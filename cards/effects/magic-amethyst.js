@@ -26,6 +26,17 @@ function _supportAbilities(engine, oi, hi) {
   try { return engine?.collectSupportZoneAbilities?.(oi, hi) || []; } catch { return []; }
 }
 
+/**
+ * „a Hero your opponent controls" = Kontrolle (`heroesControlledBy`, wie Magic Ruby/Cobalt/Arcane Lamp, W16e F02-08), nicht die Brettspalte: ein eigener, vom Gegner
+ * kontrollierter Held ist wählbar, ein vom Wirker übernommener Held der Gegnerspalte nicht. `physOwner` = Brettseite (dort liegen Ability- und Support-Zonen).
+ * Ohne Engine: die Spalte des Gegners.
+ */
+function _gegnerHelden(gs, pi, engine) {
+  const oi = opponentOfGs(gs, pi);
+  if (engine?.heroesControlledBy) return engine.heroesControlledBy(oi);
+  return (gs.players[oi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: oi, heroIdx, hero }));
+}
+
 /** True iff the opp hero at `hi` has at least 1 Ability stacked anywhere (Ability Zones oder Support Zonen). */
 function _heroHasAbilities(ps, hi, engine, oi) {
   const zones = ps.abilityZones?.[hi] || [];
@@ -97,19 +108,15 @@ module.exports = {
   cpuMeta: {
     alwaysCommit: (engine, pi) => {
       try {
-        const oppIdx = engine.opponentOf(pi);
-        const oppPs = engine.gs?.players?.[oppIdx];
-        if (!oppPs) return false;
-        for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-          const h = oppPs.heroes[hi];
+        for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(engine.gs, pi, engine)) {   // Kontrolle, nicht Spalte (F02-08)
           if (!h?.name || h.hp <= 0) continue;
-          const zones = oppPs.abilityZones?.[hi];
+          const zones = engine.gs?.players?.[physOwner]?.abilityZones?.[hi];
           if (Array.isArray(zones)) {
             for (const z of zones) {
               if (Array.isArray(z) ? z.length > 0 : !!z) return true;
             }
           }
-          if (_supportAbilities(engine, oppIdx, hi).length > 0) return true;   // N5-12
+          if (_supportAbilities(engine, physOwner, hi).length > 0) return true;   // N5-12
         }
       } catch { /* konservativ: Gate entscheidet */ }
       return false;
@@ -121,26 +128,20 @@ module.exports = {
   canActivate(gs, pi, engine) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one opp hero with at least one ability to discard.
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
-    if (!ops) return false;
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(gs, pi, engine)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (_heroHasAbilities(ops, hi, engine, oi)) return true;
+      if (_heroHasAbilities(gs.players[physOwner], hi, engine, physOwner)) return true;
     }
     return false;
   },
 
+  // W16e-Linie (F02-08): „a Hero your opponent controls" = Kontrolle; die Ziel-IDs tragen die Brettseite des Helden.
   getValidTargets(gs, pi, engine) {
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
     const out = [];
-    for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(gs, pi, engine)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (!_heroHasAbilities(ops, hi, engine, oi)) continue;
-      out.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
+      if (!_heroHasAbilities(gs.players[physOwner], hi, engine, physOwner)) continue;
+      out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
     return out;
   },
@@ -159,16 +160,17 @@ module.exports = {
     const id = (selectedIds || [])[0] || '';
     const m = id.match(/^hero-(\d+)-(\d+)$/);
     if (!m) return { keepInHand: false };
-    const oi = parseInt(m[1]);
+    const seite = parseInt(m[1]);   // Brettseite des Helden (dort liegen Ability- und Support-Zonen)
     const hi = parseInt(m[2]);
+    const ops = engine.gs.players[seite];
+    const zielHeld = ops?.heroes?.[hi];
+    if (!zielHeld?.name) return { keepInHand: false };
+    const oi = engine.heroSideOf(seite, zielHeld);   // Kontrolleur des Helden: er wählt die Ability (F02-08, Kontrolle statt Spalte)
     if (oi === pi) return { keepInHand: false };
-
-    const ops = engine.gs.players[oi];
-    if (!ops) return { keepInHand: false };
 
     // Re-build the gallery at resolve time — the board state may have
     // shifted between target pick and resolve (rare via reactions).
-    const gallery = _buildAbilityGallery(ops, hi, engine, oi);
+    const gallery = _buildAbilityGallery(ops, hi, engine, seite);
     if (gallery.length === 0) {
       // No abilities left → silent fizzle on the main effect.
       return await maybeKeepGemInHand(engine, pi, CARD_NAME);
@@ -205,7 +207,7 @@ module.exports = {
       if (sInst && sInst.zone === 'support') {
         await engine.sendBoardCardToDiscard(sInst, { source: { name: CARD_NAME, owner: pi } });
         engine.log('magic_amethyst_discard', {
-          player: ops.username, ability: entry.realName, hero: ops.heroes[hi]?.name,
+          player: engine.gs.players[oi]?.username, ability: entry.realName, hero: ops.heroes[hi]?.name,
         });
         engine.sync();
       }
@@ -224,7 +226,7 @@ module.exports = {
         // tracking stays consistent.
         slotArr.pop();
         const inst = engine.cardInstances.find(c =>
-          c.zone === 'ability' && c.owner === oi && c.heroIdx === hi
+          c.zone === 'ability' && c.owner === seite && c.heroIdx === hi
           && c.zoneSlot === chosenSlot && c.name === chosen
         );
         if (inst) {
@@ -232,7 +234,7 @@ module.exports = {
           // cleanup (like Fighting's atkGranted revoke) runs.
           await engine.runHooks('onCardLeaveZone', {
             _onlyCard: inst, leavingCard: inst, fromZone: 'ability',
-            fromOwner: oi, fromHeroIdx: hi, fromZoneSlot: chosenSlot,
+            fromOwner: seite, fromHeroIdx: hi, fromZoneSlot: chosenSlot,
             toZone: 'discard', _skipReactionCheck: true,
           });
           engine._untrackCard(inst.id);
@@ -243,7 +245,7 @@ module.exports = {
           _skipReactionCheck: true,
         });
         engine.log('magic_amethyst_discard', {
-          player: ops.username, ability: chosen, hero: ops.heroes[hi]?.name,
+          player: engine.gs.players[oi]?.username, ability: chosen, hero: ops.heroes[hi]?.name,
         });
         engine.sync();
       }
