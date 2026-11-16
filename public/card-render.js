@@ -936,7 +936,7 @@
       type,
       rarity: rarityBase(over.rarity),
       noStamp: !!over.noStamp,   // ohne Seltenheits-Stempel (die Rarity-Ebene malt ihn selbst, siehe stampSprite)
-      name: (over.name != null ? over.name : (c.displayName || c.name)).replace(/\s*\[(?:B|W)\]$/, ''),
+      name: (over.name != null ? ((window.PP_I18N && window.PP_I18N.names && window.PP_I18N.names[over.name]) || over.name) : (c.displayName || c.name)).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
       glue: Array.isArray(meta.glue) ? meta.glue : null,   // Wendungen, die im Umbruch zusammenbleiben („Support Spell“ -> [Symbol] Spell in einer Zeile)

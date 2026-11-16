@@ -42,7 +42,16 @@ function strs(n, kind, cb) {   // alle String-Zweige eines Ausdrucks (Bedingunge
     case 'TemplateLiteral': cb(tpl(n), n); break;
     case 'ConditionalExpression': strs(n.consequent, kind, cb); strs(n.alternate, kind, cb); break;
     case 'LogicalExpression': strs(n.left, kind, cb); strs(n.right, kind, cb); break;
-    case 'BinaryExpression': if (n.operator === '+') { strs(n.left, kind, cb); strs(n.right, kind, cb); } break;
+    case 'BinaryExpression':
+      if (n.operator === '+') {
+        // "a " + x + " b" -> "a {0} b" (ganzer Text; Teilstuecke allein ergaeben im Deutschen keine Saetze)
+        const parts = []; (function flat(m) { if (m.type === 'BinaryExpression' && m.operator === '+') { flat(m.left); flat(m.right); } else parts.push(m); })(n);
+        const lit = m => m.type === 'StringLiteral' || m.type === 'TemplateLiteral';
+        if (parts.some(lit) && parts.some(m => !lit(m))) {
+          let t = '', i = 0; for (const m of parts) { if (m.type === 'StringLiteral') t += m.value; else if (m.type === 'TemplateLiteral') t += tpl(m).replace(/\{(\d+)\}/g, () => '{' + (i++) + '}'); else t += '{' + (i++) + '}'; }
+          cb(t, n);
+        } else { strs(n.left, kind, cb); strs(n.right, kind, cb); }
+      } break;
     case 'ParenthesizedExpression': strs(n.expression, kind, cb); break;
   }
 }
@@ -65,6 +74,9 @@ Babel.transform(src, { presets: ['react'], plugins: [() => ({ visitor: {
   CallExpression(p) {
     const c = p.node.callee, nm = c.type === 'Identifier' ? c.name : (c.type === 'MemberExpression' && c.property.name);
     if (CALLS.has(nm)) p.node.arguments.forEach(a => strs(a, 'call', (s, n) => add(s, n, 'call:' + nm)));
+  },
+  ArrayExpression(p) {   // Listen von Saetzen (Sprechzeilen, Hinweise): mindestens 3 Woerter
+    p.node.elements.forEach(e => { if (e && e.type === 'StringLiteral' && /\S+\s+\S+\s+\S+/.test(e.value) && /[A-Za-z]{3}/.test(e.value) && !/[;{}<>]|px\b|\.png/.test(e.value)) add(e.value, e, 'array'); });
   },
   ObjectProperty(p) {
     const k = p.node.key.name || p.node.key.value;

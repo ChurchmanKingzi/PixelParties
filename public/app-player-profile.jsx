@@ -71,7 +71,7 @@ function ppfRateTone(pct) {
 }
 function ppfMemberSince(ts) {
   if (!ts) return null;
-  try { return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); } catch { return null; }
+  try { return new Date(ts * 1000).toLocaleDateString(window.ppLocale ? window.ppLocale() : 'en-US', { month: 'short', year: 'numeric' }); } catch { return null; }
 }
 
 // ── Host ───────────────────────────────────────────────────────

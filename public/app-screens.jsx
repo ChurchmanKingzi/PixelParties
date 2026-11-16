@@ -2872,7 +2872,7 @@ function ProfileScreen() {
   const losses = user.losses || 0;
   const gamesPlayed = wins + losses;
   const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
-  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—';
+  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString(window.ppLocale ? window.ppLocale() : 'en-US', { year: 'numeric', month: 'short' }) : '—';
 
   // Next rank progress
   const nextRank = RANK_TIERS.find(r => r.min > (user.elo || 1000));

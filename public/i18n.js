@@ -54,8 +54,9 @@
       const parts = k.split(/\{\d+\}/);
       const re = new RegExp('^' + parts.map(esc).join('([\\s\\S]*?)') + '$');
       const head = (parts[0] || '*').charAt(0);
-      (tplByHead[head] = tplByHead[head] || []).push({ re, to: P.ui[k] });
+      (tplByHead[head] = tplByHead[head] || []).push({ re, to: P.ui[k], len: parts.join('').length });
     }
+    for (const h in tplByHead) tplByHead[h].sort((a, b) => b.len - a.len);   // spezifischere (laengere) Vorlagen zuerst
   };
   // Platzhalter einsetzen: {k} = Wert (Namen/Begriffe werden mituebersetzt), {k:suffix} = Plural-Endung: suffix nur, wenn der englische Wert ein Plural-s ist
   const PLURAL = { s: 1, es: 1, ies: 1 };
@@ -71,11 +72,15 @@
     if (r == null && P.names[t]) r = P.names[t];
     if (r == null) {
       if (!tplByHead) buildTemplates();
-      const cand = (tplByHead[t.charAt(0)] || []).concat(tplByHead['*'] || []);
+      const cand = (tplByHead[t.charAt(0)] || []).concat(tplByHead['*'] || []).sort((a, b) => b.len - a.len);
       for (const c of cand) {
         const m = c.re.exec(t);
         if (m) { r = fill(c.to, (i) => m[+i + 1]); break; }
       }
+    }
+    if (r == null) {   // dekorierter Text ("📋 Name ★", "→ Name"): Kern nachschlagen, Rand (Symbole/Leerzeichen) behalten
+      const m = /^([^A-Za-z]*)(.*?)([^A-Za-z]*)$/.exec(t);
+      if (m && m[2] && m[2] !== t && m[2].length >= 3) { const core = lookup(m[2]); if (core !== m[2]) r = m[1] + core + m[3]; }
     }
     if (cache.size > 5000) cache.clear();
     cache.set(t, r == null ? t : r);
@@ -138,16 +143,20 @@
     if (!document.body) { document.addEventListener('DOMContentLoaded', P.startDom, { once: true }); return; }
     try { const tt = document.title, de = lookup(tt); if (de !== tt) document.title = de; } catch (e) { /* ohne Titel */ }
     walk(document.body);
+    P.stat = { calls: 0, ms: 0, mut: 0, max: 0 };   // Eigenmessung des Uebersetzers (Leistungstest): window.PP_I18N.stat
     new MutationObserver((muts) => {
+      const t0 = performance.now();
       for (const m of muts) {
         if (m.type === 'childList') m.addedNodes.forEach(walk);
         else if (m.type === 'characterData') textNode(m.target);
         else if (m.type === 'attributes') attrs(m.target);
       }
+      const dt = performance.now() - t0; P.stat.calls++; P.stat.mut += muts.length; P.stat.ms += dt; if (dt > P.stat.max) P.stat.max = dt;
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
   };
   window.PP_I18N = P;
   window.ppT = P.t;
+  window.ppLocale = () => (lang === 'de' ? 'de-DE' : 'en-US');
   window.ppTrans = P.trans;
   window.ppTx = P.tx;
   document.documentElement.lang = lang;
