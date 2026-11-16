@@ -18,10 +18,19 @@
 //  ★ Spielgestalter-Entscheidung 16.11.2026 („destroyed zählt als defeated"): auch ein Tod durch eine ZERSTÖRUNG löst das Elixir aus
 //  (Plant Golems Aufräum-Effekt, Zerstör-/Defeat-Effekte, `actionDestroyCard`) — nicht nur der Schadenstod. Helden fielen schon immer über
 //  `onHeroKO` (jeder Heldentod, auch `actionDefeatHero`); Kreaturen kommen ZUSÄTZLICH über `onCreatureDeath` (nur Nicht-Schadens-Tode:
-//  der Schadenstod bleibt bei `afterCreatureDamageBatch`; ein Opfer als Kosten zählt wie bei Extra Life nicht als „defeated").
+//  der Schadenstod bleibt bei `afterCreatureDamageBatch`).
 //  Eine NICHT LEBENSFÄHIGE Kreatur löst das Elixir nie aus und verbraucht es nicht (`kreaturLebensfaehig`, EINE Prüfung für beide Wege): ohne
 //  Landeplatz (kein lebender Wirtshelden / keine freie oder erlaubte Zone — EOI-03), wenn die Karte nicht mehr in ihrem Stapel liegt (schon
 //  anders zurückgeholt) und für eine an ihren Helden gebundene Kreatur (`sharesHpWithHero`: Bonded Companion) bei totem Helden.
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („Opfer löst das Elixir aus"): wird eine Kreatur, die der Spieler kontrolliert, GEOPFERT (als Kosten oder als
+//  Effekt: `resolveSacrificeCost`, `opfereKreatur`, die Tausch-Wege Suspicious Monster / Guardian of Teocuilatl, Selbstopfer wie Loyal Rottweiler,
+//  Occultism, Brackle …), gilt sie als besiegt — das Elixir belebt sie wie bei jedem anderen Tod (halbe Max-HP, aufgerundet). Der Tod wird nur
+//  VORGEMERKT (`onCreatureDeath`); aufgelöst wird erst am nächsten Haltepunkt (`onAnyActionResolved`, `afterSpellResolved`, `afterCreatureEffect` …),
+//  also NACHDEM die Kosten bezahlt sind und der Effekt der Karte gelaufen ist. Mehrere zugleich Geopferte: EINE Kreatur kehrt zurück (Galerie-Wahl).
+//  Ein von Barrier of Undying gerettetes Opfer stirbt nie (kein Todes-Hook) und löst nichts aus; die Lebensfähigkeitsprüfung unten gilt unverändert
+//  (Bonded Companion bei totem Helden, fehlender Landeplatz, Karte nicht mehr im Stapel: kein Auslösen, Elixir bleibt liegen). Der frühere
+//  Ausschluss („ein Opfer ist kein defeated", Auslegung nach Extra Life, W16d) gilt nur noch für Extra Life, nicht mehr für das Elixir.
 //
 //  Death collection: onHeroKO collects dead heroes
 //  without immediately reviving. The actual revive
@@ -285,10 +294,16 @@ module.exports = {
       if (!perm || perm._triggered) return;
       // Die sterbende Instanz steht während des Hooks noch auf dem Brett (`actionMoveCard`: Hooks zwischen Splice und Zonenwechsel).
       const inst = engine.cardInstances.find(c => c.id === ctx.creature?.instId);
-      if (!inst || inst.zone !== 'support') return;
+      if (!inst) return;
+      let ansicht = inst;
+      if (inst.zone !== 'support') {
+        // Spielgestalter-Entscheidung 16.11.2026 (Opfer löst das Elixir aus): die handgebauten Tausch-Wege (Suspicious Monster, Guardian of Teocuilatl) schieben
+        // den Geopferten VOR dem Todes-Hook in die Ablage (`zone` 'discard', Platz nur noch in `ctx.creature`) — Opfer-Stempel (`onCreatureSacrificed`) vorausgesetzt.
+        if (!(inst.zone === 'discard' && inst.counters?._sacrificedTurn === engine.gs.turn && ctx.creature?.heroIdx >= 0)) return;
+        ansicht = Object.assign(Object.create(inst), { heroIdx: ctx.creature.heroIdx, zoneSlot: ctx.creature.zoneSlot });
+      }
       if ((inst.controller ?? inst.owner) !== pi) return;                      // nur der aktuelle Kontrolleur
-      if (inst.counters?._sacrificedTurn === engine.gs.turn) return;           // ein Opfer (Kosten) ist kein „defeated" (wie Extra Life, W16d)
-      sammleKreatur(engine, pi, perm, inst);
+      sammleKreatur(engine, pi, perm, ansicht);
     },
 
     /** After all status damage: resolve pending hero deaths from burn/poison. */
@@ -314,6 +329,14 @@ module.exports = {
      * Beschwoerungen, Ability- und Artefakt-Aktivierungen, Traenke).
      */
     onAnyActionResolved: async (ctx) => {
+      await loeseAusstehende(ctx);
+    },
+
+    /**
+     * Spielgestalter-Entscheidung 16.11.2026 (Opfer löst das Elixir aus): eine FREIE Ability-Aktivierung (Occultism: Kreatur opfern → Schaden) kennt kein
+     * `onAnyActionResolved`; `onActiveEffectUsed` meldet sie NACH ihrem Effekt — so kehrt das Opfer gleich danach zurück statt erst beim nächsten Haltepunkt.
+     */
+    onActiveEffectUsed: async (ctx) => {
       await loeseAusstehende(ctx);
     },
 
