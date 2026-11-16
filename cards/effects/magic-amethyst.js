@@ -166,9 +166,11 @@ module.exports = {
     const hi = parseInt(m[2]);
     const ops = engine.gs.players[seite];
     const zielHeld = ops?.heroes?.[hi];
-    if (!zielHeld?.name) return { keepInHand: false };
+    // Fizzle (CARD_API Z7b): ist das Ziel beim Auflösen kein Gegnerheld mehr, war die Karte trotzdem gespielt — Einmal-Stempel und Behalten-Angebot
+    // wie beim Verpuffen ohne Abilities (unten); nur der Abbruch durch den Spieler stempelt nie.
+    if (!zielHeld?.name) return await maybeKeepGemInHand(engine, pi, CARD_NAME);
     const oi = engine.heroSideOf(seite, zielHeld);   // Kontrolleur des Helden: er wählt die Ability (F02-08, Kontrolle statt Spalte)
-    if (oi === pi) return { keepInHand: false };
+    if (oi === pi) return await maybeKeepGemInHand(engine, pi, CARD_NAME);
 
     // Re-build the gallery at resolve time — the board state may have
     // shifted between target pick and resolve (rare via reactions).

@@ -74,7 +74,9 @@ module.exports = {
     const tpi = parseInt(m[1]);
     const hi = parseInt(m[2]);
     const ziel = engine.gs.players[tpi]?.heroes?.[hi];
-    if (!ziel?.name || engine.heroSideOf(tpi, ziel) === pi) return { keepInHand: false }; // must be opponent (Kontrolle, W16e)
+    // Fizzle (CARD_API Z7b): ist das Ziel beim Auflösen kein Gegnerheld mehr (Kontrolle gewechselt), war die Karte trotzdem gespielt — Einmal-Stempel und Behalten-Angebot
+    // wie bei jedem anderen Verpuffen; nur der Abbruch durch den Spieler stempelt nie.
+    if (!ziel?.name || engine.heroSideOf(tpi, ziel) === pi) return await maybeKeepGemInHand(engine, pi, CARD_NAME); // must be opponent (Kontrolle, W16e)
 
     await engine.addHeroStatus(tpi, hi, 'stunned', {
       duration: STUN_DURATION,
