@@ -56,6 +56,7 @@
         CardRender.loadMeta('/data/card-render.json'),
         CardRender.loadArtIndex(),
       ]);
+      if (window.PP_I18N && window.PP_I18N.get() !== 'en') { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }   // Sprache: eigene Kartenkopie uebersetzen (Name/Effekt/Boni)
       await CardRender.openCache(version);     // ohne Version oder ohne IndexedDB: false, dann wird wie bisher jedes Mal gezeichnet
       cardsByName = Object.create(null);
       cardByStem = Object.create(null);
