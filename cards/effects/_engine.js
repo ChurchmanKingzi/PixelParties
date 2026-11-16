@@ -3830,6 +3830,10 @@ class GameEngine {
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
                  && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
+            // Gegenstück zum Anlegen: Skript-Flag `bypassStatusFilterOnPlay` - die Vergabe eines Stempel-Bonus (Fighting-ATK) beim Anlegen der EIGENEN Karte
+            // läuft in jedem Heldenzustand (sonst blieb der Bonus an einem gefrorenen/betäubten/negierten Träger dauerhaft aus, auch nach dem Auftauen).
+            && !(hookName === 'onPlay' && (hookCtx.playedCard || hookCtx._onlyCard)?.id === c.id
+                 && loadCardEffect(c.name)?.bypassStatusFilterOnPlay)
             && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
@@ -12133,6 +12137,13 @@ class GameEngine {
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
       hero.maxHpCapped = opts.maxHpCap;
+      // ★ Die max HP sind jetzt ein FESTER Wert der Karte (Divine Gift of Death/Equality, Paraseed Control, Resuscitation Potion): was Toughness vorher
+      // aufgeschlagen hatte (`counters.hpGranted`), steckt nicht mehr darin. Der gemerkte Bonus wuerde beim Abgang einer Kopie sonst von den NEUEN max HP
+      // abgezogen — der Held fiel auf 1/1 statt auf seinen festen Wert zu bleiben. Neu angelegte Kopien bringen unter der Obergrenze ohnehin nichts mehr.
+      for (const c of this.cardInstances) {
+        if ((c.counters?.hpGranted || 0) > 0 && c.owner === playerIdx && c.heroIdx === heroIdx
+            && (c.zone === ZONES.ABILITY || this.istAbilityImSupport(c))) c.counters.hpGranted = 0;
+      }
     }
     if (opts.forceKillAtTurnEnd) {
       hero._forceKillAtTurnEnd = this.gs.turn;
@@ -52499,6 +52510,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Specific cards that legitimately install Divinity (etc.) pass
     // `opts.allowRestricted: true` to bypass.
     if (script?.restrictedAttachment && !opts.allowRestricted) return { success: false };
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return { success: false };   // Smugness: nur an einen Ascended Hero (s. `canAttachAbilityToHero`)
     // ★★ v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame
     // Guillotine) — vorher eine eigene Kopie der Schleife.
     // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — hoechstens EIN Stapel je Ability ueber beide Zonenarten.
@@ -54974,6 +54986,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Starting abilities are placed at game start via _trackCard
     // directly and bypass this check entirely.
     if (script?.restrictedAttachment && !opts.allowRestricted) return false;
+    // ★ „You can only attach this Ability to an Ascended Hero" (Smugness) gilt fuer JEDES Anlegen, auch per Effekt (Training, Pressed Skill, Wise Village Elder …).
+    // Der Hand-Weg (`doPlayAbility` in server.js) prueft es selbst und geht nicht hierueber — er bleibt unveraendert.
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
 
     // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`); 24.10.: auch Support Zonen (`abilityZielOrt`).
     void abZones;

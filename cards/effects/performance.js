@@ -132,6 +132,21 @@ module.exports = {
       }
     },
 
+    /**
+     * Rundeneinkommen: Performance auf Wealth ist eine Kopie und bringt ihre +4 Gold wie jede andere Kopie (Wealth zaehlt seine
+     * Stufen ueber je EINEN `onResourceGain`-Hook je Kopie — die Performance-Instanz trug den Hook nicht, Stufe 2/3 blieb auf
+     * Stufe 1/2). Delegiert an den Hook der kopierten Ability, falls sie einen hat (sonst nichts).
+     */
+    onResourceGain: async (ctx) => {
+      const stapel = ctx._engine.abilityStapelVon(ctx.card);
+      const basis = stapel.find(n => n !== 'Performance');
+      if (!basis) return;
+      const baseScript = loadCardEffect(basis);
+      if (baseScript?.hooks?.onResourceGain) {
+        await baseScript.hooks.onResourceGain(ctx);
+      }
+    },
+
     onCardLeaveZone: async (ctx) => {
       // Only react when an ability card leaves (not creatures dying in support zones)
       if (ctx.fromZone !== 'ability') return;

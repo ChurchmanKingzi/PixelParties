@@ -117,6 +117,11 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel, feld = pi) {
     // sacrifice path) to apply the STRICT per-Hero rule here, since
     // Necromancy bypasses beforeSummon entirely.
     if (!engine.isCreatureSummonable(cardName, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi })) continue;
+    // Die Aktivierung IST eine Beschwoerung: Beschwoerungssperren des Spielers (`summonLocked` — Shadowy Slime: „you cannot summon any more Creatures for
+    // the rest of the turn", Tamed Primordium, Infected Squirrel …; Greatmaw-Remora-Teilsperre, Grinning Cat) gelten auch hier (CARD_API „Sperren auf
+    // Nebenwegen": `getSummonBlockedFor`). Ohne Kandidat ist die Ability grau (`canFreeActivate`) und die Aktivierung wird verweigert. Kein Skript-Flag
+    // `blockedBySummonLock`: der Client graut damit auch die Ability-KARTE auf der Hand aus, obwohl das Anlegen erlaubt bleibt.
+    if (engine.getSummonBlockedFor(pi, cardName)) continue;
     seen.add(cardName);
     result.push({ name: cardName, source: 'discard' });
   }
