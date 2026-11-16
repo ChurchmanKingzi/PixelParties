@@ -7,6 +7,10 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // „Choose a target" — Einzelziel-Attack: ein geblendeter Held (Smoke Vial / Trunk Sand, `blocksTargeting`) darf sie nicht spielen. Die Blendungs-Sperre
+  // der Engine liest genau dieses Kennzeichen; ohne es blieb Heavy Hit unter „Blinded" spielbar.
+  requiresTarget: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
