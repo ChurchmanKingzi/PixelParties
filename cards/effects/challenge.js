@@ -53,9 +53,9 @@ function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
     // Must NOT be the already-selected target
     if (selected.type === 'hero' && selected.owner === seite && selected.heroIdx === hi) continue;
 
-    // Must be a valid target for the original effect
+    // Must be a valid target for the original effect — ausgegraute Ziele (`ineligible`, z. B. Overheat: nur Artefakte waehlbar) sind nie Umleitungsziel (CARD_API: zaehlen nicht als Ausweichziel)
     const isValidTarget = validTargets.some(t =>
-      t.type === 'hero' && t.owner === seite && t.heroIdx === hi
+      t.type === 'hero' && t.owner === seite && t.heroIdx === hi && !t.ineligible
     );
     if (!isValidTarget) continue;
 
