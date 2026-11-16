@@ -105,7 +105,8 @@ module.exports = {
       if (exclude < 0) return undefined;
       const out = [];
       for (let i = 0; i < ps.hand.length; i++) if (i !== exclude) out.push(i);
-      return out.length > 0 ? out : undefined;
+      // Keine andere Handkarte: LEERE Auswahl (der Helfer bricht dann ohne Abfrage ab) — nicht `undefined`, das hieße „alles wählbar" und ließe Wheels sich selbst ablegen/löschen.
+      return out;
     };
 
     if (choice.optionId === 'draw3') {
