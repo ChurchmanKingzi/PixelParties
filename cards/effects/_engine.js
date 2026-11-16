@@ -34626,7 +34626,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _umgebung = _ersatzErlaubt ? (_spQ || this._umgebungsQuelle(playerIdx, config)) : null;
     const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
-      const quelle = _ausdruecklich || _ersatzQuelle || null;
+      let quelle = _ausdruecklich || _ersatzQuelle || null;
+      // Viele Skripte nennen die Quelle nur als NAMEN (`source: CARD_NAME` — Voodoo Curse, Exorcism, Midnight Assault, Ricochet, Tail Slap …). Die Hand-Reaktionen lesen aber `sourceCard.owner/.name`
+      // (Anti Magic Shield: `postTargetCondition`): mit einem blossen String war die Quelle fuer sie „kein Besitzer, keine Karte" und das Fenster nie offen. Wie das Umleitungsfenster darunter
+      // (`_redirectSourceFor`) bekommt der Hub eine Quelle MIT Besitzer: die gerade wirkende Karte, wenn sie so heisst (Instanz mit Wirker-Held), sonst ein Namensobjekt des Waehlenden.
+      const _quelleWarName = typeof quelle === 'string';
+      if (_quelleWarName) {
+        const _wirkend = this._umgebungsQuelle(playerIdx, config);
+        quelle = (_wirkend && _wirkend.name === quelle)
+          ? _wirkend
+          : { ...this._redirectSourceFor(playerIdx, { source: quelle }), ...(config.chooserHeroIdx != null ? { heroIdx: config.chooserHeroIdx } : {}) };
+      }
       const ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id));
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
@@ -34639,7 +34649,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
-        if (_ersatzQuelle) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
+        if (_ersatzQuelle || _quelleWarName) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
         this._inPostTargetWindow = true;
         try {
           const pt = await this._checkPostTargetHandReactions(helden.concat(kreaturen), quelle, {
@@ -34647,6 +34657,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             dealsDamage: config.dealsDamage === true,
             heroChoiceIsCost: config.heroChoiceIsCost === true,
             ausZielwahl: true,
+            cannotBeNegated: config.cannotBeNegated === true,   // Exorcism mit Decay Magic 2: Reaktionen, die die ganze Karte negieren, werden gar nicht erst angeboten
           });
           if (pt?.effectNegated) {
             // Negation ≠ Abbruch (wie in `promptDamageTarget`/`promptMultiTarget`): der Zauber ist gespielt und geht in die Ablage — ohne die Marke wertete `doPlaySpell` die
@@ -43625,6 +43636,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
+        if (opts.cannotBeNegated && script.negatesWholeCard) continue;   // „cannot be negated" (`config.cannotBeNegated` der Zielwahl): kein Angebot fuer ganz negierende Reaktionen
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
         // Kreatur-Reaktionen die gewaehlten Kreaturen.
         targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
