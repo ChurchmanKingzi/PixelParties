@@ -18,6 +18,9 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.BEFORE_DRAW_BATCH, HOOKS.ON_CARD_ADDED_TO_HAND,
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
+// Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Haltepunkte, an denen zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger aufgelöst werden
+// (dieselben wie beim Elixir of Immortality; siehe `_loeseOpferWiederbelebungen`).
+const OPFER_REVIVE_HALTEPUNKTE = new Set(['afterAllStatusDamage', 'afterSpellResolved', 'afterCreatureEffect', 'onAnyActionResolved', 'onActiveEffectUsed', 'onPhaseEnd']);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
 const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
@@ -3237,6 +3240,13 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger kehren an den Haltepunkten
+    // zurück, nachdem der Effekt der Karte gelaufen ist, die das Opfer verlangte (`_loeseOpferWiederbelebungen`) — vor den Zuhörern, damit z. B. ein Elixir of Immortality sie nicht
+    // zusätzlich belebt. Ein freier Ability-Effekt meldet sich nur auf oberster Ebene (nicht mitten in einem Zauber / Flächentreffer), wie beim Elixir.
+    if (this.gs?._opferRevives?.length && !this._opferReviveLaeuft && OPFER_REVIVE_HALTEPUNKTE.has(hookName)
+        && !(hookName === HOOKS.ON_ACTIVE_EFFECT_USED && ((this.gs._spellResolutionDepth || 0) > 0 || this._multiHitScope))) {
+      try { await this._loeseOpferWiederbelebungen(); } catch (err) { console.error('[Engine] Opfer-Wiederbelebung:', err.message); }
+    }
     // ★ 12.11. (Al: „Reaktionen, z. B. Quetzahuitl, sollen unbedingt auch aus der Crestina-Zone feuern“): Fällt Crestina SELBST (typisch: als letzter Held — genau dann zieht
     // Quetzahuitl ein), laufen die Todes-Reaktionen ihrer Vorratskarten noch im Augenblick ihres Falls. Ohne diese Marke gälte der Vorrat schon als nicht nutzbar (Crestina tot,
     // `isCreationZoneUsable`) und die Karte feuerte nie. Die Marke gilt nur für die Dauer dieser Meldung (`_heldImKO`).
@@ -14988,9 +14998,14 @@ class GameEngine {
       }
     }
     // W16d (A08-07): Extra Life (Trial of Coolness) greift bei JEDEM „defeat" einer Kreatur, nicht nur beim Schadenstod:
-    // gleiche Stempelung wie im Schadens-Batch, die Wiederbelebung löst `actionMoveCard` ein. Ein Opfer ist kein „defeat"
-    // (sonst wären Opferkosten umsonst) und bleibt außen vor.
-    if (isCreatureTarget && !opts.isSacrifice && targetCard.counters?._extraLife && !targetCard._reviveAfterDeath) {
+    // gleiche Stempelung wie im Schadens-Batch, die Wiederbelebung löst `actionMoveCard` ein.
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): auch ein OPFER (Kosten oder Effekt, mit oder ohne `opts.isSacrifice` —
+    // die handgebauten Opferwege Garius, Trex, Rottweiler … stempeln `_sacrificedTurn` über `onCreatureSacrificed`) löst Extra Life aus. Das Opfer
+    // ist bezahlt, der Effekt der Karte läuft weiter: die Wiederbelebung wird bei einem Opfer erst NACH dem Effekt aufgelöst (`nachEffekt`,
+    // `_loeseOpferWiederbelebungen` an den Haltepunkten) — „place it into the same Support Zone" (Garius, Rottweiler …) braucht den Platz noch — und
+    // weicht dann bei besetztem Platz auf eine andere freie Zone aus (`ausweichen`).
+    if (isCreatureTarget && targetCard.counters?._extraLife && !targetCard._reviveAfterDeath) {
+      const _opferTod = !!opts.isSacrifice || targetCard.counters?._sacrificedTurn === this.gs.turn;
       const lifeMark = this._popExtraLife(targetCard.counters);
       targetCard._reviveAfterDeath = {
         name: targetCard.name,
@@ -15001,6 +15016,7 @@ class GameEngine {
         by: lifeMark?.by || 'Extra Life',
         fireHooks: true,
         bypassSummoningSickness: true,
+        ...(_opferTod ? { nachEffekt: true, ausweichen: true, instId: targetCard.id } : {}),
       };
       this.log('extra_life_creature_revive', { creature: targetCard.name, by: lifeMark?.by || 'Extra Life' });
     }
@@ -16858,8 +16874,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (fromZone === ZONES.SUPPORT && cardInstance._reviveAfterDeath && toZone === ZONES.DISCARD) {
       const _rev = cardInstance._reviveAfterDeath;
       delete cardInstance._reviveAfterDeath;
+      if (_rev.nachEffekt) {
+        // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): ein geopferter Träger von Extra Life kehrt erst NACH dem Effekt zurück, der das Opfer
+        // verlangte (Haltepunkte: `_loeseOpferWiederbelebungen`). Bis dahin liegt die Karte in der Ablage (Ablage-Instanz bleibt getrackt).
+        (this.gs._opferRevives || (this.gs._opferRevives = [])).push(_rev);
+      }
       // Wiederbelebt → die Ablage-Instanz dieser Karte ist verbraucht.
-      if (await this._wiederbelebungNachTod(_rev)) this._untrackCard(cardInstance.id);
+      else if (await this._wiederbelebungNachTod(_rev)) this._untrackCard(cardInstance.id);
     }
     if (_sofortWiederbelebt) this._untrackCard(cardInstance.id);   // Welle 10 (Q38): die Ablage-Instanz ist verbraucht
 
@@ -28912,6 +28933,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           reason: String(err.message || '').slice(0, 240),
         });
       }
+      // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): ein Opfer im Zugende-Trigger (Pharaoh) lässt seinen Extra-Life-Träger gleich zurückkehren.
+      try { await this._loeseOpferWiederbelebungen(); } catch (err) { console.error('[Engine] Opfer-Wiederbelebung am Zugende:', err.message); }
       // ★ W66a: SPIELERgebundene Zugende-Aufträge (Hand of Death: „at the end of your opponent's next turn … defeat it") laufen in einem EIGENEN Fangnetz —
       // ein abgebrochener ON_TURN_END (Hook-Obergrenze, Kartenfehler eines anderen Zugende-Lauschers) darf sie nicht verschlucken; sie hängen an
       // `ps._handOfDeathArmed`, nicht an einer Karteninstanz (Ablage, Hand, Fantasy Buddy Token …). Welle 14 (Q171) hatte den Nachhol-Weg, W66a macht ihn zum einzigen.
@@ -32780,6 +32803,57 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   liegen — dann FIZZELT der zugehoerige Effekt (Als Ruling 23.9.).
    */
   /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life für handgebaute Opferwege, die den Geopferten selbst in die Ablage schieben und nicht über
+   * `actionDestroyCard` laufen (Tausch-Kreaturen: Suspicious Monster, Guardian of Teocuilatl & Co.). Aufruf NACH dem Ablegen, VOR `_untrackCard`; `platz` = Heldenindex und Zone,
+   * in der der Geopferte stand (die Instanz trägt sie dann nicht mehr). Die Rückkehr läuft wie bei jedem Opfer (`_loeseOpferWiederbelebungen`): erst nach dem Tausch, bei besetztem Platz in einer
+   * anderen freien Zone, ohne freie Zone gar nicht. @returns {boolean} true, wenn ein Extra Life vorgemerkt wurde.
+   */
+  opferExtraLebenVormerken(inst, platz = {}) {
+    if (!inst?.counters?._extraLife || inst._reviveAfterDeath) return false;
+    const lifeMark = this._popExtraLife(inst.counters);
+    (this.gs._opferRevives || (this.gs._opferRevives = [])).push({
+      name: inst.name, owner: inst.owner, originalOwner: inst.originalOwner,
+      heroIdx: platz.heroIdx ?? inst.heroIdx, zoneSlot: platz.zoneSlot ?? inst.zoneSlot,
+      by: lifeMark?.by || 'Extra Life', fireHooks: true, bypassSummoningSickness: true,
+      nachEffekt: true, ausweichen: true, instId: inst.id,
+    });
+    this.log('extra_life_creature_revive', { creature: inst.name, by: lifeMark?.by || 'Extra Life' });
+    return true;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): löst die zurückgestellten Wiederbelebungen GEOPFERTER Extra-Life-Träger auf
+   * (`gs._opferRevives`, gefüllt in `actionMoveCard` aus `_reviveAfterDeath.nachEffekt`). Läuft an denselben Haltepunkten wie das Elixir of Immortality
+   * (`OPFER_REVIVE_HALTEPUNKTE` in `runHooks`, VOR den Zuhörern des Hooks): erst nach dem Effekt der Karte, die das Opfer verlangte. Liegt die Karte nicht mehr
+   * in ihrem Stapel (anders zurückgeholt) oder ist eine an ihren Helden gebundene Kreatur (`sharesHpWithHero`) bei totem Wirtsheld nicht lebensfähig, kehrt nichts zurück.
+   */
+  async _loeseOpferWiederbelebungen() {
+    const gs = this.gs;
+    const liste = gs._opferRevives;
+    if (!Array.isArray(liste) || liste.length === 0 || this._opferReviveLaeuft) return;
+    gs._opferRevives = [];
+    this._opferReviveLaeuft = true;
+    try {
+      for (const rev of liste) {
+        if (gs.result) break;
+        const bps = gs.players[rev.originalOwner ?? rev.owner];
+        const alt = this.cardInstances.find(c => c.id === rev.instId);
+        // Tokens liegen im Gelöscht-Stapel (`_wiederbelebungNachTod` holt sie wie bisher ohne Stapel-Eintrag zurück); jede andere Karte muss noch in der Ablage liegen.
+        if (!bps || !((bps.discardPile || []).includes(rev.name) || (alt && this.isTokenCard(alt) && (bps.deletedPile || []).includes(rev.name)))) continue;
+        if (loadCardEffect(rev.name)?.sharesHpWithHero) {
+          const wirt = gs.players[rev.owner]?.heroes?.[rev.heroIdx];
+          if (!(wirt?.name && wirt.hp > 0)) continue;
+        }
+        if (await this._wiederbelebungNachTod(rev)) {
+          if (alt && alt.zone === ZONES.DISCARD) this._untrackCard(alt.id);   // wiederbelebt → die Ablage-Instanz ist verbraucht
+        }
+      }
+    } finally {
+      this._opferReviveLaeuft = false;
+    }
+  }
+
+  /**
    * ★★ v1360 — WIEDERBELEBUNG NACH DEM TOD („_reviveAfterDeath"), an EINER
    * Stelle fuer beide Todeswege. Bisher lebte sie nur im Schadens-Batch:
    * eine ZERSTOERTE Creature (Defeat-Effekte ohne Schaden), die Cute Phoenix
@@ -32788,6 +32862,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _wiederbelebungNachTod(reviveAfterDeath) {
     if (!reviveAfterDeath) return;
+    // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): die zurückgestellte Wiederbelebung eines Opfers (Extra Life, `ausweichen`) findet ihren Platz oft
+    // belegt (der Effekt des Opfers hat ihn genommen: Garius, Rottweiler, Tausch-Kreaturen …) — dann kehrt sie in eine andere freie Zone zurück (zuerst desselben
+    // Helden), erst ohne freie Zone fizzelt sie. Plätze, die die Kreatur teilen darf (Alice), bleiben wie bisher.
+    if (reviveAfterDeath.ausweichen && this.supportSlotBelegt(reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot)
+        && !require('./_alice-shared').canShareInto(this, reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot, reviveAfterDeath.name)) {
+      const _frei = this.beschwoerZonenFuer(reviveAfterDeath.owner, reviveAfterDeath.name, { livingHeroesOnly: true })
+        .filter(z => this.isCreatureSummonable(reviveAfterDeath.name, reviveAfterDeath.owner, z.heroIdx, { _bypassBeforeSummon: true }));
+      const _z = _frei.find(z => z.heroIdx === reviveAfterDeath.heroIdx) || _frei[0];
+      if (_z) reviveAfterDeath = { ...reviveAfterDeath, heroIdx: _z.heroIdx, zoneSlot: _z.slotIdx };
+    }
     // ★ v1360 (Audit „same Support Zone"): die Wiederbelebung geht in
     // DENSELBEN Platz. Hat ein Todes-Listener ihn inzwischen gefuellt
     // (Call of the Deepsea, Grave Worm, Loyal Shepherd …), fizzelt sie
