@@ -6,7 +6,28 @@
   try { const v = localStorage.getItem('pp-lang'); if (v === 'de' || v === 'en') lang = v; } catch (e) {}
   const P = { lang, cards: {}, names: {} };
   P.get = () => lang;
-  P.set = (l) => { try { localStorage.setItem('pp-lang', l); } catch (e) {} location.reload(); };
+  // Sprache wechseln. Mit gemounteter App (window.__ppLangSwitch) ohne Neuladen: Woerterbuecher nachladen, Kartendaten und Kartenbilder
+  // in der neuen Sprache holen, App neu zeichnen, Oberflaechen-Uebersetzer an/aus. Sonst (oder bei Fehlern) Neuladen wie bisher.
+  let wechsel = Promise.resolve();
+  P.set = (l) => {
+    if (l !== 'de' && l !== 'en') return Promise.resolve();
+    try { localStorage.setItem('pp-lang', l); } catch (e) {}
+    if (!window.__ppLangSwitch || !window.PP_I18N || !window.PP_I18N.stopDom) { location.reload(); return Promise.resolve(); }
+    wechsel = wechsel.then(async () => {
+      if (l === lang) return;
+      try {
+        lang = l; P.lang = l; document.documentElement.lang = l;
+        P.stopDom();
+        cache.clear(); tplByHead = null;
+        if (l === 'en') { P.ui = {}; P.names = {}; P.cards = {}; P.archetypes = {}; P.gender = {}; P.imgs = new Set(); loading = null; }
+        else { loading = null; await P.load(); }
+        await window.__ppLangSwitch(l);                         // Kartendatenbank + Kartenbilder + App neu zeichnen
+        window.dispatchEvent(new CustomEvent('pp-lang', { detail: l }));
+        if (l === 'de') { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); P.startDom(); }
+      } catch (e) { console.warn('[i18n] sanfter Wechsel fehlgeschlagen, lade neu', e); location.reload(); }
+    });
+    return wechsel;
+  };
   P.toggle = () => P.set(lang === 'en' ? 'de' : 'en');
   // Anzeigename einer Karte (Fallback: englischer Name)
   P.ui = {}; P.imgs = new Set(); P.miss = new Set();   // Texte ohne Uebersetzung (zur Kontrolle: window.PP_I18N.miss)
@@ -118,13 +139,15 @@
   };
   const SKIP_TAG = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CANVAS: 1, NOSCRIPT: 1 };
   const skipped = (n) => { for (let e = n.nodeType === 1 ? n : n.parentNode; e && e.nodeType === 1; e = e.parentNode) { if (SKIP_TAG[e.tagName] || (e.hasAttribute && e.hasAttribute('data-i18n-skip'))) return true; } return false; };
+  const textOrig = new WeakMap(), attrOrig = new WeakMap();   // uebersetzter Knoten/Attribut -> Original (fuer den Rueckwechsel ohne Neuladen)
+  const merke = (e, a, raw, tr) => { let m = attrOrig.get(e); if (!m) attrOrig.set(e, m = {}); m[a] = { raw, tr }; };
   const textNode = (n) => {
     const raw = n.nodeValue;
     if (!raw || raw.length > 400 || !/[A-Za-z]{2}/.test(raw)) return;
     const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(raw);
     const t = m[2].replace(/\s+/g, ' ');
     const r = lookup(t);
-    if (r !== t) { if (!skipped(n)) n.nodeValue = m[1] + r + m[3]; }
+    if (r !== t) { if (!skipped(n)) { const neu = m[1] + r + m[3]; textOrig.set(n, { raw, tr: neu }); n.nodeValue = neu; } }
     else if (/[A-Za-z]{2}/.test(t) && !skipped(n)) P.miss.add(t);
   };
   const ATTRS = ['title', 'placeholder', 'alt', 'aria-label', 'src'];
@@ -132,10 +155,10 @@
   const imgSrc = (e) => {
     if (e.tagName !== 'IMG') return;
     const v = e.getAttribute('src'); const m = v && /^\/rules\/([^\/?#]+\.png)(.*)$/.exec(v);
-    if (m && P.imgs.has(m[1])) e.setAttribute('src', '/rules/de/' + m[1] + m[2]);
+    if (m && P.imgs.has(m[1])) { const neu = '/rules/de/' + m[1] + m[2]; merke(e, 'src', v, neu); e.setAttribute('src', neu); }
   };
   const attrs = (e) => {
-    imgSrc(e); for (const a of ATTRS) { if (a === 'src') continue; const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && (e.tagName === 'TEXTAREA' ? !skipped(e.parentNode) : !skipped(e))) e.setAttribute(a, r); } } };
+    imgSrc(e); for (const a of ATTRS) { if (a === 'src') continue; const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && (e.tagName === 'TEXTAREA' ? !skipped(e.parentNode) : !skipped(e))) { merke(e, a, v, r); e.setAttribute(a, r); } } } };
   const walk = (root) => {
     if (root.nodeType === 3) return textNode(root);
     if (root.nodeType !== 1 || (SKIP_TAG[root.tagName] && root.tagName !== 'TEXTAREA')) return;
@@ -144,13 +167,25 @@
     const tw = document.createTreeWalker(root, 5 /* TEXT | ELEMENT */);
     for (let n = tw.nextNode(); n; n = tw.nextNode()) { if (n.nodeType === 3) textNode(n); else if (!SKIP_TAG[n.tagName] || n.tagName === 'TEXTAREA') attrs(n); }
   };
+  let obs = null, titelEn = null;
+  // Rueckwechsel auf Englisch: Beobachter stoppen und alle uebersetzten Texte/Attribute auf ihr Original setzen (nur wenn sie noch unveraendert uebersetzt sind)
+  P.stopDom = () => {
+    if (obs) { obs.disconnect(); obs = null; }
+    if (!document.body) return;
+    if (titelEn != null) { document.title = titelEn; titelEn = null; }
+    const tw = document.createTreeWalker(document.body, 5);
+    for (let n = tw.currentNode; n; n = tw.nextNode()) {
+      if (n.nodeType === 3) { const o = textOrig.get(n); if (o && n.nodeValue === o.tr) n.nodeValue = o.raw; textOrig.delete(n); }
+      else if (n.nodeType === 1) { const m = attrOrig.get(n); if (m) { for (const a in m) { if (n.getAttribute(a) === m[a].tr) n.setAttribute(a, m[a].raw); } attrOrig.delete(n); } }
+    }
+  };
   P.startDom = () => {
     if (lang === 'en') return;
     if (!document.body) { document.addEventListener('DOMContentLoaded', P.startDom, { once: true }); return; }
-    try { const tt = document.title, de = lookup(tt); if (de !== tt) document.title = de; } catch (e) { /* ohne Titel */ }
+    try { const tt = document.title, de = lookup(tt); if (de !== tt) { titelEn = tt; document.title = de; } } catch (e) { /* ohne Titel */ }
     walk(document.body);
     P.stat = { calls: 0, ms: 0, mut: 0, max: 0 };   // Eigenmessung des Uebersetzers (Leistungstest): window.PP_I18N.stat
-    new MutationObserver((muts) => {
+    obs = new MutationObserver((muts) => {
       const t0 = performance.now();
       for (const m of muts) {
         if (m.type === 'childList') m.addedNodes.forEach(walk);

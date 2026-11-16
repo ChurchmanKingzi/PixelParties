@@ -3560,8 +3560,16 @@ function PpSeitenGrund() {
   return null;
 }
 
+// Sprachwechsel ohne Neuladen (PP_I18N.set): Kartendatenbank und Kartenbilder in der neuen Sprache holen; die App zeichnet sich danach über das Ereignis 'pp-lang' neu
+window.__ppLangSwitch = async () => {
+  if (window.loadCardDB) await window.loadCardDB();
+  if (window.__cardShimLang) await window.__cardShimLang();
+};
+
 function App() {
   const [user, setUser] = useState(null);
+  const [, setLangTick] = useState(0);
+  useEffect(() => { const h = () => setLangTick(t => t + 1); window.addEventListener('pp-lang', h); return () => window.removeEventListener('pp-lang', h); }, []);
   // Sprache des Kontos: gespeicherte Sprache uebernehmen (Neuladen); Konten ohne Eintrag bekommen die aktuelle Browsersprache
   useEffect(() => {
     if (!user || !window.PP_I18N) return;

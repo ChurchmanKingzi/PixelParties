@@ -45,6 +45,29 @@
   let failed = false;
   let cardByStem = null, skinByStem = null, cardsByName = null;
 
+  // Karten-/Skin-Zuordnung aufbauen (auch beim Sprachwechsel neu: die Kartenobjekte tragen die uebersetzten Texte)
+  async function indexCards(cards) {
+    // erst in lokalen Tabellen aufbauen und am Ende in einem Zug austauschen (laufende Auftraege sehen nie einen halben Stand)
+    const nByName = Object.create(null), nByStem = Object.create(null), nSkin = Object.create(null), nBase = Object.create(null);
+    for (const c of cards) {
+      nByName[c.name] = c;
+      // Farbvarianten „Name [B]“ / „Name [W]“ liegen als „Name.png“ / „Name.1.png“ auf der Platte
+      const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
+      nByStem[strippedKey(m ? (m[2] === 'B' ? m[1] : m[1] + '.1') : c.name)] = c.name;
+    }
+    const art = await CardRender.loadArtIndex();
+    for (const k of [...Object.keys(art.a), ...Object.keys(art.b)]) {
+      if (k.startsWith('skin/')) nSkin[strippedKey(k.slice(5))] = k.slice(5);
+    }
+    // Skin -> Basiskarte (data/skins.json: Held -> [Skins]); Held-Namen dürfen ohne Satzzeichen stehen
+    const skins = await fetch('/data/skins.json').then(r => r.json());
+    for (const [hero, list] of Object.entries(skins)) {
+      const base = nByName[hero] || nByName[nByStem[strippedKey(hero)]];
+      if (base) for (const s of list) nBase[s] = base;
+    }
+    cardsByName = nByName; cardByStem = nByStem; skinByStem = nSkin; window.__cardShimSkinBase = nBase;
+  }
+
   function boot() {
     if (ready) return ready;
     ready = (async () => {
@@ -58,26 +81,7 @@
       ]);
       if (window.PP_I18N && window.PP_I18N.get() !== 'en') { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }   // Sprache: eigene Kartenkopie uebersetzen (Name/Effekt/Boni)
       await CardRender.openCache(version);     // ohne Version oder ohne IndexedDB: false, dann wird wie bisher jedes Mal gezeichnet
-      cardsByName = Object.create(null);
-      cardByStem = Object.create(null);
-      for (const c of cards) {
-        cardsByName[c.name] = c;
-        // Farbvarianten „Name [B]“ / „Name [W]“ liegen als „Name.png“ / „Name.1.png“ auf der Platte
-        const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
-        cardByStem[strippedKey(m ? (m[2] === 'B' ? m[1] : m[1] + '.1') : c.name)] = c.name;
-      }
-      skinByStem = Object.create(null);
-      const art = await CardRender.loadArtIndex();
-      for (const k of [...Object.keys(art.a), ...Object.keys(art.b)]) {
-        if (k.startsWith('skin/')) skinByStem[strippedKey(k.slice(5))] = k.slice(5);
-      }
-      // Skin -> Basiskarte (data/skins.json: Held -> [Skins]); Held-Namen dürfen ohne Satzzeichen stehen
-      const skins = await fetch('/data/skins.json').then(r => r.json());
-      window.__cardShimSkinBase = Object.create(null);
-      for (const [hero, list] of Object.entries(skins)) {
-        const base = cardsByName[hero] || cardsByName[cardByStem[strippedKey(hero)]];
-        if (base) for (const s of list) window.__cardShimSkinBase[s] = base;
-      }
+      await indexCards(cards);
     })().catch(err => { failed = true; console.warn('[card-image-shim] Renderer nicht verfügbar, nutze PNG-Dateien:', err && err.message); });
     return ready;
   }
@@ -331,6 +335,25 @@
   IMG.removeAttribute = function (name) {
     if (String(name).toLowerCase() === 'src') { this.__cardOrig = null; this.__cardTok = (this.__cardTok || 0) + 1; }
     return nativeRemoveAttr.call(this, name);
+  };
+
+  // ── Sprachwechsel ohne Neuladen ──
+  // Kartendaten in der neuen Sprache holen, Dauer-Cache (je Sprache eine Datenbank) umstellen, alle Blob-Bilder verwerfen und jedes
+  // Kartenbild der Seite neu anfordern. Die alten Bilder bleiben stehen, bis die neuen fertig sind (gleiche Karte: kein Aufblitzen).
+  window.__cardShimLang = async function () {
+    if (!ready) return;                                   // noch nie gestartet: der erste Start liest die Sprache selbst
+    await ready;
+    const alt = [...cache.values()];
+    cache.clear(); inflight.clear(); pinned.clear(); keepPinned.clear(); fromStore.clear(); warming.clear();
+    const [cards, version] = await Promise.all([
+      fetch('/data/cards.json').then(r => r.json()),
+      fetch('/api/render-version', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.v) || null).catch(() => null),
+    ]);
+    if (window.PP_I18N && window.PP_I18N.get() !== 'en') { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }
+    await CardRender.openCache(version);
+    await indexCards(cards);
+    setTimeout(() => alt.forEach(u => URL.revokeObjectURL(u)), 10000);
+    for (const img of document.querySelectorAll('img')) if (img.__cardOrig != null) handle(img, img.__cardOrig);
   };
 
   // Per `innerHTML` / `insertAdjacentHTML` erzeugte <img> setzen ihre Quelle im HTML-Parser und umgehen die
