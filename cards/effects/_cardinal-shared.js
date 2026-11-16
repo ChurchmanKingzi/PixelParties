@@ -59,6 +59,8 @@ async function _checkCardinalWin(ctx) {
         const inst = (engine.cardInstances || []).find(c => c.zone === 'support'
           && c.name === slot[0] && c.heroIdx === hi && c.zoneSlot === zi
           && engine.physicalSide(c) === side);
+        // Eine negierte Illusion (Omikron: „its effects are negated …") zaehlt nicht als Cardinal Beast fuer den Sieg.
+        if (inst && engine.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false })) continue;
         const wer = inst ? (inst.controller ?? inst.owner) : side;
         kontrolle[wer]?.add(slot[0]);
       }

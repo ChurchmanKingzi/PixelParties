@@ -143,6 +143,7 @@ module.exports = {
       fristBeginn:      true,   // W68a: „until the start of your next turn"
       buffKey:          'omikron_negated',
       selfInflicted:    true,
+      alsPlatzierung:   true,   // gilt auch fuer ein Cardinal Beast („unaffected by all cards and effects"): die Illusion steht negiert da, ihre Immunitaet ist ein negierter Effekt
     });
 
     // Track summon count

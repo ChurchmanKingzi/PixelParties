@@ -21702,14 +21702,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // are immune to ALL negation paths — Forbidden Zone, Dark Gear,
     // Necromancy, Diplomacy, Null Zone, etc. The name-list fallback
     // covers pre-placed beasts whose onPlay never fired.
-    if (inst.counters?._cardinalImmune) return;
+    // ★ `opts.alsPlatzierung` (Omikron: „place a copy …, but its effects are negated"): die Negation gehoert zur Platzierung des Abbilds selbst — kein Zugriff auf eine
+    // bestehende Kreatur. Die „unaffected"-Immunitaet eines Cardinal Beast ist ein Effekt der Kreatur und damit selbst Teil dessen, was negiert wird; sie sperrt die eigene
+    // Platzierungs-Negation deshalb nicht (sonst stand die Illusion eines Cardinal Beast wirksam auf dem Brett).
+    if (inst.counters?._cardinalImmune && !opts.alsPlatzierung) return;
     if (this.kreaturGegnerEffektImmun(inst, source, opts)) return;   // W17b: Golden Wings – nur gegnerische Negation
     // Sparkfly Attendant gift: opp-applied negations only — own-side
     // self-negations (test scaffolding, future "negate your own
     // creature" cards) still work.
     if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return;
+    if (CARDINAL_NAMES.includes(inst.name) && !opts.alsPlatzierung) return;
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
