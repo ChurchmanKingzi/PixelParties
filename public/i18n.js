@@ -111,7 +111,9 @@
   // Langtexte mit Markup (Tutorial-Textbox): ganzen Text nachschlagen, danach Kartennamen in **fett**/{farbe:**…**}/"…" durch die deutschen Namen ersetzen
   P.tx = (s) => {
     if (lang === 'en' || !s) return s;
-    let r = lookup(s.trim()); if (r === s.trim()) r = s;
+    const t0 = s.trim(), t1 = t0.replace(/[ \t]*\n[ \t]*/g, ' ');
+    // Tutorial-/Dialogtexte: erst exakter Treffer (mit/ohne Zeilenumbruch), erst danach die allgemeine Suche (Satzvorlagen koennen sonst fremde Saetze zerlegen)
+    let r = P.ui[t0] != null ? P.ui[t0] : P.ui[t1] != null ? P.ui[t1] : lookup(t1); if (r === t0 || r === t1) r = s;
     return r.replace(/(\*\*)([^*\n]+)(\*\*)|"([^"\n]+)"/g, (m, a, b, c, q) => { const n = b != null ? b : q, de = P.names[n.trim()]; if (!de) return m; return b != null ? a + de + c : '"' + de + '"'; });
   };
   const SKIP_TAG = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CANVAS: 1, NOSCRIPT: 1 };
