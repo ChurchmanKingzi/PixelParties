@@ -97,8 +97,10 @@ module.exports = {
   // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: { impact: { type: 'overheal_shock_equip' }, impactMs: 260 },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to a Hero your opponent controls") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
   // First-turn safety: Overheal Shock can ONLY attach to an opponent's Hero,
   // so when going first it is always wasted against the first-turn shield
   // (the onPlay handler just discards it). Tell the CPU never to play it on

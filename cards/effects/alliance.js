@@ -153,9 +153,10 @@ function nutzerHatAndereWaehlbare(engine, nutzer) {
 }
 
 module.exports = {
-  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
-  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „choose a Hero your opponent controls".
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „choose a Hero your opponent controls".
   requiresTarget: true,
+  // Die Wahl eines Gegnerhelden ist Pflicht → unter Blinded nie spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
+  blindedEigeneZiele: false,
 
   // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
   dealsNoAttackDamage: true,

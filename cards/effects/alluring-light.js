@@ -99,7 +99,10 @@ module.exports = {
     impact: { type: 'lure_beacon' }, impactMs: 260,
   },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Choose a Hero your opponent controls …") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
+  blindedEigeneZiele: false,
 
   spellPlayCondition(gs, pi, engine) {
     const oppIdx = opponentOfGs(gs, pi);

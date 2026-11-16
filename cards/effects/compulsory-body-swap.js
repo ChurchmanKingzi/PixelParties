@@ -119,8 +119,12 @@ function bestePaare(engine, pi, casterHeroIdx, okFn) {
 
 module.exports = {
   paarMoeglich, verlagerungsPlan,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Helden waehlen; spielbar nur, wenn zwei eigene Helden ihre Abilities tauschen koennen.
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele({ engine, pi }) {
+    const eig = engine.heroesControlledBy(pi).filter(e => e.hero.hp > 0).map(e => ({ owner: e.physOwner, heroIdx: e.heroIdx }));
+    return eig.some((x, i) => eig.slice(i + 1).some(y => paarMoeglich(engine, x, y)));
+  },
   activeIn: ['hand'],
 
   /**

@@ -136,9 +136,12 @@ async function doCure(engine, pi, target, casterHeroIdx, casterSeite = pi) {
 }
 
 module.exports = {
-  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
-  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Choose any target … except the user".
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte „Choose any target … except the user" — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine,
+  // auch im Reaktionsfenster zwischen den Phasen). Spielbar/aktivierbar ist Cure dann nur, wenn es ein eigenes Ziel (ausser dem Nutzer) mit negativem Status gibt (`blindedEigeneZiele`).
   requiresTarget: true,
+  blindedEigeneZiele({ gs, engine, pi, seite, heroIdx }) {
+    return getValidTargets(gs, engine, `${seite}-${heroIdx}`).some(t => engine.zielSeite(t, t.owner) === pi);
+  },
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.

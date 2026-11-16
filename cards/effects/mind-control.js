@@ -151,7 +151,10 @@ module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER: wird die Karte NEGIERT, spielt die Engine dieses Bild.
   spellVisual: { impact: { type: 'mind_control_hex' }, impactMs: 260 },
 
-  requiresTarget: true,                    // wählt ein Ziel (Blinded-Sperre)
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to 1 of your opponent's Heroes") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
+  requiresTarget: true,
+  blindedEigeneZiele: false,
   takesControlOfTargets: true,             // Boris & Co.: übernimmt fremde Ziele
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],

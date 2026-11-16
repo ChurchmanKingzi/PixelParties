@@ -230,9 +230,8 @@ async function nachholenOhneKarte(engine) {
 }
 
 module.exports = {
-  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
-  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „you may choose any target and defeat it" (Wahl beim späteren Auflösen).
-  requiresTarget: true,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): das Ziel wird erst beim spaeteren Aufloesen gewaehlt („you may choose any target") → die Karte ist immer spielbar (KEIN `requiresTarget`);
+  // ist der Nutzer BEIM AUFLOESEN geblendet, bietet die Zielwahl (`ctx.promptDamageTarget`, Quelle = die Karte) nur eigene Ziele an (Picker-Filter der Engine).
 
   nachholenOhneKarte,
   neverMultiTarget: true,   // W75b: „This effect can never affect more than 1 target." — Bartas bietet keinen Zweitwurf an (Text-Waechter `scripts/check-never-multi-target.js`)

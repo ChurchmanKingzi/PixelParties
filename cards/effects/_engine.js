@@ -7363,6 +7363,157 @@ class GameEngine {
   }
 
   /**
+   * ★ BLINDED BEI ATTACKS UND SPELLS (Spielgestalter-Entscheidung 16.11.2026, ersetzt die pauschale `requiresTarget`-Sperre fuer Attack-/Spell-KARTEN)
+   * „Blinded verhindert nur, GEGNERISCHE Ziele zu waehlen." Ein geblendeter Held, der eine Attack/einen Spell wirkt, darf bei jeder Zielwahl nur Ziele waehlen, die sein
+   * Kontrolleur selbst kontrolliert; Gegnerisches ist nicht waehlbar (`ineligible`, ausgegraut). Karten ohne Zielwahl (feste Mengen, Zufall, Selbsteffekte, Jump in the River …),
+   * Platzieren/Beschwoeren (Zonenwahl) und Kosten-Auswahl eigener Karten ignorieren Blinded von selbst. Drei Stellen, EINE Auslegung:
+   *   • `markiereBlindGesperrte` — der Picker-Filter am Flaschenhals `promptEffectTarget` (deckt `promptDamageTarget`, `promptMultiTarget`, `ctx.promptTarget` und jede Karte, die selbst
+   *     eine Liste baut); wirkt auch fuer die CPU (`_waehlbar`) und den Trockenlauf (`_sondeListe`/`_waehlbarProbe`);
+   *   • `blindedAttackSpellGesperrt` — die SPIELBARKEIT: eine Zielwahl-Karte (`requiresTarget: true`), die keinen legalen EIGENEN Kandidaten haben kann, ist unter Blinded nicht spielbar
+   *     (`getHeroPlayableCards`, `validateActionPlay`, `_canHeroActivateSurprise`). Kein Trockenlauf der Karte selbst (Karten zahlen Kosten vor der Wahl): Kartenvertrag
+   *     `blindedEigeneZiele` (Funktion/Boolean) bzw. der gedruckte Text („Choose … your opponent controls", `istReineGegnerKarte`). Grenzfaelle dokumentiert CARD_API („Blinded").
+   *   • `_attachment-shared.js` (Wirtswahl eines Anhaengsels) fragt `blindWirtGesperrt`.
+   * Nicht beruehrt: Kreaturen-, Helden-, Ability-, Artefakt-Effekte (dort sperrt `requiresTarget` weiter pauschal) und Effekte, die nur als Attack/Spell ZAEHLEN (`heroKannAngreifen`).
+   */
+  _irgendeinHeldGeblendet() {
+    for (const ps of this.gs?.players || []) {
+      for (const h of ps?.heroes || []) {
+        const st = h?.statuses;
+        if (st && BLIND_STATUSES.some(n => !!st[n])) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Gilt Blinded fuer diese Attack/diesen Spell ueberhaupt NICHT (Ausnahmen)? `true` = ignoriert Blinded.
+   * • Effekte „can be used in spite of any negative status effects" (Outbreak, `canPlayDespiteStatuses`);
+   * • Karten/Helden mit „can always choose any target" / Truth-Seeing Eye (`_sourceIgnoresTargetingRestrictions`: sie heben jede Wahl-Sperre auf, auch die der Blendung).
+   */
+  _blindAusgenommen(pi, seite, heroIdx, cardData) {
+    if (!cardData) return false;
+    if (this._mitWirker(pi, heroIdx, seite, () => this._spielTrotzStatus(pi, heroIdx, cardData))) return true;   // `pi` = Kontrolleur, `seite` = Brettseite des Helden (geliehener Held)
+    return this._sourceIgnoresTargetingRestrictions({ name: cardData.name, owner: seite, controller: seite, heroIdx });
+  }
+
+  /**
+   * Ist diese Attack/dieser Spell fuer den geblendeten Helden (Kontrolleur `pi`, Brettseite `seite`, Index `heroIdx`) GESPERRT, weil er keinen legalen eigenen Kandidaten hat? Siehe `_irgendeinHeldGeblendet`.
+   *   1. nicht geblendet / keine Attack-/Spell-Karte / keine Zielwahl-Karte (`requiresTarget !== true`) / Surprise-Subtyp (Setzen ist kein Wirken) / Karte ohne Wirker-Helden → frei;
+   *   2. Ausnahmen (`_blindAusgenommen`) → frei;
+   *   3. Kartenvertrag `blindedEigeneZiele`: `true` frei, `false` gesperrt, oder Funktion `({ gs, engine, pi, seite, heroIdx, cardData }) => boolean` (true = es gibt einen legalen eigenen Kandidaten);
+   *   4. sonst der gedruckte Text: sagt JEDER „Choose …"-Satz „your opponent controls" (`istReineGegnerKarte`), kann sie nie etwas Eigenes waehlen → gesperrt; alles andere frei.
+   * `opts.aktivierung`: Reaktion/Surprise beim AKTIVIEREN (dort zaehlt auch der Surprise-Subtyp).
+   */
+  blindedAttackSpellGesperrt(pi, seite, heroIdx, cardData, opts = {}) {
+    if (!cardData || (cardData.cardType !== 'Spell' && cardData.cardType !== 'Attack')) return false;
+    if (!this._isHeroBlinded(seite, heroIdx)) return false;
+    const script = loadCardEffect(cardData.name);
+    if (script?.requiresTarget !== true || script.playsWithoutHero) return false;
+    if (!opts.aktivierung && String(cardData.subtype || '').toLowerCase() === 'surprise') return false;
+    if (this._blindAusgenommen(pi, seite, heroIdx, cardData)) return false;
+    const vertrag = script.blindedEigeneZiele;
+    if (vertrag === true) return false;
+    if (vertrag === false) return true;
+    if (typeof vertrag === 'function') {
+      try {
+        return !vertrag({ gs: this.gs, engine: this, pi, seite, heroIdx, cardData });
+      } catch (err) {
+        console.error(`[Engine] blindedEigeneZiele "${cardData.name}" warf:`, err.message);
+        return false;
+      }
+    }
+    if (this.istReineGegnerKarte(cardData.name)) return true;
+    return !this._blindEigenerKandidat(pi, seite, heroIdx, cardData);
+  }
+
+  /**
+   * Gibt es fuer den geblendeten Wirker ueberhaupt einen eigenen Helden-/Kreaturen-Kandidaten? Grobe, ehrliche Naeherung fuer die Spielbarkeit (kein Trockenlauf der Karte):
+   * eigene lebende Helden (Kontrolle, nicht Besitz) und eigene offene Kreaturen. Der Wirker selbst zaehlt NICHT bei Attacks (`executeAttack` schliesst den Angreifer aus) und bei Texten
+   * „except the user" / „another Hero" (Petrifier, Calm Diatribe, Trial of Coolness …); sonst waehlt ein Spell auch sich selbst (Heal, Icebolt). Was daran vorbeigeht (Ziele erst waehrend der
+   * Aufloesung, Artefakt-/Ability-Ziele, Zustandsbedingungen wie bei Cure), loest die Zielwahl selbst: kein legales Ziel → Abbruch, die Karte bleibt auf der Hand. Genauer: Vertrag `blindedEigeneZiele`.
+   */
+  _blindEigenerKandidat(pi, seite, heroIdx, cardData) {
+    const ohneNutzer = cardData.cardType === 'Attack' || /except the user|another (?:target|Hero|Creature)\b/i.test(cardData.effect || '');
+    for (const e of this.heroesControlledBy(pi)) {
+      if (!(e.hero.hp > 0)) continue;
+      if (ohneNutzer && e.physOwner === seite && e.heroIdx === heroIdx) continue;
+      return true;
+    }
+    return this.hasRequiredTargetKind(pi, 'ownCreature');
+  }
+
+  /**
+   * ★ Wer WIRKT gerade die Attack/den Spell, hinter der diese Zielwahl steht — und ist er geblendet? `{ seite, heroIdx, controller }` oder `null` (kein Blinded-Filter).
+   * `playerIdx` = der Waehlende: nur der KONTROLLEUR des Wirkers waehlt „fuer" ihn (Chain Lightning, Big Oopsie, Ricochet-Gegenzug: der Gegner waehlt SEINE Ziele → frei).
+   * Quelle der Zielwahl: `config._quellObjekt` (Engine-Picker) → ausdrueckliche Quelle → aufloesende Surprise → Titelkarte → wirkende Karte (`_tauntQuelleFuer`).
+   * Nur echte Attack-/Spell-KARTEN (Hand, Surprise, Reaktionsglied, verzoegerter Guss wie Hand of Death); keine Dauerwirkung einer liegenden Karte (Area/Anhaengsel: Gathering Storm),
+   * keine Effekte, die nur als Attack/Spell zaehlen, keine Kreatur-/Helden-/Ability-/Artefakt-Effekte.
+   */
+  _blindWirkerFuer(playerIdx, config = {}) {
+    if (!this._irgendeinHeldGeblendet()) return null;
+    let q = config._quellObjekt || (config.sourceCard && typeof config.sourceCard === 'object' ? config.sourceCard : null);
+    if (!q) q = this._tauntQuelleFuer(playerIdx, config);
+    if (!q || typeof q !== 'object') return null;
+    const name = q.name || q.cardName || q.cardInstance?.name;
+    const cd = name ? this._getCardDB()[name] : null;
+    if (!cd || hasCardType(cd, 'Creature') || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return null;
+    if (this._zaehltAlsArt(q)) return null;
+    if (q.zone === ZONES.SUPPORT || q.zone === 'area' || q.zone === 'permanent' || q.zone === ZONES.ABILITY || q.zone === 'hero') return null;
+    // Wirker: ein Reaktionsglied (Cure, Golden Wings …) kennt seinen Helden im Glied, sonst die Quelle selbst (Handkarte, Surprise, verzoegerter Guss). Nennt die Zielwahl die Karte nur
+    // beim Namen (`source: 'Voodoo Curse'` → Ersatzquelle ohne Held), gilt die wirkende Karte der Umgebung (`_umgebungsQuelle`), zuletzt `chooserHeroIdx`.
+    let seite, heroIdx, controller;
+    const link = this._rxResolvingLink;
+    if (link && !link.isInitialCard && !link.fromHero && !link.fromCreature && link.cardName === name && link.casterHeroIdx >= 0) {
+      heroIdx = link.casterHeroIdx; controller = link.owner; seite = link.casterOwner ?? link.owner;
+    } else {
+      let src = q;
+      if (!(Number.isInteger(src.heroIdx) && src.heroIdx >= 0)) {
+        const amb = this._umgebungsQuelle(playerIdx, config);
+        if (amb && amb.name === name) src = amb;
+      }
+      heroIdx = src.heroIdx; controller = src.controller ?? src.owner; seite = src.heroOwner ?? src.owner;
+      if (!(Number.isInteger(heroIdx) && heroIdx >= 0) && config.chooserHeroIdx >= 0) {
+        const ws = this.gs._wirkerSeite;
+        heroIdx = config.chooserHeroIdx; controller = playerIdx;
+        seite = (ws && ws.pi === playerIdx && ws.heroIdx === heroIdx && Number.isInteger(ws.heroOwner)) ? ws.heroOwner : playerIdx;
+      }
+    }
+    if (!Number.isInteger(heroIdx) || heroIdx < 0 || !Number.isInteger(seite) || !Number.isInteger(controller)) return null;
+    if (controller !== playerIdx) return null;
+    if (!this._isHeroBlinded(seite, heroIdx)) return null;
+    if (this._blindAusgenommen(controller, seite, heroIdx, cd)) return null;
+    return { seite, heroIdx, controller };
+  }
+
+  /** Ziele, die ein Wirker NICHT waehlen darf, weil sein Kontrolleur sie nicht kontrolliert (nur Brett-Ziele; Hand-/Optionslisten tragen keinen Besitzer). */
+  _blindZielGegnerisch(t, controller) {
+    if (!t || !t.type || !['hero', 'equip', 'creature', 'ability', 'surprise', 'area', 'perm'].includes(t.type)) return false;
+    const seite = this.zielSeite(t, null);
+    return Number.isInteger(seite) && seite !== controller;
+  }
+
+  /**
+   * Picker-Filter: markiert (`ineligible`, wie Taunt/Erstrunden-Schutz) jedes gegnerisch kontrollierte Ziel, wenn die Quelle eine Attack/ein Spell eines GEBLENDETEN Helden ist.
+   * `config.ignoreBlinded: true` = Opt-out (z. B. eine Zonenwahl zum Platzieren, die ueber diesen Picker laeuft — Platzieren ist kein Auswaehlen).
+   */
+  markiereBlindGesperrte(targets, playerIdx, config = {}) {
+    if (!Array.isArray(targets) || targets.length === 0 || config.ignoreBlinded) return targets;
+    const w = this._blindWirkerFuer(playerIdx, config);
+    if (!w) return targets;
+    for (const t of targets) {
+      if (t && !t.ineligible && this._blindZielGegnerisch(t, w.controller)) t.ineligible = true;
+    }
+    return targets;
+  }
+
+  /** Wirtswahl eines Anhaengsels (`_attachment-shared`): ist dieser Held fuer den geblendeten Wirker der Karte `quelle` (Handinstanz) gesperrt? */
+  blindWirtGesperrt(quelle, hostSeite, hostHeroIdx) {
+    const w = this._blindWirkerFuer(quelle?.controller ?? quelle?.owner, { _quellObjekt: quelle });
+    if (!w) return false;
+    return this.kontrolleurVonHeld(hostSeite, hostHeroIdx) !== w.controller;
+  }
+
+  /**
    * ★ W12 (Al, Q114/H02-heroes-11): „Karian wird NIEMALS durch Freeze/Stun/Negation daran gehindert, irgendetwas zu tun." Skriptmarke
    * `ignoresHaltStatuses` am Heldenskript (Karian; ein Shapeshifter in Karian-Gestalt traegt sie mit dem Namen). Frost und Betaeubung legt
    * das Skript selbst still (Stash, `_karianSuspendedParalysis`); an den Stellen, die eine NEGIERUNG ohne `addHeroStatus` direkt auf den
@@ -24775,14 +24926,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Alleiniger Angriff (v726) — Spiegel des Gates in
         // `validateActionPlay`, damit der Client die Karte ausgraut.
         if (cd.cardType === 'Attack' && ps._soleAttackTurn === gs.turn) continue;
-        // Blinded heroes can't play targeting Spells / Attacks. Mirrors
-        // the play-time gate in validateActionPlay; when set, the client
-        // grays this card out under the affected hero so its hand
-        // preview matches what the server will accept.
-        if (this._isHeroBlinded(playerIdx, hi) && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
-          const s = loadCardEffect(cd.name);
-          if (s?.requiresTarget === true && !this._spielTrotzStatus(playerIdx, hi, cd)) continue;   // W14 (Q174): Outbreak trotz Blendung
-        }
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): ein geblendeter Held darf bei Attacks/Spells nur EIGENE Ziele waehlen. Die Karte ist grau, wenn sie keinen legalen eigenen
+        // Kandidaten haben kann (Fireball: „targets your opponent controls"); Cure & Co. bleiben mit eigenen Zielen spielbar. Spiegel des Tors in `validateActionPlay`.
+        if (this.blindedAttackSpellGesperrt(playerIdx, playerIdx, hi, cd)) continue;   // W14 (Q174): Outbreak trotz Blendung (`_blindAusgenommen`)
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set
         // cleared in the turn-start reset path alongside other per-turn flags.
@@ -24981,6 +25127,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
           if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) continue;   // v879; 24.10. Polymorph
           if ((cd.cardType === 'Spell' || cd.cardType === 'Attack') && this.heroPranked(hero, cd.name)) continue;   // 24.10. Nasty Prank
+          if (this.blindedAttackSpellGesperrt(playerIdx, oppIdx, hi, cd)) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): wie im eigenen Zweig (Love Shot spielt mit dem geliehenen Helden)
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -25668,16 +25815,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
 
-    // Blinded heroes can't play Attacks or Spells whose script declares
-    // `requiresTarget: true`. AoE-only cards (no requiresTarget flag)
-    // are still legal — that's the whole point of the status. Mirror in
-    // `getHeroPlayableCards` keeps the client gray-out aligned with this
-    // server-side gate.
-    if (this._isHeroBlinded(heroOwner, heroIdx) && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
-      const cardScript = loadCardEffect(cardData.name);
-      if (cardScript?.requiresTarget === true
-          && !this._mitWirker(pi, heroIdx, opts.charmedOwner, () => this._spielTrotzStatus(pi, heroIdx, cardData))) return null;   // W14 (Q174): Outbreak trotz Blendung
-    }
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): „Blinded verhindert nur, GEGNERISCHE Ziele zu waehlen." Der Picker-Filter (`markiereBlindGesperrte`) erzwingt das bei jeder
+    // Zielwahl; hier faellt nur die Karte weg, die keinen legalen eigenen Kandidaten haben kann (Fireball, Alliance …). Karten ohne Zielwahl ignorieren Blinded. Mirror in
+    // `getHeroPlayableCards` haelt die Ausgrauung im Client synchron mit diesem Tor.
+    if (this.blindedAttackSpellGesperrt(pi, heroOwner, heroIdx, cardData)) return null;   // W14 (Q174): Outbreak trotz Blendung (`_blindAusgenommen`)
 
     // Divine Gift of Skill lock — the chosen hero can't perform Actions
     // this turn unless they have Magic Arts >= 1. Spell/Attack/Creature
@@ -34208,6 +34349,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (side === _ftProtected) t.ineligible = true;
       }
     }
+    // ★ BLINDED (Spielgestalter-Entscheidung 16.11.2026): wirkt ein GEBLENDETER Held die Attack/den Spell hinter dieser Zielwahl, ist alles gegnerisch Kontrollierte nicht waehlbar —
+    // markiert (ausgegraut), nicht entfernt, wie die Schutzmarkierungen darunter. Eigene Ziele bleiben waehlbar. Siehe `_blindWirkerFuer`; Opt-out `config.ignoreBlinded`.
+    this.markiereBlindGesperrte(validTargets, playerIdx, config);
     // Erzwungene Aufloesung (v741) — s. `promptGeneric`.
     if (this._forceNonCancellable > 0 && config?.cancellable) {
       config = { ...config, cancellable: false };
@@ -44994,6 +45138,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): eine Reaktion/Surprise MIT Zielwahl beim Aktivieren darf der geblendete Held nur mit eigenen Zielen wirken; kann sie keinen legalen
+    // eigenen Kandidaten haben (Reflection: „Choose a target your opponent controls"), ist sie fuer ihn nicht aktivierbar. Reaktionen ohne Zielwahl (kein `requiresTarget`) bleiben frei;
+    // die Zielwahl selbst filtert `markiereBlindGesperrte`.
+    if (this.blindedAttackSpellGesperrt(reaktor, playerIdx, heroIdx, cardData, { aktivierung: true })) return false;
+
     // W19b (Al): Kontrolleffekte koennen ausdruecklich ausschliessen, mit dem Helden Attacks/Spells auszufuehren — dann darf auch der
     // Kontrolleur ihn dafuer nicht nutzen (`_kontrollRechte.zauber/attacken === false`; heute stempelt keine Karte so).
     {
@@ -47552,8 +47701,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             // ein anderes negiert (`negateChainLink` liest das).
             const _vorherAufloeser = this._rxResolvingOwner;
             const _vorherKarte = this._rxResolvingCard;
+            const _vorherGlied = this._rxResolvingLink;   // Blinded: der Wirker eines Reaktionsglieds (`_blindWirkerFuer`)
             this._rxResolvingOwner = link.owner;
             this._rxResolvingCard = link.cardName;
+            this._rxResolvingLink = link;
             let result;
             const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
             // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
@@ -47565,6 +47716,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
+              this._rxResolvingLink = _vorherGlied;
               if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
             if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);

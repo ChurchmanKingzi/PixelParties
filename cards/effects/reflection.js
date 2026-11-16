@@ -72,6 +72,9 @@ function moeglichkeiten(engine, pi, statusInfo) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte mit Pflichtwahl „a target your opponent controls“ → unter Blinded nicht aktivierbar (`engine.blindedAttackSpellGesperrt`: nur Gegnerziele).
+  requiresTarget: true,
+
   // ★★ v1181 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT, läuft ihr Effekt-Rumpf nie — die Engine spielt dann dieses Bild.
   spellVisual: { impact: { type: 'reflection_mirror' }, impactMs: 420 },
 

@@ -116,8 +116,9 @@ function cpuPaarWert(engine, a, b) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen; spielbar nur, wenn sein Kontrolleur mindestens zwei Ziele hat („2 targets that are controlled by the same player").
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele({ engine, pi }) { return zieleVon(engine, pi).length >= 2; },
 
   /** Grau, solange kein Spieler zwei Ziele kontrolliert. */
   spellPlayCondition(gs, pi, engine) {
