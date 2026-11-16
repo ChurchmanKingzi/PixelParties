@@ -47,7 +47,7 @@
 "Kasperov the King of the East": "Kasperov, der König des Ostens",
 "Kasperov the King of the East1": "Kasperov, der König des Ostens1",
 "Kyli the True Mastermind": "Kyli, der wahre Drahtzieher",
-"Layn Summoner of Weapons": "Layn, Waffenbeschwörer",
+"Layn Summoner of Weapons": "Layn, Waffenbeschwörerin",
 "Lightning-Fast Monia": "Blitzschnelle Monia",
 "Little Carris": "Kleiner Carris",
 "Lizbeth the Hunter of Souls": "Lizbeth, die Seelenjägerin",
@@ -2413,7 +2413,7 @@
 "effect": "Nenne einen Kartennamen. Dein Gegner fügt alle Exemplare der genannten Karte von seiner Hand deiner Hand hinzu. Fügt er mit diesem Effekt mindestens 1 Karte deiner Hand hinzu, zählt dies als zusätzliche Aktion. Danach kannst du für den Rest des Zuges nicht mit der Hand deines Gegners interagieren."
 },
 "Atta, Speaker of Desires": {
-"name": "Atta, Sprecher der Begierden",
+"name": "Atta, Sprecherin der Begierden",
 "effect": "Einmal pro Zug darfst du, wenn du genau 1 normalen Zauber aus deinem Deck oder deiner Hand aufdeckst, den dieser Held verwenden kann (außer durch den Effekt einer Fähigkeit), diesen Zauber löschen. Am Ende des nächsten Zuges deines Gegners verwendet dieser Held ihn sofort als zusätzliche Aktion, unabhängig von seinem Level und trotz negativer Statuseffekte, sofern dieser Held nicht besiegt ist und der Zauber noch gelöscht ist. Zauber, die dieser Held verwendet und die auf den Ablagestapel gelegt würden, werden stattdessen gelöscht."
 },
 "Attack": {
@@ -4025,12 +4025,12 @@
 "effect": "Spiele diese Karte sofort, wenn ein Held, den du kontrollierst und der diesen Zauber verwenden kann, durch einen Angriff oder Zauber besiegt würde. \nNegiere alle Effekte, die dieser Angriff oder Zauber auf diesen Helden hätte (einschließlich Schaden). Mische danach alle Karten in den Unterstützungszonen des Helden zurück in die Decks ihrer Besitzer."
 },
 "Layn, Defender of Deri": {
-"name": "Layn, Verteidiger von Deri",
+"name": "Layn, Verteidigerin von Deri",
 "effect": "Erhöhe die aktuellen und maximalen LP jeder Kreatur, die du beschwörst, um 100."
 },
 "Layn, Master of Deri's Relic": {
-"name": "Layn, Meister von Deris Relikt",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Layn, Verteidiger von Deri\" spielen, den du kontrollierst und der mit \"Erderschütternder Hammer, Relikt von Deri\" ausgerüstet ist. Du darfst einmal pro Zug bis zu 3 Kreaturen mit Level 1 mit demselben Namen aus deinem Ablagestapel wählen und sie in die freien Unterstützungszonen von Helden platzieren, die du kontrollierst."
+"name": "Layn, Meisterin von Deris Relikt",
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Layn, Verteidigerin von Deri\" spielen, den du kontrollierst und der mit \"Erderschütternder Hammer, Relikt von Deri\" ausgerüstet ist. Du darfst einmal pro Zug bis zu 3 Kreaturen mit Level 1 mit demselben Namen aus deinem Ablagestapel wählen und sie in die freien Unterstützungszonen von Helden platzieren, die du kontrollierst."
 },
 "Leadership": {
 "name": "Führungsstärke",
