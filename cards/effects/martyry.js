@@ -183,6 +183,7 @@ module.exports = {
     });
     engine.sync();
 
-    return { redirectTo: redirectTarget };
+    // `casterIdx`/`casterSeite`: der Martyr ist der Wirker — die Engine verbucht damit die Wisdom-Abwurfkosten (Held ohne Support Magic Lv1, nur dank Wisdom spielbar).
+    return { redirectTo: redirectTarget, casterIdx: selectedHeroIdx, casterSeite: heroSeite };
   },
 };

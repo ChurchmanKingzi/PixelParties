@@ -35974,6 +35974,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      // Wisdom (Luecke zur Stufe des Wirkers) wie in jedem anderen Hand-Reaktionsweg (`_rxWisdomKosten`, z. B. Post-Target-Hub): nennt der Umleiter seinen Wirker (`casterIdx`/`casterSeite`,
+      // Martyry: der Held, der sich vorwirft), zahlt der Reagierende den Abwurf — die Karte ist schon aus der Hand, die Rechnung entspricht dem Hub. Ohne Wirker (Challenge, Anti-Magnet) entfaellt er.
+      if (Number.isInteger(result.casterIdx) && result.casterIdx >= 0) {
+        const _wisdomKosten = this._rxWisdomKosten(targetOwnerIdx, result.casterSeite ?? targetOwnerIdx, result.casterIdx, this._getCardDB()[cardName]);
+        if (_wisdomKosten > 0) {
+          await this.actionPromptForceDiscard(targetOwnerIdx, _wisdomKosten, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
+        }
+      }
+
       this.log('target_redirect', {
         redirectCard: cardName,
         originalTarget: selected.cardName,
