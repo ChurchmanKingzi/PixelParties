@@ -428,6 +428,12 @@ module.exports = {
 
         gs._immediateActionContext = true;
         gs._spellCancelled = false;
+        // Der Stempel `_spellPlacedOnBoard` („diese Karte hat ihren Weg selbst erledigt": Löschstapel, Area …) gehört dem NACHGUSS, nicht Love Shot:
+        // den Stempel des äußeren Wegs retten, den eigenen auswerten (Muster `performImmediateAction`, v1364). Sonst blieb er stehen — Love Shot
+        // selbst verschwand aus Hand und Ablage, und der Nachguss lag zugleich im Löschstapel UND in der Ablage.
+        const _placedVorher = gs._spellPlacedOnBoard;
+        let _nachgussSelbstEntsorgt = false;
+        delete gs._spellPlacedOnBoard;
         // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
         // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
         // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
@@ -477,6 +483,10 @@ module.exports = {
             await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: heroSeite });
           }
         } finally {
+          // Stempel des Nachgusses auswerten, den des äußeren Wegs wiederherstellen (s. o.).
+          _nachgussSelbstEntsorgt = !!gs._spellPlacedOnBoard;
+          if (_placedVorher) gs._spellPlacedOnBoard = true;
+          else delete gs._spellPlacedOnBoard;
           // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
           if (_aeussererLog === undefined) delete gs._spellDamageLog;
           else gs._spellDamageLog = _aeussererLog;
@@ -512,7 +522,9 @@ module.exports = {
           // Als Fix (Al 27.10.): legt sich eine AREA aus diesem Nachguss selbst aufs Brett, hat ihre Instanz die Hand verlassen (`zone` ≠ 'hand'; `placeArea` stempelt `_spellPlacedOnBoard` nur fuer die gerade
           // AUFLOESENDE Karte, hier Love Shot). Sie gehoert dann dem Brett: nicht zusaetzlich in die Ablage (Dublette) und die Instanz nicht austragen (Geisterkarte: Name in `areaZones` ohne Instanz).
           if (inst.zone === 'hand') {
-            engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
+            // „Delete this card" (Forbidden Zone, Meditation, Liberation): das Kartenskript hat die Karte schon in den Löschstapel des Besitzers gelegt
+            // und `_spellPlacedOnBoard` gestempelt — dann nicht zusätzlich in die Ablage (Dublette), nur die Instanz austragen.
+            if (!_nachgussSelbstEntsorgt) engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
             engine._untrackCard(inst.id);
           }
           engine.log('love_shot_action', {
