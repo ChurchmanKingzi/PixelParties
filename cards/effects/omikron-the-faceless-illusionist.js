@@ -17,11 +17,10 @@
 //      Trigger (Nero Zira, Maya, Pes'zet, …) feuern aber
 //      ueber `onCardEnterZone` (Welle 13, Q122, Al: „Ja!")
 //
-//  ★ Spielgestalter-Entscheidung 16.11.2026: „Die Illusion-Karten holen doch alle eine echte Kopie der Karte und bringen sie ins Spiel? Die wird ja
-//  nicht einfach aus dem Äther gezogen (außer bei Omikron selbst)." — Omikrons Illusion wird aus dem ÄTHER gezogen: sie ist KEINE permanente Karte.
-//  Sie trägt die Marke `counters._spiegelKopie` (wie die Magic-Mirror-Kopie, `engine.isTokenCard`): beim Verlassen des Bretts (Tod, Zerstörung, Löschen,
-//  Bounce, Zurückmischen, Ablegen) verschwindet sie (`tokenAbgang`, Ereignis `token_disintegrate`) — nie ein Eintrag in Ablage, Gelöscht-Stapel, Deck oder
-//  Hand. Create Illusion / Staff of Illusions / Living Illusion holen dagegen eine ECHTE Karte aus Deck/Hand: ihre Kreaturen bleiben permanente Karten.
+//  ★ Spielgestalter-Entscheidung 16.11.2026: Die von Omikron beschworene Creature ist, einmal beschworen, ECHT — kein Token, keine Kopie ohne Karte
+//  (nicht die Marke `counters._spiegelKopie`, die nur die Magic-Mirror-Kopie traegt). Verlaesst sie das Brett (Tod, Zerstoerung, Hand, Ablage, Loeschen,
+//  Mass Routing, Hunting, Sas'Za …), geht die Karte physisch in den passenden Stapel ihres Besitzers (des Beschwoerers); der Spieler hat dadurch eine Karte
+//  mehr in Rotation. Wie bei Create Illusion / Staff of Illusions / Living Illusion (dort kommt die Karte aus Deck/Hand, hier aus dem Aether).
 //
 //  Per-name once-per-game gate: each Omikron
 //  Hero tracks the names it has already summoned
@@ -134,9 +133,6 @@ module.exports = {
 
     // Blue illusion filter
     inst.counters._illusionSummon = true;
-
-    // Spielgestalter-Entscheidung 16.11.2026: eine Kopie aus dem Äther, keine Karte — verschwindet beim Abgang (siehe Kopf, `engine.isTokenCard`).
-    inst.counters._spiegelKopie = true;
 
     // Force HP to 1 (regardless of base stats)
     inst.counters.maxHp     = 1;

@@ -123,13 +123,8 @@ async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
   }
   // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: die Kreatur kommt in den Gelöscht-Stapel ihres Besitzers
   // statt ins Deck. Annahme: eine so gelöschte Kreatur gilt NICHT als „shuffled back" (kein Nachziehen dafür, kein Mischen).
-  // Spielgestalter-Entscheidung 16.11.2026: Omikrons Illusion ist KEINE Karte (Kopie aus dem Äther, `counters._spiegelKopie`) — sie verschwindet, es gibt nichts zurückzumischen
-  // (kein Deck-Eintrag, auch keine Ankhota-Löschung); als Kreatur des Zaubers zählt sie für das Nachziehen weiter („shuffled back").
-  const kopie = !!inst.counters?._spiegelKopie;
-  const geloescht = kopie ? false : engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
-  if (kopie) {
-    engine.tokenAbgang(inst);
-  } else if (!geloescht) {
+  const geloescht = engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
+  if (!geloescht) {
     if (!hps.mainDeck) hps.mainDeck = [];
     hps.mainDeck.push(cardName);
   }

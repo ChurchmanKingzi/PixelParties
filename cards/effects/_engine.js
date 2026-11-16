@@ -56658,7 +56658,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (zoneOwner == null || zoneOwner < 0 || !(inst.heroIdx >= 0)) return false;
     if (!this.isSupportZoneLocked(zoneOwner, inst.heroIdx, { cardName: inst.name, via: 'enter', instId: inst.id })) return false;   // instId: die eintretende Karte sperrt sich nicht selbst (Bonded Companion wurde sonst sofort auf die Hand zurückgeschickt)
     const cd = this._getCardDB()[inst.name];
-    const isToken = !!(cd && hasCardType(cd, 'Token')) || !!inst.counters?._spiegelKopie;   // Kopie ohne Karte (Omikrons Illusion): wie ein Token, verschwindet
+    const isToken = !!(cd && hasCardType(cd, 'Token'));
     inst._zoneLockReverting = true;
     this.log('placement_reverted', {
       card: inst.name, reason: 'support_zones_locked', heroIdx: inst.heroIdx,
@@ -58764,8 +58764,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
     if (creatureDiscardPs && !_claim) {
       const effectiveCd = this.getEffectiveCardData(e.inst);
-      // Spielgestalter-Entscheidung 16.11.2026: eine Kopie ohne Karte (Omikrons Illusion, Magic-Mirror-Kopie: `counters._spiegelKopie`) stirbt wie ein Token — kein Stapel-Eintrag (`tokenAbgang`).
-      const _istTokenArt = !!(effectiveCd && hasCardType(effectiveCd, 'Token')) || !!e.inst.counters?._spiegelKopie;
       // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
       // vom Board zum Discard, ehe es im Deleted Pile landet. Das
       // ist falsch.").
@@ -58790,7 +58788,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // hier gibt es dafuer nur `_onlyCard`. Darum meldet der Tod vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie dort) und liest die Marke aus.
       // Nicht gemeldet wird, was ohnehin nie abgelegt wird (Ghazma/Ankhota/Root/Selbstloeschen/Token) oder gleich wiederbelebt wird (`_reviveAfterDeath`).
       let _ersatzLoescht = false;
-      if (!_eigenLoeschend && !e.inst._reviveAfterDeath && !_istTokenArt) {
+      if (!_eigenLoeschend && !e.inst._reviveAfterDeath && !(effectiveCd && hasCardType(effectiveCd, 'Token'))) {
         const _stempelVorher = !!e.inst._redirectToDeleted;
         await this.runHooks('onCreatureWouldBeDiscarded', {
           leavingCard: e.inst, fromZone: 'support', fromOwner: physicalSide, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot,
@@ -58802,7 +58800,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
       // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
       let _gerettet = false;
-      if ((_ghazmaLoescht || _ersatzLoescht) && !_istTokenArt && loadCardEffect(e.inst.name)?.beforeDelete) {
+      if ((_ghazmaLoescht || _ersatzLoescht) && !(effectiveCd && hasCardType(effectiveCd, 'Token')) && loadCardEffect(e.inst.name)?.beforeDelete) {
         const _loeschQuelle = _ghazmaLoescht ? 'Ghazma' : 'Vacarn / The Bonegrinder';
         _gerettet = await this._tryBeforeDelete(e.inst.name, e.inst.originalOwner, {
           fromZone: 'support', fromInstance: null, source: _loeschQuelle,
@@ -58811,7 +58809,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (_gerettet) {
         _creatureDest = 'rescued';
-      } else if (_istTokenArt || _selbstLoeschend) {
+      } else if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
         // W5a: ein Token verschwindet vollstaendig; nur eine echte Karte darunter (Biomancy/Boulder) wird gelöscht.
         // W64a (Al): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (Ghazma/Selbstlöschen: gelöscht).
         const _tokenZiel = _selbstLoeschend ? 'deleted' : this.tokenStapelZiel(e.inst);
