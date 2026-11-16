@@ -180,11 +180,27 @@ module.exports = {
       });
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       const ziel = id && ziele(engine, pi, heroIdx).find(z => z.id === id);
-      if (!ziel) { gs._spellCancelled = true; return; }
+      if (!ziel) {
+        // UMGELENKT (Martyry, Anti-Magnet …): das Umleitungsziel stand nicht in der Zielliste (kein Anhängsel/Status zum Entfernen). Der Zauber löst dort trotzdem auf — und findet nichts.
+        // Ein Abbruch (`_spellCancelled`) gäbe die Karte zurück auf die Hand und liesse die Aktion stehen, während die Reaktionskarte des Gegners schon verbraucht ist.
+        if (id && !liste.some(z => z.id === id)) {
+          engine.log('exorcism_redirected_nothing', { player: ps.username, target: id });
+          engine.sync();
+          return;
+        }
+        gs._spellCancelled = true; return;
+      }
 
       const tHero = ziel.type === 'hero' ? gs.players[ziel.owner]?.heroes?.[ziel.heroIdx] : null;
       const tInst = ziel.type === 'hero' ? null : ziel.cardInstance;
       if (ziel.type === 'hero' ? !(tHero?.name && tHero.hp > 0) : !(tInst && tInst.zone === 'support')) { gs._spellCancelled = true; return; }
+
+      // ── Charme Lv3: „It and its Support Zones are unaffected by other cards and effects" — der Zauber löst auf, entfernt aber nichts (auch nicht bei Decay Magic 2: „unaffected" ≠ „verhindert"). ──
+      if (engine.heroZonenGeschuetzt?.(ziel.owner, ziel.heroIdx)) {
+        engine.log('exorcism_blocked', { player: ps.username, target: ziel.cardName, reason: 'charme' });
+        engine.sync();
+        return;
+      }
 
       // ── Schutzfenster (Resistance, Zauber-Immunität) — fällt bei Decay Magic 2 weg ──
       if (!hart) {

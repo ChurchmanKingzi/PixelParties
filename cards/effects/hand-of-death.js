@@ -56,11 +56,25 @@
 const CARD_NAME = 'Hand of Death';
 const HOPT_KEY = 'hand-of-death';
 
-/** Steht für `pi` ein Auftrag im Fenster „Ende des nächsten gegnerischen Zuges"? */
-function imFenster(gs, pi) {
-  const armed = gs.players[pi]?._handOfDeathArmed;
+/**
+ * Die offenen Aufträge des Spielers (`ps._handOfDeathArmed`) als Liste. Jede gespielte Karte ist ein eigener Auftrag: wird ein Gegnerzug übersprungen (Zhu), kann der Spieler
+ * eine zweite Karte spielen, bevor die erste fällig wird — beide wirken dann am Ende des nächsten gespielten Gegnerzuges (zwei Zielabfragen). (Ein einzelnes Objekt wird mitgenommen.)
+ */
+function auftraege(ps) {
+  const a = ps?._handOfDeathArmed;
+  if (!a) return [];
+  return Array.isArray(a) ? a : [a];
+}
+
+/** Ist dieser Auftrag im Fenster „Ende des nächsten gegnerischen Zuges"? */
+function istFaellig(gs, pi, armed) {
   if (!armed || typeof armed.armedOnTurn !== 'number') return false;
   return gs.activePlayer !== pi && gs.turn > armed.armedOnTurn;
+}
+
+/** Steht für `pi` ein Auftrag im Fenster „Ende des nächsten gegnerischen Zuges"? */
+function imFenster(gs, pi) {
+  return auftraege(gs.players[pi]).some(a => istFaellig(gs, pi, a));
 }
 
 /**
@@ -70,9 +84,23 @@ function imFenster(gs, pi) {
 async function ausloesen(engine, ownerIdx) {
   const gs = engine.gs;
   const ps = gs.players[ownerIdx];
-  const armed = ps?._handOfDeathArmed;
-  if (!ps || !armed) return;
-  delete ps._handOfDeathArmed;
+  if (!ps) return;
+  // Alle fälligen Aufträge werden SOFORT aus der Liste genommen (jeder genau einmal) und nacheinander aufgelöst; nicht fällige (in diesem Zug gewirkte) bleiben stehen.
+  const alle = auftraege(ps);
+  const faellig = alle.filter(a => istFaellig(gs, ownerIdx, a));
+  if (faellig.length === 0) return;
+  const rest = alle.filter(a => !faellig.includes(a));
+  if (rest.length > 0) ps._handOfDeathArmed = rest; else delete ps._handOfDeathArmed;
+  for (const armed of faellig) {
+    if (gs.result) return;
+    await auftragAusloesen(engine, ownerIdx, armed);
+  }
+}
+
+/** EIN Auftrag (eine gespielte Karte): Wirker-Prüfung, Zielwahl, Defeat. */
+async function auftragAusloesen(engine, ownerIdx, armed) {
+  const gs = engine.gs;
+  const ps = gs.players[ownerIdx];
 
   // ── User-status gate ──
   const userHeroIdx = armed.casterHeroIdx;
@@ -245,12 +273,12 @@ module.exports = {
         return;
       }
 
-      // Arm the pending effect on player state (W66a: the ONLY carrier). Overwrites any previous armed entry — HOPT enforces 1/turn so
-      // there's only ever at most one pending effect per player.
-      ps._handOfDeathArmed = {
+      // Arm the pending effect on player state (W66a: the ONLY carrier). Jede gespielte Karte ist ein eigener Auftrag (HOPT erlaubt 1/Zug, aber ein übersprungener Gegnerzug lässt
+      // zwei Aufträge nebeneinander offen — der zweite Cast darf den ersten nicht überschreiben).
+      ps._handOfDeathArmed = [...auftraege(ps), {
         armedOnTurn: gs.turn,
         casterHeroIdx: heroIdx, casterHeroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
-      };
+      }];
 
       // Pre-fire flourish on the caster — dark swarm rising. The
       // serious animation lands later at trigger time on the picked

@@ -165,6 +165,7 @@ module.exports = {
         : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }), {
         damage: DAMAGE, damageType: 'creature', sourceName: CARD_NAME,
         animationType: 'explosion', animDelay: 400, hitDelay: 0,
+        istFlaeche: true,   // alle Ziele des Gegners = echter Flächenschlag: Redirecting Aura (Umleitung) wird gefragt
         });
 
       engine.log('exploding_skull_blast', {

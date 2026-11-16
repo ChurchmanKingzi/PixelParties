@@ -64,6 +64,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // Interference-Klammer, Heldentreffer) — vorher alles von Hand.
   await engine.dealDamageToTargets(source, heroHits.map(({ owner, hi }) => ({ type: 'hero', owner, heroIdx: hi })), {
     damage: DAMAGE, damageType: 'creature', hitDelay: 0, surpriseCheck: false,
+    istFlaeche: true,   // alle Helden des Gegners = echter Flächenschlag: Redirecting Aura (Umleitung) wird gefragt
   });
 
   engine.log('carpet_bomblebee_strike', {

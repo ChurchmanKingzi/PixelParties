@@ -71,12 +71,14 @@ module.exports = {
       // fire here. Apply the same gate locally so a self-Anti-Magic'd
       // caster (Anti Magic Lv 2+ attached to their own Hero) doesn't
       // pick up the untargetable from their own Butterfly Cloud cast.
+      let setztUntargetable = false;   // diese Wolke hat den Status gesetzt (eine frühere Wolke desselben Zuges hat ihn schon)
       if (hero.hp > 0) {
         if (engine._isHeroSpellProtected(hero, 'Butterfly Cloud')) {
           engine.log('status_blocked', { target: hero.name, status: 'untargetable', reason: 'magic_immune' });
           engine._playAntiMagicBlockedAnim(hero);
         } else {
           if (!hero.statuses) hero.statuses = {};
+          setztUntargetable = !hero.statuses.untargetable;
           hero.statuses.untargetable = true;
           engine.log('status_applied', { target: hero.name, status: 'untargetable', player: ps.username });
         }
@@ -84,7 +86,7 @@ module.exports = {
       }
 
       // ── AoE 50 damage to all enemy targets ──
-      await ctx.aoeHit({
+      const result = await ctx.aoeHit({
         damage: 50,
         // W16g (R01-09, S01-03): ein ZAUBER → Typ '<school>_spell' (nicht 'other'); sonst blockt Dark Ocean ihn und
         // Corpse Explosion erkennt den Tod nicht als „Attack or Spell".
@@ -94,6 +96,17 @@ module.exports = {
         animationType: 'none',
         _skipSurpriseCheck: false,
       });
+
+      // ── Negiert/abgebrochen (Anti Magic Shield, Magic Mirror, Frost Rune …): eine ganz NEGIERTE Karte hat keine Wirkung — kein „untargetable" und kein Cooldown-Stempel
+      // (wie Flame Avalanche; `aoeHit` meldet `cancelled`, die Reaktionsfenster setzen `_spellNegatedByEffect`). ──
+      if (result?.cancelled || gs._spellCancelled || gs._spellNegatedByEffect) {
+        if (setztUntargetable && hero.statuses?.untargetable === true) {
+          delete hero.statuses.untargetable;
+          engine.log('status_remove', { target: hero.name, status: 'untargetable', by: 'Butterfly Cloud (negated)' });
+          engine.sync();
+        }
+        return;
+      }
 
       // ── Set cooldown flag (blocks next turn, not this turn) ──
       ps._butterflyCloudUsedThisTurn = true;

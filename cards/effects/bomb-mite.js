@@ -65,6 +65,7 @@ async function explodiere(engine, quelle, seite, betrag) {
   const lebend = ziele.filter(z => { const h = engine.gs.players[z.physOwner]?.heroes?.[z.heroIdx]; return h?.name && h.hp > 0; });
   await engine.dealDamageToTargets(quelle, lebend.map(z => ({ type: 'hero', owner: z.physOwner, heroIdx: z.heroIdx })), {
     damage: betrag, damageType: 'creature', hitDelay: 0, surpriseCheck: false, postTargetCheck: false,
+    istFlaeche: true,   // alle Helden einer Seite = echter Flächenschlag: Redirecting Aura (Umleitung) wird gefragt
   });
   getroffen = lebend.length;
   engine.sync();

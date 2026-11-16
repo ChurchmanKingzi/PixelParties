@@ -7853,7 +7853,7 @@ class GameEngine {
    * Zieht das Anhaengsel eines uebertragenen Status zum neuen Traeger um.
    * @returns {boolean} ob der Umzug geklappt hat
    */
-  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx) {
+  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     const zonen = this.gs.players[neuOwner]?.supportZones?.[neuHeroIdx];
     if (!zonen) return false;
@@ -7862,27 +7862,10 @@ class GameEngine {
       if ((zonen[z] || []).length === 0) { platz = z; break; }
     }
     if (platz < 0) return false;
-
-    const altZonen = this.gs.players[inst.owner]?.supportZones?.[inst.heroIdx];
-    const altSlot = altZonen?.[inst.zoneSlot];
-    if (Array.isArray(altSlot)) {
-      const i = altSlot.indexOf(inst.name);
-      if (i >= 0) altSlot.splice(i, 1);
-    }
-    this._broadcastEvent('play_pile_transfer', {
-      owner: inst.owner, cardName: inst.name,
-      from: 'support', to: 'support',
-      fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
-      toHeroIdx: neuHeroIdx, toSlotIdx: platz,
-      ...(neuOwner !== inst.owner ? { fromOwner: inst.owner, toOwner: neuOwner } : {}),
-    });
-    zonen[platz] = [inst.name];
-    inst.owner = neuOwner;
-    inst.heroIdx = neuHeroIdx;
-    inst.zoneSlot = platz;
-    this.log('attachment_moved', { card: inst.name, toHeroIdx: neuHeroIdx });
-    this.sync();
-    return true;
+    // ★ ATT-01/02: EIN Umhaengeweg (`actionTransferAttachment`) statt eines rohen Platztauschs — mit Austritts-/Eintritts-Haken und
+    // `attachmentMovedToHost`, damit die Wirkung der Karte (Polymorph-ATK-Bonus, Fluch-ATK-Sperre, Mind-Control-Kontrolle …) mit umzieht.
+    const r = await this.actionTransferAttachment(inst, neuOwner, neuHeroIdx, platz, { sourceName: 'Tea', quiet: true, ...opts });
+    return !!r?.success;
   }
 
   /**
@@ -21733,6 +21716,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name) && !opts.alsPlatzierung) return;
+    // ATT-04: Negationen mit „This counts as a negative status effect" (`opts.cleansable`: Anti Magic Zone, Pink Sky, Forbidden Zone, Locke, Null …) sind negative Status —
+    // Light Ball („all other targets you control are immune to all negative status effects") schuetzt die Kreaturen seiner Seite davor, wie `canApplyCreatureStatus` es fuer
+    // Frozen & Co. tut (diese Funktion ruft jene nicht auf). Unverhinderbare Negationen (Dark Gear, Diplomacy) sind kein Statuseffekt, Eigenkosten ohne `cleansable` auch nicht.
+    if (opts.cleansable && !hart && inst.zone === 'support' && this._lightBallProtects(inst.controller ?? inst.owner, 'creature')) {
+      this.log('negation_blocked', { creature: inst.name, source: (typeof source === 'string' ? source : source?.name) || 'effect', reason: 'light_ball' });
+      return;
+    }
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
@@ -49772,6 +49762,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.name || physOwner === pi || this.heroSideOf(physOwner, hero) !== pi) return false;
     if (hero.permaControlBy != null) return false;
     return !!hero.statuses?.charmed && this._charmBlocksFrom(hero, pi, { loveShotOhneSchutz: true });
+  }
+
+  /**
+   * ★ ATT-14: Charme Lv3 („It and its Support Zones are unaffected by other cards and effects"): Held UND Support Zones (Karten darin) der Spalte (`physOwner`, `heroIdx`) sind fuer jede
+   * andere Karte tabu — Anhaengsel werden dort weder angelegt noch entfernt. Die Marke `zonenGeschuetzt` setzt `temporaereKontrolle` nur bei `supportZonesLocked` (nur Charme Lv3 nennt
+   * die Zonen im Kartentext; Golden Apple & Co. nicht) und sie endet mit dem `charmed`-Status am Zugende.
+   */
+  heroZonenGeschuetzt(physOwner, heroIdx) {
+    return !!this.gs.players[physOwner]?.heroes?.[heroIdx]?.statuses?.charmed?.zonenGeschuetzt;
   }
 
   /**

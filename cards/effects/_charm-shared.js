@@ -104,6 +104,9 @@ async function temporaereKontrolle(engine, {
   if (supportZonesLocked) {
     if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
     gs._charmedSupportLocked.push({ owner: ownerPi, heroIdx });
+    // „It and its Support Zones are unaffected by other cards and effects": Marke fuer `engine.heroZonenGeschuetzt` — Anhaengsel werden dort weder angelegt (`placeAttachment`)
+    // noch entfernt (Exorcism). (Die Liste `_charmedSupportLocked` oben fuehrt auch dauerhafte Uebernahmen und wird nirgends gelesen.)
+    hero.statuses.charmed.zonenGeschuetzt = true;
   }
 
   engine.log('charm_control', {

@@ -38,8 +38,9 @@ function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
       : engine._canHeroActivateSurprise(seite, hi, 'Martyry', { spellInHand: true, reaktor: pi });
     if (!darf) continue;
     if (selected.type === 'hero' && selected.owner === seite && selected.heroIdx === hi) continue;
+    // ausgegraute Ziele (`ineligible`) sind nie Umleitungsziel (CARD_API: zaehlen nicht als Ausweichziel)
     const isValidTarget = validTargets.some(t =>
-      t.type === 'hero' && t.owner === seite && t.heroIdx === hi
+      t.type === 'hero' && t.owner === seite && t.heroIdx === hi && !t.ineligible
     );
     if (!isValidTarget) continue;
     eligible.push({ seite, hi });

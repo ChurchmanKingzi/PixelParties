@@ -64,14 +64,17 @@ module.exports = {
           c.owner === result.target.owner && c.zone === 'support' &&
           c.heroIdx === result.target.heroIdx && c.zoneSlot === result.target.slotIdx
         );
-        if (inst) {
+        // Die Kreatur kann am Schaden gestorben sein (80 > 50 HP): auf eine tote Kreatur kein Stun (Icebolt prüft ebenso `stillAlive`) — sonst öffnete sich ihr Status-Fenster
+        // (Cactus Creature) für ein Phantom-Ziel und `stun` ginge an die Ablage.
+        const stillAlive = inst && engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
+        if (stillAlive) {
           // Animation always plays — visual feedback for the hit even
           // if the stun fizzles against a Cardinal-immune target.
           engine._broadcastEvent('play_zone_animation', {
             type: 'electric_strike', owner: result.target.owner,
             heroIdx: result.target.heroIdx, zoneSlot: result.target.slotIdx,
           });
-          const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+          const applied = await engine.applyCreatureStatus(stillAlive, 'stunned', {
             sourceOwner: ctx.cardOwner,
             source: 'Heavy Hit',
           });
