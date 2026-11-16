@@ -12332,7 +12332,7 @@ function LangFlag({ menu }) {
     stripes.push(<rect key="c" x="0" y="6.67" width="19" height="3.33" fill="#ffd61a" />);
   }
   return (
-    <button className={"lang-flag-btn" + (menu ? " lang-flag-btn--menu" : "")} data-pp-px="aus" onClick={() => { if (window.playSFX) window.playSFX('ui_click'); const next = lang === 'en' ? 'de' : 'en'; if (window.AUTH_TOKEN && window.api) { window.api('/profile/lang', { method: 'POST', body: JSON.stringify({ lang: next }) }).catch(() => {}).finally(() => window.PP_I18N.set(next)); } else window.PP_I18N.toggle(); }}
+    <button className={"lang-flag-btn" + (menu ? " lang-flag-btn--menu" : "")} data-pp-px="aus" onClick={() => { if (window.playSFX) window.playSFX('ui_click'); const next = lang === 'en' ? 'de' : 'en'; if (window.AUTH_TOKEN && window.api) window.api('/profile/lang', { method: 'POST', body: JSON.stringify({ lang: next }) }).catch(() => {}); window.PP_I18N.set(next); }}
       title={lang === 'en' ? 'Language: English (click for Deutsch)' : 'Sprache: Deutsch (Klick für English)'} aria-label={'Language ' + next}>
       <svg viewBox="0 0 19 10" width="38" height="20" shapeRendering="crispEdges" style={{ imageRendering: 'pixelated', display: 'block' }}>{stripes}</svg>
     </button>
