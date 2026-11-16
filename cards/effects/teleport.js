@@ -201,6 +201,16 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
   if (plan.moves.some(m => m.mover.art === 'puppet')) tauscheSchluessel(gs._puppetActiveLock, `${seite}-${a}`, `${seite}-${b}`);   // „No other Token in the corresponding Hero's Support Zones …" hängt am Helden
   engine.sync();
 
+  // Kreaturen, die der Held ihrer Spalte als Status tragen (Stowaway: `teleportSpaltenAbgleich`): sie bleiben liegen, ihr Status gehört nach dem Tausch dem NEUEN Helden der Spalte.
+  const abgeglichen = new Set();
+  for (const c of engine.cardInstances) {
+    if (c.zone !== 'support' || engine.physicalSide(c) !== seite || (c.heroIdx !== a && c.heroIdx !== b) || abgeglichen.has(c.name)) continue;
+    const skript = require('./_loader').loadCardEffect(c.name);
+    if (typeof skript?.teleportSpaltenAbgleich !== 'function') continue;
+    abgeglichen.add(c.name);
+    try { await skript.teleportSpaltenAbgleich(engine, { seite, cols: [a, b] }); } catch (err) { console.error(`[teleportSpaltenAbgleich] ${c.name} threw:`, err.message); }
+  }
+
   // ── ③ Eintritt der Ausrüstung/Anhängsel am NEUEN Wirt (Boni neu anlegen) ──
   for (const inst of traeger) {
     if (inst.zone !== 'support') continue;
