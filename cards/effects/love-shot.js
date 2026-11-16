@@ -94,7 +94,10 @@ module.exports = {
   // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Deck-Zug, Heldenübernahme) — gegen den durch die Erste-Runden-Immunität
   // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
   blockedByFirstTurnProtection: true,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („choose a Hero your opponent controls and perform an Attack or Spell … with it") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
+  blindedEigeneZiele: false,
 
   /**
    * ★ „This Spell can be used by Heroes with the «Charme» Ability

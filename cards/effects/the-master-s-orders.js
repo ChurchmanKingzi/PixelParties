@@ -135,8 +135,10 @@ function wirtWert(engine, side, hi) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to a Hero your opponent controls") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,           // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)

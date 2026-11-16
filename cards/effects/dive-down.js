@@ -135,7 +135,7 @@ module.exports = {
   // ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   spellVisual: { impact: { type: 'dive_down' }, impactMs: 300 },
 
-  requiresTarget: true,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Dive Down waehlt kein Ziel (der Nutzer ist der tauchende Held, keine Zielwahl) → ignoriert Blinded; deshalb KEIN `requiresTarget`.
   activeIn: ['hand'],
   reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 

@@ -59,8 +59,7 @@ module.exports = {
     impact: { type: 'electric_strike' }, impactMs: 260,
   },
 
-  requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Wirker waehlt nichts — der GEGNER waehlt seine Ziele selbst (und die liegende Karte ist eine Dauerwirkung) → ignoriert Blinded; KEIN `requiresTarget`.
   // Active in 'hand' for self-cast onPlay; in 'support' for the
   // recurring opp-turn-start damage hook.
   activeIn: ['hand', 'support'],

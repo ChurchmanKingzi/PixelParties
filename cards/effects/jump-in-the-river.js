@@ -276,8 +276,7 @@ module.exports = {
     if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
-  requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Jump in the River waehlt kein Ziel (der Nutzer ist der tauchende Held, keine Zielwahl) → ignoriert Blinded; deshalb KEIN `requiresTarget`.
   // Fire hooks ONLY from hand zone
   activeIn: ['hand'],
   reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)

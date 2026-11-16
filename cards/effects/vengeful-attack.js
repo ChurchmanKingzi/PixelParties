@@ -54,7 +54,10 @@ module.exports = {
   // Gefizzelt (Wirker beim Auflösen handlungsunfähig) → trotzdem gestempelt.
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber das Ziel ist per Text der Taeter, der etwas Eigenes besiegt hat — also immer ein gegnerisches Ziel; ein geblendeter
+  // Held darf nur eigene waehlen → nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
+  blindedEigeneZiele: false,
   cpuMeta: { scalesWithSchool: 'Fighting' },
 
   /** Grau, solange die Karte diesen Zug schon gespielt wurde oder es keinen Täter zu bestrafen gibt. */
