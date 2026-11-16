@@ -80,6 +80,22 @@ function getOtherValidTargets(selected, validTargets, engine) {
   return validTargets.filter(t => t && t.id !== selected.id && istHeldOderKreatur(engine, t));
 }
 
+/**
+ * „exactly 1 target you control is chosen" (wie Alleria, W24d): Anzahl der vom Effekt GEWAEHLTEN Ziele (Held/Kreatur), die `ownerIdx` kontrolliert — die Umleitungsfenster geben die
+ * ganze Auswahl in `config._redirectPickedIds` mit (nur das aktuelle Ziel, wenn der Aufrufer sie nicht fuehrt).
+ */
+function gewaehlteEigeneZiele(engine, ownerIdx, selected, validTargets, config) {
+  const ids = Array.isArray(config?._redirectPickedIds) && config._redirectPickedIds.length
+    ? config._redirectPickedIds : [selected.id];
+  let n = 0;
+  for (const id of ids) {
+    const v = id === selected.id ? selected : (validTargets || []).find(t => t && t.id === id);
+    if (!v || !istHeldOderKreatur(engine, v)) continue;
+    if ((engine?.zielSeite ? engine.zielSeite(v) : v.owner) === ownerIdx) n++;
+  }
+  return n;
+}
+
 module.exports = {
   // Marks this as a target-redirect card for the engine's redirect
   // scanner (`_checkTargetRedirect`).
@@ -104,6 +120,8 @@ module.exports = {
     // Must be a target the Anti-Magnet player controls.
     // Kontrolle statt Seite (Styx 28.9.).
     if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
+    // „exactly 1 target you control is chosen": waehlt der Effekt mehrere eigene Ziele (Fireball auf zwei eigene Helden), ist Anti-Magnet nicht ausloesbar.
+    if (gewaehlteEigeneZiele(engine, pi, selected, validTargets, config) !== 1) return false;
 
     // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow).
     const ps = gs.players[pi];
