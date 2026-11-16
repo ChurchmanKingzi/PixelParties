@@ -2611,6 +2611,9 @@ class GameEngine {
     this.cardInstances.push(inst);
     // W63c: eine fremde Handkarte (Charme Lv 2, Diebstahl, Geschenk …) betritt das Brett — die Instanz gehoert weiter ihrem BESITZER.
     if (zone === ZONES.SUPPORT || zone === ZONES.ABILITY || zone === ZONES.SURPRISE || zone === ZONES.AREA || zone === ZONES.HERO) this._stempelFremdHerkunft(inst);
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): waehrend die Kopie wirkt (`_spiegelKopieName`), ist jede Brettinstanz desselben Namens, die dabei entsteht
+    // (Anhaengsel am Helden …), selbst eine Kopie — Marke `_spiegelKopie` (siehe `isTokenCard`).
+    if (this._spiegelKopieName && name === this._spiegelKopieName && zone !== ZONES.HAND) inst.counters._spiegelKopie = true;
     return inst;
   }
 
@@ -16129,7 +16132,7 @@ class GameEngine {
     // Z5: gleiche Konvention fuer „zurueck auf die Hand" (Chasing the Legend, Surprising Opportunity …): ein Token ist keine Karte.
     if ((toZone === ZONES.DISCARD || toZone === ZONES.HAND) && fromZone === 'support') {
       const _tokenCd = this.getEffectiveCardData(cardInstance);
-      if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
+      if ((_tokenCd && hasCardType(_tokenCd, 'Token')) || cardInstance.counters?._spiegelKopie) {   // Magic-Mirror-Kopie: wie ein Token ohne Karte darunter (verschwindet, `tokenAbgang`)
         // W64a (Al, 23.10.2026): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (auch bei „zurück auf die Hand").
         toZone    = this.tokenStapelZiel(cardInstance) === 'discard' ? ZONES.DISCARD : ZONES.DELETED;
         toHeroIdx = -1;
@@ -30041,9 +30044,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
    * Broadcasts the coin-burst animation on both gold counters.
    *
-   * `opts.verlustBleibtBeiSperre` (Thieving, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes gesperrt (Golden Arrow `goldLocked`,
-   * Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg". Ohne die Option bleibt es beim
-   * alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann `{ stolen: 0, lost: <Menge>, fizzled: false }`.
+   * `opts.verlustBleibtBeiSperre` (Thieving, Deepsea Pirate, Dirty Smuggler, Mimic, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes
+   * gesperrt (Golden Arrow `goldLocked`, Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg".
+   * Ohne die Option bleibt es beim alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann
+   * `{ stolen: 0, lost: <Menge>, fizzled: false }`. Der Erstzug-Schutz des Opfers fizzelt IMMER (auch mit der Option): der Gegner verliert nichts.
    */
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
@@ -49660,6 +49664,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {boolean}
    */
   isTokenCard(inst) {
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): die Kopie, die der Spiegel wirkt, ist KEINE permanente Karte — sie verhaelt sich wie ein Token ohne echte Karte darunter
+    // (`counters._spiegelKopie`): sie wirkt/liegt als Anhaengsel auf dem Brett, geht beim Abgang aber nie in Ablage, Gelöscht-Stapel, Deck oder Hand (`tokenAbgang`).
+    if (inst?.counters?._spiegelKopie) return true;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst?.name];
     return !!(cd && hasCardType(cd, 'Token'));
   }
@@ -49711,6 +49718,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   tokenUnterkarte(inst) {
     if (!inst || !this.isTokenCard(inst)) return null;
+    if (inst.counters?._spiegelKopie) return null;   // Magic-Mirror-Kopie: es liegt keine echte Karte darunter
     const roh = this._getCardDB()[inst.name];
     return (roh && !hasCardType(roh, 'Token')) ? inst.name : null;
   }
@@ -57099,11 +57107,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
+      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
         // Beast name fallback and identity stay clean.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): „cannot take damage or be defeated" (Time Bomblebee) hält Idas Zauberschaden NICHT ab
+        // (`e.ignoreUnaffected`, siehe Ida) — nur „unaffected by ALL cards and effects" (Cardinal Beasts …) bleibt immun.
         e._immuneCreature = true;
       } else if (inst?.counters?._monkeeShieldUntilTurn != null
                  && this.gs.turn < inst.counters._monkeeShieldUntilTurn
@@ -57119,8 +57129,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         e._immuneCreature = true;
       } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
-      } else if (inst?.counters?._stealImmortal) {
+      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert auch diesen Schutz (`e.ignoreUnaffected`).
         e._immuneCreature = true;
       } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source, { ignoreUnaffected: e.ignoreUnaffected === true })) {
         // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
@@ -58803,7 +58814,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if ((supZones[zi] || []).indexOf(inst.name) >= 0) { slotIdx = zi; break; }
         }
         const effectiveCd = this.getEffectiveCardData(inst);
-        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token'));
+        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token')) || !!inst.counters?._spiegelKopie;   // Magic-Mirror-Kopie (Spielgestalter-Entscheidung 16.11.2026): kein Stapel
         // Zone-anchored fly-out so the client animates this equip from THIS
         // hero's exact slot, not the leftmost same-named one — e.g. two
         // Lifeforce Howitzers on different heroes. The client's name-keyed

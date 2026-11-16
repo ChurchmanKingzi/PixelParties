@@ -31,6 +31,11 @@
 module.exports = {
   activeIn: ['hero'],
 
+  // Spielgestalter-Entscheidung 16.11.2026: Idas Stempel (`canBeNegated = false`, `ignoreUnaffected`) muss VOR den Schutz-Hooks anderer Karten stehen, die Schaden
+  // an Kreaturen verhindern/negieren (Wowkyrie, Guardian Beast Gou …) — sonst entscheidet die Reihenfolge (Zugspieler zuerst), ob Ida durchkommt, wenn sie
+  // NICHT am Zug ist (Reaktion). Der Hook ändert keinen Betrag, die Vorrang-Stufe verschiebt nur den Stempel nach vorn.
+  hookPriority: { beforeCreatureDamageBatch: 1 },
+
   hooks: {
     /**
      * On game start + on play + every turn start: register the single-
@@ -115,6 +120,8 @@ module.exports = {
         // „unaffected by (your opponent's) cards and effects" / „unaffected by [Typ]" (Black-Thorn Dragon, Golden Wings, Sparkfly Attendant,
         // Rook/Board of Kings), NICHT aber „unaffected by ALL cards and effects" (Cardinal Beasts, Stowaway, Hot Skull Potato …).
         // Die Engine liest den Stempel in `_markCreatureDamageImmunity` (Neubewertung nach dieser Hook-Runde).
+        // Erweitert (Spielgestalter-Entscheidung 16.11.2026): auch „cannot take damage / cannot be defeated" (Time Bomblebee, Deepsea Succubus) und „damage is negated"
+        // (Resilient Monkee, Divine Gift of the Guardian, The Egg of God, Wowkyrie, Guardian Beast Gou) halten Idas Zauberschaden NICHT ab.
         e.ignoreUnaffected = true;
       }
     },

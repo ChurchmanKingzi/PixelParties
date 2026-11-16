@@ -16,6 +16,14 @@
 //  Die grosszuegigere Lesart trifft dann trotzdem zu, weil die
 //  Bedingung „drei auf Stufe 1" erfuellt ist.
 //
+//  ── RESISTANCE (Spielgestalter-Entscheidung 16.11.2026) ──────────
+//  Die Klausel waehlt KEINE Ability, sie trifft den HELDEN (alle seine
+//  Abilities) — ein Nicht-Schadens-Effekt auf den Helden: Resistance
+//  faengt ihn ab (`heroNonDamageEffectBlocked`, 'ability_discard', einmal
+//  je Held, erst wenn die Bedingung „3 Abilities auf Stufe 1" erfuellt
+//  ist — eine unnoetig verbrauchte Ladung waere falsch). Der Attack-
+//  Schaden selbst bleibt (Resistance gilt nicht fuer Schaden).
+//
 //  Eingesammelt wird ueber `engine.getAbilityTargets` — der zentrale
 //  Sammler, der Ability-Zonen UND als Ability zaehlende Support-Karten
 //  abdeckt (Vorschrift aus CARD_API.md). Selbst durch die Zonen zu
@@ -60,6 +68,9 @@ module.exports = makeCrusaderArtifact({
     const abilities = engine.getAbilityTargets(opferSeite, { heroIdx: opferHeld });
     const aufStufe1 = abilities.filter(a => a.level === 1).length;
     if (aufStufe1 < LEVEL1_SCHWELLE) return;
+
+    // Spielgestalter-Entscheidung 16.11.2026: der Zusatzeffekt trifft den Helden (nicht eine gewaehlte Ability) → Resistance blockt ihn.
+    if (await engine.heroNonDamageEffectBlocked(opferSeite, opferHeld, 'ability_discard', { sourceOwner: pi, source: CARD_NAME })) return;
 
     // Alle Abilities dieses Helden — nicht nur die auf Stufe 1. Der
     // Text sagt „send ALL Abilities attached to that Hero".

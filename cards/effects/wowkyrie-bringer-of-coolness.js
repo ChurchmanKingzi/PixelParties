@@ -54,6 +54,8 @@ module.exports = {
       if (engine.getCoolnessStackSize(ctx.cardOwner) < STACK_THRESHOLD) return;
       const entries = ctx.entries || [];
       for (const e of entries) {
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert jeden Schutz, der Schaden verhindert/negiert (nur „unaffected by ALL cards and effects" bleibt) — `e.ignoreUnaffected`.
+        if (e.ignoreUnaffected === true) continue;
         if (e.inst?.id === ctx.card.id) {
           e.amount = 0;
           e.negated = true;
