@@ -1878,7 +1878,7 @@ async function activateHeroEffects(engine, helpers) {
         const ms = loadCardEffect('Mummy Token');
         let ok = !!(ms?.heroEffect && ms?.onHeroEffect) && gs.hoptUsed?.[`hero-effect:MummyToken:${cpuIdx}:${hi}`] !== gs.turn
           && !engine.isHeroEffectBlockedByGraceShield(ms, cpuIdx);
-        if (ok && hero.statuses && ['blinded', 'blinded_hit'].some(n => hero.statuses[n]) && ms.requiresTarget === true) ok = false;
+        if (ok && engine.blindedEffektGesperrt(cpuIdx, cpuIdx, hi, 'Mummy Token', { script: ms })) ok = false;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn der Effekt nur Gegner waehlen kann
         if (ok && ms.canActivateHeroEffect) {
           try { ok = !!ms.canActivateHeroEffect(engine._createContext(mumieInst, { event: 'canHeroEffectCheck' })); } catch { ok = false; }
         }

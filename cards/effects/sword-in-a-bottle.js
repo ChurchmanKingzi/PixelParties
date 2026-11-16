@@ -64,7 +64,7 @@ function angreifer(gs, pi, engine, nurAngriffsfaehig) {
       const h = helden[hi];
       if (!h?.name || h.hp <= 0) continue;
       if (seiteVon(p, h) !== pi) continue;
-      if (nurAngriffsfaehig && engine && !engine.heroKannAngreifen(p, hi, pi)) continue;
+      if (nurAngriffsfaehig && engine && !engine.heroKannAngreifen(p, hi, pi, { blindedName: CARD_NAME })) continue;
       out.push({ physOwner: p, heroIdx: hi, hero: h });
     }
   }
@@ -140,7 +140,7 @@ module.exports = {
       for (const t of engine.getHeroTargets(p)) {
         const seite = engine.heroSideOf(p, gs.players[p]?.heroes?.[t.heroIdx]);
         if (seite === gegner && schutz) continue;
-        if (seite === playerIdx && !engine.heroKannAngreifen(p, t.heroIdx, playerIdx)) continue;   // W32a: nur angriffsfaehige eigene Helden als Angreifer
+        if (seite === playerIdx && !engine.heroKannAngreifen(p, t.heroIdx, playerIdx, { blindedName: CARD_NAME })) continue;   // W32a: nur angriffsfaehige eigene Helden als Angreifer
         ziele.push({ ...t, seite });
       }
     }
@@ -194,7 +194,7 @@ module.exports = {
     const eigenes = gewaehlt.find(t => validTargets.some(v => v.id === t.id) && t.type === 'hero'
       && gewaehlt.some(o => seite(o) !== seite(t)));
     if (!eigenes) return false;
-    if (engine && typeof pi === 'number' && !engine.heroKannAngreifen(eigenes.owner, eigenes.heroIdx, pi)) return false;   // W32a: der Angreifer muss angreifen koennen
+    if (engine && typeof pi === 'number' && !engine.heroKannAngreifen(eigenes.owner, eigenes.heroIdx, pi, { blindedName: CARD_NAME })) return false;   // W32a: der Angreifer muss angreifen koennen
     // W29a: Paarregel (Alliance) – `engine`/`pi` liefert der Server (`doConfirmPotion`); ohne sie (alte Aufrufer) entfaellt die Pruefung.
     if (engine && typeof pi === 'number' && paarGesperrt(engine, pi, eigenes, gewaehlt.find(o => o !== eigenes), validTargets)) return false;
     // W39a: Hero-Zielschutz (Butterfly Cloud, Invisibility) gilt für dieses Paar, außer der Angreifer trägt das Truth-Seeing Eye
@@ -280,7 +280,7 @@ module.exports = {
     const angreiferHeld = gs.players[held.owner]?.heroes?.[held.heroIdx];
     if (!angreiferHeld?.name || angreiferHeld.hp <= 0) return;
     if (seiteVon(held.owner, angreiferHeld) !== pi) return;
-    if (!engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return { aborted: true };   // W32a: zwischen Wahl und Aufloesung eingefroren/betaeubt/gesperrt → blockiert, Karte bleibt auf der Hand (Konvention `aborted`)
+    if (!engine.heroKannAngreifen(held.owner, held.heroIdx, pi, { blindedName: CARD_NAME })) return { aborted: true };   // W32a: zwischen Wahl und Aufloesung eingefroren/betaeubt/gesperrt → blockiert, Karte bleibt auf der Hand (Konvention `aborted`)
 
     const schaden = angriffswert(engine, held.owner, held.heroIdx);
     if (!(schaden > 0)) return;
@@ -349,7 +349,7 @@ module.exports = {
     // erneut gespielt; die Einmal-pro-Zug-Sperre bleibt unberührt. Kann der Held nicht mehr angreifen oder wird die Wahl abgebrochen/negiert, findet keine Wiederholung statt.
     const wiederhole = async () => {
       const h = gs.players[held.owner]?.heroes?.[held.heroIdx];
-      if (!h?.name || h.hp <= 0 || !engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return false;
+      if (!h?.name || h.hp <= 0 || !engine.heroKannAngreifen(held.owner, held.heroIdx, pi, { blindedName: CARD_NAME })) return false;
       const dmg2 = angriffswert(engine, held.owner, held.heroIdx);
       if (!(dmg2 > 0)) return false;
       const vorhanden = engine.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === CARD_NAME);

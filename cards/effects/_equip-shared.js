@@ -141,6 +141,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
     greenSelect: true,
     exclusiveTypes: false,
     maxPerType: { hero: 1, equip: 1 },
+    ignoreBlinded: true,   // Blinded (Spielgestalter-Entscheidung 16.11.2026): Held/Zone zum AUSRUESTEN waehlen ist Platzieren, kein „Auswaehlen" eines Ziels
   });
   if (!ids || ids.length === 0) return null;
   const ziel = ziele.find(t => t.id === ids[0]);

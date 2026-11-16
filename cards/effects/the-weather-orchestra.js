@@ -229,6 +229,7 @@ module.exports = {
             description: `Choose a Support Zone (any Hero on the board) for ${c.name}.`,
             confirmLabel: '🎼 Equip here!', confirmClass: 'btn-success', cancellable: false, greenSelect: true,
             previewCardName: c.name, exclusiveTypes: true, maxPerType: { equip: 1 },
+            ignoreBlinded: true,   // Blinded (Spielgestalter-Entscheidung 16.11.2026): einen Platz zum Ausruesten zu waehlen ist kein „Auswaehlen" eines Ziels
           });
           const hit = ids && zoneTargets.find(t => t.id === ids[0]);
           if (hit) dest = dests.find(d => d.side === hit.owner && d.heroIdx === hit.heroIdx && d.slotIdx === hit.slotIdx) || dests[0];

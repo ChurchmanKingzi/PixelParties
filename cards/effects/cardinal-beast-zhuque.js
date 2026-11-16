@@ -32,8 +32,9 @@ module.exports = {
   },
 
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Effekt; das Skript bietet NUR Gegnerziele an (Text: „choose a target") → unter Blinded nicht aktivierbar (`blindedEigeneZiele: false`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
   creatureEffect: true,
 
   // Cardinal Beasts are signature win-condition pieces — their once-per-
