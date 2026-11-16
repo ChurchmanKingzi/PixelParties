@@ -343,6 +343,8 @@ module.exports = {
      * `onAnyActionResolved`; `onActiveEffectUsed` meldet sie NACH ihrem Effekt — so kehrt das Opfer gleich danach zurück statt erst beim nächsten Haltepunkt.
      */
     onActiveEffectUsed: async (ctx) => {
+      // Nur auf oberster Ebene: mitten in einem Zauber / Flächentreffer löst dessen Nachlauf-Punkt auf (gleichzeitige Tode bleiben gebündelt).
+      if ((ctx._engine.gs._spellResolutionDepth || 0) > 0 || ctx._engine._multiHitScope) return;
       await loeseAusstehende(ctx);
     },
 
