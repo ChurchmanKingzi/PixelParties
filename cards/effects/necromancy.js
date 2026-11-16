@@ -131,6 +131,10 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
   noDefaultFlash: true, // Skip the generic gold sparkle — Necromancy plays its own animation
+  // Die Aktivierung IST eine Beschwoerung: unter `summonLocked` (Shadowy Slime: „you cannot summon any more Creatures for the rest of the turn",
+  // Tamed Primordium, Infected Squirrel …) ist sie grau und der Server verweigert sie. Der Loader erkennt das hier nicht selbst
+  // (keine Beschwoerungs-Primitive im Skript: die Platzierung laeuft ueber `zoneEintragen`/`_trackCard`) - also manuelles Flag (CARD_API „Sperren auf Nebenwegen").
+  blockedBySummonLock: true,
 
   // CPU per-hero attachment scoring. Necromancy's value is entirely
   // gated on the host Hero's Summoning Magic level (the cap on which
