@@ -47202,7 +47202,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           const oppPs = this.gs.players[link.owner];
           const zielIdx = diebPs.hand.length;
           diebPs.hand.push(link.cardName);
-          this._tagHandCardOrigin(dieb, link.cardName, link.owner);   // kehrt spaeter zum Besitzer zurueck
+          // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte: spielte `link.owner` eine gestohlene Karte, gehoert sie dem Bestohlenen (Key holt sie zurueck →
+          // keine Fremdmarke auf seiner eigenen Karte). Wie der Ablagezweig unten (`handKartenBesitzerPs`); aus Deck/Vorrat gespielt gilt `link.owner`.
+          const _kartenBesitzer = (oppPs && !link.fromDeck && !link.fromCreation)
+            ? this.gs.players.indexOf(this.handKartenBesitzerPs(oppPs, link.cardName)) : -1;
+          this._tagHandCardOrigin(dieb, link.cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : link.owner);   // kehrt spaeter zum Besitzer zurueck
           if (link._negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, link.cardName);
           if ((link.goldCost || 0) > 0 && oppPs) {
             oppPs.gold = (oppPs.gold || 0) + link.goldCost;
@@ -47694,7 +47698,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const diebPs = this.gs.players[dieb];
       const zielIdx = diebPs.hand.length;
       diebPs.hand.push(cardName);
-      this._tagHandCardOrigin(dieb, cardName, ownerIdx);   // kehrt spaeter zum Besitzer zurueck
+      // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte (s. Reaktionsglied-Zweig in `_resolveReactionChain`): eine gestohlene Karte, die ihr Besitzer per Key
+      // zurueckholt, bekommt keine Fremdmarke auf seiner eigenen Hand. Nur Handkarten tragen Herkunftsmarken (`opts.fromZone`).
+      const _besitzerPs = (!opts.fromZone || opts.fromZone === 'hand') ? this.handKartenBesitzerPs(ps, cardName) : ps;
+      const _kartenBesitzer = this.gs.players.indexOf(_besitzerPs);
+      this._tagHandCardOrigin(dieb, cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : ownerIdx);   // kehrt spaeter zum Besitzer zurueck
       if (chainResult?.negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);   // 24.10. Reverse Trap
       this._broadcastEvent('play_pile_transfer', {
         cardName, from: 'hand', to: 'hand',
