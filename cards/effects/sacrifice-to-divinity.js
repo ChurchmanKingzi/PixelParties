@@ -48,6 +48,10 @@ function opferSpec() {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „attach it to one of your Heroes".
+  requiresTarget: true,
+
   inherentAction: true,
 
   /**
