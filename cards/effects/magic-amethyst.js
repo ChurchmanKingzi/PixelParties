@@ -39,6 +39,8 @@ function _gegnerHelden(gs, pi, engine) {
 
 /** True iff the opp hero at `hi` has at least 1 Ability stacked anywhere (Ability Zones oder Support Zonen). */
 function _heroHasAbilities(ps, hi, engine, oi) {
+  // v1375 (Love-Shot-Errata): die Ability-Karten eines TEMPORÄR gesteuerten Helden (Charme, Love Shot, Golden Apple) sind „unaffected by all effects" — es gibt dort nichts abzuwerfen.
+  if (engine?.istTemporaerGesteuert?.(ps.heroes?.[hi])) return false;
   const zones = ps.abilityZones?.[hi] || [];
   for (const slot of zones) {
     if ((slot || []).length > 0) return true;
@@ -109,7 +111,7 @@ module.exports = {
     alwaysCommit: (engine, pi) => {
       try {
         for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(engine.gs, pi, engine)) {   // Kontrolle, nicht Spalte (F02-08)
-          if (!h?.name || h.hp <= 0) continue;
+          if (!h?.name || h.hp <= 0 || engine.istTemporaerGesteuert(h)) continue;   // temporär gesteuert: Abilities unberührbar (v1375)
           const zones = engine.gs?.players?.[physOwner]?.abilityZones?.[hi];
           if (Array.isArray(zones)) {
             for (const z of zones) {
@@ -171,8 +173,16 @@ module.exports = {
     // Re-build the gallery at resolve time — the board state may have
     // shifted between target pick and resolve (rare via reactions).
     const gallery = _buildAbilityGallery(ops, hi, engine, seite);
-    if (gallery.length === 0) {
+    if (gallery.length === 0 || engine.istTemporaerGesteuert(zielHeld)) {   // v1375: Abilities eines temporär gesteuerten Helden sind unberührbar
       // No abilities left → silent fizzle on the main effect.
+      return await maybeKeepGemInHand(engine, pi, CARD_NAME);
+    }
+
+    // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt, fremden Ability-Abwurf ausdrücklich): der Effekt wählt den HELDEN und wirft eine seiner Abilities ab
+    // (wie Memory Wipe) — einmal je Effekt fragen, bevor der Kontrolleur wählt. Geblockt: nichts wird abgeworfen; der Einmal-Einsatz der Karte zählt trotzdem als gewirkt.
+    if (await engine.heroNonDamageEffectBlocked(seite, hi, 'ability_discard', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('magic_amethyst_blocked', { player: engine.gs.players[pi]?.username, hero: zielHeld.name });
+      engine.sync();
       return await maybeKeepGemInHand(engine, pi, CARD_NAME);
     }
 
@@ -221,32 +231,23 @@ module.exports = {
     if (chosen && chosenSlot >= 0) {
       const slotArr = ops.abilityZones[hi]?.[chosenSlot];
       if (slotArr && slotArr.length > 0 && slotArr[slotArr.length - 1] === chosen) {
-        // Pop the top of the stack and route through the standard
-        // discard pile. Untrack the ability inst so the engine's
-        // tracking stays consistent.
-        slotArr.pop();
-        const inst = engine.cardInstances.find(c =>
-          c.zone === 'ability' && c.owner === seite && c.heroIdx === hi
-          && c.zoneSlot === chosenSlot && c.name === chosen
+        // Oberste Kopie über die EINE Brett→Ablage-Primitive (wie die Support-Zonen-Variante oben): sie fährt den Leave-Hook (Fighting nimmt seinen ATK-Bonus zurück),
+        // untrackt die Karte, legt sie in die Ablage ihres BESITZERS (nicht der Spalte des Helden — „Verbotene Muster", CARD_API) und fragt die Leafagami Snake
+        // (die Ability bleibt liegen, der Kontrolleur der Schlange zieht).
+        const vorher = slotArr.length;
+        await engine.discardAbilityTopCopy(
+          { owner: seite, heroIdx: hi, slotIdx: chosenSlot, zoneKind: 'ability' },
+          { source: { name: CARD_NAME, owner: pi }, sourceOwner: pi },
         );
-        if (inst) {
-          // Fire onCardLeaveZone before untracking so any per-card
-          // cleanup (like Fighting's atkGranted revoke) runs.
-          await engine.runHooks('onCardLeaveZone', {
-            _onlyCard: inst, leavingCard: inst, fromZone: 'ability',
-            fromOwner: seite, fromHeroIdx: hi, fromZoneSlot: chosenSlot,
-            toZone: 'discard', _skipReactionCheck: true,
+        if (slotArr.length < vorher) {   // wirklich abgeworfen (nicht von der Leafagami Snake gehalten)
+          await engine.runHooks('onDiscard', {
+            playerIdx: oi, cardName: chosen, discardedCardName: chosen,
+            _skipReactionCheck: true,
           });
-          engine._untrackCard(inst.id);
+          engine.log('magic_amethyst_discard', {
+            player: engine.gs.players[oi]?.username, ability: chosen, hero: ops.heroes[hi]?.name,
+          });
         }
-        ops.discardPile.push(chosen);
-        await engine.runHooks('onDiscard', {
-          playerIdx: oi, cardName: chosen, discardedCardName: chosen,
-          _skipReactionCheck: true,
-        });
-        engine.log('magic_amethyst_discard', {
-          player: engine.gs.players[oi]?.username, ability: chosen, hero: ops.heroes[hi]?.name,
-        });
         engine.sync();
       }
     }
