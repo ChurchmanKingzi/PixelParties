@@ -13946,7 +13946,13 @@ class GameEngine {
   //  • `revealedHandIndices(pi)` / `anyHandCardRevealed()`  welche Handkarten gelten als aufgedeckt (alle Wege: Luna Kiai, Bamboo Shield, Crystals, Madaga, Arcane Eyes).
   arcaneEyesFor(ctrlIdx) {
     if (ctrlIdx == null || ctrlIdx < 0) return null;
-    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && c.zone === ZONES.SUPPORT && !c.faceDown
+    // Held als Kreatur (Hulijing, „This Hero becomes that Creature"): die Überlagerung (`heroOverlay`) ist die Kreatur — sie zählt wie eine Karte in einer Support Zone, solange ihr Wirt lebt (fällt er, gilt sie als besiegt).
+    const ueberlagerungLebt = (c) => {
+      if (c.zone !== ZONES.HERO_OVERLAY || !c.counters?._heldKreatur) return false;
+      const w = require('./_hero-creature-shared').wirtVon(this, c);
+      return !!w?.hero && w.hero.hp > 0 && !w.hero.heldKreatur?._tot;
+    };
+    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && (c.zone === ZONES.SUPPORT || ueberlagerungLebt(c)) && !c.faceDown
       && this.kontrolleurVon(c) === ctrlIdx && !this.isCardPassiveDormant(c)) || null;
   }
 

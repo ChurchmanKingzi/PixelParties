@@ -30,7 +30,8 @@ const CARD_NAME = 'Arcane Eyes';
 
 /** Kontrolliert `pi` schon eine aufgedeckte Arcane Eyes? (die Karte in der Hand zählt nicht) */
 function kontrolliertSchon(engine, pi, ausser = null) {
-  return (engine.cardInstances || []).some(c => c.name === CARD_NAME && c.zone === 'support' && !c.faceDown
+  // `heroOverlay`: ein Held, der zu dieser Kreatur geworden ist (Hulijing), kontrolliert sie ebenfalls (`arcaneEyesFor` liest dieselbe Überlagerung).
+  return (engine.cardInstances || []).some(c => c.name === CARD_NAME && (c.zone === 'support' || c.zone === 'heroOverlay') && !c.faceDown
     && (c.controller ?? c.owner) === pi && c !== ausser);
 }
 
