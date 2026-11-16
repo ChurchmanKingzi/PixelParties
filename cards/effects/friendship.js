@@ -141,11 +141,12 @@ module.exports = {
      * ★ Abgang einer Kopie: Die Zusatzaktion haengt an EINER Instanz je Held (der ersten Friendship-Karte, `setupAdditionalAction`). Wirft ein Effekt
      * eine Kopie ab (Weird Doll, Fire Bomb, Magic Amethyst … nehmen die Instanz nach Namen, also die ERSTE statt der obersten), kann das genau diese
      * Instanz sein, obwohl Friendship (Lv3→2, 2→1) noch am Helden liegt — die Zusatzaktion verfiel samt Instanz. Sie wandert, mit dem Stand dieses
-     * Zuges (schon eingesetzt = 0), auf eine verbleibende Kopie desselben Helden. Liegt keine mehr da, geht sie mit der Karte.
+     * Zuges (schon eingesetzt = 0), auf eine verbleibende Kopie desselben Helden. Liegt keine mehr da, erlischt sie mit der Karte (auch an der
+     * Ablage-Instanz, die `sendBoardCardToDiscard` in `cardInstances` zurueckliess: sie gab sonst weiter eine Zusatzaktion).
      */
     onCardLeaveZone: async (ctx) => {
-      if (ctx.fromZone !== 'ability') return;
       const inst = ctx.card;
+      if (ctx.fromZone !== 'ability' && !(ctx.fromZone === 'support' && ctx._engine.istAbilityImSupport(inst))) return;   // auch ein Stapel in einer Support Zone (Xal, Xalibur)
       const weg = ctx.leavingCard || ctx._onlyCard;
       if (!inst || !weg || weg.id !== inst.id) return;   // nur die abgehende Karte selbst
       const grants = inst.counters?.aaGrants;
@@ -156,13 +157,12 @@ module.exports = {
       const rest = engine.cardInstances.find(c =>
         c.id !== inst.id && c.name === 'Friendship' && c.owner === inst.owner && c.heroIdx === inst.heroIdx
         && engine.istWirksameAbility(c));
-      if (!rest) return;
-      if (!rest.counters.aaGrants) rest.counters.aaGrants = {};
+      if (rest && !rest.counters.aaGrants) rest.counters.aaGrants = {};
       for (const k of typen) {
-        rest.counters.aaGrants[k] = grants[k];
-        delete grants[k];
+        if (rest) rest.counters.aaGrants[k] = grants[k];
+        delete grants[k];   // die abgegangene Instanz bleibt in `cardInstances` (Zone Ablage) — sie darf keine Zusatzaktion mehr geben
       }
-      engine._syncAAMirror(rest);
+      if (rest) engine._syncAAMirror(rest);
       engine._syncAAMirror(inst);
     },
 
