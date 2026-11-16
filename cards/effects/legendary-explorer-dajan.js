@@ -236,6 +236,15 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   if (engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName) >= 0) destSlot = engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName);   // Darion: Pflicht-Platz im Equip-Stapel
   else if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
 
+  // Spielgestalter-Entscheidung 16.11.2026: Ausrüsten PER EFFEKT prallt an der Resistance des Trägers ab (Regel Welle 14 Q5) — Dajans Deck-Spiel genauso wie Treasure Hunter's Backpack
+  // (`heroNonDamageEffectBlocked(…, 'equip')`, VOR jeder Kartenbewegung). Wie beim Backpack bleibt die Ausrüstung im Deck (kein Mischen, kein Aufdecken), es wird nichts bezahlt, nichts
+  // abgelegt — Karte und Gold sind unberührt, der Heldeneffekt ist gewirkt und verbraucht (Rückgabe 'blocked': `onHeroEffect` überspringt das Mischen und meldet Erfolg, die Aktion bleibt weg).
+  if (await engine.heroNonDamageEffectBlocked(destSeite, destHeroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+    engine.log('dajan_equip_blocked', { player: ps.username, equip: cardName, hero: dps.heroes?.[destHeroIdx]?.name });
+    engine.sync();
+    return 'blocked';
+  }
+
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.
   const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
@@ -459,6 +468,7 @@ module.exports = {
     if (isEquip) {
       success = await _playEquip(engine, pi, chosenName, cd, cost);
       if (!success) return false; // Cancelled before commitment.
+      if (success === 'blocked') return true;   // Resistance des Trägers fing das Ausrüsten ab (siehe `_playEquip`): Effekt verbraucht, Karte bleibt im Deck, kein Mischen/Aufdecken
     } else if (isTargeting) {
       // Build validTargets + run the script's UI prompt inline.
       const validTargets = script.getValidTargets(gs, pi, engine) || [];
