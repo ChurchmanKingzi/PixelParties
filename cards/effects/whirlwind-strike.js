@@ -111,7 +111,9 @@ module.exports = {
         // Skipped when singleTargetAttack is active — only the hero itself is hit.
         if (!singleTargetOnly) {
           for (const inst of engine.cardInstances) {
-            if (inst.owner !== tgt.owner) continue;
+            // „Creatures in their Support Zones" = nach BRETTSEITE (`physicalSide`), nicht nach `owner`: eine seitenfremd kontrollierte Kreatur (Elusive Hind
+            // des Wirkers in der Zone des Gegnerhelden) hat `owner` = Wirker und wurde sonst übersprungen. Wie `kreaturZiel`/Chain Lightning.
+            if (engine.physicalSide(inst) !== tgt.owner) continue;
             if (inst.zone !== 'support') continue;
             if (inst.heroIdx !== tgt.heroIdx) continue;
             // Check cardType from DB
@@ -200,11 +202,11 @@ module.exports = {
         }
 
         // Creatures in this hero's support zones (one batch per hero)
-        const seine = allCreatureEntries.filter(e => e.tgtHeroIdx === tgt.heroIdx && e.inst.owner === tgt.owner && e.inst.zone === 'support');
+        const seine = allCreatureEntries.filter(e => e.tgtHeroIdx === tgt.heroIdx && engine.physicalSide(e.inst) === tgt.owner && e.inst.zone === 'support');
         if (seine.length > 0) {
           for (const e of seine) {
             engine._broadcastEvent('play_zone_animation', {
-              type: 'explosion', owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+              type: 'explosion', owner: engine.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
             });
           }
           await engine.processCreatureDamageBatch(seine);
