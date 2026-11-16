@@ -28,7 +28,8 @@
 //   • Artifact, Cost 2: the redirect system does
 //     NOT auto-deduct gold (Challenge/Martyry are
 //     free Spell/Attack reactions). `canRedirect`
-//     gates on affordability (gold ≥ 2, not gold-
+//     gates on affordability (`canAffordGold`: gold ≥ 2
+//     or Kent/Debt-O-Tron credit, not gold-
 //     locked); `onRedirect` pays it via
 //     `actionSpendGold` only once a new target is
 //     locked in. If the spend fails (a goldLock
@@ -123,9 +124,9 @@ module.exports = {
     // „exactly 1 target you control is chosen": waehlt der Effekt mehrere eigene Ziele (Fireball auf zwei eigene Helden), ist Anti-Magnet nicht ausloesbar.
     if (gewaehlteEigeneZiele(engine, pi, selected, validTargets, config) !== 1) return false;
 
-    // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow).
+    // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow). Kreditrahmen (Kent, Debt-O-Tron) zaehlt wie bei jeder Hand-Reaktion (`canAffordGold`, vorher roh `gold >= 2`).
     const ps = gs.players[pi];
-    if (!ps || ps.goldLocked || (ps.gold || 0) < GOLD_COST) return false;
+    if (!ps || !engine.canAffordGold(pi, GOLD_COST, CARD_NAME)) return false;
 
     // "while you control other possible targets" → W12 (Al, Q88/F01-08): „Es braucht mindestens ein zweites **eigenes**
     // legales Ziel." Der Besitzer muss selbst (Kontrolle statt Seite) ein ZWEITES legales Ziel des Effekts kontrollieren;
@@ -185,7 +186,7 @@ module.exports = {
     if (!redirectTarget) return null;
 
     // ── Pay the 2 gold (only now that a target is locked in) ──
-    const paid = await engine.actionSpendGold(pi, GOLD_COST);
+    const paid = await engine.actionSpendGold(pi, GOLD_COST, { cardName: CARD_NAME });   // `cardName`: Kreditrahmen wie in `canRedirect`
     if (!paid) return null; // goldLock race — no redirect, card not consumed.
 
     // ── Chain visualization (mirrors Challenge / Martyry) ──
