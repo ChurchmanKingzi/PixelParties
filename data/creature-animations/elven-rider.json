@@ -1,0 +1,15 @@
+{
+  "creature": "Elven Rider",
+  "sheet": "elven-rider.png",
+  "frameWidth": 52,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 5,
+  "padBottom": 2,
+  "faceX": 26.0
+}

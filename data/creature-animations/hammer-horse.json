@@ -1,0 +1,15 @@
+{
+  "creature": "Hammer Horse",
+  "sheet": "hammer-horse.png",
+  "frameWidth": 43,
+  "frameHeight": 29,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 21.5
+}

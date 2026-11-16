@@ -1,0 +1,15 @@
+{
+  "creature": "Winged Haressassin",
+  "sheet": "winged-haressassin.png",
+  "frameWidth": 44,
+  "frameHeight": 38,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 22.0
+}

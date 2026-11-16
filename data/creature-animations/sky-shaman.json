@@ -1,0 +1,15 @@
+{
+  "creature": "Sky Shaman",
+  "sheet": "sky-shaman.png",
+  "frameWidth": 22,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 11.0
+}

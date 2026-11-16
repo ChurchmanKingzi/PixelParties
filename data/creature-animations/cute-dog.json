@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Dog",
+  "sheet": "cute-dog.png",
+  "frameWidth": 30,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 15.0
+}

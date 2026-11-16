@@ -1,0 +1,15 @@
+{
+  "creature": "Shiny Slime",
+  "sheet": "shiny-slime.png",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 16.0
+}

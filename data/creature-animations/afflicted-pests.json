@@ -1,0 +1,15 @@
+{
+  "creature": "Afflicted Pests",
+  "sheet": "afflicted-pests.png",
+  "frameWidth": 107,
+  "frameHeight": 67,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 53.5
+}

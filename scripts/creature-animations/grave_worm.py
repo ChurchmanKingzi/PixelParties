@@ -1,0 +1,94 @@
+# -*- coding: utf-8 -*-
+"""Idle-Animation für „Grave Worm“ (Creature) — bleicher Ringelwurm, der aus einem Erdloch am Grab ragt und den Kopf nach links senkt.
+
+Quelle: src/grave-worm.png (24×29 px, 9 Farben) — Ebene „Grave Worm“ (Motive.xcf, Ebene 677, 66×51), Figur 2 (der Wurm samt seinem schwarzen Erdloch). Die Ebene enthält außerdem vier weitere schwarze
+Löcher (Kulisse, ohne Wurm) — sie gehören nicht zur Figur. Die Quelle ist vollständig (alles deckend).
+PICK: [["Motive", 677, 2]]
+
+Aufruf:   python3 grave_worm.py [--preview <ordner>]
+Ausgabe:  ../../data/creature-animations/grave-worm.png + .json
+
+Was ist was (x, y im 24×29-Sprite):
+* KOPF (x 0–13, y 0–9): runder Wurmkopf, hellgrau (195,195,195)/(118,118,118) mit weißen Lichtern (255,255,255) und dunklem Umriss (26,26,26); AUGE (x 1–4, y 5–8): brauner Augapfel (136,95,93)/(72,44,46)
+  mit schwarzer Pupille (3,1,1) und weißen Glanzpixeln (255,255,255) bei (3,5), (4,6), (1,7), (2,8). Einen Mund zeigt der Sprite nicht.
+* KÖRPER (x 8–23, y 8–24): schräg nach rechts unten laufende Röhre aus Ringen (Ringfarben (195,195,195) hell, (118,118,118) mittel, (82,82,82) dunkel, weißes Licht (255,255,255) an der Kante) mit dunklem Umriss
+  (26,26,26); knapp 8 Pixel dick.
+* ERDLOCH (x 12–23, y 25–28): schwarzes Oval (0,0,0), in dem der Wurmfuß verschwindet; bleibt fest.
+Knochen/Haut: kein Metall → kein Glanz. Kein Feuer.
+
+Ablauf (48 Frames à 65 ms = 3,12 s; Frame 0 = Original):
+* WIEGEN (Runde 3, Nutzer: „zuckt viel zu sehr, das muss natürlicher aussehen“; ersetzt die früheren überlagerten Wellen und das Kopfnicken): EIN langsames, gleichmäßiges Biegen des Wurmes, Periode 48 (einmal pro Schleife, 3,1 s).
+  Jede Zeile des Körpers (y 9–24) wird waagerecht verschoben: am Loch 0, zum Hals hin wachsend (Potenz 1,3, am Hals bis +4 / −2 px), der Hals hinkt dem Fuß 0,5 rad hinterher; der Versatz läuft monoton auf und ab (kein Hin-und-her-Zittern,
+  höchstens 1 px Änderung alle ~2,5 Frames am Hals), das Gefälle zwischen benachbarten Zeilen ist ≤ 1 px, so bleibt der Wurm in jeder Pose ein einziger 4-verbundener Körper (für alle 48 Frames geprüft: 4er-Flecken = Original). Das Loch bleibt stehen.
+  Der KOPF (y 0–8) wird NICHT geschert, sondern schwingt starr mit der obersten Körperzeile mit (kein eigenes Nicken mehr); Auge und Kopfform bleiben unverändert.
+* AUGE blinzelt (Frames 18–20 und 41–43): die Augenpixel nehmen die Kopffarbe (118,118,118) an.
+Keine Partikel (graue Erdbrocken wirkten wie Fehlpixel und wurden wieder entfernt — Regel 25: im Zweifel weglassen).
+Ruhepose = Original (das Wiegen wird bei Frame 0 abgezogen). Alle Bewegungen laufen auf der vollen Leinwand (anim_lib wirft ClipError). Nur ganze Pixel, nur Farben der Quelle.
+Ergänzungen: keine gemalten Pixel.
+"""
+import math
+import sys
+
+import numpy as np
+
+import anim_lib as L
+import anim_untote as U
+import anim_untote2 as V
+
+N, MS = 48, 65
+PAD_L, PAD_R, PAD_T, PAD_B = 8, 7, 5, 8
+
+spr = L.lade('grave-worm')
+sh, sw = spr.shape[:2]
+H, W = sh + PAD_T + PAD_B, sw + PAD_L + PAD_R
+OFF = (PAD_L, PAD_T)
+vorhanden = L.deckend(spr)
+col = lambda x, y: tuple(int(v) for v in spr[y, x, :3])
+UMRISS = U.umrissfarben(spr)
+KOPF = (118, 118, 118)
+AUGE = [(x, y) for y in range(5, 9) for x in range(1, 5) if vorhanden[y, x] and col(x, y) in {(136, 95, 93), (72, 44, 46), (3, 1, 1), (255, 255, 255)}]
+KOMP0 = V.komp4(spr)
+WURM_Y = list(range(24, 8, -1))                   # Fuß (y 24) → Hals (y 9); der Kopf (y 0–8) schwingt starr mit dem Hals
+EBENE_Y = [OFF[1] + y for y in WURM_Y]
+KOPF_Y = [OFF[1] + y for y in range(0, 9)]
+TEST_EBENEN = 'koerper'
+
+
+def offs(i):
+    """Runde 3 (Nutzer: „zuckt viel zu sehr, das muss natürlicher aussehen“): EIN langsames, gleichmäßiges Wiegen (Periode 48 = einmal pro Schleife, 3,1 s) statt vieler überlagerter schneller Wellen und des
+    seitlichen Kopfnickens. Der Fuß am Loch bleibt stehen, der Versatz wächst zum Hals hin (Potenz 1,3), der Hals hinkt dem Fuß leicht hinterher (0,5 rad) — wie ein Halm, der sich im Wind biegt. Der Versatz ändert sich
+    nie schneller als 1 px alle ~2,5 Frames und läuft ohne Hin-und-her-Zittern monoton auf und ab; Frame 0 = Original. Der Kopf schwingt starr mit der obersten Körperzeile."""
+    n = len(EBENE_Y)
+    res = {}
+    for k, y in enumerate(EBENE_Y):
+        f = k / float(n - 1)
+        lag = 0.5 * f
+        res[y] = int(round(3.0 * f ** 1.3 * (math.sin(2 * math.pi * i / 48 - lag) - math.sin(-lag))))
+    res = V.glatt(res, EBENE_Y)
+    for y in KOPF_Y:
+        res[y] = res[EBENE_Y[-1]]
+    return res
+
+
+def frame(i, nur=None):
+    k = L.platz(spr.copy(), H, W, OFF[0], OFF[1])
+    if V.fenster(i, N, 18, 3) or V.fenster(i, N, 41, 3):                     # Blinzeln
+        V.setze(k, {p: KOPF for p in AUGE}, OFF)
+    # Wurmkörper (Zeilen 0–24) windet sich, Loch (ab Zeile 25) bleibt
+    wurm = k.copy(); wurm[OFF[1] + 25:] = 0
+    boden = k.copy(); boden[:OFF[1] + 25] = 0
+    wurm = V.zeilen_versatz4(wurm, offs(i))
+    f = L.zusammen(H, W, [(boden, 0, 0), (wurm, 0, 0)])
+    f = U.kontur_schliessen(f, UMRISS, (26, 26, 26))
+    return f
+
+
+if __name__ == '__main__':
+    frames = [frame(i) for i in range(N)]
+    prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
+    for i in range(N):
+        assert V.komp4(frame(i, nur='k')) == KOMP0, f'Frame {i}: Wurm zerrissen'
+    L.pruefe(frames, quelle=spr, min_rand=2)
+    L.speichern('grave-worm', 'Grave Worm', frames, MS, prev)
+    if prev:
+        L.streifen(prev + '/grave-worm-strip.png', [frames[k] for k in range(0, N, 4)], spalten=6, scale=8)

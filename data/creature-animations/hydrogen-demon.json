@@ -1,0 +1,15 @@
+{
+  "creature": "Hydrogen Demon",
+  "sheet": "hydrogen-demon.png",
+  "frameWidth": 21,
+  "frameHeight": 41,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 10.5
+}

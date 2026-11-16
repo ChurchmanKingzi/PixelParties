@@ -1,0 +1,15 @@
+{
+  "creature": "Gigantisaur Brachion",
+  "sheet": "gigantisaur-brachion.png",
+  "frameWidth": 73,
+  "frameHeight": 60,
+  "frames": 72,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 36.5
+}

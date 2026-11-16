@@ -1,0 +1,15 @@
+{
+  "creature": "Greatmaw Remora",
+  "sheet": "greatmaw-remora.png",
+  "frameWidth": 66,
+  "frameHeight": 39,
+  "frames": 64,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 33.0
+}

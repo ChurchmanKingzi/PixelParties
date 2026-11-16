@@ -2940,6 +2940,92 @@ const HeroIdleAnims = (() => {
     }
     return listeLaedt;
   }
+  // ── Creature-Figuren (`data/creature-animations`, `/api/creature-animations`) ──
+  // Dieselbe Maschine wie die Helden (Laden, Takt, Sprite-Ebene, Malen); eigene Liste, Schlüssel im Zwischenspeicher mit Vorsatz `c:` (ein Held und eine
+  // Creature dürfen denselben Slug tragen). Die Liste ist nach dem Slug des KARTENNAMENS geordnet (Server). Sonderfall `kopiert` (Clone): kein Sheet,
+  // das Brett zeigt die Figur des Heroes der Spalte (`kopiertHeld`).
+  let kListe = null, kListeLaedt = null;
+  function ladeKreaturListe() {
+    if (!kListeLaedt) {
+      kListeLaedt = fetch('/api/creature-animations', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { kListe = (d && d.animations) || {}; return kListe; })
+        .catch(() => { kListeLaedt = null; return {}; });
+    }
+    return kListeLaedt;
+  }
+  const kKey = (name) => 'c:' + slug(name);
+  // ★ Vorladen zu Spielbeginn (Als Vorgabe 14.11.: „für alle Creatures in allen Decks"): Der Client kennt das Deck des Gegners nicht und soll es auch nicht erfahren — eine
+  // Liste „Creatures dieser Partie" vom Server verriete es (eigene Karten abziehen = Deck des Gegners). Deshalb lädt JEDER Client ALLE Creature-Sheets (zusammen ~3 MB PNG,
+  // lange zwischengespeichert), in zwei Stufen: `zuerst` (was der eigene Spielstand nennt: Brett, Hand, eigene Stapel) sofort, der Rest einzeln im Leerlauf
+  // (`requestIdleCallback`, ein Sheet je Leerlauf-Scheibe: Bild holen, dekodieren, Umriss messen). Danach steht jede Figur im selben Bild wie ihre Karte.
+  // Einmal je Seitenaufbau (der Zwischenspeicher `fertig` bleibt über Partien erhalten). Auf dem Handy und bei abgeschalteten Creature-Figuren wird das nie aufgerufen.
+  let vorladenLaeuft = false;
+  function kreaturenVorladen(zuerst) {
+    return ladeKreaturListe().then((l) => {
+      for (const n of (zuerst || [])) { const k = slug(n); if (l[k] && l[k].sheetUrl) hole('c:' + k); }
+      if (vorladenLaeuft) return;
+      vorladenLaeuft = true;
+      const rest = Object.keys(l).filter(k => l[k] && l[k].sheetUrl);
+      let i = 0;
+      const leerlauf = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 30));
+      const weiter = () => {
+        while (i < rest.length && eintraege.has('c:' + rest[i])) i++;
+        if (i >= rest.length) return;
+        hole('c:' + rest[i++]).then(() => leerlauf(weiter), () => leerlauf(weiter));
+      };
+      leerlauf(weiter);
+    });
+  }
+  // Platzierung der Creature-Sheets in die Felder übersetzen, die `HeroIdleSprite` kennt: Standlinie = Unterkante der RUHEFIGUR (`frameHeight − padBottom`),
+  // mit `kern {x,y,w,h}` (Frame enthält Sprung-/Flugraum) Unterkante und Mitte des Ruhe-Körpers. Ausdrückliche `anchorX`/`footY` im Sheet gewinnen.
+  function kreaturMeta(m) {
+    const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
+    const aus = { ...m };
+    const k = m.kern && zahl(m.kern.x) && zahl(m.kern.y) && m.kern.w > 0 && m.kern.h > 0 ? m.kern : null;
+    if (!zahl(aus.footY)) aus.footY = k ? k.y + k.h : m.frameHeight - (zahl(m.padBottom) ? m.padBottom : 0);
+    if (!zahl(aus.anchorX) && k) aus.anchorX = k.x + k.w / 2;
+    // ★ Obergrenze (Als Vorgabe 14.11.: „Zu große Creatures müssen herunterskaliert werden"): die RUHEFIGUR (`kern`, sonst Frame minus Leerrand) ist auf dem Brett höchstens
+    // KREATUR_MAX_B × KREATUR_MAX_H Hero-Pixel groß (64 × 68 = gut 2,6 Zonenbreiten × 2 Zonenhöhen — die Größe der großen Heldenfiguren: Nero Zira 92 × 76, Medea 96 × 73,
+    // Flamebathed Waflav 86 × 56; Median der Helden 24 × 28). Größere Figuren bekommen den größten Faktor aus KREATUR_STUFEN, mit dem sie hineinpassen (saubere Verhältnisse,
+    // gleichmäßig, `image-rendering: pixelated` — ihr Sprite-Pixel ist dann bewusst kleiner als der Hero-Pixel); kleiner als 2/5 wird nicht verkleinert (darunter fiele ein
+    // Sprite-Pixel bei 100 % Anzeige unter einen Bildschirmpixel und würde weich). Derselbe Hebel wie `boardScale` bei den Helden; ein ausdrückliches `boardScale` im Sheet gewinnt.
+    if (!(Number(aus.boardScale) > 0)) {
+      const b = k ? k.w : m.frameWidth - (m.padLeft || 0) - (m.padRight || 0), h = k ? k.h : m.frameHeight - (m.padTop || 0) - (m.padBottom || 0);
+      const stufe = KREATUR_STUFEN.find(f => b * f <= KREATUR_MAX_B && h * f <= KREATUR_MAX_H) || KREATUR_STUFEN[KREATUR_STUFEN.length - 1];
+      // ★ 16.11. (Als Vorgabe: „die Creatures können ruhig etwas kleiner dargestellt sein"): ALLE Creature-Figuren stehen im Creature-Maßstab KREATUR_MASS (3/4 des
+      // Hero-Maßstabs), die Stufe der zu großen kommt obendrauf (Faktoren multipliziert). Untergrenze KREATUR_MIN = 2/5 des Hero-Maßstabs: darunter fiele ein Sprite-Pixel
+      // am Desktop (Brettskala ≈ 0,97, hintere Reihe ≈ 0,91) unter einen Bildschirmpixel und würde weich — das trifft die Stufen 1/2 und 2/5 (Cybug ANTS, The Spawn Mother,
+      // Demon's Gate), die bei 2/5 stehen bleiben.
+      aus.boardScale = Math.max(KREATUR_MIN, kreaturMass() * stufe);
+    }
+    return aus;
+  }
+  const KREATUR_MAX_B = 64, KREATUR_MAX_H = 68, KREATUR_STUFEN = [1, 3 / 4, 2 / 3, 3 / 5, 1 / 2, 2 / 5];
+  // Creature-Maßstab: Anteil des Hero-Maßstabs (2,8125 Kartenpixel je Sprite-Pixel) — DIE Stellschraube für die Größe aller Creature-Figuren (auch Clone, der die Heldenfigur
+  // seiner Spalte in diesem Maßstab zeigt). `window.__ppKreaturMass` (vor dem Laden der Sheets gesetzt) überschreibt sie nur für Vergleichsaufnahmen.
+  const KREATUR_MASS = 3 / 4, KREATUR_MIN = 2 / 5;
+  function kreaturMass() { const t = typeof window !== 'undefined' ? Number(window.__ppKreaturMass) : 0; return t > 0 ? t : KREATUR_MASS; }
+  // `deckkraft` < 1 (Yuki-Onna, Lunatic Golem): die Figur scheint durch — per Bayer-Raster in Sprite-Pixeln ausgedünnt (jeder Pixel bleibt voll deckend
+  // oder fällt weg), nie per Alpha. Raster in FRAME-Koordinaten, damit es auf jedem Bild gleich liegt. Einmal beim Laden.
+  function ausduennen(meta, img) {
+    const f = Number(meta.deckkraft);
+    if (!(f > 0) || f >= 1) return img;
+    try {
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, fw = meta.frameWidth, fh = meta.frameHeight, vertikal = meta.layout === 'vertical';
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h), d = bild.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4 + 3;
+        if (d[i] && (BAYER[(vertikal ? y % fh : y) & 3][(vertikal ? x : x % fw) & 3] + 0.5) / 16 >= f) d[i] = 0;
+      }
+      ctx.putImageData(bild, 0, 0);
+      return c;
+    } catch { return img; }
+  }
 
   // Umriss der DECKENDEN Figur über alle Frames (Alpha ≥ 160), in
   // Frame-Koordinaten. Eingepasst und ausgerichtet wird nach ihm, nicht
@@ -3076,15 +3162,17 @@ const HeroIdleAnims = (() => {
   function hole(key) {
     if (!key) return Promise.resolve(null);
     if (eintraege.has(key)) return eintraege.get(key);
-    const p = ladeListe().then(l => {
-      const meta = l[key];
-      if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+    const istKreatur = key.indexOf('c:') === 0;
+    const p = (istKreatur ? ladeKreaturListe() : ladeListe()).then(l => {
+      const roh = istKreatur ? l[key.slice(2)] : l[key];
+      if (!roh || !roh.sheetUrl) { if (istKreatur ? kListe : liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+      const meta = istKreatur ? kreaturMeta(roh) : roh;
       return new Promise(res => {
         const img = new Image();
         img.onload = () => {
           // Geometrie aus dem ORIGINAL, damit `alphaScale` nichts verschiebt
           const kern = kernRahmen(meta, img);
-          const e = { meta, img: halbtransparenzSkalieren(meta, img), kern };
+          const e = { meta, img: istKreatur ? ausduennen(meta, img) : halbtransparenzSkalieren(meta, img), kern };
           fertig.set(key, e); res(e);
         };
         img.onerror = () => { fertig.set(key, null); res(null); };
@@ -3155,7 +3243,7 @@ const HeroIdleAnims = (() => {
   if (typeof window !== 'undefined') {
     window.ppHeldenAnimationen = () => {
       const zeilen = [...diagnose.values()].map(d => ({
-        Held: d.held,
+        Held: d.held, Art: d.art || 'Held',
         Frame: `${d.st.frame + 1}/${d.frames}`,
         Schritte: d.st.schritte,
         angehalten: !!d.zustand.current.angehalten,
@@ -3229,14 +3317,25 @@ const HeroIdleAnims = (() => {
     const cs = getComputedStyle(plane);
     const t = cs.transform || 'none', o = cs.transformOrigin;
     const clip = plane.parentElement;
-    const huellenBox = huelle && clip ? `${clip.offsetLeft}|${clip.offsetTop}|${clip.offsetWidth}|${clip.offsetHeight}` : '';
+    // ★ 14.11. (Als Vorgabe: „Figuren sollen NICHT am oberen Brettrand abgeschnitten werden"): Abgeschnitten hat `overflow: hidden` von `.board-center` und `.game-board` —
+    // die Figuren der hinteren gegnerischen Reihe ragen über die Brettoberkante. Im Normalfall (Desktop, kein Scrollmodus, kein Tutorial-Zoom; style.css `.hero-sprite-huelle`)
+    // ist die Hülle deshalb `position: fixed`: sie verlässt den Zuschnitt ihrer Vorfahren und wird hier in FENSTER-Koordinaten auf die Box des Clips gelegt (Box von
+    // `.board-center` im Fenster + Lage des Clips darin; ohne die Transformation des Clips selbst). Seiten und Unterkante schneidet sie selbst (`clip-path`), nur oben ist sie offen.
+    const fest = !!huelle && !!clip && getComputedStyle(huelle).position === 'fixed';
+    let hx = clip ? clip.offsetLeft : 0, hy = clip ? clip.offsetTop : 0;
+    if (fest) {
+      const mitte = huelle.parentElement, mr = mitte.getBoundingClientRect();
+      hx = mr.left + mitte.clientLeft + clip.offsetLeft - mitte.scrollLeft;
+      hy = mr.top + mitte.clientTop + clip.offsetTop - mitte.scrollTop;
+    }
+    const huellenBox = huelle && clip ? `${hx}|${hy}|${clip.offsetWidth}|${clip.offsetHeight}` : '';
     const stand = `${plane.offsetLeft}|${plane.offsetTop}|${plane.offsetWidth}|${plane.offsetHeight}|${t}|${o}|${huellenBox}`;
     if (stand === ebeneStand) return;
     ebeneStand = stand;
     if (huelle && clip) {
       const hs = huelle.style;
-      hs.left = clip.offsetLeft + 'px';
-      hs.top = clip.offsetTop + 'px';
+      hs.left = hx + 'px';
+      hs.top = hy + 'px';
       hs.width = clip.offsetWidth + 'px';
       hs.height = clip.offsetHeight + 'px';
     }
@@ -3394,6 +3493,14 @@ const HeroIdleAnims = (() => {
       const k = slug(name);
       return !!(liste && liste[k]) && fertig.get(k) !== null;
     },
+    // Creature-Figuren: Liste, Schlüssel für `hole`/`schonDa`, „steht eine Figur bereit?" und der Clone-Sonderfall (`kopiert`: Figur des Heroes der Spalte)
+    ladeKreaturListe, kreaturKey: kKey, kreaturenVorladen, kreaturMass,
+    kreaturVorladeStand: () => { let n = 0, da = 0; if (kListe) for (const k in kListe) if (kListe[k].sheetUrl) { n++; if (fertig.get('c:' + k)) da++; } return { n, da }; },
+    hatKreaturAnimation: (name) => {
+      const k = slug(name);
+      return !!(kListe && kListe[k] && kListe[k].sheetUrl) && fertig.get('c:' + k) !== null;
+    },
+    kopiertHeld: (name) => { const m = kListe && kListe[slug(name)]; return !!(m && !m.sheetUrl && m.kopiert === 'host-hero'); },
   };
 })();
 window.HeroIdleAnims = HeroIdleAnims;   // fuer das Vorladen der Tutorial-Helden (app-screens.jsx)
@@ -3604,6 +3711,7 @@ const HERO_TOENUNGEN = [
   { status: 'burned',       farbe: 'rgba(248,116,32,0.2)' },
   { status: 'berserked',    farbe: 'rgba(192,20,28,0.24)' },
   { status: 'healReversed', farbe: 'rgba(102,255,162,0.14)' },
+  { status: 'sporen',       farbe: 'rgba(192,20,28,0.3)' },      // Deepsea Spores an Creature-Figuren (die Karte darunter wird dunkelrot gefiltert)
   // ★ v1460 (Als Vorgabe 27.9.): Cursed „flasht lila", Charmed pink —
   // pulsierende Tönung (Stärke zwischen min und max, siehe `puls` im
   // Zeichenschritt).
@@ -3924,8 +4032,10 @@ function HeroStatusSymbole({ st, links, oben, k }) {
   );
 }
 
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
-  const key = HeroIdleAnims.slug(cardName);
+// `massstab`: Faktor auf den Maßstab (Clone: Heldenfigur im Creature-Maßstab). `kreatur`: `cardName` ist eine Creature (Sheet aus `data/creature-animations`, sonst identische Darstellung). `ohnePartikel`: nur Tönung/Eis/Stein an der Figur,
+// keine Status-Partikel und -Symbole (Creatures in Support-Zonen behalten die Status-Overlays ihrer Karte).
+function HeroIdleSprite({ cardName, kreatur, massstab, ohnePartikel, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
+  const key = kreatur ? HeroIdleAnims.kreaturKey(cardName) : HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
   const [eisPhase, setEisPhase] = useState(eingefroren ? 'da' : 'weg');
@@ -4097,6 +4207,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           }
         }
       }
+      // (Kein Einfahren für fremde Zonen: beim Hover fährt nur die Figur DIESER Zone ein — Als Befund 16.11.: „nicht nur diese, sondern auch ihre Nachbarn".)
       const weg = !rammt && (hover || phasenHover || !!zustand.current.eingeklappt);
       if (weg !== st.weg) {
         st.weg = weg;
@@ -4135,7 +4246,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         st.fehler = was + ': ' + (err && err.message ? err.message : String(err));
         if (!st.gewarnt) {
           st.gewarnt = true;
-          try { console.warn('[Helden-Animation] ' + (meta.hero || '?') + ' — ' + st.fehler, err); } catch {}
+          try { console.warn('[Helden-Animation] ' + (meta.hero || meta.creature || '?') + ' — ' + st.fehler, err); } catch {}
         }
       }
     };
@@ -4183,7 +4294,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
         || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt
         || (zustand.current.weiss || 0) !== (st.weissGemalt || 0)) sicher('Malen', male);
-    }, { held: meta.hero || '?', frames, st, zustand });
+    }, { held: meta.hero || meta.creature || '?', art: meta.creature && !meta.hero ? 'Creature' : 'Held', frames, st, zustand });
     sicher('Zonenlage', folgeZone);
     sicher('Malen', male);
     // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
@@ -4231,7 +4342,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   // ★ v1455: `boardScale` im Sheet-JSON ist ein Faktor für Einzelfälle
   // (Als Vorgabe 27.9.: Bubbles in voller Größe „geht so gar nicht, der
   // sitzt viel zu hoch und wird fast komplett abgeschnitten").
-  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1);
+  // `massstab` (Clone): zusätzlicher Faktor für eine HELDENfigur, die als Creature auf dem Brett steht (Creature-Maßstab; Creature-Sheets tragen ihn schon in `boardScale`).
+  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1) * (massstab > 0 ? massstab : 1);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
@@ -4295,13 +4407,13 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     <>
       {anker}
       {ReactDOM.createPortal(
-        <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
+        <div ref={platzRef} data-held={cardName} data-kreatur={kreatur ? '1' : undefined}
+          className={'hero-idle-platz' + (kreatur ? ' hero-idle-kreatur' : '') + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
-              {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
+              {statusIcons && !ohnePartikel && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
                   links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
               )}
@@ -4319,7 +4431,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               <HeroAufstiegLicht />
             </div>
           )}
-          {effekte && (
+          {effekte && !ohnePartikel && (
             <div className="hero-idle-fx" style={fxStil}>
               <HeroStatusPartikel effekte={effekte} kern={kern} s={s} mitteX={mitteX}
                 fw={fw} fh={fh} saat={key} />
@@ -38107,6 +38219,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // v1463: Profil-Optionen „Display Heroes" / „Dynamic Heroes" (beide
   // standardmäßig an; ohne Display kein Dynamic).
   const heldenAnzeigen = user?.display_heroes == null ? true : !!user.display_heroes;
+  // Creature-Figuren (`data/creature-animations`): eigene Profil-Option „Display Creatures" (Standard an), Unteroption von „Display Heroes" wie „Dynamic Heroes" — ohne
+  // Heldenfiguren auch keine Creature-Figuren (gleiche Sprite-Ebene, Clone zeigt die Heldenfigur). Auf dem HANDY (`ppIsPhone`, dieselbe Schwelle wie `battle-lite`) gibt es sie
+  // gar nicht (Als Vorgabe 14.11.: „zu viel Last"): keine Liste, keine Sheets, keine Figur.
+  const kreaturenAnzeigen = heldenAnzeigen && (user?.display_creatures == null ? true : !!user.display_creatures) && !(window.ppIsPhone && window.ppIsPhone());
+  useEffect(() => { if (kreaturenAnzeigen) HeroIdleAnims.ladeKreaturListe().then(() => setHeldenAnimListe(n => n + 1)); }, [kreaturenAnzeigen]);
+  // Vorladen zu Spielbeginn: ALLE Creature-Sheets (siehe `kreaturenVorladen` — verrät nichts über das Deck des Gegners), zuerst die, die der eigene Spielstand nennt.
+  useEffect(() => {
+    if (!kreaturenAnzeigen || !gameState?.roomId) return;
+    const namen = new Set();
+    const lauf = (o, tiefe) => {
+      if (typeof o === 'string') { if (CARDS_BY_NAME[o]) namen.add(o); }
+      else if (Array.isArray(o)) { for (const x of o) lauf(x, tiefe + 1); }
+      else if (o && typeof o === 'object' && tiefe < 6) { for (const k in o) lauf(o[k], tiefe + 1); }
+    };
+    try { lauf(gameState.players, 0); } catch {}
+    HeroIdleAnims.kreaturenVorladen([...namen]).then(() => setHeldenAnimListe(n => n + 1));
+  }, [kreaturenAnzeigen, gameState?.roomId]);
   // Spielstart-Effekt (app-fx-51: Held-Ausbruch + Brettaufbau-Welle, nur Optik): im Render entscheiden, ob er laeuft — die Figuren melden sich schon in ihren Layout-Effekten, die vor dem
   // Layout-Effekt dieser Komponente laufen. Die Leinwaende entstehen erst im ersten Bild nach dem Einhaengen (kein Mehraufwand beim Mounten); `ppFx51Abbruch` raeumt beim Verlassen auf.
   useState(() => (window.ppFx51Vorbereiten ? window.ppFx51Vorbereiten(gameState, { figuren: heldenAnzeigen }) : 0));
@@ -38382,6 +38511,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Auftritts-Animation — die Figuren steigen aus den Karten.
   const tutorialFigurenGesperrt = (window.useTutorialFigurenGesperrt || (() => false))();
   const heldenFigurenZeigen = heldenAnzeigen && !(gameState?.isTutorial && tutorialFigurenGesperrt);
+  const kreaturFigurenZeigen = heldenFigurenZeigen && kreaturenAnzeigen;
   // Die Sheets schon waehrend des Gespraechs laden, damit die Figuren beim
   // Aufsteigen nicht erst noch auf ihr Bild warten.
   useEffect(() => {
@@ -57012,6 +57142,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const rarAb = (hi, z) => ((rar.abilityZones || [])[hi] || [])[z] || [];
     const rarSup = (hi, z) => ((rar.supportZones || [])[hi] || [])[z] || [];
     const ownerLabel = isOpp ? ((Number.isInteger(sideOwner) && sideOwner !== outerOppIdx) ? 'mini' + sideOwner : 'opp') : 'me';
+    // Name der Figur, die für den Helden `hi` dieser Seite auf dem Brett steht (vorgezogene Gestalt → Skin des Besitzers → Basis-Held).
+    // Skins sind ebenfalls animiert (`data/hero-animations/<skin-slug>`): Traegt der Besitzer dieses Helden einen Skin fuer die Karte, steht
+    // dessen Figur auf dem Brett statt der des Basis-Helden. Nach dem BESITZER (`p.deckSkins`) statt nach `gameSkins`, denn dort
+    // ueberschreibt der Gegner bei gleichem Helden den eigenen Skin. Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
+    // Auch die Creature „Clone" nutzt das: sie zeigt immer die Figur des Heroes ihrer Spalte.
+    const heldFigurName = (hi) => {
+      const basis = (formPreview && formPreview.owner === (isOpp ? oppIdx : myIdx) && formPreview.heroIdx === hi
+        && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : p?.heroes?.[hi]?.name;
+      const sk = basis ? p?.deckSkins?.[basis] : null;
+      return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : basis;
+    };
 
     // Board skin: extract number from board ID (e.g. "board1" → "1")
     const boardNum = p.board ? p.board.replace(/\D/g, '') : null;
@@ -57313,18 +57454,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Karte, zeigt SIE die Status (Partikel, Tönung, Eis, Stein) — die
           // Status-Overlays der Karte entfallen dann (doppelt und teuer).
           // Helden ohne Spritesheet behalten ihre Karten-Overlays.
-          const figurBasisName = (formPreview && formPreview.owner === pi && formPreview.heroIdx === i
-            && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero?.name;
-          // Skins sind ebenfalls animiert (`data/hero-animations/<skin-slug>`):
-          // Traegt der Besitzer dieses Helden einen Skin fuer die Karte, steht
-          // dessen Figur auf dem Brett statt der des Basis-Helden. Nach dem
-          // BESITZER (`p.deckSkins`) statt nach `gameSkins`, denn dort
-          // ueberschreibt der Gegner bei gleichem Helden den eigenen Skin.
-          // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
-          const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
-          const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
-          // ★ Held als Kreatur (Hulijing): liegt eine Kreatur auf dem Helden, zeigt das Brett deren Karte — die Heldenfigur steht dann nicht darüber.
-          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && HeroIdleAnims.hatAnimation(figurName));
+          const figurName = heldFigurName(i);
+          // ★ Held als Kreatur (Hulijing): liegt eine Kreatur auf dem Helden, zeigt das Brett deren Karte — die Heldenfigur steht dann nicht darüber,
+          // sondern die Figur der KREATUR (`data/creature-animations`), sofern sie eine hat; sonst wie bisher nur die Karte.
+          const kreaturFigur = !!(kreaturFigurenZeigen && hero?.heldKreatur && HeroIdleAnims.hatKreaturAnimation(hero.heldKreatur.name));
+          const figurMoeglich = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (!hero.heldKreatur || kreaturFigur));
+          const figurDa = figurMoeglich && (kreaturFigur || HeroIdleAnims.hatAnimation(figurName));
           // Aufstiegs-Morph dieses Helden (s. HeroIdleSprite): alte und neue Figur stehen zugleich da.
           const aufstiegHier = !!(ascMorph && ascMorph.ownerLabel === ownerLabel && ascMorph.heroIdx === i);
           // Chain target pick
@@ -57598,11 +57733,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && (() => {
+                {figurMoeglich && (() => {
                   const skinFuer = (n) => { const sk = n ? p?.deckSkins?.[n] : null; return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : n; };
                   const basis = (
                   <HeroIdleSprite
-                    cardName={figurName}
+                    cardName={kreaturFigur ? hero.heldKreatur.name : figurName}
+                    kreatur={kreaturFigur}
                     eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
                     angehalten={!!(isFrozen || isStunned)}
                     eingefroren={!!isFrozen}
@@ -57634,8 +57770,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Immer ein Feld mit Schluesseln: die Hauptfigur behaelt ihre Identitaet,
                   // wenn die alte Figur fuer den Morph dazukommt und wieder geht.
                   return aufstiegHier ? [
-                    React.cloneElement(basis, { key: 'alt', cardName: skinFuer(ascMorph.oldHero), aufstieg: { rolle: 'alt', t0: ascMorph.t0 } }),
-                    React.cloneElement(basis, { key: 'haupt', cardName: skinFuer(ascMorph.newHero), aufstieg: { rolle: 'neu', t0: ascMorph.t0 } }),
+                    React.cloneElement(basis, { key: 'alt', kreatur: false, cardName: skinFuer(ascMorph.oldHero), aufstieg: { rolle: 'alt', t0: ascMorph.t0 } }),
+                    React.cloneElement(basis, { key: 'haupt', kreatur: false, cardName: skinFuer(ascMorph.newHero), aufstieg: { rolle: 'neu', t0: ascMorph.t0 } }),
                   ] : [React.cloneElement(basis, { key: 'haupt' })];
                 })()}
                 {/* Aufstiegs-Morph: weisses Licht ueber der Karte; der Kartenwechsel (Sync) faellt in den Hoehepunkt. */}
@@ -59472,8 +59608,41 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         const _effLvl = CARDS_BY_NAME[cards[0]]?.level != null || cc?._cardDataOverride?.level != null
                           ? _cardLvl + _delta + _letheBonus
                           : null;
-                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
-                          effectiveLevel={_effLvl} stampBonus={_letheBonus} />;
+                        // ★ CREATURE-FIGUR: wie bei den Helden steht die Idle-Figur der Creature auf ihrer Karte (gleiche Sprite-Ebene, gleicher Maßstab, gleicher Takt —
+                        // `HeroIdleSprite`). Nur für die schlichte, offene Einzelkreatur dieses Zweigs: keine Figur bei verdeckt/sterbend (oben schon abgezweigt), im
+                        // Rammflug oder Abflug der Karte, bei Stapeln, Nest, angelegtem Helden, Mimik/Kopie und Illusionen (dafür hat die Figur keine Darstellung) —
+                        // dort bleibt es bei der Karte. Ohne Sheet (noch nicht animierte Creatures) ebenso. Die Karte behält ihre Status-Overlays; die Figur zeigt
+                        // nur, was sie selbst kann: Stillstand, Eis, Stein, Tönungen. „Clone" hat kein eigenes Sheet und zeigt die Figur des Heroes seiner Spalte.
+                        const _figur = (() => {
+                          if (!kreaturFigurenZeigen || isSupportRamming || cc?._xuanwuRevived || cc?._illusionSummon) return null;
+                          if (!p.equipShareHeroes?.[i] && (bounceOutgoingHidden.has(cKey) || bounceOutgoingHidden.has(`${cKey}::${cards[0] || ''}`))) return null;
+                          let name = cards[0], kreatur = true;
+                          if (HeroIdleAnims.kopiertHeld(name)) {
+                            const wirt = p.heroes?.[i];
+                            if (!wirt?.name || !(wirt.hp > 0)) return null;
+                            if (wirt.heldKreatur) name = wirt.heldKreatur.name;
+                            else { name = heldFigurName(i); kreatur = false; }
+                          }
+                          if (!(kreatur ? HeroIdleAnims.hatKreaturAnimation(name) : HeroIdleAnims.hatAnimation(name))) return null;
+                          const stein = !!(cc?._petrified || cc?._baihuPetrify);
+                          return <HeroIdleSprite key="figur" cardName={name} kreatur={kreatur} massstab={kreatur ? undefined : HeroIdleAnims.kreaturMass()} ohnePartikel
+                            eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
+                            angehalten={!!(cc?.frozen || cc?.stunned || stein)}
+                            eingefroren={!!cc?.frozen}
+                            versteinert={stein}
+                            effekte={[
+                              cc?.stunned && !stein ? 'stunned' : '',
+                              cc?.burned ? 'burned' : '',
+                              cc?.poisoned ? 'poisoned' : '',
+                              (cc?.negated || cc?.nulled) ? 'negated' : '',
+                              _ccSporified ? 'sporen' : '',
+                            ].filter(Boolean).join(' ')} />;
+                        })();
+                        return <>
+                          <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
+                            effectiveLevel={_effLvl} stampBonus={_letheBonus} />
+                          {_figur}
+                        </>;
                       })()
                     ) : (
                       <div className="board-stack">

@@ -1,0 +1,15 @@
+{
+  "creature": "Bird",
+  "sheet": "bird.png",
+  "frameWidth": 18,
+  "frameHeight": 21,
+  "frames": 24,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 9.0
+}

@@ -1,0 +1,15 @@
+{
+  "creature": "Soul Shard Ren",
+  "sheet": "soul-shard-ren.png",
+  "frameWidth": 50,
+  "frameHeight": 43,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 25.0
+}

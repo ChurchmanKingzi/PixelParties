@@ -1,0 +1,15 @@
+{
+  "creature": "Cardinal Beast Qinglong",
+  "sheet": "cardinal-beast-qinglong.png",
+  "frameWidth": 84,
+  "frameHeight": 90,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 42.0
+}

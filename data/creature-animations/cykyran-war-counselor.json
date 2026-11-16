@@ -1,0 +1,15 @@
+{
+  "creature": "Cykyran War Counselor",
+  "sheet": "cykyran-war-counselor.png",
+  "frameWidth": 32,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 16.0
+}

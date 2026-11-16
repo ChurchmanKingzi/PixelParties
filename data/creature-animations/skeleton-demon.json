@@ -1,0 +1,15 @@
+{
+  "creature": "Skeleton Demon",
+  "sheet": "skeleton-demon.png",
+  "frameWidth": 54,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 8,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 27.0
+}

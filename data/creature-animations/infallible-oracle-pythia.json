@@ -1,0 +1,15 @@
+{
+  "creature": "Infallible Oracle Pythia",
+  "sheet": "infallible-oracle-pythia.png",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "frames": 64,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 16.0
+}

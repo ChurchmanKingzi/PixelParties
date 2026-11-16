@@ -1,0 +1,15 @@
+{
+  "creature": "Mischief Militia - Heli Troopers",
+  "sheet": "mischief-militia-heli-troopers.png",
+  "frameWidth": 29,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 14.5
+}

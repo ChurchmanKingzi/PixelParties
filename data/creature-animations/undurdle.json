@@ -1,0 +1,15 @@
+{
+  "creature": "Undurdle",
+  "sheet": "undurdle.png",
+  "frameWidth": 27,
+  "frameHeight": 17,
+  "frames": 48,
+  "frameMs": 100,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 13.5
+}

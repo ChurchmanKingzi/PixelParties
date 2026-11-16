@@ -1,0 +1,15 @@
+{
+  "creature": "Sleeping Beauty",
+  "sheet": "sleeping-beauty.png",
+  "frameWidth": 56,
+  "frameHeight": 55,
+  "frames": 64,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 28.0
+}

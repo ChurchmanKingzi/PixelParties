@@ -1,0 +1,15 @@
+{
+  "creature": "Embodiment of Biseria",
+  "sheet": "embodiment-of-biseria.png",
+  "frameWidth": 80,
+  "frameHeight": 48,
+  "frames": 64,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 40.0
+}

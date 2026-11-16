@@ -1,0 +1,15 @@
+{
+  "creature": "Skeleton Priest",
+  "sheet": "skeleton-priest.png",
+  "frameWidth": 30,
+  "frameHeight": 38,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 15.0
+}

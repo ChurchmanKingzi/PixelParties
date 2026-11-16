@@ -1,0 +1,15 @@
+{
+  "creature": "Harpthenean War Counselor",
+  "sheet": "harpthenean-war-counselor.png",
+  "frameWidth": 50,
+  "frameHeight": 46,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 8,
+  "padRight": 8,
+  "padBottom": 3,
+  "faceX": 25.0
+}

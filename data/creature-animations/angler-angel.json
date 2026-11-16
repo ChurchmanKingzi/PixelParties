@@ -1,0 +1,15 @@
+{
+  "creature": "Angler Angel",
+  "sheet": "angler-angel.png",
+  "frameWidth": 37,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 18.5
+}

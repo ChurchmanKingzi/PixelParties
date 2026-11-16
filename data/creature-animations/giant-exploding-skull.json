@@ -1,0 +1,15 @@
+{
+  "creature": "Giant Exploding Skull",
+  "sheet": "giant-exploding-skull.png",
+  "frameWidth": 74,
+  "frameHeight": 67,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 37.0
+}

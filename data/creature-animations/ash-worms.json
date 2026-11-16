@@ -1,0 +1,15 @@
+{
+  "creature": "Ash Worms",
+  "sheet": "ash-worms.png",
+  "frameWidth": 25,
+  "frameHeight": 25,
+  "frames": 48,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 12.5
+}
