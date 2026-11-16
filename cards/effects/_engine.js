@@ -32055,6 +32055,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ Held als Kreatur (Hulijing): die aufgelegte Kreatur teilt ihre HP mit dem Wirt — ihr Schaden IST Heldenschaden (ruht NICHT mit dem Wirt: sie hat keine eigenen HP).
       const _ueber = !!inst?.counters?._heldKreatur;
       if (!_ueber && (!script?.sharesHpWithHero || this.isCardPassiveDormant(inst))) { keep.push(e); continue; }   // W8: der Pool ruht bei Frost/Betäubung/Negation
+      // ★ Spielgestalter-Entscheidung 16.11.2026 (Cute Angel Molinda × Bonded Companion): „Es kommt nur auf das primäre Ziel an." Ist die Kreatur das Ziel, gilt, was für Kreaturen gilt —
+      // sagt die Quelle „Creatures take no damage from this Hero's Attacks and Spells", entsteht KEIN Schaden, auch nicht über den geteilten Pool am Helden (die Umbuchung findet gar nicht erst statt).
+      // Ist der Held das Ziel, läuft der Heldenpfad ganz normal (er kommt hier nicht vorbei). Der Eintrag bleibt als abgewehrter im Stapel (Bild, „0"), wie bei jeder anderen immunen Kreatur;
+      // die Kreatur hat keine eigenen HP und ihr Stempel `_immuneCreature` hält den Heldenschaden und (Molinda: `_immuneCreature` wird übersprungen) die Übernahme der Companion-Kreatur fern.
+      if (!_ueber && e.source && typeof e.source === 'object' && !e.isStatusDamage) {
+        const probe = { ...e, source: this._klonSicht(e.source), _quelleNegiert: false };
+        await this.runHooks(HOOKS.BEFORE_POOLED_CREATURE_DAMAGE, { entry: probe });
+        if (probe._quelleNegiert) {
+          e.amount = 0;
+          e._immuneCreature = true;
+          this.log('pooled_damage_negated_by_source', { token: inst.name, source: e.source?.name || null, type: e.type });
+          keep.push(e);
+          continue;
+        }
+      }
       const owner = _ueber ? (inst.counters?._heldKreatur?.seite ?? inst.heroOwner) : (inst.controller ?? inst.owner);
       const hero = this.gs.players[owner]?.heroes?.[inst.heroIdx];
       e._pooledToHero = true;
