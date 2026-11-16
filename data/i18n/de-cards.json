@@ -1992,12 +1992,12 @@
 "effect": "Du darfst einmal pro Zug eine \"Seelensplitter\"-Kreatur aus deinem Ablagestapel wählen, die in diesem Zug nicht dorthin gelegt wurde, und sie in eine der freien Unterstützungszonen dieses Helden platzieren."
 },
 "Hive's Crown": {
-"name": "Krone des Stocks",
+"name": "Krone des Bienenstocks",
 "effect": "Opfere eine \"Funkenfliegen\"-Kreatur, die du kontrollierst, außer \"Funkenfliegen-Königin\", um diese Karte zu spielen. Wähle eine \"Funkenfliegen-Königin\" aus deiner Hand und platziere sie in dieselbe Unterstützungszone wie die geopferte Kreatur. Wurde die geopferte Kreatur nicht in diesem Zug beschworen, darfst du stattdessen eine \"Funkenfliegen-Königin\" aus deinem Deck beschwören."
 },
 "Sparkfly Architect": {
 "name": "Funkenfliegen-Architekt",
-"effect": "Wenn du diese Kreatur beschwörst, darfst du in deinem Deck nach einer \"Funkenfliegen\"-Karte oder \"Krone des Stocks\" suchen und sie offen deiner Hand hinzufügen. Wird diese Kreatur geopfert, um \"Funkenfliegen-Königin\" zu beschwören, erhält sie diesen Effekt:\n\"*Du darfst einmal pro Zug Karten ziehen, bis du genauso viele Karten auf der Hand hast wie dein Gegner.\""
+"effect": "Wenn du diese Kreatur beschwörst, darfst du in deinem Deck nach einer \"Funkenfliegen\"-Karte oder \"Krone des Bienenstocks\" suchen und sie offen deiner Hand hinzufügen. Wird diese Kreatur geopfert, um \"Funkenfliegen-Königin\" zu beschwören, erhält sie diesen Effekt:\n\"*Du darfst einmal pro Zug Karten ziehen, bis du genauso viele Karten auf der Hand hast wie dein Gegner.\""
 },
 "Sparkfly Attendant": {
 "name": "Funkenfliegen-Begleiter",
@@ -2005,7 +2005,7 @@
 },
 "Sparkfly Queen": {
 "name": "Funkenfliegen-Königin",
-"effect": "Du kannst nur 1 \"Funkenfliegen-Königin\" kontrollieren. Diese Kreatur kann nicht beschworen werden, außer durch den Effekt von \"Krone des Stocks\". Du darfst einmal pro Zug einen Kartentyp nennen (Angriff/Zauber/Kreatur, Fähigkeit, Artefakt, Trank, Held/Aufgestiegener Held) und deinen Gegner so viele Karten dieses Typs aus seinem Deck wählen lassen, wie du \"Funkenfliegen\"-Kreaturen kontrollierst (oder so viele wie möglich), und sie deiner Hand hinzufügen. Der zugehörige Held darf Angriffe, Zauber und Kreaturen, die auf diese Weise deiner Hand hinzugefügt wurden, verwenden, als wären ihre Level um 3 verringert."
+"effect": "Du kannst nur 1 \"Funkenfliegen-Königin\" kontrollieren. Diese Kreatur kann nicht beschworen werden, außer durch den Effekt von \"Krone des Bienenstocks\". Du darfst einmal pro Zug einen Kartentyp nennen (Angriff/Zauber/Kreatur, Fähigkeit, Artefakt, Trank, Held/Aufgestiegener Held) und deinen Gegner so viele Karten dieses Typs aus seinem Deck wählen lassen, wie du \"Funkenfliegen\"-Kreaturen kontrollierst (oder so viele wie möglich), und sie deiner Hand hinzufügen. Der zugehörige Held darf Angriffe, Zauber und Kreaturen, die auf diese Weise deiner Hand hinzugefügt wurden, verwenden, als wären ihre Level um 3 verringert."
 },
 "Sparkfly Worker": {
 "name": "Funkenfliegen-Arbeiter",
@@ -2401,7 +2401,7 @@
 "effect": "Wenn diese Kreatur von irgendwo gelöscht wird, darfst du sie sofort als zusätzliche Aktion mit einem beliebigen Helden, den du kontrollierst, beschwören und 1 Karte ziehen. Du kannst nur 1 \"Aschewürmer\" pro Zug beschwören."
 },
 "Asriel, the Sapling Sacrificer": {
-"name": "Asriel, der Setzlingsopferer",
+"name": "Asriel, der Setzling-Opferbringer",
 "effect": "Du darfst Kreaturen in dem Zug, in dem sie beschworen werden, mit dem Okkultismus dieses Helden opfern."
 },
 "Assault for Teocuilatl": {
@@ -2618,7 +2618,7 @@
 "effect": "Aktiviere diese Überraschung, wenn eine Kreatur in die Unterstützungszone eines Gegners platziert wird. Diese Kreatur wird auf die Hand ihres Besitzers zurückgeführt. Wurde die Kreatur in die Unterstützungszone des Helden an derselben Position wie der Anwender dieser Überraschung platziert, wird das Level dieser Überraschung 0."
 },
 "Bow Sniper Darge": {
-"name": "Bogenschütze Darge",
+"name": "Bogenscharfschütze Darge",
 "effect": "Trifft dieser Held mit einem Angriff genau 1 Ziel, erhöhe den Schaden dieses Angriffs um 50 für jedes \"Pfeil\"-Artefakt, das du als Reaktion auf den Angriff spielst. \nDieser Bonus wird von Effekten, die Schaden verdoppeln, nicht beeinflusst."
 },
 "Bow of the Hunt Goddess": {
@@ -4629,7 +4629,7 @@
 "effect": "Lege diese Karte an einen Helden an, den du kontrollierst. Einmal pro Zug, wenn ein anderes Ziel, das du kontrollierst, Schaden erleiden würde, darfst du diesen Schaden auf diesen Helden umleiten. Der Schaden, den dieser Held erleiden würde, kann 100 nicht übersteigen. Schaden, den dieser Held erleidet, kann nicht durch andere Karten oder Effekte verringert oder negiert werden. Du kannst nur 1 \"Prophezeiung der Tempeste\" gleichzeitig im Spiel haben."
 },
 "Pseudonia, the Skill Devourer": {
-"name": "Pseudonia, Fertigkeitenfresserin",
+"name": "Pseudonia, die Fertigkeitenfresserin",
 "effect": "Bis zu dreimal, wenn ein anderer Held besiegt wird: Du darfst diesen Helden die Effekte jenes Helden dauerhaft erhalten lassen. Dieser Held kann die Effekte jedes Helden nur einmal pro Spiel erhalten."
 },
 "Psychic Scout": {
