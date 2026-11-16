@@ -222,11 +222,10 @@ module.exports = {
     return `${selected.cardName} was chosen by ${attackerName}! Discard a card to redirect it to ${CARD_NAME}?`;
   },
 
-  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard) {
-    const gs = engine.gs;
-    const ziel = eigenerEintrag(inst, validTargets);
-    if (!ziel) return null;
-    // Kosten: eine Handkarte. Abbruch der Kartenwahl = keine Umleitung, nichts verbraucht.
+  // ★ Spielgestalter-Entscheidung 16.11.2026: die KOSTEN (der Handabwurf) sind VOR dem Kettenfenster der Auslösung zu bezahlen und bleiben bei Negation bezahlt — wie die Kosten einer
+  // gespielten Hand-Reaktion (Hub `_checkTargetRedirectOnce`: `payBoardRedirectCost` → Fenster → `onBoardRedirect`). Abbruch der Kartenwahl = keine Aktivierung, nichts bezahlt, nichts
+  // ausgelöst (`false`). Das Once-per-turn (`spendUse`) ist keine Kostenzahlung: es fällt erst mit der Umleitung selbst (negiert → bleibt frei, wie beim Bow of the Hunt Goddess).
+  async payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config, sourceCard) {
     const kosten = await engine.zahleAbwurfKosten(ownerIdx, 1, {
       costFor: CARD_NAME,          // Kosten-Abwurf-Lernkanal der CPU
       costKind: 'protect',
@@ -236,8 +235,16 @@ module.exports = {
       cancellable: true,
       description: `Discard a card to redirect ${sourceCard?.name || 'the effect'} from ${selected.cardName} to ${CARD_NAME}.`,
     });
-    if (!kosten.bezahlt) return null;
-    // Zwischen Frage und Zahlung kann sich das Brett geändert haben (Abwurf-Trigger).
+    return kosten.bezahlt ? { bezahlt: true } : false;
+  },
+
+  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard, bezahlt) {
+    const gs = engine.gs;
+    const ziel = eigenerEintrag(inst, validTargets);
+    if (!ziel) return null;
+    // Aufruf ohne Hub: Kosten wie bisher erst hier zahlen. Abbruch der Kartenwahl = keine Umleitung, nichts verbraucht.
+    if (!bezahlt && !(await module.exports.payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config, sourceCard))) return null;
+    // Zwischen Frage und Zahlung (und im Kettenfenster) kann sich das Brett geändert haben (Abwurf-Trigger, Reaktion): ohne die Kreatur keine Umleitung (die Kosten bleiben bezahlt).
     if (inst.zone !== 'support' || !(((inst.counters?.currentHp) ?? 1) > 0)) return null;
 
     spendUse(inst, gs, ZAEHLER);
