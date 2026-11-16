@@ -83,6 +83,9 @@ function getCapturableCreatures(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt eine BELIEBIGE Creature vom Brett auf die eigene Hand.
   // Trifft beliebige Creature auf dem GESAMTEN Brett — deshalb NICHT sperren, sondern bei
   // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange

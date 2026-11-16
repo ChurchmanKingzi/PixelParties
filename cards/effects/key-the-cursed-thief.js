@@ -28,7 +28,8 @@
 //    ihn deshalb ausdruecklich erzwingen). Fuer Reaktions-Artefakte
 //    gibt die Engine den bereits abgezogenen Preis zurueck.
 //  • HOPT ueber `gs.hoptUsed['key-thief:<pi>-<hi>']`, gestempelt beim
-//    Bezahlen.
+//    Bezahlen — bleibt auch bei Negation der Reaktion verbraucht
+//    (Spielgestalter-Entscheidung 16.11.2026).
 //  • Nur lebend und nicht stummgeschaltet (Engine prueft
 //    `_isHeroEffectSilenced` beim Sammeln).
 //  • „from their hand": Brett-Aktivierungen tragen `fromBoard` und
@@ -90,11 +91,6 @@ module.exports = {
       player: gs.players[pi]?.username, artifact: ziel.link.cardName, gold: kosten,
     });
     return true;
-  },
-
-  /** Z7b: wird Keys Reaktion selbst GANZ negiert, hat sie nie aufgelöst — die Rundengrenze bleibt frei (das Gold ist bezahlt). */
-  refundOnNegation(engine, link) {
-    if (engine.gs.hoptUsed) delete engine.gs.hoptUsed[hoptKey(link.owner, link.heroIdx)];
   },
 
   async heroReactionResolve(engine, pi, chain, myIndex, heroIdx) {

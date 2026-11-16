@@ -93,8 +93,8 @@ function regulaereAktionOffen(gs, pi, engine) {
 }
 
 module.exports = {
-  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
-  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  // ★ FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328) oder wird sie NEGIERT (Kette), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`;
+  // Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem Beginn der Aktivierung verbraucht).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
   // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Zwangssuche) — gegen den durch die Erste-Runden-Immunität

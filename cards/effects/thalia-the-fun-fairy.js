@@ -109,8 +109,8 @@ function hasActiveThaliaOnSide(engine, ownerIdx) {
  * Eine Kopie je Kartenname (Basisname) und Zug, solange ein Thalia-Held auf der Seite von `pi` aktiv ist (lebt, kein Frost/Betäubung/
  * Negierung — Beschränkungen ruhen wie alle Helden-Passiven, W8: `isHeroPassiveDormant`). Gilt für den Kontrolleur/Spieler `pi`, der
  * den Spell wirkt (Hand, Sofort-Guss, Zusatzaktion, Support-Reaktion aus der Hand). Der Stempel liegt in `gs.hoptUsed`
- * (`thalia-support:<Basisname>:<pi>` = Zugnummer), damit die Z7b-Rückgabe bei ganz negiertem Spell ihn mitnimmt. Abbruch stempelt nie;
- * gespielt und verpufft stempelt (die Stempel-Aufrufer sitzen hinter dem Abbruch-Tor).
+ * (`thalia-support:<Basisname>:<pi>` = Zugnummer). Abbruch stempelt nie; gespielt und verpufft oder negiert stempelt (Spielgestalter-Entscheidung
+ * 16.11.2026; die Stempel-Aufrufer sitzen hinter dem Abbruch-Tor, die Kettennegation stempelt über `_noteFizzledPlay`).
  */
 function aktiveThalia(engine, pi) {
   const ps = engine.gs?.players?.[pi];

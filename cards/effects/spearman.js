@@ -20,9 +20,10 @@
 //    und hat in diesem Zug noch nicht gestochen. Auch ein Spearman unter Dark Ocean oder in der Erstzug-Sperre bleibt stumm — das Fenster kennt beides.
 //  • Pro Aktivierung sticht nur EIN Speerkämpfer (der Effekt wird nur einmal negiert; eine weitere Kopie bietet sich in derselben Kette nicht an).
 //  • „Once per turn": je EXEMPLAR (`inst.counters._spearTurn`), wie jede Creature mit Rundengrenze — zwei Speerkämpfer stechen zweimal. Gestempelt wird
-//    beim Aktivieren (`payActivationCost`); die NEGIERTE Creature behält dagegen ihre eigene Rundensperre (Z7b: ganz negiert = nie aufgelöst).
+//    beim Aktivieren (`payActivationCost`) und bleibt auch dann verbraucht, wenn der Stich selbst negiert wird (Spielgestalter-Entscheidung 16.11.2026: Einmal-Limits sind mit dem
+//    Beginn der Aktivierung verbraucht); die NEGIERTE Creature verbraucht ihrerseits ihre Rundensperre (Engine: `negierteAktivierungStempeln`).
 //  • Wirkung („negate that effect and deal 50 damage to that Creature instead"): die Aktivierung wird negiert (`negateChainLink` auf das Initialglied),
-//    der Server überspringt dann `onCreatureEffect`, stempelt die Rundengrenze der negierten Creature NICHT (Z7b, Als Entscheidung Welle 3) und erstattet eine verbrauchte Zusatzaktion; die
+//    der Server überspringt dann `onCreatureEffect`, stempelt die Rundengrenze der negierten Creature (Spielgestalter-Entscheidung 16.11.2026) und erstattet eine verbrauchte Zusatzaktion; die
 //    Creature bekommt 50 Schaden (`actionDealCreatureDamage`, Quelle: der Speerkämpfer, `canBeNegated`).
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -55,17 +56,11 @@ module.exports = {
     return true;
   },
 
-  /** Der Stich ist mit dem Aktivieren verbraucht — außer er wird ganz negiert (`refundOnNegation`, Z7b); Fizzle behält die Sperre. */
+  /** Der Stich ist mit dem Aktivieren verbraucht — auch wenn er danach negiert wird oder fizzelt (Spielgestalter-Entscheidung 16.11.2026). */
   async payActivationCost(engine, pi, chainCtx, inst) {
     if (!inst.counters) inst.counters = {};
     inst.counters._spearTurn = engine.gs.turn;
     return true;
-  },
-
-  /** Z7b: wird der Stich selbst GANZ negiert (Cute Camera …), hat er nie aufgelöst — die Rundengrenze bleibt frei. */
-  refundOnNegation(engine, link) {
-    const inst = engine.cardInstances.find(c => c.id === link.creatureInstId);
-    if (inst?.counters) delete inst.counters._spearTurn;
   },
 
   async creatureReactionResolve(engine, pi, chain, myIndex, inst) {

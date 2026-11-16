@@ -20,7 +20,11 @@
 //  Phase). The replacement action is optional —
 //  the target can cancel the prompt to skip it.
 //
-//  Hard once per turn (across all copies).
+//  Hard once per turn (across all copies). Spielgestalter-Entscheidung
+//  16.11.2026: gestempelt mit dem BEGINN der Aktivierung
+//  (`stempelBeiAktivierung`, vor dem Kettenfenster) — auch wenn der
+//  Plan danach selbst negiert wird, ist die Karte für diesen Zug
+//  verbraucht.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -41,6 +45,10 @@ module.exports = {
 
   // Cannot be played proactively
   canActivate: () => false,
+
+  // Spielgestalter-Entscheidung 16.11.2026: „You can only play 1 per turn" gilt ab dem Ausspielen — noch vor dem Kettenfenster (Engine: `_promptReactionsForChain`),
+  // nicht erst mit der Wirkung in `resolve`. Eine negierte Master's Plan gibt nichts zurück.
+  stempelBeiAktivierung(engine, pi) { engine.claimHOPT('masters_plan', pi); },
 
   /**
    * Reaction fires when the chain's most recent card was played by the
@@ -89,7 +97,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
 
-    // Mark HOPT
+    // Mark HOPT (schon bei der Aktivierung gestempelt, `stempelBeiAktivierung`; hier nur zur Sicherheit)
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`masters_plan:${pi}`] = gs.turn;
 

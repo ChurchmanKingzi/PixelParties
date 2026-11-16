@@ -71,8 +71,8 @@ function kopieStapelBereinigen(engine, pi, cardName, summeVorher) {
 }
 
 module.exports = {
-  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
-  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  // „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; nur Hammer Throws Item Lock liest es noch —
+  // Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
   negatesWholeCard: true,
 
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
@@ -197,15 +197,13 @@ module.exports = {
       }
     }
     if (kopieMoeglich) {
-      // Eigenes „once per game"-Limit des Spiegel-Besitzers verbrauchen; `_surpriseStempel` schützt es vor dem Z7b-Abzug,
-      // falls der Spiegel-Besitzer zugleich Wirker des negierten Zaubers ist.
+      // Eigenes „once per game"-Limit des Spiegel-Besitzers verbrauchen.
       const opgKey = script.oncePerGameKey || (script.oncePerGame ? sourceCard : null);
       if (opgKey) {
         const ops = gs.players[ownerIdx];
         if (ops) {
           if (!ops._oncePerGameUsed) ops._oncePerGameUsed = new Set();
           ops._oncePerGameUsed.add(opgKey);
-          (engine._surpriseStempel || (engine._surpriseStempel = new Set())).add(`${ownerIdx}|${opgKey}`);
         }
       }
     }

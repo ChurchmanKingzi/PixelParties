@@ -37,8 +37,8 @@
 //    Besitzers (`deleteOnUse` + `_spellPlacedOnBoard`, Muster Liberation).
 //  ⑧ „only 1 per turn": harte Rundensperre je Spieler
 //    (`spell-played:Meditation`), erst NACH der letzten abbrechbaren
-//    Wahl gestempelt (Abbruch kostet nichts), bei Fizzle über
-//    `onFizzledPlay`.
+//    Wahl gestempelt (Abbruch kostet nichts), bei Fizzle oder Negation
+//    über `onFizzledPlay`.
 // ═══════════════════════════════════════════
 
 // COST-DISCARD-CHANNEL: n/a — „discard pile" im Kartentext ist die QUELLE der Karten (Ablagestapel → Deck/Hand), kein Abwurf als Kosten.
@@ -89,7 +89,7 @@ module.exports = {
 
   cpuMeta: { castTriggersDraw: true },
 
-  // ⑧ Fizzle (Wirker beim Auflösen handlungsunfähig): die Karte war GESPIELT → Rundensperre.
+  // ⑧ Fizzle (Wirker beim Auflösen handlungsunfähig) oder Negation in der Kette: die Karte war GESPIELT → Rundensperre.
   onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
   // ⑧ „You can only play 1 per turn" — grau, sobald in diesem Zug schon eine gespielt wurde.

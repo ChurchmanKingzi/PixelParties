@@ -16,7 +16,8 @@
 //  `payActivationCost` VOR dem Reaktionsfenster bezahlt (Wahl des
 //  Opfers, Tod). Wird die Karte danach komplett negiert (Silence, The
 //  Master's Plan …), bleibt der Held geopfert, die Karte wirkt nicht,
-//  und der Einmal-Slot `divineGift` bleibt frei (Z7b). Erst `onPlay`
+//  und der Einmal-Slot `divineGift` ist verbraucht (Spielgestalter-
+//  Entscheidung 16.11.2026; früher Z7b: frei). Erst `onPlay`
 //  (Wirkung) wählt den Empfänger und erhöht die HP.
 //  Fallback: lief `payActivationCost` nicht (anderer Spielweg), zahlt
 //  `onPlay` die Kosten wie früher selbst.

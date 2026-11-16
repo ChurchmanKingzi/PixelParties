@@ -56,6 +56,9 @@ function countBurnedTargets(engine) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   // D1 (Regel von Al): der Zug IST die ganze Karte - unter der Zieh-Sperre (drawLocked) nicht spielbar; unter handLocked
   // markiert der Loader sie schon selbst (blockedByHandLock).
   blockedByDrawLock: true,

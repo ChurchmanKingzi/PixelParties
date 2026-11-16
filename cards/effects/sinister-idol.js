@@ -16,7 +16,7 @@
 //    (`_resolveImmediateActionPick`: Guardian Beast Hu, Celia …) und die Zusatznutzung der Secret Lab Entrance (Al: ja) — die drei letzten über `engine.abilityAktivierungsFenster`
 //    (Initialglied mit `abilityZone`, Surprise-Fenster, Stufe danach neu gelesen). Vollständige Wegeliste: CARD_API, Abschnitt „Welle 82 — Sinister Idol".
 //    Wird die Aktivierung einer ZUSATZaktion im Fenster NEGIERT (Ragnarock …), bleibt die Zusatzaktion unverbraucht (Al): Sofort-Aktion = der Auswahl-Prompt geht erneut auf (ist nichts mehr zu wählen,
-//    ist sie weg), Anbieter-Zusatzaktion = Anbieter zurück; Einmal-Stempel der negierten Ability nach Z7b frei. Secret Lab Entrance ist keine Zusatzaktion in diesem Sinn (Lab-Stempel bleibt gesetzt).
+//    ist sie weg), Anbieter-Zusatzaktion = Anbieter zurück; Einmal-Stempel der negierten Ability bleibt verbraucht (Spielgestalter-Entscheidung 16.11.2026). Secret Lab Entrance ist keine Zusatzaktion in diesem Sinn (Lab-Stempel bleibt gesetzt).
 //  • „your opponent activates": der Aktivierer ist ein Gegner des Idol-Spielers (2–4 Sitze). Bezauberte/geliehene Abilities (Charme Lv 3, Lizbeth/Smugbeth): das Glied
 //    trägt den Stapel, der aktiviert wird — die Kopie fällt von DIESEM Stapel („the user" = der Held, auf dem sie liegt), auch wenn er dem Idol-Spieler gehört.
 //  • Wirkung: BEVOR die Ability auflöst (die Kette löst rückwärts auf, die Initialkarte zuletzt) wird die OBERSTE Kopie des Stapels in die ABLAGE ihres Besitzers geschickt

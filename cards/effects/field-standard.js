@@ -142,6 +142,9 @@ function _isEligible(engine, inst, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY_PREFIX, pi); },
+
   /**
    * Suppress the default `potion_resolved` explosion that
    * `doConfirmPotion` would otherwise fire on each picked Creature.

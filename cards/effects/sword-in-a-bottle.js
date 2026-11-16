@@ -100,6 +100,9 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
