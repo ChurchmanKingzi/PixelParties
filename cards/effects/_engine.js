@@ -12134,6 +12134,13 @@ class GameEngine {
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
       hero.maxHpCapped = opts.maxHpCap;
+      // ★ Die max HP sind jetzt ein FESTER Wert der Karte (Divine Gift of Death/Equality, Paraseed Control, Resuscitation Potion): was Toughness vorher
+      // aufgeschlagen hatte (`counters.hpGranted`), steckt nicht mehr darin. Der gemerkte Bonus wuerde beim Abgang einer Kopie sonst von den NEUEN max HP
+      // abgezogen — der Held fiel auf 1/1 statt auf seinen festen Wert zu bleiben. Neu angelegte Kopien bringen unter der Obergrenze ohnehin nichts mehr.
+      for (const c of this.cardInstances) {
+        if ((c.counters?.hpGranted || 0) > 0 && c.owner === playerIdx && c.heroIdx === heroIdx
+            && (c.zone === ZONES.ABILITY || this.istAbilityImSupport(c))) c.counters.hpGranted = 0;
+      }
     }
     if (opts.forceKillAtTurnEnd) {
       hero._forceKillAtTurnEnd = this.gs.turn;
