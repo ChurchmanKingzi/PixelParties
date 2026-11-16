@@ -143,7 +143,7 @@ module.exports = {
 
       // Randomize order — sells the "scattered, confused forgetting"
       // read better than a deterministic walk. Fisher-Yates shuffle.
-      const order = removable.slice();
+      let order = removable.slice();
       for (let i = order.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [order[i], order[j]] = [order[j], order[i]];
@@ -162,6 +162,18 @@ module.exports = {
           type: 'forgetting_question_mark',
           owner: ow, heroIdx: hi, zoneSlot: -1,
         });
+      }
+
+      // Spielgestalter-Entscheidung 16.11.2026: Resistance fängt „Divine Gift of Forgetting" ab — der Effekt wirkt auf den HELDEN, nicht auf eine einzelne Ability. Je betroffenem Helden EINMAL fragen
+      // (nicht je Ability: eine Ladung der Resistance = ein Effekt), nach den Bildern und vor jeder Zustandsänderung. Ein Held mit Resistance bleibt unberührt (seine Abilities bleiben liegen, die
+      // Leafagami Snake zieht dort nichts); die übrigen Helden verlieren ihre Abilities wie gehabt. Reihenfolge: erst Resistance (Held), dann Snake (je Ability) in der Schleife unten.
+      {
+        const verschont = new Set();
+        for (const key of affectedHeroes) {
+          const [ow, hi] = key.split('-').map(Number);
+          if (await engine.heroNonDamageEffectBlocked(ow, hi, 'ability_discard', { sourceOwner: pi, source: 'Divine Gift of Forgetting' })) verschont.add(key);
+        }
+        if (verschont.size > 0) order = order.filter(inst => !verschont.has(`${inst.owner}-${inst.heroIdx}`));
       }
 
       // ── Flight animation: each removed ability flies one-by-one
