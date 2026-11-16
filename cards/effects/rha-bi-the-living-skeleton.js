@@ -215,6 +215,7 @@ module.exports = {
       cancellable: true,
       maxTotal: 1,
       minRequired: 1,
+      ignoreBlinded: true,   // Blinded (Spielgestalter-Entscheidung 16.11.2026): einen Helden/eine Zone zum PLATZIEREN zu waehlen ist kein „Auswaehlen" eines Ziels
     });
     if (!wahl || wahl.length === 0) return false;
     const ziel = ziele.find(z => z.id === wahl[0]);

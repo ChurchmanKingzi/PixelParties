@@ -10203,10 +10203,9 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
-  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Kreatur ODER ihr Wirtsheld geblendet + Zielwahl-Effekt `requiresTarget`).
-  // Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
-  if (!anyPlayer && script.requiresTarget === true
-      && (room.engine._isCreatureBlinded(inst) || room.engine._isHeroBlinded(heroOwner, heroIdx))) return false;
+  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Spielgestalter-Entscheidung 16.11.2026: Kreatur ODER ihr Wirtsheld geblendet UND der Effekt kann NUR
+  // gegnerische Ziele wählen — `blindedKreaturGesperrt`). Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
+  if (!anyPlayer && room.engine.blindedKreaturGesperrt(inst, pi, effectName, script)) return false;
   // ★ EINMAL PRO SPIEL FUER DEN EFFEKT (v1030, Als Auftrag 12.9.).
   // Eigener Schluessel (`effect:…`), damit „1 Beschwoerung je Partie"
   // und „1 Aktivierung je Partie" nebeneinander stehen koennen.
@@ -10725,6 +10724,8 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
@@ -10788,7 +10789,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   try {
     // v353: `'board'` — eine Ability liegt im Ability-Slot am Brett,
     // beide Seiten sehen den Auftritt.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');   // v349
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // v349; Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
@@ -11646,6 +11647,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -11771,7 +11774,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
     // Luecke, keine Absicht. `'board'`: beide Seiten sehen sie.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
@@ -12092,6 +12095,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       name: 'Transform back', trueFormRevert: true, inst: heroInst, hoptKey: null,
       script: { heroEffect: `Remove ${trueFormRevert.formName} (discard pile) and return to ${trueFormRevert.baseName}.` },
     });
+  }
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg (wie `getActiveHeroEffects`) — ein Effekt, der nur gegnerische Ziele waehlen kann, faellt aus der Auswahl.
+  for (let i = availableEffects.length - 1; i >= 0; i--) {
+    const e = availableEffects[i];
+    if (!e.trueFormRevert && room.engine.blindedEffektGesperrt(pi, heroOwner, heroIdx, e.name, { script: e.script })) availableEffects.splice(i, 1);
   }
   if (availableEffects.length === 0) return false;
 
@@ -12461,6 +12469,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
   if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg — gesperrt nur, wenn der Traeger-Held (Kontrolleur `pi`) den Effekt nur gegen Gegner richten koennte.
+  if (!_crossInst && room.engine.blindedEffektGesperrt(pi, _brett, heroIdx, inst.counters?._effectOverride || cardName, { script })) return false;
   // W27a (Al, 21.10.2026): Spell-Anhängsel (Prayer) liegen bei Frozen/Stunned nicht still; W29a (Al, 21.10.2026: „Webbed negiert NICHT Attachments!"): auch nicht bei Webbed.
   if (!script.bypassHostStatusFilter) {
     const _anhaengsel = room.engine._istSpellAnhaengsel(inst);
@@ -12505,7 +12515,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
     // v353: Auftritt — das Artefakt liegt ausgeruestet am Brett
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
-    room.engine.armEffectAnnounce(cardName, pi, 'board');
+    room.engine.armEffectAnnounce(cardName, pi, 'board', _crossInst ? undefined : { seite: _brett, heroIdx });
     let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();

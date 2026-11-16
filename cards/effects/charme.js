@@ -26,7 +26,10 @@ module.exports = {
   // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
   stealsOpponentCards: true,
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Ability — Lv1 („Ability attached to an opponent's Hero") und Lv3 („a Hero your opponent controls") brauchen ein gegnerisches Ziel,
+  // Lv2 („make your opponent add a card from their hand to yours") waehlt nichts und ignoriert Blinded (`blindedEigeneZiele`, `level` = Stapelhoehe).
   requiresTarget: true,
+  blindedEigeneZiele: ({ level }) => (level || 0) === 2,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
   freeActivation: true,

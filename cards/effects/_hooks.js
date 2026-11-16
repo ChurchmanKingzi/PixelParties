@@ -359,10 +359,10 @@ const STATUS_EFFECTS = {
   // all keep firing. Distinct from Stunned which silences everything.
   // Cleansable like Stunned.
   bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
-  // `blinded` (Smoke Vial, future Blinded sources): ATTACKS und SPELLS des Traegers duerfen nur EIGENE Ziele waehlen (Spielgestalter-Entscheidung 16.11.2026 —
-  // Picker-Filter `engine.markiereBlindGesperrte`, Spielbarkeit `engine.blindedAttackSpellGesperrt`); Karten ohne Zielwahl ignorieren Blinded. Kreatur-/Helden-/
-  // Ability-/Artefakt-Effekte mit Zielwahl (`requiresTarget: true`) bleiben dagegen gesperrt (`blocksTargeting: true` + Skriptflag). Cleansable like Stunned.
-  // Status icon is rendered as 👁 with a CSS strikethrough line.
+  // `blinded` (Smoke Vial, future Blinded sources): „Cannot choose a target the opponent controls with Attacks, Spells or effects." (Spielgestalter-Entscheidung 16.11.2026.)
+  // Gilt fuer ALLE Effekte des Traegers (Attacks, Spells, Reaktionen, Surprises, Helden-, Ability-, Kreatur-, Ausruestungs-Effekte): Picker-Filter `engine.markiereBlindGesperrte`
+  // (gegnerische Ziele ausgegraut), Spielbarkeit/Aktivierbarkeit `engine.blindedEffektGesperrt` (gesperrt nur, wenn der Effekt keinen legalen EIGENEN Kandidaten hat).
+  // Effekte ohne Zielwahl und Platzierungen ignorieren Blinded. Cleansable like Stunned.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   // ★ v1059 (Als Befund 14.9.): ZWEITE Blendungs-Art mit anderer
   // Endbedingung — „until the next time it takes damage" („Trunk Sand")
