@@ -13,7 +13,9 @@
 //  Engine. Opfer zaehlen als „defeated" (Als Ruling 6.9., Frage 16).
 //  Die Zone ist beim Todes-Hook bereits geraeumt (`_removeCardFromState`
 //  vor ON_CREATURE_DEATH). Platzieren = keine Aktion, kein Level-Check.
-//  Harte Einmal-pro-Zug-Sperre je Spieler ueber `gs.hoptUsed`.
+//  Harte Einmal-pro-Zug-Sperre je Spieler ueber `gs.hoptUsed`, gestempelt mit
+//  der Aktivierung (`stempelBeiAktivierung`, Spielgestalter-Entscheidung
+//  16.11.2026): auch eine danach negierte Pawn Chain ist verbraucht.
 // ═══════════════════════════════════════════
 const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const {
@@ -35,6 +37,9 @@ module.exports = {
   // im generischen Kettenfenster bei JEDEM Kartenspiel (v830, Als
   // Report). Das Kreaturentod-Fenster braucht nur das Flag darunter.
   isCreatureDefeatedReaction: true,
+
+  // Spielgestalter-Entscheidung 16.11.2026: die Rundengrenze gilt ab dem Ausspielen (vor dem Gegenreaktions-Fenster), nicht erst mit der Wirkung.
+  stempelBeiAktivierung(engine, pi) { engine.claimHOPT('pawn-chain', pi); },
 
   creatureDefeatedCondition(gs, pi, engine, deathInfo) {
     if (!deathInfo || deathInfo.heroIdx == null || deathInfo.zoneSlot == null) return false;

@@ -48,6 +48,10 @@
 //  ── „1 je Held pro Zug" ──
 //  Harte Sperre je HELD, nicht je Spieler: der Schluessel traegt den
 //  Heldenindex. (`claimHOPT` haengt den Spielerindex selbst an.)
+//  Spielgestalter-Entscheidung 16.11.2026: gestempelt mit dem BEGINN der
+//  Aktivierung (`stempelBeiAktivierung`, vor dem Gegenreaktions-Fenster) —
+//  auch ein danach negierter Escape Device verbraucht den Einsatz für
+//  diesen Helden.
 // ═══════════════════════════════════════════
 
 const { zaehleInAblage } = require('./_future-tech-shared');
@@ -73,6 +77,40 @@ function kontrolliert(engine, pi, t) {
 }
 function heldSchluessel(pi, t) {
   return t.owner === pi ? t.heroIdx : `${t.owner}:${t.heroIdx}`;
+}
+
+/**
+ * Bei mehreren eigenen Zielen entscheidet der Spieler, wer entkommt.
+ *
+ * ★ Die Auswahlliste MUSS aus `engine.getHeroTargets(pi)` kommen
+ *   (Als Befund 21.8.: „konnte kein Ziel wählen, saß im Target
+ *   Picker fest"). Die Eintraege aus `targetedHeroes` tragen nicht
+ *   zwingend die kanonischen Ziel-Ids, auf die der Client seine
+ *   Klickflaechen abbildet — mit ihnen bewirkt ein Klick nichts.
+ */
+async function waehleHeld(engine, pi, eigene) {
+  let ziel = eigene[0];
+  if (eigene.length > 1) {
+    const erlaubt = new Set(eigene.map(t => `${t.owner}:${t.heroIdx}`));
+    const auswahl = engine.getControlledHeroTargets(pi).filter(t => erlaubt.has(`${t.owner}:${t.heroIdx}`));   // W33a: kontrollierte Helden (Brettseite in der ID)
+    if (auswahl.length > 1) {
+      const wahl = await engine.promptEffectTarget(pi, auswahl, {
+        title: CARD_NAME,
+        description: 'Choose which of your Heroes escapes — it ignores every effect of this card.',
+        confirmLabel: '🛡️ Escape!',
+        confirmClass: 'btn-success',
+        greenSelect: true,
+        cancellable: false,
+        maxTotal: 1,
+      });
+      const id = Array.isArray(wahl) ? wahl[0] : wahl;
+      const gewaehlt = auswahl.find(t => t.id === id);
+      if (gewaehlt) ziel = eigene.find(t => t.owner === gewaehlt.owner && t.heroIdx === gewaehlt.heroIdx) || ziel;
+    } else if (auswahl.length === 1) {
+      ziel = eigene.find(t => t.owner === auswahl[0].owner && t.heroIdx === auswahl[0].heroIdx) || ziel;
+    }
+  }
+  return ziel;
 }
 
 module.exports = {
@@ -120,42 +158,38 @@ module.exports = {
     return (srcData.level || 0) <= zaehleInAblage(gs, pi, CARD_NAME);
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: „1 je Held pro Zug" ist mit dem BEGINN der Aktivierung verbraucht — auch wenn die Karte danach negiert wird (Cute Camera …).
+   * Der Held, der entkommt, wird deshalb schon HIER gewählt (mehrere eigene Ziele: der Spieler wählt vor dem Gegenreaktions-Fenster) und die Sperre für ihn gestempelt; `postTargetResolve`
+   * übernimmt die Wahl (`engine._ftEscapeWahl`). Kontext (`extra.postTarget`) liefert das Post-Target-Fenster der Engine (`_reaktionGespielt`).
+   */
+  async stempelBeiAktivierung(engine, pi, extra) {
+    const t = extra?.postTarget;
+    if (!t) return;
+    const eigene = (t.targetedHeroes || []).filter(h =>
+      kontrolliert(engine, pi, h) && sperreFrei(engine.gs, pi, heldSchluessel(pi, h)));
+    if (eigene.length === 0) return;
+    const ziel = await waehleHeld(engine, pi, eigene);
+    if (!ziel) return;
+    engine.claimHOPT(`ft-escape:${heldSchluessel(pi, ziel)}`, pi);
+    engine._ftEscapeWahl = { pi, turn: engine.gs.turn, owner: ziel.owner, heroIdx: ziel.heroIdx };
+  },
+
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard) {
     const gs = engine.gs;
-    const eigene = (targetedHeroes || []).filter(t =>
-      kontrolliert(engine, pi, t) && sperreFrei(gs, pi, heldSchluessel(pi, t)));
-    if (eigene.length === 0) return {};
-
-    // Bei mehreren eigenen Zielen entscheidet der Spieler, wer entkommt.
-    //
-    // ★ Die Auswahlliste MUSS aus `engine.getHeroTargets(pi)` kommen
-    //   (Als Befund 21.8.: „konnte kein Ziel wählen, saß im Target
-    //   Picker fest"). Die Eintraege aus `targetedHeroes` tragen nicht
-    //   zwingend die kanonischen Ziel-Ids, auf die der Client seine
-    //   Klickflaechen abbildet — mit ihnen bewirkt ein Klick nichts.
-    let ziel = eigene[0];
-    if (eigene.length > 1) {
-      const erlaubt = new Set(eigene.map(t => `${t.owner}:${t.heroIdx}`));
-      const auswahl = engine.getControlledHeroTargets(pi).filter(t => erlaubt.has(`${t.owner}:${t.heroIdx}`));   // W33a: kontrollierte Helden (Brettseite in der ID)
-      if (auswahl.length > 1) {
-        const wahl = await engine.promptEffectTarget(pi, auswahl, {
-          title: CARD_NAME,
-          description: 'Choose which of your Heroes escapes — it ignores every effect of this card.',
-          confirmLabel: '🛡️ Escape!',
-          confirmClass: 'btn-success',
-          greenSelect: true,
-          cancellable: false,
-          maxTotal: 1,
-        });
-        const id = Array.isArray(wahl) ? wahl[0] : wahl;
-        const gewaehlt = auswahl.find(t => t.id === id);
-        if (gewaehlt) ziel = eigene.find(t => t.owner === gewaehlt.owner && t.heroIdx === gewaehlt.heroIdx) || ziel;
-      } else if (auswahl.length === 1) {
-        ziel = eigene.find(t => t.owner === auswahl[0].owner && t.heroIdx === auswahl[0].heroIdx) || ziel;
-      }
+    // Die Wahl samt Stempel stammt aus der Aktivierung (`stempelBeiAktivierung`); ohne sie (KI-Simulation, anderer Weg) wie bisher: wählen und stempeln.
+    const vorab = engine._ftEscapeWahl;
+    delete engine._ftEscapeWahl;
+    let ziel = (vorab && vorab.pi === pi && vorab.turn === gs.turn)
+      ? ((targetedHeroes || []).find(t => t.type === 'hero' && t.owner === vorab.owner && t.heroIdx === vorab.heroIdx) || null)
+      : null;
+    if (!ziel) {
+      const eigene = (targetedHeroes || []).filter(t =>
+        kontrolliert(engine, pi, t) && sperreFrei(gs, pi, heldSchluessel(pi, t)));
+      if (eigene.length === 0) return {};
+      ziel = await waehleHeld(engine, pi, eigene);
+      if (!engine.claimHOPT(`ft-escape:${heldSchluessel(pi, ziel)}`, pi)) return {};
     }
-
-    if (!engine.claimHOPT(`ft-escape:${heldSchluessel(pi, ziel)}`, pi)) return {};
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'shield_bubble', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1,
