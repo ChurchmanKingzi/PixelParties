@@ -6967,6 +6967,10 @@ function installCpuBrain(engine) {
     if (!validTargets || validTargets.length === 0) return [];
     throwIfAborted(engine, 'promptEffectTarget');
 
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): wirkt ein GEBLENDETER Held die Attack/den Spell hinter dieser Wahl, ist Gegnerisches nicht waehlbar. Die Markierung der Engine
+    // (`promptEffectTarget`) laeuft fuer die CPU nie — dieser Wrapper kehrt ohne sie zurueck —, also hier vor der `ineligible`-Bereinigung darunter (idempotent).
+    engine.markiereBlindGesperrte?.(validTargets, playerIdx, config);
+
     // ── AUSGEGRAUTE (`ineligible`) ZIELE SIND FUER DIE KI NICHT WAEHLBAR ──
     // Geschuetzte Ziele (Butterfly Cloud `untargetable`, Stealth, Invisibility,
     // `blocksTargeting`-Vertraege …) kommen als MARKIERTE Eintraege an, damit der

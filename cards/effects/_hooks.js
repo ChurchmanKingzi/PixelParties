@@ -359,11 +359,9 @@ const STATUS_EFFECTS = {
   // all keep firing. Distinct from Stunned which silences everything.
   // Cleansable like Stunned.
   bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
-  // `blinded` (Smoke Vial, future Blinded sources) prevents the bearer
-  // from using Attacks, Spells, or activated effects that need to pick
-  // one or more targets. AoE / area-wide effects keep working — the
-  // engine reads `blocksTargeting: true` plus the card script's
-  // `requiresTarget: true` flag to decide. Cleansable like Stunned.
+  // `blinded` (Smoke Vial, future Blinded sources): ATTACKS und SPELLS des Traegers duerfen nur EIGENE Ziele waehlen (Spielgestalter-Entscheidung 16.11.2026 —
+  // Picker-Filter `engine.markiereBlindGesperrte`, Spielbarkeit `engine.blindedAttackSpellGesperrt`); Karten ohne Zielwahl ignorieren Blinded. Kreatur-/Helden-/
+  // Ability-/Artefakt-Effekte mit Zielwahl (`requiresTarget: true`) bleiben dagegen gesperrt (`blocksTargeting: true` + Skriptflag). Cleansable like Stunned.
   // Status icon is rendered as 👁 with a CSS strikethrough line.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   // ★ v1059 (Als Befund 14.9.): ZWEITE Blendungs-Art mit anderer

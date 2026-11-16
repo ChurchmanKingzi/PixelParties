@@ -217,7 +217,10 @@ async function _pickAttachmentHostRaw(ctx, CARD_NAME, opts = {}) {
   //   • `opts.heroAccent(hero, hi, side)` → Hervorhebungsfarbe des Ziels
   //     (`t.accent`, z.B. 'green': „dieses Ziel macht den Einsatz zur
   //     Zusatz-Aktion").
-  const gedimmt = (h) => !!opts.heroDim?.(gs.players[h.side]?.heroes?.[h.heroIdx], h.heroIdx, h.side, engine);
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Wirt eines Anhaengsels ist ein gewaehltes Ziel — ein geblendeter Wirker darf nur Helden waehlen, die sein Kontrolleur
+  // kontrolliert. Hier (vor Drop-Hinweis, Caster-Standard und Automatik, die den Picker umgehen) ausgegraut; der Picker markiert dasselbe noch einmal.
+  const gedimmt = (h) => !!opts.heroDim?.(gs.players[h.side]?.heroes?.[h.heroIdx], h.heroIdx, h.side, engine)
+    || !!engine.blindWirtGesperrt?.(ctx.card, h.side, h.heroIdx);
   const hosts = alle.filter(h => !gedimmt(h));
   if (hosts.length === 0) { gs._spellCancelled = true; return null; }
 
