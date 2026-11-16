@@ -26,6 +26,10 @@ const MAX_TARGETS = 3;
 const FLUG_MS = 380;       // Flugzeit der Pfeile (Client: `ArkanPfeil`, Einschlag bei `dur`)
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Choose up to 3 targets".
+  requiresTarget: true,
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
