@@ -2130,7 +2130,7 @@ function MainMenu() {
           halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
           `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
           bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
-      <LangFlag />
+      <LangFlag menu />
       <div className="menu-topleft">
       <div className="menu-stats">
         <div className="menu-stats-row">

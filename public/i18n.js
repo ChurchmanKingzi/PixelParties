@@ -130,13 +130,14 @@
     if (m && P.imgs.has(m[1])) e.setAttribute('src', '/rules/de/' + m[1] + m[2]);
   };
   const attrs = (e) => {
-    imgSrc(e); for (const a of ATTRS) { if (a === 'src') continue; const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && !skipped(e)) e.setAttribute(a, r); } } };
+    imgSrc(e); for (const a of ATTRS) { if (a === 'src') continue; const v = e.getAttribute && e.getAttribute(a); if (v && /[A-Za-z]{2}/.test(v)) { const r = lookup(v.replace(/\s+/g, ' ').trim()); if (r !== v && (e.tagName === 'TEXTAREA' ? !skipped(e.parentNode) : !skipped(e))) e.setAttribute(a, r); } } };
   const walk = (root) => {
     if (root.nodeType === 3) return textNode(root);
-    if (root.nodeType !== 1 || SKIP_TAG[root.tagName]) return;
+    if (root.nodeType !== 1 || (SKIP_TAG[root.tagName] && root.tagName !== 'TEXTAREA')) return;
     attrs(root);
+    if (root.tagName === 'TEXTAREA') return;
     const tw = document.createTreeWalker(root, 5 /* TEXT | ELEMENT */);
-    for (let n = tw.nextNode(); n; n = tw.nextNode()) { if (n.nodeType === 3) textNode(n); else if (!SKIP_TAG[n.tagName]) attrs(n); }
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) { if (n.nodeType === 3) textNode(n); else if (!SKIP_TAG[n.tagName] || n.tagName === 'TEXTAREA') attrs(n); }
   };
   P.startDom = () => {
     if (lang === 'en') return;

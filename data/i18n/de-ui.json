@@ -6710,7 +6710,7 @@
 "{0} {1} Zones for your and your opponent's Areas. Each player can only use 1 of those 2 zones.": "{0} {1} Zonen für deine Gebiete und die deines Gegners. Jeder Spieler kann nur 1 dieser 2 Zonen nutzen.",
 "{0}ACTIVE DECK": "{0}AKTIVES DECK",
 "{0}Sign in with Google": "{0}Mit Google anmelden",
-"{0}TOP PLAYERS": "{0}BESTE SPIELER",
+"{0}TOP PLAYERS": "{0}TOP-SPIELER",
 "{0}YOUR DECKS": "{0}DEINE DECKS",
 "{0}YOUR RECORD": "{0}DEINE BILANZ",
 "{0} has joined!": "{0} ist beigetreten!",
@@ -7521,5 +7521,6 @@
 "ILLEGAL": "UNZULÄSSIG",
 "EASY": "LEICHT",
 "MEDIUM": "MITTEL",
-"HARD": "SCHWER"
+"HARD": "SCHWER",
+"TOP PLAYERS": "TOP-SPIELER"
 }

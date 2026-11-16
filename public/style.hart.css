@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 5cacd8771d00f2df — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN c17086d65bebec73 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26470,4 +26470,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* Sprach-Flagge (Login + Hauptmenue), oben links; harter Pixelrahmen */
 .lang-flag-btn { position: fixed; top: 10px; left: 12px; z-index: 60; padding: 0; border: 0; background: none; cursor: pointer;
   box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; line-height: 0; }
+/* Telefon quer: oben links liegen Avatar/Name/ELO/SC — die Flagge wandert rechts neben die Knoepfe */
+@media (max-height: 600px) { .lang-flag-btn--menu { left: auto; right: 292px; } }
 .lang-flag-btn:hover { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fbc86a; }
