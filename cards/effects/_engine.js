@@ -35903,8 +35903,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _nurNegation = !!config._noRedirectOutcome;
 
     // Scan hand for redirect cards
+    // Dark Ocean („neither player can react to … the effects of their opponent's Creatures"): die Umleiter aus der Hand (Martyry, Challenge, Anti-Magnet) sind Reaktionen — wie in allen anderen
+    // Hand-Fenstern (W34a) gesperrt, wenn der Effekt von einer GEGNERISCHEN Creature kommt; auf Effekte der eigenen Creatures darf man reagieren.
+    const _ozeanSperre = this.darkOceanBlocksReaction(targetOwnerIdx, null);
     const seen = new Set();
-    for (const { cardName } of (_nurNegation ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
+    for (const { cardName } of ((_nurNegation || _ozeanSperre) ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
