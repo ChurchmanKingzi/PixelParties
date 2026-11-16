@@ -180,7 +180,16 @@ module.exports = {
       });
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       const ziel = id && ziele(engine, pi, heroIdx).find(z => z.id === id);
-      if (!ziel) { gs._spellCancelled = true; return; }
+      if (!ziel) {
+        // UMGELENKT (Martyry, Anti-Magnet …): das Umleitungsziel stand nicht in der Zielliste (kein Anhängsel/Status zum Entfernen). Der Zauber löst dort trotzdem auf — und findet nichts.
+        // Ein Abbruch (`_spellCancelled`) gäbe die Karte zurück auf die Hand und liesse die Aktion stehen, während die Reaktionskarte des Gegners schon verbraucht ist.
+        if (id && !liste.some(z => z.id === id)) {
+          engine.log('exorcism_redirected_nothing', { player: ps.username, target: id });
+          engine.sync();
+          return;
+        }
+        gs._spellCancelled = true; return;
+      }
 
       const tHero = ziel.type === 'hero' ? gs.players[ziel.owner]?.heroes?.[ziel.heroIdx] : null;
       const tInst = ziel.type === 'hero' ? null : ziel.cardInstance;
