@@ -7971,7 +7971,7 @@ class GameEngine {
         message: `${chainCtx.eventDesc}. Activate ${hero.name}?`,
         showCard: cardName, confirmLabel: 'Activate!', cancelLabel: 'No', cancellable: true,
       });
-      if (!ja) continue;
+      if (!this._confirmSaidYes(ja)) continue;
       if (typeof script.payActivationCost === 'function') {
         const paid = await script.payActivationCost(this, gegner, chainCtx, hi);
         if (paid === false) continue;
@@ -37936,7 +37936,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancellable: true,
       });
       
-      if (!confirmed) {
+      if (!this._confirmSaidYes(confirmed)) {
         // Remember the decline for the rest of THIS effect resolution
         // so the remaining targets of a multi-target effect don't
         // re-prompt (mirrors `_gateShieldActive`'s per-resolution scope).
@@ -38321,7 +38321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(promptConfig.extra || {}),
       });
 
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : {};
       const result = await this._activateSurprise(seite, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
@@ -39214,7 +39214,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           sourceOwner: source?.owner ?? -1,
         },
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx, targetSeite: zielPhys }))) continue;
 
@@ -39464,7 +39464,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           sourceOwner: source?.owner ?? -1,
         },
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -39629,7 +39629,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -39786,7 +39786,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -39989,7 +39989,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -40668,7 +40668,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
         // W26a: Quelle für Cute Camera nur, wenn alle Niederlagen dieser Seite von derselben bekannten Quelle stammen.
         const _quellen = new Set(defeated.map(d => this._rxQuellBesitzer(d.source)));
@@ -41368,7 +41368,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -41502,7 +41502,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancellable: true,
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adZielIdx, targetSeite: zielPhys }))) continue;
 
@@ -41713,7 +41713,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -41888,7 +41888,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -42110,7 +42110,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -42311,7 +42311,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) { if (_bwOut) _bwOut.declined++; continue; }
+        if (!this._confirmSaidYes(confirmed)) { if (_bwOut) _bwOut.declined++; continue; }
         if (_bwOut) _bwOut.fired++;
         // Zählbarer Einsatz-Beleg: Der Reaction-Play bucht die Karte
         // namensbasiert in den Discard (kein ZoneEnter) — ohne dieses
@@ -42482,7 +42482,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -42636,7 +42636,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -42971,7 +42971,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           _hostSeite: tOwner,   // Als Vorgabe 29.9.: Brettseite der Zone
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
 
         // Activate the surprise. `opts.hostHeroIdx` is the physical
         // zone (defaults to the activator unless Brain Spider's cross-
@@ -43105,7 +43105,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         _hostSeite: seite,   // 29.9.
         _damageAmount: dmgInfo.amount,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       const result = await this._activateSurprise(seite, hi, surpriseCardName, sourceInfo, script);
       if (result?.damageReduced) totalReduced += result.damageReduced;
@@ -43289,7 +43289,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         confirmClass: 'btn-success',
         cancellable: true,
       });
-      if (!confirmed || confirmed.cancelled) {
+      if (!this._confirmSaidYes(confirmed)) {
         if (!this.gs._ameDeclinedHeroes) this.gs._ameDeclinedHeroes = new Set();
         this.gs._ameDeclinedHeroes.add(key);
         return false;
@@ -43973,7 +43973,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancellable: true,
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
         // ★ 10.10. (Test Flight): `fensterInfo` reicht das Zielfenster an `reactionCasterAllowed` weiter — „a Hero you control that
         // can use this Spell would be hit" bindet den Wirker an einen GETROFFENEN Helden. Bisher bekam das Skript hier `null`;
@@ -44228,7 +44228,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               _handReactionWindow: true,
               reactionCardName: cardName,
             });
-            if (!confirmed) {
+            if (!this._confirmSaidYes(confirmed)) {
               // ★ Al 14.10.2026: „The first time every turn …, you may …" — ein abgelehntes
               // Angebot verbraucht das „erste Mal" (nur bei Effekten, die ausdrücklich nur die
               // erste Instanz treffen; Skript meldet das über `consumeOnDecline`).
@@ -44323,7 +44323,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -46861,7 +46861,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         chosenName = onlyName;
       } else {
         const cards = [...eligibleByName.keys()]
