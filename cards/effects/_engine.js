@@ -35913,6 +35913,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {object|null} Redirected target, or null
    */
   /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: ein AUSGELÖSTES PASSIV, das umleitet bzw. negiert (Brett-Wächter `isBoardRedirect` — Laki, Vinny, Tri Fecta, Tri Ad, Anti-Magnetic Armor, Empty Armor,
+   * Winged Haressassin, Redirecting Aura — und Helden-Passive `heroRedirect` — Alleria, Monia Bot), öffnet das Kettenfenster: NACH der Bestätigung des Besitzers (bzw. sofort bei einer Pflicht-
+   * Umleitung), VOR der Wirkung des Skripts. Das Glied ist die Auslösung selbst (`cardType: 'TriggeredEffect'`, `fromBoard: true`, Name = Wächter/Held): Der Gegner darf mit seinen passenden Reaktionen antworten;
+   * wird sie negiert, findet die Umleitung/Negation nicht statt. Der Typ ist bewusst weder 'CreatureEffect' noch 'Hero': die Reaktionen auf AKTIVE Effekte (Spearman, Dark Deal, Gigantisaur Skull, Divine Punishment …)
+   * meinen laut Kartentext nur aktivierte Effekte und lesen genau diese Typen; Handkarten-Reaktionen („from their hand": The Master's Plan, Lunar Eclipse) schließt `fromBoard` aus. Wer künftig auf ausgelöste
+   * Passive reagieren soll, liest `link.cardType === 'TriggeredEffect'`. Kosten, die das Skript in `onBoardRedirect` zahlt (Abwurf, Counter), fallen bei Negation nicht an — die Wirkung hat nie begonnen.
+   * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und in KI-Simulationen öffnet kein neues Fenster (Konvention von `alsAttackKette`).
+   * @returns {Promise<boolean>} true = die Auslösung wurde negiert
+   */
+  async _passivAusloesungNegiert(quellName, ownerIdx, heroIdx) {
+    if (this._inMctsSim || this._inReactionCheck || !quellName) return false;
+    const k = await this.executeCardWithChain({
+      cardName: quellName, owner: ownerIdx, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1,
+      cardType: 'TriggeredEffect', goldCost: 0, resolve: null, fromBoard: true, casterCheck: false,
+    });
+    return !!k?.negated;
+  }
+
+  /**
    * ★ EINE Auslegung fuer „hat der Spieler JA gesagt?" (v672).
    *
    * Die Rueckgabeform-Falle, dritter Fund. `promptGeneric` liefert bei
@@ -36144,6 +36163,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!this._confirmSaidYes(confirmed)) continue;
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Helden-Passivs ist kettbar (`_passivAusloesungNegiert`); negiert → keine Umleitung.
+      if (await this._passivAusloesungNegiert(hero.name, targetOwnerIdx, hi)) continue;
+
       // Run the hero's redirect logic (hero selection, animation, etc.)
       const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
       if (!result?.redirectTo) continue;
@@ -36235,6 +36257,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (!this._confirmSaidYes(confirmedB)) {
         if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+        continue;
+      }
+
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Brett-Wächters ist kettbar (`_passivAusloesungNegiert`; auch die Pflicht-Umleitung — Empty Armor); negiert → keine Umleitung/Negation.
+      if (await this._passivAusloesungNegiert(guardNameB, targetOwnerIdx, bInst.heroIdx)) {
+        if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);   // wie ein Nein: derselbe Effekt fragt nicht noch einmal
         continue;
       }
 
