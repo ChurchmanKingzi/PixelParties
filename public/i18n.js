@@ -22,7 +22,7 @@
       try { P.ui = await (await fetch('/data/i18n/' + lang + '-ui.json')).json(); } catch (e) { P.ui = {}; }
       try { P.imgs = new Set(await (await fetch('/data/i18n/' + lang + '-images.json')).json()); } catch (e) { P.imgs = new Set(); }
       const j = await (await fetch('/data/i18n/' + lang + '-cards.json')).json();
-      P.names = Object.assign({}, j._names || {}); P.archetypes = j._archetypes || {}; delete j._names; delete j._archetypes; P.cards = j; for (const k in j) P.names[k] = j[k].name;
+      P.names = Object.assign({}, j._names || {}); P.archetypes = j._archetypes || {}; P.gender = j._gender || {}; delete j._names; delete j._archetypes; delete j._gender; P.cards = j; for (const k in j) P.names[k] = j[k].name;
     } catch (e) { /* ohne Datei: englisch */ }
   })());
   // Faehigkeits-Bonus ("Leadership 3", "Fighting") -> Namensliste; sonst Freitext aus der Uebersetzung der Karte
@@ -63,6 +63,8 @@
   const fill = (to, get) => to.replace(/\{(\d+)(?::([^}]*))?\}/g, (_, i, suf) => {
     const g = get(i);
     if (g == null) return '';
+    // {k:@m|w|n|sonst}: Wortform nach dem Geschlecht des Helden, dessen (englischer) Name der Wert ist; Unbekannte/Nicht-Helden: letzte Form
+    if (suf !== undefined && suf.charAt(0) === '@') { const o = suf.slice(1).split('|'), gd = P.gender && P.gender[g]; const ix = gd === 'm' ? 0 : gd === 'w' ? 1 : gd === 'n' ? 2 : 3; return o[ix] != null ? o[ix] : o[o.length - 1]; }
     if (suf !== undefined) return PLURAL[g] ? suf : '';
     return (typeof g === 'string' && (P.ui[g] || P.names[g])) || g;
   });
@@ -95,7 +97,8 @@
       if (parts[k]) out.push(parts[k]);
       if (k + 1 < parts.length) {
         const v = vals[+parts[k + 1]], suf = parts[k + 2];
-        if (suf !== undefined) { if (typeof v === 'string' && PLURAL[v]) out.push(suf); }
+        if (suf !== undefined && suf.charAt(0) === '@') { const o = suf.slice(1).split('|'), gd = P.gender && P.gender[v]; const ix = gd === 'm' ? 0 : gd === 'w' ? 1 : gd === 'n' ? 2 : 3; out.push(o[ix] != null ? o[ix] : o[o.length - 1]); }
+        else if (suf !== undefined) { if (typeof v === 'string' && PLURAL[v]) out.push(suf); }
         else if (v != null && v !== false && v !== true) out.push(typeof v === 'string' ? (lang === 'en' ? v : (P.ui[v] || P.names[v] || v)) : window.React.createElement(window.React.Fragment, { key: 'pp' + k }, v));
       }
     }

@@ -1,7 +1,7 @@
 {
 "_names": {
 "Absolute Moron Tempeste": "Absoluter Volltrottel Tempeste",
-"Alchemic Xal": "Alchemistische Xal",
+"Alchemic Xal": "Alchemistischer Xal",
 "Alice the Wonderous Girl": "Alice, das Wundermädchen",
 "Alien Invader Bartas": "Alien-Invasor Bartas",
 "Alleria the Octo Princess": "Alleria, die Oktoprinzessin",
@@ -46,7 +46,7 @@
 "Kaito Sid the Phantom Thief": "Kaito Sid, der Phantomdieb",
 "Kasperov the King of the East": "Kasperov, der König des Ostens",
 "Kasperov the King of the East1": "Kasperov, der König des Ostens1",
-"Kyli the True Mastermind": "Kyli, der wahre Drahtzieher",
+"Kyli the True Mastermind": "Kyli, die wahre Drahtzieherin",
 "Layn Summoner of Weapons": "Layn, Waffenbeschwörerin",
 "Lightning-Fast Monia": "Blitzschnelle Monia",
 "Little Carris": "Kleiner Carris",
@@ -636,7 +636,7 @@
 "effect": "Wähle eine \"Süß\"-Karte aus deinem Deck und füge sie offen deiner Hand hinzu."
 },
 "Maho, the Cute Magical Girl": {
-"name": "Maho, das süße Zaubermädchen",
+"name": "Maho, das Süße Zaubermädchen",
 "effect": "Dieser Held darf einmal pro Zug Doppelkreatur als zusätzliche Aktion beschwören. Immer wenn dieser Held eine Kreatur beschwört, darfst du einen Doppelzauber aus deinem Deck deiner Hand hinzufügen."
 },
 "Mean Cute Cat": {
@@ -644,7 +644,7 @@
 "effect": "Wenn du diese Karte durch einen Effekt abwirfst, darfst du sie sofort als zusätzliche Aktion beschwören. \nEinmal pro Zug, wenn ein Ziel, das du kontrollierst, Schaden erleiden würde, darfst du diesen Schaden auf eine Kreatur mit Level 3 oder höher umleiten, die du kontrollierst. \nWird diese Kreatur durch diesen Schaden besiegt, darfst du diesen Effekt im selben Zug ein weiteres Mal verwenden."
 },
 "Mirjam, the Fallen Cute Angel": {
-"name": "Mirjam, der gefallene süße Engel",
+"name": "Mirjam, der gefallene Süße Engel",
 "effect": "Immer wenn dieser Held Schaden erleidet, erhöhe seinen Angriffswert dauerhaft um denselben Betrag. Dieser Held kann nie mehr als 1 Angriff pro Zug ausführen. Die LP dieses Helden können auf keine Weise geheilt werden (sie können aber weiterhin erhöht werden)."
 },
 "Molinda, the Cutest Being in the Sky": {
@@ -888,7 +888,7 @@
 "effect": "Kontrollierst du keine Kreaturen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Wenn diese Kreatur während deines Zuges besiegt wird, darfst du ein beliebiges Ziel auf dem Spielfeld wählen und es verbrennen."
 },
 "Green Dragoneer": {
-"name": "Grüner Drachenreiter",
+"name": "Grüner Dragoneer",
 "effect": "Wenn eine \"Drago\"-Kreatur, die du kontrollierst, besiegt wird, darfst du diese Kreatur sofort aus deiner Hand als zusätzliche Aktion in die Unterstützungszone beschwören, die sie belegt hat. Du darfst einmal pro Zug eine Kreatur, die du kontrollierst und die in diesem Zug nicht beschworen wurde, opfern, um einem beliebigen Ziel auf dem Spielfeld 100 Schaden zuzufügen."
 },
 "Icy Dragonegg": {
@@ -896,11 +896,11 @@
 "effect": "Kontrollierst du keine Kreaturen, zählt das Beschwören dieser Kreatur als zusätzliche Aktion. Wenn diese Kreatur während deines Zuges besiegt wird, darfst du ein beliebiges Ziel auf dem Spielfeld wählen und es für 1 Zug einfrieren."
 },
 "Red Dragoneer": {
-"name": "Roter Drachenreiter",
+"name": "Roter Dragoneer",
 "effect": "Wenn du diese Kreatur beschwörst, darfst du eine \"Drago\"-Kreatur aus deinem Deck offen deiner Hand hinzufügen. Du darfst einmal pro Zug einem beliebigen Ziel auf dem Spielfeld Schaden in Höhe des 50-Fachen der Anzahl der anderen \"Drago\"-Kreaturen, die du kontrollierst, zufügen."
 },
 "Rubin, the Dragoneer Champion": {
-"name": "Rubin, der Drachenreiter-Champion",
+"name": "Rubin, der Dragoneer-Champion",
 "effect": "Einmal pro Zug, während des Zuges eines beliebigen Spielers, darfst du, wenn du eine Kreatur beschwörst, indem du eine oder mehrere andere Kreaturen opferst, sofort einen Zerstörungsmagie-Zauber aus deiner Hand mit diesem Helden als zusätzliche Aktion ausführen."
 },
 "Shimmering Dragonegg": {
@@ -1056,7 +1056,7 @@
 "effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Erhöhe den Angriffswert des ausgerüsteten Helden um das 40-Fache der Anzahl der \"Zukunftstech-Pistole\"-Karten in deinem Ablagestapel."
 },
 "Future Tech Gunslinger Riffel": {
-"name": "Zukunftstech-Revolverheld Riffel",
+"name": "Zukunftstech-Revolverheldin Riffel",
 "effect": "Du darfst einmal pro Zug ein ausrüstbares Artefakt in deinem Ablagestapel wählen, von dem dieser Held noch kein Exemplar ausgerüstet hat. Durchsuche dein Deck nach einem Exemplar dieses Artefakts und rüste es an diesen Helden aus, ohne seine Kosten zu bezahlen."
 },
 "Future Tech Jetpack": {
@@ -1392,40 +1392,40 @@
 "effect": "Immer wenn eine \"Treuer\"-Kreatur außer \"Treuer Terrier\", die du kontrollierst, besiegt wird, darfst du einem Ziel, das dein Gegner kontrolliert, 50 Schaden zufügen."
 },
 "Orthos, the Loyal Guard Dog": {
-"name": "Orthos, der treue Wachhund",
+"name": "Orthos, der Treue Wachhund",
 "effect": "Einmal pro Zug: Wenn dieser Held eine \"Treuer\"-Kreatur beschwört, darfst du ihn sofort eine zweite \"Treuer\"-Kreatur aus deiner Hand als zusätzliche Aktion beschwören lassen."
 },
 "Lunar Eclipse": {
 "name": "Mondfinsternis",
-"effect": "Aktiviere diese Überraschung, wenn dein Gegner eine beliebige Karte aus seiner Hand aktiviert, indem du eine \"Mondsüchtiger Zyklus\"-Karte von deiner Seite des Spielfelds auf den Ablagestapel legst. \nNegiere die Karte deines Gegners und lösche sie. War die Karte eine Aktion deines Gegners, darf er sofort stattdessen eine andere Aktion ausführen."
+"effect": "Aktiviere diese Überraschung, wenn dein Gegner eine beliebige Karte aus seiner Hand aktiviert, indem du eine \"Lunatic-Zyklus\"-Karte von deiner Seite des Spielfelds auf den Ablagestapel legst. \nNegiere die Karte deines Gegners und lösche sie. War die Karte eine Aktion deines Gegners, darf er sofort stattdessen eine andere Aktion ausführen."
 },
 "Lunatic Cycle - Crescent Moon": {
-"name": "Mondsüchtiger Zyklus - Sichelmond",
-"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Mondsüchtiger Zyklus - Neumond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Jedes Mal, wenn der ausgerüstete Held eine Aktion ausführt, darfst du beliebig viele Karten aus deiner Hand zurück in dein Deck mischen und dieselbe Anzahl Karten ziehen."
+"name": "Lunatic-Zyklus - Sichelmond",
+"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Lunatic-Zyklus - Neumond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Jedes Mal, wenn der ausgerüstete Held eine Aktion ausführt, darfst du beliebig viele Karten aus deiner Hand zurück in dein Deck mischen und dieselbe Anzahl Karten ziehen."
 },
 "Lunatic Cycle - Full Moon": {
-"name": "Mondsüchtiger Zyklus - Vollmond",
-"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Mondsüchtiger Zyklus - Dreiviertelmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
+"name": "Lunatic-Zyklus - Vollmond",
+"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Lunatic-Zyklus - Dreiviertelmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 100 erhöht."
 },
 "Lunatic Cycle - Gibbous Moon": {
-"name": "Mondsüchtiger Zyklus - Dreiviertelmond",
-"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Mondsüchtiger Zyklus - Halbmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held ist von negativen Statuseffekten nicht betroffen."
+"name": "Lunatic-Zyklus - Dreiviertelmond",
+"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Lunatic-Zyklus - Halbmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held ist von negativen Statuseffekten nicht betroffen."
 },
 "Lunatic Cycle - Half Moon": {
-"name": "Mondsüchtiger Zyklus - Halbmond",
-"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Mondsüchtiger Zyklus - Sichelmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held kann in einem einzelnen Vorgang nicht mehr als die Hälfte seiner maximalen LP (aufgerundet) als Schaden erleiden."
+"name": "Lunatic-Zyklus - Halbmond",
+"effect": "Du kannst diese Karte nur spielen, solange sich mindestens 1 \"Lunatic-Zyklus - Sichelmond\" auf dem Spielfeld befindet. Rüste diese Karte an einen Helden aus, den du kontrollierst. Der ausgerüstete Held kann in einem einzelnen Vorgang nicht mehr als die Hälfte seiner maximalen LP (aufgerundet) als Schaden erleiden."
 },
 "Lunatic Cycle - New Moon": {
-"name": "Mondsüchtiger Zyklus - Neumond",
-"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Solange du einen Helden kontrollierst, der mit dieser Karte ausgerüstet ist, darfst du einmal pro Zug eine Karte aus deiner Hand abwerfen, um in deinem Deck nach einer \"Mondsüchtiger Zyklus\"-Karte zu suchen, sie aufzudecken und offen deiner Hand hinzuzufügen. Tust du das, werden die Kosten dieser Karte für den Rest des Zuges zu 4."
+"name": "Lunatic-Zyklus - Neumond",
+"effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Solange du einen Helden kontrollierst, der mit dieser Karte ausgerüstet ist, darfst du einmal pro Zug eine Karte aus deiner Hand abwerfen, um in deinem Deck nach einer \"Lunatic-Zyklus\"-Karte zu suchen, sie aufzudecken und offen deiner Hand hinzuzufügen. Tust du das, werden die Kosten dieser Karte für den Rest des Zuges zu 4."
 },
 "Lunatic Golem": {
-"name": "Mondsüchtiger Golem",
-"effect": "Diese Kreatur erhält folgende Effekte, abhängig von der Anzahl verschiedener \"Mondsüchtiger Zyklus\"-Karten auf dem Spielfeld:\n* 1+: Du darfst ein Ziel wählen und ihm 100 Schaden mal die Anzahl verschiedener \"Mondsüchtiger Zyklus\"-Karten auf dem Spielfeld zufügen. Du kannst diesen Effekt nur einmal pro Zug aktivieren.\n* 2+: Diese Kreatur ist immun gegen negative Statuseffekte.\n* 3+: Halbiere allen Schaden, den diese Kreatur erleidet.\n* 4+: Aller Schaden, den der zugehörige Held erleiden würde, wird negiert.\n* 5: Jedes Ziel, das von dieser Kreatur gewählt wird, wird sofort besiegt."
+"name": "Lunatic-Golem",
+"effect": "Diese Kreatur erhält folgende Effekte, abhängig von der Anzahl verschiedener \"Lunatic-Zyklus\"-Karten auf dem Spielfeld:\n* 1+: Du darfst ein Ziel wählen und ihm 100 Schaden mal die Anzahl verschiedener \"Lunatic-Zyklus\"-Karten auf dem Spielfeld zufügen. Du kannst diesen Effekt nur einmal pro Zug aktivieren.\n* 2+: Diese Kreatur ist immun gegen negative Statuseffekte.\n* 3+: Halbiere allen Schaden, den diese Kreatur erleidet.\n* 4+: Aller Schaden, den der zugehörige Held erleiden würde, wird negiert.\n* 5: Jedes Ziel, das von dieser Kreatur gewählt wird, wird sofort besiegt."
 },
 "Lunatic Hawk": {
-"name": "Mondsüchtiger Falke",
-"effect": "Diese Kreatur erhält folgende Effekte, abhängig von der Anzahl verschiedener \"Mondsüchtiger Zyklus\"-Karten auf dem Spielfeld:\n* 1+: Solange du keine Kreaturen kontrollierst, zählt die Beschwörung dieser Kreatur als zusätzliche Aktion.\n* 2+: Immer wenn du einen Helden mit einem Artefakt ausrüstest, zieht dessen Kontrolleur 1 Karte.\n* 3+: Die aktuellen und maximalen LP aller Kreaturen, die du beschwörst, werden verdoppelt.\n* 4+: Du darfst einmal pro Zug eine \"Mondsüchtig\"-Kreatur aus deiner Hand als zusätzliche Aktion beschwören.\n* 5: Du darfst während der Aktionsphase jedes deiner Züge eine zweite Aktion ausführen."
+"name": "Lunatic-Falke",
+"effect": "Diese Kreatur erhält folgende Effekte, abhängig von der Anzahl verschiedener \"Lunatic-Zyklus\"-Karten auf dem Spielfeld:\n* 1+: Solange du keine Kreaturen kontrollierst, zählt die Beschwörung dieser Kreatur als zusätzliche Aktion.\n* 2+: Immer wenn du einen Helden mit einem Artefakt ausrüstest, zieht dessen Kontrolleur 1 Karte.\n* 3+: Die aktuellen und maximalen LP aller Kreaturen, die du beschwörst, werden verdoppelt.\n* 4+: Du darfst einmal pro Zug eine \"Lunatic\"-Kreatur aus deiner Hand als zusätzliche Aktion beschwören.\n* 5: Du darfst während der Aktionsphase jedes deiner Züge eine zweite Aktion ausführen."
 },
 "Ice Sculpture Garden": {
 "name": "Eisskulpturengarten",
@@ -2550,7 +2550,7 @@
 "effect": "Lege alle Artefakte, die an alle Helden auf dem Spielfeld ausgerüstet sind, außer dem Anwender, auf den Ablagestapel. Jeder Held erleidet 50 Schaden mal die Anzahl seiner durch diesen Effekt abgeworfenen Artefakte."
 },
 "Blood Rock": {
-"name": "Blutfelsen",
+"name": "Blood Rock",
 "effect": "Am Ende jedes Zuges füge allen Helden, die der Spieler am Zug kontrolliert, 100 Schaden zu."
 },
 "Blood-Soaked Coin": {
@@ -2939,7 +2939,7 @@
 "effect": "Solange diese Kreatur auf dem Spielfeld bleibt, zählen Angriffe als Zauber, und von einem Kreatureneffekt getroffen zu werden zählt als von einem Zauber getroffen zu werden."
 },
 "Cuberto, Supreme Lord of Edges": {
-"name": "Cuberto, oberster Herr der Kanten",
+"name": "Cuberto, der oberste Edgelord",
 "effect": "Ist dieser Held in einem Cube-Draft-Spiel einer deiner Starthelden, darfst du beim Deckbau bis zu 5 deiner gedrafteten Karten gegen beliebige andere Karten tauschen, musst aber Karten mit verschiedenen Namen wählen."
 },
 "Cure": {
@@ -2984,7 +2984,7 @@
 "effect": "Wähle einen Helden, den dein Gegner kontrolliert und der einen anderen Namen hat als alle Helden, die du kontrollierst (einschließlich besiegter). Der Anwender erhält die Effekte dieses Helden zusätzlich zu seinen eigenen für den Rest des Spiels. Die Effekte eines Helden können durch diesen Effekt nur einmal pro Spiel erhalten werden. Dies zählt als zusätzliche Aktion."
 },
 "Darion, the Blood-Crazy Groundskeeper": {
-"name": "Darion, der blutrünstige Platzwart",
+"name": "Darion, der blutrünstige Hausmeister",
 "effect": "Alle Artefakte, die an diesem Helden ausgerüstet sind, teilen sich 1 Unterstützungszone. Immer wenn dieser Held 1 oder mehr Ziele besiegt, darfst du ein ausrüstbares Artefakt aus deiner Hand oder deinem Deck wählen und es an diesen Helden ausrüsten, indem du die Hälfte seiner Kosten bezahlst."
 },
 "Dark Deal": {
@@ -3209,7 +3209,7 @@
 "effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 10 erhöht. Immer wenn der ausgerüstete Held genau 1 Helden mit einem Angriff trifft, darfst du eine Karte in einer der Unterstützungszonen des Ziels wählen und auf den Ablagestapel legen."
 },
 "Elana, the Rocky Rebel": {
-"name": "Elana, die felsige Rebellin",
+"name": "Elana, die Rockende Rebellin",
 "effect": "Du darfst einmal pro Zug deine gesamte Hand zurück ins Deck mischen und dann dieselbe Anzahl Karten +1 ziehen."
 },
 "Elixir of Cold": {
@@ -3489,7 +3489,7 @@
 "effect": "Bis zu 5-mal pro Zug ziehst du 1 Karte, wenn dieser Held 30 oder mehr Schaden erleidet."
 },
 "Gabby, the Pirate Zombie": {
-"name": "Gabby, die Piratenzombie",
+"name": "Gabby, der Piratenzombie",
 "effect": "Dieser Held kann nicht einer deiner Starthelden sein. Du darfst diese Karte in deinem Hauptdeck haben, wenn \"Gabby, die Enterbraut\" einer deiner Starthelden ist. Würde eine \"Gabby, die Enterbraut\", die du kontrollierst, besiegt, darfst du diesen Helden sofort aus deiner Hand auf sie spielen, um stattdessen ihre LP vollständig zu heilen. Tust du das, lösche alle Karten in ihren Fähigkeitszonen und lege 1 Kannibalismus und 1 Nekromantie von außerhalb des Spiels als zusätzliche Anlagen an sie an."
 },
 "Gangster Angel": {
@@ -3957,7 +3957,7 @@
 "effect": "Ist dieser Held einer deiner Starthelden, darf dein Trankdeck beliebige Karten enthalten, aber nur bis zu 2 Exemplare jeder Karte. Exemplare von Karten, die in deinem Trankdeck gespielt werden, außer Tränken, zählen nicht zur Anzahl der Exemplare dieser Karten in deinem Deck."
 },
 "Key, the Cursed Thief": {
-"name": "Key, der verfluchte Dieb",
+"name": "Key, die verfluchte Diebin",
 "effect": "Einmal pro Zug darfst du, wenn dein Gegner ein Artefakt aus seiner Hand spielt, Gold in Höhe seiner Kosten ausgeben, um dieses Artefakt zu negieren und stattdessen deiner Hand hinzuzufügen. Tust du das, muss dein Gegner das Artefakt nicht bezahlen."
 },
 "Kidnapping": {
@@ -4061,7 +4061,7 @@
 "effect": "Lege bis zu 3 Exemplare von Magiekunst aus deiner Hand oder deinem Deck als zusätzliche Anlagen an den Anwender an. Beende danach sofort deinen Zug."
 },
 "Lethe, the Forgetful Fixer": {
-"name": "Lethe, der vergessliche Problemlöser",
+"name": "Lethe, die vergessliche Problemlöserin",
 "effect": "Dieser Held kann keine Aktionen ausführen, wenn seit dem Ende deines letzten Zuges ein Ziel, das du kontrollierst, besiegt wurde. Du darfst die Nekromantie dieses Helden bis zu 3-mal pro Zug verwenden, aber nachdem dieser Held Nekromantie verwendet hat, werden die Level aller Kreaturen, die in deinem Ablagestapel und deinem Stapel gelöschter Karten verbleiben, um 1 erhöht, bis sie in deine Hand oder dein Deck bewegt werden."
 },
 "Liberation": {
@@ -4093,7 +4093,7 @@
 "effect": "Nenne einen Kartennamen. Immer wenn dein Gegner bis zum Beginn deines nächsten Zuges eine Karte mit diesem Namen spielt, durchsuche dein Deck nach einer beliebigen Karte und füge sie offen deiner Hand hinzu."
 },
 "Little Lyta, the Amazon Princess": {
-"name": "Klein-Lyta, die Amazonenprinzessin",
+"name": "Little Lyta, die Amazonenprinzessin",
 "effect": "Wähle zu Beginn des Spiels einen Helden, den dein Gegner kontrolliert. Zu Beginn jedes deiner Züge darfst du, solange du diesen unbesiegten Helden kontrollierst, die Kontrolle über diesen Helden ODER über eine beliebige Kreatur, die dein Gegner kontrolliert, für die Dauer des Zuges übernehmen. Ein durch diesen Effekt kontrollierter Held erleidet von keiner Quelle Schaden. Diese Effekte können nicht negiert werden."
 },
 "Live Show": {
@@ -4105,7 +4105,7 @@
 "effect": "Spiele diese Karte sofort, wenn dein Gegner in einem Zug seinen zweiten Trank verwendet. Negiere diesen Trank und füge ihn deiner Hand hinzu."
 },
 "Locke, the Unseen Saboteur": {
-"name": "Locke, der unsichtbare Saboteur",
+"name": "Locke, der ungesehene Saboteur",
 "effect": "Du darfst einmal pro Zug zu Beginn deines Zuges ein Ziel wählen, das dein Gegner kontrolliert. Die Effekte dieses Ziels sind bis zum Beginn deines nächsten Zuges negiert.\nDies zählt als negativer Statuseffekt."
 },
 "Lolek, Mender of the Shattered Trident": {
@@ -4137,7 +4137,7 @@
 "effect": "Spiele diese Karte sofort, nachdem ein Held besiegt wurde. Wähle ein Ausrüstungs-Artefakt aus einem der beiden Ablagestapel und rüste es an den Anwender aus, ohne seine Kosten zu bezahlen."
 },
 "Lord Mithuru, the Rotten Mastermind": {
-"name": "Lord Mithuru, der verfaulte Drahtzieher",
+"name": "Lord Mithuru, der verdorbene Drahtzieher",
 "effect": "Dieser Held darf Doppelzauber ausführen, als wären ihre Level um 2 verringert."
 },
 "Love Shot": {
@@ -4173,7 +4173,7 @@
 "effect": "Spiele diese Karte sofort, wenn dein Gegner einen Zauber aktiviert, der 1 oder mehr Ziele betreffen würde, die du kontrollierst. Negiere diesen Zauber. Hätte der Zauber genau 1 Ziel betroffen, kannst du bis zum Ende deines nächsten Zuges keine Karten ziehen (einschließlich deiner Ressourcenphase)."
 },
 "Madaga, the Forsaken Seafarer": {
-"name": "Madaga, die verlassene Seefahrerin",
+"name": "Madaga, der verdammte Seefahrer",
 "effect": "Du darfst einmal pro Zug eine Karte aus deiner Hand aufdecken, um in deinem Deck nach einem Exemplar dieser Karte zu suchen und es offen deiner Hand hinzuzufügen. Für den Rest des Zuges werden alle Karten, die auf deinen Ablagestapel gelegt würden, stattdessen gelöscht."
 },
 "Madame Guillotine, the Great Equalizer": {
@@ -4241,7 +4241,7 @@
 "effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 10 erhöht. Außerdem ist der ausgerüstete Held von den Effekten aller Mana-Zauber unberührt."
 },
 "Marianne, the Cocky Caretaker": {
-"name": "Marianne, die freche Pflegerin",
+"name": "Marianne, die freche Tierpflegerin",
 "effect": "Du darfst einmal pro Zug eine Kreatur mit Level 3 oder niedriger aus deiner Hand in die freie Unterstützungszone eines Helden platzieren, den dein Gegner kontrolliert. Du darfst einmal pro Zug bis zu 3 Vergiftete Kreaturen wählen, die dein Gegner kontrolliert, und dauerhaft die Kontrolle über sie übernehmen. Platziere sie in die freien Unterstützungszonen dieses Helden."
 },
 "Market Crash": {
@@ -4505,7 +4505,7 @@
 "effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Der Angriffswert des ausgerüsteten Helden wird um 30 erhöht. Außerdem löst der Held mit seinen Angriffen keine Überraschungen aus."
 },
 "Pharaoh, the Lone Living Being": {
-"name": "Pharao, das einzige lebende Wesen",
+"name": "Pharao, das einsame lebende Wesen",
 "effect": "Immer wenn dieser Held einen Angriff oder Zauber verwendet oder eine Kreatur beschwört, was er ohne den Effekt von Göttlichkeit nicht könnte, platziere 1 Göttlichkeits-Marker auf ihm. Am Ende deines Zuges, wenn sich mindestens 1 Göttlichkeits-Marker auf diesem Helden befindet, opfere ein Ziel, das du kontrollierst, entferne dann 1 Göttlichkeits-Marker von diesem Helden und ziehe 2 Karten. Dieser Effekt kann nicht negiert werden."
 },
 "Philosopher's Stone": {
@@ -4761,7 +4761,7 @@
 "effect": "So oft du willst während deines Zuges darfst du die aktuellen und max. LP dieses Helden um 100 verringern, um die oberste Karte deines Decks verdeckt in die freie Unterstützungszone eines Helden zu platzieren, den dein Gegner kontrolliert und der in diesem Zug noch nicht von diesem Effekt gewählt wurde. Zu Beginn deines nächsten Zuges fügst du alle durch diesen Effekt platzierten Karten deiner Hand hinzu und fügst den zugehörigen Helden 100 Schaden zu; danach erhöhst du die aktuellen und max. LP dieses Helden um 100 für jede deiner Hand hinzugefügte Karte. Wenn dieser Held besiegt wird, lösche alle durch diesen Effekt platzierten Karten, die sich noch in Unterstützungszonen befinden."
 },
 "Rick, the Trigger Happy Undertaker": {
-"name": "Rick, der schießwütige Bestatter",
+"name": "Rick, der übereifrige Bestatter",
 "effect": "Du darfst einmal pro Zug einen anderen Helden wählen, den du kontrollierst, und ihn opfern. Wenn du das tust, belebe diesen Helden zu Beginn deines nächsten Zuges mit denselben LP wieder. Wird dieser Held bis dahin besiegt, wird der Held nicht wiederbelebt."
 },
 "Ricochet": {
@@ -4769,8 +4769,8 @@
 "effect": "Beide Spieler wählen abwechselnd Ziele, die ihr Gegner kontrolliert und die noch nicht mit diesem Effekt gewählt wurden, bis ein Spieler kein neues Ziel wählen kann. Du beginnst. Das erste Ziel erleidet Schaden in Höhe des Angriffswerts des Angreifers. Jedes weitere Ziel erleidet halb so viel Schaden wie das vorherige (aufgerundet)."
 },
 "Riffel, Master of the Ultimate Gun": {
-"name": "Riffel, Meister der ultimativen Feuerwaffe",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Zukunftstech-Revolverheld Riffel\" spielen, den du kontrollierst und der mit \"Unendlicher Alttech-Energiekern\" und \"Zukunftstech-Pistole\" ausgerüstet ist. Du darfst einmal pro Zug eine Karte aus deinem Deck wählen, sie offen deiner Hand hinzufügen. Lege dann so viele Exemplare dieser Karte wie möglich aus deinem Deck auf den Ablagestapel."
+"name": "Riffel, Meisterin der ultimativen Feuerwaffe",
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Zukunftstech-Revolverheldin Riffel\" spielen, den du kontrollierst und der mit \"Unendlicher Alttech-Energiekern\" und \"Zukunftstech-Pistole\" ausgerüstet ist. Du darfst einmal pro Zug eine Karte aus deinem Deck wählen, sie offen deiner Hand hinzufügen. Lege dann so viele Exemplare dieser Karte wie möglich aus deinem Deck auf den Ablagestapel."
 },
 "Rioting Village": {
 "name": "Aufständisches Dorf",
@@ -4817,7 +4817,7 @@
 "effect": "Spiele diese Karte sofort, wenn dein Gegner ein Artefakt spielt. Negiere dieses Artefakt (dein Gegner muss aber trotzdem seine Kosten bezahlen)."
 },
 "Sabrina, the Psychic Witch": {
-"name": "Sabrina, die psychische Hexe",
+"name": "Sabrina, die Psycho-Hexe",
 "effect": "Du darfst einmal pro Zug eine Kreatur opfern, die du kontrollierst, um in deinem Deck nach einer Überraschung zu suchen, deren Level gleich oder niedriger als das der geopferten Kreatur ist, und sie sofort zu aktivieren, als hätte ein Ziel oder Spieler deiner Wahl ihre Aktivierungsbedingung erfüllt. Du brauchst nicht die Fähigkeiten, die zum Aktivieren dieser Überraschung nötig sind."
 },
 "Sacred Cattle": {
@@ -4837,7 +4837,7 @@
 "effect": "Rüste diese Karte an einen Helden aus, den du kontrollierst. Einmal pro Zug darfst du, wenn du ein Ziel opferst, das du kontrollierst, ein Ziel wählen und ihm Schaden in Höhe des Angriffswerts des ausgerüsteten Helden zufügen. Dies zählt so, als würde der ausgerüstete Held dieses Ziel mit einem Angriff treffen."
 },
 "Saint Nicolas": {
-"name": "Sankt Nikolaus",
+"name": "Saint Nicolas",
 "effect": "Tränke, die beide Spieler verwenden, werden den Händen ihrer jeweiligen Gegner hinzugefügt, statt gelöscht zu werden. Du musst einen Trank aus deiner Hand der Hand deines Gegners hinzufügen, um mit diesem Helden eine Aktion auszuführen."
 },
 "Salute to the Fallen": {
@@ -4853,7 +4853,7 @@
 "effect": "Du darfst einmal pro Zug ein Ziel wählen und ihm Schaden in Höhe des 60-Fachen der Anzahl der Zauberschulen-Fähigkeiten mit unterschiedlichen Namen zufügen, die an deinen unbesiegten Helden angelegt sind."
 },
 "Sas'Za, the Snaka Adventurer": {
-"name": "Sas'Za, der Snaka-Abenteurer",
+"name": "Sas'Za, die Snaka-Abenteurerin",
 "effect": "Bis zu 3-mal pro Zug ziehst du, wenn eine Kreatur von der Karte oder dem Effekt ihres Gegners besiegt wird, so viele Karten, wie das Level dieser Kreatur beträgt. Du darfst deine Kreaturen, die von der Karte oder dem Effekt eines Gegners besiegt werden, wieder deiner Hand hinzufügen, statt sie auf den Ablagestapel zu legen."
 },
 "Saya, the Plant Princess": {
@@ -5025,7 +5025,7 @@
 "effect": "Dieser Held darf den Zauber \"Kettenblitz\" unabhängig von seinem Level verwenden. Dieser Held kann nie mehr als 1 Aktion pro Zug ausführen."
 },
 "Sorin, the Warden of Blood Rock": {
-"name": "Sorin, der Wärter des Blutfelsens",
+"name": "Sorin, der Wärter von Blood Rock",
 "effect": "Dieser Held kann Angriffe mit Level 3 oder niedriger unabhängig von ihrem Level verwenden. Dieser Held kann mit Angriffen keine Ziele betreffen, außer sie bluten."
 },
 "Soul Absorption": {
@@ -5037,12 +5037,12 @@
 "effect": "Opfere 3 Kreaturen mit Level 0, die du kontrollierst, um diesen Zauber zu verwenden. Wähle einen besiegten Helden, den du kontrollierst, und belebe ihn wieder, wobei seine LP vollständig geheilt werden. Hat der Anwender mindestens Magiekunst 1, zählt dies als zusätzliche Aktion. Wird der wiederbelebte Held das nächste Mal besiegt, lösche ihn und alle Karten in seinen Fähigkeits- und Unterstützungszonen, außer Kreaturen."
 },
 "Sparrow, the Buffoon of the Treasure Cave": {
-"name": "Sparrow, der Possenreißer der Schatzhöhle",
-"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Sparrow, der tollpatschige Possenreißer\" spielen, den du kontrollierst und an dem \"Skullmaels Großschwert\" ausgerüstet und \"Elixier der Unsterblichkeit\" als Fähigkeit angelegt ist. Diese Bedingung kann nicht negiert oder ersetzt werden. Immer wenn ein Trank abgehandelt wird (egal, wer ihn gespielt hat), darfst du ihn als Kreatur ohne Level in die freie Unterstützungszone dieses Helden beschwören. Auf diese Weise beschworene Tränke haben 50 LP und dürfen einmal pro Zug ihren Effekt verwenden.",
+"name": "Sparrow, der Depp der Schatzhöhle",
+"effect": "Du musst diesen Helden aus deiner Hand auf einen \"Sparrow, der tollpatschige Depp\" spielen, den du kontrollierst und an dem \"Skullmaels Großschwert\" ausgerüstet und \"Elixier der Unsterblichkeit\" als Fähigkeit angelegt ist. Diese Bedingung kann nicht negiert oder ersetzt werden. Immer wenn ein Trank abgehandelt wird (egal, wer ihn gespielt hat), darfst du ihn als Kreatur ohne Level in die freie Unterstützungszone dieses Helden beschwören. Auf diese Weise beschworene Tränke haben 50 LP und dürfen einmal pro Zug ihren Effekt verwenden.",
 "startingAbility1": "Spiele die obersten 3 Karten deines Trankdecks, falls möglich"
 },
 "Sparrow, the Bumbling Buffoon": {
-"name": "Sparrow, der tollpatschige Possenreißer",
+"name": "Sparrow, der tollpatschige Depp",
 "effect": "Du kannst die Fähigkeiten dieses Helden nicht aufwerten, indem du Exemplare davon an ihn anlegst. Bis zu 2-mal pro Zug, wenn du einen Trank spielst, darfst du ihn, nachdem er abgehandelt wurde, als zusätzliche Anlage auf eine beliebige Fähigkeit dieses Helden platzieren. Auf diese Weise platzierte Tränke werden zu Exemplaren der Fähigkeit, auf die sie platziert wurden, solange sie auf dem Spielfeld bleiben. Wenn ein durch diesen Effekt angelegter Trank das Spielfeld verlässt, egal wohin, lösche ihn."
 },
 "Spatial Crevice": {
@@ -5238,12 +5238,12 @@
 "effect": "Solange dieser Held ein Artefakt mit Kosten von 10 oder mehr ausgerüstet hat, werden die Level aller Zerstörungsmagie-Zauber, die er verwendet, um das Kampfkunst-Level dieses Helden verringert. Der Angriffswert dieses Helden wird für jedes an ihn ausgerüstete Artefakt um 20 erhöht."
 },
 "Tarleinn the Traveler": {
-"name": "Tarleinn der Reisende",
+"name": "Tarleinn die Reisende",
 "effect": "Wenn ein Held, den du kontrollierst und an den zwei oder mehr verschiedene Zauberschulen angelegt sind, einen Zauber verwendet, darfst du einmal pro Zug ein Ziel wählen, das du kontrollierst, und seine LP um 40/80/150 heilen, je nach Level des Zaubers."
 },
 "Tarleinn's Floating Island": {
 "name": "Tarleinns schwebende Insel",
-"effect": "Ist der Anwender \"Tarleinn der Reisende\", zählt die Verwendung dieses Zaubers als zusätzliche Aktion. Wenn die LP eines Ziels, das ein Spieler kontrolliert, geheilt werden, darf dieser Spieler einmal pro Zug 1 Karte ziehen."
+"effect": "Ist der Anwender \"Tarleinn die Reisende\", zählt die Verwendung dieses Zaubers als zusätzliche Aktion. Wenn die LP eines Ziels, das ein Spieler kontrolliert, geheilt werden, darf dieser Spieler einmal pro Zug 1 Karte ziehen."
 },
 "Taunting Elephant": {
 "name": "Spöttischer Elefant",
@@ -5575,8 +5575,8 @@
 "effect": "Bis zu 2-mal pro Zug muss dein Gegner 2 zufällige Karten aus seiner Hand abwerfen, wenn dieser Held ein Ziel besiegt, das dein Gegner kontrolliert."
 },
 "Tsu'Ki, the Lunatic Princess": {
-"name": "Tsu'Ki, die mondsüchtige Prinzessin",
-"effect": "Dieser Held kann \"Mondsüchtig\"-Kreaturen unabhängig von ihrem Level beschwören. Die Kosten von \"Mondsüchtiger Zyklus\"-Karten, die an diesem Helden ausgerüstet sind, sind um 10 verringert."
+"name": "Tsu'Ki, die Lunatic-Prinzessin",
+"effect": "Dieser Held kann \"Lunatic\"-Kreaturen unabhängig von ihrem Level beschwören. Die Kosten von \"Lunatic-Zyklus\"-Karten, die an diesem Helden ausgerüstet sind, sind um 10 verringert."
 },
 "Tushu, the Knowledge Keeper": {
 "name": "Tushu, der Wissenshüter",
@@ -5829,7 +5829,7 @@
 "Hell Circles": "Höllenkreise",
 "Idej": "Idej",
 "Loyals": "Getreue",
-"Lunatic": "Mondsüchtig",
+"Lunatic": "Lunatic",
 "Mischief Militia": "Unfug-Miliz",
 "Monkees": "Monkees",
 "Motharch": "Mottarch",
@@ -5855,5 +5855,233 @@
 "Tuscan": "Toskanisch",
 "Waflav": "Waflav",
 "War Counselors": "Kriegsberater"
+},
+"_gender": {
+"\"Bloom\", the Continent Corruptor": "n",
+"???, the Shapeshifter": "m",
+"???, the Throne Robber": "m",
+"Alex, Trainer of Heroes": "m",
+"Alice, the Puppeteer Girl": "w",
+"Alice, the Transfer Student": "w",
+"Alleria, the Queen of Spiders": "w",
+"Andras, the Human Weapon": "m",
+"Archibald, the Archmage": "m",
+"Argos, the Eye of the Cosmos": "n",
+"Arnold, the Maximum Lotl": "m",
+"Arthor, Inheritor of the Barbarian Sword": "m",
+"Arthor, the King of Blackport": "m",
+"Asriel, the Sapling Sacrificer": "m",
+"Atta, Speaker of Desires": "w",
+"Baaliel, the Demon General": "m",
+"Bad Birthday Girl Cecilia": "w",
+"Bakhm, the Desert Digger": "m",
+"Barker, the Monster Tamer": "m",
+"Beato, the Butterfly Witch": "w",
+"Beato, the Eternal Butterfly": "w",
+"Bill, the Angry Auctioneer": "m",
+"Blackstache, Scourge of the Pixel Seas": "m",
+"Bloom, the Maniacal Botanist": "n",
+"Bomb Berserker Bartas": "m",
+"Boris, the Guardian of Blackport": "m",
+"Bow Sniper Darge": "m",
+"Brackle, the Catapulting Turtle": "m",
+"Broghan, the Frozen Guardian of the North": "m",
+"Bubbles, the Bouncy Bunny": "m",
+"Calamitusk, the Chaorc War Chief": "m",
+"Card Game Player Inya": "w",
+"Carris, the Time Keeper": "m",
+"Cecilia, the Harrowing Crusader": "w",
+"Champion, the Eye of the Storm": "m",
+"Champion, the Stormbringer": "m",
+"Chaos-Diamond, the Cracked Keeper": "m",
+"Chuck, the Crazy Veteran": "m",
+"Chuck, the Storyteller": "m",
+"Codumbus, the Clueless Voyager": "m",
+"Cool Birthday Girl Monia": "w",
+"Cool Rescuer Monia": "w",
+"Cooldin, King of Coolness": "m",
+"Cuberto, Supreme Lord of Edges": "m",
+"Cute Angel Molinda": "w",
+"Cute Annoyance Mini": "w",
+"Cute Ditz Monami": "w",
+"Cute Meanie Melissa": "w",
+"Cute Nerd Magenta": "w",
+"Cute Princess Mary": "w",
+"Cute Starlet Megu": "w",
+"Dajan, Conqueror of the Treasure Cave": "m",
+"Damus, the Prophet of Apocalypse": "m",
+"Dante, the Wanderer of Hell": "m",
+"Darion, the Blood-Crazy Groundskeeper": "m",
+"Deep-Drowned Waflav": "m",
+"Definitely not Andras, the Human Weapon": "m",
+"Devlin, the Masked Butcher": "m",
+"Diamond, the Bulwark of Peace": "m",
+"Diamond, the Keeper of Peace": "m",
+"Don Quisto, the Gold Seeker": "m",
+"Elana, the Rocky Rebel": "w",
+"Enigma, the Seller of Secrets": "w",
+"Fairy Queen Crestina, the Creation Fairy": "w",
+"Feral, the Fortress Breaker": "m",
+"Fern, the Liberated Fairy": "m",
+"Fern, the Ship Slave": "m",
+"Fiedel, the Mercenary Mage": "m",
+"Fiona, the Empty Vessel of a Forgotten Sorceress": "w",
+"Fiona, the Princess of Blackport": "w",
+"Flamebathed Waflav": "m",
+"Freshya, Beauty of Coolness": "w",
+"Friedhelm, the Misled Avenger": "m",
+"Future Tech Gunslinger Riffel": "w",
+"Gabby, the Boarding Broad": "w",
+"Gabby, the Pirate Zombie": "w",
+"Garius, the Great Reformer": "m",
+"George, the Mad Tyrant King": "m",
+"Ghazma, the Worm Feeder": "m",
+"Ghuanjun, the Undead Martial Artist": "m",
+"Gobbo, Chief of Goblin": "m",
+"Gon, the Frostbringer": "m",
+"Grand Inquisitor Karian": "m",
+"Great Detective Doq": "m",
+"Grisgar, Emissary of the Demon Lord": "m",
+"Güldefaber, the King of Dwarfs": "m",
+"Hatusbal, the Leader of Tusca": "m",
+"Hel, the Bound Specter": "w",
+"Heragas, the Monster Slayer": "m",
+"Hulijing, the Foxdemon": "w",
+"Ida, the Adept of Destruction": "w",
+"Idej Lord Daiyo": "m",
+"Idej Lord Nobunakin": "m",
+"Idej Lord Shoguwana": "m",
+"Idej Lord Todugawin": "w",
+"Ingo, Investor of Evil": "m",
+"Jack, the Crooked Killer": "m",
+"Jean, the Pillaging Knight": "m",
+"Jenny, the Class Fairy": "w",
+"Johanna, Crusader of Light": "w",
+"Junshi, the Tactical Genius": "m",
+"Kasperov, the King of Kings [B]": "m",
+"Kasperov, the King of Kings [W]": "m",
+"Kassaran, Seer of Everything": "m",
+"Kazena, the Storming Rebel": "w",
+"Kent, the Indebted Apprentice": "m",
+"Kerthwack, the Reality Breaker": "m",
+"Key, the Cursed Thief": "w",
+"Kit, the Shark Researcher": "m",
+"Klaus, the Cult Leader": "m",
+"Kohta, Master of Super-Killing": "m",
+"Kohta, the Silent Observer": "m",
+"Koperniko, the Stargazer": "m",
+"Krates, the Smartass": "m",
+"Kyli, the Deceptive Sapling": "w",
+"Layn, Defender of Deri": "w",
+"Layn, Master of Deri's Relic": "w",
+"Legendary Explorer Dajan": "m",
+"Lethe, the Forgetful Fixer": "w",
+"Lilly, the Charming Infiltrator": "w",
+"Little Lyta, the Amazon Princess": "w",
+"Lizbeth, the Reaper of the Light": "w",
+"Locke, the Unseen Saboteur": "m",
+"Logan, the Investment Monkee": "m",
+"Lolek, Mender of the Shattered Trident": "m",
+"Lolek, the Shard Knight": "m",
+"Lolki, Trickstar of Coolness": "m",
+"Lord Mithuru, the Rotten Mastermind": "m",
+"Luna Pele, the Flame Dancer": "w",
+"Luna, the Flame Fairy": "w",
+"Madaga, the Forsaken Seafarer": "m",
+"Madame Guillotine, the Great Equalizer": "w",
+"Maho, the Cute Magical Girl": "w",
+"Mao, the Vengeful Guardian": "m",
+"Marianne, the Cocky Caretaker": "w",
+"Mary Crestmas": "w",
+"Maya, the Nature Fairy": "w",
+"Medea, the Swamp Witch": "w",
+"Mirjam, the Fallen Cute Angel": "w",
+"Molinda, the Cutest Being in the Sky": "w",
+"Monia Bot, the Foretold Rescuer of Coolness": "w",
+"Monsieur Pete, the Booty Raider": "m",
+"Nao, the Barrier Priestess": "w",
+"Natas, the Master of Hell": "m",
+"Nero Zira, the Mastermind": "m",
+"Nicolas, the Hidden Alchemist": "m",
+"Nieht, the Blitz Blade": "m",
+"Night, the Herald of Chess": "m",
+"Nomu, Wanderer of Worlds": "m",
+"Null, the Mage Slayer": "m",
+"Omikron, the Faceless Illusionist": "m",
+"Orthos, the Loyal Guard Dog": "m",
+"Patty, the Ninja of Revenge": "w",
+"Pes'zet, the Plague Bringer": "m",
+"Peter Röll, the Protagonist": "m",
+"Pharaoh, the Lone Living Being": "m",
+"Pinta, the Singing Ship": "w",
+"Pseudonia, the Skill Devourer": "w",
+"Quetzahuitl, Receiver of Sacrifices": "m",
+"Rafflesia, the Poison Princess": "w",
+"Rakah, the Loan Shark": "m",
+"Reiza, the Chief Tormentor": "w",
+"Rescued Damsel Cecilia": "w",
+"Rha'Bi, the Living Skeleton": "m",
+"Rick, the Trigger Happy Undertaker": "m",
+"Riffel, Master of the Ultimate Gun": "w",
+"Rool, the Troll Guard": "m",
+"Rubin, the Dragoneer Champion": "m",
+"Sabrina, the Psychic Witch": "w",
+"Saint Nicolas": "m",
+"Santa Klaus": "m",
+"Sas'Za, the Snaka Adventurer": "w",
+"Saya, the Plant Princess": "w",
+"Serket, Dread of the Desert": "w",
+"Sett, the Adept of Necromancy": "m",
+"Shu'Chaku, the Blood Moon Projection": "w",
+"Sid, the King of Thieves": "m",
+"Silent Water Mizune": "m",
+"Siphem, the Deepsea Demon": "m",
+"Sol Rym, the Thunder Djinn": "m",
+"Sorin, the Warden of Blood Rock": "m",
+"Sparrow, the Buffoon of the Treasure Cave": "m",
+"Sparrow, the Bumbling Buffoon": "m",
+"Stellan, the Calm Cat": "m",
+"Stormkissed Waflav": "m",
+"Styx, the Gate to the Spirit World": "n",
+"Styx, the Opened Gate": "n",
+"Swampborne Waflav": "m",
+"Taio, Absorber of the Mountain's Heart": "m",
+"Taio, the Sun Fencer": "m",
+"Tarleinn the Traveler": "w",
+"Tazune, the Angry Hot-Blood": "m",
+"Tempeluna, the Convergence Fairy": "w",
+"Tempeste Moana, the Rain Singer": "w",
+"Tempeste, the Weather Fairy": "w",
+"Teocuilatl, the Embodiment of Gods": "m",
+"Teppes, the Deepsea Vampire": "m",
+"Thalia, the Fun Fairy": "w",
+"Tharx, the Never-Losing General": "m",
+"Thep, the Court Scribe": "m",
+"Thorad, Strength of Coolness": "m",
+"Thunderstruck Waflav": "m",
+"Timeless King Zi": "m",
+"Toras, Master of all Weapons": "m",
+"Treasure Huntress Semi": "w",
+"Tri Ad, the Puppet Mistress": "w",
+"Tri Fecta, the Puppet Master": "m",
+"True Fairy Crestina, the Primordial Goddess": "w",
+"Tryse, the Shadow Slayer": "m",
+"Tsu'Ki, the Lunatic Princess": "w",
+"Tushu, the Knowledge Keeper": "m",
+"Vacarn, the Dark Goblin Necromancer": "m",
+"Vena, the Bounty Huntress": "w",
+"Victorica, the Eternal Empress": "w",
+"Visionary Genius Heinz": "m",
+"Von Pixmarck, the Iron Chancellor": "m",
+"Waflav, the Metamorphing Monstrosity": "m",
+"Wall Breaker General Ralzish": "m",
+"Willy, the Valiant Leprechaun": "m",
+"Xal, the Animated Armor": "m",
+"Xiong, the Bamboo Guardian": "m",
+"Yukana, the Scholar on the Run": "w",
+"Zamorin, the Spice Rajah": "m",
+"Zhigao, the Heavenly Emperor": "m",
+"Zsos'Ssar, the Serpent Warlord": "m",
+"Zwei, the Lucky Thief": "m"
 }
 }
