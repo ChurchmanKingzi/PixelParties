@@ -29621,8 +29621,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       + (ps._handCostReductionsPermanent?.[handIdx] || 0)
       // Misfire: namensweiter Nullpreis fuer das naechste dieses Namens.
       + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
-      // Dajan, Conqueror: scharfgestellter Gratis-Kauf.
-      + (this.freeArtifactArmed(playerIdx) ? rawCost : 0)
+      // Dajan, Conqueror: scharfgestellter Gratis-Kauf (nur Karten aus der Hand; `opts.ausDeck`: Legendary Explorer Dajan spielt aus dem Deck).
+      + (!opts.ausDeck && this.freeArtifactArmed(playerIdx) ? rawCost : 0)
       // Selbstrabatt der Karte (Future Tech Laser Cannon).
       + (typeof sk?.selfCostReduction === 'function'
         ? (sk.selfCostReduction(gs, playerIdx, cardData, this) || 0) : 0);
