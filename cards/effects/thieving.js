@@ -17,8 +17,8 @@
 //  — Spielgestalter-Entscheidung 16.11.2026: Thieving bleibt
 //  aktivierbar, der Gegner VERLIERT das Gold trotzdem (gleiche
 //  Klemmung auf seinen Bestand), der Dieb bekommt nichts („es ist
-//  dann weg"). Nur dieser Aufrufer: `actionStealGold(…, { verlustBleibtBeiSperre })`;
-//  Mimic, Deepsea Pirate und Dirty Smuggler behalten das alte Verhalten (fizzelt).
+//  dann weg"). `actionStealGold(…, { verlustBleibtBeiSperre })` — dieselbe Regel gilt
+//  (Spielgestalter-Entscheidung 16.11.2026) auch für Mimic, Deepsea Pirate und Dirty Smuggler.
 // ═══════════════════════════════════════════
 
 const STEAL_BY_LEVEL = [4, 8, 12];

@@ -30041,9 +30041,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
    * Broadcasts the coin-burst animation on both gold counters.
    *
-   * `opts.verlustBleibtBeiSperre` (Thieving, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes gesperrt (Golden Arrow `goldLocked`,
-   * Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg". Ohne die Option bleibt es beim
-   * alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann `{ stolen: 0, lost: <Menge>, fizzled: false }`.
+   * `opts.verlustBleibtBeiSperre` (Thieving, Deepsea Pirate, Dirty Smuggler, Mimic, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes
+   * gesperrt (Golden Arrow `goldLocked`, Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg".
+   * Ohne die Option bleibt es beim alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann
+   * `{ stolen: 0, lost: <Menge>, fizzled: false }`. Der Erstzug-Schutz des Opfers fizzelt IMMER (auch mit der Option): der Gegner verliert nichts.
    */
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
