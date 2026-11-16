@@ -7846,7 +7846,7 @@ class GameEngine {
    * Zieht das Anhaengsel eines uebertragenen Status zum neuen Traeger um.
    * @returns {boolean} ob der Umzug geklappt hat
    */
-  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx) {
+  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     const zonen = this.gs.players[neuOwner]?.supportZones?.[neuHeroIdx];
     if (!zonen) return false;
@@ -7855,27 +7855,10 @@ class GameEngine {
       if ((zonen[z] || []).length === 0) { platz = z; break; }
     }
     if (platz < 0) return false;
-
-    const altZonen = this.gs.players[inst.owner]?.supportZones?.[inst.heroIdx];
-    const altSlot = altZonen?.[inst.zoneSlot];
-    if (Array.isArray(altSlot)) {
-      const i = altSlot.indexOf(inst.name);
-      if (i >= 0) altSlot.splice(i, 1);
-    }
-    this._broadcastEvent('play_pile_transfer', {
-      owner: inst.owner, cardName: inst.name,
-      from: 'support', to: 'support',
-      fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
-      toHeroIdx: neuHeroIdx, toSlotIdx: platz,
-      ...(neuOwner !== inst.owner ? { fromOwner: inst.owner, toOwner: neuOwner } : {}),
-    });
-    zonen[platz] = [inst.name];
-    inst.owner = neuOwner;
-    inst.heroIdx = neuHeroIdx;
-    inst.zoneSlot = platz;
-    this.log('attachment_moved', { card: inst.name, toHeroIdx: neuHeroIdx });
-    this.sync();
-    return true;
+    // ★ ATT-01/02: EIN Umhaengeweg (`actionTransferAttachment`) statt eines rohen Platztauschs — mit Austritts-/Eintritts-Haken und
+    // `attachmentMovedToHost`, damit die Wirkung der Karte (Polymorph-ATK-Bonus, Fluch-ATK-Sperre, Mind-Control-Kontrolle …) mit umzieht.
+    const r = await this.actionTransferAttachment(inst, neuOwner, neuHeroIdx, platz, { sourceName: 'Tea', quiet: true, ...opts });
+    return !!r?.success;
   }
 
   /**

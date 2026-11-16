@@ -73,6 +73,10 @@ async function berserkAnlegen(engine, appliedBy, owner, heroIdx) {
     animationType: 'dark_swarm',
     festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewaehlt (Als Ruling 9.10.)
   });
+  // Marke „dieser Status gehoert dieser Karte" (wie Polymorph/Shrink): ohne sie findet `engine.anhaengselFuerStatus` die Karte nicht, und Tea
+  // (Status uebertragen) liesse sie in die Ablage fallen, waehrend der Status als Geister-Flag am zweiten Helden haengt.
+  const st = hero.statuses?.[STATUS_NAME];
+  if (st && !st._fromAttachment) st._fromAttachment = CARD_NAME;
   return true;
 }
 
@@ -199,7 +203,9 @@ module.exports = {
       if (copies.length === 0) return;
 
       // Snapshot a list of insts — destroy mutates cardInstances.
-      const targets = [...copies];
+      // Tea uebertraegt den Status: die Karte, die mitzieht (`_anhaengselZiehtUm`), faellt nicht ab.
+      const targets = copies.filter(c => !c.counters?._anhaengselZiehtUm);
+      if (targets.length === 0) return;
       engine.gs._berserkCleanseInProgress = true;
       try {
         // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog

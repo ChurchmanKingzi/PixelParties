@@ -135,9 +135,13 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
  */
 async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   const targetHero = engine.gs.players[owner]?.heroes?.[heroIdx];
-  if (!targetHero?.name || targetHero.hp <= 0 || targetHero.statuses?.cursed) return false;
+  if (!targetHero?.name || targetHero.hp <= 0) return false;
+  // Tea (Status übertragen) hat `cursed` am neuen Wirt schon per `addHeroStatus` angelegt, aber ohne ATK-Sperre (die macht nur diese Funktion): Status da, Zwischenspeicher leer
+  // → die Sperre jetzt nachholen. Mit Zwischenspeicher (zweite Kopie, Doomed Pirate) ist der Wirt schon gesperrt: nichts zu tun.
+  const statusSchonDa = !!targetHero.statuses?.cursed;
+  if (statusSchonDa && targetHero._cursedAtkSuppressed !== undefined) return false;
   // Wehrt der Wirt den Status ab (Light Ball, Immunität …), bleibt seine ATK unberührt — wie bei Polymorph/Shrink. Sonst stünde er ohne Status (nichts zum Heilen) auf ATK 0.
-  if (engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
+  if (!statusSchonDa && engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
   // Snapshot the live ATK so the cleanse path can restore it.
   // Subsequent grant/revoke/temp-atk while cursed will accumulate
   // into this same slot (see _isHeroAtkSuppressed in _engine.js).
@@ -157,7 +161,7 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   }
   // `festesZiel`: „the Hero this Spell is attached to" — der Wirt wurde schon gewählt (Als Ruling 9.10., wie Polymorph/Shrink/Berserk). Ohne die Option
   // schluckt Submerged („Jump in the River") den Status, obwohl die ATK schon auf 0 steht.
-  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
+  if (!statusSchonDa) await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
   if (!targetHero.statuses?.[STATUS_NAME] && !schonGesperrt && targetHero._cursedAtkSuppressed !== undefined) {
     // Der Status wurde doch abgewehrt (z. B. Effekt-Immunität): die gesicherte ATK zurückgeben (ohne `cursed` bucht der Trichter sichtbar).
     const zurueck = targetHero._cursedAtkSuppressed;
@@ -165,6 +169,9 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
     engine._applyHeroAtkDelta(targetHero, owner, heroIdx, zurueck);
     return false;
   }
+  // Marke „dieser Status gehoert dieser Karte" (wie Polymorph/Shrink): ohne sie findet `engine.anhaengselFuerStatus` die Karte nicht (Tea: Status übertragen).
+  const st = targetHero.statuses?.[STATUS_NAME];
+  if (st && !st._fromAttachment) st._fromAttachment = CARD_NAME;
   return true;
 }
 
@@ -365,8 +372,9 @@ module.exports = {
         && c.owner === ownerIdx
         && c.heroIdx === heroIdx
       );
-      if (copies.length > 0) {
-        const targets = [...copies];
+      // Tea uebertraegt den Status: die Karte, die mitzieht (`_anhaengselZiehtUm`), faellt nicht ab.
+      const targets = copies.filter(c => !c.counters?._anhaengselZiehtUm);
+      if (targets.length > 0) {
         engine.gs._curseCleanseInProgress = true;
         try {
           // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
