@@ -36173,7 +36173,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Umleitung), VOR der Wirkung des Skripts. Das Glied ist die Auslösung selbst (`cardType: 'TriggeredEffect'`, `fromBoard: true`, Name = Wächter/Held): Der Gegner darf mit seinen passenden Reaktionen antworten;
    * wird sie negiert, findet die Umleitung/Negation nicht statt. Der Typ ist bewusst weder 'CreatureEffect' noch 'Hero': die Reaktionen auf AKTIVE Effekte (Spearman, Dark Deal, Gigantisaur Skull, Divine Punishment …)
    * meinen laut Kartentext nur aktivierte Effekte und lesen genau diese Typen; Handkarten-Reaktionen („from their hand": The Master's Plan, Lunar Eclipse) schließt `fromBoard` aus. Wer künftig auf ausgelöste
-   * Passive reagieren soll, liest `link.cardType === 'TriggeredEffect'`. Kosten, die das Skript in `onBoardRedirect` zahlt (Abwurf, Counter), fallen bei Negation nicht an — die Wirkung hat nie begonnen.
+   * Passive reagieren soll, liest `link.cardType === 'TriggeredEffect'`. KOSTEN (Abwurf, Counter) zahlt der Aufrufer VOR diesem Fenster (`payBoardRedirectCost` & Co. der Skripte) — sie bleiben auch bei Negation bezahlt.
    * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und in KI-Simulationen öffnet kein neues Fenster (Konvention von `alsAttackKette`).
    * @returns {Promise<boolean>} true = die Auslösung wurde negiert
    */
@@ -36418,11 +36418,20 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!this._confirmSaidYes(confirmed)) continue;
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: KOSTEN sind VOR dem Kettenfenster und unabhängig von dessen Ausgang zu bezahlen — wie bei einer gespielten Hand-Reaktion,
+      // deren Kosten auch bei Negation bezahlt bleiben. Ein Helden-Passiv mit Kosten bietet dafür das optionale Gegenstück `payHeroRedirectCost(...)` (gleiche Argumente wie
+      // `onHeroRedirect`); `false` = nicht zahlbar/abgebrochen → keine Aktivierung, nichts ausgelöst (wie ein Nein). Das Ergebnis geht als letztes Argument an `onHeroRedirect`.
+      let bezahltH;
+      if (typeof heroScript.payHeroRedirectCost === 'function') {
+        bezahltH = await heroScript.payHeroRedirectCost(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
+        if (!bezahltH) continue;
+      }
+
       // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Helden-Passivs ist kettbar (`_passivAusloesungNegiert`); negiert → keine Umleitung.
       if (await this._passivAusloesungNegiert(hero.name, targetOwnerIdx, hi)) continue;
 
       // Run the hero's redirect logic (hero selection, animation, etc.)
-      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
+      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner, bezahltH);
       if (!result?.redirectTo) continue;
 
       // Reveal hero card
@@ -36515,13 +36524,27 @@ this._deathWatch = (this._deathWatchStack || []).length
         continue;
       }
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: KOSTEN sind VOR dem Kettenfenster und unabhängig von dessen Ausgang zu bezahlen (Abwurf der Winged Haressassin, Luck-/Preserve-Counter
+      // von Tri Fecta/Tri Ad/Laki/Vinny) — wie bei einer gespielten Hand-Reaktion, deren Kosten auch bei Negation bezahlt bleiben. Der Wächter bietet dafür das optionale Gegenstück
+      // `payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config, sourceCard)`: `false` = nicht zahlbar/abgebrochen → keine Aktivierung (wie ein Nein, nichts ausgelöst);
+      // sonst wird der Rückgabewert als letztes Argument an `onBoardRedirect` gereicht (dort steht, was gezahlt wurde). Ohne `payBoardRedirectCost` zahlt `onBoardRedirect` wie bisher selbst.
+      // Verbrauchslimits („once per turn" von Anti-Magnetic Armor, Empty Armor, Haressassin) sind keine Kosten: sie fallen erst mit der Wirkung (negiert → bleibt frei, Rulings Bow/Surprise-HOPT).
+      let bezahltB;
+      if (typeof g.payBoardRedirectCost === 'function') {
+        bezahltB = await g.payBoardRedirectCost(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard);
+        if (!bezahltB) {
+          if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+          continue;
+        }
+      }
+
       // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Brett-Wächters ist kettbar (`_passivAusloesungNegiert`; auch die Pflicht-Umleitung — Empty Armor); negiert → keine Umleitung/Negation.
       if (await this._passivAusloesungNegiert(guardNameB, targetOwnerIdx, bInst.heroIdx)) {
         if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);   // wie ein Nein: derselbe Effekt fragt nicht noch einmal
         continue;
       }
 
-      const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard);
+      const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, bezahltB);
       if (Array.isArray(resultB?.dropTargetIds) && resultB.dropTargetIds.length > 0) {
         this.log('target_negated_by_board', {
           card: guardNameB, targets: resultB.dropTargetIds, player: ps.username,
@@ -56562,7 +56585,15 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
           continue;
         }
-        const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind);
+        // ★ Spielgestalter-Entscheidung 16.11.2026 (wie im Zielwahl-Fenster, `_checkTargetRedirectOnce`): Kosten VOR dem Kettenfenster (`payBoardEffectGuardCost`, optional;
+        // `false` = nicht zahlbar → wie ein Nein), dann die Auslösung kettbar (`_passivAusloesungNegiert`); negiert → keine Negation, die Kosten bleiben bezahlt.
+        let bezahltE;
+        if (typeof g.payBoardEffectGuardCost === 'function') {
+          bezahltE = await g.payBoardEffectGuardCost(this, ownerIdx, gInst, mine, source, kind);
+          if (!bezahltE) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
+        }
+        if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
+        const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind, bezahltE);
         for (const id of (res?.dropInstIds || [])) negated.add(id);
         if (res?.dropInstIds?.length) {
           this.log('effect_negated_by_board', {
@@ -56663,7 +56694,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           promptConfig: { extra: { _boardInstId: gInst.id } },
         });
         if (!this._confirmSaidYes(confirmed)) continue;
-        const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard);
+        // ★ Spielgestalter-Entscheidung 16.11.2026: Kosten VOR dem Kettenfenster (`payBoardAoeGuardCost`, optional), dann kettbar — siehe `_offerBoardEffectGuard`.
+        let bezahltA;
+        if (typeof g.payBoardAoeGuardCost === 'function') {
+          bezahltA = await g.payBoardAoeGuardCost(this, ownerIdx, gInst, mine, sourceCard);
+          if (!bezahltA) continue;
+        }
+        if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) continue;
+        const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard, bezahltA);
         const drop = new Set(res?.dropInstIds || []);
         if (drop.size === 0) continue;
         this.log('aoe_negated_by_board', {
