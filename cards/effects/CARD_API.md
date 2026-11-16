@@ -2804,10 +2804,12 @@ für tote Helden `false`.
 | `canRedirect` | `(ctx, target, validTargets) → bool` | Can this card redirect the incoming targeting? |
 | `onRedirect` | `async (ctx, target, validTargets) → target` | Execute the redirect, return the new target. |
 
-Hand-Umleiter (`isTargetRedirect`: Challenge, Martyry, Anti-Magnet; `_checkTargetRedirectOnce`): `onRedirect(engine, pi, selected, validTargets, config, sourceCard)` liefert `{ redirectTo }`
-(optional `casterIdx`/`casterSeite` = der wirkende Held einer Spell-Karte — die Engine bucht dann dessen Wisdom-Abwurf). Während `onRedirect` läuft, öffnet die eigene Ersatzzielwahl
-(`promptEffectTarget`) KEIN weiteres Umleitungsfenster; ein neuer Besitzer darf über die Kette der Engine (`_checkTargetRedirect`) erneut umleiten. Kosten mit Gold: `engine.canAffordGold(pi, kosten, name)`
-(Kredit Kent/Debt-O-Tron), nicht `ps.gold`. „exactly 1 target you control" = `config._redirectPickedIds` zählen. Dark Ocean sperrt die Hand-Umleiter gegen Effekte GEGNERISCHER Creatures (Engine, nicht im Skript).
+Hand-Umleiter (`isTargetRedirect`: Challenge, Martyry, Anti-Magnet; `_checkTargetRedirectOnce`) laufen in drei Schritten (Spielgestalter-Entscheidung 16.11.2026: Umleitungen sind kettbar):
+1. Optional `redirectWaehlen(engine, pi, selected, validTargets, config, sourceCard)` → `null` (abbrechen) oder ein Plan `{ casterIdx?, casterSeite? }` (der wirkende Held einer Spell-Karte — die Engine bucht dann dessen Wisdom-Abwurf). Keine Nebenwirkung.
+2. Die ENGINE spielt die Karte: Ablage, Gold = `cost` der Karte (das Skript bucht kein Gold selbst), Wisdom, Aufdecken, danach `_reaktionGespielt` — das öffnet das Gegenreaktions-Fenster (Cute Camera, Front Soldier, Reverse Trap; derselbe Baustein wie bei Spiky Armor, Strong Shield, Anti Magic Shield). Wird die Reaktion negiert, findet keine Umleitung statt (Karte in der Ablage, Kosten bleiben bezahlt); danach darf ein anderer Umleiter angeboten werden.
+3. Nur wenn nicht negiert: `onRedirect(engine, pi, selected, validTargets, config, sourceCard, plan)` → `{ redirectTo }` (Gegnerwahl, Bilder, Log). Während der Wahl/Wirkung öffnet die eigene Ersatzzielwahl (`promptEffectTarget`) KEIN weiteres Umleitungsfenster (`_inRedirectWindow`); ein neuer Besitzer darf über die Kette der Engine (`_checkTargetRedirect`) erneut umleiten.
+Kosten mit Gold in `canRedirect`: `engine.canAffordGold(pi, kosten, name)` (Kredit Kent/Debt-O-Tron), nicht `ps.gold`. „exactly 1 target you control" = `config._redirectPickedIds` zählen. Dark Ocean sperrt die Hand-Umleiter gegen Effekte GEGNERISCHER Creatures (Engine, nicht im Skript).
+Brett-Wächter (`isBoardRedirect`: Puppets, Tri Fecta, Anti-Magnetic Armor, Empty Armor, Redirecting Aura …) und Helden-Passive (`heroRedirect`: Alleria, Monia Bot) sind ausgelöste Passive („you may"), keine gespielten Reaktionen — sie öffnen kein Kettenfenster. Reine Kettenkarten (Silence, The Master's Plan) werden gegen Hand-Reaktionen derzeit nicht angeboten (nur Cute Camera, Front Soldier, Reverse Trap über `onReactionPlayed`).
 
 ### Surprises
 
