@@ -7510,5 +7510,10 @@
 "sleeve": "Kartenhülle",
 "sleeves": "Kartenhüllen",
 "board": "Spielfeld",
-"boards": "Spielfelder"
+"boards": "Spielfelder",
+"a card": "eine Karte",
+"a Hero": "ein Held",
+"a target": "ein Ziel",
+"the effect": "der Effekt",
+"discard pile": "Ablagestapel"
 }
