@@ -30033,6 +30033,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Steal up to `requested` Gold from the activator's opponent.
    * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
    * Broadcasts the coin-burst animation on both gold counters.
+   *
+   * `opts.verlustBleibtBeiSperre` (Thieving, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes gesperrt (Golden Arrow `goldLocked`,
+   * Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg". Ohne die Option bleibt es beim
+   * alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann `{ stolen: 0, lost: <Menge>, fizzled: false }`.
    */
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
@@ -30048,7 +30052,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Z6 (A09-12): wer kein Gold gewinnen darf (Golden Arrow), kann auch nichts stehlen.
-    if (ps.goldLocked) {
+    if (ps.goldLocked && !opts.verlustBleibtBeiSperre) {
       this.log('gold_steal_fizzle', { by: source, reason: 'goldLocked' });
       return { stolen: 0, fizzled: true };
     }
@@ -30063,11 +30067,24 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
     this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
+    // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): der Dieb darf kein Gold gewinnen (Golden Arrow) — der Gegner hat es verloren, der Dieb bekommt nichts.
+    if (ps.goldLocked) {
+      this.log('gold_gain_blocked', { player: ps.username, amount: clamped, reason: 'goldLocked' });
+      this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'goldLocked' });
+      this.sync();
+      return { stolen: 0, lost: clamped, fizzled: false };
+    }
     const _gainState = {};
     await this.actionGainGold(pi, clamped, { _gainState });
     // Z6 (A09-12): ein gesperrter Gewinn (Tuscan Aristocrat: ausserhalb der eigenen Resource Phase) macht den
     // Diebstahl wirkungslos - das Opfer bekommt sein Gold zurueck, statt dass es aus dem Spiel faellt.
     if (_gainState.blocked) {
+      // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): das Gold bleibt verloren, der Dieb bekommt es nicht.
+      if (opts.verlustBleibtBeiSperre) {
+        this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'gain blocked' });
+        this.sync();
+        return { stolen: 0, lost: clamped, fizzled: false };
+      }
       ops.gold = (ops.gold || 0) + clamped;
       this._checkGoldStateRules(oi);
       this.log('gold_steal_fizzle', { by: source, reason: 'gain blocked' });

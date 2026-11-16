@@ -12,6 +12,13 @@
 //  the shared stealGoldFromOpponent helper.
 //  Once-per-turn is enforced by the engine's
 //  standard free-ability HOPT path.
+//
+//  Gold-Gewinn-Sperre des Diebes (Tuscan Aristocrat, Golden Arrow)
+//  — Spielgestalter-Entscheidung 16.11.2026: Thieving bleibt
+//  aktivierbar, der Gegner VERLIERT das Gold trotzdem (gleiche
+//  Klemmung auf seinen Bestand), der Dieb bekommt nichts („es ist
+//  dann weg"). Nur dieser Aufrufer: `actionStealGold(…, { verlustBleibtBeiSperre })`;
+//  Mimic, Deepsea Pirate und Dirty Smuggler behalten das alte Verhalten (fizzelt).
 // ═══════════════════════════════════════════
 
 const STEAL_BY_LEVEL = [4, 8, 12];
@@ -42,8 +49,12 @@ module.exports = {
     const lv = Math.max(1, Math.min(3, level | 0));
     const amount = STEAL_BY_LEVEL[lv - 1];
 
-    const { stolen } = await engine.actionStealGold(pi, amount, {
+    // Spielgestalter-Entscheidung 16.11.2026: Unter einer Gold-Gewinn-Sperre des Diebes (Tuscan Aristocrat, Golden Arrow) bleibt Thieving aktivierbar
+    // und der Gegner VERLIERT das Gold trotzdem — der Dieb bekommt es nur nicht, es ist dann weg. Das Once-per-turn wird normal verbraucht.
+    // (Adventurousness/Trade sind dort ausgegraut, weil Gold ihr einziger Nutzen ist — hier verliert der Gegner ja etwas; Regel in `_gold-block-shared.js`.)
+    const { stolen, lost } = await engine.actionStealGold(pi, amount, {
       sourceName: CARD_NAME,
+      verlustBleibtBeiSperre: true,
     });
 
     engine.log('thieving_activated', {
@@ -52,6 +63,7 @@ module.exports = {
       level: lv,
       maxSteal: amount,
       stolen,
+      ...(lost ? { lost } : {}),
     });
   },
 };
