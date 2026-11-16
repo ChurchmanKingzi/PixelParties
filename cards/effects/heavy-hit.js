@@ -7,8 +7,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
-  // „Choose a target" — Einzelziel-Attack: ein geblendeter Held (Smoke Vial / Trunk Sand, `blocksTargeting`) darf sie nicht spielen. Die Blendungs-Sperre
-  // der Engine liest genau dieses Kennzeichen; ohne es blieb Heavy Hit unter „Blinded" spielbar.
+  // „Choose a target" — Zielwahl-Karte (Blinded, Spielgestalter-Entscheidung 16.11.2026): ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine);
+  // spielbar, wenn es einen legalen eigenen Kandidaten gibt (ein anderer eigener Held oder eine eigene Kreatur — der Angreifer selbst ist ausgeschlossen).
   requiresTarget: true,
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,

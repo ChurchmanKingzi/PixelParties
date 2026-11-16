@@ -13,8 +13,7 @@ const CARD_NAME = 'Coolness Overcharge';
 const STACK_THRESHOLD = 6;
 
 module.exports = {
-  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
-  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Choose any card on the board that isn't a Hero".
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Choose any card on the board that isn't a Hero".
   requiresTarget: true,
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
