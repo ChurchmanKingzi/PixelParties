@@ -8490,6 +8490,28 @@ class GameEngine {
     return flag === true;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 (Ida: „Da soll sie überall durchschlagen!"): schlägt der Schaden dieser Quelle die „takes no damage"-FORMEN am HELDEN durch —
+   * Kontrolle durch Deepsea Succubus/Little Lyta (`charmed.nurSchadenSchutz`: „cannot take any damage"), `damage_proof`-Status (Storm Piano, Cheat Chair) und Versteinerung
+   * (`stunned._petrified`: Baihu, Petrifier)? Heldenskript-Vertrag `piercesDamageProtection(engine, { source, target, type, sourceOwner, sourceHeroIdx })` (Ida), nur solange der
+   * Quellheld lebt und nicht stummgeschaltet ist (wie jeder laufende Heldeneffekt). NICHT dabei bleiben „unaffected by ALL cards and effects" (Charme Lv 3 …), der Erstrunden-Schutz,
+   * Effekt-Immunitäten und Quellen-Immunitäten (Damus); Gegenstück bei Kreaturen: `e.ignoreUnaffected` (`_markCreatureDamageImmunity`).
+   */
+  _quelleDurchschlaegtHeldenSchutz(source, target, type) {
+    if (!source || !target || target.hp === undefined) return false;
+    const qs = this._klonSicht(source);
+    const sOwner = qs?.heroOwner ?? qs?.owner ?? qs?.controller;
+    const sHeroIdx = qs?.heroIdx;
+    if (!Number.isInteger(sOwner) || sOwner < 0 || !Number.isInteger(sHeroIdx) || sHeroIdx < 0) return false;
+    const sHero = this.gs.players[sOwner]?.heroes?.[sHeroIdx];
+    if (!sHero?.name || !(sHero.hp > 0)) return false;
+    const f = this.heroScript(sHero)?.piercesDamageProtection;
+    if (typeof f !== 'function') return false;
+    if (this._isHeroEffectSilenced(sOwner, sHeroIdx)) return false;
+    try { return !!f(this, { source: qs, target, type, sourceOwner: sOwner, sourceHeroIdx: sHeroIdx }); }
+    catch (err) { console.error(`[piercesDamageProtection] ${sHero.name}:`, err.message); return false; }
+  }
+
   _isHeroSelfDamageImmune(target) {
     if (!target || target.hp === undefined) return false;
     const owner = this._findHeroOwner(target);
@@ -9907,7 +9929,9 @@ class GameEngine {
     // Ausnahme davon ausdruecklich in dessen Kartentext, hier nicht.
     // ★ v1341: generisch ueber `STATUS_EFFECTS[key].blocksDamage` (Storm
     // Piano, Cheat Chair) statt ueber den Namen eines einzelnen Status.
-    const _schutzStatus = (target && target.hp !== undefined && amount > 0) ? this._schadensSchutzStatus(target) : null;
+    // Spielgestalter-Entscheidung 16.11.2026: Idas Zauberschaden schlägt „damage_proof" durch (`_quelleDurchschlaegtHeldenSchutz`; Charme Lv 3 usw. bleiben).
+    const _idaDurch = (target && target.hp !== undefined && amount > 0) ? this._quelleDurchschlaegtHeldenSchutz(source, target, type) : false;
+    const _schutzStatus = (target && target.hp !== undefined && amount > 0 && !_idaDurch) ? this._schadensSchutzStatus(target) : null;
     if (_schutzStatus) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: _schutzStatus, amount, source: source?.name });
       this._flashHeroDamageZero(target);
@@ -10556,9 +10580,12 @@ class GameEngine {
     // („The controlled Hero cannot take any damage…" faellt weg).
     // Der Marker `_loveShot` liegt seit jeher auf dem Status; er
     // unterscheidet die geliehene Kontrolle vom echten Charme Lv3.
+    // Spielgestalter-Entscheidung 16.11.2026: Idas Zauberschaden schlägt NUR die reine Schadens-Kontrolle durch (Deepsea Succubus/Little Lyta: „cannot take any damage",
+    // `charmed.nurSchadenSchutz`); Charme Lv 3 / Golden Apple („unaffected by … cards and effects") bleiben.
     if (target?.hp !== undefined
         && this._charmBlocksFrom(target, source?.controller ?? source?.owner,
-          { loveShotOhneSchutz: true })) {
+          { loveShotOhneSchutz: true })
+        && !(target.statuses?.charmed?.nurSchadenSchutz && _idaDurch)) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -10599,8 +10626,9 @@ class GameEngine {
     // haette jede weitere Versteinerungs-Karte hier einen eigenen
     // Zweig gebraucht — und `_baihuPetrify` bleibt daneben stehen,
     // damit laufende Spielstaende nicht brechen.
+    // Spielgestalter-Entscheidung 16.11.2026: „takes no damage"/„would take becomes 0" (Versteinerung) hält Idas Zauberschaden NICHT ab.
     if ((target?.statuses?.stunned?._petrified || target?.statuses?.stunned?._baihuPetrify)
-        && target.hp !== undefined) {
+        && target.hp !== undefined && !_idaDurch) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'petrified' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -57555,8 +57583,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1085: `_petrified` ist der gemeinsame Marker (Baihu setzt ihn
       // jetzt mit, „Petrifier" nur ihn). `_baihuPetrify` bleibt daneben
       // stehen, damit laufende Spielstaende nicht brechen.
-      if (inst?.counters?._cardinalImmune || inst?.counters?._petrified
-          || inst?.counters?._baihuPetrify
+      // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
+      // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
+      if (inst?.counters?._cardinalImmune
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected)
           || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
