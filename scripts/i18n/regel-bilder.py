@@ -210,8 +210,39 @@ def run(name, lang, folder, outdir):
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, name + '.png'); img.save(out); return out
 
-if __name__ == '__main__':
+if __name__ == '__main__' and sys.argv[1] != 'spielfeld':
     which = sys.argv[1]; folder = sys.argv[2]; outbase = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ROOT, 'public/rules')
     for name in (list(CONFIG) if which == 'alle' else [which]):
         for lang in ('en', 'de'):
             print(run(name, lang, folder, outbase if lang == 'en' else os.path.join(outbase, 'de')))
+
+
+# ── Spielfeld-Bild (board-setup.png): kleine Karten (143x201) durch die aktuelle Darstellung ersetzen ──
+def _bbox(rgb, region, pred):
+    x0, y0, x1, y1 = region
+    sub = rgb[y0:y1, x0:x1]; m = pred(sub); ys, xs = np.nonzero(m)
+    return (x0 + int(xs.min()), y0 + int(ys.min()), x0 + int(xs.max()), y0 + int(ys.max()))
+
+def run_board(lang, folder, outdir):
+    src = Image.open(os.path.join(SRC_DIR, 'board-setup.png')).convert('RGBA')
+    rgb = np.array(src.convert('RGB')).astype(int)
+    nonbg = lambda s: ~(((s == 255).all(2)) | ((s == 0).all(2)))
+    img = src.copy()
+    W_, H_ = 143, 201
+    def small(card):
+        c = Image.open(os.path.join(folder, 'card-%s-%s.png' % (lang, card))).convert('RGBA')
+        return c.resize((W_, H_), Image.LANCZOS)
+    def put(card, x, y): img.alpha_composite(small(card), (x, y))
+    # Helden (obere Reihe)
+    for card, region in (('Ida_the_Adept_of_Destruction', (358, 0, 520, 215)), ('Bomb_Berserker_Bartas', (795, 0, 960, 215)), ('Treasure_Huntress_Semi', (1235, 0, 1400, 215))):
+        b = _bbox(rgb, region, nonbg); put(card, b[0] + (b[2] - b[0] + 1 - W_) // 2, b[1])
+    # Faehigkeiten: Stapel (hinten nur die Kopfleiste sichtbar) und zwei nebeneinander
+    blue = lambda s: (s[..., 2] > 60) & (s[..., 0] < 120) & nonbg(s)
+    b = _bbox(rgb, (358, 216, 520, 450), blue); put('Destruction_Magic', b[0], b[1]); put('Destruction_Magic', b[0], b[3] - H_ + 1)
+    b = _bbox(rgb, (640, 216, 945, 450), blue); put('Fighting', b[0], b[1]); put('Destruction_Magic', b[2] - W_ + 1, b[1])
+    b = _bbox(rgb, (1235, 216, 1400, 450), blue); put('Adventurousness', b[0], b[1]); put('Adventurousness', b[0], b[3] - H_ + 1)
+    os.makedirs(outdir, exist_ok=True); out = os.path.join(outdir, 'board-setup.png'); img.save(out); return out
+
+if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == 'spielfeld':
+    folder = sys.argv[2]; outbase = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ROOT, 'public/rules')
+    print(run_board('en', folder, outbase)); print(run_board('de', folder, os.path.join(outbase, 'de')))

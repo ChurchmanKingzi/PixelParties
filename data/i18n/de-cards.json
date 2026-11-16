@@ -656,31 +656,31 @@
 "effect": "Negiere die Effekte aller Kreaturen, die beide Spieler gerade kontrollieren, bis zum Ende des nächsten Zuges deines Gegners, außer \"Süß\"-Kreaturen. \nDies zählt als negativer Statuseffekt."
 },
 "Cybug ANTS": {
-"name": "Cybug AMEISEN",
+"name": "Cybug ANTS",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner dem Anwender Schaden zufügt und ihn nicht besiegt, indem du 1 \"Zukunftstech-Pistole\" aus deiner Hand oder deinem Deck löschst. Füge einem beliebigen Ziel, das dein Gegner kontrolliert, denselben Schaden zu und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge eine \"Zukunftstech-Pistole\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug BEE": {
-"name": "Cybug BIENE",
+"name": "Cybug BEE",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner eine Karte aus seinem Deck seiner Hand hinzufügen würde, indem du 1 \"Magnethandschuh\" aus deiner Hand oder deinem Deck löschst. Füge stattdessen die Karte, die dein Gegner gesucht hat, deiner Hand hinzu und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge einen \"Magnethandschuh\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug CENTIPEDE": {
-"name": "Cybug HUNDERTFÜSSER",
+"name": "Cybug CENTIPEDE",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner durch einen Effekt Karten ziehen würde, indem du 1 \"Räder\" aus deiner Hand oder deinem Deck löschst. Du ziehst dieselbe Anzahl Karten. Platziere dann diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge \"Räder\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug LADYBUG": {
-"name": "Cybug MARIENKÄFER",
+"name": "Cybug LADYBUG",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner den aktiven Effekt einer Fähigkeit aktiviert, indem du 1 \"Magischer Amethyst\" aus deiner Hand oder deinem Deck löschst. Negiere diese Fähigkeit. Wähle dann eine beliebige Fähigkeit auf dem Spielfeld und lege ihre oberste Kopie auf den Ablagestapel und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge einen \"Magischer Amethyst\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug LOCUST": {
-"name": "Cybug HEUSCHRECKE",
+"name": "Cybug LOCUST",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner eine Karte an einen Helden, den er kontrolliert, ausrüstet oder anlegt, indem du 1 \"Rucksack des Schatzjägers\" aus deiner Hand oder deinem Deck löschst. Diese Karte wird stattdessen an den Anwender ausgerüstet/angelegt, platziere dann diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge einen \"Rucksack des Schatzjägers\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug RHINOCEROS": {
-"name": "Cybug NASHORNKÄFER",
+"name": "Cybug RHINOCEROS",
 "effect": "Aktiviere diese Überraschung, wenn dein Gegner eine Karte in eine Zone oder Unterstützungszone platziert, indem du 1 \"Baggerschaufel\" aus deiner Hand oder deinem Deck löschst. Lege diese Karte auf den Ablagestapel und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. War die abgelegte Karte eine Kreatur, zählt dies als Besiegen. Wenn diese Kreatur besiegt wird, füge eine \"Baggerschaufel\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Cybug SCARAB": {
-"name": "Cybug SKARABÄUS",
+"name": "Cybug SCARAB",
 "effect": "Aktiviere diese Überraschung, wenn ein Held, den du kontrollierst, außer dem Anwender, besiegt wird, indem du 1 \"Goldenes Anch\" aus deiner Hand oder deinem Deck löschst. Belebe diesen Helden sofort mit 100 LP wieder und platziere diese Kreatur in eine der freien Unterstützungszonen des Anwenders. Wenn diese Kreatur besiegt wird, füge ein \"Goldenes Anch\" aus deinem Ablagestapel deiner Hand hinzu."
 },
 "Troop Annihilation": {
