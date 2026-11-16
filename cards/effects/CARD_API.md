@@ -11251,13 +11251,16 @@ Namensansage — ein Abbruch verbraucht die Grenze nicht.
 Spell, Support Magic Lv 4. „You may perform up to 2 additional Actions
 this turn. You cannot perform any other additional Actions this turn."
 
-**★ ALLES, WAS NICHT DIE ERSTE AKTION DER ACTION PHASE IST, IST EINE
-ZUSATZAKTION** (Als Auslegung 12.9.) — auch „zweite Aktionen" (Zhigao,
-Duigno, Torchure) und auch INHÄRENTE (Quick Attack).
+**★ ALLES NACH DER ERSTEN AKTION, DIE KEINE ZUSATZ-AKTION IST, IST EINE
+ZUSATZAKTION** (Als Auslegung 12.9.; **Spielgestalter-Entscheidung
+16.11.2026** — die frühere Fassung „alles nach der ersten Aktion der
+Phase" stimmte nicht, siehe Abschnitt „Zusatzaktionen sind nie die erste
+Aktion") — auch „zweite Aktionen" (Zhigao, Duigno, Torchure) und auch
+INHÄRENTE (Quick Attack).
 
-**Daraus folgt die Spielbarkeit:** Mission kann NUR die erste Aktion der
-Action Phase sein — in jedem anderen Fall wäre ihr eigener Einsatz schon
-eine Zusatzaktion und bräche ihre eigene Bedingung.
+**Daraus folgt die Spielbarkeit:** Mission kann NUR die erste
+Nicht-Zusatz-Aktion der Action Phase sein — in jedem anderen Fall wäre ihr
+eigener Einsatz schon eine Zusatzaktion und bräche ihre eigene Bedingung.
 
 **★ Und „erste Aktion" heißt erste Aktion des ZUGES** (v1006, Als
 Präzisierung): wer vorher schon eine Zusatzaktion ausgegeben hat — Quick
@@ -11267,6 +11270,11 @@ nicht: `_actionsPlayedThisPhase` zählt nur in der Action Phase, und
 `heroesActedThisTurn` bekommt von einer inhärenten Aktion nichts mit.
 Gelesen wird **`_actionsPlayedThisTurn`** (der Zugzähler aus v983, der
 jeden Aktionspfad sieht) — zusätzlich zu den beiden anderen.
+*Stand 16.11.2026:* die Entscheidung „Zusatzaktionen sind nie die erste Aktion"
+ändert an diesem Zugzähler nichts. Offen (nicht entschieden, Code unverändert):
+ob Mission nach einer früheren Zusatzaktion des Zuges (Detection, Quick Attack
+in der Main Phase) spielbar sein soll, wenn sie selbst die erste
+Nicht-Zusatz-Aktion wäre.
 
 **Die zwei Aktionen sind ein normaler Zuschlag-Typ mit ZWEI Ladungen**
 (`aaGrants[typeId]` ist eine ZAHL, nicht nur ein Flag) — so greift die
@@ -11628,12 +11636,13 @@ Negat-Zweig etwas an der Aktionswirtschaft ändert, muss beide Riegel
 
 ## ★ Inhärent NACH der ersten Aktion ist die ZWEITE Aktion (v1019, Als Ruling 12.9.)
 
-**Regel:** Alles, was nicht die ERSTE Aktion der Action Phase ist, ist
-eine Zusatzaktion — auch eine **inhärente** (Aggressive Town Guard,
-Quick Attack). Wer mit einem Zweitaktions-Zuschlag (Zhigao) in der
-Action Phase steht, seine erste Aktion hatte und dann etwas Inhärentes
-spielt, hat damit seine zweite Aktion gemacht: der Zuschlag ist durch,
-die Phase endet.
+**Regel:** Alles nach der ersten Aktion, die KEINE Zusatz-Aktion ist, ist
+eine Zusatzaktion (Spielgestalter-Entscheidung 16.11.2026; ursprünglich
+formuliert als „alles, was nicht die ERSTE Aktion der Action Phase ist") —
+auch eine **inhärente** (Aggressive Town Guard, Quick Attack). Wer mit einem
+Zweitaktions-Zuschlag (Zhigao) in der Action Phase steht, seine erste
+(reguläre) Aktion hatte und dann etwas Inhärentes spielt, hat damit seine
+zweite Aktion gemacht: der Zuschlag ist durch, die Phase endet.
 
 Vorher war eine inhärente Aktion **durchgehend** gratis und rührte die
 Aktionswirtschaft gar nicht an — der Spieler blieb mit unverbrauchtem
@@ -11653,13 +11662,40 @@ of the Light Brigade), hält er den Spieler weiterhin in der Phase —
 auch das ergibt sich aus demselben Riegel.
 
 **Die erste Aktion der Phase bleibt ausgenommen:** eine inhärente Karte
-vor jeder anderen Aktion ist weiterhin gratis.
+vor der Hauptaktion ist weiterhin gratis (sie ist selbst eine Zusatzaktion).
 
 *Korrektur:* `_actionsPlayedThisPhase` wird am Anfang von `doPlaySpell`/`doPlayCreature`
 schon für das gerade gespielte Spiel hochgesetzt. `inherentCountsAsExtraAction` prüft deshalb
 `>= 2` (nicht `>= 1`), und eine inhärente ERSTE Aktion nimmt den Zähler am Ende wieder zurück —
 vorher beendete jede inhärente Karte (Quick Attack, Aggressive Town Guard, Elusive Hind …) als erste
 Aktion der Action Phase die Phase.
+
+
+## ★ Zusatzaktionen sind nie „die erste Aktion" der Action Phase (Spielgestalter-Entscheidung 16.11.2026)
+
+**Regel:** „Alles nach der ersten Aktion, die KEINE Zusatz-Aktion ist, ist eine
+Zusatz-Aktion." Zusatzaktionen — inhärente (Detection, Meditation ab Support
+Magic 3, Quick Attack …), per Zusatzaktions-Geber gewirkte (Friendship …),
+Sofort-Güsse (Learning, Time Distortion …) und kostenlose Sofortaktionen — zählen
+nicht als „die erste Aktion" der Phase. Erst die erste Nicht-Zusatz-Aktion (die
+Hauptaktion) ist es; jede reguläre Aktion danach ist Zusatzaktion
+(Zweitaktions-Zuschläge). Die Aktionen NACH der Hauptaktion zählen wie bisher
+(inhärent nach der Hauptaktion = zweite Aktion, v1019).
+
+**Umsetzung:** `_actionsPlayedThisPhase` zählt erst ab der Hauptaktion. Eine
+Zusatzaktion davor hinterlässt keine Spur: `doPlaySpell`/`doPlayCreature` nehmen den
+vorläufigen Eintrag einer inhärenten ersten Karte zurück, Geber-Zusatzaktionen bei noch
+freier Hauptaktion zählen gar nicht (`_spellAddlFree`, `additionalIsFree`). Wer
+Zusatzaktionen INNERHALB einer laufenden Aktion wirkt, ohne selbst durch
+`doPlaySpell`/`doPlayCreature` zu laufen (Learning-Nachguss), fragt
+`engine.zusatzaktionZaehltInAktionsphase(pi)`: wahr erst, wenn die Hauptaktion
+verbraucht ist oder gerade läuft. Vorher bumpte Learning den Zähler auch nach Detection
+(1 → 2): Detection las danach „zweite Aktion", die Phase sprang nach Main Phase 2 und
+die Hauptaktion ging verloren (Torchure-/Zhigao-Zuschläge verfielen mit).
+
+**Nicht Teil dieser Entscheidung:** Kartentexte mit „first Action you perform this turn"
+(Tengu Windstorm, Flashbang, The Final Trial, Mission) behalten ihre eigenen Auslegungen
+(zählen jede frühere Aktion des Zuges, auch Zusatzaktionen).
 
 
 ## ★ Ausgrauung während einer Sofort-Aktion mit freier Heldenwahl (v1020, Als Befund 12.9.)

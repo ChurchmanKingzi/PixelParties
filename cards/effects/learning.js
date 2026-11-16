@@ -27,6 +27,12 @@
 //   "extra Action this Action Phase" grants from
 //   cards like Torchure are spent on the chained
 //   Spell rather than being saved for a fresh cast.
+//   ★ Spielgestalter-Entscheidung 16.11.2026: das gilt nur NACH
+//   der Hauptaktion („Alles nach der ersten Aktion, die KEINE
+//   Zusatz-Aktion ist, ist eine Zusatz-Aktion") — folgt Learning
+//   auf eine Zusatzaktion VOR der Hauptaktion (Detection, ein
+//   Friendship-Zauber …), zählt der Nachguss nicht
+//   (`engine.zusatzaktionZaehltInAktionsphase`).
 //
 //  Hand-source rewrite (2026-05-15):
 //   The chosen Spell now comes from the casting
@@ -313,19 +319,26 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   if (handIdx < 0) { zurueckInDenVorrat(); return false; }
 
   // ── Action-Phase action-counter bookkeeping ──
-  // Learning is gated to the Action Phase, so the chained Spell is
-  // the player's next Action of the phase. Mirror the increment the
-  // server's `doPlaySpell` performs for normal Action-Phase casts:
+  // Learning is gated to the Action Phase. A chained Spell that comes
+  // AFTER the Hero's main Action is the player's next Action of the
+  // phase. Mirror the increment the server's `doPlaySpell` performs
+  // for normal Action-Phase casts:
   // bump `_actionsPlayedThisPhase` and, when this bump crosses into
   // slot #2, consume any pending `_bonusMainActions` (Torchure's
   // grant). That makes the chained Spell occupy the second-Action
   // slot — Torchure's bonus is spent on Learning's cast rather than
   // being saved for an extra free cast later in the phase.
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Alles nach der ersten Aktion,
+  // die KEINE Zusatz-Aktion ist, ist eine Zusatz-Aktion." Wurde Learning von
+  // einer Zusatzaktion VOR der Hauptaktion ausgelöst (Detection, Meditation,
+  // ein Friendship-Zauber …), ist weder der Auslöser noch dieser Nachguss
+  // „die erste Aktion" — dann zählt hier nichts (sonst würde die Hauptaktion
+  // zur „zweiten Aktion": Phase weg, Torchure/Zhigao verfallen).
   // Done AFTER the hand-locate succeeds: same commit timing as the
   // server (post-hero-cost, pre-chain) — once we've claimed the card
   // the cast is committed and counts even if the reaction chain negates.
   const _zaehlerVorher = { n: ps._actionsPlayedThisPhase, bonus: ps._bonusMainActions };   // W13 (Q129): bei Abbruch zurückgeben
-  if (gs.currentPhase === 3) {
+  if (gs.currentPhase === 3 && engine.zusatzaktionZaehltInAktionsphase(pi)) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
       ps._bonusMainActions = 0;

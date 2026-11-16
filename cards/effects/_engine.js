@@ -47984,10 +47984,43 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ ZAEHLT EINE INHAERENTE AKTION ALS DIE ZWEITE? (v1019, Als Ruling
-   * 12.9.)
+   * ★ AKTIONSWIRTSCHAFT (Spielgestalter-Entscheidung 16.11.2026): „Alles nach
+   * der ersten Aktion, die KEINE Zusatz-Aktion ist, ist eine Zusatz-Aktion."
    *
-   * Regel: ALLES, was nicht die ERSTE Aktion der Action Phase ist, ist
+   * (Vorher stand hier „alles nach der ersten Aktion der Phase" — das stimmte
+   * nicht: eine Zusatzaktion VOR der Hauptaktion war nie „die erste Aktion".)
+   *
+   * Zusatzaktionen — inhaerente (Detection, Quick Attack …), per Geber gewirkte
+   * (Friendship …), Sofort-Gusse (Learning, Time Distortion …) und kostenlose
+   * Sofortaktionen — sind selbst nie die erste Aktion der Action Phase. Erst die
+   * erste Nicht-Zusatz-Aktion (die Hauptaktion) ist es; jede reguelaere Aktion
+   * DANACH ist eine Zusatzaktion (zweite Aktion: Zhigao, Duigno, Torchure …).
+   * `_actionsPlayedThisPhase` zaehlt darum erst ab der Hauptaktion: eine
+   * Zusatzaktion davor hinterlaesst keine Spur (doPlaySpell/doPlayCreature nehmen
+   * den vorlaeufigen Eintrag einer inhaerenten ersten Karte zurueck,
+   * `_spellAddlFree`/`additionalIsFree` zaehlen gar nicht).
+   *
+   * Diese Abfrage ist fuer Zusatzaktionen, die INNERHALB einer laufenden Aktion
+   * gewirkt werden, ohne selbst durch doPlaySpell/doPlayCreature zu laufen
+   * (Learning-Nachguss) und den Zaehler deshalb selbst pflegen muessten: sie
+   * zaehlen als Aktion der Phase nur, wenn die Hauptaktion schon verbraucht ist
+   * oder gerade laeuft (der Server traegt den Helden VOR `afterSpellResolved` in
+   * `heroesActedThisTurn` ein). Folgt Learning auf eine Zusatzaktion
+   * (Detection, ein Friendship-Zauber …), bleibt der Zaehler stehen — sonst
+   * wuerde die Hauptaktion zur „zweiten Aktion" und die Phase endete.
+   */
+  zusatzaktionZaehltInAktionsphase(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return false;
+    if (this.gs.currentPhase !== PHASES.ACTION) return false;
+    return (ps.heroesActedThisTurn || []).length > 0;
+  }
+
+  /**
+   * ★ ZAEHLT EINE INHAERENTE AKTION ALS DIE ZWEITE? (v1019, Als Ruling
+   * 12.9.; praezisiert durch die Entscheidung vom 16.11.2026 oben)
+   *
+   * Regel: ALLES nach der ersten Nicht-Zusatz-Aktion der Action Phase ist
    * eine Zusatzaktion — auch eine inhaerente (Aggressive Town Guard,
    * Quick Attack). Wer also mit einem Zweitaktions-Zuschlag (Zhigao)
    * in der Action Phase steht, seine erste Aktion schon hatte und dann
@@ -47999,8 +48032,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * unverbrauchtem Zhigao in der Action Phase haengen, obwohl er zwei
    * Aktionen gemacht hatte.
    *
-   * Die ERSTE Aktion der Phase bleibt ausgenommen: eine inhaerente
-   * Karte vor jeder anderen Aktion ist weiterhin gratis.
+   * Eine inhaerente Karte VOR der Hauptaktion bleibt gratis (sie ist selbst
+   * eine Zusatzaktion und nicht „die erste Aktion").
    */
   inherentCountsAsExtraAction(playerIdx) {
     const ps = this.gs?.players?.[playerIdx];
