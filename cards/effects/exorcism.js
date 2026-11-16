@@ -195,6 +195,13 @@ module.exports = {
       const tInst = ziel.type === 'hero' ? null : ziel.cardInstance;
       if (ziel.type === 'hero' ? !(tHero?.name && tHero.hp > 0) : !(tInst && tInst.zone === 'support')) { gs._spellCancelled = true; return; }
 
+      // ── Charme Lv3: „It and its Support Zones are unaffected by other cards and effects" — der Zauber löst auf, entfernt aber nichts (auch nicht bei Decay Magic 2: „unaffected" ≠ „verhindert"). ──
+      if (engine.heroZonenGeschuetzt?.(ziel.owner, ziel.heroIdx)) {
+        engine.log('exorcism_blocked', { player: ps.username, target: ziel.cardName, reason: 'charme' });
+        engine.sync();
+        return;
+      }
+
       // ── Schutzfenster (Resistance, Zauber-Immunität) — fällt bei Decay Magic 2 weg ──
       if (!hart) {
         const blockiert = ziel.type === 'hero'

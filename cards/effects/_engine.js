@@ -49739,6 +49739,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ ATT-14: Charme Lv3 („It and its Support Zones are unaffected by other cards and effects"): Held UND Support Zones (Karten darin) der Spalte (`physOwner`, `heroIdx`) sind fuer jede
+   * andere Karte tabu — Anhaengsel werden dort weder angelegt noch entfernt. Die Marke `zonenGeschuetzt` setzt `temporaereKontrolle` nur bei `supportZonesLocked` (nur Charme Lv3 nennt
+   * die Zonen im Kartentext; Golden Apple & Co. nicht) und sie endet mit dem `charmed`-Status am Zugende.
+   */
+  heroZonenGeschuetzt(physOwner, heroIdx) {
+    return !!this.gs.players[physOwner]?.heroes?.[heroIdx]?.statuses?.charmed?.zonenGeschuetzt;
+  }
+
+  /**
    * Get standardised target objects for all Creatures (by card type) that `playerIdx` CONTROLS
    * (Z1: nach Kontrolle, nicht nach Brettseite; ID/`owner` = Brettseite der Zone).
    * Excludes Equipment Artifacts, Tokens, attached Spells/Attacks, etc.

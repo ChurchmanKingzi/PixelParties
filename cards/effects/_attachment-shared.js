@@ -66,6 +66,9 @@ function candidateHosts(gs, pi, engine, opts = {}) {
     const ps = gs.players[side];
     const h = ps?.heroes?.[hi];
     if (!h?.name || h.hp <= 0) return;
+    // ATT-14: Charme Lv3 („It and its Support Zones are unaffected by other cards and effects"): der uebernommene Held ist kein Wirt — sonst liefen die Karten-eigenen Schritte
+    // VOR dem Anlegen (Anti Magic loest die Spells des Wirts ab) trotz Sperre. `placeAttachment` hat denselben Riegel fuer Wege ohne Wirtswahl.
+    if (engine?.heroZonenGeschuetzt?.(side, hi)) return;
     // W25a (N1-11, Al 21.10.2026: „geht immer nach aktueller Kontrolle"): „Attach … to a Hero you control" — ein an den Gegner (dauerhaft oder
     // zeitweise) abgegebener eigener Held in der eigenen Spalte ist kein Wirt; uebernommene Gegnerhelden kommen ueber `fremdAusruestHelden` hinzu.
     if (!opts.sides && side === pi && typeof engine?.heroSideOf === 'function' && engine.heroSideOf(side, h) !== pi) return;
@@ -303,6 +306,11 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
   const hps = gs.players[host.owner];
   const hero = hps?.heroes?.[host.heroIdx];
   if (!hero?.name || hero.hp <= 0) return null;
+  // ATT-14: Charme Lv3 — „It and its Support Zones are unaffected by other cards and effects": an den uebernommenen Helden legt sich nichts an (wie bei Anti Magic: `null`, die Karte geht in die Ablage).
+  if (engine.heroZonenGeschuetzt?.(host.owner, host.heroIdx)) {
+    engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'charme' });
+    return null;
+  }
   if (!opts.skipMagicImmune && engine._isHeroSpellProtected(hero, CARD_NAME)) {
     engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'magic_immune' });
     engine._playAntiMagicBlockedAnim(hero);
