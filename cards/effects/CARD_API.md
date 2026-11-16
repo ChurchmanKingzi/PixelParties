@@ -2804,6 +2804,11 @@ für tote Helden `false`.
 | `canRedirect` | `(ctx, target, validTargets) → bool` | Can this card redirect the incoming targeting? |
 | `onRedirect` | `async (ctx, target, validTargets) → target` | Execute the redirect, return the new target. |
 
+Hand-Umleiter (`isTargetRedirect`: Challenge, Martyry, Anti-Magnet; `_checkTargetRedirectOnce`): `onRedirect(engine, pi, selected, validTargets, config, sourceCard)` liefert `{ redirectTo }`
+(optional `casterIdx`/`casterSeite` = der wirkende Held einer Spell-Karte — die Engine bucht dann dessen Wisdom-Abwurf). Während `onRedirect` läuft, öffnet die eigene Ersatzzielwahl
+(`promptEffectTarget`) KEIN weiteres Umleitungsfenster; ein neuer Besitzer darf über die Kette der Engine (`_checkTargetRedirect`) erneut umleiten. Kosten mit Gold: `engine.canAffordGold(pi, kosten, name)`
+(Kredit Kent/Debt-O-Tron), nicht `ps.gold`. „exactly 1 target you control" = `config._redirectPickedIds` zählen. Dark Ocean sperrt die Hand-Umleiter gegen Effekte GEGNERISCHER Creatures (Engine, nicht im Skript).
+
 ### Surprises
 
 Surprises are cards (Spell/Attack/Creature with `subtype: 'Surprise'` in cards.json) that can be placed face-down in a Hero's Surprise Zone during Main Phase. When their trigger condition is met, the owner is prompted to activate. On activation the card flips face-up, its effect resolves, and it goes to discard (or enters a Support Zone for Creatures).

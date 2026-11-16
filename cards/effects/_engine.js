@@ -34639,7 +34639,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _umgebung = _ersatzErlaubt ? (_spQ || this._umgebungsQuelle(playerIdx, config)) : null;
     const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
-      const quelle = _ausdruecklich || _ersatzQuelle || null;
+      let quelle = _ausdruecklich || _ersatzQuelle || null;
+      // Viele Skripte nennen die Quelle nur als NAMEN (`source: CARD_NAME` — Voodoo Curse, Exorcism, Midnight Assault, Ricochet, Tail Slap …). Die Hand-Reaktionen lesen aber `sourceCard.owner/.name`
+      // (Anti Magic Shield: `postTargetCondition`): mit einem blossen String war die Quelle fuer sie „kein Besitzer, keine Karte" und das Fenster nie offen. Wie das Umleitungsfenster darunter
+      // (`_redirectSourceFor`) bekommt der Hub eine Quelle MIT Besitzer: die gerade wirkende Karte, wenn sie so heisst (Instanz mit Wirker-Held), sonst ein Namensobjekt des Waehlenden.
+      const _quelleWarName = typeof quelle === 'string';
+      if (_quelleWarName) {
+        const _wirkend = this._umgebungsQuelle(playerIdx, config);
+        quelle = (_wirkend && _wirkend.name === quelle)
+          ? _wirkend
+          : { ...this._redirectSourceFor(playerIdx, { source: quelle }), ...(config.chooserHeroIdx != null ? { heroIdx: config.chooserHeroIdx } : {}) };
+      }
       const ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id));
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
@@ -34652,7 +34662,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
-        if (_ersatzQuelle) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
+        if (_ersatzQuelle || _quelleWarName) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
         this._inPostTargetWindow = true;
         try {
           const pt = await this._checkPostTargetHandReactions(helden.concat(kreaturen), quelle, {
@@ -34660,8 +34670,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             dealsDamage: config.dealsDamage === true,
             heroChoiceIsCost: config.heroChoiceIsCost === true,
             ausZielwahl: true,
+            cannotBeNegated: config.cannotBeNegated === true,   // Exorcism mit Decay Magic 2: Reaktionen, die die ganze Karte negieren, werden gar nicht erst angeboten
           });
           if (pt?.effectNegated) {
+            // Negation ≠ Abbruch (wie in `promptDamageTarget`/`promptMultiTarget`): der Zauber ist gespielt und geht in die Ablage — ohne die Marke wertete `doPlaySpell` die
+            // leere Rueckgabe als Abbruch (Karte zurueck auf die Hand, Aktion erstattet, die Abwehrkarte trotzdem verbraucht). Nur waehrend einer Zauberaufloesung (Tiefe > 0,
+            // sonst bliebe die Marke stehen).
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
             // ★★ v1179/v1180: Bilder des abgewehrten Zaubers, dann der
             // Nachlauf der Abwehrkarte.
             await this.negationsBilder(quelle, helden.length ? helden : kreaturen, pt);
@@ -34710,15 +34725,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _kreatSr = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && t.heroIdx >= 0 && _ids.has(t.id)
         && t.cardInstance.zone === ZONES.SUPPORT && this._istKreaturenInstanz?.(t.cardInstance));
       if (_qName && (_helden.length > 0 || _kreatSr.length > 0)) {
-        const _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
+        // Ohne `sourceCard`/`chooserHeroIdx` (Love Shot, Cure, Divine Zeal, Dangerous Knowledge, Compulsory Body Swap …) kannte die Quelle den wirkenden Helden nicht (`heroIdx` -1): Surprises,
+        // die einen Angreifer brauchen (Frost Rune, Booby Trap, Toxic Trap: `sourceInfo.heroIdx < 0 → false`), bekamen nie ein Fenster, Flooding (braucht keinen) schon. Traegt die gerade
+        // wirkende Karte denselben Namen (`_umgebungsQuelle`, Instanz mit Wirker-Held und Besitzer des Wirkers — dieselbe Quelle, die `promptDamageTarget` den Fenstern gibt), ist SIE die Quelle.
+        let _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
           ? config.sourceCard
           : { name: _qName, owner: playerIdx, controller: playerIdx,
               heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
+        if (!_spFenster && config.chooserHeroIdx == null && !(typeof config.sourceCard === 'object' && config.sourceCard)) {
+          const _wirkend = _umgebung || this._umgebungsQuelle(playerIdx, config);
+          if (_wirkend && _wirkend.name === _qName && _wirkend.heroIdx >= 0) _quelle = _wirkend;
+        }
         if (_helden.length > 0) {
           const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
             damageType: config.damageType,
           });
           if (_sr?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelle, _helden, _sr);   // v1179/v1180
             return [];
           }
@@ -34734,6 +34757,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType: config.damageType,
           });
           if (_srK?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelleK, _kreatSr, _srK);
             return [];
           }
@@ -35892,8 +35916,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _nurNegation = !!config._noRedirectOutcome;
 
     // Scan hand for redirect cards
+    // Dark Ocean („neither player can react to … the effects of their opponent's Creatures"): die Umleiter aus der Hand (Martyry, Challenge, Anti-Magnet) sind Reaktionen — wie in allen anderen
+    // Hand-Fenstern (W34a) gesperrt, wenn der Effekt von einer GEGNERISCHEN Creature kommt; auf Effekte der eigenen Creatures darf man reagieren.
+    const _ozeanSperre = this.darkOceanBlocksReaction(targetOwnerIdx, null);
     const seen = new Set();
-    for (const { cardName } of (_nurNegation ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
+    for (const { cardName } of ((_nurNegation || _ozeanSperre) ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -35935,7 +35962,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!this._confirmSaidYes(confirmed)) continue; // Declined — check next redirect card
 
       // Run the card's redirect logic (hero selection, chain UI, etc.)
-      const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+      // Waehrend der Umleiter laeuft, oeffnet SEINE Ersatzzielwahl (Anti-Magnet: der Gegner waehlt per `promptEffectTarget`) kein weiteres Umleitungsfenster: die Karte stuende noch in der Hand,
+      // das Gold waere nicht abgebucht — sie wuerde fuer das Ersatzziel ein zweites Mal angeboten und aktiviert. Das Ersatzziel hat der Umleiter gewaehlt, nicht der urspruengliche Effekt;
+      // der Weiterleitungs-Fall (neuer Besitzer darf wieder umleiten) laeuft ueber die Kette in `_checkTargetRedirect`, nicht ueber diese Wahl.
+      const _fensterVorher = this._inRedirectWindow;
+      this._inRedirectWindow = true;
+      let result;
+      try {
+        result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+      } finally {
+        this._inRedirectWindow = _fensterVorher;
+      }
       if (!result?.redirectTo) continue; // Redirect was cancelled
 
       // Consume the card from hand (oder aus Crestinas Vorrat — 11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
@@ -35960,6 +35997,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.room?.spectators) {
         for (const spec of this.room.spectators) {
           if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
+        }
+      }
+
+      // Wisdom (Luecke zur Stufe des Wirkers) wie in jedem anderen Hand-Reaktionsweg (`_rxWisdomKosten`, z. B. Post-Target-Hub): nennt der Umleiter seinen Wirker (`casterIdx`/`casterSeite`,
+      // Martyry: der Held, der sich vorwirft), zahlt der Reagierende den Abwurf — die Karte ist schon aus der Hand, die Rechnung entspricht dem Hub. Ohne Wirker (Challenge, Anti-Magnet) entfaellt er.
+      if (Number.isInteger(result.casterIdx) && result.casterIdx >= 0) {
+        const _wisdomKosten = this._rxWisdomKosten(targetOwnerIdx, result.casterSeite ?? targetOwnerIdx, result.casterIdx, this._getCardDB()[cardName]);
+        if (_wisdomKosten > 0) {
+          await this.actionPromptForceDiscard(targetOwnerIdx, _wisdomKosten, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
         }
       }
 
@@ -43628,6 +43676,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
+        if (opts.cannotBeNegated && script.negatesWholeCard) continue;   // „cannot be negated" (`config.cannotBeNegated` der Zielwahl): kein Angebot fuer ganz negierende Reaktionen
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
         // Kreatur-Reaktionen die gewaehlten Kreaturen.
         targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
@@ -47169,7 +47218,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           const oppPs = this.gs.players[link.owner];
           const zielIdx = diebPs.hand.length;
           diebPs.hand.push(link.cardName);
-          this._tagHandCardOrigin(dieb, link.cardName, link.owner);   // kehrt spaeter zum Besitzer zurueck
+          // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte: spielte `link.owner` eine gestohlene Karte, gehoert sie dem Bestohlenen (Key holt sie zurueck →
+          // keine Fremdmarke auf seiner eigenen Karte). Wie der Ablagezweig unten (`handKartenBesitzerPs`); aus Deck/Vorrat gespielt gilt `link.owner`.
+          const _kartenBesitzer = (oppPs && !link.fromDeck && !link.fromCreation)
+            ? this.gs.players.indexOf(this.handKartenBesitzerPs(oppPs, link.cardName)) : -1;
+          this._tagHandCardOrigin(dieb, link.cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : link.owner);   // kehrt spaeter zum Besitzer zurueck
           if (link._negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, link.cardName);
           if ((link.goldCost || 0) > 0 && oppPs) {
             oppPs.gold = (oppPs.gold || 0) + link.goldCost;
@@ -47661,7 +47714,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const diebPs = this.gs.players[dieb];
       const zielIdx = diebPs.hand.length;
       diebPs.hand.push(cardName);
-      this._tagHandCardOrigin(dieb, cardName, ownerIdx);   // kehrt spaeter zum Besitzer zurueck
+      // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte (s. Reaktionsglied-Zweig in `_resolveReactionChain`): eine gestohlene Karte, die ihr Besitzer per Key
+      // zurueckholt, bekommt keine Fremdmarke auf seiner eigenen Hand. Nur Handkarten tragen Herkunftsmarken (`opts.fromZone`).
+      const _besitzerPs = (!opts.fromZone || opts.fromZone === 'hand') ? this.handKartenBesitzerPs(ps, cardName) : ps;
+      const _kartenBesitzer = this.gs.players.indexOf(_besitzerPs);
+      this._tagHandCardOrigin(dieb, cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : ownerIdx);   // kehrt spaeter zum Besitzer zurueck
       if (chainResult?.negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);   // 24.10. Reverse Trap
       this._broadcastEvent('play_pile_transfer', {
         cardName, from: 'hand', to: 'hand',
