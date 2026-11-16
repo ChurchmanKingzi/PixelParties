@@ -35961,34 +35961,42 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!this._confirmSaidYes(confirmed)) continue; // Declined — check next redirect card
 
-      // Run the card's redirect logic (hero selection, chain UI, etc.)
-      // Waehrend der Umleiter laeuft, oeffnet SEINE Ersatzzielwahl (Anti-Magnet: der Gegner waehlt per `promptEffectTarget`) kein weiteres Umleitungsfenster: die Karte stuende noch in der Hand,
-      // das Gold waere nicht abgebucht — sie wuerde fuer das Ersatzziel ein zweites Mal angeboten und aktiviert. Das Ersatzziel hat der Umleiter gewaehlt, nicht der urspruengliche Effekt;
-      // der Weiterleitungs-Fall (neuer Besitzer darf wieder umleiten) laeuft ueber die Kette in `_checkTargetRedirect`, nicht ueber diese Wahl.
+      // ★ Spielgestalter-Entscheidung 16.11.2026: Umleitungs-Reaktionen sind KETTBAR. Der Gegner darf auf die Aktivierung von Martyry/Challenge/Anti-Magnet antworten wie auf jede andere Hand-Reaktion
+      // (Cute Camera, Front Soldier, Reverse Trap — `_reaktionGespielt`, derselbe Baustein wie bei Spiky Armor, Strong Shield und Anti Magic Shield); wird die Umleitung negiert, findet sie nicht statt,
+      // die Karte ist verbraucht, Gold und Wisdom bleiben bezahlt. Der Umleiter läuft dafür in drei Schritten:
+      //   ① `script.redirectWaehlen(...)` (optional): Wahlen, die VOR dem Ausspielen feststehen müssen (welcher Held wirkt → Wisdom). Keine Nebenwirkung, kein Gold, kein Bild; `null` = abgebrochen (Karte bleibt auf der Hand).
+      //   ② Die Engine spielt die Karte: Hand → Ablage, Gold (`cost` der Karte — das Skript bucht es nicht mehr selbst), Wisdom, Aufdecken, Gegenreaktions-Fenster.
+      //   ③ `script.onRedirect(..., plan)`: Wahl des Gegners (Anti-Magnet), Bilder, Log; liefert `{ redirectTo }`.
+      // Während ① und ③ läuft, öffnet die Ersatzzielwahl des Umleiters (Anti-Magnet: der Gegner wählt per `promptEffectTarget`) kein weiteres Umleitungsfenster: das Ersatzziel hat der Umleiter gewählt, nicht der
+      // ursprüngliche Effekt; der Weiterleitungs-Fall (neuer Besitzer darf wieder umleiten) läuft über die Kette in `_checkTargetRedirect`, nicht über diese Wahl.
       const _fensterVorher = this._inRedirectWindow;
       this._inRedirectWindow = true;
-      let result;
+      let plan;
       try {
-        result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+        plan = typeof script.redirectWaehlen === 'function'
+          ? await script.redirectWaehlen(this, targetOwnerIdx, selected, validTargets, config, sourceCard)
+          : {};
       } finally {
         this._inRedirectWindow = _fensterVorher;
       }
-      if (!result?.redirectTo) continue; // Redirect was cancelled
+      if (!plan) continue; // Redirect was cancelled — die Karte bleibt auf der Hand
 
       // Consume the card from hand (oder aus Crestinas Vorrat — 11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
       const _q = this._rxQuelleFuer(ps, cardName);
-      if (_q) {
-        this._rxAbgang(ps, _q);
-        this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
-        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
-        // Untrack hand instance (die Vorrats-Instanz raeumt `_rxAbgang` selbst ab)
-        if (!_q.ausVorrat) {
-          const inst = this.cardInstances.find(c =>
-            c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
-          );
-          if (inst) this._untrackCard(inst.id);
-        }
+      if (!_q) continue; // nicht mehr auf der Hand
+      const _cardData = this._getCardDB()[cardName];
+      this._rxAbgang(ps, _q);
+      this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
+      this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
+      // Untrack hand instance (die Vorrats-Instanz raeumt `_rxAbgang` selbst ab)
+      if (!_q.ausVorrat) {
+        const inst = this.cardInstances.find(c =>
+          c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
+        );
+        if (inst) this._untrackCard(inst.id);
       }
+      await this._rxPay(ps, _cardData?.cost || 0, { cardName });   // Anti-Magnet: 2 Gold (Kreditrahmen Kent/Debt-O-Tron, Item Lock wie bei jedem Hand-Artefakt)
+      this.sync();
 
       // Reveal to other player + spectators
       const otherIdx = this.opponentOf(targetOwnerIdx);
@@ -35999,11 +36007,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
         }
       }
+      await this._delay(300);
 
       // Wisdom (Luecke zur Stufe des Wirkers) wie in jedem anderen Hand-Reaktionsweg (`_rxWisdomKosten`, z. B. Post-Target-Hub): nennt der Umleiter seinen Wirker (`casterIdx`/`casterSeite`,
       // Martyry: der Held, der sich vorwirft), zahlt der Reagierende den Abwurf — die Karte ist schon aus der Hand, die Rechnung entspricht dem Hub. Ohne Wirker (Challenge, Anti-Magnet) entfaellt er.
-      if (Number.isInteger(result.casterIdx) && result.casterIdx >= 0) {
-        const _wisdomKosten = this._rxWisdomKosten(targetOwnerIdx, result.casterSeite ?? targetOwnerIdx, result.casterIdx, this._getCardDB()[cardName]);
+      if (Number.isInteger(plan.casterIdx) && plan.casterIdx >= 0) {
+        const _wisdomKosten = this._rxWisdomKosten(targetOwnerIdx, plan.casterSeite ?? targetOwnerIdx, plan.casterIdx, _cardData);
         if (_wisdomKosten > 0) {
           await this.actionPromptForceDiscard(targetOwnerIdx, _wisdomKosten, {
             title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
@@ -36011,22 +36020,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
-      this.log('target_redirect', {
-        redirectCard: cardName,
-        originalTarget: selected.cardName,
-        newTarget: result.redirectTo.cardName,
-        player: ps.username,
-      });
-
       // Observer hook — hand-based redirect cards (Martyry, Challenge)
-      // are functionally Reactions, but this flow never touches the
-      // chain system. DEDICATED hook name on purpose: firing
+      // are functionally Reactions, but this flow never goes through the
+      // reaction chain window. DEDICATED hook name on purpose: firing
       // onReactionActivated here would feed every existing consumer of
       // that hook (card passives like Archer, brain-side observers,
       // anything keying on _isReaction) an event from a codepath they
       // were never written against. afterTargetRedirect is
       // observation-only by construction — today's sole listener is the
-      // training recorder.
+      // training recorder (zeichnet die Aktivierung auf, auch wenn der Gegner sie gleich negiert).
       try {
         await this.runHooks('afterTargetRedirect', {
           redirectCardName: cardName, redirectOwner: targetOwnerIdx,
@@ -36035,6 +36037,27 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error('[Engine] afterTargetRedirect hook error:', err.message);
       }
+
+      // Gegenreaktions-Fenster („when your opponent plays a Reaction": Cute Camera, Front Soldier, Reverse Trap). Negiert: keine Umleitung, die Karte liegt in der Ablage, Kosten bleiben bezahlt.
+      // Ein anderer Umleiter auf der Hand darf danach noch angeboten werden (wie im Post-Target-Hub).
+      if (await this._reaktionGespielt(targetOwnerIdx, cardName, _cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard) })) { this.sync(); continue; }
+
+      // ③ Die Umleitung wirkt (Wahl des Gegners, Bilder, Log).
+      this._inRedirectWindow = true;
+      let result;
+      try {
+        result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard, plan);
+      } finally {
+        this._inRedirectWindow = _fensterVorher;
+      }
+      if (!result?.redirectTo) { this.sync(); continue; } // die Umleitung ist verpufft (kein Ziel mehr) — Karte und Kosten sind verbraucht
+
+      this.log('target_redirect', {
+        redirectCard: cardName,
+        originalTarget: selected.cardName,
+        newTarget: result.redirectTo.cardName,
+        player: ps.username,
+      });
 
       return result.redirectTo;
     }

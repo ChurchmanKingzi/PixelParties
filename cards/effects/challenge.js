@@ -109,12 +109,13 @@ module.exports = {
   },
 
   /**
-   * Execute the redirect: hero selection + chain visualization.
+   * Spielgestalter-Entscheidung 16.11.2026: Umleiter sind kettbar. Die Engine ruft ZUERST `redirectWaehlen` (nur die Wahl des Helden, der die Challenge annimmt; keine Nebenwirkung), spielt dann
+   * die Karte (Ablage) und lässt den Gegner mit einer Reaktion antworten (Cute Camera, Front Soldier, Reverse Trap). Erst wenn die Karte nicht negiert wurde, läuft `onRedirect` (Bilder, Log, neues
+   * Ziel). Wird Challenge negiert, bleibt das Ziel, wie es war; die Karte ist verbraucht.
    * @returns {{ redirectTo: object }|null}
    */
-  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
+  redirectWaehlen: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
-    const ps = gs.players[pi];
     const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
@@ -151,6 +152,28 @@ module.exports = {
       heroSeite = target.owner;
     }
 
+    const challengeHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
+    if (!challengeHero?.name) return null;
+
+    // ── Build the redirect target ──
+    // Find the matching target in validTargets for the Challenge hero
+    const redirectTarget = validTargets.find(t =>
+      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
+    );
+    if (!redirectTarget) return null;
+
+    return { redirectTo: redirectTarget, heroSeite, heroIdx: selectedHeroIdx };
+  },
+
+  /**
+   * Execute the redirect: chain visualization + animation (nach dem Gegenreaktions-Fenster der Engine).
+   * @returns {{ redirectTo: object }|null}
+   */
+  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard, plan) => {
+    const gs = engine.gs;
+    const ps = gs.players[pi];
+    const heroSeite = plan.heroSeite;
+    const selectedHeroIdx = plan.heroIdx;
     const challengeHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
     if (!challengeHero?.name) return null;
 
@@ -199,14 +222,6 @@ module.exports = {
     });
     await engine._delay(600);
 
-    // ── Build the redirect target ──
-    // Find the matching target in validTargets for the Challenge hero
-    const redirectTarget = validTargets.find(t =>
-      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
-    );
-
-    if (!redirectTarget) return null;
-
     engine.log('challenge', {
       player: ps.username,
       challengeHero: challengeHero.name,
@@ -215,6 +230,6 @@ module.exports = {
     });
     engine.sync();
 
-    return { redirectTo: redirectTarget };
+    return { redirectTo: plan.redirectTo };
   },
 };

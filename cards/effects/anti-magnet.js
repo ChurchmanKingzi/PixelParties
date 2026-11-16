@@ -25,17 +25,18 @@
 //  Challenge/Martyry share the same limitation).
 //
 //  ── Differences from Challenge / Martyry ──
-//   • Artifact, Cost 2: the redirect system does
-//     NOT auto-deduct gold (Challenge/Martyry are
-//     free Spell/Attack reactions). `canRedirect`
-//     gates on affordability (`canAffordGold`: gold ≥ 2
+//   • Artifact, Cost 2: `canRedirect` gates on
+//     affordability (`canAffordGold`: gold ≥ 2
 //     or Kent/Debt-O-Tron credit, not gold-
-//     locked); `onRedirect` pays it via
-//     `actionSpendGold` only once a new target is
-//     locked in. If the spend fails (a goldLock
-//     race) we return null → no redirect, the card
-//     is NOT consumed (engine: `if
-//     (!result?.redirectTo) continue;`).
+//     locked). Spielgestalter-Entscheidung 16.11.2026
+//     (Umleiter sind kettbar): die ENGINE spielt die
+//     Karte VOR der Wirkung — Hand → Ablage, die 2 Gold
+//     (`cost`, Kreditrahmen, Item Lock wie bei jedem
+//     Hand-Artefakt), Aufdecken — und lässt den Gegner
+//     mit einer Reaktion antworten (Cute Camera, Front
+//     Soldier …). Erst danach läuft `onRedirect`: der
+//     Gegner wählt das Ersatzziel. Wird Anti-Magnet
+//     negiert, bleibt das Ziel, die 2 Gold sind weg.
 //   • Redirects ALL THREE source kinds (Attack,
 //     Spell, Creature effect) — the resolution
 //     wording "Attack/Spell/effect" matches
@@ -136,11 +137,13 @@ module.exports = {
   },
 
   /**
-   * Execute the redirect: opponent picks the new target among all the
-   * original effect's other valid targets; pay the 2 gold; chain UI.
+   * Execute the redirect (nach dem Spielen der Karte und dem Gegenreaktions-Fenster der Engine): the
+   * opponent picks the new target among all the original effect's other valid targets; chain UI.
+   * Gold, Ablage und Aufdecken erledigt die Engine (`_checkTargetRedirectOnce`) schon vorher — die
+   * Aufdeckung der Karte für den wählenden Gegner liegt damit ebenfalls VOR der Wahl.
    * @returns {{ redirectTo: object }|null}
    */
-  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
+  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard, plan) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
     const eligible = getOtherValidTargets(selected, validTargets, engine);
@@ -154,21 +157,6 @@ module.exports = {
     if (eligible.length === 1) {
       redirectTarget = eligible[0]; // Only one option — auto.
     } else {
-      // Stream Anti-Magnet's card image to the opponent (the player
-      // about to choose) + spectators as a `card_reveal` overlay BEFORE
-      // the pick dialogue, so it's obvious what just happened. The
-      // engine's own redirect-card reveal only fires AFTER onRedirect
-      // returns — too late for the chooser. Mirrors the Jump in the
-      // River reveal pattern.
-      const oppSid = gs.players[oppIdx]?.socketId;
-      if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-      if (engine.room?.spectators) {
-        for (const spec of engine.room.spectators) {
-          if (spec.socketId) engine.io.to(spec.socketId).emit('card_reveal', { cardName: CARD_NAME });
-        }
-      }
-      await engine._delay(100);
-
       const picked = await engine.promptEffectTarget(oppIdx, eligible, {
         title: CARD_NAME,
         description: `Choose where ${sourceCard?.name || 'the effect'} is redirected.`,
@@ -184,10 +172,6 @@ module.exports = {
       redirectTarget = eligible.find(t => t.id === id) || eligible[0];
     }
     if (!redirectTarget) return null;
-
-    // ── Pay the 2 gold (only now that a target is locked in) ──
-    const paid = await engine.actionSpendGold(pi, GOLD_COST, { cardName: CARD_NAME });   // `cardName`: Kreditrahmen wie in `canRedirect`
-    if (!paid) return null; // goldLock race — no redirect, card not consumed.
 
     // ── Chain visualization (mirrors Challenge / Martyry) ──
     const attackerName = config.title || sourceCard?.name || 'Effect';
