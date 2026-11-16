@@ -7066,11 +7066,12 @@ function ppRarityOf(card, rarity) {
   return t != null ? t : (rarity || (card && card.rarity) || 'common');
 }
 /** Kartenbild-URL der Basiskarte dieser Rarity (`?rar=<id>`; Common = unverändert). Skin-Bilder teilen die Rarity ihrer Base-Karte (der Karten-Shim backt auch für Skins die Basiskarte der Stufe). */
-function ppRarityUrl(url, rarity) {
+function ppRarityUrl(url, rarity, mitStempel) {
   const fx = window.PpRarityFx;
   if (!url || typeof url !== 'string' || !fx || !rarity || rarity === 'common' || /[?&]rar=/.test(url)) return url;
   const q = fx.imageRarity(rarity);
-  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q : url;
+  // Die Basiskarte mit `?rar=` druckt den Rarity-Stempel NICHT mit (die Rarity-Ebene malt ihn); `mitStempel` für Bilder ganz ohne Ebene (Kartenwurf).
+  return q ? url + (url.includes('?') ? '&' : '?') + 'rar=' + q + (mitStempel ? '&stempel=1' : '') : url;
 }
 window.ppRarityOf = ppRarityOf;
 window.ppRarityUrl = ppRarityUrl;
@@ -7164,9 +7165,9 @@ function ppFlugRarity(img, cardName, rarity, owner, lebenMs) {
 window.ppFlugRarity = ppFlugRarity;
 
 /**
- * Alles über dem Kartenbild: Rarity-Effekt (`RarityLayer`), Skin-Holo (Skin-Karten), Schraffur und Rahmenglanz der Vollbild-Helden.
- * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity/Skin/Vollbild rendert sie nichts.
- * Ein Skin ersetzt den Rarity-Effekt (zwei Effekte übereinander wären unruhig); Kleinansichten und das Brett zeigen nur Standbilder.
+ * Alles über dem Kartenbild: der Rarity-Effekt (`RarityLayer`) — mehr nicht (kein Skin-Holo, kein Fullart-Foil).
+ * Aufrufer schreiben `<CardFoil card={card} skin={…} werte={…} rarity={…} animated />`; ohne Rarity rendert sie nichts.
+ * Skins teilen die Rarity ihrer Base-Karte; Kleinansichten und das Brett zeigen nur Standbilder (im Deck-Editor reduziert animiert).
  */
 function CardFoil({ card, skin, werte, rarity, animated }) {
   const klein = useContext(FoilKleinContext);
@@ -7176,20 +7177,14 @@ function CardFoil({ card, skin, werte, rarity, animated }) {
   const r = ppRarityOf(card, rarity);
   const fxA = window.PpRarityFx;
   // Skins teilen die Rarity-Effekte ihrer Base-Karte: auf dem Skin-Bild läuft derselbe Effekt wie auf der Base-Karte. Ausnahme: Stufen mit Motiv-Maske (Umbra, Stained, Storm) —
-  // für Skin-Sprites gibt es noch keine Masken; dort bleibt das Skin-Holo (wie bisher).
+  // für Skin-Sprites gibt es noch keine Masken; dort zeigt der Skin das Standbild ohne Effekt.
   const effektMoeglich = !!card && r !== 'common' && !!fxA && fxA.available(r);
   const effekt = effektMoeglich && !(holoSkin0 && fxA.SPEC && fxA.SPEC[r] && fxA.SPEC[r].mask);
-  const holoSkin = holoSkin0 && !effekt;   // ein Foil je Karte: der Rarity-Effekt ersetzt das Skin-Holo
-  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
-  const schraffur = !holoSkin && !effekt && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
-  const rahmen = !effekt && !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
-  if (!holoSkin && !schraffur && !rahmen && !effekt) return null;
+  // Foils kommen nur noch von der Rarity der Karteninstanz: kein eigenes Skin-Holo und auch kein altes Fullart-Foil (Schraffur, Glanzband, glänzender Goldrahmen) mehr.
+  if (!effekt) return null;
   return (
     <>
       {effekt && <RarityLayer card={card} rarity={r} animated={!!animated && !klein && !brett} reduced={reduziert && klein && !brett} werte={werte} />}
-      {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
-      {schraffur && <FoilHatch card={card} fkey={fkey} />}
-      {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
     </>
   );
 }

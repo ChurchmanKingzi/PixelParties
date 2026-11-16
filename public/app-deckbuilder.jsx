@@ -134,7 +134,7 @@ function RarityOptionCard({ name, rarity, skins, selected, disabled, countText, 
       style={disabled ? { opacity: .5, cursor: 'default' } : undefined}
       onClick={() => { if (!disabled) onPick(rarity); }}>
       <div ref={hostRef} style={{ position: 'relative' }}>
-        <img src={cardImageUrl(name, skins)} draggable={false} />
+        <img src={window.ppRarityUrl ? window.ppRarityUrl(cardImageUrl(name, skins), rarity) : cardImageUrl(name, skins)} draggable={false} />
       </div>
       <div className="skin-gallery-label" style={{ color: selected ? 'var(--text)' : undefined }}>
         {rarLabel(rarity)} <span data-rarity-count={rarity}>{countText}</span>
@@ -2236,7 +2236,7 @@ function DeckBuilder() {
               {skinGallery.options.map(skinName => (
                 <div key={skinName} className={'skin-gallery-item' + (currentDeck?.skins?.[skinGallery.cardName] === skinName ? ' skin-selected' : '')}
                   onClick={() => { setSkin(skinGallery.cardName, skinName); setSkinGallery(null); }}>
-                  {/* Skin-Karten tragen ihr eigenes Holo-Foil (CardFoil → SkinHolo): hier sieht man es vor der Wahl. */}
+                  {/* Skin-Karten teilen die Foils ihrer Base-Karte (CardFoil): ohne eigenes Skin-Holo. */}
                   <div style={{ position: 'relative' }}>
                     <img src={skinImageUrl(skinName)} draggable={false} />
                     {window.CardFoil && <window.CardFoil card={window.CARDS_BY_NAME[skinGallery.cardName]} skin={skinName} />}
