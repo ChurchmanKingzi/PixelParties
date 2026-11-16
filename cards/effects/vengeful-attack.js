@@ -51,7 +51,7 @@ module.exports = {
   // „This counts as an additional Action." — immer.
   inherentAction: true,
   // Wie jede Attack, die einen Gegner trifft: gegen den durch die Erstrunden-Immunität geschützten Spieler gibt es nichts zu rächen (und nichts, was getroffen werden könnte).
-  // Gefizzelt (Wirker beim Auflösen handlungsunfähig) → trotzdem gestempelt.
+  // Gefizzelt (Wirker beim Auflösen handlungsunfähig) oder negiert → trotzdem gestempelt.
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
   // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber das Ziel ist per Text der Taeter, der etwas Eigenes besiegt hat — also immer ein gegnerisches Ziel; ein geblendeter

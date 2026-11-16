@@ -28,9 +28,10 @@
 //     keine Artefakt-/Item-/Such-/Stapelsperre); sonst bleibt er stumm.
 //   • „Once per turn" gilt je Bow (Kopie), Stempel beim tatsächlichen
 //     Einsatz; bricht der Spieler die Pfeilwahl ab, bleibt er frei. Wird
-//     der gespielte Pfeil danach NEGIERT (oder fizzelt), geht der Stempel
-//     zurück (W19c, Al): der Bow darf im selben Zug erneut; die Kosten des
-//     Pfeils bleiben bezahlt, der Pfeil geht in die Ablage.
+//     der gespielte Pfeil danach NEGIERT (oder fizzelt), bleibt der Stempel
+//     verbraucht (Spielgestalter-Entscheidung 16.11.2026; überholt W19c: der
+//     Bow darf im selben Zug nicht erneut); die Kosten des Pfeils bleiben
+//     bezahlt, der Pfeil geht in die Ablage.
 //   • Nach der Suche wird das Deck gemischt (Such-Konvention).
 //   • W79 (Al): Once per turn ist PRO BOGEN - ein Held mit 3 Boegen bekommt bei EINEM Angriff bis zu 3 Arrows (jeder wird bezahlt); die Kette fragt nach jedem
 //     gespielten Pfeil erneut, jede Bow-Instanz traegt ihren eigenen Stempel (Test W79/e-01).
@@ -116,11 +117,5 @@ module.exports = {
   equipReactionCommit(engine, pi, inst) {
     if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
     engine.gs.hoptUsed[`${stempelKey(inst)}:${pi}`] = engine.gs.turn;
-  },
-
-  /** W19c (Al): der gespielte Pfeil wurde negiert (oder fizzelt) -> der Einsatz zählt nicht, „once per turn" ist wieder frei. */
-  equipReactionRefund(engine, pi, inst) {
-    const h = engine.gs.hoptUsed;
-    if (h && h[`${stempelKey(inst)}:${pi}`] === engine.gs.turn) delete h[`${stempelKey(inst)}:${pi}`];
   },
 };

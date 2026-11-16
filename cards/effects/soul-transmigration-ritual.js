@@ -47,8 +47,8 @@
 //  „Sacrifice 3 level 0 Creatures you control TO USE THIS SPELL": die
 //  Opferwahl und der Tod der 3 Kreaturen laufen in `payActivationCost`
 //  VOR dem Reaktionsfenster; wird die Karte komplett negiert (Silence,
-//  The Master's Plan …), bleiben sie geopfert (Z7b/Z7c: der Einmal-
-//  Stempel bleibt frei). Danach wählt `onPlay` den Helden — nicht mehr
+//  The Master's Plan …), bleiben sie geopfert (Z7c; der Einmal-
+//  Stempel ist verbraucht, Spielgestalter-Entscheidung 16.11.2026). Danach wählt `onPlay` den Helden — nicht mehr
 //  abbrechbar. Abbruch der Opferwahl (`false`) nimmt den Zug zurück
 //  (Karte bleibt auf der Hand); ein von Barrier of Undying gerettetes
 //  Opfer lässt die Karte wie zuvor fizzeln (gespielt, ohne Wirkung).

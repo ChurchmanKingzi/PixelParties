@@ -21,8 +21,8 @@ module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
-  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
-  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  // ★ FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328) oder wird sie NEGIERT (Kette), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`;
+  // Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem Beginn der Aktivierung verbraucht).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
