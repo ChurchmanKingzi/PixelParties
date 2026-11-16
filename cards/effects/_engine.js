@@ -52494,6 +52494,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Specific cards that legitimately install Divinity (etc.) pass
     // `opts.allowRestricted: true` to bypass.
     if (script?.restrictedAttachment && !opts.allowRestricted) return { success: false };
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return { success: false };   // Smugness: nur an einen Ascended Hero (s. `canAttachAbilityToHero`)
     // ★★ v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame
     // Guillotine) — vorher eine eigene Kopie der Schleife.
     // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — hoechstens EIN Stapel je Ability ueber beide Zonenarten.
@@ -54969,6 +54970,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Starting abilities are placed at game start via _trackCard
     // directly and bypass this check entirely.
     if (script?.restrictedAttachment && !opts.allowRestricted) return false;
+    // ★ „You can only attach this Ability to an Ascended Hero" (Smugness) gilt fuer JEDES Anlegen, auch per Effekt (Training, Pressed Skill, Wise Village Elder …).
+    // Der Hand-Weg (`doPlayAbility` in server.js) prueft es selbst und geht nicht hierueber — er bleibt unveraendert.
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
 
     // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`); 24.10.: auch Support Zonen (`abilityZielOrt`).
     void abZones;
