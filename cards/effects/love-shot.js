@@ -434,6 +434,10 @@ module.exports = {
         const _placedVorher = gs._spellPlacedOnBoard;
         let _nachgussSelbstEntsorgt = false;
         delete gs._spellPlacedOnBoard;
+        // Wirker-Seite für Stufenabfragen (`effectiveSchoolLevelForCaster` ohne Seitenargument, `heldSeiteFuer`): der Nachguss läuft mit dem GELIEHENEN Helden,
+        // dessen Schulen zählen — nicht die des gleich nummerierten eigenen Helden (wie `performImmediateAction`/`doPlaySpell`).
+        const _wirkerVorher = gs._wirkerSeite;
+        gs._wirkerSeite = { pi, heroIdx: sel.heroIdx, heroOwner: heroSeite };
         // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
         // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
         // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
@@ -487,6 +491,7 @@ module.exports = {
           _nachgussSelbstEntsorgt = !!gs._spellPlacedOnBoard;
           if (_placedVorher) gs._spellPlacedOnBoard = true;
           else delete gs._spellPlacedOnBoard;
+          if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
           // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
           if (_aeussererLog === undefined) delete gs._spellDamageLog;
           else gs._spellDamageLog = _aeussererLog;
