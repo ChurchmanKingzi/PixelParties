@@ -17,6 +17,17 @@
 // ═══════════════════════════════════════════
 
 /**
+ * Gehoeren zwei Instanzen zum selben Stufenstapel? Gleicher Name — oder eine der beiden ist eine Performance: sie kopiert die
+ * Ability darunter und bringt deren Stufenbonus selbst (`counters.<schluessel>` liegt an der Performance-Instanz). ★ Befund
+ * (Performance auf Fighting/Toughness): Der reine Namensvergleich zaehlte die echten Kopien nicht mit — Performance bekam stets
+ * den Bonus der ersten Stufe (+10 ATK / +100 HP statt +20 / +200) und ein abgehendes Fighting/Toughness tauschte nie mit der Performance.
+ * Die Zone/Besitzer/Held/Slot-Pruefung der Aufrufer begrenzt auf den einen Stapel.
+ */
+function gleicherStapelName(a, b) {
+  return a.name === b.name || a.name === 'Performance' || b.name === 'Performance';
+}
+
+/**
  * @returns {number} der Betrag, der beim Abgang von `abgehend` abzuziehen ist.
  * Tauscht die gemerkten Werte, sodass die verbleibenden Kopien die unteren
  * Stufen tragen.
@@ -24,7 +35,7 @@
 function abgangsBetrag(engine, abgehend, schluessel) {
   if (!abgehend) return 0;
   const gleiche = (engine.cardInstances || []).filter(c =>
-    c.name === abgehend.name && c.zone === abgehend.zone
+    gleicherStapelName(c, abgehend) && c.zone === abgehend.zone
     && c.owner === abgehend.owner && c.heroIdx === abgehend.heroIdx
     && c.zoneSlot === abgehend.zoneSlot && (c.counters?.[schluessel] || 0) > 0);
   let oberste = abgehend;
@@ -51,7 +62,7 @@ function abgangsBetrag(engine, abgehend, schluessel) {
 function kopienIndex(engine, karte, schluessel) {
   if (!karte) return 0;
   return (engine.cardInstances || []).filter(c =>
-    c !== karte && c.id !== karte.id && c.name === karte.name && c.zone === karte.zone
+    c !== karte && c.id !== karte.id && gleicherStapelName(c, karte) && c.zone === karte.zone
     && c.owner === karte.owner && c.heroIdx === karte.heroIdx && c.zoneSlot === karte.zoneSlot
     && (c.counters?.[schluessel] || 0) > 0).length;
 }
