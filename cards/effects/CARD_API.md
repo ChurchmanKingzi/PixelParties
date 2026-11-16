@@ -11274,10 +11274,12 @@ nicht: `_actionsPlayedThisPhase` zählt nur in der Action Phase, und
 Gelesen wird **`_actionsPlayedThisTurn`** (der Zugzähler aus v983, der
 jeden Aktionspfad sieht) — zusätzlich zu den beiden anderen.
 *Stand 16.11.2026:* die Entscheidung „Zusatzaktionen sind nie die erste Aktion"
-ändert an diesem Zugzähler nichts. Offen (nicht entschieden, Code unverändert):
-ob Mission nach einer früheren Zusatzaktion des Zuges (Detection, Quick Attack
-in der Main Phase) spielbar sein soll, wenn sie selbst die erste
-Nicht-Zusatz-Aktion wäre.
+ändert an diesem Zugzähler nichts. **Entschieden (Spielgestalter-Entscheidung
+16.11.2026):** Mission ist auch durch frühere ZUSATZAKTIONEN des Zuges gesperrt
+(Detection, Quick Attack in der Main Phase …) — so wie sie heute liest
+(`_actionsPlayedThisTurn`); auch wenn sie selbst die erste Nicht-Zusatz-Aktion
+wäre, bleibt sie nach einer früheren Aktion des Zuges unspielbar. Kein
+Code-Eingriff.
 
 **Die zwei Aktionen sind ein normaler Zuschlag-Typ mit ZWEI Ladungen**
 (`aaGrants[typeId]` ist eine ZAHL, nicht nur ein Flag) — so greift die
@@ -11696,9 +11698,16 @@ verbraucht ist oder gerade läuft. Vorher bumpte Learning den Zähler auch nach 
 (1 → 2): Detection las danach „zweite Aktion", die Phase sprang nach Main Phase 2 und
 die Hauptaktion ging verloren (Torchure-/Zhigao-Zuschläge verfielen mit).
 
-**Nicht Teil dieser Entscheidung:** Kartentexte mit „first Action you perform this turn"
-(Tengu Windstorm, Flashbang, The Final Trial, Mission) behalten ihre eigenen Auslegungen
-(zählen jede frühere Aktion des Zuges, auch Zusatzaktionen).
+**Nicht Teil dieser Entscheidung, aber ebenfalls entschieden (Spielgestalter-Entscheidung
+16.11.2026):**
+* Kartentexte mit „If this is the first Action you perform this turn“ (Tengu Windstorm,
+  Flashbang, The Final Trial u. Ä.) **zählen Zusatzaktionen mit** — jede frühere Aktion des
+  Zuges, auch eine Zusatzaktion, nimmt ihnen das „first“ (so wie heute; kein Code-Eingriff).
+* **Mission** (v1006) ist auch durch frühere Zusatzaktionen des Zuges gesperrt
+  (`_actionsPlayedThisTurn`, siehe oben); kein Code-Eingriff.
+* **Learning** ist so korrekt (kein Eingriff): sein Nachguss zählt erst ab der Hauptaktion
+  (`zusatzaktionZaehltInAktionsphase`); folgt er auf eine Zusatzaktion VOR der Hauptaktion,
+  zählt er nicht.
 
 
 ## ★ Ausgrauung während einer Sofort-Aktion mit freier Heldenwahl (v1020, Als Befund 12.9.)
