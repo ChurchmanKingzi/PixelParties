@@ -45030,6 +45030,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (!bypass) return false;
     }
+    // ★ Spielgestalter-Entscheidung 16.11.2026 (Silence im zentralen Kettenfenster): „Your opponent cannot play Spells for the rest of the turn afterwards" — der Rundenstempel `_spellLockTurn` (Silence;
+    // Eraser Beam: „the only Spell you play this turn") gilt auch für Spell-REAKTIONEN aus der Hand, wie die Statussperren darüber (v880). Der Bonus-Spell-Token von Silence (`_silenceBonusSpell`) gilt nur dem
+    // Sofort-Zauber danach (`performImmediateActionAnyHero`), nicht einer Reaktion dazwischen. Surprises sind davon nicht betroffen (sie werden aktiviert, nicht gespielt).
+    if (opts.spellInHand && cardData.cardType === 'Spell' && this.gs.players[reaktor]?._spellLockTurn === this.gs.turn) return false;
 
     // Check spell school / level requirements (centralized — respects
     // Wisdom paid coverage, Performance wildcards, levelOverrideCards,
