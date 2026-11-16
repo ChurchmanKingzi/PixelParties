@@ -243,7 +243,9 @@ module.exports = {
       engine.beginDestroyScope(opfer.length, opfer);   // W78: die Opfer sind todgeweiht (Infallible Oracle Pythia darf keines opfern)
       try {
         for (const ziel of opfer) {
-          if (ziel.zone !== 'support') continue;   // schon weg
+          // Schon weg: auch eine Kreatur, die ein vorher gesprengter Exploding Skull per Schaden besiegt hat, ist nur aus `cardInstances` ausgetragen (ihre `zone` bleibt 'support') —
+          // ohne die Prüfung käme sie ein zweites Mal in die Ablage.
+          if (ziel.zone !== 'support' || !engine.cardInstances.includes(ziel)) continue;
           await engine.actionDestroyCard(quelle, ziel, {
             sourceOwner: quelle.controller, sourceName: CARD_NAME,
             fireCreatureDeath: true,
