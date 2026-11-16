@@ -495,6 +495,9 @@ class CardInstance {
     const override = this.counters?._effectOverride;
     const script = override ? loadCardEffect(override) : this.loadScript();
     if (!script) return false;
+    // ★ TELEPORTAL: die offen WARTENDE Karte („place it openly in front of you", Stempel `counters._teleportalUntil`) ist inert — keine Permanent-Hooks (Divine Gift of The Light …), bis sie auf die Hand kommt.
+    // Ausnahme: Skripte mit `listensWhileWaiting` (Teleportal selbst, wenn sie sich suchte: die wartende Kopie holt die wartenden Karten ab).
+    if ((zone || this.zone) === ZONES.PERMANENT && this.counters?._teleportalUntil != null && !script.listensWhileWaiting) return false;
     if (!script.activeIn) return true; // No restriction = always active
     // ★ HELD ALS KREATUR (Hulijing, 24.10.): die Überlagerung eines Helden (`heroOverlay`) feuert die Hooks ihrer Kreatur wie in einer Support Zone.
     const z = ((zone || this.zone) === ZONES.HERO_OVERLAY) ? ZONES.SUPPORT : (zone || this.zone);
@@ -52093,6 +52096,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ps = this.gs.players[pOwner];
       if (!ps) continue;
       for (const perm of (ps.permanents || [])) {
+        if (perm.teleportalUntil != null) continue;   // Teleportal: die wartende Karte ist noch nicht gespielt, nur „openly in front of you" — nicht aktivierbar
         const script = loadCardEffect(perm.name);
         if (!script?.canActivatePermanent) continue;
         if (script.canActivatePermanent(this.gs, playerIdx, pOwner, this)) {

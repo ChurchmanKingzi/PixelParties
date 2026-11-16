@@ -120,6 +120,9 @@ module.exports = {
   // v1160: auch aus der ABLAGE — dort liegt die Karte, wenn ihre
   // offene Karte abgeholt werden muss.
   activeIn: ['hand', 'permanent', 'discard'],
+  // Die offen WARTENDE Karte ist inert (kein Permanent-Effekt, keine Hooks, nicht aktivierbar — `CardInstance.isActiveIn`, `getActivatablePermanents`, `doActivatePermanent`),
+  // bis sie auf der Hand liegt. Ausnahme: sucht sich Teleportal selbst, soll die wartende Kopie weiter die Lieferung anstoßen.
+  listensWhileWaiting: true,
 
   /**
    * „If this is the first Spell you use this turn, this counts as an

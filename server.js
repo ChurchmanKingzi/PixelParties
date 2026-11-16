@@ -12303,6 +12303,7 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
 
   const perm = (ownerPs.permanents || []).find(p => p.id === permId);
   if (!perm) return false;
+  if (perm.teleportalUntil != null) return false;   // Teleportal: die wartende Karte ist inert, bis sie auf der Hand liegt und gespielt wird
 
   const script = loadCardEffect(perm.name);
   if (!script?.canActivatePermanent || !script?.onActivatePermanent) return false;
