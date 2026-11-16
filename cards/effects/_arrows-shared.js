@@ -233,9 +233,12 @@ function _countArrowLinks(chain) {
   const { loadCardEffect } = require('./_loader');
   if (!Array.isArray(chain)) return 0;
   let n = 0;
+  // Darge: „each Arrow Artifact YOU play in Reaction to the Attack" — nur Pfeile des Spielers der Attack (Hydra Blood Arrow des Gegners zaehlt nicht).
+  const startOwner = chain.find(l => l.isInitialCard)?.owner;
   for (const link of chain) {
     if (link.isInitialCard) continue;
     if (link.negated) continue; // A negated arrow wasn't "played" in the effect sense.
+    if (startOwner != null && link.owner != null && link.owner !== startOwner) continue;
     const script = loadCardEffect(link.cardName);
     if (script?.isArrow) n++;
   }
