@@ -3805,15 +3805,26 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { transform: translateY(-8px) rotate(45deg); opacity: .4; } /* pp-ok: drehung */
 }
 
-/* Stunned — lightning bolts */
+/* Stunned — lightning bolts (Rückfall, wenn die kreisenden Stun-Sterne aus app-fx-64 nicht laufen: Retro, reduzierte Bewegung, Animationen aus) */
 .status-stunned-overlay {
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  background: rgba(254,255,102,.08);
+  /* Kein Alpha-Hintergrund: `pixel-hart.js` mischt einen hellen `rgba(…)`-Hintergrund (Alpha ≤ .35) zu einer DECKENDEN Farbe mit dem dunklen Brettgrund (gedacht
+     für Zonen). Über einer Karte machte das die Karte unter den Blitzen einfarbig schwarz (Puzzle Creator, Helden ohne Figur im Spiel). */
+  background: none;
   border: 2px solid rgba(255,226,61,.5);
-  box-shadow: inset 0 0 10px rgba(255,226,61,.2);
+}
+/* Stun-Sterne einer Karte im Puzzle Creator (`PzStunEffekt`): Nullpunkt der Leinwand = obere Mitte der Zone; die Leinwand selbst legt `PpFx64Sterne` an. */
+.status-stunned-sterne {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 .stun-bolt {
   position: absolute;

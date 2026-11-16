@@ -13,6 +13,31 @@ const GALLERY_PAGE = 120;
 const GALLERY_GROW_MARGIN = 600;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, BleedingOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
 
+// ── Stun im Editor ──
+// Der Editor zeigt seine Helden/Kreaturen als stehende Karten (keine Sprite-Figur). Der Stun-Status bekommt hier dieselben kreisenden Pixelsterne wie im
+// Spiel (app-fx-64, `window.PpFx64Sterne`), nicht mehr die alten Blitze: deren `.status-stunned-overlay` färbte die Karte unter den Blitzen schwarz
+// (die Pixel-Pipeline `pixel-hart.js` mischt einen hellen Alpha-Hintergrund zu einer deckenden Farbe; Überlagerungen über Karten gehören nicht dazu).
+// Maße in Sprite-Pixeln (1 Zelle = Hero-Pixel = 2,8125 × --board-scale, genau wie `HeroIdleSprite`): Ursprung = obere Mitte der Zone, die Sterne kreisen
+// auf dem oberen Kartendrittel (Mitte 10 Zellen unter dem Zonenrand) und bleiben so ganz innerhalb der Zone (`.board-zone` schneidet ab). Die Kopfbreite 18 ergibt die
+// Standardbahn der Helden (Halbachse 8 Zellen). Eine feste Fassung: ein neues Objekt je Zeichnen würde die Leinwand neu aufsetzen (die Sterne sprängen auf Anfang).
+const PZ_STUN_KERN = { x0: -9, x1: 9, y0: 0, y1: 34, oben: 13 };
+const PZ_HERO_PIXEL = 2.8125;
+/**
+ * Stun-Darstellung einer Karte im Editor. Mit der neuen Fassung der Sterne (nicht Retro, keine reduzierte Bewegung, Animationen an) die Leinwand aus dem
+ * Spiel; sonst — wie im Spiel — die alten Blitze als Rückfall (`.status-stunned-overlay`).
+ */
+function PzStunEffekt() {
+  const sterne = !!(window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv());
+  if (!sterne) {
+    return <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>;
+  }
+  return (
+    <div className="status-stunned-sterne" aria-hidden="true">
+      <window.PpFx64Sterne kern={PZ_STUN_KERN} mitteX={0} s={PZ_HERO_PIXEL} zf={1} intro={false} />
+    </div>
+  );
+}
+
 // ── Ambient pixel motes for the Puzzle Creator ─────────────────────────
 // Same visual language as the battle board (reuses the global
 // .board-ambiance / .board-mote CSS and the hand-mote-float keyframes),
@@ -4077,7 +4102,7 @@ function PuzzleCreator() {
                     </div>
                   )}
                   {hero.statuses?.frozen && <FrozenOverlay />}
-                  {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                  {(hero.statuses?.stunned || hero.statuses?.webbed) && <PzStunEffekt />}
                   {hero.statuses?.negated && <NegatedOverlay />}
                   {hero.statuses?.burned && <BurnedOverlay />}
                   {hero.statuses?.bleeding && <BleedingOverlay />}
@@ -4315,6 +4340,7 @@ function PuzzleCreator() {
                           <div style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(47,78,29,.9)', color: '#b3f9b8', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(75,205,124,.6)', pointerEvents: 'none' }}>Lv{cs.biomancyLevel}</div>
                         )}
                         {cs.frozen && <FrozenOverlay />}
+                        {cs.stunned && <PzStunEffekt />}
                         {cs.burned && <BurnedOverlay />}
                         {cs.bleeding && <BleedingOverlay />}
                         {cs.negated && <NegatedOverlay />}
