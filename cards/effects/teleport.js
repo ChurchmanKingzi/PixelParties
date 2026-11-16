@@ -192,8 +192,10 @@ async function tauscheHeldenplaetze(engine, seite, a, b, wirker) {
     }
   }
   for (const inst of engine.cardInstances) {
-    if ((inst.zone !== 'hero' && inst.zone !== 'ability') || engine.physicalSide(inst) !== seite) continue;
+    // `heroOverlay`: die Kreatur, die ein Held trägt (Hulijing, „Held als Kreatur") — sie liegt auf dem HELDEN und zieht mit ihm; Schaden an ihr wird über den Wirt-Index (`_heldKreatur.heroIdx`) gebucht.
+    if ((inst.zone !== 'hero' && inst.zone !== 'ability' && inst.zone !== 'heroOverlay') || engine.physicalSide(inst) !== seite) continue;
     if (inst.heroIdx === a) inst.heroIdx = b; else if (inst.heroIdx === b) inst.heroIdx = a;
+    if (inst.zone === 'heroOverlay' && inst.counters?._heldKreatur) inst.counters._heldKreatur.heroIdx = inst.heroIdx;
   }
   // Puppet-Tokens und Support-Zonen-Abilities ziehen in die Spalte ihres Helden (stiller Umzug wie beim Tri-Ad-Tausch: keine Abgangs-Hooks, keine
   // Niederlage-Prüfung dazwischen; die Boni der Abilities hängen am Helden und wandern mit ihm).
