@@ -61,10 +61,13 @@ function collectArcherTargets(engine) {
     if (inst.counters?.immovable) continue;
     if (inst.zone === 'support' && !inst.faceDown) {
       if (!istHeldOderKreatur(engine, inst)) continue;   // „a target": Held oder Kreatur (Al, 25.10.) - keine Ausruestung, kein Anhaengsel
+      // Ziel-ID/`owner` = BRETTSEITE (`physicalSide`), nicht `inst.owner`: eine seitenfremd kontrollierte Kreatur (Plant Golem) bekam sonst die ID der eigenen
+      // Kreatur an gleicher Stelle (Kollision, nicht anwählbar). Wie `engine.kreaturZiel`.
+      const seite = engine.physicalSide(inst);
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+        id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',
-        owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+        owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst,
         _kind: 'damage',
       });
@@ -202,10 +205,7 @@ module.exports = {
       const hero = gs.players[sel.owner]?.heroes?.[sel.heroIdx];
       if (hero && hero.hp > 0) await ctx.dealDamage(hero, DAMAGE, 'creature');
     } else {
-      const inst = sel._cardInstance || engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === sel.owner
-        && c.heroIdx === sel.heroIdx && c.zoneSlot === sel.slotIdx,
-      );
+      const inst = sel._cardInstance || engine.kreaturAnBrett(sel.owner, sel.heroIdx, sel.slotIdx);   // Ziel-`owner` = Brettseite
       if (inst) {
         await engine.actionDealCreatureDamage(
           sourceCoord, inst, DAMAGE, 'creature',
