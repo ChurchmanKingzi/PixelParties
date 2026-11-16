@@ -59475,6 +59475,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Defeat creatures in the island zones being removed (rightmost block)
+    // Spielgestalter-Entscheidung 16.11.2026 (Elixir of Immortality): solange die Todes-Hooks dieser Schleife laufen, steht hier die Zonenentfernung — das Elixir belebt
+    // so einen Tod nur beim selben Helden und nur mit freier Zone (`_inselEntfernung`: Seite, Held, erster entfernter Platz). Rumpf bewusst NICHT neu eingerückt (try/finally).
+    const _inselVorher = this._inselEntfernung;
+    this._inselEntfernung = { seite: playerIdx, heroIdx, ab: firstRemoveIdx };
+    try {
     for (let zi = firstRemoveIdx; zi < totalZones; zi++) {
       const zoneCards = ps.supportZones[heroIdx][zi] || [];
       for (const cardName of [...zoneCards]) {
@@ -59515,6 +59520,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    } finally { this._inselEntfernung = _inselVorher; }
 
     // Remove the island zones from the array (rightmost block)
     ps.supportZones[heroIdx].splice(firstRemoveIdx, removeCount);
