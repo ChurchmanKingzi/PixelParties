@@ -375,6 +375,9 @@ module.exports = {
       // Device über `gs._forcedCommitPlayer`, auf Zi's Spieler beschränkt: Reaktionen des Gegners behalten ihren Abbruch). Die Unmöglichkeit
       // ("nicht möglich") prüft vorher `kannSofortWirken` (→ Fizzeln + Ablage, "Einmal pro Spiel" bleibt frei).
       const _zwangVorher = gs._forcedCommitPlayer;
+      // „Diese Karte wird gerade gespielt" (`_currentResolvingPlayName`, wie `doPlaySpell`/`_castSpellImmediately`): Cheering Rabbit („first Attack or Spell it uses each turn") erkennt daran
+      // den Wurf des Helden, Luck zaehlt einen sich selbst legenden Area-/Anhangs-Spell nur einmal.
+      engine._pushResolvingPlay(oppChoice);
       try {
         // Der Zwang gilt nur für die Auflösung des Zauberkörpers (`onPlay`), nicht für die Nachwirkungs-Haken (`afterSpellResolved`: Heldenpassive mit eigenen "may"-Abfragen).
         gs._forcedCommitPlayer = pi;
@@ -401,10 +404,15 @@ module.exports = {
         });
       } catch (err) {
         console.error('[Timeless King Zi] sub-spell error:', err?.message || err);
+      } finally {
+        engine._popResolvingPlay();
       }
       placedOnBoard = !!gs._spellPlacedOnBoard;
       // „Einmal pro Spiel" erst NACH dem Guss und nur, wenn er nicht abgebrochen wurde (allgemeine Regel Q129: Stempel erst nach dem Commit).
       const _abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+      // Der von Zi gewirkte Spell ist ein BENUTZTER Spell dieses Helden (W36a, wie jeder Sofort-Guss): ein Zaehlschritt je Spell, auch ganz/teil-negiert, ein Abbruch zaehlt nicht
+      // (`spellsPlayedThisTurn`, `hero._wuerfeZahl`, `onEffectCountedAsArt` — Cheering Rabbit, Teleport/Teleportal/True Form/Fire Bolts „second Spell"). Gezaehlt wird NACH der Aufloesung.
+      if (!_abgebrochen) await engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner: feld, name: oppChoice, karte: true });
       if (_opgKey && !_abgebrochen) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
       delete gs._spellCancelled;
       delete gs._spellNegatedByEffect;
