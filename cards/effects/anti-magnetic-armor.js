@@ -18,8 +18,10 @@
 //    nicht nutzbar (kein Leerlauf-Angebot).
 //  • „you may": Rueckfrage (Engine-Standard des Brett-Waechters).
 //  • „Once per turn": WEICH, je Instanz (Regel: nacktes „once per turn"
-//    ohne „hard"). Verbraucht wird die Nutzung erst, wenn wirklich
-//    umgeleitet wird.
+//    ohne „hard"). ★ Spielgestalter-Entscheidung 16.11.2026: verbraucht
+//    wird die Nutzung mit der AKTIVIERUNG (Bestätigung, `payBoardRedirectCost`,
+//    VOR dem Kettenfenster) — auch wenn die Auslösung danach negiert wird;
+//    wer „No" sagt, verbraucht nichts.
 //  • Wie alle Ziel-Umleitungen: nur Einzelzielwahl; Flaechenschaden
 //    waehlt nicht und loest nichts aus.
 //
@@ -65,6 +67,12 @@ module.exports = {
     return `${selected.cardName} was chosen by ${attackerName}! Make your opponent choose a different target you control instead?`;
   },
 
+  // ★ Spielgestalter-Entscheidung 16.11.2026: das Once-per-turn wird bei der Aktivierung gestempelt (Hub `_checkTargetRedirectOnce`: Bestätigung → `payBoardRedirectCost` → Kettenfenster →
+  // `onBoardRedirect`), nicht erst bei der Wirkung. `false` = schon verbraucht → keine Aktivierung.
+  async payBoardRedirectCost(engine, ownerIdx, inst) {
+    return spendUse(inst, engine.gs, ZAEHLER) ? { begrenzt: true } : false;
+  },
+
   async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard) {
     const eligible = ersatzZiele(engine, ownerIdx, selected, validTargets);
     if (eligible.length === 0) return null;
@@ -91,8 +99,6 @@ module.exports = {
       const id = Array.isArray(picked) ? picked[0] : null;
       neu = eligible.find(t => t.id === id) || eligible[0];
     }
-
-    spendUse(inst, engine.gs, ZAEHLER);
 
     for (const t of [selected, neu]) {
       engine._broadcastEvent('play_zone_animation', {

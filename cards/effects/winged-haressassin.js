@@ -25,7 +25,8 @@
 //  • „you may discard a card": Rückfrage („Ja/Nein", Engine-Standard des Brett-Wächters, CPU über `cpuResponse`), danach der Handabwurf als Kosten
 //    (`zahleAbwurfKosten`, Abwurf-Konvention des Bestands: Boris erlässt die Kosten, Abbruch der Kartenwahl = keine Umleitung, nichts verbraucht; Kosten-Lernkanal
 //    `costFor`). Ohne wählbare Handkarte (leere Hand, die auflösende Karte zählt nicht) kein Angebot.
-//  • „Once per turn": je Exemplar (`_charges`, Schlüssel `wingedHaressRedirect`), verbraucht erst, wenn wirklich umgeleitet wird. Zwei Exemplare haben je ein
+//  • „Once per turn": je Exemplar (`_charges`, Schlüssel `wingedHaressRedirect`), verbraucht mit der Aktivierung (nach der Kostenzahlung, VOR dem Kettenfenster — Spielgestalter-Entscheidung
+//    16.11.2026: auch wenn die Auslösung danach negiert wird; wer „No" sagt oder die Kartenwahl abbricht, verbraucht nichts). Zwei Exemplare haben je ein
 //    Angebot. Wie bei allen Umleitern fragt danach noch der Kontrolleur des NEUEN Ziels (Kette der Engine, Tiefe 8); leitet er weiter, ist der Effekt nicht mehr
 //    „von diesem Effekt umgeleitet" auf diese Kreatur — sie wird dann nicht getroffen.
 //
@@ -224,7 +225,7 @@ module.exports = {
 
   // ★ Spielgestalter-Entscheidung 16.11.2026: die KOSTEN (der Handabwurf) sind VOR dem Kettenfenster der Auslösung zu bezahlen und bleiben bei Negation bezahlt — wie die Kosten einer
   // gespielten Hand-Reaktion (Hub `_checkTargetRedirectOnce`: `payBoardRedirectCost` → Fenster → `onBoardRedirect`). Abbruch der Kartenwahl = keine Aktivierung, nichts bezahlt, nichts
-  // ausgelöst (`false`). Das Once-per-turn (`spendUse`) ist keine Kostenzahlung: es fällt erst mit der Umleitung selbst (negiert → bleibt frei, wie beim Bow of the Hunt Goddess).
+  // ausgelöst (`false`). Das Once-per-turn (`spendUse`) wird mit den Kosten gestempelt (Spielgestalter-Entscheidung 16.11.2026: bei der Aktivierung verbraucht, auch bei späterer Negation).
   async payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config, sourceCard) {
     const kosten = await engine.zahleAbwurfKosten(ownerIdx, 1, {
       costFor: CARD_NAME,          // Kosten-Abwurf-Lernkanal der CPU
@@ -235,7 +236,9 @@ module.exports = {
       cancellable: true,
       description: `Discard a card to redirect ${sourceCard?.name || 'the effect'} from ${selected.cardName} to ${CARD_NAME}.`,
     });
-    return kosten.bezahlt ? { bezahlt: true } : false;
+    if (!kosten.bezahlt) return false;
+    spendUse(inst, engine.gs, ZAEHLER);
+    return { bezahlt: true };
   },
 
   async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard, bezahlt) {
@@ -247,7 +250,6 @@ module.exports = {
     // Zwischen Frage und Zahlung (und im Kettenfenster) kann sich das Brett geändert haben (Abwurf-Trigger, Reaktion): ohne die Kreatur keine Umleitung (die Kosten bleiben bezahlt).
     if (inst.zone !== 'support' || !(((inst.counters?.currentHp) ?? 1) > 0)) return null;
 
-    spendUse(inst, gs, ZAEHLER);
     merkeUmleitung(gs, inst, sourceCard);
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: inst.controller ?? inst.owner });
 
