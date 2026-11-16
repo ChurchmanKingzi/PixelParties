@@ -10609,7 +10609,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
   // fallback covers puzzle setups: puzzle-placed Cardinals never
   // fire their onPlay, so `_cardinalImmune` is unset, and the
   // counter check alone would let them be stolen.
-  const { CARDINAL_NAMES } = require('./cards/effects/_cardinal-shared');
+  const { cardinalNameImmun } = require('./cards/effects/_cardinal-shared');
   let stolenCount = 0;
   for (const inst of room.engine.cardInstances) {
     if (inst.zone !== 'support') continue;
@@ -10618,7 +10618,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
     if (inst.stolenBy != null) continue;
     if (inst.counters?._cardinalImmune) continue;
     if (room.engine.kreaturGegnerEffektImmun(inst, pi)) continue;   // W17b: Golden Wings (eigene Marke `_gwImmune`)
-    if (CARDINAL_NAMES.includes(inst.name)) continue;
+    if (cardinalNameImmun(room.engine, inst)) continue;   // Spielgestalter-Entscheidung 16.11.2026: eine negierte Omikron-Illusion ist nicht immun
     // Restrict to Creature card type. Equipment / token instances
     // shouldn't be stealable, even if some future card flagged them
     // as supportable.

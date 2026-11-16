@@ -39,7 +39,7 @@
 //    nicht fuer das Ziehen.
 // ═══════════════════════════════════════════
 
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { cardinalNameImmun } = require('./_cardinal-shared');
 const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 const CARD_NAME = 'Mass Routing';
@@ -91,7 +91,7 @@ async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
     type: 'deep_sea_bubbles', owner: kontrolleur, heroIdx, zoneSlot: slotIdx,
   });
 
-  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi) || isCardinalBeastByName(inst.name)) {   // W17b: Golden Wings nur gegen den Gegner
+  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi) || cardinalNameImmun(engine, inst)) {   // W17b: Golden Wings nur gegen den Gegner
     engine.log('cardinal_immune_block', { card: cardName, by: CARD_NAME, action: 'shuffle_into_deck' });
     return null;
   }
@@ -123,13 +123,8 @@ async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
   }
   // Ankhota: „Delete all Creatures that are moved from the board to anywhere else" — dieser Sonderweg umgeht den zentralen Move: die Kreatur kommt in den Gelöscht-Stapel ihres Besitzers
   // statt ins Deck. Annahme: eine so gelöschte Kreatur gilt NICHT als „shuffled back" (kein Nachziehen dafür, kein Mischen).
-  // Spielgestalter-Entscheidung 16.11.2026: Omikrons Illusion ist KEINE Karte (Kopie aus dem Äther, `counters._spiegelKopie`) — sie verschwindet, es gibt nichts zurückzumischen
-  // (kein Deck-Eintrag, auch keine Ankhota-Löschung); als Kreatur des Zaubers zählt sie für das Nachziehen weiter („shuffled back").
-  const kopie = !!inst.counters?._spiegelKopie;
-  const geloescht = kopie ? false : engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
-  if (kopie) {
-    engine.tokenAbgang(inst);
-  } else if (!geloescht) {
+  const geloescht = engine.ankhotaLoeschtSonderweg(inst, heim, { source: CARD_NAME, vorab: ankhotaVorab });
+  if (!geloescht) {
     if (!hps.mainDeck) hps.mainDeck = [];
     hps.mainDeck.push(cardName);
   }
@@ -169,7 +164,7 @@ module.exports = {
     const hi = Number.isInteger(link?.heroIdx) ? link.heroIdx : -1;
     const dm = hi >= 0 ? engine.effectiveSchoolLevelForCaster(SCHULE, pi, hi) : 3;
     const maxLevel = Math.max(1, Math.min(3, dm));
-    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !engine.kreaturGegnerEffektImmun(i, pi) && !isCardinalBeastByName(i.name));
+    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !engine.kreaturGegnerEffektImmun(i, pi) && !cardinalNameImmun(engine, i));
   },
 
   hooks: {

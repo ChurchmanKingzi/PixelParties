@@ -208,7 +208,7 @@ const DAMAGE_HEAP_CHECK_EVERY = 25;
 // `CARDINAL_NAMES_SET`). Imported lazily inside the few hot paths
 // that need them (see usages of `require('./_cardinal-shared')`).
 
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { isCardinalBeastByName, cardinalNameImmun } = require('./_cardinal-shared');
 // Recursion depth cap for actionHealHero / actionDealDamage. Hook
 // handlers can call these engine methods DIRECTLY (not via
 // pendingTriggers), which bypasses MAX_PENDING_TRIGGERS. Known example:
@@ -14888,8 +14888,7 @@ class GameEngine {
     // counter never got stamped (puzzle preset / revive without hooks).
     // Mirrors the same belt-and-suspenders check in canApplyCreatureStatus.
     {
-      const { CARDINAL_NAMES } = require('./_cardinal-shared');
-      if (!_u && CARDINAL_NAMES.includes(targetCard.name)) {
+      if (!_u && cardinalNameImmun(this, targetCard)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Kreatur (Omikrons Cardinal-Illusion) hat die Immunität nicht
         this.log('destroy_blocked', { card: targetCard.name, reason: 'cardinal-beast' });
         return;
       }
@@ -22799,8 +22798,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.counters?._cardinalImmune) return true;
     if (this.kreaturGegnerEffektImmun(inst, quelle, opts)) return true;   // W17b: Golden Wings quellenbewusst
     if (inst.counters?._omniImmune) return true;
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return true;
+    if (cardinalNameImmun(this, inst)) return true;   // Namens-Rückfall; Spielgestalter-Entscheidung 16.11.2026: nicht, solange die Kreatur negiert ist (Omikrons Illusion)
     return false;
   }
 
@@ -32565,7 +32563,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   getSacrificableCreatures(playerIdx, opts = {}) {
     const gs = this.gs;
     const cardDB = this._getCardDB();
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
     const results = [];
     for (const inst of this.cardInstances) {
       // Kontrolle statt Seite (Styx 28.9.): „a Creature you control" —
@@ -32592,7 +32589,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // their onPlay hook, so the counter never gets stamped — but a
       // Baihu is a Baihu regardless of how it landed on the board.
       if (inst.counters?._cardinalImmune) continue;
-      if (CARDINAL_NAMES.includes(inst.name)) continue;
+      if (cardinalNameImmun(this, inst)) continue;   // (negierte Omikron-Illusion: ohne Immunität)
       // ★ „This Creature cannot be sacrificed" (v958, Boulder in a
       // Bottle). Eigener, enger Vertrag statt `_cardinalImmune`: der
       // sperrt JEDEN Effekt, hier geht es nur um das Opfern. Das
@@ -50662,7 +50659,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
 
-    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, z. B. Sinister Idol) →
+    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, heute von keiner Karte mehr gesetzt) →
     // Resistance & Co. fragen. Kosten (Weapon Storm, Quest …) sind kein Effekt auf den Helden und setzen es nicht;
     // Mehrfach-Abwuerfe EINES Effekts (Memory Wipe) fragen einmal auf Kartenebene, nicht je Ability.
     // Spielgestalter-Entscheidung 16.11.2026: Resistance schützt vor Effekten auf den HELDEN selbst; eine Karte, die eine Ability WÄHLT
@@ -56658,7 +56655,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (zoneOwner == null || zoneOwner < 0 || !(inst.heroIdx >= 0)) return false;
     if (!this.isSupportZoneLocked(zoneOwner, inst.heroIdx, { cardName: inst.name, via: 'enter', instId: inst.id })) return false;   // instId: die eintretende Karte sperrt sich nicht selbst (Bonded Companion wurde sonst sofort auf die Hand zurückgeschickt)
     const cd = this._getCardDB()[inst.name];
-    const isToken = !!(cd && hasCardType(cd, 'Token')) || !!inst.counters?._spiegelKopie;   // Kopie ohne Karte (Omikrons Illusion): wie ein Token, verschwindet
+    const isToken = !!(cd && hasCardType(cd, 'Token'));
     inst._zoneLockReverting = true;
     this.log('placement_reverted', {
       card: inst.name, reason: 'support_zones_locked', heroIdx: inst.heroIdx,
@@ -57625,7 +57622,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
           || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected)
-          || isCardinalBeastByName(inst?.name)) {
+          || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
@@ -58764,8 +58761,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
     if (creatureDiscardPs && !_claim) {
       const effectiveCd = this.getEffectiveCardData(e.inst);
-      // Spielgestalter-Entscheidung 16.11.2026: eine Kopie ohne Karte (Omikrons Illusion, Magic-Mirror-Kopie: `counters._spiegelKopie`) stirbt wie ein Token — kein Stapel-Eintrag (`tokenAbgang`).
-      const _istTokenArt = !!(effectiveCd && hasCardType(effectiveCd, 'Token')) || !!e.inst.counters?._spiegelKopie;
       // ★★ v1135 (Als Befund 15.9.: „Hell Fox fliegt jetzt visuell
       // vom Board zum Discard, ehe es im Deleted Pile landet. Das
       // ist falsch.").
@@ -58790,7 +58785,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // hier gibt es dafuer nur `_onlyCard`. Darum meldet der Tod vor dem Ablegen `onCreatureWouldBeDiscarded` (gleiche Felder wie dort) und liest die Marke aus.
       // Nicht gemeldet wird, was ohnehin nie abgelegt wird (Ghazma/Ankhota/Root/Selbstloeschen/Token) oder gleich wiederbelebt wird (`_reviveAfterDeath`).
       let _ersatzLoescht = false;
-      if (!_eigenLoeschend && !e.inst._reviveAfterDeath && !_istTokenArt) {
+      if (!_eigenLoeschend && !e.inst._reviveAfterDeath && !(effectiveCd && hasCardType(effectiveCd, 'Token'))) {
         const _stempelVorher = !!e.inst._redirectToDeleted;
         await this.runHooks('onCreatureWouldBeDiscarded', {
           leavingCard: e.inst, fromZone: 'support', fromOwner: physicalSide, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot,
@@ -58802,7 +58797,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
       // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
       let _gerettet = false;
-      if ((_ghazmaLoescht || _ersatzLoescht) && !_istTokenArt && loadCardEffect(e.inst.name)?.beforeDelete) {
+      if ((_ghazmaLoescht || _ersatzLoescht) && !(effectiveCd && hasCardType(effectiveCd, 'Token')) && loadCardEffect(e.inst.name)?.beforeDelete) {
         const _loeschQuelle = _ghazmaLoescht ? 'Ghazma' : 'Vacarn / The Bonegrinder';
         _gerettet = await this._tryBeforeDelete(e.inst.name, e.inst.originalOwner, {
           fromZone: 'support', fromInstance: null, source: _loeschQuelle,
@@ -58811,7 +58806,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (_gerettet) {
         _creatureDest = 'rescued';
-      } else if (_istTokenArt || _selbstLoeschend) {
+      } else if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
         // W5a: ein Token verschwindet vollstaendig; nur eine echte Karte darunter (Biomancy/Boulder) wird gelöscht.
         // W64a (Al): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (Ghazma/Selbstlöschen: gelöscht).
         const _tokenZiel = _selbstLoeschend ? 'deleted' : this.tokenStapelZiel(e.inst);
