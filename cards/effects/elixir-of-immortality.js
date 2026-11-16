@@ -32,6 +32,12 @@
 //  (Bonded Companion bei totem Helden, fehlender Landeplatz, Karte nicht mehr im Stapel: kein Auslösen, Elixir bleibt liegen). Der frühere
 //  Ausschluss („ein Opfer ist kein defeated", Auslegung nach Extra Life, W16d) gilt nur noch für Extra Life, nicht mehr für das Elixir.
 //
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („Insel-Zonenentfernung"): stirbt eine Kreatur, WEIL IHRE ZONE ENTFERNT WIRD (Flying Island in the Sky
+//  verlässt das Brett → `removeIslandZones`; `engine._inselEntfernung` markiert die Entfernung, solange die Todes-Hooks laufen), greift das Elixir NUR,
+//  wenn derselbe Held (der, in dessen Zone sie stand) noch mindestens EINE andere freie Zone für sie hat; belebt wird in einer freien Zone DIESES Helden
+//  (nie bei einem anderen). Gibt es keine, löst das Elixir nicht aus und wird nicht verbraucht (`findeLandeplatz`, Eintrag `zoneEntfernt`). Mehrzonen-
+//  Kreaturen sterben dabei nicht (`_multizone-shared`), alle anderen Todesarten (auch ein Tod IN einer Inselzone, die bleibt) laufen wie sonst.
+//
 //  Death collection: onHeroKO collects dead heroes
 //  without immediately reviving. The actual revive
 //  prompt happens at the NEXT batch checkpoint
@@ -382,6 +388,10 @@ function sammleKreatur(engine, pi, perm, inst) {
   const bps = engine.gs.players[besitzer] || ps;
   // An ihren Helden gebundene Kreatur (`sharesHpWithHero`: Bonded Companion, geteilter HP-Pool): stirbt sie bei totem Wirtshelden (sie folgt ihm in den Tod), ist sie nicht lebensfaehig.
   const gebunden = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+  // Spielgestalter-Entscheidung 16.11.2026 (Insel-Zonenentfernung): stirbt die Kreatur, WEIL ihre Zone entfernt wird (`removeIslandZones` setzt `engine._inselEntfernung`
+  // um die Todes-Hooks), gibt es ihre Zone beim Auflösen nicht mehr — dann zählt nur noch eine andere freie Zone DESSELBEN Helden (`findeLandeplatz`).
+  const ins = engine._inselEntfernung;
+  const zoneEntfernt = !!(ins && ins.seite === seite && ins.heroIdx === inst.heroIdx && inst.zoneSlot >= ins.ab);
   if (gebunden) {
     const wirt = engine.gs.players[seite]?.heroes?.[inst.heroIdx];
     if (!(wirt?.name && wirt.hp > 0)) return;
@@ -412,6 +422,7 @@ function sammleKreatur(engine, pi, perm, inst) {
         zoneSlot: inst.zoneSlot,
         pile: pile === 'offen' ? null : pile,
         ...(gebunden ? { gebunden: true } : {}),
+        ...(zoneEntfernt ? { zoneEntfernt: true } : {}),
         // Nur bei fremdem Besitzer/fremder Brettseite gefuellt (sonst bleibt der Eintrag wie bisher): Stapel-Besitzer, Brettseite und die Kontroll-Identitaet der Instanz
         // (`owner`/`originalOwner`/`controller`/`stolenBy`), die `reviveCreature` an der neuen Instanz wiederherstellt.
         ...((besitzer !== pi || seite !== pi) ? {
@@ -545,11 +556,19 @@ function findeLandeplatz(engine, pi, chosen) {
   const canPlaceOn = (hi) =>
     engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
 
+  // ★ Spielgestalter-Entscheidung 16.11.2026 (Insel-Zonenentfernung): ein Tod durch die Entfernung der eigenen Zone belebt NUR bei einer anderen freien Zone DESSELBEN Helden und NUR dort —
+  // nie der (nicht mehr vorhandene) alte Platz, nie ein anderer Held. Ohne solche Zone: kein Landeplatz, das Elixir löst nicht aus und bleibt liegen.
+  if (chosen.zoneEntfernt) {
+    if (!(ps.heroes[chosen.heroIdx]?.hp > 0) || !canPlaceOn(chosen.heroIdx)) return null;
+    const z = engine.beschwoerZonenFuer(pi, chosen.name, { heroIdx: chosen.heroIdx, livingHeroesOnly: true })[0];
+    return z ? { targetHi: chosen.heroIdx, targetSi: z.slotIdx } : null;
+  }
+
   // ★ W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (W63a: der alte Platz, sonst geteilt vor frei) — `engine.zoneEintragen` legt dazu.
   const { canShareInto } = require('./_alice-shared');
   const teilbar = (hi, z) => z < 3 && canShareInto(engine, pi, hi, z, chosen.name);
-  const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if ((origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
+  const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot];   // `undefined` = die Zone gibt es nicht mehr (Inselzone abgebaut) — nicht „frei"
+  if (origSlot && (origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
