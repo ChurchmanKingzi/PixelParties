@@ -43058,7 +43058,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcOwner = source.owner ?? source.controller;
     const srcHi = source.heroIdx;
     if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
-    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    // „that Hero": bei einem geliehenen Helden (Love Shot, Charme) ist `owner` der Kontrolleur, `heroOwner` die Brettseite des Helden — ohne sie träfe der Buff
+    // des eigenen Helden mit gleichem Index (quelleIstHeld).
+    const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
     if (!srcHero?.buffs?.cold_strike) return;
     // Recognise Attack and Spell damage. The damage-type tag isn't
     // standardised across cards (Spells use `<school>_spell` strings,
@@ -43171,7 +43173,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcOwner = source?.owner ?? source?.controller;
     const srcHi = source?.heroIdx;
     if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
-    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    // „that Hero": geliehener Held (Love Shot, Charme) → `heroOwner` ist seine Brettseite, `owner` der Kontrolleur (quelleIstHeld).
+    const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
     if (!srcHero?.buffs?.empowered_strike) return;
 
     // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
