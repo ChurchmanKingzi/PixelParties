@@ -93,10 +93,9 @@ module.exports = {
       const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) await ctx.healHero(hero, HEAL);
     } else {
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'support' && c.owner === target.owner
-        && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx,
-      );
+      // Ziel-`owner` = BRETTSEITE, nicht `inst.owner`: bei einer seitenfremd kontrollierten Kreatur (Plant Golem) fand die Suche nach `owner` nichts — die Heilung
+      // verpuffte still und das Once-per-turn war trotzdem verbraucht.
+      const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);
       if (inst) await ctx.healCreature(inst, HEAL);
     }
     engine.log('skeleton_healer', {
