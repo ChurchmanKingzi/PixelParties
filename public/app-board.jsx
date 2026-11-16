@@ -2992,11 +2992,20 @@ const HeroIdleAnims = (() => {
     // Sprite-Pixel bei 100 % Anzeige unter einen Bildschirmpixel und würde weich). Derselbe Hebel wie `boardScale` bei den Helden; ein ausdrückliches `boardScale` im Sheet gewinnt.
     if (!(Number(aus.boardScale) > 0)) {
       const b = k ? k.w : m.frameWidth - (m.padLeft || 0) - (m.padRight || 0), h = k ? k.h : m.frameHeight - (m.padTop || 0) - (m.padBottom || 0);
-      aus.boardScale = KREATUR_STUFEN.find(f => b * f <= KREATUR_MAX_B && h * f <= KREATUR_MAX_H) || KREATUR_STUFEN[KREATUR_STUFEN.length - 1];
+      const stufe = KREATUR_STUFEN.find(f => b * f <= KREATUR_MAX_B && h * f <= KREATUR_MAX_H) || KREATUR_STUFEN[KREATUR_STUFEN.length - 1];
+      // ★ 16.11. (Als Vorgabe: „die Creatures können ruhig etwas kleiner dargestellt sein"): ALLE Creature-Figuren stehen im Creature-Maßstab KREATUR_MASS (3/4 des
+      // Hero-Maßstabs), die Stufe der zu großen kommt obendrauf (Faktoren multipliziert). Untergrenze KREATUR_MIN = 2/5 des Hero-Maßstabs: darunter fiele ein Sprite-Pixel
+      // am Desktop (Brettskala ≈ 0,97, hintere Reihe ≈ 0,91) unter einen Bildschirmpixel und würde weich — das trifft die Stufen 1/2 und 2/5 (Cybug ANTS, The Spawn Mother,
+      // Demon's Gate), die bei 2/5 stehen bleiben.
+      aus.boardScale = Math.max(KREATUR_MIN, kreaturMass() * stufe);
     }
     return aus;
   }
   const KREATUR_MAX_B = 64, KREATUR_MAX_H = 68, KREATUR_STUFEN = [1, 3 / 4, 2 / 3, 3 / 5, 1 / 2, 2 / 5];
+  // Creature-Maßstab: Anteil des Hero-Maßstabs (2,8125 Kartenpixel je Sprite-Pixel) — DIE Stellschraube für die Größe aller Creature-Figuren (auch Clone, der die Heldenfigur
+  // seiner Spalte in diesem Maßstab zeigt). `window.__ppKreaturMass` (vor dem Laden der Sheets gesetzt) überschreibt sie nur für Vergleichsaufnahmen.
+  const KREATUR_MASS = 3 / 4, KREATUR_MIN = 2 / 5;
+  function kreaturMass() { const t = typeof window !== 'undefined' ? Number(window.__ppKreaturMass) : 0; return t > 0 ? t : KREATUR_MASS; }
   // `deckkraft` < 1 (Yuki-Onna, Lunatic Golem): die Figur scheint durch — per Bayer-Raster in Sprite-Pixeln ausgedünnt (jeder Pixel bleibt voll deckend
   // oder fällt weg), nie per Alpha. Raster in FRAME-Koordinaten, damit es auf jedem Bild gleich liegt. Einmal beim Laden.
   function ausduennen(meta, img) {
@@ -3229,16 +3238,6 @@ const HeroIdleAnims = (() => {
     const phasenHover = (e) => { const t = e.target; if (t && t.closest && t.closest('.phase-column')) markiere(); };
     document.addEventListener('mouseover', phasenHover, { passive: true, capture: true });
     document.addEventListener('mouseout', phasenHover, { passive: true, capture: true });
-  }
-  // Creature-Figuren stehen in der vordersten Reihe und sind mitunter sehr groß (Hydra, Spawn Mother, Demon's Gate): sie verdecken dann Karten ANDERER Zonen
-  // (eigene Helden dahinter, Nachbarzonen). Steht der Zeiger auf einer belegten Zone, fahren die Creature-Figuren ein, die über sie ragen (`folgeZone`) —
-  // dieselbe Regel wie bei der Phasenleiste. Hier nur: welche Zone liegt unter dem Zeiger, gemeldet beim WECHSEL der Zone.
-  let hoverZoneEl = null;
-  if (typeof document !== 'undefined') {
-    document.addEventListener('mouseover', (e) => {
-      const t = e.target, z = (t && t.closest && t.closest('.board-zone')) || null;
-      if (z !== hoverZoneEl) { hoverZoneEl = z; if (schritte.size) markiere(); }
-    }, { passive: true, capture: true });
   }
   // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
   if (typeof window !== 'undefined') {
@@ -3495,7 +3494,7 @@ const HeroIdleAnims = (() => {
       return !!(liste && liste[k]) && fertig.get(k) !== null;
     },
     // Creature-Figuren: Liste, Schlüssel für `hole`/`schonDa`, „steht eine Figur bereit?" und der Clone-Sonderfall (`kopiert`: Figur des Heroes der Spalte)
-    ladeKreaturListe, kreaturKey: kKey, hoverZone: () => hoverZoneEl, kreaturenVorladen,
+    ladeKreaturListe, kreaturKey: kKey, kreaturenVorladen, kreaturMass,
     kreaturVorladeStand: () => { let n = 0, da = 0; if (kListe) for (const k in kListe) if (kListe[k].sheetUrl) { n++; if (fertig.get('c:' + k)) da++; } return { n, da }; },
     hatKreaturAnimation: (name) => {
       const k = slug(name);
@@ -4033,9 +4032,9 @@ function HeroStatusSymbole({ st, links, oben, k }) {
   );
 }
 
-// `kreatur`: `cardName` ist eine Creature (Sheet aus `data/creature-animations`, sonst identische Darstellung). `ohnePartikel`: nur Tönung/Eis/Stein an der Figur,
+// `massstab`: Faktor auf den Maßstab (Clone: Heldenfigur im Creature-Maßstab). `kreatur`: `cardName` ist eine Creature (Sheet aus `data/creature-animations`, sonst identische Darstellung). `ohnePartikel`: nur Tönung/Eis/Stein an der Figur,
 // keine Status-Partikel und -Symbole (Creatures in Support-Zonen behalten die Status-Overlays ihrer Karte).
-function HeroIdleSprite({ cardName, kreatur, ohnePartikel, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
+function HeroIdleSprite({ cardName, kreatur, massstab, ohnePartikel, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
   const key = kreatur ? HeroIdleAnims.kreaturKey(cardName) : HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -4082,7 +4081,6 @@ function HeroIdleSprite({ cardName, kreatur, ohnePartikel, angehalten, versteine
     // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
     zone._ppFigurPlatz = platz;
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
-    const inSupport = zone.hasAttribute('data-support-zone');
     platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
     platz._ppSchluessel = key;    // Slug des Helden (Todesstil „sturz“/„shatter“, app-fx-71.jsx)
     const ctx = cv.getContext('2d');
@@ -4209,20 +4207,8 @@ function HeroIdleSprite({ cardName, kreatur, ohnePartikel, angehalten, versteine
           }
         }
       }
-      // Figur in einer SUPPORT-Zone (Creature, Clone), die über eine ANDERE belegte Zone ragt, auf der gerade der Zeiger steht: einfahren, damit Karte, HP und
-      // Status der verdeckten Zone (z. B. der eigene Held hinter einer großen Creature) lesbar und anklickbar wirken. Kasten des Stehers wie oben.
-      let fremdHover = false;
-      if (inSupport && !beruehrung && l && !l.plane.hasAttribute('data-pp-dragging')) {
-        const hz = HeroIdleAnims.hoverZone();
-        if (hz && hz !== zone && hz.isConnected && hz.classList.contains('zone-has-card')) {
-          const steher = platz.querySelector('.hero-idle-steher');
-          if (steher) {
-            const a = steher.getBoundingClientRect(), b = hz.getBoundingClientRect();
-            fremdHover = a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
-          }
-        }
-      }
-      const weg = !rammt && (hover || phasenHover || fremdHover || !!zustand.current.eingeklappt);
+      // (Kein Einfahren für fremde Zonen: beim Hover fährt nur die Figur DIESER Zone ein — Als Befund 16.11.: „nicht nur diese, sondern auch ihre Nachbarn".)
+      const weg = !rammt && (hover || phasenHover || !!zustand.current.eingeklappt);
       if (weg !== st.weg) {
         st.weg = weg;
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
@@ -4356,7 +4342,8 @@ function HeroIdleSprite({ cardName, kreatur, ohnePartikel, angehalten, versteine
   // ★ v1455: `boardScale` im Sheet-JSON ist ein Faktor für Einzelfälle
   // (Als Vorgabe 27.9.: Bubbles in voller Größe „geht so gar nicht, der
   // sitzt viel zu hoch und wird fast komplett abgeschnitten").
-  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1);
+  // `massstab` (Clone): zusätzlicher Faktor für eine HELDENfigur, die als Creature auf dem Brett steht (Creature-Maßstab; Creature-Sheets tragen ihn schon in `boardScale`).
+  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1) * (massstab > 0 ? massstab : 1);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
@@ -59638,7 +59625,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           }
                           if (!(kreatur ? HeroIdleAnims.hatKreaturAnimation(name) : HeroIdleAnims.hatAnimation(name))) return null;
                           const stein = !!(cc?._petrified || cc?._baihuPetrify);
-                          return <HeroIdleSprite key="figur" cardName={name} kreatur={kreatur} ohnePartikel
+                          return <HeroIdleSprite key="figur" cardName={name} kreatur={kreatur} massstab={kreatur ? undefined : HeroIdleAnims.kreaturMass()} ohnePartikel
                             eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
                             angehalten={!!(cc?.frozen || cc?.stunned || stein)}
                             eingefroren={!!cc?.frozen}
