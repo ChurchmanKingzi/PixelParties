@@ -79,4 +79,5 @@ def frame(i):
 
 
 if __name__ == '__main__':
-    N4.abschluss(G, 'Haressassin', [frame(i) for i in range(N)], MS, sys.argv, scale=4)
+    # faceX = Mitte ZWISCHEN DEN AUGEN (Sprite-x 9 + Rand links 2 = 11), nicht die Frame-Mitte: das waagerecht vorgestreckte Schwert (x 16–39) ragt weit nach rechts und würde die Figur sonst nach links aus der Kartenmitte schieben.
+    N4.abschluss(G, 'Haressassin', [frame(i) for i in range(N)], MS, sys.argv, scale=4, extra={'faceX': 11.0})

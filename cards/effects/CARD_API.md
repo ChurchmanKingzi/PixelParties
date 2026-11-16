@@ -26710,7 +26710,7 @@ am Kartenrand Abgeschnittenes im Stil der Figur fertigzeichnen, Skript wie oben.
 **Anbindung im Spiel:** Server `GET /api/creature-animations` (`server.js`, wie `/api/hero-animations`; Schlüssel = Slug des Feldes `creature`, nicht der Dateiname;
 Einträge ohne Sheet nur mit `kopiert`; die Sheets selbst werden 30 Tage zwischengespeichert, die URL trägt `?v=mtime`). Client `public/app-board.jsx`: dieselbe Maschine wie die
 Helden — `HeroIdleAnims` (Liste `ladeKreaturListe`, Cache-Schlüssel `c:<slug>`, `hatKreaturAnimation`, `kopiertHeld`) und `HeroIdleSprite` mit `kreatur` (gleiche Sprite-Ebene, gleicher Takt).
-Platzierung: Mitte `faceX`, Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden
+Platzierung: Mitte `faceX` (Gesichts-/Körpermitte, NICHT zwingend die Frame-Mitte: Haressassin hat `faceX` 11 zwischen den Augen, weil das Schwert weit nach rechts ragt; Skript: `extra={'faceX': …}` an `N4.abschluss`), Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden
 per Bayer-Raster ausgedünnt (`ausduennen`).
 *Größe:* Creature-Figuren stehen im Creature-Maßstab `KREATUR_MASS` = 3/4 des Hero-Maßstabs (2,8125 × `--board-scale` je Sprite-Pixel; ihr Sprite-Pixel ist also bewusst
 kleiner als der Hero-Pixel). Zusätzlich ist die Ruhefigur (`kern`, sonst Frame minus Leerrand) gedeckelt: passt sie in Sprite-Pixeln nicht in 64 × 68, kommt der größte passende
