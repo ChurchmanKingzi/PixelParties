@@ -208,7 +208,7 @@ const DAMAGE_HEAP_CHECK_EVERY = 25;
 // `CARDINAL_NAMES_SET`). Imported lazily inside the few hot paths
 // that need them (see usages of `require('./_cardinal-shared')`).
 
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { isCardinalBeastByName, cardinalNameImmun } = require('./_cardinal-shared');
 // Recursion depth cap for actionHealHero / actionDealDamage. Hook
 // handlers can call these engine methods DIRECTLY (not via
 // pendingTriggers), which bypasses MAX_PENDING_TRIGGERS. Known example:
@@ -14888,8 +14888,7 @@ class GameEngine {
     // counter never got stamped (puzzle preset / revive without hooks).
     // Mirrors the same belt-and-suspenders check in canApplyCreatureStatus.
     {
-      const { CARDINAL_NAMES } = require('./_cardinal-shared');
-      if (!_u && CARDINAL_NAMES.includes(targetCard.name)) {
+      if (!_u && cardinalNameImmun(this, targetCard)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Kreatur (Omikrons Cardinal-Illusion) hat die Immunität nicht
         this.log('destroy_blocked', { card: targetCard.name, reason: 'cardinal-beast' });
         return;
       }
@@ -22799,8 +22798,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.counters?._cardinalImmune) return true;
     if (this.kreaturGegnerEffektImmun(inst, quelle, opts)) return true;   // W17b: Golden Wings quellenbewusst
     if (inst.counters?._omniImmune) return true;
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return true;
+    if (cardinalNameImmun(this, inst)) return true;   // Namens-Rückfall; Spielgestalter-Entscheidung 16.11.2026: nicht, solange die Kreatur negiert ist (Omikrons Illusion)
     return false;
   }
 
@@ -32565,7 +32563,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   getSacrificableCreatures(playerIdx, opts = {}) {
     const gs = this.gs;
     const cardDB = this._getCardDB();
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
     const results = [];
     for (const inst of this.cardInstances) {
       // Kontrolle statt Seite (Styx 28.9.): „a Creature you control" —
@@ -32592,7 +32589,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // their onPlay hook, so the counter never gets stamped — but a
       // Baihu is a Baihu regardless of how it landed on the board.
       if (inst.counters?._cardinalImmune) continue;
-      if (CARDINAL_NAMES.includes(inst.name)) continue;
+      if (cardinalNameImmun(this, inst)) continue;   // (negierte Omikron-Illusion: ohne Immunität)
       // ★ „This Creature cannot be sacrificed" (v958, Boulder in a
       // Bottle). Eigener, enger Vertrag statt `_cardinalImmune`: der
       // sperrt JEDEN Effekt, hier geht es nur um das Opfern. Das
@@ -57625,7 +57622,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
           || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected)
-          || isCardinalBeastByName(inst?.name)) {
+          || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit

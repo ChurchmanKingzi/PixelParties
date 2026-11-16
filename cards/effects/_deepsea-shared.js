@@ -330,9 +330,9 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // animation and state mutation. Name-based fallback (shared with the
   // engine's damage-path check) catches summon paths where the
   // counter stamp got skipped.
-  const { isCardinalBeastByName } = require('./_cardinal-shared');
+  const { cardinalNameImmun } = require('./_cardinal-shared');
   // W17b: Golden Wings trägt jetzt `_gwImmune` (nur gegen Quellen anderer Spieler; `opts.sourceOwner`, ohne = geschützt).
-  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, opts.sourceOwner) || isCardinalBeastByName(inst.name)) {
+  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, opts.sourceOwner) || cardinalNameImmun(engine, inst)) {
     engine.log('cardinal_immune_block', {
       card: inst.name, by: sourceName, action: 'return_to_hand',
     });

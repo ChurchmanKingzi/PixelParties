@@ -35,7 +35,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { cardinalNameImmun } = require('./_cardinal-shared');
 
 const CARD_NAME = 'Surprising Opportunity';
 const MAX_KARTEN = 2;
@@ -47,7 +47,7 @@ function nimmbar(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   const c = inst.counters || {};
   if (c.immovable || c._gainedEffectOnly || c._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi)) return false;   // W17b: Golden Wings nur gegen den Gegner
-  if (isCardinalBeastByName(inst.name)) return false;
+  if (cardinalNameImmun(engine, inst)) return false;
   const roh = engine._getCardDB()[inst.name];
   const cd = engine.getEffectiveCardData(inst) || roh;
   if (!cd) return false;
