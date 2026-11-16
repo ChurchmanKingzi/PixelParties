@@ -50611,9 +50611,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
 
-    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, z. B. Cybug LADYBUG) →
+    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, z. B. Sinister Idol) →
     // Resistance & Co. fragen. Kosten (Weapon Storm, Quest …) sind kein Effekt auf den Helden und setzen es nicht;
     // Mehrfach-Abwuerfe EINES Effekts (Memory Wipe) fragen einmal auf Kartenebene, nicht je Ability.
+    // Spielgestalter-Entscheidung 16.11.2026: Resistance schützt vor Effekten auf den HELDEN selbst; eine Karte, die eine Ability WÄHLT
+    // (Strong Ox Headbutt, Cybug LADYBUG, Fire Bomb …), umgeht es → solche Karten setzen `effectOnHero` NICHT.
     if (opts.effectOnHero === true && eintrag.zoneKind !== 'support' && ps.heroes?.[eintrag.heroIdx]?.name
         && await this.heroNonDamageEffectBlocked(ownerIdx, eintrag.heroIdx, 'ability_discard', { sourceOwner: opts.sourceOwner, source: opts.source })) {
       return false;
