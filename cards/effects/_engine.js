@@ -34649,6 +34649,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             ausZielwahl: true,
           });
           if (pt?.effectNegated) {
+            // Negation ≠ Abbruch (wie in `promptDamageTarget`/`promptMultiTarget`): der Zauber ist gespielt und geht in die Ablage — ohne die Marke wertete `doPlaySpell` die
+            // leere Rueckgabe als Abbruch (Karte zurueck auf die Hand, Aktion erstattet, die Abwehrkarte trotzdem verbraucht). Nur waehrend einer Zauberaufloesung (Tiefe > 0,
+            // sonst bliebe die Marke stehen).
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
             // ★★ v1179/v1180: Bilder des abgewehrten Zaubers, dann der
             // Nachlauf der Abwehrkarte.
             await this.negationsBilder(quelle, helden.length ? helden : kreaturen, pt);
@@ -34706,6 +34710,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType: config.damageType,
           });
           if (_sr?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelle, _helden, _sr);   // v1179/v1180
             return [];
           }
@@ -34721,6 +34726,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType: config.damageType,
           });
           if (_srK?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelleK, _kreatSr, _srK);
             return [];
           }
