@@ -90,6 +90,10 @@ function bereitsImSpiel(ps) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Attach this card to a Hero you control".
+  requiresTarget: true,
+
   // W16g (R02-04): Engine-Marke — Schaden an den Traeger kann nicht verringert/negiert werden (`_isHeroDamageUnstoppable`).
   attachmentDamageCannotBeReducedOrNegated: true,
   activeIn: ['hand', 'support'],

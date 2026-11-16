@@ -22,6 +22,10 @@ const CARD_NAME = 'Fireball';
 const FIREBALL_DAMAGE = 150;
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Choose up to 2 targets your opponent controls".
+  requiresTarget: true,
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,

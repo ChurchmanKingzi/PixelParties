@@ -76,6 +76,10 @@ function _hasAnySwappable(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026 (Blinded): ein geblendeter Held (Smoke Vial, Trunk Sand) kann keine Attacks/Spells spielen, die Ziele waehlen — auch „up to N".
+  // Die Blendungs-Sperre der Engine liest dieses Kennzeichen. Hier: „Choose a Creature in one of your Heroes' Support Zones".
+  requiresTarget: true,
+
   // Inherent additional action is granted specifically when a not-
   // summoned-this-turn target with a valid replacement exists. The
   // engine consults this to decide whether the card can be played
