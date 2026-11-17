@@ -42,6 +42,9 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
     engine.log('edge_fizzle', { player: ps.username, reason: 'empty side deck' });
     return false;
   }
+  // Spielgestalter-Entscheidung 17.11.2026 (ANG-13, Hand-Sperre): „add it to your hand" — unter der Hand-/Such-Sperre ("cannot draw or add cards to your hand", `handLocked`; Cats of the
+  // Pharaoh: `searchLocked`) kommt keine Karte aus dem Side Deck auf die Hand (zweite Absicherung; die Karte ist dort schon nicht spielbar/anbietbar).
+  if (engine._isSearchBlocked(pi, {}, 'deck')) return false;
 
   const cardDB = engine._getCardDB();
   const seen = new Set();
@@ -129,6 +132,8 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
 }
 
 module.exports = {
+  // Hand-Sperre/Such-Sperre: der ganze Nutzen ist ein Zugang zur Hand — Handkarte dann nicht spielbar (`engine._cardBlockedBySearchLock`).
+  blockedBySearchLock: true,
   isReaction: true,
   proactivePlay: true,
   inherentAction: true,
@@ -153,11 +158,12 @@ module.exports = {
    * the reactive path to opponent's turn while the proactive `onPlay`
    * covers the player's own turn.
    */
-  reactionCondition: (gs, pi) => {
+  reactionCondition: (gs, pi, engine) => {
     if (gs.activePlayer === pi) return false;
     const ps = gs.players[pi];
     if (!ps) return false;
     if ((ps.sideDeck || []).length === 0) return false;
+    if (engine?._isSearchBlocked?.(pi, {}, 'deck')) return false;   // Hand-/Such-Sperre: nicht anbieten (siehe `doSideDeckPick`)
     if (ps._oncePerGameUsed?.has('divineGift')) return false;
     return true;
   },

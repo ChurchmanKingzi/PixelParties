@@ -44,6 +44,9 @@ module.exports = {
     // windows (card plays, damage, hero KO, …) don't let Sculpture
     // Theft sneak in.
     if (chainCtx?.hookName !== 'onStatusApplied') return false;
+    // Spielgestalter-Entscheidung 17.11.2026 (ANG-13): der ganze Nutzen ist ein Hand-Zugang — unter der Hand-Sperre ("cannot draw or add cards to your hand", `handLocked`) nicht anbieten
+    // (die reine Zieh-Sperre `drawLocked` sperrt es nicht).
+    if (engine?.handZugangGesperrt?.(pi)) return false;
     const hc = chainCtx.hookCtx || {};
     const statusName = hc.statusName || hc.status;
     if (statusName !== 'frozen') return false;
@@ -71,6 +74,7 @@ module.exports = {
   },
 
   resolve: async (engine, pi, _selectedIds, _validTargets, _chain, _myIdx) => {
+    if (engine.handZugangGesperrt?.(pi)) return false;   // zweite Absicherung (Sperre erst nach dem Angebot gesetzt): die Kreatur bleibt auf dem Brett
     const candidates = [];
     // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner
     // einen wirksamen Boris, faellt SEINE Seite als Quelle weg — die

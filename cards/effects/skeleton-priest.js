@@ -55,6 +55,8 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
+    // Spielgestalter-Entscheidung 17.11.2026 (G-01): "as an additional Action" ist eine Aktion — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar.
+    if (engine.areActionsBlocked(ctx.cardOwner)) return false;
     return eligibleSpells(ps, engine, ctx.cardOwner).length > 0;
   },
 
@@ -67,6 +69,7 @@ module.exports = {
     const heroIdx = priestInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (engine.areActionsBlocked(pi)) return false;   // zweite Absicherung (Sperre nach dem Angebot gesetzt): Einmal-Stempel bleibt frei
     // Styx 28.9.: Wirtsheld = Held der Spalte auf der BRETTSEITE der
     // Kreatur (seitenfremd beschworen: liegt auf B, gehoert A). Wirkt fuer
     // `pi`; die fluechtige Spell-Instanz traegt die Brettseite als

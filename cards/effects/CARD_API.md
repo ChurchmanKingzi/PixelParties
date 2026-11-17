@@ -3314,6 +3314,11 @@ Illusion is a Spell, and a Spell is an Action).
 The client receives the answer as the computed `actionLocked` boolean
 on the player state — same pattern as `potionLocked`.
 
+**„as an additional Action" ist eine Aktion (Spielgestalter-Entscheidung 17.11.2026, G-01):** Ein FREIER Effekt (Kreatur-Effekt, Held-Trigger), der
+einen Zauber/Angriff/eine Kreatur „as an additional Action" wirkt, unterliegt der Aktionssperre — er fragt `engine.areActionsBlocked(pi)` selbst, sobald er
+eine EIGENE Auswahlliste baut (Demon's Gate, Skeleton Wizard, Skeleton Priest: `canActivateCreatureEffect` + `onCreatureEffect`; Archibald, Rubin: am Auslöser).
+Wer `engine.getHeroEligibleActionCards`/`performImmediateAction` benutzt (Yukana, Junshi, Ellie, Coffee, Mana Beacon …), bekommt die Sperre dort schon geschenkt.
+
 ### Cancelling out of an additional Action
 
 Picking an Action and then backing out of **that Action's own** prompt
@@ -12172,7 +12177,8 @@ Divine Gifts) NICHT; dazu `_stempelAbzug`/`_stempelZurueck`, `link._opgNeu`, `re
   Kettenfenster) — auch eine danach negierte Surprise ist verbraucht.
 * *Fizzle* (Wirker beim Auflösen eingefroren/besiegt/betäubt/negiert, v1328) und *Negation*: `_noteFizzledPlay` (aus `executeCardWithChain`; nur Initialkarten aus der Hand, nicht Board-Aktivierungen/Platzierungen).
 * *Zähler-Lauscher* („Held hat einen Zauber BENUTZT": Kogarasu „1 Spell pro Zug"): `afterSpellResolved` plus der Hook **`afterSpellPrevented`** (`_meldeZauberVerhindert`): feuert bei Fizzle, Teil-Negierung UND
-  ganzer Negation.
+  ganzer Negation. Bei einer Negation NACH der Zielwahl (MOE Shield …) traegt er `viaAdditionalProvider` (der Geber, dessen Zusatzaktion der Zauber verbraucht hat — wie bei `afterSpellResolved`;
+  Spielgestalter-Entscheidung 17.11.2026): Friendship Lv2/3 zieht daher auch bei einem negierten Support Spell („then draw"). Bei Fizzle und Kettennegation (Zusatzaktion zurueck) ist er `null`.
 * Unverändert: Creature-Beschwörungen stempeln `oncePerGame` bei der **Landung** (v1030) — und, seit dieser Entscheidung, auch bei einer negierten Beschwörung; zielende Artefakte (`doConfirmPotion`) und
   Normal-Artefakte (`doUseArtifactEffect`) haben Tor **und** Stempel für `oncePerGame` (Perfect Disguise); `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit `opts.pruefen`); Item-/Zieh-Sperren
   aus Z6 (`drawWouldBeBlocked` in Squire/Albrecht/Pteranos/Raptoren).
@@ -16627,6 +16633,14 @@ Artifact-Creatures aus; Hand-Reaktionsartefakte zahlen den Item-Lock (`_rxPay` m
 (`_handPlayLockedFor`). Wer Karten aus Deck/Ablage holt, geht durch `takeFromPile`/`deckEntnahme` (kein eigener Splice).
 **Nicht betroffen bleibt (Als Ruling 14.9., Gruppe C/D):** Deck-Suchen, die auf Brett/Ablage/Held fuehren (Garius, Alex, Ska,
 Greenhouse) — die Such-Sperre meint nur "AUF DIE HAND".
+
+**Klauen ist „add cards to your hand" (Spielgestalter-Entscheidung 17.11.2026, ANG-13):** Unter der Hand-Sperre (`handLocked`: Rain of Spores
+„You cannot draw or add cards to your hand", Ice Sculpture Garden, Kazena, Navigation) entfaellt jeder Klau auf die eigene Hand — `actionStealFromHand` (Thieving
+Strike, Loot the Leftovers, Secret Entrance, Gather Intel, Live Show) und `blindHandWahl` pruefen `engine.handZugangGesperrt(pi)` zentral; der Rest
+des Effekts (der Schaden von Thieving Strike) wirkt weiter. Reine Klau-Karten sind dort unspielbar bzw. werden nicht angeboten (Charme Lv2, Loot the
+Leftovers, Sculpture Theft, Hunting Lv1, Divine Gift of Edge …). Die REINE Zieh-Sperre (`drawLocked`: The Sacred Jewel, MOE Shield, Prayer, Smuggler's Pier, Jenny) sperrt das Klauen
+NICHT — dort gilt nur „draw". Wer einen neuen Weg „Karte auf die Hand" baut, fragt `handZugangGesperrt` (bzw. `_isSearchBlocked` fuer Deck-/Ablage-Suchen),
+nie `drawLocked`.
 
 
 ### ★ Zieh-Sperre und Aktivierungen: nur REINE Zieher sind gesperrt (Welle 3, D1 — Regel von Al)

@@ -203,6 +203,13 @@ module.exports = {
     return hasLegalTrio(activatorEligibleSpells(ctx._engine, pi));
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (ZI-03): Zis Kartentext („You may spend your Action to …") nennt KEINE Einmal-pro-Zug-Grenze — nur die Aktion begrenzt ihn (mit einer
+   * Zusatzaktion darf Zi also mehrfach wirken). Die Engine-Rundensperre fuer aktive Heldeneffekte entfaellt deshalb: `ctx._skipHeroEffectHopt` im Erfolgsweg (Kassaran-/Sett-Muster) und hier
+   * `false` — eine NEGIERTE Aktivierung stempelt keine Rundensperre (die Aktion ist bezahlt, mehr gibt es nicht zu buchen). Dajan, Champion und Omikron schreiben „once per turn" und bleiben gesperrt.
+   */
+  stempelNegierteAktivierung() { return false; },
+
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -212,6 +219,7 @@ module.exports = {
     const oppPs = gs.players[oppIdx];
     const heroIdx = ctx.cardHeroIdx;
     if (!ps || !oppPs) return false;
+    ctx._skipHeroEffectHopt = true;   // keine Engine-Rundensperre (siehe `stempelNegierteAktivierung`); Abbruch (`false`) erstattet die Aktion weiterhin
 
     const spells = activatorEligibleSpells(engine, pi);
     if (!hasLegalTrio(spells)) return false; // defensive (gated by canActivate)

@@ -289,6 +289,8 @@ module.exports = {
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;
       if (!hero?.name || hero.hp <= 0) return;
+      // Spielgestalter-Entscheidung 17.11.2026 (G-01): "as an additional Action" ist eine Aktion — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar.
+      if (engine.areActionsBlocked(pi)) return;
       // Als Vorgabe 29.9.: ein uebernommener Rubin wirkt auf seiner
       // Brettseite (`feld`), Hand/Sperre/Prompt beim Kontrolleur `pi`.
       const feld = ctx.cardHeroOwner ?? pi;
