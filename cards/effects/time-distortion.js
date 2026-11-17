@@ -3,7 +3,7 @@
 //  CARD EFFECT: "Time Distortion"
 //  Spell (Magic Arts Lv1, Normal)
 //
-//  „Flip the top 3 cards of your deck face-up and choose a level 3 or lower Spell among them, if possible. The user of this Spell immediately performs that Spell as an additional Action,
+//  „Flip the top 3 cards of your deck face-up and choose a level 3 or lower Normal, Area, or Attachment Spell among them, if possible. The user of this Spell immediately performs that Spell as an additional Action,
 //   regardless of its level. Shuffle the other cards back into your deck."
 //
 //  ── AUFDECKEN (Muster Chaos-Diamond, nur vom Main Deck) ─────────────────
@@ -11,10 +11,10 @@
 //  `hand_card_revealed`). Aufdecken ist keine Suche (keine Such-Sperre). Ist das Deck leer, passiert nichts („if possible").
 //
 //  ── „CHOOSE A LEVEL 3 OR LOWER SPELL AMONG THEM, IF POSSIBLE" ───────────
-//  Wählbar ist ein aufgedeckter SPELL (Kartentyp Spell, jeder Untertyp) der Stufe 3 oder niedriger, den der Nutzer JETZT als Zusatzaktion wirken kann (`engine.kannSofortWirken`: Status des Helden —
+//  Wählbar ist ein aufgedeckter SPELL (Kartentyp Spell, Untertyp Normal, Area oder Attachment — Reactions und Surprises sind keine legitimen Ziele, Spielgestalter-Entscheidung 17.11.2026, `_perform-shared.js`) der Stufe 3 oder niedriger, den der Nutzer JETZT als Zusatzaktion wirken kann (`engine.kannSofortWirken`: Status des Helden —
 //  Null Zone, Frozen …; Spielbedingungen des Spells — z. B. ein Ziel muss existieren oder „This must be the only Spell you play this turn" (Eraser Beam: Time Distortion zählt schon als
 //  gespielter Spell, `_spellResolvedTurn`); Zusatzaktions-Sperren wie Duigno/Mission; „Only 1 per game"). Die Zusatzaktion STELLT Time Distortion — der Spell muss nicht selbst als
-//  Zusatzaktion spielbar sein (`inherentAction`). Die STUFE des Helden spielt ausdrücklich keine Rolle („regardless of its level"). Eine Attack, Creature oder ein höherer Spell ist nicht wählbar.
+//  Zusatzaktion spielbar sein (`inherentAction`). Die STUFE des Helden spielt ausdrücklich keine Rolle („regardless of its level"). Eine Attack, Creature, Reaction, Surprise oder ein höherer Spell ist nicht wählbar.
 //    • KEIN wählbarer Spell → die Karte FIZZELT (sichtbar, `zeigeFizzle`), alle aufgedeckten Karten werden zurückgemischt. Kein Spell geht verloren, die Aktion ist verbraucht.
 //    • Genau EIN wählbarer Spell → er wird ohne Rückfrage genommen. Mehrere → Galerie mit allen aufgedeckten Karten, die nicht wählbaren abgedunkelt, NICHT abbrechbar.
 //  Ist mindestens ein Spell wählbar, MUSS einer genutzt werden: die Galerie lässt sich nicht abbrechen, und auch der Guss ist Pflicht — Abbruch in der Zielwahl ist gesperrt
@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════
 
 const { REVEAL_MS } = require('./_deck-top-shared');
+const { performbarerUntertyp } = require('./_perform-shared');
 
 const CARD_NAME = 'Time Distortion';
 const ANZAHL = 3;
@@ -100,6 +101,7 @@ module.exports = {
         const wirkbar = (n) => {
           const cd = db[n];
           if (!cd || cd.cardType !== 'Spell' || (cd.level ?? 0) > MAX_STUFE) return false;
+          if (!performbarerUntertyp(cd)) return false;   // Spielgestalter-Entscheidung 17.11.2026: nur Normal, Area oder Attachment — Reactions und Surprises sind keine legitimen Ziele (in der Galerie ausgegraut)
           return engine.kannSofortWirken(pi, heroIdx, n, heroSeite, { alsZusatzaktion: true });
         };
         const kandidaten = [...new Set(gezogen)].filter(wirkbar);
