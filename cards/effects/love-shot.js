@@ -37,6 +37,11 @@
 //
 //     Praktisch heisst das: waehrend der geliehenen Aktion kann der
 //     Held Rueckstoss, Gegenschlaege und Reaktionen abbekommen.
+//     ★ Spielgestalter-Entscheidung 17.11.2026: dasselbe gilt fuer
+//     negative STATUS — der geliehene Held ist nicht status-immun
+//     (Frost Rune friert ihn ein, Toxic Trap vergiftet ihn; sonst
+//     wirkte `_charmBlocksFrom` am Statustor weiter). Nur der echte
+//     Charme Lv3 (Marke ohne `_loveShot`) bleibt immun.
 //
 //  Implementation
 //  ──────────────

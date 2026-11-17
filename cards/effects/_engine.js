@@ -20958,14 +20958,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @param quellenSeite Spielerindex der Quelle (oder null/-1)
    * @param opts.loveShotOhneSchutz  true am SCHADENSpfad — dort hebt
-   *        `_loveShot` den Schutz auf; beim Status bleibt er.
+   *        `_loveShot` den Schutz auf (`nurSchadenSchutz` bleibt davon getrennt).
    */
   _charmBlocksFrom(target, quellenSeite, opts = {}) {
     const ch = target?.statuses?.charmed;
     if (!ch) return false;
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
-    if (ch._loveShot && opts.loveShotOhneSchutz) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (LOVE-01): der von Love Shot GELIEHENE Held ist weder schadens- noch status-immun — nur die Kontrolle ist geliehen. Frozen/Poisoned/Stunned …
+    // (Frost Rune, Toxic Trap & Co. am Angreifer) wirken wie bei jedem anderen Helden; die Immunität echter Charme-Helden (Charme Lv3, Marke ohne `_loveShot`) bleibt unverändert.
+    if (ch._loveShot) return false;
     // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
     // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
     if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
