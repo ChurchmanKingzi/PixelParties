@@ -12536,6 +12536,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
     room.engine.armEffectAnnounce(cardName, pi, 'board', _crossInst ? undefined : { seite: _brett, heroIdx });
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
@@ -12552,6 +12553,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
         room.engine._lastPromptGerryDeclined = false;
         hoptReserved = false; // keep HOPT consumed
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, equip: cardName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Zielfenster-Reaktion/-Surprise/-Wächter: Cool Tech Jetpack, Rolling Boulder, Glass Wall …;
+        // der Picker lieferte `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei Kreatur-/Helden-/Ability-Aktivierungen ist die Einmal-pro-Zug-Sperre verbraucht.
+        // (Ausrüstungs-Effekte haben kein Kettenfenster; Abbruch/„Nein" gibt die Sperre weiter frei.)
+        hoptReserved = false; // keep HOPT consumed
       } else {
         releaseHopt();
       }
