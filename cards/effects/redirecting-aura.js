@@ -20,10 +20,13 @@
 //
 //  ── WOHIN? „any other target you control" — NUR LEGALE ZIELE ────────────
 //  Die Möglichkeiten sind die Ziele, die DER umgelenkte Effekt überhaupt treffen darf (seine Zielliste `validTargets`, bei Flächeneffekten seine Trefferliste), die der Aura-Besitzer
-//  kontrolliert (Helden und Kreaturen, beide Bretthälften, Kontrolle statt Seite), nicht das ursprüngliche Ziel sind, nicht ausgegraut/gesperrt (`ineligible`), nicht immun gegen den
-//  Effekt und LEBEN. Daraus folgt alles Weitere von selbst:
+//  kontrolliert (Helden und Kreaturen, beide Bretthälften, Kontrolle statt Seite), nicht das ursprüngliche Ziel sind, nicht ausgegraut/gesperrt (`ineligible`) und LEBEN. Daraus folgt
+//  alles Weitere von selbst:
 //    • trifft ein Effekt nur Helden, bleibt es bei einem Helden; ein Effekt, der nur Kreaturen wählt, kann nur auf eine Kreatur gehen;
 //    • Zielschutz („cannot be chosen" …) bleibt gültig — ein geschütztes Ziel steht gar nicht erst in der Liste;
+//    • ★ Spielgestalter-Entscheidung 17.11.2026: IMMUNE Ziele (Anti Magic, Effekt-Immunität …) sind legitime Umleitungsziele — immun heißt nicht „nicht wählbar". Die Aura darf einen Spell
+//      auf einen immunen Helden lenken; der Treffer verpufft dort (Log `damage_blocked`/`magic_immune`), die Aura wirkt dann wie eine Negation. (Der frühere Satz „nicht immun gegen den
+//      Effekt" an dieser Stelle war falsch und ist gestrichen; der Code filterte nie auf Immunität.)
 //    • „even if that target was already hit by the same Spell/effect": ein Ziel, das der Effekt ohnehin trifft, bleibt eine Möglichkeit. Der Effekt trifft es dann ZWEIMAL.
 //  Die neue Wahl wird ihrerseits „gewählt": die Umleiter des neuen Ziels dürfen ihrerseits reagieren (Kette, von der Engine bei 8 Stufen gedeckelt).
 //
