@@ -64,6 +64,8 @@ module.exports = {
     for (let seite = 0; seite < gs.players.length; seite++) {
       targets.push(...engine.getHeroTargets(seite));
     }
+    // Warnungsprinzip (Spielgestalter-Entscheidung 17.11.2026): betäubungs-immune Helden bleiben wählbar, die Zielwahl warnt („… is immune to stunning and will not be affected."), die CPU wählt sie nicht.
+    engine.markiereStatusWirkungslos?.(targets, 'stunned', pi, CARD_NAME);
     return targets;
   },
 
