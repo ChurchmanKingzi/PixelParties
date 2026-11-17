@@ -17,7 +17,12 @@
 //  "when you gain 4 or more Gold through an effect":
 //    • EIGENER Gewinn (der Gegner loest nichts aus),
 //    • NICHT das automatische Rundeneinkommen der Resource Phase —
-//      das traegt `_isResourceGain` (siehe actionGainGold),
+//      das traegt `_isResourceGain` (siehe actionGainGold). Seine
+//      ZUSCHLAEGE (Treasure Huntress Semi +6, Wealth +4 je Stufe) sind
+//      dagegen Effekt-Gold (Spielgestalter-Entscheidung 17.11.2026, Q76):
+//      `actionGainGold` feuert je Zuschlag ein eigenes `afterResourceGain`
+//      OHNE `_isResourceGain` (Marker `_einkommensBonus`) — das liest dieser
+//      Ausloeser wie jeden Kartengewinn,
 //    • mindestens 4 Gold in EINEM Ereignis,
 //    • ausgewertet NACH der Buchung (`afterResourceGain`), damit
 //      "immediately pay that Gold" wirklich bezahlbar ist und die

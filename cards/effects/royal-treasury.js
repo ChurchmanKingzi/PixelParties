@@ -11,7 +11,9 @@
 //    Anti-Magic, Zone, Instanz, `_spellPlacedOnBoard`). Danach liegt die
 //    Karte in der Support Zone des Wirts (`ctx.attachedHero`).
 //  · Hook `afterResourceGain` NACH der Buchung (Monkee-Muster): nur
-//    eigener Gewinn, kein Rundeneinkommen (`_isResourceGain`), Betrag > 0,
+//    eigener Gewinn, kein Rundeneinkommen (`_isResourceGain`; dessen Zuschlaege —
+//    Semi, Wealth — kommen als eigenes Ereignis ohne dieses Flag an, Spielgestalter-
+//    Entscheidung 17.11.2026), Betrag > 0,
 //    und NICHT der eigene Bonus (Marker `gs._royalTreasuryGain`) — „through
 //    ANOTHER effect". Die Goldquelle wird nicht verbraucht (Monkees
 //    duerfen weiter darauf reagieren; der Bonus ist eine eigene Quelle).

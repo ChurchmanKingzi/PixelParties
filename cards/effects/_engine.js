@@ -29848,6 +29848,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Welle 11 (Al, Q76: „das normale Einkommen sollte unberührt sein. Aber andere Einkommensquellen in der Resource Phase, etwa Wealth oder
     // Semi, dürfen ihn triggern!"): die Zuschläge zum Rundeneinkommen sind Effekt-Gold — je Quelle bietet der Hook `onIncomeBonusGain`
     // (Golden Vermin) an, sie durch eine Karte zu ersetzen. Das Grund-Einkommen (4) bleibt immer.
+    // Spielgestalter-Entscheidung 17.11.2026 (SEM-01): derselbe Zuschlag ist Effekt-Gold auch fuer „when you gain Gold through an effect" NACH der Buchung (Monkees, Royal Treasury, Humby): die nicht
+    // ersetzten Zuschlaege (`wirksameBoni`) feuern unten je Quelle einen eigenen `afterResourceGain` OHNE `_isResourceGain` (Marker `_einkommensBonus`); nur das Grund-Einkommen (4) bleibt ausgenommen.
+    const wirksameBoni = [];
     if (hookCtx._isResourceGain && hookCtx._einkommensBoni?.length) {
       for (const bonus of hookCtx._einkommensBoni) {
         const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
@@ -29857,6 +29860,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // W24b N2-09: derselbe Zuschlag ist auch fuer Gold Trap „Gold through an effect" — Fenster nur fuer den Zuschlag, das Grund-Einkommen bleibt.
           const trap = await this._checkSurpriseOnResourceGain(playerIdx, bonus.delta);
           if (trap?.redirected) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
+          else wirksameBoni.push(bonus);
         }
       }
     }
@@ -29899,6 +29903,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         playerIdx, amount: gained, _isResourceGain: !!opts._isResourceGain,
         _goldSource: { playerIdx, amount: gained, consumed: false },
       });
+      // Spielgestalter-Entscheidung 17.11.2026 (SEM-01: „Semis Gold-Gain zählt als Effekt-Gold und soll entsprechende Trigger aktivieren können"; Q76: Wealth, Semi & Co.): jeder Einkommens-Zuschlag
+      // ist ein eigenes Effekt-Gold-Ereignis — wie ein Gewinn durch eine Karte (`_isResourceGain: false`, eigene Goldquelle), damit Cheeky/Nimble/Resilient Monkee („4 or more Gold through an effect"),
+      // Royal Treasury („through another effect") und Humby darauf reagieren. Das Grund-Einkommen bleibt ausgenommen (kein eigenes Ereignis); schon ersetzte (Golden Vermin) oder umgeleitete (Gold Trap)
+      // Zuschlaege kommen hier nicht mehr vor. Der Betrag ist bereits gebucht (Teil von `gained`).
+      if (wirksameBoni.length > 0) {
+        let rest = gained;
+        for (const bonus of wirksameBoni) {
+          const betrag = Math.min(bonus.delta, rest);
+          rest -= betrag;
+          if (!(betrag > 0)) continue;
+          await this.runHooks(HOOKS.AFTER_RESOURCE_GAIN, {
+            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.card?.name,
+            _goldSource: { playerIdx, amount: betrag, consumed: false },
+          });
+        }
+      }
     }
     // Zustandsregeln (Logan) — siehe _checkGoldStateRules.
     this._checkGoldStateRules(playerIdx);
