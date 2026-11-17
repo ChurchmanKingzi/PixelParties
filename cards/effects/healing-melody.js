@@ -107,7 +107,9 @@ module.exports = {
       for (const inst of engine.cardInstances) {
         if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
         const seite = engine.physicalSide(inst);
-        if (!(gs.players[seite]?.heroes?.[inst.heroIdx]?.hp > 0)) continue;   // Kreaturen eines toten Helden wie bisher nicht
+        // Spielgestalter-Entscheidung 17.11.2026: „alle eigenen Creatures sollen geheilt werden, unabhaengig vom Hero" — auch Kreaturen
+        // eines gefallenen Helden (sie bleiben auf dem Brett und sind bei Heal/Healing Potion Ziel). Kein Lebend-Filter am Helden mehr;
+        // eine HP-teilende Kreatur (`sharesHpWithHero`) eines toten Helden bleibt wirkungslos (`actionHealCreature`: der Pool ist der tote Held).
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
         allTargets.push({ type: 'creature', heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, inst, ownerIdx: seite });

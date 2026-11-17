@@ -10,6 +10,9 @@
 //  controlled Hero cannot take any damage while
 //  it is controlled by this effect.
 //
+//  ★ Spielgestalter-Entscheidung 17.11.2026: „… perform an Attack or a Normal, Area, or Attachment Spell from your hand …" — Reactions und Surprises
+//  (Untertyp Reaction/Surprise, Spell wie Attack) sind keine legitimen Ziele und in der Kartenwahl ausgegraut (`_perform-shared.js`).
+//
 //  ★★ NEUER TEXT (Al 15.9.) — cards.json ist mitgeaendert:
 //
 //  „This Spell can be used by Heroes with the «Charme» Ability
@@ -81,6 +84,7 @@ const CARD_NAME = 'Love Shot';
 
 const { zieheAusGegnerDeck } = require('./_opponent-deck-shared');
 const { ausgegrauteRestkarten } = require('./_target-dim-shared');
+const { performbarerUntertyp } = require('./_perform-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -358,6 +362,9 @@ module.exports = {
           const cd = cardDB[name];
           if (!cd) continue;
           if (cd.cardType !== 'Spell' && cd.cardType !== 'Attack') continue;
+          // Spielgestalter-Entscheidung 17.11.2026: „… perform an Attack or a Normal, Area, or Attachment Spell" — Reactions und Surprises sind keine legitimen
+          // Ziele (ausgegraut in der Kartenwahl; vorher wählbar und dann ohne Wirkung abgelegt, die Karte war verloren). Siehe `_perform-shared.js`.
+          if (!performbarerUntertyp(cd)) continue;
           // No Love Shot inside Love Shot — would recurse and re-
           // pin the charm to itself.
           if (name === CARD_NAME) continue;
