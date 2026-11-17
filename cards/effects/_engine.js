@@ -2186,7 +2186,19 @@ class GameEngine {
 
       // Generic: take the first `pickN` eligible indices.
       const pickN = Math.min(maxSelect, eligible.length);
-      const selectedIndices = eligible.slice(0, pickN);
+      let selectedIndices = eligible.slice(0, pickN);
+      // Typ-Obergrenzen (`cardTypes`/`typeLimits`, Shard of Chaos): nie mehr Karten eines Typs, als der Prompt zulaesst (der Server prueft sie, 17.11.2026).
+      if (promptData.typeLimits && promptData.cardTypes) {
+        const benutzt = {};
+        selectedIndices = [];
+        for (const idx of eligible) {
+          if (selectedIndices.length >= pickN) break;
+          const t = promptData.cardTypes[idx];
+          if (t != null && promptData.typeLimits[t] != null && (benutzt[t] || 0) >= promptData.typeLimits[t]) continue;
+          benutzt[t] = (benutzt[t] || 0) + 1;
+          selectedIndices.push(idx);
+        }
+      }
       return {
         selectedCards: selectedIndices.map(idx => ({
           handIndex: idx, cardName: ps.hand?.[idx] ?? null,
@@ -8527,6 +8539,9 @@ class GameEngine {
    */
   _quelleDurchschlaegtHeldenSchutz(source, target, type) {
     if (!source || !target || target.hp === undefined) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „cannot be reduced or negated" — „Der Schaden soll durchgehen! Gilt allgemein für jede Immunität"): der vom Elixir verstärkte
+    // Attack-Treffer schlägt dieselben „takes no damage"-Formen durch wie Ida (Storm Piano/Cheat Chair, Versteinerung, Succubus-/Lyta-Kontrolle); „unaffected by …"-Effekt-Immunitäten bleiben.
+    if (this._empoweredStrikeHeld(source, type)) return true;
     const qs = this._klonSicht(source);
     const sOwner = qs?.heroOwner ?? qs?.owner ?? qs?.controller;
     const sHeroIdx = qs?.heroIdx;
@@ -10364,6 +10379,13 @@ class GameEngine {
         this.log('true_damage', { target: this._heroLabel(target), source: source?.name });
       }
     }
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength): „that Attack's damage is increased by 150 and cannot be reduced or negated" — der GANZE Schaden dieses Treffers ist unreduzier-/unnegierbar,
+    // schon fuer die Hook-Runde unten (Schilde, Senkungen, negierende Hooks sehen die Flaggen wie bei Ida); +150 und Verbrauch des Buffs folgen im Rider (`_applyEmpoweredStrikeIfApplicable`).
+    if (target?.hp !== undefined && amount > 0 && this._empoweredStrikeHeld(source, type)) {
+      hookCtx.cannotBeNegated = true;
+      hookCtx.cannotBeReduced = true;
+      hookCtx._unreduzierbar = true;
+    }
     // v687: zielseitige Unangreifbarkeit (Tempeste, the Weather Fairy).
     // VOR BEFORE_DAMAGE gesetzt, damit jeder Listener `ctx.cannotBe…`
     // schon liest und setAmount/modifyAmount die Reduktion abweisen
@@ -11364,7 +11386,7 @@ class GameEngine {
   _todesAufschubBeginnen() {
     const a = this._todesAufschub;
     if (a) { a.tiefe += 1; return; }
-    this._todesAufschub = { tiefe: 1, liste: [], nachher: [] };
+    this._todesAufschub = { tiefe: 1, liste: [], nachher: [], nachTode: [] };
   }
 
   /**
@@ -11380,18 +11402,32 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * Spielgestalter-Entscheidung 17.11.2026 (Explosivo's Sword × Whirlwind Strike): Wirkung, die erst laufen darf, wenn der Flaechenschlag
+   * KOMPLETT aufgeloest ist — aller Schaden, alle Tode samt ihrer Trigger (Wanted Poster …) und die Klammer selbst sind durch.
+   * Laeuft gerade ein Schlag (Klammer offen), wird `fn` vorgemerkt und beim Schliessen der AEUSSERSTEN Klammer NACH den Toden
+   * abgearbeitet (`endMultiHit`); sonst `false` zurueck, und der Aufrufer wirkt sofort (Einzeltreffer unveraendert).
+   */
+  nachFlaechenschlagTode(fn) {
+    const a = this._todesAufschub;
+    if (!a || typeof fn !== 'function') return false;
+    (a.nachTode || (a.nachTode = [])).push(fn);
+    return true;
+  }
+
   /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
-   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen. */
+   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen.
+   *  Rueckgabe: die erst NACH den Toden vorgemerkten Wirkungen (`nachFlaechenschlagTode`) — `endMultiHit` fuehrt sie nach dem Schliessen der Klammer aus. */
   async _todesAufschubAbschliessen() {
     const a = this._todesAufschub;
-    if (!a) return;
-    if (a.tiefe > 1) { a.tiefe -= 1; return; }
+    if (!a) return [];
+    if (a.tiefe > 1) { a.tiefe -= 1; return []; }
     this._todesAufschub = null;
     // Aller Schaden ist durch: vorgemerkte Nachwirkungen (Rool …) jetzt, vor der Todesauswertung.
     for (const fn of (a.nachher || [])) {
       try { await fn(); } catch (err) { console.error('[nachFlaechenschlag]', err.message); }
     }
-    if (a.liste.length === 0) return;
+    if (a.liste.length === 0) return a.nachTode || [];
     // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
     // Creatures are defeated" sieht die ganze Liste auf einmal.
     await this._mitNiederlagenSammler(async () => {
@@ -11412,6 +11448,7 @@ class GameEngine {
         await this._checkReactiveHandLimits(owner);
       }
     });
+    return a.nachTode || [];
   }
 
   /**
@@ -44335,16 +44372,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Mutates the passed hookCtx-shape object directly (works for both
    * the hero-damage hookCtx and the creature-damage proxy).
    */
-  _applyEmpoweredStrikeIfApplicable(hookCtx) {
-    if (!hookCtx) return;
-    if (hookCtx.type !== 'attack') return;
-    const source = hookCtx.source;
+  /**
+   * Der Held, dessen bereitstehender Elixir of Strength (`empowered_strike`) diesen Treffer verstaerkt — oder `null`. EINE Stelle fuer die Bedingungen (Attack-Schaden eines Helden mit dem Buff,
+   * nicht in einer Mehrziel-Klammer mit 2+ Zielen): der Rider (`_applyEmpoweredStrikeIfApplicable`) und die Durchschlags-Abfrage (`_quelleDurchschlaegtHeldenSchutz`) lesen sie beide.
+   */
+  _empoweredStrikeHeld(source, type) {
+    if (type !== 'attack') return null;
     const srcOwner = source?.owner ?? source?.controller;
     const srcHi = source?.heroIdx;
-    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return null;
     // „that Hero": geliehener Held (Love Shot, Charme) → `heroOwner` ist seine Brettseite, `owner` der Kontrolleur (quelleIstHeld).
     const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
-    if (!srcHero?.buffs?.empowered_strike) return;
+    if (!srcHero?.buffs?.empowered_strike) return null;
 
     // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
     // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
@@ -44353,7 +44392,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
     // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
     const _mh = this._multiHitScope;
-    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return null;
+    return srcHero;
+  }
+
+  _applyEmpoweredStrikeIfApplicable(hookCtx) {
+    if (!hookCtx) return;
+    const srcHero = this._empoweredStrikeHeld(hookCtx.source, hookCtx.type);
+    if (!srcHero) return;
 
     hookCtx.amount = (hookCtx.amount || 0) + EMPOWERED_STRIKE_BONUS;   // W49a (Al, 22.10.2026): 150 statt 100
     if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
@@ -49634,8 +49680,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._aoeSurpriseKeys = null;
     }
     if (!this._multiHitScope) return;
+    let nachTode = [];
     try {
-      await this._todesAufschubAbschliessen();
+      nachTode = await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
         if ((this._multiHitScope.tiefe || 1) <= 1) {
@@ -49643,6 +49690,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           this._multiHitScope = null;
         } else this._multiHitScope.tiefe -= 1;
       }
+    }
+    // Spielgestalter-Entscheidung 17.11.2026: der Schlag ist komplett aufgeloest (Schaden, Tode, Trigger) — jetzt erst die Wirkungen „danach" (Explosivo's Sword).
+    for (const fn of (nachTode || [])) {
+      try { await fn(); } catch (err) { console.error('[nachFlaechenschlagTode]', err.message); }
     }
   }
 
@@ -56750,6 +56801,42 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip, Snow Cannon × freeze-immune Held): Ziele, auf die ein Status schon wegen einer Zustands-Immunitaet NICHT wirken
+   * wird (freeze_immune, burn_immune, `immune`, Charme, Johanna, Light Ball, Kreaturen-Schutz …), bleiben als Ziel WAEHLBAR — der Effekt verpufft, die Karte ist verbraucht. Der Picker
+   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz), `server.js` (`mitWirkungslosHinweis`) haengt ihn an den Beschreibungstext der Zielwahl; die CPU waehlt solche
+   * Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
+   * Gibt den Hinweissatz fuer EIN Picker-Ziel (`{type:'hero', owner, heroIdx}` bzw. `{type:'equip', cardInstance}`) zurueck, '' wenn der Status landen kann.
+   * `pi` = Seite der Quelle (Charme-Schutz, Golden Wings), `quelleName` = Name der Karte.
+   */
+  statusWirkungslosHinweis(ziel, statusName, pi, quelleName) {
+    if (!ziel) return '';
+    const GERUND = { frozen: 'freezing', burned: 'burning', stunned: 'stunning', negated: 'negation', bound: 'binding', poisoned: 'poison' };
+    let blockt = false;
+    let name = ziel.cardName || '';
+    if (ziel.type === 'hero') {
+      const hero = this.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+      if (!hero?.name) return '';
+      name = name || hero.name;
+      blockt = this.heroBlocksStatusNow(ziel.owner, ziel.heroIdx, statusName, { appliedBy: pi });
+    } else {
+      const inst = ziel.cardInstance || ziel._cardInstance || this.kreaturAnBrett(ziel.owner, ziel.heroIdx, ziel.slotIdx);   // Listen ohne Instanz (Poison Vial) loesen ueber (Brettseite, Held, Zone) auf
+      if (!inst?.counters) return '';
+      name = name || inst.name;
+      blockt = !this.canApplyCreatureStatus(inst, statusName, { name: quelleName, owner: pi }, { gwSourceOwner: pi });
+    }
+    return blockt ? `${name} is immune to ${GERUND[statusName] || statusName} and will not be affected.` : '';
+  }
+
+  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos`). Rueckgabe: dieselbe Liste. */
+  markiereStatusWirkungslos(ziele, statusName, pi, quelleName) {
+    for (const t of (ziele || [])) {
+      const h = this.statusWirkungslosHinweis(t, statusName, pi, quelleName);
+      if (h) t.wirkungslos = h;
+    }
+    return ziele;
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
@@ -58453,14 +58540,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
-          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected)
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz)
           || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
+      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !e.durchschlagSchutz && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
@@ -58482,7 +58569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         e._immuneCreature = true;
       } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
-      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected) {
+      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected && !e.durchschlagSchutz) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert auch diesen Schutz (`e.ignoreUnaffected`).
         e._immuneCreature = true;
@@ -58670,6 +58757,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „… cannot be reduced or negated", Kreaturen-Zwilling des Heldenpfads): ein vom Elixir verstärkter Attack-Treffer auf EIN Ziel
+    // ist unreduzier-/unnegierbar (wie True Damage: `canBeNegated: false` — Defending the Gate, Resilient Monkee, Guardian & Co. halten ihn nicht ab) und schlägt die „takes no damage"-Formen
+    // durch (Versteinerung, „cannot take damage" von Time Bomblebee, gestohlene Kreatur: `e.durchschlagSchutz`); „unaffected by …"-Effekt-Immunitäten bleiben. Der Stempel liegt VOR der
+    // Immunitäts-Markierung unten; +150 und Verbrauch des Buffs folgen im Rider weiter unten.
+    if (entries.length === 1) {
+      const e0 = entries[0];
+      if (e0 && e0.amount > 0 && this._empoweredStrikeHeld(e0.source, e0.type)) {
+        e0.canBeNegated = false;
+        e0.cannotBeNegated = true;
+        e0.cannotBeReduced = true;
+        e0._unreduzierbar = true;
+        e0.durchschlagSchutz = true;
+      }
+    }
     this._markCreatureDamageImmunity(entries);
 
     // Annotate entries with cancelled flag and init HP

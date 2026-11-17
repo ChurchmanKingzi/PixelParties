@@ -56,6 +56,9 @@ module.exports = {
       if (!h?.name || h.hp <= 0) continue;
       out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
+    // Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): betäubungs-immune Helden bleiben wählbar (so war es schon), die Zielwahl warnt jetzt
+    // („… is immune to stunning and will not be affected."), die CPU wählt sie nicht (`engine.markiereStatusWirkungslos`); die Karte ist verbraucht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(out, 'stunned', pi, CARD_NAME);
     return out;
   },
 

@@ -31,32 +31,31 @@ const CARD_NAME = 'Gigantisaur Skull';
 
 /**
  * Every Creature on the board that can legally be targeted by Freeze —
- * alive support-zone occupant, not face-down, not freeze_immune. Uses
- * the TARGETING-side gate so omni-immune Creatures (Cardinal Beasts,
- * Golden-Wings wearers, …) stay selectable; the actual Freeze
- * application fizzles silently in `_freezeCreature` via the
- * application-side `canApplyCreatureStatus`. Used by both the
+ * alive support-zone occupant, not face-down. Spielgestalter-Entscheidung
+ * 17.11.2026 (Warnungsprinzip): gegen Frost immune Creatures (freeze_immune,
+ * Cardinal Beasts, Golden-Wings wearers, …) bleiben ALLE selectable — die
+ * Zielwahl warnt (`wirkungslos`, „… is immune to freezing and will not be
+ * affected."), the actual Freeze application fizzles in `_freezeCreature`
+ * via the application-side `canApplyCreatureStatus`. Used by both the
  * proactive target picker and the proactive playability gate.
  */
-function _allFreezeableCreatureTargets(engine) {
+function _allFreezeableCreatureTargets(engine, pi) {
   // Delegate Creature enumeration to the engine's standard helper —
   // it already iterates every Support Zone regardless of host-Hero
   // state (creatures are independent of their Hero) and filters down
   // to actual Creatures (including Artifact-Creature hybrids).
-  // Layer the Freeze-specific filters on top: non-face-down + the
-  // TARGETING-side `canTargetForStatus` gate (omni-immune Creatures
-  // stay selectable so the application-side fizzles silently rather
-  // than the picker hiding them).
+  // Layer the Freeze-specific filter on top: non-face-down (immune
+  // Creatures stay selectable, flagged `wirkungslos`).
   const out = [];
-  for (let pi = 0; pi < engine.playerCount(); pi++) {
-    for (const t of engine.getCreatureTargets(pi)) {
+  for (let seite = 0; seite < engine.playerCount(); seite++) {
+    for (const t of engine.getCreatureTargets(seite)) {
       const inst = t.cardInstance;
       if (!inst) continue;
       if (inst.faceDown) continue;
-      if (!engine.canTargetForStatus(inst, 'frozen')) continue;
       out.push(t);
     }
   }
+  if (engine.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(out, 'frozen', pi, CARD_NAME);
   return out;
 }
 
@@ -129,12 +128,12 @@ module.exports = {
       }
       return false;
     }
-    return _allFreezeableCreatureTargets(engine).length > 0;
+    return _allFreezeableCreatureTargets(engine, pi).length > 0;
   },
 
   getValidTargets(gs, pi, engine) {
     if (!engine) return [];
-    return _allFreezeableCreatureTargets(engine);
+    return _allFreezeableCreatureTargets(engine, pi);
   },
 
   targetingConfig: {
