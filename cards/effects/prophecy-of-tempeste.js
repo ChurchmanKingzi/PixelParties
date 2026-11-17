@@ -23,6 +23,24 @@
 //    `beforeCreatureDamageBatch` hook by
 //    cancelling individual entries and firing
 //    a follow-up actionDealDamage on the host.
+//  • ★ Spielgestalter-Entscheidung 17.11.2026 (unreduzierbarer Schaden): Gegen
+//    „cannot be reduced or negated"-Schaden (True Damage: Rockfall, Pressure
+//    Projectile, Surefire Shot …; auch `cannotBeReduced`-Treffer wie Idas Zauber)
+//    wird die Umleitung nach dem Warnungsprinzip ANGEBOTEN (Hook `beforeTrueDamage`
+//    fuer Helden, der Kreaturen-Stapel ohnehin) und FINDET STATT — Umleiten ist
+//    weder Senken noch Negieren (wie Gigantisaur Brachion / Mean Cute Cat). Der
+//    Deckel „cannot exceed 100" ist aber eine REDUKTION und greift gegen
+//    unreduzierbaren Schaden NICHT: der Traeger nimmt den vollen Betrag; die Frage
+//    traegt dann den Hinweis „… cannot be reduced, so … cap will not apply. Activate
+//    … anyway?" (nur wenn der Deckel greifen wuerde, d. h. Betrag > 100; fuer die
+//    CPU `_nutzlos`). Direkt auf den Traeger gerichteter True Damage wird ebenfalls
+//    nicht gedeckelt (unreduzierbarer Schaden toppt den Deckel, wie jeden Schild).
+//    Normaler Schaden: unveraendert (Umleitung mit Deckel 100).
+//    Quellen mit `cannotBeRedirected` (Acid Vial, Glasowt) werden nie umgeleitet.
+//  • ★ Spielgestalter-Entscheidung 17.11.2026: Gegen Quellen, auf die der Gegner nicht
+//    reagieren darf („cannot be reacted to": Surefire Shot, Midnight Assault —
+//    `engine._reaktionGesperrt`), wird die Umleitung GAR NICHT angeboten (anders als bei
+//    „cannot be reduced": dort Warnungsprinzip). Der Dauer-Deckel am Traeger bleibt.
 //  • Once per turn: HOPT key scoped per
 //    Tempeste instance (`tempeste_redirect:
 //    <instId>`). Each Tempeste fires once per
@@ -57,9 +75,29 @@
 const { hasCardType } = require('./_hooks');
 
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { loadCardEffect } = require('./_loader');
 const CARD_NAME    = 'Prophecy of Tempeste';
 const DAMAGE_CAP   = 100;
 const ANIM_FLY_MS  = 700;
+
+/** Quelle, die laut Kartentext nicht umgeleitet werden darf (Acid Vial, Glasowt: `cannotBeRedirected`) — wie Mean Cute Cat / Johanna. */
+function nichtUmleitbar(source, extra) {
+  if (extra) return true;
+  if (!source) return false;
+  if (source.cannotBeRedirected) return true;
+  if (source.name) {
+    try { if (loadCardEffect(source.name)?.cannotBeRedirected) return true; } catch { /* unbekannte Quelle: normal */ }
+  }
+  return false;
+}
+
+/** Frage der Umleitung; `unreduzierbar` (Betrag ueber dem Deckel): Hinweis „cap will not apply" (Warnungsprinzip, CPU lehnt ab). */
+function umleitFrage(wer, betrag, quelle, hostName, unreduzierbar) {
+  const hinweis = unreduzierbar && betrag > DAMAGE_CAP;
+  const vorne = `${wer} is about to take ${betrag} damage from ${quelle}.`;
+  if (hinweis) return { hinweis, message: `${vorne} This damage cannot be reduced, so ${CARD_NAME}'s ${DAMAGE_CAP} cap will not apply. Activate ${CARD_NAME} anyway?` };
+  return { hinweis, message: unreduzierbar ? `${vorne} Redirect to ${hostName}?` : `${vorne} Redirect to ${hostName}? (Capped at ${DAMAGE_CAP})` };
+}
 
 function findFreeSlot(ps, heroIdx) {
   const sz = ps.supportZones?.[heroIdx] || [[], [], []];
@@ -232,7 +270,9 @@ module.exports = {
       // `setAmount` ist der absolute Weg (Deckel statt Abzug) und beachtet
       // eine gesetzte `cannotBeReduced`-Klammer; echter Durchschlag-Schaden
       // (Ida, Monia-Bot) bleibt damit wie ueberall unbeschnitten.
-      if (ctx.target === host && (ctx.amount || 0) > DAMAGE_CAP) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026: der Deckel ist eine Reduktion — unreduzierbarer Schaden der QUELLE (True Damage-Stempel, `_tempesteUnreduzierbar` an der
+      // eigenen unreduzierbaren Umleitung) wird nicht gedeckelt.
+      if (ctx.target === host && (ctx.amount || 0) > DAMAGE_CAP && !ctx.trueDamage && !ctx.source?._tempesteUnreduzierbar) {
         engine.log('prophecy_of_tempeste_cap', {
           player: ps.username, hero: host.name,
           original: ctx.amount, capped: DAMAGE_CAP,
@@ -259,21 +299,31 @@ module.exports = {
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — keine Umleitung angeboten (der Deckel am
+      // Traeger oben bleibt: Passiv, keine Reaktion).
+      if (engine._reaktionGesperrt(ownerIdx)) return;
+      // Quellen, die nicht umgeleitet werden duerfen (Acid Vial, Glasowt): keine Umleitung.
+      if (nichtUmleitbar(ctx.source, ctx.cannotBeRedirected)) return;
+
       // Prompt the controller (the player holding Tempeste).
       const heroName = target.name || 'Hero';
       const srcName  = ctx.source?.name || 'An effect';
       const incoming = ctx.amount || 0;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: unreduzierbarer Schaden (True Damage / `cannotBeReduced`) wird umgeleitet, aber NICHT gedeckelt (Warnungsprinzip, s. Kopf).
+      const unreduzierbar = !!(ctx.trueDamage || ctx.cannotBeReduced);
+      const frage = umleitFrage(heroName, incoming, srcName, host.name, unreduzierbar);
       const confirmed = await engine.promptGeneric(ownerIdx, {
         type: 'confirm',
         protMeta: { d: incoming, hp: target.hp, pi: ctx.cardOwner },
         title: CARD_NAME,
-        message: `${heroName} is about to take ${incoming} damage from ${srcName}. Redirect to ${host.name}? (Capped at ${DAMAGE_CAP})`,
+        message: frage.message,
         showCard: CARD_NAME,
+        ...(frage.hinweis ? { _nutzlos: true } : {}),
         confirmLabel: '🌧️ Redirect!',
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) return;
+      if (!engine._confirmSaidYes(confirmed)) return;
 
       // Claim HOPT NOW so the same instance can't be re-prompted by a
       // mid-redirect cascade (extremely unlikely but defensive).
@@ -281,11 +331,13 @@ module.exports = {
       gs.hoptUsed[hoptKey] = gs.turn;
 
       // Cap before the redirect — Tempeste's own cap is exempt from
-      // "cannot be reduced".
-      const cappedAmount = Math.min(DAMAGE_CAP, incoming);
+      // "cannot be reduced". Unreduzierbarer Schaden: kein Deckel (17.11.2026).
+      const cappedAmount = unreduzierbar ? incoming : Math.min(DAMAGE_CAP, incoming);
 
-      // Cancel the original hit.
+      // Cancel the original hit. `_umgeleitet`: die Engine wertet das Abbrechen als UMLEITUNG und nimmt es bei „cannot be negated"-Schaden (Ida, True Damage) nicht zurueck
+      // (sonst nähmen Ziel UND Träger den Treffer; wie Mean Cute Cat / Gigantisaur Brachion).
       ctx.cancelled = true;
+      if (typeof ctx.setFlag === 'function') ctx.setFlag('_umgeleitet', true);
 
       // Visual: brief lightning thread from the original target to host.
       engine._broadcastEvent('tempeste_redirect_strike', {
@@ -303,10 +355,16 @@ module.exports = {
       const syntheticSource = {
         ...(ctx.source || {}),
         _tempesteRedirected: true,
+        ...(unreduzierbar ? { _tempesteUnreduzierbar: true } : {}),
       };
-      await engine.actionDealDamage(syntheticSource, host, cappedAmount, ctx.type, {
-        cannotBeNegated: true,
-      });
+      // True Damage bleibt True Damage (Rockfall & Co. laufen am Traeger weiter ueber den Weg ohne Reduktion/Negation).
+      if (ctx.trueDamage) {
+        await engine.actionDealTrueDamage(syntheticSource, host, cappedAmount, { type: ctx.type || 'other' });
+      } else {
+        await engine.actionDealDamage(syntheticSource, host, cappedAmount, ctx.type, {
+          cannotBeNegated: true,
+        });
+      }
 
       engine.log('prophecy_of_tempeste_redirect', {
         player: ps.username,
@@ -317,6 +375,13 @@ module.exports = {
       });
       engine.sync();
     },
+
+    /**
+     * ★ Spielgestalter-Entscheidung 17.11.2026: True Damage („cannot be reduced or negated": Rockfall, Pressure Projectile, Surefire Shot, Acid Vial …) auf einen Helden laeuft nur ueber
+     * `beforeTrueDamage`. Die Umleitung wird dort nach dem Warnungsprinzip angeboten und findet statt; der 100-Deckel (eine Reduktion) greift nicht, der Traeger nimmt den vollen Betrag.
+     * Gleiche Logik wie `beforeDamage` (`ctx.trueDamage`: die Umleitung bleibt True Damage).
+     */
+    beforeTrueDamage: async (ctx) => module.exports.hooks.beforeDamage(ctx),
 
     /**
      * Creature damage redirect. The engine batches creature damage —
@@ -342,6 +407,7 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
       // W27a: kein Ruhe-Prüfer mehr — Anhänge liegen bei Frost/Betäubung/Negation des Wirts nicht still (s. beforeDamage).
+      if (engine._reaktionGesperrt(ownerIdx)) return;   // „cannot be reacted to" (Surefire Shot, Midnight Assault): keine Umleitung angeboten (Spielgestalter-Entscheidung 17.11.2026)
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
@@ -359,6 +425,8 @@ module.exports = {
         // Skip entries whose source is our own redirect re-fire.
         if (e.source?._tempesteRedirected) continue;
         if (e.amount <= 0) continue;
+        // Quellen, die nicht umgeleitet werden duerfen (Acid Vial, Glasowt): keine Umleitung.
+        if (nichtUmleitbar(e.source, e.cannotBeRedirected)) continue;
         candidate = e;
         break;
       }
@@ -366,21 +434,25 @@ module.exports = {
 
       const incoming = candidate.amount || 0;
       const srcName  = candidate.source?.name || 'An effect';
+      // ★ Spielgestalter-Entscheidung 17.11.2026: unreduzierbarer Schaden (True Damage / `cannotBeReduced`) wird umgeleitet, aber NICHT gedeckelt (Warnungsprinzip, s. Kopf).
+      const unreduzierbar = !!(candidate.trueDamage || candidate.cannotBeReduced);
+      const frage = umleitFrage(candidate.inst.name, incoming, srcName, host.name, unreduzierbar);
       const confirmed = await engine.promptGeneric(ownerIdx, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `${candidate.inst.name} is about to take ${incoming} damage from ${srcName}. Redirect to ${host.name}? (Capped at ${DAMAGE_CAP})`,
+        message: frage.message,
         showCard: CARD_NAME,
+        ...(frage.hinweis ? { _nutzlos: true } : {}),
         confirmLabel: '🌧️ Redirect!',
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) return;
+      if (!engine._confirmSaidYes(confirmed)) return;
 
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[hoptKey] = gs.turn;
 
-      const cappedAmount = Math.min(DAMAGE_CAP, incoming);
+      const cappedAmount = unreduzierbar ? incoming : Math.min(DAMAGE_CAP, incoming);
       candidate.cancelled = true;
 
       engine._broadcastEvent('tempeste_redirect_strike', {
@@ -397,10 +469,15 @@ module.exports = {
       const syntheticSource = {
         ...(candidate.source || {}),
         _tempesteRedirected: true,
+        ...(unreduzierbar ? { _tempesteUnreduzierbar: true } : {}),
       };
-      await engine.actionDealDamage(syntheticSource, host, cappedAmount, candidate.type || 'normal', {
-        cannotBeNegated: true,
-      });
+      if (candidate.trueDamage) {
+        await engine.actionDealTrueDamage(syntheticSource, host, cappedAmount, { type: candidate.type || 'other' });   // True Damage bleibt True Damage
+      } else {
+        await engine.actionDealDamage(syntheticSource, host, cappedAmount, candidate.type || 'normal', {
+          cannotBeNegated: true,
+        });
+      }
 
       engine.log('prophecy_of_tempeste_redirect', {
         player: ps.username,

@@ -53,6 +53,8 @@ function oppFreeZones(engine, pi) {
 async function bezahlen(engine, inst, ctrl, was) {
   const ps = engine.gs.players[ctrl];
   if (!ps || (ps.hand || []).length < DISCARD_COST) return false;
+  // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — die Negation ist eine Reaktion, keine Abfrage.
+  if (engine._reaktionGesperrt(ctrl)) return false;
   const vorher = ps.hand.length;
   const kosten = await engine.zahleAbwurfKosten(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
