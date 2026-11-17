@@ -90,6 +90,9 @@ module.exports = {
       // stream. Picks are mandatory (`cancellable: false`).
       const oppHandSize = ops.hand?.length || 0;
       // ★ W74c: Boris des GEGNERS darf den erzwungenen Abwurf ignorieren — ERST Ambush the Scout, DANN Boris (einmal für den ganzen Stapel).
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „Wird eine der anderen Karten negiert, wird auch die Sperre mitnegiert." Negiert Ambush the Scout den Hand-Teil, gilt die mitgelieferte Selbstsperre
+      // („cannot draw or add cards …") nicht — der eigene Abwurf oben ist schon passiert (Kosten/erster Teil). Boris' Verzicht negiert nichts: die Sperre bleibt.
+      const _negiertVorher = engine.handInteraktionenNegiert();
       const cap = (await engine.fremdAbwurfEntfaellt(oi, Math.min(oppToDiscard, oppHandSize), { source: CARD_NAME, sourceOwner: pi }))
         ? 0 : Math.min(oppToDiscard, oppHandSize);
       if (cap > 0) {
@@ -127,6 +130,11 @@ module.exports = {
       // Hand-lock for the rest of the turn — standard `handLocked`
       // flag the engine respects in actionDrawCards / actionAddCard-
       // FromDeckToHand / actionAddCardFromDiscardToHand.
+      if (engine.handInteraktionenNegiert() > _negiertVorher) {
+        engine.log('rain_of_spores_negated', { player: ps.username, reason: 'Ambush the Scout — keine Sperre' });
+        engine.sync();
+        return;
+      }
       ps.handLocked = true;
       engine.log('rain_of_spores_hand_lock', { player: ps.username });
 

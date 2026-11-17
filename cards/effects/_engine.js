@@ -38006,6 +38006,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Usage in card scripts:
    *   if (!engine.claimHOPT('icy-slime', ctx.cardOwner)) return;
    */
+  /** Anzahl der bisher durch eine Reaktion (Ambush the Scout) negierten Hand-Interaktionen dieser Partie — vorher/nachher vergleichen, ob der Hand-Teil einer Karte negiert wurde (siehe `checkHandInteractionReaction`). */
+  handInteraktionenNegiert() { return this._handInteraktionNegiert || 0; }
+
   /**
    * ZENTRALES REAKTIONSFENSTER FÜR HAND-INTERAKTIONEN
    *
@@ -38072,6 +38075,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._pendingHandInteraction = prevWindow;
     }
     if (hookCtx.cancelled) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout × Slow / Rain of Spores / Champion / Draw): ein negierter Hand-Teil nimmt seine FOLGEWIRKUNGEN mit — die mitgelieferte Selbstsperre
+      // („cannot interact with your opponent's hand" / „cannot draw or add cards") und das Ziehen des Spielers, der nichts abgeworfen hat. Der Teileffekt ist nur ein `true` am Aufrufer (Primitive
+      // `actionPromptForceDiscard` gibt dann nichts zurueck) — Karten mit solcher Folgewirkung vergleichen deshalb diesen Zaehler vor/nach dem Hand-Teil (`handInteraktionenNegiert()`).
+      this._handInteraktionNegiert = (this._handInteraktionNegiert || 0) + 1;
       this.log('hand_interaction_negated', {
         player: gs.players[targetPi]?.username,
         kind,

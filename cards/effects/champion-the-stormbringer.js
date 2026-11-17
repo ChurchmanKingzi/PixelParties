@@ -37,6 +37,9 @@
 //    (b) Ist der GEGNER Boris-Spieler, darf er den erzwungenen Abwurf („must discard the same number") ignorieren: er wirft nichts ab und zieht
 //        auch nichts („draw that many" = tatsächlich abgeworfene Anzahl 0 — Annahme, Rückfrage an Al). Der eigene Zug des Champion-Spielers bleibt.
 //
+//  ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout): Ambush negiert NUR die Seite des Ambush-Spielers (seinen Zwangsabwurf) — Abwurf und Ziehen des Champion-Spielers sind schon passiert und
+//  bleiben. Wer nichts abwirft, zieht auch nichts („draw that many"): der Ambush-Spieler zieht in diesem Fall KEINE Karten (wie bei Boris' Verzicht, W74c).
+//
 //  Visual: each of the player's discarded cards
 //  flies hand → discard via the windstorm flight
 //  style first added for Tengu Windstorm
@@ -194,8 +197,10 @@ module.exports = {
     // that propagates the splice — so the source hand-slot rect is
     // still in the client DOM when the animation captures it.
     let gegnerBorisVerzicht = false;
+    let gegnerAmbush = false;   // 17.11.2026: Ambush the Scout hat den Zwangsabwurf negiert → der Gegner zieht nichts
     if ((ops.hand || []).length > 0) {
       const stempelVor = engine._borisStempelHeute(oi);
+      const negiertVor = engine.handInteraktionenNegiert();
       await engine.actionPromptForceDiscard(oi, N, {
         source:        CARD_NAME,
         selfInflicted: false,
@@ -205,6 +210,7 @@ module.exports = {
       });
       // ★ W74c (Al): ignoriert der Gegner den Zwangsabwurf per Boris, wurde nichts abgeworfen — „draw that many" ist dann 0 (Annahme, Rückfrage an Al).
       gegnerBorisVerzicht = !stempelVor && engine._borisStempelHeute(oi);
+      gegnerAmbush = engine.handInteraktionenNegiert() > negiertVor;
       // Hold for the last opp-side gust to land before the draw begins,
       // identical pacing to the player's own discard → draw transition
       // above. Without this the opp's tutor flies in while their wind-
@@ -216,7 +222,7 @@ module.exports = {
     // `_unpreventable: true` bypasses handLocked + any BEFORE_DRAW
     // cancel listener — see actionDrawCards in _engine.js for the
     // bypass branches added alongside this card.
-    if (!gegnerBorisVerzicht) {
+    if (!gegnerBorisVerzicht && !gegnerAmbush) {
       await engine.actionDrawCards(oi, N, {
         source: CARD_NAME,
         _unpreventable: true,
