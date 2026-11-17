@@ -48578,23 +48578,29 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * ★ Spielgestalter-Entscheidung 16.11.2026 — die Einmal-Limits einer AKTIVIERUNG (Kreatur-/Helden-Effekt) sind mit dem BEGINN der Aktivierung verbraucht: wird sie danach negiert (Spearman,
-   * Divine Punishment, Cybug LADYBUG, Assault for Teocuilatl …), läuft ihr Skript nie — der Aufrufer ruft diese Stelle, die dann stempelt, was der Erfolgsweg stempeln würde: die Rundensperre
-   * `hoptKey`, „1 pro Spiel" (`markOncePerGameEffect`) und bei „up to N times per turn" (`chargesPerTurn` + `chargeKey`, 3-Headed Giant) EINE Nutzung (die Rundensperre fällt wie im Skript erst
-   * mit der letzten). Effekte mit EIGENER mehrteiliger Buchführung (`ctx._skipCreatureEffectHopt` / `_skipHeroEffectHopt` ohne deklarative Ladungen: Analyzer, Gatherer, Wolflesia, Clausss,
-   * Vullary, Sparkfly Queen, Rha'Bi, Sett) lassen sich nicht auf einen Modus/eine Nutzung abbilden — dort bleibt die Rundensperre wie bisher unberührt (siehe CARD_API).
-   * `traeger` = Karteninstanz (Kreatur) bzw. Heldenobjekt, an dem der Ladungszähler hängt. Abbruch durch den Spieler und nicht aktivierbare Effekte rufen das nie.
+   * Divine Punishment, Cybug LADYBUG, Assault for Teocuilatl … in der Kette; Rolling Boulder, Frost Rune, Cool Tech Jetpack … nach der Zielwahl, siehe `negationsStand`), läuft ihr Skript nicht
+   * (zu Ende) — der Aufrufer ruft diese Stelle, die dann stempelt, was der Erfolgsweg stempeln würde: die Rundensperre `hoptKey`, „1 pro Spiel" (`markOncePerGameEffect`) und bei „up to N times
+   * per turn" (`chargesPerTurn` + `chargeKey`, 3-Headed Giant) EINE Nutzung (die Rundensperre fällt wie im Skript erst mit der letzten).
+   * Effekte mit EIGENER Buchführung (`ctx._skipCreatureEffectHopt` / `_skipHeroEffectHopt`: Analyzer, Gatherer, Sparkfly Queen, Rha'Bi, Sett) melden ihre Buchung über den optionalen Skript-Vertrag
+   *   `stempelNegierteAktivierung(engine, traeger, { pi, modus, ziele })`   → `true` = zusätzlich die Rundensperre `hoptKey` stempeln, sonst führt das Skript alles selbst.
+   * `modus` = der VOR dem Kettenfenster gewählte Modus (Skript-Vertrag `waehleModus(ctx)`, nur Kreaturen mit mehreren eigenständig begrenzten Modi), `ziele` = die im Zielfenster negierten Ziele
+   * (nur bei Negation nach der Zielwahl). Skripte ohne den Vertrag (auch Wolflesia, Clausss, Vullary: der Modus ergibt sich aus dem Zustand, der Erfolgsweg stempelt die normale Rundensperre)
+   * bekommen den Standardweg. `traeger` = Karteninstanz (Kreatur) bzw. Heldenobjekt, an dem der Ladungszähler hängt. Abbruch durch den Spieler und nicht aktivierbare Effekte rufen das nie.
    */
-  negierteAktivierungStempeln(playerIdx, script, effectName, hoptKey, traeger) {
+  negierteAktivierungStempeln(playerIdx, script, effectName, hoptKey, traeger, extra = {}) {
     if (!script || !hoptKey) return;
     const gs = this.gs;
     this.markOncePerGameEffect(playerIdx, script, effectName);
-    if (typeof script.chargesPerTurn === 'number' && typeof script.chargeKey === 'string' && traeger) {
+    if (typeof script.stempelNegierteAktivierung === 'function') {
+      let engineSperre = false;
+      try { engineSperre = script.stempelNegierteAktivierung(this, traeger, { pi: playerIdx, modus: extra.modus, ziele: extra.ziele }) === true; }
+      catch (err) { console.error('[stempelNegierteAktivierung]', effectName, err.message); }
+      if (!engineSperre) return;
+    } else if (typeof script.chargesPerTurn === 'number' && typeof script.chargeKey === 'string' && traeger) {
       const { spendUse, usesLeft } = require('./_charges');
       const opt = { key: script.chargeKey, max: script.chargesPerTurn };
       spendUse(traeger, gs, opt);
       if (usesLeft(traeger, gs, opt) > 0) return;
-    } else if (this._aktivierungMitEigenerBuchfuehrung(effectName)) {
-      return;
     }
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[hoptKey] = gs.turn;
@@ -48618,16 +48624,6 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Wurde seit `stand` im Zielfenster etwas negiert? `null` = nein, sonst die Ziele der letzten Negation. */
   negiertSeit(stand) { return (this._negZaehler || 0) > stand ? (this._negZiele || []) : null; }
-
-  /** Setzt das Skript `_skipCreatureEffectHopt` / `_skipHeroEffectHopt` (eigene Mehrfach-Buchführung)? Textsuche im Skript, einmal je Name (Muster `_initialFlugSicher`). */
-  _aktivierungMitEigenerBuchfuehrung(name) {
-    const cache = this._buchfuehrungCache || (this._buchfuehrungCache = new Map());
-    if (cache.has(name)) return cache.get(name);
-    let r = false;
-    try { r = /_skip(Creature|Hero)EffectHopt\s*=/.test(require('fs').readFileSync(require('path').join(__dirname, nameToFile(name) + '.js'), 'utf8')); } catch (e) { r = false; }
-    cache.set(name, r);
-    return r;
-  }
 
   /**
    * ★ „CONTROL OF THIS CREATURE CANNOT CHANGE." (v1021, Creepy

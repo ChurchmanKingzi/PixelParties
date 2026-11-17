@@ -90,6 +90,13 @@ module.exports = {
     return necromancyOpfer(engine, feld, hi).length > 0;
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Aktivierung verbraucht, was sie verbraucht hätte — beim Klick-Effekt NICHTS: er ist „at any time" und beliebig oft nutzbar (der
+   * Erfolgsweg stempelt keine Rundensperre, `_skipHeroEffectHopt`), es gibt kein Limit zu buchen. Rückgabe `false`: die Engine stempelt keine Rundensperre (sonst wäre der Effekt nach einer
+   * Negation für den Rest des Zuges gesperrt).
+   */
+  stempelNegierteAktivierung() { return false; },
+
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardController ?? ctx.cardOwner;

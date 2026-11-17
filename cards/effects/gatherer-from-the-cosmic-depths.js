@@ -45,6 +45,52 @@ function stampHopt(gs, key, instId) {
   gs.hoptUsed[`${key}:${instId}`] = gs.turn;
 }
 
+/** Welche der beiden Optionen sind gerade benutzbar (je Option eigenes Einmal-Limit, Counter, Ziele)? */
+function verfuegbareModi(ctx) {
+  const inst = ctx.card;
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = inst.controller ?? inst.owner;
+  const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
+    && changeCounterCardsOnSide(engine, pi).length > 0
+    && ownCosmicCreatures(engine, pi).length > 0;
+  const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
+    && getChangeCounters(inst) > 0
+    && !drawBlockedFor(engine, pi);
+  return { moveAvail, drawAvail };
+}
+
+/**
+ * ★ Spielgestalter-Entscheidung 16.11.2026 — der Modus wird VOR dem Kettenfenster gewählt (Skript-Vertrag `waehleModus`, gerufen von `doActivateCreatureEffect`): jeder Modus hat sein
+ * EIGENES Einmal-Limit, eine Negation der Aktivierung (Kette oder Zielfenster) muss also wissen, WELCHER Modus verbraucht wird (`stempelNegierteAktivierung` unten). Liefert die Modus-Kennung
+ * ('move' | 'draw') oder `null` (Abbruch durch den Spieler / nichts verfügbar). Ohne Vorwahl (geliehene Verwendung: Grimoire, Kohta) wählt `onCreatureEffect` wie bisher selbst.
+ */
+async function waehleModus(ctx) {
+  const engine = ctx._engine;
+  const inst = ctx.card;
+  const pi = inst.controller ?? inst.owner;
+  const { moveAvail, drawAvail } = verfuegbareModi(ctx);
+  if (!moveAvail && !drawAvail) return null;
+  if (moveAvail && !drawAvail) return 'move';
+  if (drawAvail && !moveAvail) return 'draw';
+  const opts = [];
+  opts.push({ id: 'move', label: 'Move Counters → CD Creature' });
+  opts.push({ id: 'draw', label: 'Spend Counters → Draw cards' });
+  const pick = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    title: CARD_NAME,
+    description: 'Choose which once-per-turn ability to activate.',
+    options: opts,
+    cancellable: true,
+    // Sub-ability picker — Move vs Draw are distinct effects.
+    // The count pickers below are parameters, NOT distinct
+    // effects, so they intentionally lack this flag.
+    gerrymanderEligible: true,
+  });
+  if (!pick || pick.cancelled) return null;
+  return pick.optionId;
+}
+
 // ── ACTIVE 1: Move counters between own cards (sink: CD Creature) ──
 async function runMove(engine, inst, ctx) {
   const gs = engine.gs;
@@ -180,60 +226,33 @@ module.exports = {
   },
 
   canActivateCreatureEffect(ctx) {
-    const inst = ctx.card;
-    const engine = ctx._engine;
-    const gs = engine.gs;
-    const pi = inst.controller ?? inst.owner;
-
-    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
-      && changeCounterCardsOnSide(engine, pi).length > 0
-      && ownCosmicCreatures(engine, pi).length > 0;
-
-    const ps = gs.players[pi];
-    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
-      && getChangeCounters(inst) > 0
-      && !drawBlockedFor(engine, pi);
-
+    const { moveAvail, drawAvail } = verfuegbareModi(ctx);
     return moveAvail || drawAvail;
+  },
+
+  waehleModus,
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: wird die Aktivierung NEGIERT (Kette oder nach der Zielwahl), ist der gewählte Modus verbraucht — dieselbe Buchung wie im Erfolgsweg
+   * (`stampHopt`). Die Engine-Sperre bleibt hier immer offen (`_skipCreatureEffectHopt`): die Modi sperren sich selbst. Rückgabe `false` = keine Engine-Rundensperre.
+   */
+  stempelNegierteAktivierung(engine, inst, { modus } = {}) {
+    if (modus === 'move') stampHopt(engine.gs, HOPT_MOVE, inst.id);
+    else if (modus === 'draw') stampHopt(engine.gs, HOPT_DRAW, inst.id);
+    return false;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const gs = engine.gs;
     const inst = ctx.card;
-    const pi = inst.controller ?? inst.owner;
-    const ps = gs.players[pi];
-
-    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
-      && changeCounterCardsOnSide(engine, pi).length > 0
-      && ownCosmicCreatures(engine, pi).length > 0;
-    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
-      && getChangeCounters(inst) > 0
-      && !drawBlockedFor(engine, pi);
+    const { moveAvail, drawAvail } = verfuegbareModi(ctx);
 
     if (!moveAvail && !drawAvail) return false;
 
-    let pickedAbility;
-    if (moveAvail && !drawAvail) pickedAbility = 'move';
-    else if (drawAvail && !moveAvail) pickedAbility = 'draw';
-    else {
-      const opts = [];
-      opts.push({ id: 'move', label: 'Move Counters → CD Creature' });
-      opts.push({ id: 'draw', label: 'Spend Counters → Draw cards' });
-      const pick = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Choose which once-per-turn ability to activate.',
-        options: opts,
-        cancellable: true,
-        // Sub-ability picker — Move vs Draw are distinct effects.
-        // The count pickers below are parameters, NOT distinct
-        // effects, so they intentionally lack this flag.
-        gerrymanderEligible: true,
-      });
-      if (!pick || pick.cancelled) return false;
-      pickedAbility = pick.optionId;
-    }
+    // Modus: vorgewählt (`ctx.modus`, regulärer Weg über `waehleModus`) oder — geliehene Verwendung — hier gewählt.
+    const pickedAbility = ctx.modus || await waehleModus(ctx);
+    if (!pickedAbility) return false;
+    if ((pickedAbility === 'move' && !moveAvail) || (pickedAbility === 'draw' && !drawAvail)) return false;   // zwischen Vorwahl und Auflösung nicht mehr benutzbar
 
     if (pickedAbility === 'move') return await runMove(engine, inst, ctx);
     if (pickedAbility === 'draw') return await runDraw(engine, inst, ctx);

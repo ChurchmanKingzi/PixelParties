@@ -10310,6 +10310,39 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     gs._pendingCardReveal = { cardName: creatureName, ownerIdx: pi };
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026 — Effekte mit MEHREREN, je für sich einmal-pro-Zug-begrenzten Modi (Analyzer, Gatherer, Sparkfly Queen; optionaler Skript-Vertrag `waehleModus`):
+    // der Modus wird VOR dem Kettenfenster gewählt. Eine Negation der Aktivierung (Kette oder nach der Zielwahl) verbraucht dann genau diesen Modus (`stempelNegierteAktivierung`); ohne Vorwahl
+    // ließe sich der negierte Modus nicht zuordnen. Abbruch der Modus-Wahl = Abbruch vor dem Beginn: nichts verbraucht (Gerrymander-Veto wie bisher verbraucht).
+    let _modus;
+    if (typeof script.waehleModus === 'function') {
+      const _modusCtx = room.engine._createContext(inst, {});
+      room.engine._promptCardStack.push(inst.name);
+      try { _modus = await room.engine._alsAkteur(_modusCtx, () => script.waehleModus(_modusCtx)); }
+      finally { room.engine._promptCardStack.pop(); }
+      if (_modus == null || _modus === false) {
+        room.engine.beendeDarkDeal(inst);
+        if (charmedHeroCreature) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        } else if (isStolenByPi) {
+          delete inst.heroOwner;
+        }
+        delete gs._pendingCardReveal;
+        delete gs._pendingPlayLog;
+        if (room.engine._lastPromptGerryDeclined) {
+          room.engine._lastPromptGerryDeclined = false;
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+          room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+        } else if (consumedAdditionalCreatureInst) {
+          room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
+        }
+        for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+        return true;
+      }
+    }
+
     // Open a reaction window around the creature-effect activation so
     // Reaction Artifacts that target THIS event (Gigantisaur Skull) can
     // chain in. `cardType: 'CreatureEffect'` keeps existing reactions
@@ -10352,14 +10385,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       }
       // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Spearman …) verbraucht die Rundensperre (HOPT), „1 pro Spiel" und bei
       // „up to N times per turn" (3-Headed Giant, `chargesPerTurn`) eine Nutzung; bezahlte Kosten bleiben bezahlt. (Früher Z7b: ganz negiert = nie aufgelöst = nichts verbraucht.)
-      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst);
+      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { modus: _modus });
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
-    const ctx = room.engine._createContext(inst, {});
+    const ctx = room.engine._createContext(inst, _modus != null ? { modus: _modus } : {});
     // Mark this Creature as the ambient prompt source so any confirm /
     // optionPicker its activated effect opens via promptGeneric shows its
     // image (general "which card is prompting" rule; ctx helpers already
@@ -10507,7 +10540,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Rolling Boulder, Frost Rune, Chaorc Interception, Cool Tech Jetpack …; der Picker lieferte
         // `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei der Negation in der Kette sind die Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung);
         // der Zusatzaktions-Geber wird wie dort zurückgegeben.
-        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele });
+        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele, modus: _modus });
         if (consumedAdditionalCreatureInst) room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       } else if (consumedAdditionalCreatureInst) {
         // Standard cancel — refund the additional-action provider
