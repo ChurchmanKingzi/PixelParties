@@ -21,6 +21,8 @@ const { temporaereKontrolle } = require('./_charm-shared');
 const { opponentOfGs } = require('./_opp');
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
   // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
   // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
@@ -155,7 +157,8 @@ module.exports = {
     // Lv1 kannte die Regel gar nicht. Die Fizzles bleiben als zweite
     // Absicherung stehen, falls eine Stufe über einen anderen Weg
     // erreicht wird.
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — die Fähigkeit ist auch gegen den Erste-Runden-Geschützten aktivierbar; die Fizzles unten (`charme_fizzle`) verbrauchen den Einsatz.
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten waehlen, die CPU nicht
 
     if (level >= 3) {
       // Lv3: need opponent hero alive (Main Phase only)

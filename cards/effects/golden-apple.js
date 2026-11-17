@@ -41,11 +41,13 @@ const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Golden Apple';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {
     const oi = opponentOfGs(gs, pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;   // nichts zu waehlen
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — Helden waehlbar, die Wahl verpufft.)
     return uebernehmbareHelden(gs, oi).length > 0;
   },
 

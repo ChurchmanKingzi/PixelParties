@@ -65,6 +65,8 @@ function _stormCap(gs, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hero'],
   heroEffect: true,
   // Adventurousness-style activation cost: spend an Action (Action Phase
@@ -93,8 +95,8 @@ module.exports = {
     // protection either — the protection is absolute. Rather than
     // letting the player burn their Action on a fizzle, gate the
     // activation entirely while turn-1 shielding is up.
-    const oi = engine.opponentOf(pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — aktivierbar, der Teil am Gegner (Abwurf/Zug) verpufft, die eigene Seite wirkt wie gedruckt.
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     return _stormCap(gs, pi) >= 1;
   },
 

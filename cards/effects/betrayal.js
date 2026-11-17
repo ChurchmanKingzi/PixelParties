@@ -127,7 +127,7 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz, ziel = null) {
     if (typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;
     if (inst.counters?.untargetable_by_opponent && inst.counters.untargetable_by_opponent_pi === pi) return false;   // Golden Wings & Co.
     if (typeof engine._boardGuardsCreatureChoice === 'function' && engine._boardGuardsCreatureChoice(inst, pi)) return false;   // Board of Kings
-    if (engine.gs.firstTurnProtectedPlayer === ktrl) return false;       // Erste-Runden-Immunität des Gegners
+    // (Erste-Runden-Immunität des Gegners: Spielgestalter-Entscheidung 16.11.2026 — Kreatur waehlbar, die Uebernahme verpufft in `actionTransferCreature`.)
   }
   return true;
 }

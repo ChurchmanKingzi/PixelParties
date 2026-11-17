@@ -51,7 +51,7 @@ function wirkbar(engine, pi, oi) {
   const gs = engine.gs;
   const ps = gs.players[pi], ops = gs.players[oi];
   if (!ps || !ops) return false;
-  if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
+  // (Erstrunden-Schutz des Gegners: Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — spielbar, verpufft in `onPlay`.)
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor / Slow
   if (engine.handZugangGesperrt?.(oi)) return false;                       // Hand-Sperre des Empfängers
   return (ps.discardPile || []).length > 0;
@@ -90,6 +90,8 @@ module.exports = {
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) return;
+      // Erstrunden-Schutz: die Hand des Geschuetzten ist tabu — die Karte ist gespielt, die Wirkung verpufft (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt)
+      if (gs.firstTurnProtectedPlayer === oi) { engine.log('transmission_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return; }
       if (!wirkbar(engine, pi, oi)) { gs._spellCancelled = true; return; }
 
       // ── 1. Wahl ──

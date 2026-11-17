@@ -100,6 +100,8 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
   onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 
@@ -122,7 +124,7 @@ module.exports = {
     const gegner = opponentOfGs(gs, playerIdx);
     // Runde 1: der Gegner ist gegen alles immun — dann gibt es kein
     // legales Opfer und der Trank bleibt grau, statt ins Leere zu laufen.
-    if (gs?.firstTurnProtectedPlayer === gegner) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — spielbar, das geschuetzte Opfer ist waehlbar und verpufft.)
     const ops = gs?.players?.[gegner];
     if (!ops) return false;
     const heldLebt = angreifer(gs, gegner).length > 0;   // Kontrolle statt Seite
@@ -138,7 +140,7 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): Helden beider Spalten, sortiert
     // nach Kontrolleur. KONTROLLIERTE Helden = die moeglichen Angreifer,
     // vom Gegner kontrollierte Helden und seine Kreaturen = die Opfer.
-    const schutz = gs.firstTurnProtectedPlayer === gegner;
+    const schutz = false;   // Spielgestalter-Entscheidung 16.11.2026: auch der Erste-Runden-Geschuetzte ist waehlbar (die Wahl verpufft)
     for (let p = 0; p < (gs.players || []).length; p++) {
       for (const t of engine.getHeroTargets(p)) {
         const seite = engine.heroSideOf(p, gs.players[p]?.heroes?.[t.heroIdx]);

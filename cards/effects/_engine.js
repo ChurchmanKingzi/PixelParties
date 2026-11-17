@@ -13177,10 +13177,49 @@ class GameEngine {
     return prot != null && seite === prot && wirker !== prot;
   }
 
-  /** `blockedByFirstTurnProtection`: unspielbar, solange der Gegner des Spielers `pi` durch die Erste-Runden-Immunität geschützt ist. */
+  /**
+   * `blockedByFirstTurnProtection`: ehemals „unspielbar, solange der Gegner des Spielers `pi` durch die Erste-Runden-Immunität geschützt ist".
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Nutzlose Aktivierungen müssen möglich sein"): ÜBERHOLT — die Karte ist spielbar, das geschützte Ziel wählbar, der Effekt verpufft (Karte gespielt, Kosten und
+   * Aktion bezahlt, Einmal-Marker verbraucht; Schaden/Status/Zerstörung/Gold-/Hand-/Deck-Eingriffe blockt die Engine selbst, Zielwahlen ziehen das geschützte Ziel ab). Das Flag in den Skripten bleibt als
+   * Dokumentation („trifft nur die Gegnerseite") stehen, sperrt aber nichts mehr; die CPU spielt solche Karten weiter nicht gegen den Geschützten (`_cpu.js`: `isFirstTurnSafe`).
+   */
   _cardBlockedByFirstTurn(script, playerIdx) {
-    if (!script?.blockedByFirstTurnProtection || !Number.isInteger(playerIdx) || playerIdx < 0) return false;
-    return this.ersterZugGeschuetzt(this.opponentOf(playerIdx), playerIdx);
+    return false;
+  }
+
+  /** Erste-Runden-Immunität: steht diese Kreatur unter der Kontrolle des geschützten Spielers? (Schutz vor Status/Eingriffen von aussen; bei Selbstwirkung des Geschützten gibt es keinen Schutz zu prüfen.) */
+  _ersterZugKreatur(inst) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    return prot != null && !!inst && (inst.controller ?? inst.owner) === prot;
+  }
+
+  /** ★ Spielgestalter-Entscheidung 16.11.2026: ist dieses Ziel (Ziel-Objekt einer Zielliste) durch die Erste-Runden-Immunität gegenüber dem WÄHLENDEN geschützt? Gilt nur gegenüber dem Zugspieler. */
+  _ersterZugZiel(t, waehler) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    if (prot == null || !t || waehler === prot) return false;
+    const inst = t.cardInstance || t._cardInstance;
+    const seite = inst ? (inst.controller ?? inst.owner) : t.owner;
+    return seite === prot;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: nach der Zielwahl die Erste-Runden-geschützten Ziele abziehen (sie sind wählbar, der Effekt verpufft). Bleibt nichts übrig, gilt die Wahl als NEGIERT (nicht
+   * als Abbruch): der Zauber ist gespielt (`_spellNegatedByEffect`), Aktivierungen verbrauchen ihr Einmal-Limit (`_merkeNegation`/`negiertSeit`). Rückgabe { ids, abgezogen }.
+   */
+  _ersterZugZielAbziehen(waehler, validTargets, ids, config = {}) {
+    if (!Array.isArray(ids) || ids.length === 0 || config?.ignoreFirstTurnProtection) return { ids, abgezogen: false };
+    if (this.gs.firstTurnProtectedPlayer == null || waehler === this.gs.firstTurnProtectedPlayer) return { ids, abgezogen: false };
+    const byId = (id) => (validTargets || []).find(t => t && t.id === id);
+    let behalten = ids.filter(id => !this._ersterZugZiel(byId(id), waehler));
+    if (behalten.length === ids.length) return { ids, abgezogen: false };
+    // Paarwahlen (Sword in a Bottle: Angreifer + Opfer, `minRequired: 2`): fehlt nach dem Abziehen die Mindestzahl, verpufft die ganze Wahl.
+    if (behalten.length < (config?.minRequired ?? config?.minSelect ?? 0)) behalten = [];
+    this.log('target_fizzled', { reason: 'first-turn protection', chosen: ids.length, kept: behalten.length, by: config?.title || null });
+    if (behalten.length === 0) {
+      this._merkeNegation(ids.map(byId).filter(Boolean));
+      if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
+    }
+    return { ids: behalten, abgezogen: true };
   }
 
   _cardBlockedBySearchLock(script, cardData, ps, playerIdx) {
@@ -13278,6 +13317,7 @@ class GameEngine {
    */
   async actionApplyCreaturePoison(source, inst, stacks = 1, opts = {}) {   // W25a (N5-09-Klasse): `opts.unhealable` (Venom Infusion Lv3) - Marke VOR dem Reaktionsfenster
     if (!inst || inst.zone !== 'support') return;
+    if (this._ersterZugKreatur(inst)) { this.log('status_blocked', { card: inst.name, status: 'poisoned', reason: 'shielded' }); return; }   // Erste-Runden-Immunitaet (Spielgestalter-Entscheidung 16.11.2026: wählbar, verpufft)
     if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
 
     const hookCtx = {
@@ -18825,6 +18865,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const fromSeite = this.physicalSide(inst);
     const fromZonenPs = gs.players[fromSeite] || fromPs;
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — das Ziel ist wählbar, der Kontrollwechsel gegen den Geschützten verpufft (früher filterte `isCreatureImmune` die Kreatur aus der
+    // Zielwahl). Nur ein Wechsel ZU einem anderen Spieler als dem geschützten, den der Zugspieler auslöst (eigene Effekte des Geschützten bleiben möglich).
+    if (!opts.selfInflicted && fromPlayerIdx !== neuerKtrl && this.ersterZugGeschuetzt(fromPlayerIdx, opts.sourceOwner ?? neuerKtrl)) {
+      this.log('transfer_fizzle', { creature: inst.name, reason: 'first-turn protection', from: fromPs.username, to: toPs.username });
+      return { success: false, firstTurnProtected: true };
+    }
     // Omni-immune Creatures (Cardinal Beasts, `_cardinalImmune` /
     // `_omniImmune` flag, cardinal-name fallback) silently fizzle
     // any transfer/control attempt — the caller already played its
@@ -21377,6 +21423,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     const already = inst.counters?.[statusName];
     if (already && !opts.addStacks) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet auch fuer Kreaturen — „blocks ALL negative statuses" wie bei Helden (`addHeroStatus`). Die Zielwahlen blenden die Kreatur nicht mehr
+    // aus (wählbar, der Effekt verpufft), also blockt der Status-Weg selbst; gilt fuer jeden negativen Status von aussen (nicht fuer eigene Kosten: `opts.selfInflicted`).
+    if (STATUS_EFFECTS[statusName]?.negative && !opts.selfInflicted && this._ersterZugKreatur(inst)) {
+      this.log('status_blocked', { card: inst.name, status: statusName, reason: 'shielded' });
+      return false;
+    }
 
     const sourceObj = typeof opts.source === 'string'
       ? { name: opts.source }
@@ -24421,9 +24473,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Check creature's own immunity counter
     if (inst.counters[immuneType]) return true;
     // First-turn protection grants targeting + control immunity
-    if (this.gs.firstTurnProtectedPlayer != null) {
-      if (inst.controller === this.gs.firstTurnProtectedPlayer) return true;
-    }
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — die Erste-Runden-Immunitaet macht Kreaturen NICHT mehr „unwaehlbar" (`targeting_immune`/`control_immune`
+    // meldeten sie bisher als Ziel-/Kontrollschutz und die Zielwahlen der Karten blendeten sie aus): sie sind wählbar, der Effekt verpufft (Übernahme: `_stealMoeglich`/`actionTransferCreature`
+    // lehnen den Kontrollwechsel gegen den Geschützten ab, Schaden/Status/Zerstören blocken die Engine-Primitive wie bisher).
     // NOTE: omni-immune Creatures (Cardinal Beasts, `_cardinalImmune`
     // / `_omniImmune` flag, cardinal-name fallback) are intentionally
     // NOT included here. They remain VALID TARGETS for picker UIs —
@@ -29442,6 +29494,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Check if a player's abilities are protected from removal (first-turn rule).
    * Use this in any card's getValidTargets() to skip opponent abilities during turn 1.
    * Example: if (engine.isAbilityRemovalProtected(gs, targetOwnerIdx)) { skip; }
+   * ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT für Zielwahlen — Ziele des Erste-Runden-Geschützten werden NICHT mehr aus `getValidTargets` ausgeschlossen (wählbar, die Wahl verpufft;
+   * `_ersterZugZielAbziehen`). Die Methode bleibt als Prädikat für Effekt-Teile.
    */
   static isAbilityRemovalProtected(gs, targetOwnerIdx) {
     return gs.firstTurnProtectedPlayer === targetOwnerIdx;
@@ -31142,6 +31196,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!toPs) return false;
     if (handIdx < 0 || handIdx >= (fromPs.hand?.length || 0)) return false;
     if (this._isSearchBlocked(toPi, opts, 'deck')) return false;   // v1068
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — dem Geschuetzten kann keine Karte auf die Hand gelegt werden (Welle 11); die Karte verpufft (Cool Presents: gespielt, Preis bezahlt).
+    if (this.ersterZugGeschuetzt(toPi, fromPi)) { this.log('hand_gift_blocked', { player: fromPs.username, reason: 'first-turn protection', by: opts.source || opts.sourceName || null }); return false; }
 
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert':
     // jemandem eine Karte IN die Hand zu legen zählt laut Als Ruling
@@ -31760,6 +31816,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const originalOwner = inst.controller ?? inst.owner;
     if (originalOwner === stealerPi) return false;
     if (inst.stolenBy != null) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — das Ziel ist wählbar, die Übernahme verpufft (früher filterte `isCreatureImmune` die Kreatur aus der Zielwahl).
+    if (!opts.selfInflicted && this.ersterZugGeschuetzt(originalOwner, opts.sourceOwner ?? stealerPi)) {
+      this.log('steal_fizzle', { creature: inst.name, reason: 'first-turn protection', by: opts.sourceName || 'Steal' });
+      return false;
+    }
     // Omni-immune Creatures silently fizzle the steal attempt — the
     // caller's pre-steal animation already played, but the Creature
     // stays put on its original side. Matches `actionTransferCreature`
@@ -34617,19 +34678,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // besteht nur gegenüber dem Zugspieler. Deckt alle Ziel-Typen ab
     // (hero, equip, ability, perm, area, surprise, hand …), nicht nur
     // Creatures. Opt-out für Sonderfälle: `ignoreFirstTurnProtection`.
-    const _ftProtected = this.gs.firstTurnProtectedPlayer;
-    if (_ftProtected != null && playerIdx !== _ftProtected
-        && !config.ignoreFirstTurnProtection) {
-      // ★ v1294: MARKIEREN statt entfernen — geschuetzte Ziele werden
-      // ausgegraut gezeigt (Als Regel 21.8., fuer Midnight Assault
-      // nachgezogen am 23.9.). Waehlbar sind sie trotzdem nicht: jede
-      // Entscheidung laeuft unten ueber `_waehlbar`.
-      for (const t of validTargets) {
-        const inst = t?.cardInstance || t?._cardInstance;
-        const side = inst ? (inst.controller ?? inst.owner) : t?.owner;
-        if (side === _ftProtected) t.ineligible = true;
-      }
-    }
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — Ziele des durch die Erste-Runden-Immunitaet geschuetzten Spielers sind HIER WAEHLBAR (nicht mehr
+    // ausgegraut, v1294 ueberholt): die Wahl eines geschuetzten Ziels verpufft (Karte gespielt/bezahlt, Einmal-Marker verbraucht, keine Wirkung) — `_zielwahlAbschliessen` zieht es nach der
+    // Wahl ab (`_ersterZugZielAbziehen`). Das gilt wie bisher nur gegenueber dem Zugspieler (der Geschuetzte waehlt seine eigenen Karten normal) und nicht bei `ignoreFirstTurnProtection`.
     // ★ BLINDED (Spielgestalter-Entscheidung 16.11.2026): wirkt ein GEBLENDETER Held die Attack/den Spell hinter dieser Zielwahl, ist alles gegnerisch Kontrollierte nicht waehlbar —
     // markiert (ausgegraut), nicht entfernt, wie die Schutzmarkierungen darunter. Eigene Ziele bleiben waehlbar. Siehe `_blindWirkerFuer`; Opt-out `config.ignoreBlinded`.
     this.markiereBlindGesperrte(validTargets, playerIdx, config);
@@ -35076,6 +35127,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     let _pickedIds = Array.isArray(_pickedRoh)
       ? _pickedRoh.filter(id => !_gesperrt.has(id))
       : _pickedRoh;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Ziele des Erste-Runden-Geschuetzten sind waehlbar und verpuffen — nach der Wahl abziehen (Negation, nicht Abbruch: Karte gespielt, Kosten gezahlt).
+    {
+      const _ft = this._ersterZugZielAbziehen(playerIdx, validTargets, _pickedIds, config);
+      if (_ft.abgezogen) {
+        if (_ft.ids.length === 0) return [];
+        _pickedIds = _ft.ids;
+      }
+    }
 
     // ★ POST-TARGET-FENSTER AUCH HIER (Als Vorgabe 21.8.: „stelle
     //   sicher, dass ALLE Effekte Escape Device und Invisibility Cloak
@@ -51680,10 +51739,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `activateHeroEffects` in _cpu.js (der Pilot bewertet gar nicht erst).
    */
   isHeroEffectBlockedByGraceShield(script, playerIdx) {
-    if (!script?.heroEffectHarmfulOnly) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — ein rein schaedlicher Heldeneffekt ist auch gegen den Geschuetzten aktivierbar und verpufft (Einmal-Marker
+    // verbraucht); die Sperre (Ruling 8.8.) ist ueberholt. Die Methode bleibt (Aufrufer in Engine, Server und CPU), liefert aber immer `false`; die CPU aktiviert nutzlose Effekte weiter nicht (`_cpu.js`).
+    return false;
+  }
+
+  /** CPU-Sicht (Spielgestalter-Entscheidung 16.11.2026): der Heldeneffekt waere gegen den Erste-Runden-Geschuetzten nutzlos (`heroEffectHarmfulOnly`, `blockedByFirstTurnProtection`) — der Mensch darf ihn aktivieren, die CPU nicht. */
+  heroEffectNutzlosErsteRunde(script, playerIdx) {
+    return this.nutzlosErsteRunde(script, playerIdx);
+  }
+
+  /** CPU-Sicht: `pi` ist die CPU und der Gegner steht unter der Erste-Runden-Immunität — Gates opponent-only Aktivierungen melden dann „nicht möglich" (der Mensch sieht sie weiter als aktivierbar). */
+  cpuMeidetErsteRunde(pi) {
+    return this.isCpuPlayer(pi) && this.ersterZugGeschuetzt(this.opponentOf(pi), pi);
+  }
+
+  /**
+   * CPU-Sicht (Spielgestalter-Entscheidung 16.11.2026: „Nutzlose Aktivierungen müssen möglich sein"): ist die Aktivierung dieses Skripts (Karte, Fähigkeit, Heldeneffekt, Kreatureneffekt) für `playerIdx`
+   * gegen den Erste-Runden-Geschützten nutzlos? Skript-Marken `heroEffectHarmfulOnly` (reine Schadenseffekte) und `blockedByFirstTurnProtection` („trifft nur die Gegnerseite"). Der Mensch darf sie spielen
+   * (verpufft), die CPU verbrennt sie nicht.
+   */
+  nutzlosErsteRunde(script, playerIdx) {
+    if (!script || !(script.heroEffectHarmfulOnly || script.blockedByFirstTurnProtection)) return false;
     if (playerIdx == null || playerIdx < 0) return false;
-    const opp = this.opponentOf(playerIdx);
-    return this.gs?.firstTurnProtectedPlayer === opp;
+    return this.gs?.firstTurnProtectedPlayer === this.opponentOf(playerIdx);
   }
 
   /**

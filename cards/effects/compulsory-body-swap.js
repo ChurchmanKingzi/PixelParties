@@ -87,7 +87,7 @@ const MIN_GAIN  = 25;   // darunter lohnt weder der Cast noch ein Tausch (Eval-P
 function heldWaehlbar(engine, pi, casterHeroIdx, h) {
   try {
     if (h.owner === pi) return true;
-    if (engine.gs.firstTurnProtectedPlayer === h.owner) return false;
+    // (Erstrunden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — waehlbar, die Wahl verpufft.)
     const cd = engine._getCardDB()[CARD_NAME];
     return !engine.heroBlocksTargeting(h.owner, h.heroIdx, {
       sourceData: cd, cardName: CARD_NAME, chooserIdx: pi, chooserHeroIdx: casterHeroIdx ?? -1,
@@ -118,6 +118,8 @@ function bestePaare(engine, pi, casterHeroIdx, okFn) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   paarMoeglich, verlagerungsPlan,
   // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Helden waehlen; spielbar nur, wenn zwei eigene Helden ihre Abilities tauschen koennen.
   requiresTarget: true,

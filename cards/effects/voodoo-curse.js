@@ -63,7 +63,7 @@ function zieleVon(engine, kontrolleur) {
 function gruppen(engine, pi) {
   const out = [];
   for (let c = 0; c < engine.playerCount(); c++) {
-    if (engine.ersterZugGeschuetzt(c, pi)) continue;
+    // (Erste-Runden-Immunitaet: Spielgestalter-Entscheidung 16.11.2026 — waehlbar, die Wahl verpufft.)
     const liste = zieleVon(engine, c);
     if (liste.length >= 2) out.push({ kontrolleur: c, ziele: liste });
   }
@@ -116,6 +116,8 @@ function cpuPaarWert(engine, a, b) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen; spielbar nur, wenn sein Kontrolleur mindestens zwei Ziele hat („2 targets that are controlled by the same player").
   requiresTarget: true,
   blindedEigeneZiele({ engine, pi }) { return zieleVon(engine, pi).length >= 2; },

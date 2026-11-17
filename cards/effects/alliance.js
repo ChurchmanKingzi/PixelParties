@@ -153,6 +153,8 @@ function nutzerHatAndereWaehlbare(engine, nutzer) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „choose a Hero your opponent controls".
   requiresTarget: true,
   // Die Wahl eines Gegnerhelden ist Pflicht → unter Blinded nie spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
@@ -184,7 +186,7 @@ module.exports = {
     if (attachmentHostsFor(gs, playerIdx, engine).length === 0) return false;
     // Es muss einen waehlbaren gegnerischen Helden geben.
     const oi = opponentOfGs(gs, playerIdx);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — waehlbar, die Wahl verpufft.)
     // Kontrolle statt Seite (Styx 28.9.)
     return engine.heroesControlledBy(oi).some(({ hero: h }) => h?.name && h.hp > 0);
   },
