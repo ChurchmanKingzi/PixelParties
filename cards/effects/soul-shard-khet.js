@@ -50,6 +50,7 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
+    if (!engine.beschwoerHeldBedingungOk(creatureCardData.name, physOwner, hi, pi)) continue;   // NECRO-02 (17.11.2026): Helden-Voraussetzung der Beschwörung (Spirits)
     // W63a (Al, 22.10.2026: Alices Effekt gilt fuer ALLE Beschwoerungs-Effekte; „erst die geteilte Zone, DANN die erste leere"): freie Zonen UND — mit
     // Alice-Teilung des Beschwoerers — die Zone einer GLEICHNAMIGEN Creature (`engine.beschwoerZonenFuer`).
     for (const zz of engine.beschwoerZonenFuer(pi, creatureCardData.name, { seite: physOwner, heroIdx: hi, nurBasis: true, namedHeroesOnly: true })) {
@@ -141,7 +142,7 @@ module.exports = {
       const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, chosenHost.heroIdx, chosenHost.slotIdx, {
         source: CARD_NAME, flug: false,
         heldSeite: chosenHost.owner,   // Kontrolle statt Seite (Styx 28.9.)
-        summonOpts: { isPlacement: true },
+        summonOpts: { isPlacement: true, alsBeschwoerung: true },   // summon as an additional Action: Beschwörungs-Voraussetzungen (Spirit-Ausrüstung) gelten (NECRO-02, Spielgestalter-Entscheidung 17.11.2026)
         hookExtras: { _summonedBySoulShard: true, _isNormalSummon: false },
       });
       if (!placeRes) return;

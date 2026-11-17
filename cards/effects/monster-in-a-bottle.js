@@ -236,9 +236,31 @@ module.exports = {
       });
       if (!zone) continue; // Back → re-pick creature
 
+      // Spielgestalter-Entscheidung 17.11.2026 (NECRO-02): „summon … as an additional Action" ist eine Beschwörung — die Pflicht-KOSTEN der Karte („Sacrifice … to summon this Creature":
+      // Blue-Ice Dragon, Foresta, The Egg of God …) gelten auch hier und werden VOR dem Auftritt bezahlt (abbrechbar: zurück zur Kreaturenwahl). Die Helden-Voraussetzung der Spirits
+      // steckt schon im Angebot (`isCreatureSummonable` je Held).
+      const kosten = await engine.zahleEffektBeschwoerKosten(creatureName, pi, zone.heroIdx, zone.slotIdx, {
+        source: 'Monster in a Bottle',
+        hookExtras: creatureSource === 'discard' ? engine.ablageHookExtras() : { _summonedFromPile: 'hand' },
+      });
+      if (!kosten.ok && !kosten.selbstGelegt) continue; // Kosten abgebrochen/nicht zahlbar → zurück zur Wahl
+
       // All decisions finalized — stream the card NOW (W64b: zentral über den Auftritts-Puffer, auch für Zuschauer)
       engine.commitAppearance();
       await engine._delay(100);
+
+      if (kosten.selbstGelegt) {
+        // 500 Piranhas legt sich in `beforeSummon` selbst aufs gegnerische Brett: nur die Quelle abrechnen, kein zweites Platzieren.
+        if (creatureSource === 'hand') {
+          const hIdx = ps.hand.indexOf(creatureName);
+          if (hIdx >= 0) engine.takeFromPileSync(ps, 'hand', hIdx);
+        } else {
+          const abSelbst = await engine.ablageEntnahme(pi, pi, creatureName, { source: 'monster-in-a-bottle' });
+          if (abSelbst) engine.ablageLandung(kosten.selbstGelegt, abSelbst, 'summon');
+        }
+        engine.sync();
+        break;
+      }
 
       // Execute: remove from source, place into support zone
       // v1389: der Ablage-Zweig läuft über die EINE Stelle (Sperre, Lethe).
@@ -269,8 +291,8 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'deep_sea_bubbles', owner: pi, heroIdx: hi, zoneSlot: si });
 
       // Fire on-summon hooks
-      await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: creatureName, zone: 'support', heroIdx: hi, zoneSlot: si, ...ablageExtras });
-      await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: hi, ...ablageExtras });
+      await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: creatureName, zone: 'support', heroIdx: hi, zoneSlot: si, ...ablageExtras, ...kosten.extras });
+      await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: hi, ...ablageExtras, ...kosten.extras });
 
       engine.sync();
       break;

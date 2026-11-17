@@ -296,6 +296,24 @@ module.exports = {
       chosenZone = currentFreeZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || currentFreeZones[0];
     }
 
+    // ── Beschwörungs-Voraussetzungen (Spielgestalter-Entscheidung 17.11.2026, NECRO-02) ──
+    // „Restriktionen wie die der Spirits, aber z. B. auch Opfer-Anforderungen, gelten IMMER, egal, von wo eine Creature beschworen wird." Die Helden-Voraussetzung (Spirit-Ausrüstung)
+    // steckt schon im Angebot (`isCreatureSummonable` in `getEligibleCreatures`); die Pflicht-KOSTEN der Karte („Sacrifice … to summon this Creature": Blue-Ice Dragon, Foresta, The Egg of
+    // God, Dragon Pilot, Pollution Piranha …) bezahlt die Necromancy hier — VOR jeder Animation, abbrechbar (dann bleibt die Aktivierung unverbraucht). Die Necromancy ist selbst die
+    // Zusatzaktion; „may"-Alternativwege der Karte fragen nicht.
+    const kosten = await engine.zahleEffektBeschwoerKosten(creatureName, feld, chosenZone.heroIdx, chosenZone.slotIdx, {
+      source: 'Necromancy', controller: pi,
+      hookExtras: engine.ablageHookExtras({ _summonedByNecromancy: true, _necromancyLevel: level }),
+    });
+    if (kosten.selbstGelegt) {
+      // 500 Piranhas legt sich in `beforeSummon` selbst auf das gegnerische Brett (wie bei den Pile-Wegen): nur noch die Ablage abrechnen.
+      const abSelbst = await engine.ablageEntnahme(pi, pi, creatureName, { source: 'necromancy' });
+      if (abSelbst) engine.ablageLandung(kosten.selbstGelegt, abSelbst, 'summon');
+      engine.sync();
+      return true;
+    }
+    if (!kosten.ok) return false; // Kosten abgebrochen/nicht zahlbar — don't claim HOPT
+
     // ── Effect resolves here ──
 
     // Play dark magic skull animation on the Necromancy ability zone
@@ -415,6 +433,7 @@ module.exports = {
     // Soul Shards skip the negation above so their hooks run.
     const summonExtras = {
       ...ablageExtras,
+      ...kosten.extras,   // `_tributePaid`, wenn die Beschwörung mit Opfern bezahlt wurde (Vertrag `takeTributeSummonExtras`)
       _summonedByNecromancy: true,
       _necromancyLevel: level,
     };
