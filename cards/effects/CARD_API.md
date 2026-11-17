@@ -12620,6 +12620,7 @@ Zwei Sonderfälle:
 * **Explosivo's Sword** — nur der 100er-Splash ist ein Flächenschlag;
   der ursprüngliche Angriffsschaden des Trägers läuft getrennt und
   bleibt unberührt. Die Klammer sitzt deshalb eng um die Splash-Phase.
+  **Spielgestalter-Entscheidung 17.11.2026:** trifft der Angriff des Trägers selbst mehrere Ziele (Whirlwind Strike), löst das Schwert erst NACH dem komplett aufgelösten Angriff aus (alle Treffer, alle Tode samt Wanted-Poster-Zügen), nicht schon nach dem ersten Kill — Baustein `engine.nachFlaechenschlagTode(fn)` (läuft beim Schließen der äußersten Flächenklammer nach den Toden; ohne offene Klammer `false`, der Aufrufer wirkt sofort wie beim Einzelziel).
 * **Invisibility** — ausdrücklich NICHT betroffen, keine Klammer.
 
 **★ ES ZÄHLT DIE ECHTE ZIELMENGE, NICHT DIE GEPLANTE** (Als Ruling
