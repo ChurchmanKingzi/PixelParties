@@ -24099,6 +24099,12 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    Knoepfe sie flankieren. */
 .panel-zielwahl .panel-zielwahl-knoepfe > :only-child { grid-column: 1 / -1; justify-self: center; }
 .panel-zielwahl .btn { white-space: nowrap; }
+/* ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026): Hinweis des ANGEWÄHLTEN Ziels (`validTargets[].hinweis`) — steht über der Knopfzeile und erscheint nur zwischen „Ziel
+   gewählt" und „Confirm" (app-board.jsx, Zielwahl-Fenster). Normaler Oberflächentext, harte Pixelkante links statt Schein/Verlauf, keine Alpha-Fläche, kein Symbol; nur Palettenfarben.
+   Warnung (die Wahl verpufft: immun, volle HP, Erstrunden-Schutz) = Bernstein, Info (Wirkung anders als erwartet, aber nicht nutzlos: Overheal Shock) = Akzentblau. */
+.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; }
+.panel-zielwahl-hinweis { font-size: 12px; line-height: 1.35; padding: 1px 0 1px 8px; border-left: 3px solid var(--accent4); color: var(--accent4); }
+.panel-zielwahl-hinweis-info { border-left-color: var(--accent); color: var(--accent); }
 /* Seitliche Kartenvorschau: `.card-mini` hat sonst feste Masse
    (`--card-w`/`--card-h`) und ragte aus dem schmalen Kasten. */
 .panel-zielwahl-vorschau .card-mini {

@@ -6,12 +6,17 @@
 //  ★ Spielgestalter-Entscheidung 17.11.2026: der Trank ist
 //  IMMER spielbar (sofern es ueberhaupt ein legales Ziel gibt)
 //  und waehlt auch Ziele mit vollen HP an — der Picker warnt
-//  nur („will have no effect", Warnungsprinzip). Helden mit
-//  Overheal Shock (Heilung wird zu Schaden) tragen diese
-//  Warnung NICHT, die Aktion hat Wirkung; der Picker nennt sie
-//  mit dem Hinweis „Heal becomes Damage". Die CPU sieht
-//  weiter nur Ziele mit HP-Defizit (`cpuSicht`): sie
-//  verbrennt den Trank nicht auf volle Ziele.
+//  nur („will have no effect", Warnungsprinzip).
+//  ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026): der
+//  Hinweis haengt NICHT mehr an der Beschreibung der Zielwahl,
+//  sondern am einzelnen Ziel (`hinweis`/`hinweisArt`); der Client
+//  zeigt ihn nur, solange dieses Ziel angewaehlt und noch nicht
+//  bestaetigt ist. Volle HP: Warnung („will have no effect").
+//  Helden mit Overheal Shock (Heilung wird zu Schaden) tragen
+//  diese Warnung NICHT, die Aktion hat Wirkung: Info „healing
+//  will deal 250 damage". Die CPU sieht weiter nur Ziele mit
+//  HP-Defizit (`cpuSicht`): sie verbrennt den Trank nicht auf
+//  volle Ziele.
 //
 //  Animation: red/green hearts and pluses rising
 //  from the healed target.
@@ -80,9 +85,15 @@ module.exports = {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (nurDefizit && hero.hp >= hero.maxHp) continue;
-        targets.push({
+        const t = {
           id: `hero-${p}-${hi}`, type: 'hero', owner: p, heroIdx: hi, cardName: hero.name,
-        });
+        };
+        if (engine?.setzeZielHinweis) {
+          // Overheal Shock: die Heilung trifft als Schaden (`healReversed` → `actionHealHero`) — eine Information, keine Warnung vor Nutzlosigkeit.
+          if (hero.statuses?.healReversed) engine.setzeZielHinweis(t, `Overheal Shock: healing will deal ${HEAL_AMOUNT} damage to ${hero.name}.`, 'info');
+          else if (hero.hp >= hero.maxHp) engine.setzeZielHinweis(t, `${hero.name} is at full HP, so healing will have no effect.`, 'warnung');
+        }
+        targets.push(t);
       }
     }
 
@@ -95,30 +106,23 @@ module.exports = {
         const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
         const curHp = inst.counters?.currentHp ?? maxHp;
         if (curHp <= 0 || (nurDefizit && curHp >= maxHp)) continue;
-        targets.push({
+        const t = {
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
           slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
-        });
+        };
+        if (curHp >= maxHp && engine?.setzeZielHinweis) engine.setzeZielHinweis(t, `${inst.name} is at full HP, so healing will have no effect.`, 'warnung');
+        targets.push(t);
       }
     }
 
     return targets;
   },
 
-  // Funktionsform (Server: `targetingConfig(gs, pi, …)`): der Picker-Text nennt die Warnung fuer volle Ziele und, solange ein Held
-  // Overheal Shock traegt, den Hinweis „Heal becomes Damage" (die Aktion trifft ihn, `healReversed` → Schaden in `actionHealHero`).
-  targetingConfig(gs) {
-    const umgekehrt = [];
-    for (const ps of (gs?.players || [])) {
-      for (const hero of (ps?.heroes || [])) {
-        if (hero?.name && hero.hp > 0 && hero.statuses?.healReversed) umgekehrt.push(hero.name);
-      }
-    }
-    let description = `Choose a target to heal for ${HEAL_AMOUNT} HP. A target at full HP will have no effect.`;
-    if (umgekehrt.length > 0) description += ` Overheal Shock (Heal becomes Damage): ${umgekehrt.join(', ')} would take ${HEAL_AMOUNT} damage.`;
+  // Die Hinweise zu vollen Zielen und Overheal Shock stehen an den Zielen (`getValidTargets`), nicht im Beschreibungstext.
+  targetingConfig() {
     return {
-      description,
+      description: `Choose a target to heal for ${HEAL_AMOUNT} HP.`,
       confirmLabel: '💚 Heal!',
       confirmClass: 'btn-success',
       cancellable: true,

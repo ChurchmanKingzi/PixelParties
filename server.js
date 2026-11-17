@@ -12870,12 +12870,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     }
     // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): die neu aufgebaute Liste der erneut geöffneten Zielwahl läuft sonst am Taunt vorbei (`normalizeValidTargets` wurde hier nie gerufen).
     if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });   // W43a: Quelle = die Karte der Zielwahl (Taunt nur für Attack/Spell/Creature effect)
+    if (Array.isArray(freshTargets) && typeof room.engine.ersterZugHinweisSetzen === 'function') room.engine.ersterZugHinweisSetzen(freshTargets, pi, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel
     gs.potionTargeting = {
       potionName, handIndex,
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi, cardType, goldCost,
-      validTargets: freshTargets, config: mitWirkungslosHinweis(config, freshTargets),
+      validTargets: freshTargets, config,
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -13205,20 +13206,6 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
 }
 
 /**
- * Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): Ziele einer Ziel-Karte, auf die der Effekt NICHT wirken wird (Status-Immunitaet, z. B. freeze_immune bei Snow Cannon), bleiben
- * waehlbar — die Karte traegt am Ziel `wirkungslos` (Hinweissatz, `engine.markiereStatusWirkungslos`). Die Zielwahl haengt die Saetze an ihren Beschreibungstext, damit der Spieler
- * VOR dem Klick gewarnt ist. Gibt eine Kopie der Konfiguration zurueck (das Skript-Objekt bleibt unveraendert); ohne markierte Ziele die Konfiguration selbst.
- */
-function mitWirkungslosHinweis(config, validTargets) {
-  const hinweise = [];
-  for (const t of (validTargets || [])) {
-    if (t && !t.ineligible && typeof t.wirkungslos === 'string' && t.wirkungslos && !hinweise.includes(t.wirkungslos)) hinweise.push(t.wirkungslos);
-  }
-  if (hinweise.length === 0) return config;
-  return { ...config, description: `${config?.description || 'Select targets'} Warning: ${hinweise.join(' ')}` };
-}
-
-/**
  * Rewrite `equip`-type validTargets so their `id` and `owner` fields
  * point at the creature's PHYSICAL side rather than `inst.owner`. Two
  * paths produce a controller / owner mismatch:
@@ -13364,6 +13351,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     }
     for (const t of geblockt2) t.ineligible = true;
   }
+  // Spielgestalter-Entscheidung 17.11.2026 (Warntext am Ziel): waehlbare Ziele des Erste-Runden-Geschuetzten tragen `hinweis` (nur der Client zeigt ihn, solange das Ziel angewaehlt und unbestaetigt ist).
+  if (engine && typeof casterPi === 'number' && typeof engine.ersterZugHinweisSetzen === 'function') engine.ersterZugHinweisSetzen(validTargets, casterPi, config);
   return validTargets;
 }
 
@@ -13431,7 +13420,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi,
-      cardType: 'Potion', validTargets, config: mitWirkungslosHinweis(cfg, validTargets),
+      cardType: 'Potion', validTargets, config: cfg,
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -13739,7 +13728,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi,
-      cardType: 'Artifact', goldCost: cost, validTargets, config: mitWirkungslosHinweis(config, validTargets),
+      cardType: 'Artifact', goldCost: cost, validTargets, config,
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;

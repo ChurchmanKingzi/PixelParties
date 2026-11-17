@@ -11153,8 +11153,10 @@ class GameEngine {
    *
    * What it still respects:
    *   • firstTurnProtectedPlayer (game-start grace shield — absolute)
-   *   • Cardinal Beast immunity + Baihu Petrify on creatures (absolute
-   *     "immune to all damage" flags, not reductions)
+   *   • Cardinal Beast immunity (absolute "unaffected by all cards and effects").
+   *     Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung von
+   *     Baihu/Petrifier („takes no damage from any sources" / „Damage … becomes 0") hält True Damage bei KREATUREN nicht mehr ab (`durchschlagVersteinerung`,
+   *     wie beim Helden, wo sie nie griff); Time Bomblebee/Succubus-Kontrolle („cannot take damage") bleiben für True Damage immun.
    *
    * Behavior preserved vs. actionDealDamage:
    *   • Sets `_damagedOnTurn` on the target (used by Medusa's Curse etc.)
@@ -11334,8 +11336,9 @@ class GameEngine {
     // Route through the batch so all the centralized plumbing runs
     // (animation, death hooks, _damagedOnTurn tracker, hand-limit rechecks,
     // discard-pile routing). canBeNegated:false pierces Gate Shield,
-    // Guardian, and buff multipliers. Cardinal Beast / Baihu absolutes
-    // still block — those are "immune to all damage" flags, not reductions.
+    // Guardian, and buff multipliers. Cardinal Beast absolutes
+    // still block — "unaffected by all cards and effects", not a reduction.
+    // Spielgestalter-Entscheidung 17.11.2026: die Versteinerung (Baihu/Petrifier) gilt hier nicht mehr als Schutz (`durchschlagVersteinerung`).
     if (target.counters) {
       await this.processCreatureDamageBatch([{
         inst: target,
@@ -11344,6 +11347,7 @@ class GameEngine {
         source,
         sourceOwner,
         canBeNegated: false,
+        durchschlagVersteinerung: true,
         trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
@@ -35192,6 +35196,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return await this._zielwahlAbschliessen(playerIdx, validTargets, config, cpuPicked);
     }
     this.beginHumanWait();   // v848: Uhren der CPU anhalten
+    this.ersterZugHinweisSetzen(validTargets, playerIdx, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel (Erste-Runden-Schutz), vom Client nur beim angewaehlten Ziel gezeigt
     const picked = await new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
@@ -56804,8 +56809,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip, Snow Cannon × freeze-immune Held): Ziele, auf die ein Status schon wegen einer Zustands-Immunitaet NICHT wirken
    * wird (freeze_immune, burn_immune, `immune`, Charme, Johanna, Light Ball, Kreaturen-Schutz …), bleiben als Ziel WAEHLBAR — der Effekt verpufft, die Karte ist verbraucht. Der Picker
-   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz), `server.js` (`mitWirkungslosHinweis`) haengt ihn an den Beschreibungstext der Zielwahl; die CPU waehlt solche
-   * Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
+   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz, nur fuer die CPU) und `hinweis` (`setzeZielHinweis`: der Client zeigt ihn, solange DIESES Ziel angewaehlt und noch nicht
+   * bestaetigt ist); die CPU waehlt solche Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
    * Gibt den Hinweissatz fuer EIN Picker-Ziel (`{type:'hero', owner, heroIdx}` bzw. `{type:'equip', cardInstance}`) zurueck, '' wenn der Status landen kann.
    * `pi` = Seite der Quelle (Charme-Schutz, Golden Wings), `quelleName` = Name der Karte.
    */
@@ -56828,11 +56833,42 @@ this._deathWatch = (this._deathWatchStack || []).length
     return blockt ? `${name} is immune to ${GERUND[statusName] || statusName} and will not be affected.` : '';
   }
 
-  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos`). Rueckgabe: dieselbe Liste. */
+  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos` + `ziel.hinweis`). Rueckgabe: dieselbe Liste. */
   markiereStatusWirkungslos(ziele, statusName, pi, quelleName) {
     for (const t of (ziele || [])) {
       const h = this.statusWirkungslosHinweis(t, statusName, pi, quelleName);
-      if (h) t.wirkungslos = h;
+      if (h) { t.wirkungslos = h; this.setzeZielHinweis(t, h, 'warnung'); }
+    }
+    return ziele;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warntext-UX: „Der soll nur erscheinen, wenn ein immunes Ziel angewählt wird, also zwischen ‚Ziel gewählt' und ‚Confirm target'"):
+   * Hinweise der Zielwahl (Warnungsprinzip) gehoeren an das einzelne ZIEL, nicht an den Beschreibungstext. Ein Kandidat in `validTargets` traegt `hinweis` (englischer Satz, nennt den Zielnamen
+   * selbst) und `hinweisArt`: 'warnung' = die Wahl verpufft (immun, volle HP, Erstrunden-Schutz), 'info' = die Wirkung ist anders als erwartet, aber NICHT nutzlos (Overheal Shock: Heilung wird zu
+   * Schaden). Der Client zeigt den Satz NUR, solange dieses Ziel angewaehlt und noch nicht bestaetigt ist (`app-board.jsx`, Zielwahl-Fenster); er rechnet nichts selbst. Die CPU liest `hinweis`
+   * nicht (sie meidet nur `wirkungslos`). Bereits gesetzte Hinweise bleiben (der speziellere gewinnt), ausser `opts.ueberschreiben`.
+   */
+  setzeZielHinweis(ziel, text, art = 'warnung', opts = {}) {
+    if (!ziel || typeof text !== 'string' || !text) return ziel;
+    if (typeof ziel.hinweis === 'string' && ziel.hinweis && !opts.ueberschreiben) return ziel;
+    ziel.hinweis = text;
+    ziel.hinweisArt = art === 'info' ? 'info' : 'warnung';
+    return ziel;
+  }
+
+  /**
+   * Erste-Runden-Immunitaet (`_ersterZugZiel`, wie `_ersterZugZielAbziehen` nach der Wahl): jedes WAEHLBARE Ziel des geschuetzten Spielers bekommt einen Hinweis (nur gegenueber dem Zugspieler,
+   * nicht bei `config.ignoreFirstTurnProtection`; ein schon gesetzter speziellerer Hinweis bleibt). Rueckgabe: dieselbe Liste.
+   */
+  ersterZugHinweisSetzen(ziele, waehler, config = {}) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    if (!Array.isArray(ziele) || prot == null || waehler === prot || config?.ignoreFirstTurnProtection) return ziele;
+    for (const t of ziele) {
+      if (!t || t.ineligible || t.hinweis || !this._ersterZugZiel(t, waehler)) continue;
+      const inst = t.cardInstance || t._cardInstance;
+      const name = t.cardName || t.name || inst?.name || 'This target';
+      this.setzeZielHinweis(t, `${name} is protected during the first turn and will not be affected.`, 'warnung');
     }
     return ziele;
   }
@@ -58540,7 +58576,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
-          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz)
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz && !e.durchschlagVersteinerung)   // Spielgestalter-Entscheidung 17.11.2026: True Damage (Acid Vial & Co.) trifft versteinerte Kreaturen
           || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {

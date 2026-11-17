@@ -63703,6 +63703,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </>
             );
           })()}
+          {(() => {
+            // ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026: „Der soll nur erscheinen, wenn ein immunes Ziel angewählt wird, also zwischen ‚Ziel gewählt' und ‚Confirm target'"):
+            // der Server liefert den Hinweis AM Ziel (`validTargets[].hinweis`, englischer Satz mit Zielname; `hinweisArt` 'warnung' = die Wahl verpufft, 'info' = Wirkung anders als
+            // erwartet, aber nicht nutzlos). Gezeigt wird er nur für die aktuell angewählten, noch unbestätigten Ziele — Auswahl wechseln/aufheben lässt ihn verschwinden, nach „Confirm" ist
+            // die Zielwahl weg. Der Client rechnet keine Regeln, er zeigt das Feld.
+            const hinweise = [];
+            for (const id of potionSelection) {
+              const t = (pt.validTargets || []).find(x => x.id === id);
+              if (t && typeof t.hinweis === 'string' && t.hinweis) hinweise.push({ id, text: t.hinweis, art: t.hinweisArt === 'info' ? 'info' : 'warnung' });
+            }
+            if (hinweise.length === 0) return null;
+            return (
+              <div className="panel-zielwahl-hinweise" role="status">
+                {hinweise.map(h => <div key={h.id} className={'panel-zielwahl-hinweis panel-zielwahl-hinweis-' + h.art}>{h.text}</div>)}
+              </div>
+            );
+          })()}
           <div className="panel-zielwahl-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
               disabled={!canConfirmPotion}
