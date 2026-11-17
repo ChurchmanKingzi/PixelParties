@@ -8111,10 +8111,10 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
   ps.supportZones[heroIdx][supIdx].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill) — gemerkt, damit ein Negieren den richtigen zurückgibt.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill). ★ Spielgestalter-Entscheidung 16.11.2026: mit dem Beginn des Anlegens ist der Platz verbraucht — wird die Ability
+  // danach negiert, bekommt der Held ihn NICHT zurück (wie bei jedem Einmal-Limit, siehe CARD_API „Einmal-Limits werden bei Aktivierungsbeginn verbraucht"). Ein Abbruch VOR diesem Punkt
+  // (Held-/Zonenwahl abbrechen) hat noch nichts verbraucht.
   engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const inst = engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
   engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, zone: 'support' });
@@ -8133,17 +8133,8 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'support', fromHeroIdx: heroIdx, fromSlotIdx: supIdx });
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        hero.buffs.blessed_skill.remaining++;
-        hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      }
+      // Der Platz bleibt verbraucht (s. o.); nur die Sperrmarke des Blessed-Buffs wird neu gelesen (die Ability liegt nicht mehr in der Zone, Magic-Arts-Stufe kann gefallen sein).
+      if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
       engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -8269,13 +8260,12 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   room.engine.notePlayedFromHand(pi);
   // Consume the standard slot first; if it's already used, spend a bonus
-  // attachment from Divine Gift of Skill instead. Track which slot was
-  // consumed so a negation refund can return it cleanly.
+  // attachment from Divine Gift of Skill instead.
   // v1356: Verbrauch (Standard zuerst, sonst Bonus-Platz) und Blessed-Buff
   // an EINER Stelle — derselbe Helfer wie im Engine-Anlegeweg.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Platz ist mit dem Beginn des Anlegens verbraucht und kommt bei einer Negation der Ability NICHT zurück (Standard- wie Bonus-Platz);
+  // ein Abbruch vor diesem Punkt (Zonen-/Heldenwahl) hat nichts verbraucht.
   room.engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -8304,26 +8294,10 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       // `zoneSlotFound` merkt sich, aus welchem Slot sie entfernt wurde.
       await room.engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: zoneSlotFound });
-      // Refund whichever slot was consumed (regular vs Skill bonus).
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        // Restore the Blessed buff: re-add the slot to the visible
-        // counter, and re-create the buff entry if it was deleted when
-        // remaining hit 0 mid-resolve.
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) {
-          hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        }
-        hero.buffs.blessed_skill.remaining++;
+      // Kein Zurückgeben des Platzes (s. o.). Die Ability liegt nicht mehr in der Zone — Magic Arts
+      // kann unter 1 gefallen sein, also die Sperrmarke des Blessed-Buffs neu lesen.
+      if (hero.buffs?.blessed_skill) {
         hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        // The regular slot was the consumer — Magic Arts level may have
-        // dropped back below 1, so re-evaluate the lock flag.
-        if (hero.buffs?.blessed_skill) {
-          hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-        }
       }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
