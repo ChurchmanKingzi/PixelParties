@@ -193,7 +193,7 @@ module.exports = {
       if (neu?.statuses?.[statusName]) {
         if (!neu.statuses[statusName]._fromAttachment) neu.statuses[statusName]._fromAttachment = anh.name;   // der Status am neuen Ziel gehört dieser Karte (Heilen wirft sie ab)
       } else if (typeof loadCardEffect(anh.name)?.attachmentMovedToHost !== 'function') {
-        await engine.addHeroStatus(ziel.owner, ziel.heroIdx, statusName, { ...(sourceInfo.opts || {}), _fromSurpriseRedirect: true, _fromAttachment: anh.name });
+        await engine.addHeroStatus(ziel.owner, ziel.heroIdx, statusName, { ...(sourceInfo.opts || {}), appliedBy: sourceInfo.opts?.appliedBy ?? anh.originalOwner ?? engine.opponentOf(pi), _fromSurpriseRedirect: true, _fromAttachment: anh.name });
       }
       engine.log('reflection_attachment', { card: anh.name, to: ziel.cardName });
       engine.sync();
