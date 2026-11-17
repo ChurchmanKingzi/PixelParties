@@ -1,4 +1,5 @@
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+const { loadCardEffect } = require('./_loader');
 // ═══════════════════════════════════════════
 //  GETEILT: Attachment-Spells anlegen — DIE eine Auslegung (v650)
 //
@@ -443,7 +444,8 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       const engine = ctx._engine;
       const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
       if (!wirt?.name || (wirt.statuses?.[STATUS_NAME] && !(STATUS_NAME === 'negated' && !wirt.statuses[STATUS_NAME]._fromAttachment))) return;   // W24a (N1-09): eine fremde Negierung steht dem Anlegen nicht im Weg
-      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME, optionen.statusExtras);
+      if (loadCardEffect(CARD_NAME)?.statusFolgtImmunitaet) setzeOderRuhe(engine, inst, STATUS_NAME, optionen.statusExtras);   // 17.11.2026: Status-Immunität des Wirts → Status ruht
+      else setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME, optionen.statusExtras);
       engine.sync();
     },
 
@@ -504,7 +506,151 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
   return hooks;
 }
 
+// ═══════════════════════════════════════════
+//  ★★ STATUS-ANHAENGSEL FOLGEN DER STATUS-IMMUNITAET DES WIRTS
+//
+//  Spielgestalter-Entscheidung 17.11.2026 (JOH-01 Stowaway × Status-Immunität, ATT-15 Curse/Berserk/Polymorph/Shrink):
+//  „Die Negation [bzw. der Status] applied immer nur exakt dann, wenn der Held nicht status-immune ist. Er ist gerade immun dank Johanna, Stowaway
+//  wird beschworen, Alex wird nicht negiert. Johanna stirbt jetzt, während der Stowaway schon da ist → er wird negiert." — „Die Karte soll wirkungslos
+//  in der Zone verbleiben. ABER sobald die Statusimmunität aufgehoben wird, greift sie und hindert den Hero!"
+//
+//  Der Status eines solchen Anhängsels ist ein DAUERZUSTAND, der fortlaufend ausgewertet wird: der Wirt trägt ihn genau dann, wenn die Karte am Wirt liegt
+//  UND der Wirt im Moment nicht status-immun ist (`engine.heroBlocksStatusNow`: Johanna, Light Ball, Immunitäts-Anhängsel, Buff `negative_status_immune`,
+//  Erstzug-Schutz, Einzel-Immunität; ohne Charme-Schutz und ohne die kurzlebige Nach-CC-Immunität `immune` — beide gehören nicht zur Status-Immunität).
+//    • Beim Anlegen unter Immunität: der Status wird nicht gesetzt, die Karte liegt wirkungslos in der Zone (`counters._statusRuht`).
+//    • `statusAnhaengselAbgleichen` (läuft in jedem `engine.sync()`) holt ihn nach, sobald die Immunität endet (Johanna stirbt, Light Ball weg, Buff läuft ab …),
+//      und nimmt ihn wieder weg, wenn sie später dazukommt (Marke wieder gesetzt). Gegen Immunitäten, die einander bedingen (Johanna selbst negiert), läuft der
+//      Abgleich bis zu 3 Durchgänge.
+//    • Geheilt (Cleanse) und Abgang der Karte laufen wie bisher über die Karten-Haken: ein geheilter Status wirft die Karte ab (Marke bleibt aus); ruhende Karten
+//      mit `countsAsNegativeStatus` (Stowaway, Decisive Defeat) stehen in den Heil-Listen als eigener `attach:`-Eintrag.
+//
+//  Vertrag am Kartenskript (nur Karten, die ihn setzen, sind betroffen):
+//    statusFolgtImmunitaet: {
+//      status: 'negated',                       // = `attachmentStatus`
+//      extras: { ... },                         // optional: Zusatzfelder des Statuseintrags (Stowaway: `abilitiesNegated`)
+//      einsetzen(engine, inst, hero, seite, heroIdx) {},   // optional, synchron: Nebenwirkungen NACH dem Setzen (Polymorph: ATK-Bonus, Fluch: ATK-Sperre)
+//      ruhen(engine, inst, hero, seite, heroIdx) {},       // optional, synchron: Nebenwirkungen NACH dem Wegnehmen (muss idempotent sein)
+//    }
+//  Die Karten melden das Ergebnis ihres Anlegens mit `statusErgebnisBuchen` (oder `setzeOderRuhe`), damit eine Karte, deren Status wegen Immunität ausblieb, markiert ist.
+// ═══════════════════════════════════════════
+
+const RUHT = '_statusRuht';
+
+/** Würde der Wirt diesen Anhängsel-Status wegen einer ZUSTANDS-Immunität gerade abweisen? (Brettseite `owner`.) */
+function wirtStatusImmun(engine, owner, heroIdx, statusName) {
+  if (typeof engine?.heroBlocksStatusNow !== 'function') return false;
+  return !!engine.heroBlocksStatusNow(owner, heroIdx, statusName, { festesZiel: true, bypassImmune: true, ohneCharme: true });
+}
+
+/** Alle Kopien von Status-Anhängseln (Vertrag `statusFolgtImmunitaet`) am Wirt, die diesen Status tragen sollen. */
+function statusKopienAmWirt(engine, owner, heroIdx, statusName) {
+  return (engine.cardInstances || []).filter(c => c.zone === 'support' && !c.faceDown && c.owner === owner && c.heroIdx === heroIdx
+    && loadCardEffect(c.name)?.statusFolgtImmunitaet?.status === statusName);
+}
+
+/**
+ * Anlegen eines Status-Anhängsels melden: `gesetzt` = der Wirt trägt den Status jetzt. Fehlt er wegen Status-Immunität des Wirts, wird die Karte als ruhend
+ * markiert (der Abgleich holt den Status nach, sobald die Immunität endet); fehlt er aus anderem Grund (Resistance, Effekt-Immunität …), bleibt es bei der toten Karte wie bisher.
+ */
+function statusErgebnisBuchen(engine, inst, gesetzt, owner, heroIdx, statusName) {
+  if (!inst) return;
+  if (!inst.counters) inst.counters = {};
+  if (!gesetzt && wirtStatusImmun(engine, owner, heroIdx, statusName)) inst.counters[RUHT] = true;
+  else delete inst.counters[RUHT];
+}
+
+/**
+ * Status am Wirt anlegen — oder ruhen lassen, wenn der Wirt gerade status-immun ist.
+ * @returns {'gesetzt'|'ruht'|false}  false = kein negierbarer Wirt (tot, Karian)
+ */
+function setzeOderRuhe(engine, inst, statusName, extras) {
+  const owner = inst.owner, heroIdx = inst.heroIdx;
+  const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
+  if (!wirt?.name || wirt.hp <= 0) return false;
+  if (statusName === 'negated' && engine.heroIgnoresHaltStatuses?.(owner, heroIdx)) return false;   // W12: Karian wird nie durch Negation gehindert
+  if (wirtStatusImmun(engine, owner, heroIdx, statusName)) {
+    statusErgebnisBuchen(engine, inst, false, owner, heroIdx, statusName);
+    engine.log('status_blocked', { target: wirt.name, status: statusName, reason: 'status immunity — takes effect when it ends' });
+    return 'ruht';
+  }
+  const ok = setzeAnhaengselStatus(engine, owner, heroIdx, inst.name, statusName, extras);
+  statusErgebnisBuchen(engine, inst, ok, owner, heroIdx, statusName);
+  return ok ? 'gesetzt' : false;
+}
+
+/** Ein Durchgang über eine Gruppe (Wirt + Status). Gibt `true` zurück, wenn sich etwas geändert hat. */
+function _abgleichGruppe(engine, g) {
+  const { owner, heroIdx, status, insts } = g;
+  const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
+  const ruhende = insts.filter(i => i.counters?.[RUHT]);
+  if (!hero?.name || !(hero.hp > 0)) {            // besiegter Wirt: nichts mehr nachzuholen (die Status sind mit dem Tod gefallen)
+    for (const i of ruhende) delete i.counters[RUHT];
+    return false;
+  }
+  const namen = new Set(insts.map(i => i.name));
+  const st = hero.statuses?.[status];
+  const traegt = !!st && namen.has(st._fromAttachment);
+  const blockiert = wirtStatusImmun(engine, owner, heroIdx, status);
+
+  if (ruhende.length > 0) {
+    // Trägt der Wirt den Status schon (Übertragung, zweite Kopie) oder liegt ein fremder Status gleichen Namens — außer der überlagerbaren Negierung —, ist nichts nachzuholen.
+    if (traegt || (st && status !== 'negated')) { for (const i of ruhende) delete i.counters[RUHT]; return true; }
+    if (blockiert) return false;
+    // Karten mit Zusatzfeldern (Stowaway: harte Negierung) bestimmen den Eintrag.
+    const erste = ruhende.find(i => loadCardEffect(i.name).statusFolgtImmunitaet.extras) || ruhende[0];
+    const extras = Object.assign({}, ...ruhende.map(i => loadCardEffect(i.name).statusFolgtImmunitaet.extras || {}));
+    if (!setzeAnhaengselStatus(engine, owner, heroIdx, erste.name, status, extras)) return false;   // z. B. Karian: bleibt ruhend
+    for (const i of ruhende) delete i.counters[RUHT];
+    engine.log('status_add', { target: hero.name, status, owner, source: erste.name });   // Immunität beendet: der Status greift jetzt
+    for (const i of insts) loadCardEffect(i.name).statusFolgtImmunitaet.einsetzen?.(engine, i, hero, owner, heroIdx);
+    return true;
+  }
+
+  if (traegt && blockiert) {
+    const fremd = st._fremd;                       // darunter liegende fremde Negierung läuft weiter (Austritts-Hook-Form)
+    if (fremd) hero.statuses[status] = fremd; else delete hero.statuses[status];
+    for (const i of insts) { if (!i.counters) i.counters = {}; i.counters[RUHT] = true; }
+    engine.log('status_remove', { target: hero.name, status, owner });   // Immunität begonnen: der Status ruht, die Karte bleibt liegen
+    for (const i of insts) loadCardEffect(i.name).statusFolgtImmunitaet.ruhen?.(engine, i, hero, owner, heroIdx);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Abgleich aller Status-Anhängsel mit der Status-Immunität ihres Wirts (siehe Kopf). Läuft in jedem `engine.sync()` — auch in Simulationen — und ist ohne
+ * solche Karten auf dem Brett ein Durchlauf der Kartenliste. Sperre gegen Selbstaufruf (die Nebenwirkungen rufen `sync`).
+ */
+function statusAnhaengselAbgleichen(engine) {
+  if (engine._anhStatusLaeuft) return;
+  let gruppen = null;
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    const cfg = loadCardEffect(inst.name)?.statusFolgtImmunitaet;
+    if (!cfg || !cfg.status || !(inst.heroIdx >= 0)) continue;
+    if (!gruppen) gruppen = new Map();
+    const key = `${inst.owner}:${inst.heroIdx}:${cfg.status}`;
+    let g = gruppen.get(key);
+    if (!g) gruppen.set(key, g = { owner: inst.owner, heroIdx: inst.heroIdx, status: cfg.status, insts: [] });
+    g.insts.push(inst);
+  }
+  if (!gruppen) return;
+  engine._anhStatusLaeuft = true;
+  try {
+    for (let durchgang = 0; durchgang < 3; durchgang++) {
+      let geaendert = false;
+      for (const g of gruppen.values()) geaendert = _abgleichGruppe(engine, g) || geaendert;
+      if (!geaendert) break;
+    }
+  } catch (err) {
+    console.error('[statusAnhaengselAbgleichen]', err && err.message);
+  } finally {
+    engine._anhStatusLaeuft = false;
+  }
+}
+
 module.exports = {
   freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero,
   setzeAnhaengselStatus, anhaengselStatusHooks,
+  setzeOderRuhe, statusErgebnisBuchen, statusAnhaengselAbgleichen, statusKopienAmWirt, wirtStatusImmun,
 };

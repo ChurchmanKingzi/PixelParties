@@ -3428,6 +3428,19 @@ frischen 2+-Runden-Stun getauscht, die Laufzeit beginnt nicht von vorn (`addHero
 erneuern dürfen, übergibt sie `{ renew: true }`. Gezielte Verlängerungen (Gon, Frost-Verlängerung in `_frost-shared.js`) schreiben die Laufzeit selbst
 und sind nicht betroffen. Test: `scripts/skilltest-e2e/status-renewal.test.js`.
 
+### Status-Anhängsel folgen der Status-Immunität des Wirts (Spielgestalter-Entscheidung 17.11.2026)
+
+Ein Anhängsel, dessen Status eine NEGATIVE Wirkung auf den Helden hat (Stowaway, Decisive Defeat: `negated`), legt den Status nur an, solange der Wirt im Moment **nicht status-immun** ist
+(`engine.heroBlocksStatusNow`: Johanna, Light Ball, Immunitäts-Anhängsel, Buff `negative_status_immune`, Erstzug-Schutz, Einzel-Immunität). Die Negierung ist ein **Dauerzustand, der fortlaufend ausgewertet
+wird**: Stowaway unter Johanna beschworen → Alex nicht negiert; Johanna stirbt, während er da ist → Alex wird negiert; kommt die Immunität später dazu → die Negierung ruht wieder. Die Karte liegt in der Zwischenzeit
+wirkungslos in der Support Zone (Marke `inst.counters._statusRuht`), eine ruhende Karte mit `countsAsNegativeStatus` steht weiter als `attach:`-Eintrag in den Heil-Listen.
+
+* **Vertrag am Kartenskript:** `statusFolgtImmunitaet: { status, extras?, einsetzen?(engine, inst, hero, seite, heroIdx), ruhen?(…) }` (`_attachment-shared.js`). `einsetzen`/`ruhen` sind synchrone Nebenwirkungen
+  nach dem Setzen bzw. Wegnehmen des Status (Idempotenz!). Das Anlegen läuft über `setzeOderRuhe(engine, inst, status, extras)` bzw. meldet sein Ergebnis mit `statusErgebnisBuchen(engine, inst, gesetzt, owner, heroIdx, status)`.
+* **Der Abgleich** `statusAnhaengselAbgleichen` läuft in jedem `engine.sync()` (auch in Simulationen): holt ruhende Status nach, sobald die Immunität endet, und nimmt sie weg, wenn sie beginnt (bis zu 3 Durchgänge, weil Johannas
+  Schutz selbst an ihrer Negierung hängt). Er legt nur Status an/ab, die eine Karte der Gruppe trägt (`_fromAttachment`); Heilen/Abgang der Karte laufen wie bisher über ihre Haken (`anhaengselStatusHooks`) und setzen die Marke nicht.
+* **Nicht** zur Status-Immunität zählen der Charme-Schutz (er gehört zur Kontrolle) und die kurzlebige Nach-CC-Immunität `immune`.
+
 ### Applying creature statuses### Applying creature statuses
 
 `engine.applyCreatureStatus(inst, statusName, opts)` is the **single** chokepoint every creature-status applier must use. Direct `inst.counters.<status> = 1` writes are forbidden in new card scripts — they bypass `canApplyCreatureStatus` (immunity gate) and skip the `ON_STATUS_APPLIED` hook fire, which would silently break Bear Rider's hand-level recompute, Chilly Wizard's status mirror, Colored Snow's reaction trigger, and any future creature-status-aware Creature.

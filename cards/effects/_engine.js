@@ -61540,6 +61540,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): der Status von Anhängseln wie Stowaway/Decisive Defeat/Curse/Berserk/Polymorph/Shrink folgt fortlaufend der
+    // Status-Immunität des Wirts (Johanna, Light Ball, Buff …) — s. `_attachment-shared.js` (`statusAnhaengselAbgleichen`). Vor den ATK-Abgleichen (Fluch/Polymorph buchen ATK).
+    require('./_attachment-shared').statusAnhaengselAbgleichen(this);
     this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)

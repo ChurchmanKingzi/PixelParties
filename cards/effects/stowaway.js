@@ -19,12 +19,16 @@
 //  • „Unaffected by all other cards and effects": `counters._cardinalImmune` (quellenblind,
 //    wie die Cardinal Beasts) — gegen Schaden, Status, Negation, Bewegen und Zerstoeren.
 //    Die eigene Loeschung laeuft ausdruecklich `unaufhaltsam`.
+//  • Status-Immunität (Spielgestalter-Entscheidung 17.11.2026, JOH-01): „Stowaway kann zu Alex beschworen werden, aber die Negation applied immer nur exakt dann, wenn er nicht
+//    status-immune ist." Die Negation ist ein Dauerzustand, der fortlaufend ausgewertet wird (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`): unter Johanna, Light Ball,
+//    `negative_status_immune` … liegt der Passagier wirkungslos in der Zone; endet die Immunität (Johanna stirbt, Light Ball weg), setzt die Negation ein — kommt sie später dazu,
+//    ruht sie wieder. Eine ruhende Karte steht in den Heil-Listen als „Negated (Stowaway)" (`attach:`-Eintrag) und lässt sich dort wie sonst löschen. Gilt ebenso für Decisive Defeat.
 //  • Beschwoerung in die freie Zone JEDES Helden (`playOnAnyHeroSide`, Muster Chilly Wizard):
 //    Dragziel = beliebiger freier Platz; Level reicht, wenn irgendein EIGENER lebender Held
 //    Decay + Summoning >= 1 hat. Die Creature gehoert danach der Seite, in deren Zone sie liegt.
 // ═══════════════════════════════════════════
 
-const { anhaengselStatusHooks, setzeAnhaengselStatus } = require('./_attachment-shared');
+const { anhaengselStatusHooks, setzeOderRuhe } = require('./_attachment-shared');
 
 const CARD_NAME = 'Stowaway';
 const BASE_LEVEL = 1;
@@ -90,6 +94,11 @@ async function loeschen(engine, inst, grund) {
 const HARTE_NEGIERUNG = { abilitiesNegated: true };
 const geteilt = anhaengselStatusHooks(CARD_NAME, 'negated', { heilenWirftAb: true, statusExtras: HARTE_NEGIERUNG });
 
+/** Die rosa Tentakel umklammern den Wirt (beim Beschwören UND wenn die Negation nach einer Status-Immunität einsetzt). */
+function tentakel(engine, inst) {
+  engine._broadcastEvent('play_zone_animation', { type: 'stowaway_tentacles', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: -1, duration: 4300 });
+}
+
 module.exports = {
   playOnAnyHeroSide: true,
   activeIn: ['support'],
@@ -102,6 +111,16 @@ module.exports = {
   unaffectedByOthers: true,   // Puzzle-Start setzt `_cardinalImmune` (server.js)
   negativeStatusLabel: 'Negated (Stowaway)',
   negativeStatusIcon: '🧳',
+
+  // Spielgestalter-Entscheidung 17.11.2026 (JOH-01): die Negation folgt fortlaufend der Status-Immunität des Wirts (s. Kopf, `_attachment-shared.js`).
+  statusFolgtImmunitaet: {
+    status: 'negated',
+    extras: HARTE_NEGIERUNG,
+    einsetzen(engine, inst, hero) {      // Immunität beendet: die Negation setzt jetzt ein
+      tentakel(engine, inst);
+      engine.log('stowaway_negates', { hero: hero?.name });
+    },
+  },
 
   /** Jede Hero Zone ist nur eine Adresse (auch besiegte): Platz frei genuegt. */
   canBypassFreeZoneRequirement() { return true; },
@@ -148,7 +167,10 @@ module.exports = {
       const hier = engine.cardInstances.filter(c => c.name === CARD_NAME && c.zone === 'support' && !c.faceDown
         && c.owner === seite && c.heroIdx === col);
       if (hier.length === 0) continue;
-      if (setzeAnhaengselStatus(engine, seite, col, CARD_NAME, 'negated', HARTE_NEGIERUNG)) continue;
+      if (setzeOderRuhe(engine, hier[0], 'negated', HARTE_NEGIERUNG)) {   // 17.11.2026: ein status-immuner Held trägt die Negation nicht (ruhend, bis die Immunität endet)
+        for (const k of hier.slice(1)) { k.counters = k.counters || {}; if (hier[0].counters?._statusRuht) k.counters._statusRuht = true; else delete k.counters._statusRuht; }
+        continue;
+      }
       for (const inst of hier) await loeschen(engine, inst, 'no_host');   // Hero Zone ohne negierbaren Helden: nichts zu negieren (wie beim Beschwören)
     }
     engine.sync();
@@ -200,10 +222,12 @@ module.exports = {
       inst.counters = inst.counters || {};
       inst.counters._cardinalImmune = true;
 
-      // Der Held dieser Zone wird negiert (echter, heilbarer Status).
-      const ok = setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, 'negated', HARTE_NEGIERUNG);
+      // Der Held dieser Zone wird negiert (echter, heilbarer Status) — es sei denn, er ist gerade status-immun (17.11.2026, JOH-01): dann liegt der Passagier wirkungslos da,
+      // bis die Immunität endet (`statusAnhaengselAbgleichen`).
+      const ok = setzeOderRuhe(engine, inst, 'negated', HARTE_NEGIERUNG);
       if (!ok) { await loeschen(engine, inst, 'no_host'); return; }   // Hero Zone ohne lebenden Helden: nichts zu negieren
-      engine._broadcastEvent('play_zone_animation', { type: 'stowaway_tentacles', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: -1, duration: 4300 });   // rosa Tentakel umklammern den Wirt
+      if (ok === 'ruht') { engine.sync(); return; }
+      tentakel(engine, inst);   // rosa Tentakel umklammern den Wirt
       engine.log('stowaway_negates', {
         hero: engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx]?.name,
       });
