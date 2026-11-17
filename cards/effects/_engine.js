@@ -11350,7 +11350,7 @@ class GameEngine {
   _todesAufschubBeginnen() {
     const a = this._todesAufschub;
     if (a) { a.tiefe += 1; return; }
-    this._todesAufschub = { tiefe: 1, liste: [], nachher: [] };
+    this._todesAufschub = { tiefe: 1, liste: [], nachher: [], nachTode: [] };
   }
 
   /**
@@ -11366,18 +11366,32 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * Spielgestalter-Entscheidung 17.11.2026 (Explosivo's Sword × Whirlwind Strike): Wirkung, die erst laufen darf, wenn der Flaechenschlag
+   * KOMPLETT aufgeloest ist — aller Schaden, alle Tode samt ihrer Trigger (Wanted Poster …) und die Klammer selbst sind durch.
+   * Laeuft gerade ein Schlag (Klammer offen), wird `fn` vorgemerkt und beim Schliessen der AEUSSERSTEN Klammer NACH den Toden
+   * abgearbeitet (`endMultiHit`); sonst `false` zurueck, und der Aufrufer wirkt sofort (Einzeltreffer unveraendert).
+   */
+  nachFlaechenschlagTode(fn) {
+    const a = this._todesAufschub;
+    if (!a || typeof fn !== 'function') return false;
+    (a.nachTode || (a.nachTode = [])).push(fn);
+    return true;
+  }
+
   /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
-   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen. */
+   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen.
+   *  Rueckgabe: die erst NACH den Toden vorgemerkten Wirkungen (`nachFlaechenschlagTode`) — `endMultiHit` fuehrt sie nach dem Schliessen der Klammer aus. */
   async _todesAufschubAbschliessen() {
     const a = this._todesAufschub;
-    if (!a) return;
-    if (a.tiefe > 1) { a.tiefe -= 1; return; }
+    if (!a) return [];
+    if (a.tiefe > 1) { a.tiefe -= 1; return []; }
     this._todesAufschub = null;
     // Aller Schaden ist durch: vorgemerkte Nachwirkungen (Rool …) jetzt, vor der Todesauswertung.
     for (const fn of (a.nachher || [])) {
       try { await fn(); } catch (err) { console.error('[nachFlaechenschlag]', err.message); }
     }
-    if (a.liste.length === 0) return;
+    if (a.liste.length === 0) return a.nachTode || [];
     // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
     // Creatures are defeated" sieht die ganze Liste auf einmal.
     await this._mitNiederlagenSammler(async () => {
@@ -11398,6 +11412,7 @@ class GameEngine {
         await this._checkReactiveHandLimits(owner);
       }
     });
+    return a.nachTode || [];
   }
 
   /**
@@ -49375,8 +49390,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._aoeSurpriseKeys = null;
     }
     if (!this._multiHitScope) return;
+    let nachTode = [];
     try {
-      await this._todesAufschubAbschliessen();
+      nachTode = await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
         if ((this._multiHitScope.tiefe || 1) <= 1) {
@@ -49384,6 +49400,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           this._multiHitScope = null;
         } else this._multiHitScope.tiefe -= 1;
       }
+    }
+    // Spielgestalter-Entscheidung 17.11.2026: der Schlag ist komplett aufgeloest (Schaden, Tode, Trigger) — jetzt erst die Wirkungen „danach" (Explosivo's Sword).
+    for (const fn of (nachTode || [])) {
+      try { await fn(); } catch (err) { console.error('[nachFlaechenschlagTode]', err.message); }
     }
   }
 
