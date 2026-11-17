@@ -30722,6 +30722,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     const oppPs = gs.players[this.opponentOf(pi)];
     if (!oppPs) return { cancelled: true };
+    if (this.handZugangGesperrt(pi)) return { cancelled: true };   // Hand-Sperre: nichts zu wählen (siehe `actionStealFromHand`)
     // Die aufgeloeste Karte des Gegners bleibt bis zum Ende seiner Aufloesung in `oppPs.hand`, ist aber nicht stehlbar: die Indizes bleiben die
     // physischen Handplaetze (die Anzeige zeigt sie ausgegraut mit), `blockedIndices` nennt dem Client den gesperrten Platz.
     const oppStehlbar = this._handIndizesOhneAufloesende(oppPs);
@@ -30768,6 +30769,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         by: opts.sourceName || 'Hand Steal',
         reason: 'first-turn protection',
       });
+      return { stolen: [], cancelled: false, fizzled: true };
+    }
+
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ANG-13): Klauen ist „add cards to your hand" — unter der Hand-Sperre („You cannot draw or add cards to your hand", Rain of Spores &
+    // Co.: `handLocked`) entfällt der Klau; der Rest des Effekts (z. B. der Schaden von Thieving Strike) wirkt weiter. Die reine Zieh-Sperre (`drawLocked`: Sacred Jewel, MOE Shield …)
+    // verbietet das Klauen NICHT — dort gilt nur „draw". Vor dem Ambush-Fenster: ein Klau, der nicht stattfinden kann, öffnet auch keine Reaktion.
+    if (this.handZugangGesperrt(pi)) {
+      this.log('hand_steal_blocked', { by: opts.sourceName || 'Hand Steal', reason: 'hand lock' });
       return { stolen: [], cancelled: false, fizzled: true };
     }
 

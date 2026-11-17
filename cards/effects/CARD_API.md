@@ -16619,6 +16619,14 @@ Artifact-Creatures aus; Hand-Reaktionsartefakte zahlen den Item-Lock (`_rxPay` m
 **Nicht betroffen bleibt (Als Ruling 14.9., Gruppe C/D):** Deck-Suchen, die auf Brett/Ablage/Held fuehren (Garius, Alex, Ska,
 Greenhouse) — die Such-Sperre meint nur "AUF DIE HAND".
 
+**Klauen ist „add cards to your hand" (Spielgestalter-Entscheidung 17.11.2026, ANG-13):** Unter der Hand-Sperre (`handLocked`: Rain of Spores
+„You cannot draw or add cards to your hand", Ice Sculpture Garden, Kazena, Navigation) entfaellt jeder Klau auf die eigene Hand — `actionStealFromHand` (Thieving
+Strike, Loot the Leftovers, Secret Entrance, Gather Intel, Live Show) und `blindHandWahl` pruefen `engine.handZugangGesperrt(pi)` zentral; der Rest
+des Effekts (der Schaden von Thieving Strike) wirkt weiter. Reine Klau-Karten sind dort unspielbar bzw. werden nicht angeboten (Charme Lv2, Loot the
+Leftovers, Sculpture Theft, Hunting Lv1, Divine Gift of Edge …). Die REINE Zieh-Sperre (`drawLocked`: The Sacred Jewel, MOE Shield, Prayer, Smuggler's Pier, Jenny) sperrt das Klauen
+NICHT — dort gilt nur „draw". Wer einen neuen Weg „Karte auf die Hand" baut, fragt `handZugangGesperrt` (bzw. `_isSearchBlocked` fuer Deck-/Ablage-Suchen),
+nie `drawLocked`.
+
 
 ### ★ Zieh-Sperre und Aktivierungen: nur REINE Zieher sind gesperrt (Welle 3, D1 — Regel von Al)
 
