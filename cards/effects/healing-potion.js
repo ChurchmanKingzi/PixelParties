@@ -43,7 +43,7 @@ module.exports = {
 
   canActivate(gs, pi, engine) {
     // Mensch: spielbar, sobald es ueberhaupt ein Ziel gibt (volle HP sind kein Grund mehr, den Trank zu sperren)
-    if (!cpuSicht(engine, pi)) return this.getValidTargets(gs, pi, engine).length > 0;
+    if (!cpuSicht(engine, pi)) return module.exports.getValidTargets(gs, pi, engine).length > 0;
     // CPU: Need at least one target with HP < maxHP on either side
     for (let p = 0; p < gs.players.length; p++) {
       const ps = gs.players[p];
