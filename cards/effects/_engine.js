@@ -36358,11 +36358,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Rolling Boulder) — v701. Nur eine Kopie, das Original bleibt
     // unangetastet.
     config = { ...config, _redirectPickCount: liste.length };
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Ein Umleiter (Martyry, Challenge, Anti-Magnet, Anti-Magnetic Armor, Empty Armor, Laki, Shield of
+    // Wisdom, Alleria, Monia Bot …) bietet KEIN Ziel an, das derselbe Spell/Effekt schon gewählt oder (durch eine frühere Umleitung) schon getroffen hat — ein „up to 2 targets" meint verschiedene
+    // Ziele. Die Fenster bekommen dafür eine Kopie der Zielliste, in der diese Ziele `ineligible` UND `_bereitsGewaehlt` sind (ausgegraut: „zählt nicht als Ausweichziel"; Skripte, die `ineligible`
+    // nicht lesen, prüfen `_bereitsGewaehlt`). AUSNAHME: Redirecting Aura („even if that target was already hit by the same Spell/effect") liest das Flag und bietet sie weiter an (der Effekt trifft
+    // dann zweimal). `config._bereitsGewaehlt`: weitere schon gewählte/getroffene Ziele des Effekts, die nicht in `pickedIds` stehen (Chain Lightning: die übrigen Glieder der Kette).
+    const _vorBelegt = Array.isArray(config._bereitsGewaehlt) ? config._bereitsGewaehlt : [];
     this._inRedirectWindow = true;
     try {
       for (let i = 0; i < liste.length; i++) {
         const sel = (validTargets || []).find(t => t && t.id === liste[i]);
         if (!sel) continue;
+        const _belegt = new Set(_vorBelegt);
+        for (let j = 0; j < liste.length; j++) if (j !== i) _belegt.add(liste[j]);
+        _belegt.delete(sel.id);
+        const _vtUml = (_belegt.size > 0 && Array.isArray(validTargets))
+          ? validTargets.map(t => (t && _belegt.has(t.id) && !t.ineligible) ? { ...t, ineligible: true, _bereitsGewaehlt: true } : t)
+          : validTargets;
         // v704 (Puppets, Vinny): Brett-Waechter sehen die GANZE aktuelle
         // Auswahl, um alle geschuetzten Ziele in einem Zug fallen zu lassen.
         config._redirectPickedIds = liste.slice();
@@ -36371,7 +36383,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (sel.type !== 'hero' && sel.type !== 'equip') continue;
         if (typeof sel.owner !== 'number' || sel.owner < 0) continue;
         const redirected = await this._checkTargetRedirect(
-          sel.owner, sel, validTargets, config, sourceCard
+          sel.owner, sel, _vtUml, config, sourceCard
         );
         if (!redirected) continue;
         // Negation (v701): der GANZE Effekt ist negiert — leere Auswahl
@@ -49349,7 +49361,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * to it" ist ab zwei erfuellt.
    */
   beginMultiHit(anzahl) {
-    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1, ...(this._multiHitScope?._umleitZiele ? { _umleitZiele: this._multiHitScope._umleitZiele } : {}) };
     // Al 26.10. (Idej Sword - Onima „exactly 1 Hero und kein anderes Ziel"): `afterSpellResolved.damageTargets` kennt nur die GEWÄHLTEN Ziele
     // (Whirlwind Strikes Kreaturen im Support fehlen); die Klammer ist dann schon zu. Die größte Zielzahl einer Mehrziel-Klammer dieses Gusses
     // bleibt deshalb am Zielprotokoll (`gs._spellDamageLog._mehrziel`) lesbar, solange der Guss auflöst.
@@ -49387,6 +49399,41 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else this._multiHitScope.tiefe -= 1;
       }
     }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Schadensumleiter, die den Schaden eines Ziels auf ein ANDERES Ziel verlegen (Mean Cute Cat,
+   * Gigantisaur Brachion, Johanna, Bubbles, Prophecy of Tempeste), bieten das Ziel NICHT an, das derselbe Mehrziel-Schlag ohnehin selbst trifft (Fireball auf Held UND Kreatur, Chain Lightning, Flächenschlag).
+   * Die Klammer `beginAoeStrike` merkt dafür ihre Ziele am Scope (Helden-OBJEKTE, Kreaturen-Ids); `schlagTrifftZiel(ziel)` fragt sie ab. Ohne laufende Klammer (Einzelziel-Treffer) immer false.
+   * Gegenstück im Zielwahl-Fenster: `applyRedirectWindows` (`_bereitsGewaehlt`). Ausnahme wie dort: Redirecting Aura (Text: „even if that target was already hit by the same Spell/effect").
+   */
+  _schlagZieleFuerUmleiter(scope, opts) {
+    try {
+      const helden = new Set(), insts = new Set();
+      for (const h of (opts.heroes || [])) {
+        const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+        if (hero?.name) helden.add(hero);
+      }
+      for (const k of (opts.creatures || [])) {
+        const inst = (k && k.inst) ? k.inst : k;
+        if (inst && inst.id != null) insts.add(inst.id);
+      }
+      const vorher = scope._umleitZiele;   // verschachtelte Schläge (Booby Trap im Fireball …): die Ziele des äußeren bleiben stehen, es gilt die Vereinigung
+      if (vorher) { for (const h of vorher.helden) helden.add(h); for (const i of vorher.insts) insts.add(i); }
+      scope._umleitZiele = { helden, insts };
+    } catch { /* Buchführung darf den Schlag nie stören */ }
+  }
+
+  /**
+   * Trifft der laufende Mehrziel-Schlag dieses Ziel (Heldenobjekt, Kreaturen-Instanz oder Picker-Ziel `{type:'hero',owner,heroIdx}`) selbst? Siehe `_schlagZieleFuerUmleiter`.
+   * Ohne laufenden Schlag oder ohne Ziellisten-Merker: false (Verhalten wie bisher).
+   */
+  schlagTrifftZiel(ziel) {
+    const z = this._multiHitScope?._umleitZiele;
+    if (!z || !ziel) return false;
+    const t = this._todgeweihtZiel(ziel);
+    if (!t) return false;
+    return t.hero ? z.helden.has(t.hero) : (t.inst && t.inst.id != null && z.insts.has(t.inst.id));
   }
 
   /**
@@ -49430,6 +49477,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    this._schlagZieleFuerUmleiter(scope, opts);   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer durch Schadensumleiter (s. `schlagTrifftZiel`)
     // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
     if (opts.heroes?.length) await this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)

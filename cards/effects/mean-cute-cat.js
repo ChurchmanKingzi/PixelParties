@@ -120,6 +120,8 @@ function kandidaten(engine, pi, ausser) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst === ausser) continue;
+    // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — eine Kreatur, die derselbe Mehrziel-Schlag (Fireball auf Held UND Kreatur, Flaechenschlag) ohnehin selbst trifft, ist kein Umleitungsziel.
+    if (engine.schlagTrifftZiel(inst)) continue;
     if (inst._deathResolved) continue;
     if (!((inst.counters?.currentHp ?? 1) > 0)) continue;
     const cd = engine.getEffectiveCardData(inst) || db[inst.name];

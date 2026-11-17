@@ -111,7 +111,9 @@ function buildOpponentTargets(engine, sourceOwner, attackingInst) {
 function legalPool(pool, validTargets) {
   if (!Array.isArray(validTargets) || validTargets.length === 0) return pool;
   const ids = new Set(validTargets.map(v => v && v.id));
-  return pool.filter(t => ids.has(t.id));
+  // ★ Spielgestalter-Entscheidung 17.11.2026: kein Ziel, das derselbe Effekt schon gewählt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert; kein Doppeltreffer).
+  const belegt = new Set(validTargets.filter(v => v && v._bereitsGewaehlt).map(v => v.id));
+  return pool.filter(t => ids.has(t.id) && !belegt.has(t.id));
 }
 
 module.exports = {

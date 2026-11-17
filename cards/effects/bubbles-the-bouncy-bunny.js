@@ -192,6 +192,8 @@ module.exports = {
       // Gesperrter Held leistet nichts — allgemeine CC-Regel.
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.negated) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag (Fireball auf Kreatur UND Bubbles, Flaechenschlag) Bubbles ohnehin selbst, wird nichts auf sie umgeleitet.
+      if (engine.schlagTrifftZiel(hero)) return;
 
       for (const entry of (ctx.entries || [])) {
         if (!isRedirectable(entry)) continue;

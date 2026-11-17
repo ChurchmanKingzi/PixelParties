@@ -79,7 +79,9 @@ const GOLD_COST = 2;
 function getOtherValidTargets(selected, validTargets, engine) {
   if (!Array.isArray(validTargets)) return [];
   // Al, 25.10.2026: „target" = Held oder Kreatur - Ausruestung, Anhaengsel, Areas ... sind keine Umleitungsziele und zaehlen nicht als „other possible target".
-  return validTargets.filter(t => t && t.id !== selected.id && istHeldOderKreatur(engine, t));
+  // ★ Spielgestalter-Entscheidung 17.11.2026: „different target" — ein Ziel, das derselbe Effekt schon gewaehlt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert), ist kein
+  // Ersatzziel (kein Doppeltreffer; nur Redirecting Aura darf das).
+  return validTargets.filter(t => t && t.id !== selected.id && !t._bereitsGewaehlt && istHeldOderKreatur(engine, t));
 }
 
 /**

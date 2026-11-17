@@ -143,6 +143,8 @@ module.exports = {
       const hostHero = engine.gs.players[engine.physicalSide(inst)]?.heroes?.[inst.heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
       if (target !== hostHero) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag (Fireball auf Held UND Brachion, Flaechenschlag) Brachion ohnehin selbst, wird nichts umgeleitet.
+      if (engine.schlagTrifftZiel(inst)) return;
 
       // Re-entry guard — Brachion's redirect re-issues damage on
       // ITSELF (a creature damage event); without this guard, a

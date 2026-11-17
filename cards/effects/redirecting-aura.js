@@ -28,6 +28,9 @@
 //      auf einen immunen Helden lenken; der Treffer verpufft dort (Log `damage_blocked`/`magic_immune`), die Aura wirkt dann wie eine Negation. (Der frühere Satz „nicht immun gegen den
 //      Effekt" an dieser Stelle war falsch und ist gestrichen; der Code filterte nie auf Immunität.)
 //    • „even if that target was already hit by the same Spell/effect": ein Ziel, das der Effekt ohnehin trifft, bleibt eine Möglichkeit. Der Effekt trifft es dann ZWEIMAL.
+//      ★ Spielgestalter-Entscheidung 17.11.2026: Das ist die EINZIGE Ausnahme. Alle anderen Umleiter (Martyry, Challenge, Anti-Magnet, Anti-Magnetic Armor, Empty Armor, Laki, Shield of Wisdom,
+//      Alleria, Monia Bot, Mean Cute Cat, Brachion …) bieten kein Ziel an, das derselbe Effekt schon gewählt/getroffen hat (Doppeltreffer ist normalerweise nicht erlaubt). Der Hub
+//      (`applyRedirectWindows`) markiert solche Ziele in der Zielliste mit `_bereitsGewaehlt` (+ `ineligible`); die Aura liest das Flag und bietet sie weiter an (`moeglichkeiten`).
 //  Die neue Wahl wird ihrerseits „gewählt": die Umleiter des neuen Ziels dürfen ihrerseits reagieren (Kette, von der Engine bei 8 Stufen gedeckelt).
 //
 //  ── ZWEI WEGE ───────────────────────────────────────────────────────────
@@ -91,7 +94,8 @@ function lebt(engine, t) {
  */
 function moeglichkeiten(engine, ownerIdx, selected, validTargets, bearer = false) {
   return (validTargets || []).filter(t => {
-    if (!t || t.id === selected.id || t.ineligible) return false;
+    // `_bereitsGewaehlt` (vom Umleitungs-Hub gesetzt, zusammen mit `ineligible`): das Ziel hat derselbe Effekt schon gewählt/getroffen — für die Aura bleibt es eine Möglichkeit (siehe Kopf).
+    if (!t || t.id === selected.id || (t.ineligible && !t._bereitsGewaehlt)) return false;
     if (bearer) {
       if (t.type !== 'equip') return false;
       if (t.owner === selected.owner && t.heroIdx === selected.heroIdx) return false;      // „ein ANDERER Held"
@@ -99,6 +103,10 @@ function moeglichkeiten(engine, ownerIdx, selected, validTargets, bearer = false
       if (!(h?.name && h.hp > 0)) return false;
     } else if (t.type !== 'hero' && t.type !== 'equip') return false;
     return engine.zielSeite(t) === ownerIdx && lebt(engine, t);
+  }).map(t => {
+    if (!t._bereitsGewaehlt) return t;
+    const { _bereitsGewaehlt, ...rest } = t;   // die Wahl des neuen Ziels zeigt es wählbar (nicht ausgegraut)
+    return { ...rest, ineligible: false };
   });
 }
 

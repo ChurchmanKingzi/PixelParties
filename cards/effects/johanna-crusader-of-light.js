@@ -180,6 +180,8 @@ async function _heldUmleitung(ctx, istTrue) {
   const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
   if (!_johannaActive(johannaHero)) return;
   if (johannaHero === target) return; // self-target — no redirect
+  // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag Johanna ohnehin selbst (Fireball auf Johanna UND einen anderen Helden), wird nichts auf sie umgeleitet.
+  if (engine.schlagTrifftZiel(johannaHero)) return;
 
   // Target must be another Hero Johanna's CONTROLLER controls.
   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Ziels
@@ -328,6 +330,7 @@ module.exports = {
       if (engine._reaktionGesperrt(ctrl)) return;   // „cannot be reacted to" (Surefire Shot): kein Angebot (Spielgestalter-Entscheidung 17.11.2026)
       const hoptKey = heldenSperreKey('johanna_redirect', ctrl);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+      if (engine.schlagTrifftZiel(johannaHero)) return;   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer (derselbe Mehrziel-Schlag trifft Johanna ohnehin selbst)
       const entries = ctx.entries || [];
       for (const e of entries) {
         if (gs.hoptUsed?.[hoptKey] === gs.turn) break; // accepted earlier

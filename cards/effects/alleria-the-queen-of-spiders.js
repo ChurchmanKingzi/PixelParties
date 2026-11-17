@@ -21,8 +21,10 @@ const { hasCardType } = require('./_hooks');
  * kontrolliert (auch uebernommene der Gegenspalte), Surprise-Zone auf der
  * Brettseite, ohne das urspruengliche Ziel (Seite + Index).
  */
-function umleitungsZiele(gs, ownerIdx, selected, engine, validTargets = null) {
+function umleitungsZiele(gs, ownerIdx, selected, engine, validTargets = null, alleZiele = null) {
   const out = [];
+  // ★ Spielgestalter-Entscheidung 17.11.2026: kein Held, den derselbe Effekt schon gewählt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub in der Zielliste markiert; kein Doppeltreffer).
+  const belegt = new Set((alleZiele || validTargets || []).filter(v => v && v._bereitsGewaehlt).map(v => v.id));
   const helden = engine?.heroesControlledBy
     ? engine.heroesControlledBy(ownerIdx)
     : (gs.players[ownerIdx]?.heroes || []).map((hero, heroIdx) => ({ physOwner: ownerIdx, heroIdx, hero }));
@@ -32,6 +34,7 @@ function umleitungsZiele(gs, ownerIdx, selected, engine, validTargets = null) {
     const surprises = (gs.players[physOwner]?.surpriseZones || [])[hi] || [];
     if (surprises.length === 0) continue;
     const id = `hero-${physOwner}-${hi}`;
+    if (belegt.has(id)) continue;
     // W24d (N4-13): wird eine KREATUR umgeleitet, muss der Effekt den Helden auch waehlen koennen
     // (steht in seiner Zielliste) – sonst ginge die Umleitung stumm verloren.
     if (validTargets && !validTargets.some(v => v && v.id === id)) continue;
@@ -124,7 +127,7 @@ module.exports = {
 
     // Check for at least 1 OTHER hero with a Surprise in its Surprise Zone
     if (!gs.players[ownerIdx]) return false;
-    return umleitungsZiele(gs, ownerIdx, selected, engine, istKreatur ? validTargets : null).length > 0;
+    return umleitungsZiele(gs, ownerIdx, selected, engine, istKreatur ? validTargets : null, validTargets).length > 0;
   },
 
   /**
@@ -137,7 +140,7 @@ module.exports = {
     const gs = engine.gs;
 
     // Build list of eligible redirect targets (controlled heroes with Surprises, not original target)
-    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null);
+    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null, validTargets);
 
     if (eligible.length === 0) return false;
 
@@ -182,7 +185,7 @@ module.exports = {
       if (!bezahlt) return null;
     }
     // Zwischen Wahl und Wirkung (Kettenfenster) kann sich das Brett geändert haben: das Ziel muss noch ein Held mit Surprise sein.
-    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null);
+    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null, validTargets);
     const redirectTarget = eligible.find(t => t.id === bezahlt.redirectTarget?.id);
     if (!redirectTarget) return null;
 
