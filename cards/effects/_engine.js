@@ -8525,6 +8525,9 @@ class GameEngine {
    */
   _quelleDurchschlaegtHeldenSchutz(source, target, type) {
     if (!source || !target || target.hp === undefined) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „cannot be reduced or negated" — „Der Schaden soll durchgehen! Gilt allgemein für jede Immunität"): der vom Elixir verstärkte
+    // Attack-Treffer schlägt dieselben „takes no damage"-Formen durch wie Ida (Storm Piano/Cheat Chair, Versteinerung, Succubus-/Lyta-Kontrolle); „unaffected by …"-Effekt-Immunitäten bleiben.
+    if (this._empoweredStrikeHeld(source, type)) return true;
     const qs = this._klonSicht(source);
     const sOwner = qs?.heroOwner ?? qs?.owner ?? qs?.controller;
     const sHeroIdx = qs?.heroIdx;
@@ -10361,6 +10364,13 @@ class GameEngine {
         delete this.gs._redirectedTrueDamage;
         this.log('true_damage', { target: this._heroLabel(target), source: source?.name });
       }
+    }
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength): „that Attack's damage is increased by 150 and cannot be reduced or negated" — der GANZE Schaden dieses Treffers ist unreduzier-/unnegierbar,
+    // schon fuer die Hook-Runde unten (Schilde, Senkungen, negierende Hooks sehen die Flaggen wie bei Ida); +150 und Verbrauch des Buffs folgen im Rider (`_applyEmpoweredStrikeIfApplicable`).
+    if (target?.hp !== undefined && amount > 0 && this._empoweredStrikeHeld(source, type)) {
+      hookCtx.cannotBeNegated = true;
+      hookCtx.cannotBeReduced = true;
+      hookCtx._unreduzierbar = true;
     }
     // v687: zielseitige Unangreifbarkeit (Tempeste, the Weather Fairy).
     // VOR BEFORE_DAMAGE gesetzt, damit jeder Listener `ctx.cannotBe…`
@@ -44163,16 +44173,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Mutates the passed hookCtx-shape object directly (works for both
    * the hero-damage hookCtx and the creature-damage proxy).
    */
-  _applyEmpoweredStrikeIfApplicable(hookCtx) {
-    if (!hookCtx) return;
-    if (hookCtx.type !== 'attack') return;
-    const source = hookCtx.source;
+  /**
+   * Der Held, dessen bereitstehender Elixir of Strength (`empowered_strike`) diesen Treffer verstaerkt — oder `null`. EINE Stelle fuer die Bedingungen (Attack-Schaden eines Helden mit dem Buff,
+   * nicht in einer Mehrziel-Klammer mit 2+ Zielen): der Rider (`_applyEmpoweredStrikeIfApplicable`) und die Durchschlags-Abfrage (`_quelleDurchschlaegtHeldenSchutz`) lesen sie beide.
+   */
+  _empoweredStrikeHeld(source, type) {
+    if (type !== 'attack') return null;
     const srcOwner = source?.owner ?? source?.controller;
     const srcHi = source?.heroIdx;
-    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return null;
     // „that Hero": geliehener Held (Love Shot, Charme) → `heroOwner` ist seine Brettseite, `owner` der Kontrolleur (quelleIstHeld).
     const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
-    if (!srcHero?.buffs?.empowered_strike) return;
+    if (!srcHero?.buffs?.empowered_strike) return null;
 
     // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
     // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
@@ -44181,7 +44193,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
     // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
     const _mh = this._multiHitScope;
-    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return null;
+    return srcHero;
+  }
+
+  _applyEmpoweredStrikeIfApplicable(hookCtx) {
+    if (!hookCtx) return;
+    const srcHero = this._empoweredStrikeHeld(hookCtx.source, hookCtx.type);
+    if (!srcHero) return;
 
     hookCtx.amount = (hookCtx.amount || 0) + EMPOWERED_STRIKE_BONUS;   // W49a (Al, 22.10.2026): 150 statt 100
     if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
@@ -58226,14 +58245,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
-          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected)
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz)
           || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
+      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !e.durchschlagSchutz && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
@@ -58255,7 +58274,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         e._immuneCreature = true;
       } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
-      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected) {
+      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected && !e.durchschlagSchutz) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert auch diesen Schutz (`e.ignoreUnaffected`).
         e._immuneCreature = true;
@@ -58443,6 +58462,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „… cannot be reduced or negated", Kreaturen-Zwilling des Heldenpfads): ein vom Elixir verstärkter Attack-Treffer auf EIN Ziel
+    // ist unreduzier-/unnegierbar (wie True Damage: `canBeNegated: false` — Defending the Gate, Resilient Monkee, Guardian & Co. halten ihn nicht ab) und schlägt die „takes no damage"-Formen
+    // durch (Versteinerung, „cannot take damage" von Time Bomblebee, gestohlene Kreatur: `e.durchschlagSchutz`); „unaffected by …"-Effekt-Immunitäten bleiben. Der Stempel liegt VOR der
+    // Immunitäts-Markierung unten; +150 und Verbrauch des Buffs folgen im Rider weiter unten.
+    if (entries.length === 1) {
+      const e0 = entries[0];
+      if (e0 && e0.amount > 0 && this._empoweredStrikeHeld(e0.source, e0.type)) {
+        e0.canBeNegated = false;
+        e0.cannotBeNegated = true;
+        e0.cannotBeReduced = true;
+        e0._unreduzierbar = true;
+        e0.durchschlagSchutz = true;
+      }
+    }
     this._markCreatureDamageImmunity(entries);
 
     // Annotate entries with cancelled flag and init HP
