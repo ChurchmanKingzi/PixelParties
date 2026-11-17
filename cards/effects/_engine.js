@@ -6198,7 +6198,8 @@ class GameEngine {
                 if (deadIdx >= 0) gs._spellDamageLog.splice(deadIdx, 1);
               }
               // Recursive retarget — rebuild targets, dead hero excluded naturally
-              return ctx.promptDamageTarget({ ...config, _skipPostTargetReactions: false });
+              // ★ 17.11.2026 (ARW-01): hat das Pfeil-Fenster nach der Zielwahl schon geoeffnet, ist die Attack verbindlich — die neue Wahl ist nicht abbrechbar (kein Abbruch nach der Zielwahl).
+              return ctx.promptDamageTarget({ ...config, _skipPostTargetReactions: false, ...(gs._pfeilFenster?.geoeffnet && gs._pfeilFenster.cardName === cardInstance.name ? { cancellable: false } : {}) });
             }
           }
         }
@@ -7113,6 +7114,14 @@ class GameEngine {
   async _fireAttackDeclare(source, target, baseDamage) {
     if (source && source._attackDeclareFired) return Math.max(0, baseDamage || 0);
     if (this.istKlonQuelle(source)) return Math.max(0, baseDamage || 0);   // der Klon greift an, nicht der Held: keine „when this Hero attacks"-Fenster
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): Rueckfall fuer das Pfeil-Fenster NACH der Zielwahl (`_pfeilFensterNachZielwahl`) — eine Attack, deren Ziel nicht ueber `_zielwahlAbschliessen` lief
+    // (Zwangsziel, feste Ziele), bietet die Pfeile spaetestens hier an, bevor der Schaden feststeht. Nur fuer die gespielte Attack-Karte selbst (Name + Besitzer + Held).
+    {
+      const _pf = this.gs._pfeilFenster;
+      if (_pf && !_pf.geoeffnet && source && source.name === _pf.cardName && (source.owner ?? source.controller) === _pf.owner && source.heroIdx === _pf.heroIdx) {
+        await this._pfeilFensterNachZielwahl();
+      }
+    }
     const hookCtx = { source, target, amount: Math.max(0, baseDamage || 0) };
     await this.runHooks('onAttackDeclare', hookCtx);
     if (source) source._attackDeclareFired = true;
@@ -35267,6 +35276,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): die Zielwahl einer gespielten Attack steht fest → JETZT bieten sich Pfeile und Magic Topaz an (`_pfeilFensterNachZielwahl`). Nur die Wahl des Attack-Besitzers
+    // waehrend der Aufloesung dieser Karte, nur echte Ziele (Held/Kreatur), nicht in den inneren Fenstern (Umleitung, Post-Target) und nicht im Trockenlauf.
+    {
+      const _pf = this.gs._pfeilFenster;
+      if (_pf && !_pf.geoeffnet && playerIdx === _pf.owner && !config._sondeListe && !config._waehlbarProbe
+          && !this._inPostTargetWindow && !this._inRedirectWindow && this._currentResolvingPlayName() === _pf.cardName) {
+        const _ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : (_pickedIds ? [_pickedIds] : []));
+        if ((validTargets || []).some(t => _ids.has(t.id) && (t.type === 'hero' || t.type === 'equip' || t.type === 'creature'))) {
+          await this._pfeilFensterNachZielwahl();
+        }
+      }
+    }
+
     // ★ POST-TARGET-FENSTER AUCH HIER (Als Vorgabe 21.8.: „stelle
     //   sicher, dass ALLE Effekte Escape Device und Invisibility Cloak
     //   triggern"). Bis v545 oeffnete das Fenster NUR in
@@ -38008,6 +38030,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Usage in card scripts:
    *   if (!engine.claimHOPT('icy-slime', ctx.cardOwner)) return;
    */
+  /** Anzahl der bisher durch eine Reaktion (Ambush the Scout) negierten Hand-Interaktionen dieser Partie — vorher/nachher vergleichen, ob der Hand-Teil einer Karte negiert wurde (siehe `checkHandInteractionReaction`). */
+  handInteraktionenNegiert() { return this._handInteraktionNegiert || 0; }
+
   /**
    * ZENTRALES REAKTIONSFENSTER FÜR HAND-INTERAKTIONEN
    *
@@ -38074,6 +38099,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._pendingHandInteraction = prevWindow;
     }
     if (hookCtx.cancelled) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout × Slow / Rain of Spores / Champion / Draw): ein negierter Hand-Teil nimmt seine FOLGEWIRKUNGEN mit — die mitgelieferte Selbstsperre
+      // („cannot interact with your opponent's hand" / „cannot draw or add cards") und das Ziehen des Spielers, der nichts abgeworfen hat. Der Teileffekt ist nur ein `true` am Aufrufer (Primitive
+      // `actionPromptForceDiscard` gibt dann nichts zurueck) — Karten mit solcher Folgewirkung vergleichen deshalb diesen Zaehler vor/nach dem Hand-Teil (`handInteraktionenNegiert()`).
+      this._handInteraktionNegiert = (this._handInteraktionNegiert || 0) + 1;
       this.log('hand_interaction_negated', {
         player: gs.players[targetPi]?.username,
         kind,
@@ -46854,6 +46883,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
       handFlug: cardInfo.handFlug || null,   // Handkarte des Initialglieds: { handIdx, to, toOwner } — Flug beim Aufloesen des Glieds (`_resolveReactionChain`)
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): eine Attack mit Zielwahl (`requiresTarget`) bietet Pfeile und Magic Topaz erst NACH der Zielwahl an (`_pfeilFensterNachZielwahl`);
+      // dieses Fenster (beim Ausspielen) zeigt sie nicht (`arrowTriggerCondition`, Bow of the Hunt Goddess). `nurPfeile` = das spaetere Pfeil-Fenster selbst: am Basisglied nur Pfeile.
+      _pfeileNachZielwahl: !!cardInfo.pfeileNachZielwahl,
+      _nurPfeile: !!cardInfo.nurPfeile,
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -46945,6 +46978,38 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._noteFizzledPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
     }
     return result;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten! Nach der Zielwahl kann man dann nicht mehr abbrechen."
+   * Eine gespielte Attack mit Zielwahl (`requiresTarget`) bietet die Pfeil-Klasse — alle `isArrow`-Reaktionen (Angelfeather, Flame, Poisoned, Golden, Hydra Blood, Bomb, Racket, Rainbow's Arrow, Magic Topaz)
+   * und den Bow of the Hunt Goddess (`spieltPfeile`), der einen Pfeil aus dem Deck spielt — nicht mehr im Kettenfenster beim Ausspielen an (`arrowTriggerCondition`), sondern in DIESEM Fenster an: sobald der Spieler
+   * das Ziel der Attack bestätigt hat (`_zielwahlAbschliessen`; Rückfall `_fireAttackDeclare`, falls eine Attack ihr Ziel anders bestimmt). Ein Abbruch der Zielwahl verbraucht deshalb keinen Pfeil, kein Gold und
+   * keinen Topaz-Stempel; ab hier gibt es keinen Abbruch mehr (server.js ignoriert `_spellCancelled`, solange `geoeffnet` steht, und der Wiederhol-Wähler nach einem toten Ziel ist nicht abbrechbar).
+   * Alle übrigen Reaktionen auf die Attack (Silence, Rusty Touch, Master's Plan, Cute Camera, Surprises, Hand-Reaktionen, Schilde …) behalten ihr Fenster beim Ausspielen und ihre Ziel-Fenster (Umleiter, Surprises, Post-Target).
+   * Das Fenster ist eine eigene Mini-Kette: Basisglied = die Attack (Anzeige), nur ihr Besitzer (und Hydra Blood Arrow des Gegners) bietet Pfeile an (`_nurPfeile`, `_promptReactionsForChain`); ab dem ersten Pfeil gilt die Kette
+   * normal (Arrow Slit, Gegenreaktionen auf den Pfeil, weitere Pfeile). Die Pfeile bewaffnen den Angreifer (`armAttackerWithArrow`) und wirken im Schaden der Attack; abgeräumt werden sie wie bisher am Ende der Attack (server.js).
+   * Eine Attack ohne Zielwahl (Flächen-/Ohne-Ziel-Attacks) behält die Pfeile im Fenster beim Ausspielen. Nur ein Mal je gespielter Attack (`geoeffnet`).
+   * @returns {Promise<object|null>} Kettenergebnis (`chainFormed`, …) oder null, wenn nichts zu tun war
+   */
+  async _pfeilFensterNachZielwahl() {
+    const gs = this.gs;
+    const pf = gs?._pfeilFenster;
+    if (!pf || pf.geoeffnet) return null;
+    pf.geoeffnet = true;   // Zielwahl steht fest: ab jetzt kein Abbruch mehr (server.js) und das Fenster oeffnet nur einmal
+    if (this._inReactionCheck || gs.result) return null;   // mitten in einer offenen Kette (Pfeil-Wirkung, Gegenreaktion): kein neues Fenster
+    const heroSeite = Number.isInteger(pf.casterOwner) ? pf.casterOwner : pf.owner;
+    const hero = gs.players[heroSeite]?.heroes?.[pf.heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;   // der Angreifer ist nicht mehr da: nichts zu verstaerken
+    const _aeussere = this._inReactionCheck;
+    try {
+      return await this.executeCardWithChain({
+        cardName: pf.cardName, owner: pf.owner, cardType: 'Attack', goldCost: 0, heroIdx: pf.heroIdx,
+        casterOwner: heroSeite, casterCheck: false, resolve: null, fromBoard: true, nurPfeile: true,
+      });
+    } finally {
+      this._inReactionCheck = _aeussere;
+    }
   }
 
   /**
@@ -47403,6 +47468,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // bedient haben (Cute Camera, Front Soldier: `hooks.onReactionPlayed`; Reverse Trap: `surpriseReactionPlayedTrigger`), nicht noch einmal anzubieten — kein Doppelangebot. Tiefer in der Kette gelten sie normal.
       const _zentralBasis = chain.length === 1 && chain[0]?._zentral === true;
       if (_zentralBasis && chain[0].owner === pi) continue;   // 16.11.2026: auf die eigene eingesetzte Reaction antwortet nur der Gegner (kein Selbstangebot, z. B. Divine Gift of Edge)
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): das Pfeil-Fenster NACH der Zielwahl (`_pfeilFensterNachZielwahl`) bietet am Basisglied NUR Pfeile an (`isArrow`, Magic Topaz) und Ausruestungen,
+      // die einen Pfeil spielen (`spieltPfeile`: Bow of the Hunt Goddess) — alle uebrigen Reaktionen auf die Attack hatten ihr Fenster schon beim Ausspielen. Ab dem ersten Pfeil gilt die Kette normal
+      // (Arrow Slit, Gegenreaktionen auf den Pfeil, weitere Pfeile).
+      const _nurPfeile = chain.length === 1 && chain[0]?._nurPfeile === true;
       const eligibleByName = new Map();
       const countByName = new Map();
       for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
@@ -47417,6 +47486,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         const script = loadCardEffect(cardName);
         if (!script?.isReaction) continue;
+        if (_nurPfeile && !script.isArrow) continue;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (_zentralBasis && script.hooks && typeof script.hooks.onReactionPlayed === 'function') continue;   // 16.11.2026: schon über `onReactionPlayed` gefragt
         if (chain[0]?._imFlug && chain[0].owner === pi && cardName === chain[0].cardName && !!_av === chain[0]._imFlug.ausVorrat && hi === chain[0]._imFlug.idx) continue;   // 16.11.2026: die gerade gespielte Kopie (noch in der Hand)
 
@@ -47544,6 +47614,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Als Vorgabe 29.9.: Zonen nach KONTROLLE (`_getAllSurpriseEntries`),
       // auch am geliehenen Helden; `seite` = Brettseite der Zone.
       for (const sEntry of this._getAllSurpriseEntries(pi)) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (sEntry.isBakhmSlot) continue;
         const shi = sEntry.heroIdx;
         const sSeite = sEntry.seite ?? pi;
@@ -47579,6 +47650,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ W21a (Al, 20.10.2026: „nur der aktuelle Kontrolleur"): angeboten wird dem KONTROLLEUR des Helden (`heroesControlledBy`): ein an den Gegner
       // abgegebener eigener Held fehlt, ein vom Spieler kontrollierter Gegnerheld zaehlt (Seite `seite` = Brettspalte; Bedingung/Kosten laufen ueber `pi`).
       for (const { physOwner: hSeite, heroIdx: hhi, hero } of this.heroesControlledBy(pi)) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (!hero?.name || hero.hp <= 0) continue;
         if (eligibleByName.has(hero.name)) continue;
         const hScript = this.heroScript(hero);
@@ -47602,6 +47674,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Der Link traegt `fromCreature` und `creatureInstId`; `creatureReactionResolve(engine, pi, chain, myIndex, inst)` loest ihn auf,
       // `payActivationCost(engine, pi, chainCtx, inst)` (optional, `false` = nicht bezahlt) stempelt z. B. die Rundengrenze.
       for (const cInst of this.cardInstances) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (cInst.zone !== ZONES.SUPPORT || cInst.faceDown) continue;
         if ((cInst.controller ?? cInst.owner) !== pi) continue;
         if (eligibleByName.has(cInst.name)) continue;
@@ -47635,6 +47708,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             _eBenutzt.add(eInst.id);
             const eScript = loadCardEffect(eInst.counters?._effectOverride || eName);
             if (!eScript?.isEquipReaction || typeof eScript.equipReactionCondition !== 'function') continue;
+            if (_nurPfeile && !eScript.spieltPfeile) continue;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
             let okE = false;
             try { okE = !!eScript.equipReactionCondition(this.gs, pi, this, chainCtx, eInst); } catch { okE = false; }
             if (!okE) continue;

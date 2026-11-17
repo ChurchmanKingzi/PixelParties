@@ -81,6 +81,9 @@ module.exports = {
 
   // ── Ausrüstungs-Reaktion (Vertrag: siehe `_promptReactionsForChain`, Block „Ausruestungs-Reaktionen") ──
   isEquipReaction: true,
+  // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): der Bow spielt einen Pfeil — wie die Pfeile selbst wird er erst NACH der Zielwahl der Attack angeboten (`engine._pfeilFensterNachZielwahl`;
+  // `kandidaten()` fragt `arrowTriggerCondition`, das beim Ausspielen einer Attack mit Zielwahl nichts liefert). `spieltPfeile` lässt ihn im reinen Pfeil-Fenster mitspielen.
+  spieltPfeile: true,
 
   /** Der Träger greift mit einer Attack an (Initialkarte der Kette), der Bow ist frisch und ein Pfeil ist spielbar. */
   equipReactionCondition(gs, pi, engine, chainCtx, inst) {

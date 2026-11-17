@@ -38,7 +38,7 @@
 //  Klänge in ZONE_ANIM_SFX; Log `polymorph_attached`.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero, anhaengselStatusHooks } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, anhaengselStatusHooks, anhaengselUmgelenkt } = require('./_attachment-shared');
 
 const CARD_NAME = 'Polymorph';
 const STATUS_NAME = 'polymorphed';
@@ -156,6 +156,8 @@ module.exports = {
       await engine._delay(POOF_VOR_MS);
 
       const gesetzt = await polymorphAnlegen(engine, inst, pi, host.owner, host.heroIdx);
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection Polymorph samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, host)) { engine.log('polymorph_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
       if (!gesetzt) engine.log('polymorph_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       engine.sync();
       await engine._delay(POOF_MS - POOF_VOR_MS);

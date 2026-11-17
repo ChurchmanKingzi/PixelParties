@@ -32,7 +32,7 @@
 //  `play_zone_animation` `shrink_squeeze` (Pixelart, ANIM_REGISTRY): ein Rahmen aus Pixeln presst sich in ganzen Schritten um den Helden zusammen, Pfeile weisen nach innen.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero, anhaengselStatusHooks } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, anhaengselStatusHooks, anhaengselUmgelenkt } = require('./_attachment-shared');
 const { isAttackSpellOrCreatureSource } = require('./_hooks');
 
 const CARD_NAME = 'Shrink';
@@ -112,6 +112,8 @@ module.exports = {
       await engine._delay(ANIM_VOR_MS);
 
       const gesetzt = await shrinkAnlegen(engine, pi, host.owner, host.heroIdx);
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection Shrink samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, host)) { engine.log('shrink_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
       if (!gesetzt) engine.log('shrink_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       engine.sync();
       await engine._delay(ANIM_MS - ANIM_VOR_MS);

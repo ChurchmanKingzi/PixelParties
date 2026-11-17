@@ -60,7 +60,7 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
   return n;
 }
 
-const { candidateHosts, attachToHero } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, anhaengselUmgelenkt } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
 /** Berserk am Wirt anlegen — fuer das Spielen der Karte UND das Umhaengen (Inheritance Ceremony, 12.10.). */
@@ -144,6 +144,8 @@ module.exports = {
           target: targetHero.name,
         });
       }
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection Berserk samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, { owner: targetOwner, heroIdx: targetHeroIdx })) { engine.log('berserk_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
 
       // ── Attach burst animation ──
       engine._broadcastEvent('play_zone_animation', {

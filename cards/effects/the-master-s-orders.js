@@ -157,6 +157,11 @@ module.exports = {
     engine.sync();
   },
 
+  /** Reflection (Spielgestalter-Entscheidung 17.11.2026): die Karte hängt nur an einem Helden, den ein GEGNER des Anhängers kontrolliert („a Hero your opponent controls") — ein Reflection-Ziel (Held des Anhängers) ist keiner. */
+  attachmentHostAllowed(engine, inst, owner, heroIdx) {
+    return engine.opponentsOf(anhaenger(engine, inst)).includes(engine.kontrolleurVonHeld(owner, heroIdx));
+  },
+
   /**
    * ★ „… they cannot make it choose itself as a target for an Attack or Spell" — der zweite Zielvertrag (wie Alliance): gefragt wird diese Instanz für JEDES Ziel. Gesperrt ist der Wirt als
    * Ziel einer Attack/eines Spells, die er SELBST (als übernommener Held des Anhängers) wirkt.
