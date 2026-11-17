@@ -11153,8 +11153,10 @@ class GameEngine {
    *
    * What it still respects:
    *   • firstTurnProtectedPlayer (game-start grace shield — absolute)
-   *   • Cardinal Beast immunity + Baihu Petrify on creatures (absolute
-   *     "immune to all damage" flags, not reductions)
+   *   • Cardinal Beast immunity (absolute "unaffected by all cards and effects").
+   *     Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung von
+   *     Baihu/Petrifier („takes no damage from any sources" / „Damage … becomes 0") hält True Damage bei KREATUREN nicht mehr ab (`durchschlagVersteinerung`,
+   *     wie beim Helden, wo sie nie griff); Time Bomblebee/Succubus-Kontrolle („cannot take damage") bleiben für True Damage immun.
    *
    * Behavior preserved vs. actionDealDamage:
    *   • Sets `_damagedOnTurn` on the target (used by Medusa's Curse etc.)
@@ -11334,8 +11336,9 @@ class GameEngine {
     // Route through the batch so all the centralized plumbing runs
     // (animation, death hooks, _damagedOnTurn tracker, hand-limit rechecks,
     // discard-pile routing). canBeNegated:false pierces Gate Shield,
-    // Guardian, and buff multipliers. Cardinal Beast / Baihu absolutes
-    // still block — those are "immune to all damage" flags, not reductions.
+    // Guardian, and buff multipliers. Cardinal Beast absolutes
+    // still block — "unaffected by all cards and effects", not a reduction.
+    // Spielgestalter-Entscheidung 17.11.2026: die Versteinerung (Baihu/Petrifier) gilt hier nicht mehr als Schutz (`durchschlagVersteinerung`).
     if (target.counters) {
       await this.processCreatureDamageBatch([{
         inst: target,
@@ -11344,6 +11347,7 @@ class GameEngine {
         source,
         sourceOwner,
         canBeNegated: false,
+        durchschlagVersteinerung: true,
         trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
@@ -58540,7 +58544,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
       // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
       if (inst?.counters?._cardinalImmune
-          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz)
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz && !e.durchschlagVersteinerung)   // Spielgestalter-Entscheidung 17.11.2026: True Damage (Acid Vial & Co.) trifft versteinerte Kreaturen
           || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
       } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
