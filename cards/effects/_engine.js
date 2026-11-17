@@ -6091,6 +6091,7 @@ class GameEngine {
                 if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
               }
               gs._zielNegiertDurchSchutz = true;   // W36a: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
+              engine._merkeNegation(selected);   // (auch der Schutz-Drop bei EINEM Ziel: das einzige Ziel ist weg) — siehe `negationsStand`
               return null;
             }
             if (redirected) {
@@ -26644,6 +26645,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _abOrig = _leihSeite != null ? { controller: _fInst.controller, owner: _fInst.owner } : null;
       if (_abOrig) { _fInst.controller = playerIdx; _fInst.owner = playerIdx; _fInst.heroOwner = _leihSeite; }
       let abErgebnis;
+      const negStand = this.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
       try {
         const ctx = this._createContext(_fInst, {});
         ctx.kostenStufe = level;   // W82: Kosten bleiben die der Stufe beim Aktivieren
@@ -26668,6 +26670,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           this.log('gerrymander_veto', { player: ps.username, ability: abilityName });
           this.sync();
           return { played: false };
+        }
+        if (this.negiertSeit(negStand)) {
+          // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch — der Einmal-Stempel bleibt verbraucht, die Zusatzaktion bleibt wie bei der Negation in der Kette (oben)
+          // unverbraucht (zurück zur Auswahl).
+          this.sync();
+          return { retry: true };
         }
         delete this.gs.hoptUsed[hoptKey];
         this.sync();
@@ -34361,6 +34369,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Nachlauf als `nachBilder` im Rueckgabewert.
    */
   async negationsBilder(quelle, ziele, ergebnis, opts = {}) {
+    this._merkeNegation(ziele);   // Spielgestalter-Entscheidung 16.11.2026: der Aufrufer (Aktivierung) erkennt eine echte Negation im Zielfenster (`negationsStand`/`negiertSeit`)
     // ★★ v1181 (Al 17.9.): Die Abwehr soll KURZ NACH dem Beginn der
     // Zauberbilder sichtbar werden — dafuer startet ihr `waehrendBilder`
     // parallel (nicht abgewartet), die Karte legt ihre eigene Pause fest.
@@ -36148,7 +36157,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           for (let j = liste.length - 1; j >= 0; j--) {
             if (drop.has(liste[j])) { liste.splice(j, 1); if (j <= i) i--; }
           }
-          if (liste.length === 0) return [];
+          if (liste.length === 0) { this._merkeNegation(sel); return []; }   // alle Ziele geschützt = der Effekt ist negiert (siehe `negationsStand`)
           continue;
         }
         // Eine ID, die nicht in der Zielliste des Aufrufers steht, ginge
@@ -36748,6 +36757,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           surprise: sName, source: sourceCard?.name,
           target: selected.cardName, player: this.gs.players[reaktor]?.username,
         });
+        this._merkeNegation(selected);   // Negation (nicht Abbruch) im Zielfenster — siehe `negationsStand`
         return { _redirectNegated: true, _bySurprise: sName };
       }
       if (!sResult?.redirectTo) continue; // Declined / cancelled inside
@@ -48590,6 +48600,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     gs.hoptUsed[hoptKey] = gs.turn;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 — NEGATION NACH DER ZIELWAHL einer Aktivierung (Kreatur-/Helden-/Ability-Effekt) ≠ ABBRUCH DURCH DEN SPIELER.
+   * Wird die Aktivierung im Zielfenster negiert (Rolling Boulder, Surprises wie Frost Rune/Glass Wall, Hand-Reaktionen wie Chaorc Interception, Cool Tech Jetpack, Schutz-Wächter), liefern die Pickers
+   * `null`/`[]` und das Skript bricht ab (`return false`) — für den Eintritt war das bisher ein Abbruch (Einmal-Limit blieb frei). Die Fenster melden jede echte Negation über `_merkeNegation`
+   * (`negationsBilder`, Rolling-Boulder-Sentinel, Schutz-Drop, alle Ziele geschützt); der Eintritt vergleicht den Stand vor und nach dem Skript:
+   *   const stand = engine.negationsStand();  … script …  const neg = engine.negiertSeit(stand);   // null = nicht negiert, sonst die negierten Ziele (Liste, evtl. leer)
+   * und behandelt ein `false` MIT Negation wie die Negation in der Kette (Einmal-Limits verbraucht, bezahlte Kosten bleiben bezahlt); ein `false` OHNE Negation bleibt der Abbruch (nichts verbraucht).
+   */
+  _merkeNegation(ziele) {
+    this._negZaehler = (this._negZaehler || 0) + 1;
+    this._negZiele = Array.isArray(ziele) ? ziele.slice() : (ziele ? [ziele] : []);
+  }
+
+  /** Stand des Negations-Zählers (vor dem Skript merken). */
+  negationsStand() { return this._negZaehler || 0; }
+
+  /** Wurde seit `stand` im Zielfenster etwas negiert? `null` = nein, sonst die Ziele der letzten Negation. */
+  negiertSeit(stand) { return (this._negZaehler || 0) > stand ? (this._negZiele || []) : null; }
+
   /** Setzt das Skript `_skipCreatureEffectHopt` / `_skipHeroEffectHopt` (eigene Mehrfach-Buchführung)? Textsuche im Skript, einmal je Name (Muster `_initialFlugSicher`). */
   _aktivierungMitEigenerBuchfuehrung(name) {
     const cache = this._buchfuehrungCache || (this._buchfuehrungCache = new Map());
@@ -51621,6 +51650,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _zusatzVorher = this.gs._heroEffectZusatzInst;
     this.gs._heroEffectZusatzInst = opts.zusatzInst || null;
     let resolved;
+    const negStand = this.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
     } finally {
@@ -51731,6 +51761,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
       delete this.gs._pendingCardReveal;
       delete this.gs._pendingPlayLog;
+      const negZiele = this.negiertSeit(negStand);
       // Gerrymander veto on a "may" confirm consumes the once-per-turn
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them.
@@ -51740,6 +51771,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
         this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
         this.log('gerrymander_veto', { player: this.gs.players[pi].username, hero: hero.name, effect: chosen.name });
+      } else if (negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (der Picker lieferte `null`, das Skript brach ab) — kein Abbruch durch den Spieler. Wie bei der
+        // Negation in der Kette (oben): Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung), bezahlte Kosten (Aktion) bleiben bezahlt — keine Rückerstattung (`onCancel`).
+        this.negierteAktivierungStempeln(pi, chosen.script, chosen.name, chosen.hoptKey, hero, { ziele: negZiele });
+        return { ok: true, resolved: false, negated: true };
       } else if (isActionCost) {
         // Plain cancellation (no Gerrymander veto, no commitment past
         // chain resolution) — refund the action resource so the player

@@ -10400,6 +10400,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     const _vorigerCasterCreature = gs._spellCasterCreature;
     gs._spellCasterCreature = inst;
     let resolved;
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
@@ -10496,11 +10497,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them. Stamp HOPT so
       // the activation can't be retried this turn.
+      const _negZiele = room.engine.negiertSeit(_negStand);
       if (room.engine._lastPromptGerryDeclined) {
         room.engine._lastPromptGerryDeclined = false;
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      } else if (_negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Rolling Boulder, Frost Rune, Chaorc Interception, Cool Tech Jetpack …; der Picker lieferte
+        // `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei der Negation in der Kette sind die Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung);
+        // der Zusatzaktions-Geber wird wie dort zurückgegeben.
+        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele });
+        if (consumedAdditionalCreatureInst) room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       } else if (consumedAdditionalCreatureInst) {
         // Standard cancel — refund the additional-action provider
         // consumed upfront. The action-counter increment / heroesActedThisTurn
@@ -10818,6 +10826,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): die Kette hat die Stufe gesenkt → die Auflösung ist Pflicht (kein Abbrechen)
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     const resolved = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, aufLevel)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
@@ -10895,6 +10904,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
         hoptReserved = false;
         if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
         room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert (Zielfenster-Reaktion/-Surprise/-Wächter) ist kein Abbruch durch den Spieler — die Rundensperre bleibt verbraucht,
+        // wie bei der Negation in der Kette (oben).
+        hoptReserved = false;
       } else {
         releaseHopt();
       }
@@ -11724,6 +11737,19 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     return false;
   }
   let _heroCostFinalized = false;
+  // Ausgang einer NEGIERTEN Aktivierung (Kette/Surprise-Fenster ODER Negation nach der Zielwahl): Helden-Vorkosten zurück (Saint Nicolas behält den markierten Trank), eine ZUSATZaktion bleibt
+  // unverbraucht (Anbieter zurück, Aktionszähler zurückgedreht), die Hauptaktion bleibt — wie bei jeder negierten Karte — verbraucht.
+  const negierterAusgang = async () => {
+    await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+    _heroCostFinalized = true;
+    if (consumedAdditionalInst) {
+      // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+      // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+      room.engine.restoreAdditionalAction(consumedAdditionalInst);
+      if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+    } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+  };
 
   try {
     // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
@@ -11761,17 +11787,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
       // ★ Spielgestalter-Entscheidung 16.11.2026: negiert = Aktivierung begonnen → die Rundensperre (oben vorab gestempelt) bleibt verbraucht.
-      // Negated — refund the Hero pre-action cost (Saint Nicolas
-      // keeps the marked Potion).
-      await room.engine.refundHeroActionCost(heroOwner, heroIdx);
-      _heroCostFinalized = true;
-      if (consumedAdditionalInst) {
-        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
-        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
-        room.engine.restoreAdditionalAction(consumedAdditionalInst);
-        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
-        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
-      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+      // Negated — refund the Hero pre-action cost (Saint Nicolas keeps the marked Potion); Zusatzaktion/Hauptaktion s. `negierterAusgang`.
+      await negierterAusgang();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -11806,6 +11823,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): gesenkte Auflösung = Pflicht, kein Abbrechen
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let result = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onActivate(ctx, aufLevel)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
@@ -11843,6 +11861,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
           room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
         }
         room.engine._lastPromptGerryDeclined = false;
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch durch den Spieler — die Rundensperre (oben vorab gestempelt) bleibt verbraucht und der Ausgang ist
+        // derselbe wie bei der Negation in der Kette (`negierterAusgang`).
+        await negierterAusgang();
       } else {
         // Player cancelled — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(heroOwner, heroIdx);
