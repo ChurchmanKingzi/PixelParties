@@ -12065,6 +12065,17 @@ class GameEngine {
       return;
     }
 
+    // Spielgestalter-Entscheidung 16.11.2026: eine Effekt-Immunität dieser Auflösung (Future Tech Escape Device …: „Negate all effects … on that Hero") negiert auch eine Heilung
+    // (auch durch einen eigenen hilfreichen Zauber, der die Reaktion ausgelöst hat) — wie im Schadens- und Statuspfad.
+    {
+      const iOwner = this._findHeroOwner(target);
+      const iHi = iOwner >= 0 ? (this.gs.players[iOwner].heroes || []).indexOf(target) : -1;
+      if (iOwner >= 0 && iHi >= 0 && this.hasEffectImmunity(iOwner, iHi, source)) {
+        this.log('effect_immunity', { hero: this._heroLabel(target), source: source?.name || null, effect: 'heal' });
+        return;
+      }
+    }
+
     // ★ v1096 („Forbidden Curse of Aging"): Heilsperre durch ein
     // Anhaengsel am Wirt.
     {
@@ -12381,6 +12392,12 @@ class GameEngine {
     // v1466: 0 max HP → keine Wiederbelebung, auch kein Fenster davor.
     // v1467: `opts.heilt` (voll/halb heilen) → auch nicht bei Heilsperre.
     if (!this.canReviveHero(hero, opts)) return false;
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — auch der gewählte besiegte Held
+    // (das Zielfenster bietet die Reaktion für ihn an) wird dann nicht wiederbelebt.
+    if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: this._heroLabel(hero), source: typeof opts.source === 'string' ? opts.source : (opts.source?.name || null), effect: 'revive' });
+      return false;
+    }
     // ★ v1288 — Fenster UNMITTELBAR vor jeder Wiederbelebung. Alles, was
     // an den Tod dieses Helden anknuepft und noch aussteht (Pseudonias
     // vorgemerkte Aufnahme), wird hier entschieden — solange der Held noch
@@ -12704,6 +12721,13 @@ class GameEngine {
     // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — auch die Wege ohne Status/Heilung/Buff (Max-HP, Entfernen, Abwurf, Kontrolle …).
     if (!opts.piercing && this.heroHasSpellImmunity(heroOwner, heroIdx) && this.quelleIstSpell(opts.source ?? null, opts)) {
       this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'spell_immunity' });
+      return true;
+    }
+    // Spielgestalter-Entscheidung 16.11.2026: eine Effekt-Immunität dieser Auflösung (Future Tech Escape Device, Castling, Man-Eater Birds …: „Negate all effects … on that Hero")
+    // gilt für ALLE Effekte auf den Helden, auch die ohne Schaden und Status (Max-HP-Gewinn, Fähigkeiten abwerfen/tauschen, Kontrolle, Ausrüstung …) — auch ein hilfreicher eigener Zauber
+    // (Divine Gift of Sacrifice) kann die Reaktion auslösen. `defeat` prüft `actionDefeatHero` selbst (Rückgabe `effectImmune`); `piercing` (Exorcism Decay 2) geht durch.
+    if (!opts.piercing && effectType !== 'defeat' && this.hasEffectImmunity(heroOwner, heroIdx, opts.source ?? null)) {
+      this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'effect_immunity' });
       return true;
     }
     const ctx = {
@@ -20957,13 +20981,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {string} source - Card name for logging (e.g. 'Beer', 'Cure')
    * @returns {string[]} Array of actually removed status keys
    */
-  cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
+  cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source, opts = {}) {
     // ★ v1473 (Als Vorgabe 28.9.: „Effekte, die Status entfernen (Beer,
     // Tea …) dürfen den Gift-of-Skill-Debuff nie entfernen können!").
     // Die Sperre von Divine Gift of Skill ist KEIN Status: sie liegt in
     // `hero._skillLockTurn` (Anzeige `hero.buffs.blessed_skill`) und wird
     // hier nie angefasst — nur `hero.statuses`. So muss es bleiben.
     if (!hero?.statuses) return [];
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — auch eine heilende Wirkung
+    // (Cure, Divine Zeal …) entfernt dann nichts. `opts.piercing` (Exorcism mit Decay Magic 2: „cannot be prevented or negated") geht durch.
+    if (!opts.piercing && this.hasEffectImmunity(playerIdx, heroIdx, source)) {
+      this.log('effect_immunity', { hero: this._heroLabel(hero), source: typeof source === 'string' ? source : (source?.name || null), effect: 'cleanse' });
+      return [];
+    }
     const removed = [];
     const poisonLocked = this._isPoisonHealLocked()
       && !this._isDiverHelmetProtectedTarget(hero);
@@ -21655,6 +21685,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         return false;
       }
     }
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch Buffs/Debuffs auf dem Helden.
+    if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: hero.name, buff: buffName });
+      return false;
+    }
     // Allow Resistance (and similar) to cancel the buff
     const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_add', buffName, cancelled: false, _skipReactionCheck: true };
     await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
@@ -21729,6 +21764,12 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async actionRemoveBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
     if (!hero?.buffs?.[buffName]) return;
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch das Entfernen von Buffs. Das Auslaufen am Ende der Dauer (`opts.ablauf`)
+    // ist kein Effekt einer Karte und bleibt unberührt.
+    if (!opts.ablauf && this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: hero.name, buffRemove: buffName });
+      return;
+    }
     // Allow Resistance to cancel debuff removal too (e.g. an enemy stripping a hero's buff)
     const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_remove', buffName, cancelled: false, _skipReactionCheck: true };
     await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
@@ -21829,7 +21870,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
-          await this.actionRemoveBuff(hero, pi, hi, buffName);
+          await this.actionRemoveBuff(hero, pi, hi, buffName, { ablauf: true });
           expired = true;
         }
       }

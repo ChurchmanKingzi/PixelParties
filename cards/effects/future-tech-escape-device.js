@@ -207,7 +207,9 @@ module.exports = {
     //   Die Karte laeuft also sichtbar durch; nur an diesem einen
     //   Helden prallt alles ab. Frueher hat der Ein-Ziel-Fall die
     //   ganze Karte negiert — das unterdrueckte auch ihre Anzeige.
-    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard);   // W33a: Brettseite des Helden (bei eigenem Helden = pi)
+    // Spielgestalter-Entscheidung 16.11.2026: „Negate all effects … the Attack or Spell has on that Hero" gilt für die GANZE Auflösung — auch für spätere Zielfenster derselben Karte
+    // (Ricochet, Duel, Divine Gift of Equality …), die die Immunitätsliste sonst leerten, bevor Schaden/Wirkung ankam (`ueberFenster`: endet mit der Auflösung, `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard, { ueberFenster: true });   // W33a: Brettseite des Helden (bei eigenem Helden = pi)
     engine.sync();
     return {};
   },
