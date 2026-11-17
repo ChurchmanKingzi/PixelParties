@@ -44322,7 +44322,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W15a (Al, R01-10): Zauber OHNE Schaden (`opts.dealsDamage === false`, Status-Flächenzauber) melden das den Reaktionen
     // (Schadens-Reaktionen springen ab) und geben den Schulen-Tag mit (Anti Magic Shield: „hit by an opponent's Spell").
     const ptResult = await this._checkPostTargetHandReactions(normalized, source,
-      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : {});
+      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : (opts.nurTreffer ? { damageType: opts.damageType, nurTreffer: true } : {}));
     // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
     // actionAoeHit (which set `_spellNegatedByEffect` and return an
     // empty target list so the caster's onPlay deals nothing), the
@@ -44584,6 +44584,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Overheat): reagiert diese Reaktion laut Kartentext auf eine WAHL („is chosen by …", „chooses a target …": Invisibility Cloak, Chaorc Interception,
+   * Dream Dust, Dream World Switcheroo, Deepsea Encounter, Cool Tech Jetpack, Winged Skeleton, Flesh-Eating Swarm Trap)? Fenster für einen reinen TREFFER ohne Wahl (`opts.nurTreffer`,
+   * `preDamageMultiTargetWindow`) lassen solche Karten aus — „hit / would take damage / would be affected"-Karten (Anti Magic Shield, Test Flight, Unreasonable Anger, Barrier of Faith, Divine Gift
+   * of Rain, Future Tech Escape Device, MOE Shield, Spectral Armor, Bamboo Shield …) kommen dran. Gelesen wird der gedruckte Kartentext (wie beim Surprise-Filter „chosen/targeted by").
+   */
+  _waehltZielKarte(cardName) {
+    return /\b(chosen|chooses)\b/i.test(this._getCardDB()[cardName]?.effect || '');
+  }
+
+  /**
    * Post-target hand-reaction hub. ONE call per damage source per
    * resolution: the loop offers every eligible `isPostTargetReaction`
    * card in both players' hands (defender first), letting multiple
@@ -44681,6 +44691,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
         if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+        if (opts.nurTreffer && this._waehltZielKarte(cardName)) continue;   // „Treffer ohne Wahl" (Overheat-Träger): nur „hit/affect/damage"-Reaktionen, keine „is chosen"-Reaktionen
         // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — bei „cannot be negated" (`config.cannotBeNegated` der Zielwahl: Exorcism mit Decay Magic 2) werden auch
         // ganz negierende Reaktionen angeboten (Hinweis in der Frage, CPU waehlt sie nicht); ihre Negation wird unten verworfen (die Karte ist bezahlt, der Effekt laeuft).
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
@@ -45013,6 +45024,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
             if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+            if (opts.nurTreffer && this._waehltZielKarte(rxInst?.counters?._ftCopyOf || cardName)) continue;   // „Treffer ohne Wahl": keine „is chosen"-Reaktion (Cool Tech Jetpack, Winged Skeleton)
             // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
             // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
             targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
