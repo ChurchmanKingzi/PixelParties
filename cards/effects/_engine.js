@@ -18330,6 +18330,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ── HELDEN-VORAUSSETZUNG DER BESCHWÖRUNG (Spielgestalter-Entscheidung 17.11.2026, NECRO-02) ─────
+    // „Restriktionen wie die der Spirits … gelten IMMER, egal, von wo eine Creature beschworen wird": „This Creature can only be summoned by a Hero equipped with …" ist ein
+    // Skript-`canPlayWithHero`; der Handweg prüft es in `validateActionPlay`, JEDE Effekt-Beschwörung hier. Beschwörer = `controller`, sonst die Feldseite; der Held ist der Held der
+    // Landezone. Ausgenommen: Platzieren (`isPlacement`, keine Beschwörung — Q9) und Wiederbelebung/Eigenplatzierung (`skipBeforeSummon`/`skipHooks`, wie bei der Beschwörungssperre oben);
+    // die Wege, die als Beschwörung zählen und `isPlacement` nur für die Reaktionsfenster setzen (Soul Shard Ka/Khet), melden sich mit `alsBeschwoerung: true`.
+    if ((!opts.isPlacement || opts.alsBeschwoerung) && !opts.skipBeforeSummon && !opts.skipHooks && !this.beschwoerHeldBedingungOk(cardName, playerIdx, heroIdx, opts.controller ?? playerIdx)) {
+      this.log('summon_blocked', { card: cardName, reason: 'hero_condition', heroIdx });
+      return false;
+    }
+
     // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
     // Eine Artifact Creature ist NUR in einer Support Zone eine Creature
     // (siehe `isPileCreature` in `_hooks.js`). Solange sie in Hand, Deck,
@@ -18928,12 +18938,73 @@ this._deathWatch = (this._deathWatchStack || []).length
     return inst.owner === spec.mustIncludeFromHeroOwner;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (NECRO-02): „Restriktionen wie die der Spirits, aber z. B. auch Opfer-Anforderungen, gelten IMMER, egal, von wo eine Creature
+   * beschworen wird." Die HELDEN-seitige Voraussetzung einer Kreatur („This Creature can only be summoned by a Hero equipped with …": die sieben Spirits der WAW-Reihe) steht im
+   * Skript als `canPlayWithHero` — der Handweg fragt sie über `validateActionPlay`. Diese Methode ist dieselbe Frage für JEDEN Beschwörungsweg (Necromancy, Monster in a Bottle,
+   * Psychic Scout, Pinaxolotl, Stellin, Skullmael's Greatsword, Soul Shards …): sie wird von `isCreatureSummonable` (Zielangebote), `canHeroSummon`/`eligibleSummonZones`
+   * (Zonenlisten) und `_summonSperrenOk` (der Hub, Sicherheitsnetz) gerufen. Gilt nur für Beschwörungen — Platzieren („place") ist keine Beschwörung und umgeht sie (Q9).
+   * @param {number} feldSeite  Brettseite des beschwörenden Helden (dort landet die Kreatur)
+   * @param {number} [beschwoerer] der Spieler, der beschwört (Kontrolleur); Standard: der Kontrolleur des Helden
+   */
+  beschwoerHeldBedingungOk(cardName, feldSeite, heroIdx, beschwoerer = null) {
+    const script = loadCardEffect(cardName);
+    if (typeof script?.canPlayWithHero !== 'function') return true;
+    const cd = this._getCardDB()[cardName];
+    if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) return true;   // Artifact Creatures (Debt-O-Tron) werden gespielt, nie beschworen — ihr Tor gilt dem Handweg
+    const hero = this.gs.players[feldSeite]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const ktrl = beschwoerer ?? this.heroSideOf(feldSeite, hero);
+    try {
+      return !!this._mitWirker(ktrl, heroIdx, feldSeite !== ktrl ? feldSeite : null,
+        () => script.canPlayWithHero(this.gs, ktrl, heroIdx, cd, this));
+    } catch (err) {
+      console.error(`[canPlayWithHero/summon] ${cardName} threw:`, err.message);
+      return false;
+    }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (NECRO-02): die Beschwörungs-VORAUSSETZUNGEN gelten für Direktwege genauso wie für den Hub. Necromancy und Monster in a Bottle legen die
+   * Kreatur selbst aufs Brett (kein `summonCreatureWithHooks`) und ließen bisher die Pflicht-Kosten der Karte aus („Sacrifice … to summon this Creature": Blue-Ice Dragon, Foresta,
+   * The Egg of God, Steam Dwarf Dragon Pilot, Pollution Piranha, Gigantisaur Chimera/King Trex …). Hier werden sie bezahlt, mit denselben Bausteinen wie die Pile-Wege
+   * (`_beschwoerungKostenVorAuftritt`: Platz reservieren, Opfer-/Tribut-Wahl, Rettungsfenster-Sperre). Gefragt wird nur bei Karten mit PFLICHT-Bedingung
+   * (`nurUnterBedingungBeschwoerbar`); „may"-Alternativwege („You may sacrifice … to summon this Creature as an additional Action") bleiben unberührt, denn der Effekt ist selbst
+   * die Zusatzaktion. Die Helden-Voraussetzung (Spirits) prüft der Aufrufer über `isCreatureSummonable`; hier wird sie noch einmal abgesichert.
+   * @param {object} o  { source, controller (Beschwörer), hookExtras }
+   * @returns {Promise<{ ok: boolean, extras: object, selbstGelegt: (object|null) }>} `ok: false` = nichts bezahlt (abgebrochen/unzulässig), die Karte bleibt, wo sie liegt.
+   *   `selbstGelegt`: die Karte hat sich in `beforeSummon` selbst auf das Brett gelegt (500 Piranhas) — der Aufrufer legt NICHT noch einmal. `extras`: Hook-Extras des Kostenstempels (`_tributePaid`).
+   */
+  async zahleEffektBeschwoerKosten(cardName, feldSeite, heroIdx, slotIdx, o = {}) {
+    const beschwoerer = o.controller ?? feldSeite;
+    if (!this.beschwoerHeldBedingungOk(cardName, feldSeite, heroIdx, beschwoerer)) return { ok: false, extras: {}, selbstGelegt: null };
+    const script = loadCardEffect(cardName);
+    const cd = this._getCardDB()[cardName];
+    const { nurUnterBedingungBeschwoerbar } = require('./_summon-eligibility');
+    if (typeof script?.beforeSummon !== 'function' || !cd || !nurUnterBedingungBeschwoerbar(cd, cardName)) return { ok: true, extras: {}, selbstGelegt: null };
+    const kernOpts = {
+      source: o.source || null, _nurKosten: true,
+      ...(beschwoerer !== feldSeite ? { controller: beschwoerer } : {}),
+      hookExtras: { _alsZusatzaktion: true, _isNormalSummon: false, ...(o.hookExtras || {}) },
+    };
+    const ok = await this._beschwoerungKostenVorAuftritt(cardName, feldSeite, heroIdx, slotIdx, kernOpts);
+    if (!ok) return { ok: false, extras: {}, selbstGelegt: kernOpts._selbstGelegt || null };
+    return { ok: true, extras: this.takeTributeSummonExtras(cardName, beschwoerer, kernOpts.hookExtras), selbstGelegt: null };
+  }
+
   isCreatureSummonable(cardName, playerIdx, heroIdx = -1, ctxExtras = {}) {
     const script = loadCardEffect(cardName);
     {
       const _h = heroIdx >= 0 ? this.gs.players[playerIdx]?.heroes?.[heroIdx] : null;
       const _b = ctxExtras.beschwoerer ?? (_h?.name ? this.heroSideOf(playerIdx, _h) : playerIdx);
       if (this.zusatzNameSperrt(_b, cardName)) return false;   // W73c: ein Zusatzname (Shroomasaur) belegt das „only 1"
+      // Spielgestalter-Entscheidung 17.11.2026: die Helden-Voraussetzung der Beschwörung („can only be summoned by a Hero equipped with …", Spirits) gilt auf JEDEM Weg,
+      // nicht nur beim Spielen aus der Hand — mit Held: dieser Held; ohne Held (`heroIdx < 0`, Kartenfrage): mindestens ein kontrollierter Held erfüllt sie.
+      if (script?.canPlayWithHero && !ctxExtras._ohneHeldenBedingung) {
+        if (heroIdx >= 0) {
+          if (!this.beschwoerHeldBedingungOk(cardName, playerIdx, heroIdx, _b)) return false;
+        } else if (!this.heroesControlledBy(_b).some(h => h.hero.hp > 0 && this.beschwoerHeldBedingungOk(cardName, h.physOwner, h.heroIdx, _b))) return false;
+      }
     }
     if (!script?.canSummon) return true;
     try {
@@ -41996,7 +42067,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `kernOpts` = die Optionen des spaeteren `summonCreatureWithHooks`-Aufrufs; der Aufrufer reicht sie danach mit `_sperrenGeprueft` / `_kostenGezahlt` weiter.
    */
   async _beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts = {}) {
-    if (!this._summonSperrenOk(cardName, feld, heroIdx, kernOpts)) return false;
+    if (!kernOpts._nurKosten && !this._summonSperrenOk(cardName, feld, heroIdx, kernOpts)) return false;   // `_nurKosten`: Direktwege (`zahleEffektBeschwoerKosten`) fragen die Sperren selbst
     if (kernOpts.skipBeforeSummon) return true;
     const _fremd = kernOpts.controller != null && kernOpts.controller !== feld;
     const _beschwoerer = _fremd ? kernOpts.controller : feld;

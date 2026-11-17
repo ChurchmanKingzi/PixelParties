@@ -66,9 +66,12 @@ module.exports = {
     return SCHULEN.some(s => engine.effectiveSchoolLevelForCaster(s, pi, heroIdx, seite) >= 1);
   },
 
-  /** Grau, solange kein kontrollierter Held eine freie Surprise Zone hat. */
+  /** Grau, solange kein kontrollierter Held eine freie Surprise Zone hat — und unter wirksamen Arcane Eyes des Gegners. */
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
+    // Spielgestalter-Entscheidung 17.11.2026: „cannot place Surprises" sperrt den ganzen Nutzen der Karte — gesperrt statt wirkungslos spielbar
+    // (bleibt auf der Hand, keine Aktion, kein Stempel; wie Create Secret Room).
+    if (engine.surprisesLockedFor(pi)) return false;
     return kandidaten(engine, pi).length > 0;
   },
 
@@ -82,6 +85,7 @@ module.exports = {
       const wirker = ctx.attachedHero || gs.players[seiteWirker]?.heroes?.[ctx.cardHeroIdx];
       if (!ps || !wirker?.name || wirker.hp <= 0) { gs._spellCancelled = true; return; }
       if (engine._isSearchBlocked(pi, { source: CARD_NAME })) { gs._spellCancelled = true; return; }     // die Sperre fiel mitten in der Auflösung
+      if (engine.surprisesLockedFor(pi)) { gs._spellCancelled = true; return; }                          // Arcane Eyes erst in der Auflösung wirksam geworden: nichts gesucht, nichts verbraucht
       const ziele = kandidaten(engine, pi);
       if (ziele.length === 0) { gs._spellCancelled = true; return; }
 

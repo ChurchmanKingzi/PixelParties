@@ -78,6 +78,8 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   if (st.berserked) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
+  // Spielgestalter-Entscheidung 17.11.2026: die Helden-Voraussetzung der Beschwörung („can only be summoned by a Hero equipped with …", Spirits) gilt auf jedem Weg.
+  if (!engine.beschwoerHeldBedingungOk(cd.name, physOwner, heroIdx, pi)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
 }
 
