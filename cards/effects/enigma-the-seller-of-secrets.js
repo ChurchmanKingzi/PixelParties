@@ -31,6 +31,8 @@
 const CARD_NAME = 'Enigma, the Seller of Secrets';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // BORIS-SPERRE (Klausel 1): nimmt eine Karte aus dem Gegnerdeck auf die eigene Hand.
   // Bei wirksamem Boris beim Gegner nicht aktivierbar.
   stealsOpponentCards: true,
@@ -54,7 +56,8 @@ module.exports = {
     // peeks / touches the top while protection is active. Mirrors
     // Thieving / Charme Lv2 / etc. — gates here AND in onHeroEffect
     // so the activation can't be sneaked in via a stale UI flash.
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — aktivierbar, der Effekt verpufft (onHeroEffect: Einsatz verbraucht).
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
     return true;
@@ -68,7 +71,8 @@ module.exports = {
     const ps = gs.players[pi];
     const ops = gs.players[oi];
     if (!ps || !ops || ps.handLocked) return false;
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // Spielgestalter-Entscheidung 16.11.2026: gegen den Erste-Runden-Geschuetzten gespielt (Einmal-Limit verbraucht), der Effekt verpufft.
+    if (gs.firstTurnProtectedPlayer === oi) { engine.log('enigma_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return true; }
     if ((ops.mainDeck || []).length === 0) return false;
 
     // ── Step 1: peek the top up to 5 cards ────────────────────────────

@@ -157,13 +157,13 @@ function collectTargets(engine, controllerIdx) {
  * sonst den Effekt anfaengt, um im Ziel-Picker abzubrechen.
  */
 function destroyableTargets(engine, controllerIdx) {
-  const shieldedPi = engine.gs?.firstTurnProtectedPlayer;
-  const all = collectTargets(engine, controllerIdx);
-  if (shieldedPi == null) return all;
-  return all.filter(t => t.owner !== shieldedPi);
+  // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch die Karten des Erste-Runden-Geschuetzten sind waehlbar; die Zerstoerung verpufft (`actionDestroyCard`: `destroy_blocked`).
+  return collectTargets(engine, controllerIdx);
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hero'],
   heroEffect: true,
   // Keep ONLY the onTurnEnd recency bookkeeping firing through

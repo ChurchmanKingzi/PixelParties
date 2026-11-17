@@ -111,24 +111,12 @@ function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
 
-  // Erst-Runden-Schutz: Karten des geschützten Spielers kann
-  // `actionDestroyCard` gar nicht zerstören (es loggt `destroy_blocked`
-  // und kehrt zurück). Sie hier anzubieten hieße, ein Ziel zu zeigen,
-  // das die Bezahlung anschließend verweigert — der Spieler zahlt 150
-  // Selbstschaden für nichts. Der dafür vorgesehene Engine-Helfer heißt
-  // `isAbilityRemovalProtected` und ist ausdrücklich für getValidTargets
-  // gedacht.
-  const EngineClass = engine?.constructor;
-  const isProtected = (owner) => (
-    typeof EngineClass?.isAbilityRemovalProtected === 'function'
-      ? EngineClass.isAbilityRemovalProtected(gs, owner)
-      : gs.firstTurnProtectedPlayer === owner
-  );
-
+  // Erst-Runden-Schutz: Karten des geschützten Spielers kann `actionDestroyCard` gar nicht zerstören (es loggt `destroy_blocked` und kehrt zurück).
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — sie werden trotzdem als Ziel angeboten (der Spieler will vielleicht Karten loswerden bzw. den
+  // Selbstschaden/Preis zahlen): die Wahl verpufft, die Zerstörung blockt die Engine (`destroy_blocked`). Früher: Schutz → nicht gelistet (`isAbilityRemovalProtected`).
   for (const inst of engine.cardInstances) {
     if (inst.zone === 'hand' || inst.zone === 'discard' || inst.zone === 'deleted' || inst.zone === 'hero' || inst.zone === 'deck') continue;
     if (inst.counters?.immovable) continue;
-    if (isProtected(inst.owner)) continue;
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
 

@@ -128,6 +128,9 @@ module.exports = {
   isPostTargetReaction: true,
   // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`: Healing Melody, Anhänge, nur ein Empfänger …).
   affectFenster: true,
+  // Spielgestalter-Entscheidung 16.11.2026 (nutzlose Aktivierungen sind erlaubt): gegen Schaden, der laut Kartentext nicht negiert werden kann (Rockfall, Pressure Projectile, Acid Vial: `damageCannotBeReducedOrNegated`)
+  // wird die Karte angeboten und wirkt nicht (N3: `piercing`); die CPU waehlt das nicht.
+  uselessVsUnstoppableDamage: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
     if (!targetedHeroes || targetedHeroes.length === 0) return false;

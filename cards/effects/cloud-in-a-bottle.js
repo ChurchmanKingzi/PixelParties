@@ -46,9 +46,11 @@
 //      stirbt das Ziel trotzdem (die Karte ist verbraucht, kein Cloudy fuer
 //      einen Gefallenen — `afterDamage` raeumt es ab). Kreaturen: Nur Schaden,
 //      kein Zerstoeren/Opfer.
-//   • Nicht anbieten, wenn der Treffer nicht senkbar ist (`cannotBeReduced`/
-//     `cannotBeNegated`, z. B. Ida): der Multiplikator-Durchgang liesse ihn
-//     ohnehin aus.
+//   • Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt —
+//     auch ein nicht senkbarer Treffer (`cannotBeReduced`/`cannotBeNegated`, z. B. Ida,
+//     True Damage) bekommt das Angebot (Hinweis in der Frage). Cloudy liegt dann (gilt
+//     fuer weiteren Schaden dieses Zuges), der Multiplikator-Durchgang laesst DIESEN
+//     Treffer aber aus; die CPU waehlt das nicht (`preDamageUseless`).
 //   • Stapel-Sperre: Ziele, die schon „Cloudy" tragen, werden nicht mehr
 //     angeboten (der Treffer ist ja bereits halbiert).
 //   • Ein Angebot je Ziel und Quelle (wie Spectral Armor, v1378).
@@ -118,9 +120,11 @@ module.exports = {
   isPreDamageReaction: true,
   preDamageEarly: true,
 
-  preDamageCondition(gs, pi, engine, target, heroIdx, source, amount, _type, flags) {
+  /** Dieser Treffer wuerde nicht gehalbiert (`cannotBeReduced`/`cannotBeNegated`): Angebot erlaubt, aber fuer ihn nutzlos — nur CPU-Sperre und Hinweis. */
+  preDamageUseless(flags) { return !!(flags && (flags.cannotBeReduced || flags.cannotBeNegated)); },
+
+  preDamageCondition(gs, pi, engine, target, heroIdx, source, amount, _type, _flags) {
     if (!(amount > 0)) return false;
-    if (flags && flags.cannotBeReduced) return false;
     if (!target || target.hp === undefined || !(target.hp > 0)) return false;
     // Kontrolle statt Seite (Styx 28.9.): `pi` ist bereits der Kontrolleur des Helden.
     if (engine && engine.heroSideOf) {

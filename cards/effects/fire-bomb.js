@@ -27,9 +27,9 @@ module.exports = {
     const engine = engineArg || gs._engineRef || null;
     for (let pi = 0; pi < gs.players.length; pi++) {
       const ps = gs.players[pi];
-      // First-turn protection: cannot target opponent's abilities for removal (generic rule)
-      // See Engine.isAbilityRemovalProtected() — use in any card that removes abilities
-      const isOpponentProtected = pi !== playerIdx && gs.firstTurnProtectedPlayer === pi;
+      // First-turn protection: (ehemals) cannot target opponent's abilities for removal.
+      // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — die Abilities des Erste-Runden-Geschuetzten sind waehlbar, das Zerstoeren verpufft (`actionDestroyCard`: `destroy_blocked`).
+      const isOpponentProtected = false;
 
       // Abilities — any non-empty ability zone, INCLUDING dead heroes'
       // zones. Per card text, Fire Bomb can target any Hero's Ability,

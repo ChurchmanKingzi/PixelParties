@@ -25,20 +25,20 @@ const STEAL_BY_LEVEL = [4, 8, 12];
 const CARD_NAME = 'Thieving';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['ability'],
   freeActivation: true,
 
   /**
-   * Unusable while the opponent has 0 Gold or during Turn-1 protection.
-   * The helper would fizzle in those cases anyway, but surfacing it
-   * here greys out the ability button client-side so the player
-   * doesn't burn their click on a no-op.
+   * Unusable while the opponent has 0 Gold.
+   * ★ Spielgestalter-Entscheidung 16.11.2026: Turn-1-Schutz des Gegners sperrt NICHT mehr — aktivierbar, `actionStealGold` fizzelt (Einmal-Limit verbraucht).
    */
   canFreeActivate(ctx) {
     const gs = ctx._engine.gs;
     const pi = ctx.cardOwner;
     const oi = ctx._engine.opponentOf(pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    if (ctx._engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     const ops = gs.players[oi];
     return !!(ops && (ops.gold || 0) > 0);
   },

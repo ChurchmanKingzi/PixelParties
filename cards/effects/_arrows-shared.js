@@ -117,8 +117,9 @@ const { hasCardType } = require('./_hooks');
  *   a no-op because every PP Attack resolves with a single promptDamageTarget
  *   call, but the hook is in place for when multi-target Attacks ship.
  * @param {boolean} [opts.anyHero] - Hydra Blood Arrow: auch auf die Attack eines GEGNERISCHEN Helden.
- * @param {boolean} [opts.blockUnreducible] - Hydra Blood Arrow (Als Ruling Al 26.10.): nicht anbieten, wenn der Schaden der
- *   Attack unreduzierbar ist (`engine._attackSchadenUnreduzierbar`: Surefire Shot, Elixir of Strength, Club of Gobbo …).
+ * @param {boolean} [opts.blockUnreducible] - Hydra Blood Arrow: nicht anbieten, wenn ein Elixir of Strength des Angreifers bereitsteht („müssen sich ausschließen", Ruling Al 26.10.).
+ *   ★ Spielgestalter-Entscheidung 16.11.2026: ansonsten ist „nutzlos" erlaubt — gegen Quellen-seitig unreduzierbaren Attack-Schaden (Surefire Shot, Club of Gobbo …) wird Hydra
+ *   Blood Arrow angeboten (Hinweis ueber `reactionUselessHint`, die CPU waehlt es nicht) und wirkt dann nicht (weder Null noch Gift).
  * @param {boolean} [opts.effektOhneAngriffsschaden] - Rainbow's/Bomb/Racket Arrow (Als Ruling Al 28.10.): die Karte tut auch an einer Attack
  *   ohne Schaden etwas (Karten ziehen, Gegnerkreatur treffen/zurückgeben) — sie darf dann auch an `dealsNoAttackDamage`-Attacks. Standard:
  *   an einer Attack ohne Schaden nicht ankettbar.
@@ -149,11 +150,10 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   const hero = gs.players[initial.casterOwner ?? (_opts.anyHero ? initial.owner : pi)]?.heroes?.[hiIdx];
   if (!hero?.name || hero.hp <= 0) return false;
 
-  // Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren." — ein Pfeil, der den
-  // Schaden auf 0 SENKT (`opts.blockUnreducible`, Hydra Blood Arrow), wird nicht angeboten, wenn der Schaden der Attack QUELLEN-seitig unreduzierbar ist (Surefire Shot, Elixir of Strength,
-  // Club of Gobbo …; EIN Prädikat: `engine._attackSchadenUnreduzierbar`). Das Fenster öffnet VOR der Zielwahl; ein bereitstehender Elixir sperrt Hydra bei JEDER Attack (Ruling Al 26.10.: „die müssen sich ausschließen“);
-  // ZIEL-seitiges „cannot be reduced" (Tempeste, Brachion …) sperrt Hydra nicht.
-  if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial })) return false;
+  // Ruling (Al 26.10.): ein bereitstehender Elixir sperrt Hydra bei JEDER Attack („die müssen sich ausschließen“). ★ Spielgestalter-Entscheidung 16.11.2026: Quellen-seitig unreduzierbarer Schaden
+  // (Surefire Shot, Club of Gobbo …) sperrt sie NICHT mehr („nutzlose Aktivierungen sind erlaubt"): Angebot ja (`reactionUselessHint` der Karte), Wirkung nein (`resolve`).
+  // ZIEL-seitiges „cannot be reduced" (Tempeste, Brachion …) sperrt Hydra ohnehin nicht.
+  if (_opts.blockUnreducible && engine?._attackSchadenUnreduzierbar?.({ link: initial, nurElixir: true })) return false;
 
   // Als Ruling (Al 28.10.): Attack ohne Schaden (Alliance & Co.) — ein Pfeil, dessen Wirkung am Schaden hängt, hätte dort nichts zu tun: nicht ankettbar.
   if (!_opts.effektOhneAngriffsschaden && attackDealsNoDamage(chainCtx)) return false;

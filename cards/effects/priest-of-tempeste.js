@@ -15,8 +15,9 @@
 //        Riders) bleiben bestehen. Deshalb wird der Betrag auf 0 GESETZT
 //        (`setAmount(0)` — der Treffer bleibt ein Treffer, wie bei Bamboo Shield) und
 //        NICHT der ganze Eintrag storniert (`cancelled`).
-//  • Nicht anwendbar, wenn der Schaden nicht verringert werden kann (`cannotBeReduced`) oder
-//    nicht negiert werden darf (`canBeNegated: false`).
+//  • ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Auch gegen Schaden, der nicht verringert (`cannotBeReduced`)
+//    oder nicht negiert werden darf (`canBeNegated: false`, True Damage), wird der Priester angeboten (Hinweis in der Frage, die CPU waehlt es nicht):
+//    Kosten und Einmal-Limit sind verbraucht, der Treffer geht durch.
 //  • Zusatzbeschwoerung: `_priest-shared`. Einmal je Zug und je Priester; verbraucht erst bei Einsatz.
 //  • Trifft ein Schlag mehrere Creatures des Spielers, waehlt er, welches geschuetzt wird.
 // ═══════════════════════════════════════════
@@ -30,15 +31,19 @@ const sperre = (inst) => `priest-tempeste:${inst.id}`;
 function genutzt(gs, inst) { return gs.hoptUsed?.[sperre(inst)] === gs.turn; }
 
 /** Frage + Kosten; true, wenn der Spieler bezahlt hat. Setzt die Sperre erst beim Bezahlen. */
-async function bezahlen(ctx, opferName) {
+async function bezahlen(ctx, opferName, nutzlosFlags) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const inst = ctx.card;
   const pi = ctx.cardOwner;
+  const hinweis = nutzlosFlags ? engine._nutzlosHinweis(nutzlosFlags, 'damage') : '';
   const ja = await engine.promptGeneric(pi, {
     type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
-    message: `${opferName} would take damage. Shuffle ${KOSTEN} Creatures with different names from your discard pile back into your deck to negate that damage?`,
+    message: hinweis
+      ? `${opferName} would take damage. ${hinweis} Shuffle ${KOSTEN} Creatures with different names from your discard pile back into your deck to negate that damage anyway?`
+      : `${opferName} would take damage. Shuffle ${KOSTEN} Creatures with different names from your discard pile back into your deck to negate that damage?`,
     confirmLabel: '🛡️ Negate', cancelLabel: 'No', cancellable: true, _ownerIdx: pi,
+    ...(nutzlosFlags ? { _nutzlos: true } : {}),
   });
   if (!engine._confirmSaidYes(ja)) return false;
   // Kartenbild SOFORT nach dem Ja streamen (Als Befund 2.10.) — vor jedem Surprise-Fenster und vor dem Flug der Karten.
@@ -64,6 +69,9 @@ module.exports = {
   },
 
   hooks: {
+    /** True Damage (Rockfall, Pressure Projectile, Acid Vial) gegen den eigenen Helden: dieselbe Funktion — Angebot ja, Wirkung nein (s. Kopf). */
+    beforeTrueDamage: async (ctx) => (ctx._engine._reaktionGesperrt?.(ctx.cardController ?? ctx.cardOwner) ? undefined : module.exports.hooks.beforeDamage(ctx)),   // „cannot be reacted to" (Surefire Shot): kein Angebot
+
     /** Eigener HELD wuerde Schaden nehmen. */
     beforeDamage: async (ctx) => {
       const engine = ctx._engine;
@@ -74,8 +82,11 @@ module.exports = {
       if (genutzt(gs, inst) || !kannBezahlen(engine, ctx.cardOwner, KOSTEN)) return;
       const owner = engine._findHeroOwner(ctx.target);
       if (owner < 0 || engine.heroSideOf(owner, ctx.target) !== ctx.cardOwner) return;
-      if (ctx.cannotBeReduced || ctx.cannotBeNegated || ctx.canBeNegated === false) return;
-      if (!(await bezahlen(ctx, ctx.target.name || 'A Hero'))) return;
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — auch gegen unverringer-/unnegierbaren Schaden angeboten (Hinweis in der Frage, die CPU waehlt es
+      // nicht); die Kosten werden bezahlt, der Treffer geht durch (`setAmount` verweigert die Senkung bei `cannotBeReduced`, gegen `cannotBeNegated` setzen wir sie gar nicht).
+      const unaufhaltsam = !!(ctx.cannotBeReduced || ctx.cannotBeNegated || ctx.canBeNegated === false);
+      if (!(await bezahlen(ctx, ctx.target.name || 'A Hero', unaufhaltsam ? { cannotBeNegated: true, cannotBeReduced: true } : null))) return;
+      if (unaufhaltsam) return;
       ctx.setAmount(0);   // nur DIESER Treffer: Zusatzeffekte des Schadens bleiben
     },
 
@@ -90,8 +101,7 @@ module.exports = {
       // Welle 11 (Al, Q62: „Ja sollte zählen, bei allen."): Gift-/Brand-Ticks zählen wie bei Helden als „would take damage" (kein isStatusDamage-Filter).
       const treffer = ctx.entries.filter(e => e && !e.cancelled && e.inst
         && e.amount > 0 && e.inst.name !== CARD_NAME
-        && (e.inst.controller ?? e.inst.owner) === pi
-        && e.canBeNegated !== false && !e.cannotBeReduced && !e.cannotBeNegated);
+        && (e.inst.controller ?? e.inst.owner) === pi);
       if (treffer.length === 0) return;
 
       let e = treffer[0];
@@ -113,7 +123,10 @@ module.exports = {
         if (!z) return;
         e = treffer.find(t => t.inst.id === z.cardInstance.id) || e;
       }
-      if (!(await bezahlen(ctx, e.inst.name))) return;
+      // Nutzlose Aktivierung (s. Kopf): gegen unverringer-/unnegierbaren Schaden (`canBeNegated: false`, `cannotBeReduced`, True Damage) bezahlt, aber der Eintrag bleibt.
+      const unaufhaltsam = e.canBeNegated === false || !!e.cannotBeReduced || !!e.cannotBeNegated || e.trueDamage === true;
+      if (!(await bezahlen(ctx, e.inst.name, unaufhaltsam ? { cannotBeNegated: true, cannotBeReduced: true } : null))) return;
+      if (unaufhaltsam) return;
       if (typeof e.setAmount === 'function') e.setAmount(0); else e.amount = 0;   // nur dieser Eintrag, Zusatzeffekte bleiben
     },
   },

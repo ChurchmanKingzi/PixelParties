@@ -23,6 +23,9 @@ module.exports = {
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
+  // Kartentext: „This damage cannot be reduced or negated" (True Damage). Nur Metadatum fuer die Hand-Reaktionsfenster der Engine: Schutz-/Negationskarten werden TROTZDEM angeboten
+  // (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt) — die Frage traegt dann den Hinweis „This damage cannot be reduced or negated." (`_nutzlosHinweis`).
+  damageCannotBeReducedOrNegated: true,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {

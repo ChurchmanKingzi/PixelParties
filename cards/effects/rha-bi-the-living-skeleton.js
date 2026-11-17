@@ -110,7 +110,8 @@ function moeglicheZiele(engine, pi) {
   //   vorher ins Leere — aber der Knopf SAH aktivierbar aus. Eine leere
   //   Zielliste macht `canActivateHeroEffect` falsch und damit den
   //   Knopf grau, statt den Spieler in eine tote Aktion zu locken.
-  if (engine?.gs?.firstTurnProtectedPlayer === gegner) return [];
+  // (Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch der Erste-Runden-Geschuetzte ist waehlbar, die Wahl verpufft.)
+  if (engine?.cpuMeidetErsteRunde?.(pi)) return [];   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
   const helden = engine?.gs?.players?.[gegner]?.heroes || [];
   const out = [];
   for (let hi = 0; hi < helden.length; hi++) {
@@ -143,6 +144,8 @@ function bezahlbar(hero) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hero'],
   heroEffect: true,
 

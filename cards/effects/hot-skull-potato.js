@@ -160,6 +160,14 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oppIdx = engine.opponentOf(pi);
       if (!inst.counters) inst.counters = {};
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen den Erste-Runden-Geschuetzten ist die Karte spielbar, das Hinlegen in seine Zone verpufft
+      // (die Karte ist gespielt/bezahlt und geht in die Ablage, nichts liegt beim Gegner). Frueher: `blockedByFirstTurnProtection` = unspielbar.
+      if ((inst.controller ?? inst.owner) !== oppIdx && engine.ersterZugGeschuetzt(oppIdx, pi)) {
+        engine.log('hot_skull_potato_fizzle', { player: gs.players[pi]?.username, reason: 'first-turn protection' });
+        await engine.sendBoardCardToDiscard(inst, { source: CARD_NAME, sourceOwner: pi });
+        engine.sync();
+        return;
+      }
       schildAuf(inst);
       if ((inst.controller ?? inst.owner) === oppIdx) { inst.counters[KEY] = inst.counters[KEY] || 1; return; }   // liegt schon beim Gegner
 

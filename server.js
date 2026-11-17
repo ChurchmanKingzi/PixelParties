@@ -8630,10 +8630,13 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
           }
-          const result = room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
+          // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — eine Ausruestung (Future Tech Control Device, Free-Side-Equip) an einen Helden des Geschuetzten wird gespielt und bezahlt,
+          // das Anlegen verpufft (Karte in die Ablage). Frueher: `blockedByFirstTurnProtection` machte nur FTCD unspielbar.
+          const result = (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi))
+            ? null : room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
           if (!result) {
             room.engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-            room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
+            room.engine.log('equip_fizzle', { card: cardName, reason: (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? 'first-turn protection' : 'zone_occupied_by_chain' });
             return true;
           }
           const { inst, actualSlot } = result;
@@ -8856,7 +8859,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // sieben laufe nicht durch `summonCreatureWithHooks`. Geprueft
           // hatte ich nur die KARTENSKRIPTE (Powder Keg) — nicht diesen
           // Zweig hier, der genau das tut. Dritte Auflage derselben Lehre.
-          const placed = await room.engine.summonCreatureWithHooks(
+          // Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — Powder Keg & Co. in die Zone des Geschuetzten: gespielt/bezahlt, die Platzierung verpufft (Fizzle-Zweig unten: Ablage).
+          const placed = (_isCrossSideArtifact && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? null : await room.engine.summonCreatureWithHooks(
             cardName, placementOwner, heroIdx, finalSlot,
             {
               source: 'Artifact-Creature play',
@@ -12642,7 +12646,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
 
-  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation } = gs.potionTargeting;
+  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation, config: _ptConfig } = gs.potionTargeting;
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
   if (script.validateSelection && !script.validateSelection(selectedIds, validTargets, room.engine, pi)) return false;   // W29a: Engine/Spieler fuer Paarregeln (Sword in a Bottle × Alliance)
@@ -12669,11 +12673,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   //   Als Befund vom 31.8. (Book of Doom auf 1 Ziel: Monia Bot meldet
   //   sich; auf 2+: gar nichts). Die Schleife ueber alle gewaehlten
   //   Ziele steht jetzt EINMAL in `engine.applyRedirectWindows`.
-  if (!script.cannotBeRedirected) {
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — auch eine Quelle mit `cannotBeRedirected` (Acid Vial) oeffnet das Fenster: die Umleiter werden angeboten
+  // (Hinweis in der Frage), die Umleitung selbst findet nicht statt (`config.cannotBeRedirected` → `_noRedirectOutcome` in `_checkTargetRedirectOnce`).
+  {
     const srcInst = { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' };
     try {
       selectedIds = await room.engine.applyRedirectWindows(
-        selectedIds, validTargets, { title: potionName, sourceCard: srcInst }, srcInst
+        selectedIds, validTargets, { title: potionName, sourceCard: srcInst, ...(script.cannotBeRedirected ? { cannotBeRedirected: true } : {}) }, srcInst
       );
     } catch (err) {
       console.error('[Engine] targeting-session redirect error:', err.message);
@@ -12778,6 +12784,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // Als Ruling (Al 26.10., Winged Skeleton): auch die GEWÄHLTEN KREATUREN eines Ziel-Tranks/-Artefakts öffnen das Wahl-Fenster der Kreaturen-Reaktionen (negiert: die Karte ist gespielt, wirkt aber nicht).
         const _kreaturWahl = await room.engine.kreaturenWahlFenster(pi, selectedIds, validTargets, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });
         if (_kreaturWahl?.effectNegated) return {};
+        // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — geschuetzte Ziele sind waehlbar und verpuffen: sie fallen aus der Auswahl; bleibt nichts uebrig, wirkt die Karte nicht (gespielt, bezahlt).
+        const _ftAuswahl = room.engine._ersterZugZielAbziehen(pi, validTargets, selectedIds, _ptConfig || {});
+        if (_ftAuswahl.abgezogen) {
+          if (_ftAuswahl.ids.length === 0) return {};
+          selectedIds = _ftAuswahl.ids;
+        }
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });
@@ -13204,20 +13216,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
       && typeof engine.filterSelbstKontrollierteGegnerHelden === 'function') {
     engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName);
   }
-  // Erst-Runden-Immunität — Gegenstück zum Filter in
-  // `promptEffectTarget`. Targeting-Karten (getValidTargets +
-  // targetingConfig) laufen NICHT durch diesen Prompt, sondern über die
-  // potionTargeting-Session, also muss die Regel auch hier greifen.
-  const ftProtected = engine?.gs?.firstTurnProtectedPlayer;
-  if (ftProtected != null && casterPi !== ftProtected
-      && !config?.ignoreFirstTurnProtection) {
-    for (let i = validTargets.length - 1; i >= 0; i--) {
-      const t = validTargets[i];
-      const inst = t?.cardInstance || t?._cardInstance;
-      const side = inst ? (inst.controller ?? inst.owner) : t?.owner;
-      if (side === ftProtected) validTargets.splice(i, 1);
-    }
-  }
+  // Erst-Runden-Immunität — Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Die Ziele des Geschützten bleiben in der Liste (früher hier entfernt, ebenso
+  // ausgegraut in `promptEffectTarget`): wählbar, der Effekt verpufft — `doConfirmPotion` zieht sie nach der Wahl ab (`engine._ersterZugZielAbziehen`, Karte gespielt/bezahlt, keine Wirkung).
   for (const t of validTargets) {
     if (t?.type !== 'equip') continue;
     const inst = t.cardInstance;

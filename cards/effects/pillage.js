@@ -16,6 +16,8 @@
 const MILL_BY_LEVEL = [1, 3, 5];
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['ability'],
   freeActivation: true,
 
@@ -25,7 +27,8 @@ module.exports = {
     const oppPs  = ctx.players[oppIdx];
     // Turn-1 protection: milling the top of a shielded opp's deck
     // is blocked. Same gate Thieving / Infiltration / Enigma apply.
-    if (ctx._engine.gs.firstTurnProtectedPlayer === oppIdx) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — aktivierbar, der Mill verpufft (`onFreeActivate`).
+    if (ctx._engine.cpuMeidetErsteRunde(ctx.cardOwner)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     return (oppPs?.mainDeck || []).length > 0;
   },
 
@@ -35,8 +38,8 @@ module.exports = {
     const pi      = ctx.cardOwner;
     const oppIdx  = engine.opponentOf(pi);
 
-    // Defensive re-check (same gate as canFreeActivate).
-    if (gs.firstTurnProtectedPlayer === oppIdx) return false;
+    // Spielgestalter-Entscheidung 16.11.2026: gegen den Erste-Runden-Geschuetzten gespielt (Einsatz verbraucht), der Mill verpufft.
+    if (gs.firstTurnProtectedPlayer === oppIdx) { engine.log('pillage_fizzle', { player: gs.players[pi]?.username, reason: 'first-turn protection' }); engine.sync(); return true; }
 
     const count = MILL_BY_LEVEL[Math.min(level, 3) - 1] ?? 1;
 

@@ -169,6 +169,8 @@ async function abgangMelden(engine, auftrag, eintrag) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   isPotion: true,
   // ★ W54a: SCHALTER fuer die Resistance-Pruefung beim Verschwinden (`beforeHeroEffect`, W13/Q144: „Resistance blockt jeden Nicht-Schaden-Effekt"; Kartentext Resistance Lv3: „unaffected by all
   // cards and effects, except damage"). Al hat in W53 auf „Resistance beim Verschwinden weiter laufen lassen?" mit „Nein" geantwortet — das widerspricht dem dokumentierten Ruling Q144/M02-11
@@ -184,7 +186,7 @@ module.exports = {
   // dort „any … on the board", eigene Helden waren also waehlbar.
   canActivate(gs, playerIdx) {
     const oi = opponentOfGs(gs, playerIdx);
-    if (gs.firstTurnProtectedPlayer === oi) return false;   // Runde-1-Schutz
+    // (Runde-1-Schutz: Spielgestalter-Entscheidung 16.11.2026 — aktivierbar, die Wahl verpufft.)
     return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
@@ -193,8 +195,7 @@ module.exports = {
     const oi = opponentOfGs(gs, playerIdx);
     // Der Erstrunden-Schutz gilt weiterhin: in Runde 1 ist der Gegner
     // unantastbar — und damit gibt es gar kein Ziel mehr.
-    if (gs.firstTurnProtectedPlayer === oi) return [];
-    return engine.getHeroTargets(oi);
+    return engine.getHeroTargets(oi);   // Runde-1-Schutz: waehlbar, die Wahl verpufft (Spielgestalter-Entscheidung 16.11.2026)
   },
 
   targetingConfig: {

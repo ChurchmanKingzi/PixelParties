@@ -67,12 +67,9 @@ module.exports = {
     // "spielbar", weil es fremde Equips mitzählte, während der zentrale
     // Ziel-Filter sie im Picker anschließend entfernt hätte: Karte
     // gespielt, Gold weg, leerer Picker.
-    const ftProtected = gs.firstTurnProtectedPlayer;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch die Equips des Geschuetzten sind waehlbar, die Wahl verpufft (zentrale Zielwahl).
     if (!engine) return false;
-    return _findEligibleEquips(gs, engine).some(inst => {
-      const seite = engine.physicalSide(inst);
-      return !(ftProtected != null && seite === ftProtected && pi !== ftProtected);
-    });
+    return _findEligibleEquips(gs, engine).length > 0;
   },
 
   animationType: 'none',

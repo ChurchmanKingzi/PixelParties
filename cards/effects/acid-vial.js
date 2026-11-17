@@ -41,14 +41,16 @@ module.exports = {
   // Schaden durchgehen. Rockfall trägt es NICHT: sein Text nennt nur
   // "reduced or negated", er bleibt also umleitbar.
   cannotBeRedirected: true,
+  // Kartentext: „This damage cannot be reduced or negated" (True Damage). Nur Metadatum fuer die Hand-Reaktionsfenster der Engine: Schutz-/Negationskarten werden TROTZDEM angeboten
+  // (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt) — die Frage traegt dann den Hinweis „This damage cannot be reduced or negated." (`_nutzlosHinweis`).
+  damageCannotBeReducedOrNegated: true,
 
   canActivate(gs, playerIdx) {
     // Hard once per turn
     const hoptKey = `acid-vial:${playerIdx}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
-    // At least one targetable hero must exist (not turn-1 protected)
+    // At least one hero must exist. Spielgestalter-Entscheidung 16.11.2026: auch ein Erste-Runden-geschuetzter Held ist waehlbar (der Treffer verpufft: `dealTrueDamage` blockt).
     for (let pi = 0; pi < gs.players.length; pi++) {
-      if (gs.firstTurnProtectedPlayer === pi) continue;
       for (const hero of (gs.players[pi]?.heroes || [])) {
         if (hero?.name && hero.hp > 0) return true;
       }
@@ -68,9 +70,7 @@ module.exports = {
     // which keeps Artifact-Creature hybrids (Powder Keg, Pollution
     // Spewer, …) included.
     for (let pi = 0; pi < gs.players.length; pi++) {
-      if (gs.firstTurnProtectedPlayer !== pi) {
-        targets.push(...engine.getHeroTargets(pi));
-      }
+      targets.push(...engine.getHeroTargets(pi));   // Erste-Runden-Schutz: waehlbar, der Treffer verpufft (Spielgestalter-Entscheidung 16.11.2026)
       targets.push(...engine.getCreatureTargets(pi));
     }
     return targets;

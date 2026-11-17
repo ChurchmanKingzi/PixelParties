@@ -1877,7 +1877,7 @@ async function activateHeroEffects(engine, helpers) {
       if (mumieInst) {
         const ms = loadCardEffect('Mummy Token');
         let ok = !!(ms?.heroEffect && ms?.onHeroEffect) && gs.hoptUsed?.[`hero-effect:MummyToken:${cpuIdx}:${hi}`] !== gs.turn
-          && !engine.isHeroEffectBlockedByGraceShield(ms, cpuIdx);
+          && !engine.heroEffectNutzlosErsteRunde(ms, cpuIdx);
         if (ok && engine.blindedEffektGesperrt(cpuIdx, cpuIdx, hi, 'Mummy Token', { script: ms })) ok = false;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn der Effekt nur Gegner waehlen kann
         if (ok && ms.canActivateHeroEffect) {
           try { ok = !!ms.canActivateHeroEffect(engine._createContext(mumieInst, { event: 'canHeroEffectCheck' })); } catch { ok = false; }
@@ -1903,7 +1903,7 @@ async function activateHeroEffects(engine, helpers) {
       // (autoritativ) — hier steht sie, damit der Pilot die Gelegenheit
       // gar nicht erst bewertet: sonst faehrt er je Main-Phase-Durchlauf
       // eine Gate-Recon fuer einen Effekt, der nichts ausrichten kann.
-      if (available && engine.isHeroEffectBlockedByGraceShield(script, cpuIdx)) {
+      if (available && engine.heroEffectNutzlosErsteRunde(script, cpuIdx)) {
         cpuLog(`      hero-effect "${hero.name}": Spielstart-Schutz — rein schaedlich, gesperrt`);
         available = false;
       }
@@ -1997,7 +1997,7 @@ async function activateHeroEffects(engine, helpers) {
         if (!eq?.heroEffect || !eq?.onHeroEffect) return false;
         const hk = `hero-effect:${ci.name}:${cpuIdx}:${hi}`;
         if (gs.hoptUsed?.[hk] === gs.turn) return false;
-        if (engine.isHeroEffectBlockedByGraceShield(eq, cpuIdx)) return false;
+        if (engine.heroEffectNutzlosErsteRunde(eq, cpuIdx)) return false;
         // Same canActivate pre-check for equipped providers.
         if (eq.canActivateHeroEffect) {
           try {
@@ -3677,6 +3677,9 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
   const oppIdx = cpuIdx === 0 ? 1 : 0;
   // Not turn 1, or opponent isn't the shielded side → all plays are fine.
   if (gs.firstTurnProtectedPlayer !== oppIdx) return true;
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Mensch darf nutzlose Aktivierungen spielen (Karten mit `blockedByFirstTurnProtection` sind nicht mehr gesperrt) — die CPU verbrennt sie nicht:
+  // eine Karte, die nur die Gegnerseite trifft, spielt sie gegen den Erste-Runden-Geschuetzten weiter nie (wie bisher unspielbar).
+  if (loadCardEffect(cardName)?.blockedByFirstTurnProtection) return false;
   // Creatures always play — only their effects might fizzle, not their presence.
   if (cardData.cardType === 'Creature') return true;
   // Abilities, Heroes, Areas, Permanents play freely; only attack-shaped
@@ -7955,6 +7958,14 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // die Wahl steht EINMAL in der Engine (`_cpuWaehleSofortaktion`).
   if (type === 'heroAction' && !promptData._gerryRewritten) {
     return engine._cpuWaehleSofortaktion(promptData, cpuIdx);
+  }
+
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt (Mensch) — die CPU waehlt sie NICHT: eine Schutz-/Negations-/Umleitungs-Aktivierung gegen Schaden bzw.
+  // Effekte, die laut Kartentext nicht verringert/umgeleitet/negiert werden koennen (`promptData._nutzlos`, gesetzt von den Reaktionsfenstern der Engine), verbrennt nur die Karte.
+  // VOR allen Karten-Overrides (`cpuResponse` einzelner Karten wuerde sonst zusagen, Homerun!).
+  if (type === 'confirm' && promptData._nutzlos === true && promptData.cancellable) {
+    try { confirmDiag(engine, promptData, false); } catch { /* Diagnose ist Beiwerk */ }
+    return null;
   }
 
   // ── Gerrymander redirect handling ──
