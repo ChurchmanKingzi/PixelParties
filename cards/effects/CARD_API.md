@@ -18346,6 +18346,11 @@ AKTION betrifft (Kosten, Aktionsökonomie, Summon-Sperre, Kontrolle),
 fragt den **Spieler**. In `doPlayCreature` heißen die beiden seit v1198
 `heroOwner` und `pi`.
 
+**Heldeneffekte, die Karten in die Zonen des übernommenen Helden legen** (Spielgestalter-Entscheidung 17.11.2026, Omikron): unter Charme Lv3
+(`_kontrollRechte.beschwoeren = false`, „Its Support Zones are unaffected by other cards and effects") ist der Effekt für den Kontrolleur gesperrt — wie das
+Beschwören aus der Hand. Der Effekt prüft `engine.kontrollRechte(Brettseite, heroIdx).beschwoeren` in `canActivateHeroEffect` (Ausgrauen) und `onHeroEffect`.
+Love Shot/Golden Apple (`beschwoeren: true`) und eigene Helden bleiben erlaubt. Bisher nur Omikron; Argos/Calamitusk legen unter Charme Lv3 noch in die Zone.
+
 ### ★ Seitenlose Indizes im Drag-Highlight (v1200)
 
 `playDrag.targetHero` / `targetSlot` sind **blosse Indizes ohne Seite**.
