@@ -110,7 +110,10 @@ module.exports = {
 
       // ── der „corresponding Hero" hat gewirkt ──
       const feld = engine.physicalSide(inst);                           // Brettseite des Klons = Reihe seines Helden
-      if (ctx.heroOwner !== feld || ctx.heroIdx !== inst.heroIdx) { dbg('anderer Held'); return; }
+      // Spielgestalter-Entscheidung 17.11.2026: „corresponding Hero" gilt zum Zeitpunkt des WIRKENS, also VOR einem Tausch (Teleport): `heroIdxWirkzeit` ist der Platz des Wirkers vor der Auflösung,
+      // `ctx.heroIdx` bei Teleport schon der Platz danach. Wirkt Sid (Clone-Spalte) das Teleport, bietet der Clone die Kopie an; wirkt der Held der Nachbarspalte es, nicht.
+      const wirkSpalte = ctx.heroIdxWirkzeit ?? ctx.heroIdx;
+      if (ctx.heroOwner !== feld || wirkSpalte !== inst.heroIdx) { dbg('anderer Held'); return; }
       const pi = engine.kontrolleurVon(inst);
       if (ctx.casterIdx !== pi) { dbg('anderer Wirker'); return; }                                 // der Kontrolleur des Klons spielt die Karte
       const hero = gs.players[feld]?.heroes?.[inst.heroIdx];

@@ -4713,8 +4713,8 @@ class GameEngine {
       increaseMaxHp(target, amount, opts) {
         return engine.increaseMaxHp(target, amount, opts);
       },
-      decreaseMaxHp(target, amount) {
-        return engine.decreaseMaxHp(target, amount);
+      decreaseMaxHp(target, amount, opts) {
+        return engine.decreaseMaxHp(target, amount, opts);
       },
       async drawCards(playerIdx, count, opts) {
         // Der Kontext kennt seine eigene Karte — Ziehungen tragen damit
@@ -12922,9 +12922,11 @@ class GameEngine {
    * Max HP can never drop below 1. Current HP is clamped to new max.
    * @param {object} hero - The hero object
    * @param {number} amount - Desired decrease
+   * @param {object} [opts] - { alsoReduceCurrent: true } — Gegenstueck zu `increaseMaxHp(…, { alsoHealCurrent })`: die aktuellen HP sinken um denselben Betrag (nie unter 1),
+   *   statt nur auf das neue Maximum geklemmt zu werden (Toughness, s. u.)
    * @returns {number} The actual amount max HP was decreased by
    */
-  decreaseMaxHp(hero, amount) {
+  decreaseMaxHp(hero, amount, opts = {}) {
     if (!hero || hero.hp === undefined) return 0;
     const currentMax = hero.maxHp || hero.hp;
     const effective = Math.min(amount, currentMax - 1); // Never below 1
@@ -12933,7 +12935,9 @@ class GameEngine {
     hero.maxHp = currentMax - effective;
     // Ein LEBENDER Held faellt nie unter 1 HP; ein gefallener (0 HP) bleibt gefallen —
     // sonst belebte der Abgang einer Toughness ihn mit 1 HP wieder.
-    if (hero.hp > 0) hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
+    // Spielgestalter-Entscheidung 17.11.2026 (Toughness): „… soll die HP, die diese eine Kopie von Toughness beschert, abziehen, gecappt bei 1 HP" — mit `alsoReduceCurrent` sinken die
+    // aktuellen HP um den abgezogenen Betrag (Max −200, aktuell −200, mindestens 1; ein Ueberschuss ueber dem Maximum (Overheal) bleibt dabei erhalten). Ohne die Option: wie bisher auf das neue Maximum geklemmt.
+    if (hero.hp > 0) hero.hp = opts.alsoReduceCurrent ? Math.max(1, hero.hp - effective) : Math.max(1, Math.min(hero.hp, hero.maxHp));
 
     this.log('max_hp_decrease', { hero: this._heroLabel(hero), amount: effective, newMax: hero.maxHp });
     return effective;

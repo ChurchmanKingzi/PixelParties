@@ -2391,6 +2391,10 @@ Q47 „… auch für den Zähler `_creaturesSummonedThisTurn`") auf die Einsatz-
 * **Negierte Platzierung bleibt stumm:** Omikrons Illusion (und `actionPlaceCreature({ negateEffects: true })`) wird **vor** dem Eintritt negiert – ihre eigenen Effekte feuern nicht (nur
   fremde Beobachter über `onCardEnterZone`).
 * **Cardinal-Beast-Immunität ruht, solange die Kreatur negiert ist (Spielgestalter-Entscheidung 16.11.2026):** „unaffected by all cards and effects" ist ein Effekt der Karte. Omikrons Illusion eines Cardinal Beast (Baihu, Qinglong, Xuanwu, Zhuque) trägt keinen `_cardinalImmune`-Zähler (kein onPlay) und ist nur über den Namens-Rückfall immun — `cardinalNameImmun(engine, inst)` (`_cardinal-shared.js`) gilt dort NICHT, solange `isCreatureEffectSuppressed` wahr ist: die negierte Illusion nimmt Schaden, lässt sich zerstören, bewegen (Bounce, Mass Routing), opfern und mit Status belegen; läuft die Negation aus (Beginn des nächsten eigenen Zuges), ist sie wieder immun wie ein echtes Cardinal Beast. Echte, normal beschworene Cardinal Beasts tragen den Zähler und sind gegen JEDE Negation immun (`actionNegateCreature` bricht auch bei `unpreventable` ab, die Aura-Negation nimmt sie aus) — sie sind nie negiert, ihre Immunität gilt immer. Wer einen neuen Namens-Rückfall (`isCardinalBeastByName` / `CARDINAL_NAMES`) für eine Instanz baut, fragt `cardinalNameImmun`. Der Cardinal-Sofortsieg zählt eine negierte Illusion weiter nicht (`_checkCardinalWin`).
+* **Tod der negierten Illusion — Discard-Trigger ja, „defeated"-Trigger nein (Spielgestalter-Entscheidung 17.11.2026):** Omikrons Illusion ist „explizit KEIN rein temporärer Token, sondern eine vollwertige Creature": Sie landet bei ihrem
+  Tod im Ablagestapel (bzw. Gelöscht-Stapel, wenn der Effekt löscht) ihres Besitzers. Ein Effekt, der AUS DEM ABLAGESTAPEL heraus triggert (Cute Cat „sent to the discard pile from anywhere", Grave Worm), wird von der Negation der Kreatur auf dem Brett
+  NICHT unterdrückt — die Karte im Stapel ist nicht negiert (Skript `activeIn: [..., 'discard']`: die Ablage-Instanz hört, der zentrale Negationsfilter in `runHooks` gilt nur für Instanzen in `support`). „When this Creature is defeated"-Trigger
+  der negierten Kreatur selbst (Giant Exploding Skull u. ä.) feuern dagegen nicht. Wer so einen Trigger baut, hängt ihn an die Ablage-Instanz (`onCreatureDeath`/`onDiscard`/`onMill` mit `activeIn` inkl. `'discard'`), nicht an die Brett-Instanz.
 * **Zähler und Stempel zählen die Platzierung mit** (Knight/Queen of Kings: „Knight diesen Zug beschworen" ist nach einer Platzierung gesetzt).
 
 Repro: `docs/niche-tests/repro/W25/c-place-triggert-on-summon.js`.
@@ -7959,6 +7963,11 @@ Spell Armor bleibt bei 1, der Abzug verpufft), Paraseed klemmt selbst
 einen gerade getoeteten Helden wiederbeleben wuerde). Die einzigen
 `maxHp = 0` sind das Leeren eines Helden-Slots nach Entfernung
 (Initiation Ritual, Quetzahuitl) — kein lebender Held.
+
+**Toughness (Spielgestalter-Entscheidung 17.11.2026):** Der Abgang einer Toughness-Kopie — egal wie (Madame Guillotine, Abwurf, Memory Wipe, Forgetting …) — zieht den
+Betrag dieser Kopie von Max-HP UND aktuellen HP ab, die aktuellen HP nie unter 1 (`engine.decreaseMaxHp(hero, betrag, { alsoReduceCurrent: true })`; ohne die Option klemmt
+die Primitive wie bisher nur auf das neue Maximum). Die Rückkehr gibt `increaseMaxHp(…, { alsoHealCurrent })` wieder aktuell UND max: 650/800 → 450/600 → 650/800 (keine
+Gratis-Heilung). Nur Toughness nutzt die Option; Voodoo Curse (Boni bleiben bei ihren Karten) und Compulsory Body Swap (Abziehen/Aufschlagen beim Tausch) bleiben beim alten Klemmen.
 
 ## Modul `_ability-cost-shared` — Bezahlen mit Abilities/Equips (v804)
 
@@ -18345,6 +18354,11 @@ was die ZONE betrifft (`supportZones`, `isSupportZoneLocked`,
 AKTION betrifft (Kosten, Aktionsökonomie, Summon-Sperre, Kontrolle),
 fragt den **Spieler**. In `doPlayCreature` heißen die beiden seit v1198
 `heroOwner` und `pi`.
+
+**Heldeneffekte, die Karten in die Zonen des übernommenen Helden legen** (Spielgestalter-Entscheidung 17.11.2026, Omikron): unter Charme Lv3
+(„Its Support Zones are unaffected by other cards and effects", Marke `statuses.charmed.zonenGeschuetzt`, `engine.heroZonenGeschuetzt`; das Beschwören aus der Hand ist dort ebenfalls
+gesperrt) ist der Effekt für den Kontrolleur gesperrt: Omikron prüft die Marke in `canActivateHeroEffect` (Ausgrauen) und `onHeroEffect`. Nicht gemeint sind Controlled Attack („use that
+Hero's … active effect as if you controlled it"), Golden Apple, Styx, FTCD und dauerhafte Übernahme — dort bleibt der Effekt nutzbar. Bisher nur Omikron; Argos/Calamitusk legen unter Charme Lv3 noch in die Zone.
 
 ### ★ Seitenlose Indizes im Drag-Highlight (v1200)
 

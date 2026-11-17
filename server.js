@@ -9668,6 +9668,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Held der Gegenseite hat angegriffen" unterscheiden.
         heroOwner,
         spellName: cardName, spellCardData: cardData, heroIdx: _hookHeroIdx, casterIdx: pi,
+        // Spielgestalter-Entscheidung 17.11.2026 (Clone × Teleport): „Es gilt zum Zeitpunkt des Wirkens, also VOR dem Tausch" — `heroIdxWirkzeit` ist der Platz des Wirkers VOR der Auflösung
+        // (bei Teleport ≠ `heroIdx`). Spaltengebundene Kreaturen (Clone: „when the corresponding Hero uses …") vergleichen damit.
+        heroIdxWirkzeit: heroIdxPub,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         // The provider instance whose additional-action token was just
         // consumed by THIS spell-play, or null if the spell was cast as

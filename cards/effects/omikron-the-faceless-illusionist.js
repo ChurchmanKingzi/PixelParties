@@ -48,6 +48,10 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     // Styx 28.9.: Zonen auf Omikrons Brettseite.
     const ps = ctx.players[ctx.cardHeroOwner ?? pi];
+    // Spielgestalter-Entscheidung 17.11.2026: Charme Lv3 („It and its Support Zones are unaffected by other cards and effects") — der Kontrolleur darf Omikrons Effekt nicht nutzen
+    // (die Illusion landete sonst dauerhaft als fremde Kreatur in der Zone des Besitzers). Die Marke `zonenGeschuetzt` setzt nur Charme Lv3 (`temporaereKontrolle`, `supportZonesLocked`) und
+    // sperrt zugleich das Beschwören aus der Hand. Nicht gemeint: Controlled Attack („use that Hero's … active effect as if you controlled it"), Golden Apple, Styx, FTCD, dauerhafte Übernahme.
+    if (ctx._engine?.heroZonenGeschuetzt(ctx.cardHeroOwner ?? pi, heroIdx)) return false;
     // Need at least one free support zone on this hero
     if ((ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0)) return true;
     // W62a: oder (Alice-Teilung) eine Zone, in der schon Kreaturen GLEICHEN Namens liegen — die Illusion einer gleichnamigen Karte teilt sie.
@@ -71,6 +75,7 @@ module.exports = {
     const fs      = gs.players[feld];
     const hero    = ctx.attachedHero ?? fs?.heroes?.[heroIdx];
     if (!hero?.name) return false;
+    if (engine.heroZonenGeschuetzt(feld, heroIdx)) return false;   // Charme Lv3: s. `canActivateHeroEffect` (Spielgestalter-Entscheidung 17.11.2026)
 
     const cardDB = engine._getCardDB();
     const { loadCardEffect } = require('./_loader');
