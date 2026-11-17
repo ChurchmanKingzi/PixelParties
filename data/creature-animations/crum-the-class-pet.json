@@ -1,0 +1,15 @@
+{
+  "creature": "Crum, the Class Pet",
+  "sheet": "crum-the-class-pet.png",
+  "frameWidth": 35,
+  "frameHeight": 32,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 17.5
+}

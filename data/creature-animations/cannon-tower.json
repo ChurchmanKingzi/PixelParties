@@ -1,0 +1,15 @@
+{
+  "creature": "Cannon Tower",
+  "sheet": "cannon-tower.png",
+  "frameWidth": 38,
+  "frameHeight": 91,
+  "frames": 64,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 19.0
+}

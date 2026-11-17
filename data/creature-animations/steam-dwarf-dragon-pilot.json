@@ -1,0 +1,15 @@
+{
+  "creature": "Steam Dwarf Dragon Pilot",
+  "sheet": "steam-dwarf-dragon-pilot.png",
+  "frameWidth": 34,
+  "frameHeight": 64,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 17.0
+}

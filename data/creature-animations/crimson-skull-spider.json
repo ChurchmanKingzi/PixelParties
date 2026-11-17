@@ -1,0 +1,15 @@
+{
+  "creature": "Crimson Skull Spider",
+  "sheet": "crimson-skull-spider.png",
+  "frameWidth": 27,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 3,
+  "faceX": 13.5
+}

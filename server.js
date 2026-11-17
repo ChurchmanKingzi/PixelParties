@@ -940,6 +940,9 @@ app.get('/rarities.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'rarities.js'), { etag: true, lastModified: true });
 });
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
+// Creature-Sheets: die URL trägt den Zeitstempel der Datei (`?v=`, `/api/creature-animations`) — lange zwischenspeichern, damit das Vorladen aller Sheets zu Spielbeginn
+// nach dem ersten Mal ohne Netzanfragen auskommt.
+app.use('/data/creature-animations', express.static(path.join(__dirname, 'data', 'creature-animations'), { maxAge: '30d', immutable: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
 // reload / re-login serves them straight from disk instead of re-fetching
@@ -1013,6 +1016,7 @@ async function initDatabase() {
   // Einklappen während Zielwahl-Dialogen (Dynamic Heroes) — beide an.
   try { await db.execute("ALTER TABLE users ADD COLUMN display_heroes INTEGER DEFAULT 1"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN dynamic_heroes INTEGER DEFAULT 1"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN display_creatures INTEGER DEFAULT 1"); } catch {}   // Creature-Figuren auf dem Brett (Unteroption von display_heroes)
   // Ranked-games counter — incremented when a ranked SET (Bo1/Bo3/Bo5)
   // finishes. Used to filter the leaderboard to "actually competed"
   // players so fresh accounts at the default 1000 ELO don't pollute the
@@ -1041,6 +1045,7 @@ async function initDatabase() {
   // to verified=1 once. New accounts only ever land in `users` AFTER they
   // verify (see pending_signups), so they arrive already verified.
   try { await db.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN lang TEXT DEFAULT NULL"); } catch {}   // Sprache des Kontos ('en' | 'de'): Oberflaeche + E-Mails
   try { await db.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("UPDATE users SET email_verified = 1 WHERE email IS NULL AND email_verified = 0"); } catch {}
   try { await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
@@ -1101,6 +1106,7 @@ async function initDatabase() {
     attempts INTEGER DEFAULT 0,
     created_at INTEGER DEFAULT (unixepoch())
   )`);
+  try { await db.execute("ALTER TABLE pending_signups ADD COLUMN lang TEXT DEFAULT NULL"); } catch {}
 
   // One-time codes for password reset and for grandfathered accounts
   // adding an email later. `purpose` is 'reset' | 'add_email'.
@@ -1490,21 +1496,37 @@ function recordEmailSend(email) {
   _emailSends.set(key, hits);
 }
 
-function codeEmail(kind, code) {
-  const intro = kind === 'reset'
-    ? 'Use this code to reset your Pixel Parties password:'
-    : kind === 'add_email'
-      ? 'Use this code to confirm this email address for your Pixel Parties account:'
-      : 'Welcome to Pixel Parties! Use this code to verify your email and finish creating your account:';
-  const subject = kind === 'reset'
-    ? 'Your Pixel Parties password reset code'
-    : 'Your Pixel Parties verification code';
-  const text = `${intro}\n\n    ${code}\n\nThis code expires in 15 minutes. If you didn't request it, you can ignore this email.`;
+// Sprache eines Kontos / einer Anfrage: nur 'en' oder 'de' (alles andere = Englisch)
+function normLang(x) { return String(x || '').toLowerCase().startsWith('de') ? 'de' : 'en'; }
+
+const CODE_MAIL_TEXTE = {
+  en: {
+    reset: 'Use this code to reset your Pixel Parties password:',
+    add_email: 'Use this code to confirm this email address for your Pixel Parties account:',
+    signup: 'Welcome to Pixel Parties! Use this code to verify your email and finish creating your account:',
+    subjectReset: 'Your Pixel Parties password reset code', subjectOther: 'Your Pixel Parties verification code',
+    expiry: "This code expires in 15 minutes. If you didn't request it, you can ignore this email.",
+    expiryHtml: "This code expires in 15 minutes. If you didn't request it, you can safely ignore this email.",
+  },
+  de: {
+    reset: 'Mit diesem Code setzt du dein Pixel-Parties-Passwort zurück:',
+    add_email: 'Mit diesem Code bestätigst du diese E-Mail-Adresse für dein Pixel-Parties-Konto:',
+    signup: 'Willkommen bei Pixel Parties! Mit diesem Code bestätigst du deine E-Mail-Adresse und schließt die Erstellung deines Kontos ab:',
+    subjectReset: 'Dein Code zum Zurücksetzen des Pixel-Parties-Passworts', subjectOther: 'Dein Pixel-Parties-Bestätigungscode',
+    expiry: 'Dieser Code läuft in 15 Minuten ab. Wenn du ihn nicht angefordert hast, kannst du diese E-Mail ignorieren.',
+    expiryHtml: 'Dieser Code läuft in 15 Minuten ab. Wenn du ihn nicht angefordert hast, kannst du diese E-Mail einfach ignorieren.',
+  },
+};
+function codeEmail(kind, code, lang) {
+  const T = CODE_MAIL_TEXTE[normLang(lang)];
+  const intro = kind === 'reset' ? T.reset : kind === 'add_email' ? T.add_email : T.signup;
+  const subject = kind === 'reset' ? T.subjectReset : T.subjectOther;
+  const text = `${intro}\n\n    ${code}\n\n${T.expiry}`;
   const html = `<div style="font-family:system-ui,Segoe UI,sans-serif;background:#0a0a12;color:#e0e0f0;padding:32px;border-radius:12px;max-width:440px;margin:auto">
     <div style="font-size:22px;font-weight:800;letter-spacing:4px;color:#00f0ff;text-transform:uppercase;margin-bottom:16px">Pixel Parties</div>
     <p style="color:#c0c0d8;line-height:1.5">${intro}</p>
     <div style="font-size:34px;font-weight:800;letter-spacing:10px;color:#00f0ff;background:#12121f;border:1px solid #252540;border-radius:10px;padding:18px;text-align:center;margin:20px 0">${code}</div>
-    <p style="color:#8888aa;font-size:13px">This code expires in 15 minutes. If you didn't request it, you can safely ignore this email.</p>
+    <p style="color:#8888aa;font-size:13px">${T.expiryHtml}</p>
   </div>`;
   return { subject, text, html };
 }
@@ -1512,7 +1534,7 @@ function codeEmail(kind, code) {
 // Issue + email a code. Returns { ok } or { ok:false, error, status }.
 // `purpose`: 'reset' | 'add_email' (stored in email_codes against a user);
 // signup uses pending_signups directly and calls sendMail itself.
-async function issueAndSendCode({ userId, email, purpose }) {
+async function issueAndSendCode({ userId, email, purpose, lang }) {
   const status = emailSendStatus(email);
   if (!status.ok) {
     return status.capped
@@ -1525,7 +1547,7 @@ async function issueAndSendCode({ userId, email, purpose }) {
     'INSERT INTO email_codes (id, user_id, email, code_hash, purpose, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
     [uuidv4(), userId || null, email, hashCode(code), purpose, Date.now() + CODE_TTL_MS],
   );
-  const { subject, text, html } = codeEmail(purpose, code);
+  const { subject, text, html } = codeEmail(purpose, code, lang);
   try {
     await sendMail({ to: email, subject, text, html });
   } catch (e) {
@@ -1760,7 +1782,9 @@ app.post('/api/auth/signup', async (req, res) => {
     'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [uuidv4(), uname, email, await bcrypt.hash(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
   );
-  const { subject, text, html } = codeEmail('signup', code);
+  const signupLang = normLang(req.body.lang);
+  await db.run('UPDATE pending_signups SET lang = ? WHERE username = ? COLLATE NOCASE', [signupLang, uname]);
+  const { subject, text, html } = codeEmail('signup', code, signupLang);
   try {
     await sendMail({ to: email, subject, text, html });
   } catch (e) {
@@ -1811,6 +1835,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
   // Give the new account a first deck, a pinned Starter Deck (honouring a
   // specific one if a registering guest passed theirs), and the CPU roster.
   await bootstrapNewAccount(id, { starterDeckId: req.body.starterDeckId });
+  if (pending.lang) await db.run('UPDATE users SET lang = ? WHERE id = ?', [pending.lang, id]);
   await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
@@ -1845,7 +1870,7 @@ app.post('/api/auth/resend', async (req, res) => {
   const code = genCode();
   await db.run('UPDATE pending_signups SET code_hash = ?, expires_at = ?, attempts = 0 WHERE id = ?',
     [hashCode(code), Date.now() + CODE_TTL_MS, pending.id]);
-  const { subject, text, html } = codeEmail('signup', code);
+  const { subject, text, html } = codeEmail('signup', code, pending.lang || normLang(req.body.lang));
   try { await sendMail({ to: email, subject, text, html }); }
   catch (e) { console.error('[mailer] resend failed:', e.message); return res.status(502).json({ error: 'Could not send the email. Please try again later.' }); }
   recordEmailSend(email);
@@ -1858,7 +1883,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
   if (user) {
-    const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset' });
+    const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset', lang: user.lang || normLang(req.body.lang) });
     // Swallow rate-limit/send errors into the generic response except the
     // cooldown hint, which is safe and useful to surface.
     if (!r.ok && r.status === 429) return res.status(429).json({ error: r.error });
@@ -1961,6 +1986,7 @@ app.post('/api/auth/google', async (req, res) => {
         'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified, google_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
         [id, username, unusable, getRandomDefaultAvatar(), getRandomDefaultColor(), email, googleId],
       );
+      if (req.body && req.body.lang) await db.run('UPDATE users SET lang = ? WHERE id = ?', [normLang(req.body.lang), id]);
     } catch (e) {
       console.error('[auth/google] create failed:', e.message);
       return res.status(500).json({ error: 'Could not create your account. Please try again.' });
@@ -2164,8 +2190,15 @@ function parseHeroSkins(raw) {
   } catch { return {}; }
 }
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, lang: u.lang || null, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), display_creatures: (u.display_heroes === 0) ? 0 : (u.display_creatures == null ? 1 : (u.display_creatures ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
+
+// Sprache des Kontos speichern (Oberflaeche + E-Mails)
+app.post('/api/profile/lang', authMiddleware, async (req, res) => {
+  const lang = normLang(req.body && req.body.lang);
+  await db.run('UPDATE users SET lang = ? WHERE id = ?', [lang, req.user.userId]);
+  res.json({ ok: true, lang });
+});
 
 // ===== PROFILE ROUTES =====
 // Live username-availability check powering the profile name editor's
@@ -2298,6 +2331,10 @@ app.put('/api/profile/hero-display', authMiddleware, async (req, res) => {
   const display = req.body.display_heroes ? 1 : 0;
   const dynamic = display && req.body.dynamic_heroes ? 1 : 0;
   await db.run('UPDATE users SET display_heroes = ?, dynamic_heroes = ? WHERE id = ?', [display, dynamic, req.user.userId]);
+  // `display_creatures` (Creature-Figuren): Unteroption wie `dynamic_heroes`. Ein Client, der das Feld nicht schickt (alte Fassung), lässt die Wahl unberührt;
+  // ohne Heldenfiguren ist sie aus, beim Wiedereinschalten ohne Angabe wieder an.
+  if (req.body.display_creatures !== undefined) await db.run('UPDATE users SET display_creatures = ? WHERE id = ?', [display && req.body.display_creatures ? 1 : 0, req.user.userId]);
+  else if (display) await db.run('UPDATE users SET display_creatures = 1 WHERE id = ? AND display_creatures IS NULL', [req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
@@ -2309,7 +2346,8 @@ app.post('/api/profile/email/request', authMiddleware, async (req, res) => {
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
   const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
   if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
-  const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email' });
+  const meRow = await db.get('SELECT lang FROM users WHERE id = ?', [req.user.userId]);
+  const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email', lang: (meRow && meRow.lang) || normLang(req.body.lang) });
   if (!r.ok) return res.status(r.status || 500).json({ error: r.error });
   res.json({ ok: true, email });
 });
@@ -3999,6 +4037,37 @@ app.get('/api/hero-animations', async (req, res) => {
           // Zeitstempel als Cache-Brecher: ein neu erzeugtes Sheet
           // ersetzt das alte sofort, auch unter demselben Namen.
           sheetUrl: '/data/hero-animations/' + encodeURIComponent(sheet) + '?v=' + Math.floor(st.mtimeMs),
+        };
+      } catch {}
+    }));
+  } catch {}
+  res.set('Cache-Control', 'no-cache');
+  res.json({ animations });
+});
+
+// ===== CREATURE-IDLE-ANIMATIONEN =====
+// Gegenstück zu `/api/hero-animations` für `data/creature-animations/`. Schlüssel ist der Slug des KARTENNAMENS aus dem Feld `creature`
+// (nicht der Dateiname: `demons-gate.json` gehört zu „Demon's Gate" = `demon-s-gate`, `fruit-bat.json` zu „Fruit Bat, Nosferapple").
+// Einträge ohne Sheet kommen nur durch, wenn sie `kopiert` tragen (Clone zeigt die Figur des Heroes seiner Spalte).
+const CREATURE_ANIM_DIR = path.join(__dirname, 'data', 'creature-animations');
+const animSlug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+app.get('/api/creature-animations', async (req, res) => {
+  const animations = {};
+  try {
+    const files = (await fs.promises.readdir(CREATURE_ANIM_DIR)).filter(f => f.endsWith('.json'));
+    await Promise.all(files.map(async (f) => {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(path.join(CREATURE_ANIM_DIR, f), 'utf-8'));
+        const key = animSlug(meta.creature) || f.replace(/\.json$/, '');
+        if (typeof meta.sheet !== 'string' || !meta.sheet) {
+          if (meta.kopiert) animations[key] = { creature: meta.creature, sheet: null, kopiert: meta.kopiert };
+          return;
+        }
+        const st = await fs.promises.stat(path.join(CREATURE_ANIM_DIR, meta.sheet));
+        if (!(meta.frameWidth > 0 && meta.frameHeight > 0 && meta.frames > 0)) return;
+        animations[key] = {
+          ...meta,
+          sheetUrl: '/data/creature-animations/' + encodeURIComponent(meta.sheet) + '?v=' + Math.floor(st.mtimeMs),
         };
       } catch {}
     }));

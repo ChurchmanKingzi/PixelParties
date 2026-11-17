@@ -1,0 +1,15 @@
+{
+  "creature": "Skeleton Archer",
+  "sheet": "skeleton-archer.png",
+  "frameWidth": 27,
+  "frameHeight": 34,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 13.5
+}

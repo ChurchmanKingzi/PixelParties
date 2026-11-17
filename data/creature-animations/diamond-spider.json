@@ -1,0 +1,15 @@
+{
+  "creature": "Diamond Spider",
+  "sheet": "diamond-spider.png",
+  "frameWidth": 25,
+  "frameHeight": 23,
+  "frames": 84,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 12.5
+}

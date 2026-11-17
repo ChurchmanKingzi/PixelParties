@@ -1,0 +1,15 @@
+{
+  "creature": "Pet Snake",
+  "sheet": "pet-snake.png",
+  "frameWidth": 21,
+  "frameHeight": 21,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 10.5
+}

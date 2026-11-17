@@ -1,0 +1,15 @@
+{
+  "creature": "Ferocious Jaguar Warrior",
+  "sheet": "ferocious-jaguar-warrior.png",
+  "frameWidth": 22,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

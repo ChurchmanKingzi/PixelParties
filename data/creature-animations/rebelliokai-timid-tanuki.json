@@ -1,0 +1,15 @@
+{
+  "creature": "Rebelliokai Timid Tanuki",
+  "sheet": "rebelliokai-timid-tanuki.png",
+  "frameWidth": 36,
+  "frameHeight": 34,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 18.0
+}

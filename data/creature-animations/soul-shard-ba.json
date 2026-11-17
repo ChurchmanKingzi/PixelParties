@@ -1,0 +1,15 @@
+{
+  "creature": "Soul Shard Ba",
+  "sheet": "soul-shard-ba.png",
+  "frameWidth": 50,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 25.0
+}

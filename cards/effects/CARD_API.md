@@ -26910,6 +26910,49 @@ Karten in `ps.creationZone` („Extra-Hand") spielen wie Handkarten (`handSource
 * **Todes-Reaktionen aus dem Vorrat:** Fällt Crestina SELBST (Quetzahuitl feuert nur, wenn der LETZTE Held fällt), bleibt der Vorrat für die Dauer der Meldung `onHeroKO` nutzbar (`engine._heldImKO`, geprüft in `isCreationZoneUsable`) — sonst gälte er mit der toten Crestina schon als nicht nutzbar.
 * **Anzeige:** Der Server sendet `creationLevels` (nur an den Besitzer: aktuelle Stufe je Vorrats-Index, nur bei Abweichung vom Druck); der Client backt Stufe/Kosten wie in der Hand ins Kartenbild (`handLevel`/`handCost`/`handNotes` am Vorrats-Platz), weil man die Karten von dort spielt.
 
+## Creature-Idle-Animationen — Daten, Bauweg und offene Creatures (14.11.2026)
+
+**Daten:** je Creature `data/creature-animations/<slug>.png` (Spritesheet, Frames nebeneinander, Pixelart 1:1, Alpha binär, nur Farben der Kartenkunst) und `<slug>.json`:
+`creature` (Kartenname), `sheet`, `frameWidth`, `frameHeight`, `frames`, `frameMs`, `loop`, `layout: "horizontal"`, `padTop/Left/Right/Bottom` (Leerrand um die Ruhefigur),
+`faceX` (Körpermitte in Frame-Pixeln), optional `kern {x,y,w,h}` (Ruhe-Körper, wenn der Frame Sprung-/Flugraum enthält — Platzierung am `kern`, nicht am Frame),
+optional `deckkraft` (0..1, Figur soll im Spiel durchscheinen; nur per Raster/Dither umsetzen, kein Alpha). Slug = Kartenname klein, alles außer a–z/0–9 zu `-`.
+Frame 0 ist die Ruhepose (= Sprite der Kartenkunst), außer wo das Skript es im Kopf anders vermerkt (dauerhaft fliegende/jonglierende Figuren, Feuer).
+
+**Bauweg:** ein Skript je Creature `scripts/creature-animations/<slug_mit_unterstrich>.py` (Quell-Sprite `src/<slug>.png`), Ausgabe über `anim_lib.speichern`.
+Gemeinsame Module: `anim_lib` (Zerlegen, Prüfen, Speichern), `anim_textur` (Strecken/Atmen mit Textur statt Zeilenkopie — **immer** darüber strecken, nie in der Breite),
+`anim_feuer3` (Feuer: `Flamme`/`Strahl`/`saum`/`SOCKEL`, kleine Flammen `klein`), `anim_hupf`/`anim_rutsch` (Slimes hüpfen, Slipperies gleiten), Gruppenmodule `anim_*`.
+Regeln aus den Abnahmerunden: starre Dinge (Waffen, Hüte, Hörner, am Boden Liegendes) bewegen sich nur als Einheit; keine Lücken, Verdecktes fertigzeichnen; Umrisse nie verdicken;
+Humanoiden-Köpfe nie seitlich; nichts schwebt, was nicht fliegt; Helme/Masken blinzeln nicht; Glanz nur kurz auf Metall/Gold/Edelstein; Partikel mindestens 2×2.
+
+**Sonderfall Clone:** `data/creature-animations/clone.json` hat kein Sheet (`"sheet": null, "kopiert": "host-hero"`). Der Client zeigt für Clone immer den Sprite
+(samt Idle) des Heroes, an dem die Creature hängt.
+
+**Noch ohne Animation (nachziehen, sobald Kartenkunst und Motiv-Maske da sind):** Crying Seagulls, Cyclson, Klaus' Mom, Embodiment of Aeterna, Blackport Soldier #55,
+The Master's Spy. Für sie gibt es weder Kunst in `data/card-art/native` / `public/cardgen/art` noch einen Eintrag in `data/subject-masks.json` noch eine passend benannte
+Motiv-Ebene. Vorgehen dann: Maske × Kunst = Sprite (`rle` beginnt mit Hintergrund; nennt `src` eine Motiv-Ebene, lieber die ganze Figur aus der Ebene nehmen),
+am Kartenrand Abgeschnittenes im Stil der Figur fertigzeichnen, Skript wie oben. Der Client muss ohne Animation auf das Kartenbild zurückfallen.
+
+**Anbindung im Spiel:** Server `GET /api/creature-animations` (`server.js`, wie `/api/hero-animations`; Schlüssel = Slug des Feldes `creature`, nicht der Dateiname;
+Einträge ohne Sheet nur mit `kopiert`; die Sheets selbst werden 30 Tage zwischengespeichert, die URL trägt `?v=mtime`). Client `public/app-board.jsx`: dieselbe Maschine wie die
+Helden — `HeroIdleAnims` (Liste `ladeKreaturListe`, Cache-Schlüssel `c:<slug>`, `hatKreaturAnimation`, `kopiertHeld`) und `HeroIdleSprite` mit `kreatur` (gleiche Sprite-Ebene, gleicher Takt).
+Platzierung: Mitte `faceX` (Gesichts-/Körpermitte, NICHT zwingend die Frame-Mitte: Haressassin hat `faceX` 11 zwischen den Augen, weil das Schwert weit nach rechts ragt; Skript: `extra={'faceX': …}` an `N4.abschluss`), Standlinie `frameHeight − padBottom`; mit `kern` Mitte `kern.x + kern.w/2` und Standlinie `kern.y + kern.h` (`kreaturMeta`). `deckkraft` < 1 wird beim Laden
+per Bayer-Raster ausgedünnt (`ausduennen`).
+*Größe:* Creature-Figuren stehen im Creature-Maßstab `KREATUR_MASS` = 3/4 des Hero-Maßstabs (2,8125 × `--board-scale` je Sprite-Pixel; ihr Sprite-Pixel ist also bewusst
+kleiner als der Hero-Pixel). Zusätzlich ist die Ruhefigur (`kern`, sonst Frame minus Leerrand) gedeckelt: passt sie in Sprite-Pixeln nicht in 64 × 68, kommt der größte passende
+Faktor aus 3/4, 2/3, 3/5, 1/2, 2/5 (`KREATUR_STUFEN`) obendrauf (multipliziert), nie unter 2/5 des Hero-Maßstabs (`KREATUR_MIN`, sonst würde ein Sprite-Pixel am Desktop kleiner als
+ein Bildschirmpixel). Alles gleichmäßig und `pixelated`. Ein `boardScale` im Sheet-JSON setzt den Gesamtfaktor von Hand. Neue große Sheets also ruhig in voller Auflösung bauen.
+*Wer eine Figur bekommt:* nur die offene Einzelkreatur einer Support-Zone (nicht: verdeckt, `_dying`, Rammflug/Abflug, Stapel, Nest, angelegter Held, Mimik/Kopie, Illusion) sowie die
+Kreatur auf einem Helden (Hulijing, `hero.heldKreatur`); sonst bleibt die Karte. Die Karte behält ihre Status-Overlays, die Figur zeigt Stillstand, Eis, Stein und Tönungen (ohne den
+1-px-Schlagschatten der Helden — der `filter` war der teuerste Posten je Figur). Clone zeigt die Figur des Heroes seiner Spalte (`heldFigurName`, samt Skin) im Creature-Maßstab (`massstab`). Beim Hover
+fährt wie bei den Helden nur die Figur der Zone unter dem Zeiger ein, nie eine Nachbarfigur. Die Zone kennt ihre Figur wie bei Helden (`zone._ppFigurPlatz`, Klasse
+`hero-idle-platz hero-idle-kreatur`, `data-kreatur`).
+*Schalter:* Profil „Display Creatures" (`users.display_creatures`, Unteroption von „Display Heroes", `PUT /api/profile/hero-display`); auf dem Handy (`ppIsPhone`) gibt es keine
+Creature-Figuren, dort werden weder Liste noch Sheets geladen.
+*Vorladen:* zu Spielbeginn lädt `HeroIdleAnims.kreaturenVorladen` ALLE Creature-Sheets (zuerst die im eigenen Spielstand genannten, den Rest einzeln im Leerlauf) — bewusst keine
+Liste „Creatures dieser Partie" vom Server, die verriete das Deck des Gegners.
+*Oberer Brettrand:* die Sprite-Hülle steht am Desktop `position: fixed` (style.css `.hero-sprite-huelle`), damit Figuren der hinteren Reihe nicht an `.board-center` abgeschnitten
+werden; die Kopfzeile `.game-hand-opp` ist dafür keine eigene Ebene mehr (nur ihr Kartenfächer trägt z-index 400).
+
 ## Aufladen vor dem Dash und Held-Pose beim Wirken (Trailer-Looks, 13.11.2026)
 
 Zwei reine Optik-Bausteine aus dem Trailer (`public/app-fx-68.jsx`, Kill-Switch `window.__ppFx68Aus`); Regeln, Schaden und Kartenskripte ändern sich nicht.

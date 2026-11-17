@@ -1,0 +1,15 @@
+{
+  "creature": "Eager Oarsman",
+  "sheet": "eager-oarsman.png",
+  "frameWidth": 53,
+  "frameHeight": 31,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 26.5
+}

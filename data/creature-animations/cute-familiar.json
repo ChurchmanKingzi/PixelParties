@@ -1,0 +1,15 @@
+{
+  "creature": "Cute Familiar",
+  "sheet": "cute-familiar.png",
+  "frameWidth": 26,
+  "frameHeight": 21,
+  "frames": 48,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 13.0
+}

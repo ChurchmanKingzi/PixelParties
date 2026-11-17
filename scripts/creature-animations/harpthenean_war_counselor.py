@@ -1,0 +1,205 @@
+# -*- coding: utf-8 -*-
+"""Idle-Animation für „Harpthenean War Counselor“ (Creature) — die Harpyien-Kriegerin: Stahlhelm mit rotem Busch, eisblaue Flügel, schwarze Handschuhe, goldener Schurz, großer Rundschild, Krallenfüße.
+
+Quelle: src/harpthenean-war-counselor.png (26×36 px, 41 Farben, 537 Pixel).
+PICK: [["MotiveSteamDwarfs", 393, 1]]      (Ebene „Harpthenean War Counsellor“, Figur 1 = Pose mit Schild; nur in dieser Karte)
+Vorlage für Verdecktes: Kandidat 4 (MotiveSteamDwarfs 365, „Ebene #45“, 27×32) zeigt dieselbe Figur OHNE Schild: Hüfte/Schurz und beide Beine. Er wird nicht benutzt (der Schild gehört zur Kartenfigur), nur zum Verständnis.
+Abgleich mit der Kartenkunst Harpthenean_War_Counselor.png (76×51): Sprite sitzt dort 99,8 % pixelgleich. Der schwarze Schattenfleck unter der Figur (Ebenenteil, 4 Zeilen unter dem Schild) gehört nicht zum
+Sprite; er zeigt nur, dass die Harpyie über dem Boden SCHWEBT (Flügel gespreizt, Füße hängen).
+
+Aufruf:   python3 harpthenean_war_counselor.py [--preview <ordner>]
+Ausgabe:  ../../data/creature-animations/harpthenean-war-counselor.png + .json
+
+Was im Sprite ist (x, y im 26×36-Sprite):
+* HELMBUSCH (x 10–15, y 0–5): rote Federn (156,0,0)/(214,0,0)/(255,0,0); Basis y 6 mit schwarzen Ecken.
+* STAHLHELM (x 8–17, y 6–11): Metall (66,66,66)/(76,74,93)/(112,112,112)/(194,194,194)/(195,195,195), schwarzer Rand.
+* GESICHT (x 8–17, y 11–17): helle Haut (246,205,139)/(255,230,213)/(238,156,123); Augen: je ein hellblauer Iris-Pixel (172,213,255) bei (10,13) und (15,13), je ein schwarzer Wimpernpixel bei (11,13) und (14,13),
+  je ein weißer Pixel (246,255,255) bei (10,14) und (15,14) und je ein dunkelroter (123,8,24) bei (11,14) und (14,14); braune Haarsträhnen (49,24,0) neben dem Gesicht (x 6–7 und 18–19, y 12–16).
+* FLÜGEL (x 0–9 links, x 16–25 rechts, y 5–18): Federn in Weiß/Eisblau (246,255,255)/(222,255,255)/(180,246,255)/(172,213,255)/(139,213,255)/(106,197,255), ohne eigenen Umriss; sie wachsen hinter den Schultern heraus.
+* RUMPF (y 17–21): dunkelgrauer Panzer (66,66,66)/(76,74,93)/(194,194,194)/(112,112,112); schwarze Arme/Handschuhe (0,0,0)/(32,32,32)/(41,41,41)/(46,46,46)/(56,56,56) bei (4–6, 18–24) und (19–22, 18–25).
+* SCHILD (x 1–14, y 21–35): großer Rundschild, Rand in Gelbgrün (127,134,27)/(164,172,35)/(198,209,42)/(207,217,68), Fläche Silber (194,194,194)–(229,229,229).
+* SCHURZ/GOLD (x 14–18, y 21–25): goldene Rüstung (230,131,16)/(255,180,24)/(255,222,90)/(255,246,172); darunter das rechte BEIN (14–19, 25–29): orange Haut (230,131,82)/(189,90,57) mit weißer Kralle.
+Metall/Gold im Sprite: Stahlhelm, Schild, goldener Schurz. Nur sie glänzen (Regel 14); Federn, Haut, Haar, Handschuhe nicht. Kein Feuer, kein Dampf, keine Partikel.
+
+Ablauf (48 Frames à 62 ms = 2,98 s, nahtlos) — die Harpyie SCHWEBT (Schatten in der Quelle, Flügel offen), darum darf sie schweben:
+* Flügelschlag (RUNDE 3, Nutzer: „die Flügelbewegung sieht noch gar nicht nach Fliegen aus“; vorher nur Spaltenversatz um ±3 px): jetzt ein echter Flügelschlag, viermal pro Schleife (Periode 12 Frames = 744 ms; Abschlag 5 Frames, Aufschlag 7).
+  Jeder Flügel schwingt als Ganzes um den Ansatz hinter der Schulter ((8,5|17) links, (16,5|17) rechts) — von 25° über der Ruhelage (Flügel fast senkrecht, Spitze links über dem Kopfrand) bis 85° darunter (Flügel zeigt schräg nach außen unten, Spannweite wächst von 26 auf ≈ 35 px);
+  Frame 0 liegt auf dem Aufschlag bei 23 % des Hubs und ist die Originalpose. Technik wie beim Lunatic Hawk: Rückwärtsabbildung um die Schulter (F.drehen glatt=True, Nächster-Nachbar, keine Mischfarben, Federtextur bleibt). Der Flügelansatz (Federpixel im Umkreis von
+  3,4 px um das Gelenk) bleibt am Körper stehen; verdeckte Flügelpixel unter Haarsträhnen/Ohrspitzen/Schulter wurden fertiggezeichnet (siehe Ergänzungen), damit beim Schwenken kein Loch im Flügel entsteht; Hintergrundlöcher werden mit der Nachbarfarbe geschlossen.
+* Schweben: die ganze Figur starr (Helm, Gesicht, Schild, Beine zusammen) steigt beim Abschlag bis 2 px und sinkt beim Aufschlag zurück (1,5 Frames nachlaufend, Frame 0 = Original). Nichts wird gestreckt.
+* Helmbusch wiegt (Zeilen 0–5): zwei Wellen (3 s und 1 s) bis ±2 px an der Spitze, nach unten auslaufend (Gefälle ≤ 1 px je Zeile).
+* Beine baumeln (Zeilen 26–29, rechtes Bein): zweimal pro Schleife schwingt es 1 px nach rechts und zurück (Frames 8–15 und 32–39); der Schild bleibt starr.
+* Blinzeln (Frames 19–21 und 41–43): erst der Iris-Pixel, dann auch die weißen/roten Pixel nehmen die Hautfarbe (246,205,139) an (Lid = Haut, schwarze Wimpernpixel bleiben als Lidlinie); kein Augenglanz.
+* Metall glänzt (Regel 14): ein Lichtband läuft über den Helm (Frames 4–11), eines über den Schild (Frames 22–33), eines über den Goldschurz (Frames 36–43); je ein Glitzerstern am Helm (Frames 14–17),
+  an der Schildkante rechts oben (Frames 26–29) und am Schurz (Frames 38–41), alle vollständig im Metall.
+Frame 0 = Original (Ruhepose). Kontrolle: anim_humanoide.ruhepose / eckkontakt_typen / Randpixel-Test (Regel 16).
+Ergänzungen: Flügel-Ebene unter Haarsträhnen/Ohrspitzen/Schulterkante: verdeckte Pixel (Nicht-Feder-Pixel des Sprites links von x 9 (rechts: rechts von x 16) in y 7–19, die in derselben Zeile höchstens 3 px neben einem Federpixel liegen)
+mit der Farbe des nächsten Federpixels derselben Zeile (nach außen) belegt — nur im Flügel-Layer (im Ruhebild verdeckt), nur Federfarben der Quelle.
+"""
+import math
+import sys
+
+import numpy as np
+
+import anim_humanoide as Hm
+import anim_krieger as K
+import anim_lib as L
+import anim_flieger as F
+import anim_flieger_r3 as R3
+import anim_r5_fluegel2 as R5
+
+N, MS = 48, 62
+sz = K.Szene('harpthenean-war-counselor', (12, 6, 12, 4))     # Flügelschlag bis ≈ 10 px neben das Sprite, Schweben 2 px, Busch ±2 px
+spr, OFF, H, W = sz.spr, sz.OFF, sz.H, sz.W
+TEST_EBENEN = ('figur',)
+
+FEDER = {(246, 255, 255), (180, 246, 255), (106, 197, 255), (139, 213, 255), (222, 255, 255), (172, 213, 255)}
+HELM_R = [(66, 66, 66), (76, 74, 93), (112, 112, 112), (194, 194, 194), (205, 205, 205)]
+RAND_R = [(127, 134, 27), (164, 172, 35), (198, 209, 42), (207, 217, 68)]
+SILBER_R = [(195, 195, 195), (205, 205, 205), (216, 216, 216), (229, 229, 229)]
+GOLD_R = [(230, 131, 16), (255, 180, 24), (255, 222, 90), (255, 246, 172)]
+HAUT = sz.f(12, 13)                                             # (246,205,139)
+AUGE_OBEN = {(10, 13): HAUT, (15, 13): HAUT}
+AUGE_ALLES = {(10, 13): HAUT, (15, 13): HAUT, (10, 14): HAUT, (15, 14): HAUT, (11, 14): HAUT, (14, 14): HAUT}
+WEISS, HELL1, HELL2 = (246, 255, 255), (222, 255, 255), (229, 229, 229)
+
+m_fl = sz.farben_in(sz.rechteck(0, 5, 9, 18), FEDER)
+m_fr = sz.farben_in(sz.rechteck(16, 5, 25, 18), FEDER)
+rest = sz.vor & ~m_fl & ~m_fr
+m_helm = sz.farben_in(sz.rechteck(9, 7, 16, 11), set(HELM_R))
+m_rand = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(RAND_R))
+m_silber = sz.farben_in(sz.rechteck(1, 21, 14, 35), set(SILBER_R))
+m_gold = sz.farben_in(sz.rechteck(13, 21, 18, 25), set(GOLD_R))
+
+# Runde 4 (Nutzer: „Haare und Flügel ‚verlaufen‘, wenn sie gerade gesenkt sind, ungünstig ineinander und überlagern sich. Die Flügel sollen strikt vor den schwarzen Haaren sein.“):
+# Die schwarzen Massen links (x 2–6, y 18–21) und rechts (x 18–23, y 18–25) neben dem Rumpf sind die langen schwarzen HAARE (Zöpfe), keine Arme/Handschuhe. Die Flügel liegen überall VOR ihnen
+# (aber weiter hinter Kopf, Ohren, Rumpf, Schild und Schurz): Flügelpixel, die auf ein Haarpixel fallen, werden darüber gezeichnet — der Flügelumriss bleibt so in jeder Pose vollständig.
+HAAR_F = {(0, 0, 0), (32, 32, 32), (41, 41, 41), (46, 46, 46), (56, 56, 56)}
+m_haar = sz.farben_in(sz.rechteck(3, 18, 6, 20), HAAR_F) | sz.farben_in(sz.rechteck(2, 21, 3, 21), HAAR_F) | sz.farben_in(sz.rechteck(18, 18, 23, 25), HAAR_F)
+# Runde 5 (Nutzer: „Hat bei gesenkten Flügeln noch immer schwarze Linien auf den Flügeln.“). Ursachen und Abhilfe:
+# (1) Der Randpixel-Durchlauf (K.kontur) färbte Federpixel am Flügelrand SCHWARZ, wenn ihre Farbe im Original nie am Rand lag — die Flügel haben aber gar keinen Umriss. Federfarben sind jetzt alle als
+#     Randfarbe erlaubt (ERLAUBT_F), der Flügel bekommt in keiner Pose Schwarz.
+# (2) Die Schichtung ist jetzt echt dreilagig: HAARE (hinten) → FLÜGEL → übrige Figur (Kopf, Ohren, Rumpf, Schild, Schurz, Bein). Vorher wurden Flügelpixel nachträglich über Haarpixel kopiert; in jeder
+#     Kerbe/jedem Loch des gedrehten Flügels blieb Haar-Schwarz stehen. Der gedrehte Flügel wird zuerst zu einer geschlossenen Fläche gemacht (R5.schliessen, nur Federfarben).
+# (3) Die braunen Pixel (7,19)/(18,19) unter dem Flügelansatz zählen zur Haar-Lage (hinter dem Flügel). Löcher an Nähten werden bevorzugt mit Federfarbe geschlossen (R5.loecher_fuellen).
+m_haar |= sz.rechteck(7, 19, 7, 19) | sz.rechteck(18, 19, 18, 19)
+ERLAUBT_F = set(sz.ERLAUBT) | FEDER
+HAAR0 = np.zeros((H, W), bool)
+HAAR0[OFF[1]:OFF[1] + sz.sh, OFF[0]:OFF[0] + sz.sw] = m_haar
+
+BEAT, DOWN, UP = 12, 5, 7                                       # Flügelschlag: 4 pro Schleife
+HUB = math.radians(110.0)                                       # Gesamthub: oben +25° über der Ruhelage, unten −85°
+P0 = DOWN + 0.685 * UP                                          # Frame 0 = Aufschlag bei 23 % des Hubs (Originalpose)
+PIV_L, PIV_R = (8.5, 17.0), (16.5, 17.0)                        # Flügelansatz (Sprite)
+R_ANSATZ = 3.4
+
+
+def fluegel_fertig(m, links):
+    """Flügel-Layer (Spritegröße): Federpixel + verdeckte Stellen (Haar/Ohr/Schulter) mit der Farbe des nächsten Federpixels derselben Zeile (nach außen) fertiggezeichnet."""
+    a = np.zeros_like(spr)
+    a[m] = spr[m]
+    xs = range(0, 10) if links else range(16, 26)
+    for y in range(7, 20):
+        for x in xs:
+            if m[y, x] or not sz.vor[y, x]:
+                continue
+            nach_aussen = range(x - 1, -1, -1) if links else range(x + 1, spr.shape[1])
+            for d, xn in enumerate(nach_aussen):
+                if d >= 3:
+                    break
+                if m[y, xn]:
+                    a[y, x] = spr[y, xn]
+                    break
+    return a
+
+
+WING_FERTIG = {'l': fluegel_fertig(m_fl, True), 'r': fluegel_fertig(m_fr, False)}
+ans_l = m_fl & ((sz.xx - PIV_L[0]) ** 2 + (sz.yy - PIV_L[1]) ** 2 <= R_ANSATZ ** 2)
+ans_r = m_fr & ((sz.xx - PIV_R[0]) ** 2 + (sz.yy - PIV_R[1]) ** 2 <= R_ANSATZ ** 2)
+WING_ROT = {}
+for _s, _a, _m in (('l', WING_FERTIG['l'], ans_l), ('r', WING_FERTIG['r'], ans_r)):
+    _b = _a.copy()
+    _b[_m] = 0
+    WING_ROT[_s] = L.platz(_b, H, W, *OFF)
+_m0 = np.zeros((H, W), bool)
+_m0[OFF[1]:OFF[1] + sz.sh, OFF[0]:OFF[0] + sz.sw] = sz.vor
+LOCH0 = R3.eingeschlossen(_m0)
+
+
+def welle(t):
+    """0 = Flügel ganz oben … 1 = ganz unten (Abschlag in DOWN Frames, Aufschlag in UP Frames, Cosinus-weich)."""
+    u = (t + P0) % BEAT
+    if u < DOWN:
+        return 0.5 - 0.5 * math.cos(math.pi * u / DOWN)
+    return 0.5 + 0.5 * math.cos(math.pi * (u - DOWN) / UP)
+
+
+def winkel(t):
+    """Drehwinkel des LINKEN Flügels (rad, negativ = gegen den Uhrzeigersinn = Flügel schlägt nach unten); 0 bei Frame 0."""
+    return -HUB * (welle(t) - welle(0))
+
+
+ANS0 = sz.ebene(ans_l | ans_r)[..., 3] > 0                      # stehender Flügelansatz (Leinwand)
+VORN0 = sz.ebene(rest & ~m_haar)[..., 3] > 0                    # vordere Lage (verdeckt den Flügel zu Recht)
+_fp = {}
+
+
+def fluegel_pose(ang):
+    """Beide Flügel in der Pose `ang` (Leinwand, ohne Schweben): um den Ansatz gedreht und zu einer geschlossenen Fläche in Federfarben gemacht."""
+    if ang not in _fp:
+        fl = F.drehen(WING_ROT['l'], OFF[0] + PIV_L[0], OFF[1] + PIV_L[1], ang, glatt=True)
+        fr = F.drehen(WING_ROT['r'], OFF[0] + PIV_R[0], OFF[1] + PIV_R[1], -ang, glatt=True)
+        if abs(ang) > 1e-6:
+            fl, fr = R5.schliessen(fl), R5.schliessen(fr)
+        _fp[ang] = (fl, fr)
+    return _fp[ang]
+
+
+def hub_koerper(t):
+    """Schweben: Körper steigt beim Abschlag (1,5 Frames nachlaufend) bis 2 px; Frame 0 = 0."""
+    return -int(round(2.0 * (welle(t - 1.5) - welle(-1.5))))
+
+
+def frame(i, nur=None):
+    ebenen = nur if nur is not None else ('figur', 'glitzer')
+    k = sz.ebene((rest & ~m_haar) | ans_l | ans_r)                 # vordere Lage: alles außer Haaren und schlagenden Flügeln
+    haar = sz.ebene(m_haar)                                        # hintere Lage: die schwarzen Haare
+    # --- Blinzeln ---
+    lid = Hm.folge(i, 19, [1, 2, 1], N) or Hm.folge(i, 41, [1, 2, 1], N)
+    if lid:
+        K.blinzeln(k, OFF, AUGE_OBEN if lid == 1 else AUGE_ALLES)
+    # --- Metall glänzt ---
+    Hm.lichtband(k, m_helm, OFF, i, N, 4, 8, HELM_R, stufen=1, breite=2.4, achse=(1.0, 0.5), kern=2)
+    Hm.lichtband(k, m_silber, OFF, i, N, 22, 12, SILBER_R, stufen=1, breite=3.4, achse=(1.0, 1.0), kern=2)
+    Hm.lichtband(k, m_rand, OFF, i, N, 22, 12, RAND_R, stufen=1, breite=3.4, achse=(1.0, 1.0), kern=2)
+    Hm.lichtband(k, m_gold, OFF, i, N, 36, 8, GOLD_R, stufen=1, breite=2.4, achse=(1.0, 1.0), kern=2)
+    # --- Helmbusch wiegt ---
+    d = int(round(1.4 * np.sin(2 * np.pi * i / N) + 0.8 * np.sin(2 * np.pi * 3 * i / N)))
+    Hm.zeilen_versatz(k, OFF, K.gefaelle(list(range(0, 6)), d))
+    # --- Bein baumelt (rechtes Bein, Zeilen 26–29) ---
+    sw = 1 if (K.fenster(i, N, 8, 8) is not None or K.fenster(i, N, 32, 8) is not None) else 0
+    if sw:
+        Hm.bereich_versatz(k, OFF, {26: 0, 27: 1, 28: 1, 29: 1}, 15, 20)
+    # --- Flügel: Schlag um die Schulter (Runde 3) ---
+    ang = winkel(i)
+    body = hub_koerper(i)
+    fl, fr = fluegel_pose(round(ang, 5))
+    fig = L.zusammen(H, W, [(haar, 0, 0), (fl, 0, 0), (fr, 0, 0), (k, 0, 0)])                # Runde 5: Haare hinten, Flügel davor, Rest der Figur ganz vorn
+    fig = R5.loecher_fuellen(fig, FEDER, 5, ausser=LOCH0)
+    if abs(ang) > 1e-6:                                         # Flügelfläche schließen: Taschen zwischen stehendem Ansatz und geschwenktem Flügel, in denen sonst Haar-Schwarz stünde
+        fig = R5.flaeche_schliessen(fig, (fl[..., 3] > 0) | (fr[..., 3] > 0) | ANS0, VORN0, FEDER)
+    K.kontur(fig, ERLAUBT_F, lambda c, x, y: (156, 0, 0) if (c[1] == 0 and c[2] == 0 and c[0] > 0) else (0, 0, 0))    # Regel 16 (Federn haben keinen Umriss und bleiben, wie sie sind)
+    fig = L.versetze(fig, 0, body)                              # Schweben: ganze Figur starr
+    out = fig if 'figur' in ebenen else sz.leer()
+    if 'glitzer' in ebenen:
+        gl = sz.leer()
+        Hm.stern4(gl, 14, 8, Hm.folge(i, 14, [0, 1, 2, 1], N), WEISS, HELL1, HELL2, OFF)
+        Hm.stern4(gl, 12, 25, Hm.folge(i, 26, [0, 1, 2, 1], N), WEISS, HELL1, HELL2, OFF)
+        Hm.stern4(gl, 16, 23, Hm.folge(i, 38, [0, 1, 2, 1], N), (255, 246, 172), (255, 222, 90), (255, 180, 24), OFF)
+        gl = L.versetze(gl, 0, body)
+        out = L.zusammen(H, W, [(out, 0, 0), (gl, 0, 0)])
+    return out
+
+
+if __name__ == '__main__':
+    K.abschluss(sz, frame, N, MS, 'Harpthenean War Counselor', 'harpthenean-war-counselor', K.vorschau_pfad())

@@ -162,7 +162,7 @@ function compileOne(name) {
   // It still handles loop-closure semantics correctly, so it's a safe match.
   const { code } = Babel.transform(src, {
     presets: ['react'],
-    plugins: ['transform-block-scoping'],
+    plugins: [require('./i18n/jsx-template').plugin(Babel), 'transform-block-scoping'],
     compact: false,
     comments: false,
     sourceType: 'script',

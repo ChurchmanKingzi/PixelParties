@@ -1,0 +1,15 @@
+{
+  "creature": "Spirit of the Super-Killing Knife",
+  "sheet": "spirit-of-the-super-killing-knife.png",
+  "frameWidth": 35,
+  "frameHeight": 28,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 17.5
+}

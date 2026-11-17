@@ -1,0 +1,15 @@
+{
+  "creature": "Arcane Eyes",
+  "sheet": "arcane-eyes.png",
+  "frameWidth": 62,
+  "frameHeight": 26,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 31.0
+}

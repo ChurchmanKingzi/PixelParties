@@ -1,0 +1,15 @@
+{
+  "creature": "Elven Archer",
+  "sheet": "elven-archer.png",
+  "frameWidth": 27,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 4,
+  "padRight": 5,
+  "padBottom": 3,
+  "faceX": 13.5
+}

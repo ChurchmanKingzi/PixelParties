@@ -1,0 +1,15 @@
+{
+  "creature": "Tuscan Prisoner",
+  "sheet": "tuscan-prisoner.png",
+  "frameWidth": 30,
+  "frameHeight": 31,
+  "frames": 72,
+  "frameMs": 83,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 15.0
+}

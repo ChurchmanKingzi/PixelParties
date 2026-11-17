@@ -88,9 +88,19 @@
   // nie allein am Zeilenende steht („Support Spell“, „Decay or Support Spells“). Laeuft NACH dem Ersetzen der Namen durch Symbolzeichen,
   // damit mehrteilige Namen („Support Magic“) vorher noch normal erkannt werden.
   const GLUE_SYM_RE = /[\uE000-\uE0FF](?:(?:\s*,\s*|\s+(?:or|and)\s+)[\uE000-\uE0FF])*\s+Spells?\b/g;
+  // ── Deutsch: „[Schul-Symbol]-Zauber“ ──
+  // Quelltext (data/i18n/de-cards.json) schreibt „Zerstörungsmagie-Zauber“, „Verfalls- oder Unterstützungsmagie-Zauber“, „Kampfkunst-Angriffe“;
+  // das Symbol ersetzt den Schulnamen (auch Kurzform „Zerstörungs-“), „-Zauber“/„-Angriff“ bleibt Text. Nur bei gewählter Sprache DE.
+  const DE_SYMBOLS = [['Zerstörungsmagie', 'destruction'], ['Beschwörungsmagie', 'summoning'], ['Magiekunst', 'arts'], ['Unterstützungsmagie', 'support'],
+    ['Verfallsmagie', 'decay'], ['Zerstörungs', 'destruction'], ['Beschwörungs', 'summoning'], ['Unterstützungs', 'support'], ['Verfalls', 'decay']];
+  DE_SYMBOLS.forEach(([name, key]) => { SYM_CH[name] = String.fromCharCode(0xE000 + SYM_KEYS.indexOf(key)); });
+  const DE_ALT = DE_SYMBOLS.map(x => x[0]).join('|');
+  const DE_RE2 = new RegExp('(?<![\\wäöüÄÖÜß])(' + DE_ALT + ')(?=-?(?:(?:\\s*,\\s*|\\s+(?:oder|und)\\s+)(?:' + DE_ALT + ')-?)*-?Zauber)', 'g');
+  const symbolizeDe = t => t.replace(DE_RE2, m => SYM_CH[m]).replace(/\bKampfkunst(?=-Angriff)/g, SYM_CH['Fighting']);
   const symbolize = t => {
     t = String(t == null ? '' : t);
     if (OPT.symMode === 'none') return t;
+    if (window.PP_I18N && window.PP_I18N.get() === 'de') return symbolizeDe(t);
     t = t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
     if (OPT.symMode === 'all') return t;
     t = t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
@@ -105,13 +115,13 @@
   // ihrer tatsaechlichen Farbe (`boxHintergrund`), nicht nach Kartentyp: so liest sich jedes Wort auf jedem Rahmen. `fest` (Blind, weiss)
   // behaelt seinen Ton immer. Die Tooltips des Spiels lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`).
   const STATUS_TERMS = [
-    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
-    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
-    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
-    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
-    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
-    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
-    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
+    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?|(?:ver)?gift(?:et|ete|eten|eter|etem|etes|es|s)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?|verbrann(?:t|te|ten|ter|tem|tes)|verbrenn(?:en|t|ung|ungen)',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?|bet.ub(?:t|te|ten|ter|tem|tes|en|ung|ungen)',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)|negier(?:e|st|t|en|te|ten|ung)',   hell: '#9aa3b6', dunkel: '#59606e' },
+    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?|blutung(?:en)?|blutend(?:e|en|er|em|es)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen|(?:ein)?gefroren(?:e|en|er|em|es)?|einfrier(?:en|t|e)',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?|geblendet(?:e|en|er|em|es)?|blend(?:en|et|ung)',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
   ];
   const STATUS_IDX = Object.create(null);
   STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
@@ -131,6 +141,7 @@
       if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
       // „… cannot be negated“ nennt einen Schutz, keinen Status: nicht hervorheben (Als Vorgabe 20.10.)
       if (/\b(?:cannot|can't|can not) be\s+$/i.test(t.slice(Math.max(0, a - 16), a)) && /^negat/i.test(m[0])) continue;
+      if (/\bnicht\s+$/i.test(t.slice(Math.max(0, a - 10), a)) && /^negier/i.test(m[0])) continue;   // „kann nicht negiert werden“ (DE)
       let k = 1;
       while (k < m.length && m[k] === undefined) k++;
       out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
@@ -901,9 +912,9 @@
   }
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
   function ascBonusOder(c) {
-    const a = String(c.startingAbility1 || '').trim(), b = String(c.startingAbility2 || '').trim();
+    const a = String(c.sa1De || c.startingAbility1 || '').trim(), b = String(c.sa2De || c.startingAbility2 || '').trim();
     const abilityBonus = t => /^[^\n]+ \d+$/.test(t);
-    return abilityBonus(a) && abilityBonus(b) ? a + ' or ' + b : null;
+    return abilityBonus(a) && abilityBonus(b) ? a + (window.PP_I18N && window.PP_I18N.get() === 'de' ? ' oder ' : ' or ') + b : null;
   }
   function specFromCard(c, meta, over) {
     meta = meta || {}; over = over || {};
@@ -925,15 +936,15 @@
       type,
       rarity: rarityBase(over.rarity),
       noStamp: !!over.noStamp,   // ohne Seltenheits-Stempel (die Rarity-Ebene malt ihn selbst, siehe stampSprite)
-      name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
+      name: (over.name != null ? ((window.PP_I18N && window.PP_I18N.names && window.PP_I18N.names[over.name]) || (c.displayName && c.displayName !== c.name ? c.displayName : over.name)) : (c.displayName || c.name)).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
       glue: Array.isArray(meta.glue) ? meta.glue : null,   // Wendungen, die im Umbruch zusammenbleiben („Support Spell“ -> [Symbol] Spell in einer Zeile)
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       // Ascended Heroes: die Bonus-Felder (`startingAbility1/2`) sind ALTERNATIVEN (W71a, Al: „bei zwei Ability-Boni immer ODER") — zwei Ability-Boni stehen in EINER Zeile mit „or"
       // („Fighting 3 or Destruction Magic 3", wie Taio; die Box fasst nur eine Zeile). Alle anderen Boni (Text-Boni mit Zeilenumbruch) bleiben wie gedruckt.
-      skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n')) : '',
-      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
+      skillBox: (meta.sb != null && !(window.PP_I18N && window.PP_I18N.get() === 'de')) ? meta.sb : hero ? (c.sa1De || c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.sa1De || c.startingAbility1, c.sa2De || c.startingAbility2].filter(Boolean).join('\n')) : '',
+      skillBox2: (meta.sb2 != null && !(window.PP_I18N && window.PP_I18N.get() === 'de')) ? meta.sb2 : (hero ? (c.sa2De || c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
       // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
       // statt der Zahl in `cost` (die der Server weiter rechnet).
       hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,
@@ -1108,7 +1119,7 @@
     if (!version || typeof indexedDB === 'undefined') return false;
     try {
       const db = await new Promise((res, rej) => {
-        const r = indexedDB.open('pp-render-cache', 1);
+        const r = indexedDB.open('pp-render-cache' + (window.PP_I18N && window.PP_I18N.get() !== 'en' ? '-' + window.PP_I18N.get() : ''), 1);
         r.onupgradeneeded = () => r.result.createObjectStore('kv');
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blockiert'));
       });

@@ -1,0 +1,15 @@
+{
+  "creature": "Wavilion",
+  "sheet": "wavilion.png",
+  "frameWidth": 57,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 28.5
+}

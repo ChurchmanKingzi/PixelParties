@@ -1,0 +1,15 @@
+{
+  "creature": "Priest of Luna",
+  "sheet": "priest-of-luna.png",
+  "frameWidth": 24,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 2,
+  "faceX": 12.0
+}

@@ -814,6 +814,7 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      <LangFlag />
       {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
       <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
         style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -2129,6 +2130,7 @@ function MainMenu() {
           halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
           `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
           bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
+      <LangFlag menu />
       <div className="menu-topleft">
       <div className="menu-stats">
         <div className="menu-stats-row">
@@ -2209,7 +2211,7 @@ function MainMenu() {
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
             <span className="menu-nav-label">VS CPU</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
-          <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
+          <button className="btn btn-big menu-nav-btn menu-nav-btn--daily" onClick={openDaily} title="Daily Challenge">
             <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" />
             {/* Heute noch nicht gestartet → kleines NEW-Schild an der Ecke. */}
@@ -2855,6 +2857,8 @@ function ProfileScreen() {
   // Zielwahl-Dialogen (Dynamic Heroes). Fehlt der Wert, gelten beide als an;
   // ohne Display gibt es kein Dynamic.
   const [displayHeroes, setDisplayHeroes] = useState(user.display_heroes == null ? true : !!user.display_heroes);
+  const [displayCreatures, setDisplayCreatures] = useState(
+    (user.display_heroes == null ? true : !!user.display_heroes) && (user.display_creatures == null ? true : !!user.display_creatures));
   const [dynamicHeroes, setDynamicHeroes] = useState(
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
@@ -2870,7 +2874,7 @@ function ProfileScreen() {
   const losses = user.losses || 0;
   const gamesPlayed = wins + losses;
   const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
-  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—';
+  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString(window.ppLocale ? window.ppLocale() : 'en-US', { year: 'numeric', month: 'short' }) : '—';
 
   // Next rank progress
   const nextRank = RANK_TIERS.find(r => r.min > (user.elo || 1000));
@@ -3092,14 +3096,15 @@ function ProfileScreen() {
     } catch (e) { notify(e.message, 'error'); setPlayAnimations(!newVal); }
   };
 
-  const saveHeroDisplay = async (display, dynamic) => {
-    const vorher = [displayHeroes, dynamicHeroes];
-    const dyn = display && dynamic;
-    setDisplayHeroes(display); setDynamicHeroes(dyn);
+  // `kreaturen` (Display Creatures): Unteroption wie Dynamic; ohne Angabe bleibt die Wahl stehen, beim EINSCHALTEN von Display Heroes gehen beide Unteroptionen mit an.
+  const saveHeroDisplay = async (display, dynamic, kreaturen = displayCreatures) => {
+    const vorher = [displayHeroes, dynamicHeroes, displayCreatures];
+    const dyn = display && dynamic, kre = display && kreaturen;
+    setDisplayHeroes(display); setDynamicHeroes(dyn); setDisplayCreatures(kre);
     try {
-      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn }) });
+      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn, display_creatures: kre }) });
       setUser(data.user);
-    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); }
+    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); setDisplayCreatures(vorher[2]); }
   };
   const GameTooltipProfil = window.GameTooltip;
   const zeigeTipp = (e, text) => window.showGameTooltip && window.showGameTooltip(e, text);
@@ -3637,7 +3642,7 @@ function ProfileScreen() {
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
               {/* v1463: Helden-Anzeige */}
               <ProfilSchalter an={displayHeroes}
-                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes)}
+                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes, !displayHeroes)}
                 label="Display Heroes"
                 tipp="Shows animated Heroes standing on their cards on the board."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
@@ -3647,6 +3652,13 @@ function ProfileScreen() {
                 tipp={displayHeroes
                   ? 'Heroes fold back into their cards while you choose a target, so nothing blocks your view.'
                   : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".'}
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={displayCreatures} gesperrt={!displayHeroes}
+                onToggle={() => saveHeroDisplay(displayHeroes, dynamicHeroes, !displayCreatures)}
+                label="Display Creatures"
+                tipp={displayHeroes
+                  ? 'Shows animated Creatures standing on their cards on the board. Turn off for a calmer board or on low-power devices. Never shown on phones.'
+                  : 'Shows animated Creatures standing on their cards on the board. Needs "Display Heroes".'}
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
             </div>
             {GameTooltipProfil && <GameTooltipProfil />}

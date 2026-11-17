@@ -1,0 +1,15 @@
+{
+  "creature": "Demon's Gate",
+  "sheet": "demons-gate.png",
+  "frameWidth": 183,
+  "frameHeight": 72,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 9,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 4,
+  "faceX": 91.5
+}

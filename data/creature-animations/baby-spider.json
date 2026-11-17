@@ -1,0 +1,15 @@
+{
+  "creature": "Baby Spider",
+  "sheet": "baby-spider.png",
+  "frameWidth": 19,
+  "frameHeight": 12,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 3,
+  "faceX": 9.5
+}

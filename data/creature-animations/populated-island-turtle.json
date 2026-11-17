@@ -1,0 +1,15 @@
+{
+  "creature": "Populated Island Turtle",
+  "sheet": "populated-island-turtle.png",
+  "frameWidth": 54,
+  "frameHeight": 36,
+  "frames": 56,
+  "frameMs": 66,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 27.0
+}

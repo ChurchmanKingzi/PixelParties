@@ -1,0 +1,15 @@
+{
+  "creature": "Steam Dwarf Brewer",
+  "sheet": "steam-dwarf-brewer.png",
+  "frameWidth": 42,
+  "frameHeight": 42,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 21.0
+}

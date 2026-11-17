@@ -1,0 +1,15 @@
+{
+  "creature": "Harpyformer Choir",
+  "sheet": "harpyformer-choir.png",
+  "frameWidth": 71,
+  "frameHeight": 57,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 35.5
+}
