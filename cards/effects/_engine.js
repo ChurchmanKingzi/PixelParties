@@ -1952,6 +1952,9 @@ class GameEngine {
     // forever because the hand size never shrinks.
     const promptPi = promptedPlayerIdx != null ? promptedPlayerIdx : this._cpuPlayerIdx;
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt (Mensch) — die CPU (auch in Rollouts/Puzzles) waehlt sie nicht (`_nutzlos`, s. `_cpu.js`).
+    if (promptData.type === 'confirm' && promptData._nutzlos === true && promptData.cancellable) return null;
+
     // Umsortier-Dialog (`promptDeckReorder`): die CPU belaesst die Reihenfolge (bei Trennmarke: alles oben).
     if (promptData.type === 'cardReorder') {
       return { order: (promptData.cards || []).map((_, k) => k).concat(promptData.splitMarker ? [-1] : []) };
@@ -10456,16 +10459,17 @@ class GameEngine {
     // Karten, die den Treffer VOR Schilden/Deckeln/HP-Boeden senken (Cloud in a Bottle: „Halve any damage … including that damage"), melden sich mit
     // `preDamageEarly: true` und werden HIER gefragt — nach Immunitaeten/Negationen und Pfeil-Boni, aber VOR dem Buff-Multiplikatoren-Durchgang unten.
     // Die Karte legt ihren Multiplikator-Buff (Cloudy) sofort auf; der Durchgang darunter halbiert den Treffer dann wie jede andere Senkung (Kettenbetrag
-    // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Nicht anbieten, wenn der Treffer
-    // nicht senkbar ist (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang ohnehin aus).
+    // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Ein nicht senkbarer Treffer
+    // (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang aus) bekommt das Angebot trotzdem (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind
+    // erlaubt, Hinweis in der Frage) — die Karte wird bezahlt, ein zurueckgelieferter `multiplier` wird aber verworfen.
     // R5 (Als Ruling Al 26.10.): wird Hydra Blood Arrow diesen Treffer gleich auf 0 setzen, sehen Reaktionen am Ziel schon die 0 — kein Angebot.
     if (target && target.hp !== undefined && target.hp > 0 && !hookCtx.cancelled
-        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated
         && (this.istKlonQuelle(source) || !require('./_arrows-shared').hydraWirdNullen(this, source, hookCtx))) {
       const _fruehBetrag = this._projectedAmount(hookCtx);
       if (_fruehBetrag > 0) {
-        const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type, { early: true });
-        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+        const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type,
+          { early: true, cannotBeNegated: !!hookCtx.cannotBeNegated, cannotBeReduced: !!hookCtx.cannotBeReduced });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1 && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated) {
           hookCtx._mul = (hookCtx._mul ?? 1) * _fr.multiplier;
           hookCtx._kMul = (hookCtx._kMul ?? 1) * _fr.multiplier;
         }
@@ -11099,6 +11103,15 @@ class GameEngine {
           require('./_arrows-shared').applyArrowsBeforeDamage(this, source, target, pk);
           if (pk.amount > amount) amount = pk.amount;
         }
+      }
+
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Die Hand-Reaktionen des Vor-Schaden-Fensters (Homerun!, Escape, Strong Shield, Sculpture Guards,
+      // Spectral Armor, Bamboo Shield, Cloud in a Bottle …) kamen gegen True Damage nie zum Zug; sie werden jetzt angeboten (Hinweis „cannot be reduced or negated" in der Frage, die CPU
+      // waehlt das nicht). Bezahlt/verbraucht wird wie immer — Negation und Senkung werden verworfen, der Treffer geht durch („cannot be reduced or negated").
+      if (amount > 0 && target.hp > 0) {
+        const _tdFlags = { cannotBeNegated: true, cannotBeReduced: true };
+        await this._checkPreDamageHandReactions(target, source, amount, type, { early: true, ..._tdFlags });
+        if (target.hp > 0) await this._checkPreDamageHandReactions(target, source, amount, type, _tdFlags);
       }
 
       if (_atkBoni && target.hp > 0 && !this._inMctsSim && !this._fastMode) {
@@ -36369,6 +36382,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     return antwort.confirmed !== false;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Negations-/Schutzkarten (Hand-Reaktionen, Surprises, Brett-Wächter, Umleiter) werden AUCH gegen
+   * Schaden/Effekte angeboten, die laut Kartentext nicht verringert/umgeleitet/negiert werden können (Rockfall, Pressure Projectile, Acid Vial, Ida, Exorcism mit Decay Magic 2 …): Der Spieler
+   * will vielleicht Karten loswerden oder die Ablage füllen. Gespielt/bezahlt/verbraucht wird wie immer — nur die Wirkung bleibt aus (der Treffer geht durch, die Umleitung findet nicht statt).
+   * Die Bestätigungsfrage trägt dafür einen Hinweis. `flags` = { cannotBeNegated, cannotBeReduced, cannotBeRedirected }, `was` = 'damage' | 'effect' | …; ohne eines der Flags: '' (Frage unverändert).
+   */
+  _nutzlosHinweis(flags, was = 'damage') {
+    if (!flags) return '';
+    const teile = [];
+    if (flags.cannotBeReduced) teile.push('reduced');
+    if (flags.cannotBeRedirected) teile.push('redirected');
+    if (flags.cannotBeNegated) teile.push('negated');
+    if (teile.length === 0) return '';
+    const liste = teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} or ${teile[teile.length - 1]}`;
+    return `This ${was} cannot be ${liste}.`;
+  }
+
+  /** Bestätigungsfrage "… Activate X?" bzw. mit Hinweis "… <Hinweis> Activate X anyway?" (siehe `_nutzlosHinweis`). */
+  _nutzlosFrage(vorne, hinweis, aktion) {
+    return hinweis ? `${vorne} ${hinweis} ${aktion} anyway?` : `${vorne} ${aktion}?`;
+  }
+
   async _checkTargetRedirectOnce(targetOwnerIdx, selected, validTargets, config, sourceCard) {
     const ps = this.gs.players[targetOwnerIdx];
     if (!ps) return null;
@@ -36388,14 +36423,22 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // v701: Umleitungs-Ausgaenge gesperrt (cannotBeRedirected / Eye) —
     // Hand- und Helden-Scans entfallen, nur negierende Surprises bleiben.
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Umleiter (Hand, Held, Brett, Surprise) werden AUCH gegen Quellen angeboten, die laut Kartentext nicht
+    // umgeleitet werden duerfen (Acid Vial, Glasowt, Truth-Seeing Eye), und Negierer AUCH gegen „cannot be negated" (Exorcism mit Decay Magic 2): Hinweis in der Frage, Kosten/Aktivierung
+    // wie immer — die Umleitung bzw. Negation selbst findet nicht statt (`_nurNegation` = Umleitungs-Ausgang gesperrt, `_negGesperrt` = Negation gesperrt). Die CPU waehlt das nicht
+    // (`_nutzlos`). Eine Quelle, auf die der Gegner gar nicht reagieren darf (Surefire Shot, Midnight Assault: `opponentCannotReact`), oeffnet weiter keine Negations-Waechter.
     const _nurNegation = !!config._noRedirectOutcome;
+    const _srcSkriptR = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
+    const _negGesperrt = !!(config.cannotBeNegated || _srcSkriptR?.cannotBeNegated);
+    const _reaktionZu = this._reaktionGesperrt(targetOwnerIdx) || !!_srcSkriptR?.opponentCannotReact;
+    const _umlHinweis = _nurNegation ? this._nutzlosHinweis({ cannotBeRedirected: true }, 'effect') : '';
 
     // Scan hand for redirect cards
     // Dark Ocean („neither player can react to … the effects of their opponent's Creatures"): die Umleiter aus der Hand (Martyry, Challenge, Anti-Magnet) sind Reaktionen — wie in allen anderen
     // Hand-Fenstern (W34a) gesperrt, wenn der Effekt von einer GEGNERISCHEN Creature kommt; auf Effekte der eigenen Creatures darf man reagieren.
     const _ozeanSperre = this.darkOceanBlocksReaction(targetOwnerIdx, null);
     const seen = new Set();
-    for (const { cardName } of ((_nurNegation || _ozeanSperre) ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
+    for (const { cardName } of (_ozeanSperre ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -36427,7 +36470,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // vorbei in den Decline-Default: Martyry/Challenge/Anti-Magnet
         // feuerten für die CPU NIE (10 Declines in einem Testspiel).
         showCard: cardName,
-        message: `Your ${selected.cardName} was targeted by ${attackerName}! Activate ${cardName}?`,
+        ...(_nurNegation ? { _nutzlos: true } : {}),
+        message: this._nutzlosFrage(`Your ${selected.cardName} was targeted by ${attackerName}!`, _umlHinweis, `Activate ${cardName}`),
         confirmLabel: `↪️ ${cardName}!`,   // v673: Pfeil zur Seite statt Waffen-/Netz-Symbolik (Al 31.8.)
         cancelLabel: 'No',
         cancellable: true,
@@ -36516,6 +36560,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Gegenreaktions-Fenster („when your opponent plays a Reaction": Cute Camera, Front Soldier, Reverse Trap). Negiert: keine Umleitung, die Karte liegt in der Ablage, Kosten bleiben bezahlt.
       // Ein anderer Umleiter auf der Hand darf danach noch angeboten werden (wie im Post-Target-Hub).
       if (await this._reaktionGespielt(targetOwnerIdx, cardName, _cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard) })) { this.sync(); continue; }
+      if (_nurNegation) { this.log('redirect_blocked', { source: sourceCard?.name, reason: 'cannotBeRedirected', card: cardName }); this.sync(); continue; }   // nutzlose Aktivierung: bezahlt, keine Umleitung
 
       // ③ Die Umleitung wirkt (Wahl des Gegners, Bilder, Log).
       this._inRedirectWindow = true;
@@ -36543,7 +36588,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // uebernommene der Gegenspalte; ein abgegebener eigener beschuetzt
     // nicht. `physOwner` (Brettseite) geht als letztes Argument an
     // `canHeroRedirect`/`onHeroRedirect`.
-    for (const { physOwner, heroIdx: hi, hero } of (_nurNegation ? [] : this.heroesControlledBy(targetOwnerIdx))) {
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(targetOwnerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
 
@@ -36570,8 +36615,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         type: 'confirm',
         title: hero.name,
         protMeta: { d: Number(config?.baseDamage) || 0, hp: _redirHpH, pi: targetOwnerIdx },
-        message: `Redirect ${attackerName}?`,
+        message: _umlHinweis ? `${_umlHinweis} Redirect ${attackerName} anyway?` : `Redirect ${attackerName}?`,
         showCard: sourceCard?.name || null,
+        ...(_nurNegation ? { _nutzlos: true } : {}),
         confirmLabel: '↪️ Redirect!',
         cancelLabel: 'No',
         cancellable: true,
@@ -36591,6 +36637,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Helden-Passivs ist kettbar (`_passivAusloesungNegiert`); negiert → keine Umleitung.
       if (await this._passivAusloesungNegiert(hero.name, targetOwnerIdx, hi)) continue;
+      if (_nurNegation) { this.log('redirect_blocked', { source: sourceCard?.name, reason: 'cannotBeRedirected', card: hero.name }); continue; }   // nutzlose Aktivierung: bezahlt, keine Umleitung
 
       // Run the hero's redirect logic (hero selection, animation, etc.)
       const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner, bezahltH);
@@ -36652,11 +36699,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((bInst.counters?.negated || bInst.counters?.nulled || bInst.counters?.stunned) && !this._creatureNegationProof(bInst)) continue;
       for (const g of guardsB) {
       if (!g?.isBoardRedirect || typeof g.onBoardRedirect !== 'function') continue;
-      if (_nurNegation && !g.isBoardNegation) continue;
-      if (g.isBoardNegation) {
-        const _srcScriptB = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (config.cannotBeNegated || _srcScriptB?.cannotBeNegated) continue;
-      }
+      if (g.isBoardNegation && _reaktionZu) continue;   // „cannot react" (Surefire Shot, Midnight Assault): kein Negierer; „cannot be negated" laesst ihn dagegen zu (nutzlose Aktivierung, s. oben)
       if (typeof g.canBoardRedirect === 'function'
           && !g.canBoardRedirect(this.gs, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, this)) continue;
 
@@ -36671,9 +36714,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       const confirmedB = _pflichtB ? true : await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: guardNameB,
-        message: g.boardRedirectPrompt
-          ? g.boardRedirectPrompt(attackerNameB, selected, this)
-          : `${g.isBoardNegation ? 'Negate' : 'Redirect'} ${attackerNameB}?`,
+        message: (() => {
+          const _hB = g.isBoardNegation ? (_negGesperrt ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect') : '') : _umlHinweis;
+          const _basisB = g.boardRedirectPrompt
+            ? g.boardRedirectPrompt(attackerNameB, selected, this)
+            : `${g.isBoardNegation ? 'Negate' : 'Redirect'} ${attackerNameB}?`;
+          return _hB ? `${_basisB} ${_hB} Activate it anyway?` : _basisB;
+        })(),
+        ...(((g.isBoardNegation && _negGesperrt) || (!g.isBoardNegation && _nurNegation)) ? { _nutzlos: true } : {}),
         showCard: sourceCard?.name || null,
         showCardLeft: guardNameB,
         confirmLabel: g.isBoardNegation ? '🛡️ Negate!' : '↪️ Redirect!',
@@ -36707,6 +36755,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         continue;
       }
 
+      // Nutzlose Aktivierung (Spielgestalter-Entscheidung 16.11.2026): Kosten, Limit und Kettenfenster sind durch — Umleitung/Negation findet nicht statt.
+      if ((g.isBoardNegation && _negGesperrt) || (!g.isBoardNegation && _nurNegation)) {
+        this.log('board_guard_useless', { card: guardNameB, source: sourceCard?.name, reason: g.isBoardNegation ? 'cannotBeNegated' : 'cannotBeRedirected' });
+        if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+        continue;
+      }
       const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, bezahltB);
       if (Array.isArray(resultB?.dropTargetIds) && resultB.dropTargetIds.length > 0) {
         this.log('target_negated_by_board', {
@@ -36750,11 +36804,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Negierer (`isSurpriseNegation`) schweigen nur, wenn der Effekt
       // selbst „cannot be negated" ist (Quell-Skript oder Targeting-
       // Konfiguration).
-      if (_nurNegation && !sScript.isSurpriseNegation) continue;
-      if (sScript.isSurpriseNegation) {
-        const _srcScript = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (config.cannotBeNegated || _srcScript?.cannotBeNegated) continue;
-      }
+      if (sScript.isSurpriseNegation && _reaktionZu) continue;   // „cannot react": kein Negierer; „cannot be negated" laesst ihn zu (nutzlose Aktivierung, Ausgang unten verworfen)
 
       // Surprise instance must still be face-down in the zone.
       const sInst = this.cardInstances.find(c =>
@@ -36770,7 +36820,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       const confirmed = await this.promptGeneric(reaktor, {
         type: 'confirm',
         title: sName,
-        message: `Your ${selected.cardName} was chosen by ${attackerName}! Activate ${sName}?`,
+        message: this._nutzlosFrage(`Your ${selected.cardName} was chosen by ${attackerName}!`,
+          sScript.isSurpriseNegation ? (_negGesperrt ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect') : '') : _umlHinweis, `Activate ${sName}`),
+        ...(((sScript.isSurpriseNegation && _negGesperrt) || (!sScript.isSurpriseNegation && _nurNegation)) ? { _nutzlos: true } : {}),
         showCard: sourceCard?.name || null,
         // v700-Konvention auch hier: links die angebotene Surprise.
         showCardLeft: sName,
@@ -36799,6 +36851,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // neues Ziel), und die drei Eingaenge uebersetzen es einheitlich
       // in „keine Ziele" (Karten-Skripte brechen auf leerer Auswahl ab)
       // bzw. Abbruch des Targeting-Pfads.
+      // Nutzlose Aktivierung (Spielgestalter-Entscheidung 16.11.2026): Die Surprise ist aktiviert und verbraucht, ihr Ausgang aber gesperrt („cannot be negated" / „cannot be redirected").
+      if ((sResult?.negateEffect && _negGesperrt) || (sResult?.redirectTo && !sScript.isSurpriseNegation && _nurNegation)) {
+        this.log('surprise_useless', { surprise: sName, source: sourceCard?.name, reason: sResult?.negateEffect ? 'cannotBeNegated' : 'cannotBeRedirected' });
+        continue;
+      }
       if (sResult?.negateEffect) {
         this.log('target_negated_by_surprise', {
           surprise: sName, source: sourceCard?.name,
@@ -39524,19 +39581,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    // v687: Ist der Treffer UNAUFHALTBAR (weder verringerbar noch
-    // negierbar — Tempeste, the Weather Fairy; Monia-Bot-True-Damage),
-    // wird das Angebot uebersprungen statt vetoiert. Jede Reaktion in
-    // diesem Fenster (Strong Shield, Bamboo Shield, Escape, Homerun,
-    // Sculpture Guards, Spectral Armor) kann NUR negieren oder
-    // verringern; sie anzubieten hiesse, die Karte fuer nichts zu
-    // verbrauchen — „Kosten bleiben bezahlt" waere hier eine Falle.
-    // Nur-`cannotBeNegated` (Ida) bleibt beim alten Verhalten.
+    // v687: Ist der Treffer UNAUFHALTBAR (weder verringerbar noch negierbar — Tempeste, the Weather Fairy; Monia-Bot-True-Damage), wurde das Angebot bisher uebersprungen.
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — die Reaktionen dieses Fensters (Strong Shield, Bamboo Shield, Escape, Homerun,
+    // Sculpture Guards, Spectral Armor) werden AUCH gegen unaufhaltsamen Schaden angeboten (Hinweis in der Frage, `_nutzlosHinweis`); bezahlt/verbraucht wird wie immer, der
+    // Treffer geht durch (der Aufrufer verwirft Negation/Senkung bei `cannotBeNegated`/`cannotBeReduced`). Die CPU waehlt solche Aktivierungen weiter nicht (`_nutzlos`).
+    const _hinweisSchaden = this._nutzlosHinweis(opts, 'damage');
     if (opts.cannotBeNegated && opts.cannotBeReduced) {
-      this.log('pre_damage_reactions_skipped', {
+      this.log('pre_damage_reactions_unstoppable', {
         target: this._heroLabel(target), source: source?.name, reason: 'unstoppable_damage',
       });
-      return NULL_RESULT;
     }
     if (this._inPreDamageReaction) return NULL_RESULT;
 
@@ -39633,15 +39686,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Prompt
       const srcName = source?.name || 'An effect';
       const heroName = target.name || 'Hero';
+      // Nutzlos (nur fuer die CPU-Sperre): Standard = der Treffer ist weder verringer- noch negierbar; eine Karte, die nur negiert (Homerun!) bzw. nur senkt, nennt es selbst (`preDamageUseless`).
+      const _nutzlos = !!_hinweisSchaden && (typeof script.preDamageUseless === 'function'
+        ? !!script.preDamageUseless({ cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })
+        : !!(opts.cannotBeNegated && opts.cannotBeReduced));
       const confirmed = await this.promptGeneric(targetOwner, {
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
+        ...(_nutzlos ? { _nutzlos: true } : {}),
         message: opts.isSacrifice
           ? `${heroName} is about to be sacrificed by ${srcName}! Activate ${cardName}?`
           : opts.instaKill
           ? `${heroName} is about to be defeated by ${srcName}! Activate ${cardName}?`
-          : `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
+          : this._nutzlosFrage(`${heroName} is about to take ${amount} damage from ${srcName}!`, _hinweisSchaden, `Activate ${cardName}`),
         showCard: cardName,
         confirmLabel: '✨ Activate!',
         cancelLabel: 'No',
@@ -40064,11 +40122,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const srcName = source?.name || 'An effect';
       const tgtName = creatureInst.name || 'Creature';
+      // Spielgestalter-Entscheidung 16.11.2026 (nutzlose Aktivierungen sind erlaubt): Hinweis bei unnegier-/unsenkbarem Schaden; die CPU waehlt solche Aktivierungen nicht (`_nutzlos`).
+      const _hinweisK = this._nutzlosHinweis(opts, 'damage');
+      const _nutzlosK = !!_hinweisK && (typeof script.preDamageUseless === 'function'
+        ? !!script.preDamageUseless({ cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })
+        : !!(opts.cannotBeNegated && opts.cannotBeReduced));
       const confirmed = await this.promptGeneric(ownerIdx, {
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
-        message: `${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
+        ...(_nutzlosK ? { _nutzlos: true } : {}),
+        message: this._nutzlosFrage(`${tgtName} is about to take ${amount} damage from ${srcName}!`, _hinweisK, `Activate ${cardName}`),
         showCard: cardName,
         showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '🛡️ Activate!',
@@ -43954,18 +44018,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    *     konvertiert. Der Pfeil macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
    */
   _attackSchadenUnreduzierbar(ctx = {}) {
+    // `ctx.nurElixir` (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt): nur der bereitstehende Elixir of Strength („müssen sich ausschließen", s. unten) —
+    // die Quellen-seitig unreduzierbaren Attacks (Surefire Shot, Club of Gobbo) sperren Hydra Blood Arrow nicht mehr, sie wird angeboten und wirkt dann nicht.
     const h = ctx?.hookCtx;
     if (h && h._unreduzierbar) return true;
     const link = ctx?.link;
     if (!link) return false;
     const script = loadCardEffect(link.cardName);
-    if (script?.attackDamageCannotBeReduced) return true;
+    if (!ctx.nurElixir && script?.attackDamageCannotBeReduced) return true;
     const seite = link.casterOwner ?? link.owner;
     const hi = link.heroIdx;
     if (!Number.isInteger(hi) || hi < 0) return false;
     const hero = this.gs.players[seite]?.heroes?.[hi];
     if (!hero?.name) return false;
-    for (const inst of this.cardInstances) {
+    for (const inst of (ctx.nurElixir ? [] : this.cardInstances)) {
       if (inst.zone !== ZONES.SUPPORT || inst.faceDown || inst.heroIdx !== hi || this.physicalSide(inst) !== seite) continue;
       if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.attackerDamageCannotBeReduced) continue;
       if (this.isCardPassiveDormant(inst)) continue;
@@ -44351,7 +44417,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
-        if (opts.cannotBeNegated && script.negatesWholeCard) continue;   // „cannot be negated" (`config.cannotBeNegated` der Zielwahl): kein Angebot fuer ganz negierende Reaktionen
+        // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — bei „cannot be negated" (`config.cannotBeNegated` der Zielwahl: Exorcism mit Decay Magic 2) werden auch
+        // ganz negierende Reaktionen angeboten (Hinweis in der Frage, CPU waehlt sie nicht); ihre Negation wird unten verworfen (die Karte ist bezahlt, der Effekt laeuft).
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
         // Kreatur-Reaktionen die gewaehlten Kreaturen.
         targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
@@ -44401,11 +44468,20 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Build prompt message
         const targetNames = targetedHeroes.map(t => t.cardName).join(', ');
         const srcName = sourceCard?.name || 'An effect';
+        // Hinweis fuer nutzlose Aktivierungen (Spielgestalter-Entscheidung 16.11.2026): ganz negierende Reaktion gegen „cannot be negated" / Schutzkarte gegen Schaden, der laut Kartentext
+        // weder verringert noch negiert werden kann (Skript-Flag `damageCannotBeReducedOrNegated`: Rockfall, Pressure Projectile, Acid Vial).
+        const _ptGanzNeg = !!(opts.cannotBeNegated && script.negatesWholeCard);
+        const _ptSchadenFlag = dealsDamage && !script.negatesWholeCard && !!(sourceCard?.name && loadCardEffect(sourceCard.name)?.damageCannotBeReducedOrNegated === true);
+        const _ptHinweis = opts.cannotBeNegated ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')
+          : (_ptSchadenFlag ? this._nutzlosHinweis({ cannotBeNegated: true, cannotBeReduced: true }, 'damage') : '');
+        // CPU-Sperre: reine Schadens-Schutzkarten (Vor-Schaden-Reaktionen, Future Tech Escape Device: `uselessVsUnstoppableDamage`) gegen unaufhaltsamen Schaden verbrennt die CPU nicht.
+        const _ptNutzlos = _ptGanzNeg || (_ptSchadenFlag && (script.isPreDamageReaction === true || script.uselessVsUnstoppableDamage === true));
 
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: cardName,
           _handReactionWindow: true,
+          ...(_ptNutzlos ? { _nutzlos: true } : {}),
           // Structured context for per-card `cpuResponse` heuristics
           // (generic contract, mirrors `_preDamageContext` on the
           // per-hero path): the post-target stage doesn't know
@@ -44424,7 +44500,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType,
             dealsDamage,
           },
-          message: `${srcName} is targeting ${targetNames}! Activate ${cardName}?`,
+          message: this._nutzlosFrage(`${srcName} is targeting ${targetNames}!`, _ptHinweis, `Activate ${cardName}`),
           showCard: cardName,
           confirmLabel: '✨ Activate!',
           cancelLabel: 'No',
@@ -44553,7 +44629,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard,
               { damageType, dealsDamage, casterIdx: isArtifact ? null : castingHeroIdx, casterSeite: castingSeite });
           }
-          this._merkeGanzeNegation(script, resolveResult);   // Z7b
+          if (!opts.cannotBeNegated) this._merkeGanzeNegation(script, resolveResult);   // Z7b (bei 'cannot be negated' verfaellt die Negation, s. unten)
         } finally {
           this._inPostTargetReaction = false;
         }
@@ -44606,6 +44682,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // circuits the loop, because the source itself is fizzled and
         // no further damage is coming. Non-negating reactions return
         // and the loop continues to offer the next eligible card.
+        // Spielgestalter-Entscheidung 16.11.2026: „cannot be negated" — die Negation verfaellt (Karte und Kosten sind verbraucht, der Effekt laeuft; wie `piercing_override` im Schadenspfad).
+        if (resolveResult?.effectNegated && opts.cannotBeNegated) {
+          this.log('piercing_override', { source: sourceCard?.name, reason: 'post_target_negation', card: cardName });
+          resolveResult = { ...resolveResult, effectNegated: false };
+        }
         if (resolveResult?.effectNegated) return resolveResult;
         // v1368: Umlenkungen sammeln (Deepsea Encounter, Dream World
         // Switcheroo) — vorher gab der Hub sie NIE zurueck.
@@ -47290,6 +47371,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Eine Reaktion kann ueber `reactionUselessHint(gs, pi, engine, chainCtx)` einen Hinweis liefern, dass sie
+      // gegen dieses Ereignis nichts bewirkt (Hydra Blood Arrow gegen unreduzierbaren Attack-Schaden): sie wird trotzdem angeboten (Hinweis in der Frage), die CPU waehlt sie nicht.
+      const _nutzlosHinweise = new Map();
+      for (const [nm, inf] of [...eligibleByName]) {
+        let hint = null;
+        try { hint = typeof inf.script?.reactionUselessHint === 'function' ? inf.script.reactionUselessHint(this.gs, pi, this, chainCtx) : null; } catch { hint = null; }
+        if (!hint) continue;
+        if (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) { eligibleByName.delete(nm); continue; }
+        _nutzlosHinweise.set(nm, hint);
+      }
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -47302,7 +47393,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: onlyName,
-          message: `${eventDesc}. Activate ${onlyName}?`,
+          message: _nutzlosHinweise.has(onlyName)
+            ? `${eventDesc}. ${_nutzlosHinweise.get(onlyName)} Activate ${onlyName} anyway?`
+            : `${eventDesc}. Activate ${onlyName}?`,
           // ★ v877 (Als Vorgabe): Der Prompt fragt nach DIESER Karte —
           // sie gehoert LINKS an die Seite. Der Confirm-Dialog hat dafuer
           // zwei Plaetze: `showCardLeft` links neben dem Text,
@@ -47332,7 +47425,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           type: 'cardGallery',
           cards,
           title: 'Chain a Reaction?',
-          description: `${eventDesc}. Click a card to chain it, or decline.`,
+          description: `${eventDesc}. Click a card to chain it, or decline.${[..._nutzlosHinweise].map(([nm, h]) => ` ${nm}: ${h}`).join('')}`,
           // v693: WORAUF reagiere ich? Die juengste fremde Karte der
           // Kette (sonst die Initialkarte) neben dem Text zeigen — der
           // Einfach-Confirm hatte das schon (`showCard`), die Galerie nicht.
@@ -56731,7 +56824,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typeof srcOwner !== 'number' || srcOwner < 0) return negated;
     const srcName = source?.name || null;
     const srcScript = srcName ? loadCardEffect(srcName) : null;
-    if (srcScript?.cannotBeNegated) return negated;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen „cannot be negated" wird der Wächter angeboten (Hinweis in der Frage, CPU waehlt es nicht);
+    // Kosten/Limit/Kettenfenster wie immer, die Negation selbst findet nicht statt. Eine Quelle, auf die der Gegner nicht reagieren darf (`opponentCannotReact`), oeffnet weiter nichts.
+    if (srcScript?.opponentCannotReact) return negated;
+    const _negGesperrtE = !!srcScript?.cannotBeNegated;
     const owners = [...new Set(list.map(t => t.controller ?? t.owner))];
     for (const ownerIdx of owners) {
       if (ownerIdx == null || ownerIdx === srcOwner) continue;
@@ -56751,9 +56847,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(ownerIdx, {
           type: 'confirm',
           title: guardName,
-          message: g.boardEffectGuardPrompt
-            ? g.boardEffectGuardPrompt(srcName || 'an effect', mine, kind, this)
-            : `Negate ${srcName || 'this effect'} on your protected Creatures?`,
+          message: (() => {
+            const _basisE = g.boardEffectGuardPrompt
+              ? g.boardEffectGuardPrompt(srcName || 'an effect', mine, kind, this)
+              : `Negate ${srcName || 'this effect'} on your protected Creatures?`;
+            return _negGesperrtE ? `${_basisE} ${this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')} Activate it anyway?` : _basisE;
+          })(),
+          ...(_negGesperrtE ? { _nutzlos: true } : {}),
           showCard: srcName,
           showCardLeft: guardName,
           confirmLabel: '🛡️ Negate!',
@@ -56776,6 +56876,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!bezahltE) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
         }
         if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
+        if (_negGesperrtE) { this.log('board_guard_useless', { card: guardName, source: srcName, reason: 'cannotBeNegated' }); this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }   // nutzlose Aktivierung: bezahlt, keine Negation
         const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind, bezahltE);
         for (const id of (res?.dropInstIds || [])) negated.add(id);
         if (res?.dropInstIds?.length) {
@@ -56856,7 +56957,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!gScript) continue;
         if (gInst.counters?.negated || gInst.counters?.nulled || gInst.counters?.stunned) continue;
         const _srcScriptG = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (_srcScriptG?.cannotBeNegated) continue;
+        if (_srcScriptG?.opponentCannotReact) continue;   // Spielgestalter-Entscheidung 16.11.2026: „cannot be negated" laesst den Waechter zu (nutzlose Aktivierung); „cannot react" nicht
+        const _negGesperrtA = !!_srcScriptG?.cannotBeNegated;
         const guards = Array.isArray(gScript.boardGuards) ? gScript.boardGuards : [gScript];
         for (const g of guards) {
         if (!g?.boardAoeGuard || typeof g.onGuardAoe !== 'function') continue;
@@ -56866,9 +56968,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(ownerIdx, {
           type: 'confirm',
           title: guardName,
-          message: g.boardAoeGuardPrompt
-            ? g.boardAoeGuardPrompt(sourceCard?.name || 'an effect', mine, this)
-            : `Negate ${sourceCard?.name || 'this effect'} on your protected Creatures?`,
+          message: (() => {
+            const _basisA = g.boardAoeGuardPrompt
+              ? g.boardAoeGuardPrompt(sourceCard?.name || 'an effect', mine, this)
+              : `Negate ${sourceCard?.name || 'this effect'} on your protected Creatures?`;
+            return _negGesperrtA ? `${_basisA} ${this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')} Activate it anyway?` : _basisA;
+          })(),
+          ...(_negGesperrtA ? { _nutzlos: true } : {}),
           showCard: sourceCard?.name || null,
           showCardLeft: guardName,
           confirmLabel: '🛡️ Negate!',
@@ -56884,6 +56990,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!bezahltA) continue;
         }
         if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) continue;
+        if (_negGesperrtA) { this.log('board_guard_useless', { card: guardName, source: sourceCard?.name, reason: 'cannotBeNegated' }); continue; }   // nutzlose Aktivierung: bezahlt, keine Negation
         const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard, bezahltA);
         const drop = new Set(res?.dropInstIds || []);
         if (drop.size === 0) continue;
@@ -58300,12 +58407,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // is a no-op. Multipliers ≥ 1 still apply.
       // ── W51c: FRUEHES Hand-Reaktionsfenster „Schaden senken" (Cloud in a Bottle), Zwilling des Heldenpfads: VOR dem Multiplikatoren-Durchgang, damit die
       // Halbierung vor Einmal-Schilden/Flat-Boni/HP-Boeden greift. Die Karte legt „Cloudy" auf; der Durchgang darunter halbiert dann. Nicht senkbarer Schaden
-      // (`cannotBeReduced`, `canBeNegated === false`) bekommt kein Angebot; Zerstoeren/Opfer sind kein Schaden.
-      if (e.inst && !e._immuneCreature && e.canBeNegated !== false && !e.cannotBeReduced && e.amount > 0
+      // (`cannotBeReduced`, `canBeNegated === false`) bekommt das Angebot trotzdem (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt; Hinweis in der Frage,
+      // ein zurueckgelieferter `multiplier` wird verworfen); Zerstoeren/Opfer sind kein Schaden.
+      const _eNichtSenkbar = e.canBeNegated === false || !!e.cannotBeReduced || !!e.cannotBeNegated || e.trueDamage === true;
+      if (e.inst && !e._immuneCreature && e.amount > 0
           && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0
           && !require('./_arrows-shared').hydraWirdNullen(this, e.source, { type: e.type, _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true })) {   // R5: eine nullende Hydra — die Reaktion am Ziel sieht schon die 0
-        const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type, { early: true });
-        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+        const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type,
+          { early: true, cannotBeNegated: e.canBeNegated === false || !!e.cannotBeNegated || e.trueDamage === true, cannotBeReduced: !!e.cannotBeReduced || e.trueDamage === true });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1 && !_eNichtSenkbar) {
           if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * _fr.multiplier; e._kMul = (e._kMul ?? 1) * _fr.multiplier; }
           else e.amount = Math.ceil(e.amount * _fr.multiplier);
         }
@@ -58524,7 +58634,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       // which is non-lethal too. Sibling of the pre-DEFEAT reaction
       // a few lines below (lethal-only).
       if (actualAmount > 0 && (e.inst.counters.currentHp || 0) > 0) {
-        const preDamageRes = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type);
+        // Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — auch gegen unnegier-/unsenkbaren Schaden (Hinweis in der Frage); Negation/Senkung werden dann verworfen
+        // (wie im Heldenpfad, `piercing_override`): bezahlt/verbraucht, der Treffer geht durch.
+        const _eKeineNegation = e.canBeNegated === false || !!e.cannotBeNegated || e.trueDamage === true;
+        const _eKeineSenkung = !!e.cannotBeReduced || e.trueDamage === true || e._unreduzierbar === true;
+        let preDamageRes = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type,
+          { cannotBeNegated: _eKeineNegation, cannotBeReduced: _eKeineSenkung });
+        if (preDamageRes?.negated && _eKeineNegation) {
+          this.log('piercing_override', { source: e.source?.name, reason: 'creature_pre_damage_negation' });
+          preDamageRes = { ...preDamageRes, negated: false };
+        }
+        if (typeof preDamageRes?.amountOverride === 'number' && _eKeineSenkung && preDamageRes.amountOverride < actualAmount) {
+          this.log('piercing_override', { source: e.source?.name, reason: 'creature_pre_damage_reduction' });
+          preDamageRes = { ...preDamageRes, amountOverride: undefined };
+        }
         if (preDamageRes?.negated) {
           if (e.vollOut) e.vollOut.wert = 0;   // W50a
           if (e.inst.counters._dyingThisBatch) delete e.inst.counters._dyingThisBatch;

@@ -12669,11 +12669,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   //   Als Befund vom 31.8. (Book of Doom auf 1 Ziel: Monia Bot meldet
   //   sich; auf 2+: gar nichts). Die Schleife ueber alle gewaehlten
   //   Ziele steht jetzt EINMAL in `engine.applyRedirectWindows`.
-  if (!script.cannotBeRedirected) {
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — auch eine Quelle mit `cannotBeRedirected` (Acid Vial) oeffnet das Fenster: die Umleiter werden angeboten
+  // (Hinweis in der Frage), die Umleitung selbst findet nicht statt (`config.cannotBeRedirected` → `_noRedirectOutcome` in `_checkTargetRedirectOnce`).
+  {
     const srcInst = { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' };
     try {
       selectedIds = await room.engine.applyRedirectWindows(
-        selectedIds, validTargets, { title: potionName, sourceCard: srcInst }, srcInst
+        selectedIds, validTargets, { title: potionName, sourceCard: srcInst, ...(script.cannotBeRedirected ? { cannotBeRedirected: true } : {}) }, srcInst
       );
     } catch (err) {
       console.error('[Engine] targeting-session redirect error:', err.message);

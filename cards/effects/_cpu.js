@@ -7957,6 +7957,14 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     return engine._cpuWaehleSofortaktion(promptData, cpuIdx);
   }
 
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt (Mensch) — die CPU waehlt sie NICHT: eine Schutz-/Negations-/Umleitungs-Aktivierung gegen Schaden bzw.
+  // Effekte, die laut Kartentext nicht verringert/umgeleitet/negiert werden koennen (`promptData._nutzlos`, gesetzt von den Reaktionsfenstern der Engine), verbrennt nur die Karte.
+  // VOR allen Karten-Overrides (`cpuResponse` einzelner Karten wuerde sonst zusagen, Homerun!).
+  if (type === 'confirm' && promptData._nutzlos === true && promptData.cancellable) {
+    try { confirmDiag(engine, promptData, false); } catch { /* Diagnose ist Beiwerk */ }
+    return null;
+  }
+
   // ── Gerrymander redirect handling ──
   // When `_gerryRewritten` is set, the prompt was redirected from opp
   // to us (the Gerrymander owner). We're picking FOR opp — invert the
