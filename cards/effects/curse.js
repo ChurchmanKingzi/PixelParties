@@ -184,11 +184,11 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
  * Zustands-Abgleich (`statusFolgtImmunitaet`): die ATK-Sperre des Fluchs wie in `fluchAnlegen` — der Abgleich setzt den Status `cursed` selbst (vor `einsetzen`), diese Funktion sichert die ATK
  * in den Zwischenspeicher und setzt sie auf 0. Idempotent (zweite Kopie, Doomed Pirate halten den Zwischenspeicher schon).
  */
-function atkSperreEinsetzen(engine, hero, owner, heroIdx) {
-  if (hero._cursedAtkSuppressed !== undefined) return;
-  const alt = hero.atk || 0;
-  hero._cursedAtkSuppressed = alt;
-  hero.atk = 0;
+function atkSperreEinsetzen(engine, targetHero, owner, heroIdx) {   // `targetHero` wie in `fluchAnlegen`: dieselbe begründete Ausnahme des ATK-Trichter-Wächters (Absenken direkt, Wert im Zwischenspeicher)
+  if (targetHero._cursedAtkSuppressed !== undefined) return;
+  const alt = targetHero.atk || 0;
+  targetHero._cursedAtkSuppressed = alt;
+  targetHero.atk = 0;
   if (alt > 0) engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -alt });
 }
 
