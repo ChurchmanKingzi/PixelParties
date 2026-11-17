@@ -4142,7 +4142,7 @@
 },
 "Love Shot": {
 "name": "Liebespfeil",
-"effect": "Dieser Zauber kann unabhängig von seinem Level von Helden mit der Fähigkeit \"Charme\" verwendet werden. Ziehe eine Karte aus dem Deck deines Gegners. Wähle danach einen Helden, den dein Gegner kontrolliert, und führe mit ihm, falls möglich, einen Angriff oder Zauber aus deiner Hand aus. Dieser Angriff oder Zauber zählt als zusätzliche Aktion. Nur für diesen Angriff oder Zauber gilt der Held als von dir kontrolliert. Karten in den Fähigkeitszonen dieses Helden sind von allen Effekten unberührt, solange du ihn kontrollierst."
+"effect": "Dieser Zauber kann unabhängig von seinem Level von Helden mit der Fähigkeit \"Charme\" verwendet werden. Ziehe eine Karte aus dem Deck deines Gegners. Wähle danach einen Helden, den dein Gegner kontrolliert, und führe mit ihm, falls möglich, einen Angriff oder einen normalen Zauber, Gebietszauber oder Anlagezauber aus deiner Hand aus. Dieser Angriff oder Zauber zählt als zusätzliche Aktion. Nur für diesen Angriff oder Zauber gilt der Held als von dir kontrolliert. Karten in den Fähigkeitszonen dieses Helden sind von allen Effekten unberührt, solange du ihn kontrollierst."
 },
 "Lovely Teddy": {
 "name": "Liebes-Teddy",
@@ -4898,7 +4898,7 @@
 },
 "Shard of Chaos": {
 "name": "Splitter des Chaos",
-"effect": "Lösche bis zu 3 Karten aus deiner Hand. Wähle dann dieselbe Anzahl Karten desselben Typs (Fähigkeit, Angriff/Zauber/Kreatur, Artefakt, Trank, Held) aus deinem Ablagestapel und füge sie deiner Hand hinzu. Lösche diese Karte."
+"effect": "Lösche bis zu 3 Karten aus deiner Hand. Wähle dann dieselbe Anzahl Karten desselben Typs (Fähigkeit, Angriff/Zauber/Kreatur, Artefakt, Trank, Held/Aufgestiegener Held) aus deinem Ablagestapel und füge sie deiner Hand hinzu. Lösche diese Karte."
 },
 "Shared Blood Tanks": {
 "name": "Geteilte Bluttanks",
@@ -5456,7 +5456,7 @@
 },
 "Time Distortion": {
 "name": "Zeitverzerrung",
-"effect": "Decke die obersten 3 Karten deines Decks auf und wähle, falls möglich, einen Zauber mit Level 3 oder niedriger unter ihnen. Der Anwender dieses Zaubers führt diesen Zauber sofort als zusätzliche Aktion aus, unabhängig von seinem Level. Mische die anderen Karten zurück in dein Deck."
+"effect": "Decke die obersten 3 Karten deines Decks auf und wähle, falls möglich, einen normalen Zauber, Gebietszauber oder Anlagezauber mit Level 3 oder niedriger unter ihnen. Der Anwender dieses Zaubers führt diesen Zauber sofort als zusätzliche Aktion aus, unabhängig von seinem Level. Mische die anderen Karten zurück in dein Deck."
 },
 "Time Tyrant": {
 "name": "Zeittyrann",
