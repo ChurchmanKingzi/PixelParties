@@ -46,9 +46,9 @@ module.exports = {
         ? engine.cardInstances.find(i => i.zone === 'support' && !i.faceDown && engine.physicalSide(i) === t.owner && i.heroIdx === t.heroIdx && i.zoneSlot === t.slotIdx)
         : null);
       if ((t.type === 'equip' || t.type === 'creature') && kreatur) {
-        if (engine.grantCreatureEffectImmunity(kreatur, source)) granted++;
+        if (engine.grantCreatureEffectImmunity(kreatur, source, { ueberFenster: true })) granted++;   // Spielgestalter-Entscheidung 17.11.2026: für die ganze Auflösung dieser einen Karte/dieses Effekts, danach vorbei
       } else if (t.heroIdx != null && t.heroIdx >= 0 && t.type !== 'equip' && t.type !== 'creature') {
-        if (engine.grantEffectImmunity(t.owner, t.heroIdx, source)) granted++;
+        if (engine.grantEffectImmunity(t.owner, t.heroIdx, source, { ueberFenster: true })) granted++;
       }
     }
     if (granted === 0) return;

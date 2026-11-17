@@ -153,7 +153,8 @@ module.exports = {
 
     engine._broadcastEvent('play_zone_animation', { type: 'glass_wall_shatter', owner: t.seite, heroIdx: t.heroIdx, zoneSlot: -1 });
     await engine._delay(BRUCH_MS);                        // die Risse laufen, dann bricht die Scheibe
-    engine.grantEffectImmunity(t.seite, t.heroIdx, source);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(t.seite, t.heroIdx, source, { ueberFenster: true });
     engine.log('glass_wall_shatter', { player: gs.players[pi]?.username, hero: t.hero.name, negated: srcName });
     if (inst.zone === 'surprise') {
       // Flug Surprise Zone → Ablage, an die Zone des Trägers gebunden (gleichnamige Karten auf anderen Helden sind sonst nicht unterscheidbar; Muster: Spider Silk Bridge).

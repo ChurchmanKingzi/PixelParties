@@ -12070,6 +12070,7 @@ class GameEngine {
     {
       const iOwner = this._findHeroOwner(target);
       const iHi = iOwner >= 0 ? (this.gs.players[iOwner].heroes || []).indexOf(target) : -1;
+      if (iOwner >= 0 && iHi >= 0 && amount > 0) await this.heroAffectWindow(iOwner, iHi);   // „Affected"-Fenster (17.11.2026): auch Heilungen ohne Zielwahl (Healing Melody …)
       if (iOwner >= 0 && iHi >= 0 && this.hasEffectImmunity(iOwner, iHi, source)) {
         this.log('effect_immunity', { hero: this._heroLabel(target), source: source?.name || null, effect: 'heal' });
         return;
@@ -12726,6 +12727,7 @@ class GameEngine {
     // Spielgestalter-Entscheidung 16.11.2026: eine Effekt-Immunität dieser Auflösung (Future Tech Escape Device, Castling, Man-Eater Birds …: „Negate all effects … on that Hero")
     // gilt für ALLE Effekte auf den Helden, auch die ohne Schaden und Status (Max-HP-Gewinn, Fähigkeiten abwerfen/tauschen, Kontrolle, Ausrüstung …) — auch ein hilfreicher eigener Zauber
     // (Divine Gift of Sacrifice) kann die Reaktion auslösen. `defeat` prüft `actionDefeatHero` selbst (Rückgabe `effectImmune`); `piercing` (Exorcism Decay 2) geht durch.
+    if (!opts.piercing && effectType !== 'defeat') await this.heroAffectWindow(heroOwner, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Effekte ohne Zielwahl (Divine Gift of Sacrifice mit nur einem Empfänger, Anhänge …)
     if (!opts.piercing && effectType !== 'defeat' && this.hasEffectImmunity(heroOwner, heroIdx, opts.source ?? null)) {
       this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'effect_immunity' });
       return true;
@@ -21686,6 +21688,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch Buffs/Debuffs auf dem Helden.
+    await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Buffs ohne Zielwahl
     if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
       this.log('effect_immunity', { hero: hero.name, buff: buffName });
       return false;
@@ -21766,6 +21769,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.buffs?.[buffName]) return;
     // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch das Entfernen von Buffs. Das Auslaufen am Ende der Dauer (`opts.ablauf`)
     // ist kein Effekt einer Karte und bleibt unberührt.
+    if (!opts.ablauf) await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026)
     if (!opts.ablauf && this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
       this.log('effect_immunity', { hero: hero.name, buffRemove: buffName });
       return;
@@ -23053,10 +23057,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Liste `gs._effectImmunities` (wird zu Beginn jedes Zielfensters
    * geleert), quellenblind wie beim Helden (Als Befund 21.8.).
    */
-  grantCreatureEffectImmunity(inst, sourceObj) {
+  grantCreatureEffectImmunity(inst, sourceObj, opts = {}) {
     if (!inst || !sourceObj || typeof sourceObj !== 'object') return false;
     if (!this.gs._effectImmunities) this.gs._effectImmunities = [];
-    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj });
+    // Spielgestalter-Entscheidung 17.11.2026: `opts.ueberFenster` wie beim Helden — übersteht die Leerung beim nächsten Zielfenster und endet mit der Auflösung (`endeEffektImmunitaeten`).
+    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj, ...(opts.ueberFenster ? { ueberFenster: true } : {}) });
     return true;
   }
 
@@ -24149,6 +24154,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const order = [...targetOwners, ...this.gs.players.map((_, i) => i).filter(i => !targetOwners.includes(i))];
     for (const pi of order) {
       if (this._reaktionGesperrt(pi)) continue;   // v1293 Reaktionssperre
+      if (opts.affect && this.isCpuPlayer(pi)) continue;   // „Affected"-Fenster: kein neuer Prompt für die CPU
       for (const inst of [...this.cardInstances]) {
         // 12.10. (Glass Wall): auch eine OFFEN liegende Karte in einer Surprise Zone reagiert hier (sie gehoert dem Kontrolleur des Helden, dessen Zone sie belegt).
         if (inst.zone !== 'support' && inst.zone !== 'area' && inst.zone !== 'surprise') continue;
@@ -24158,6 +24164,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (inst.faceDown) continue;
         const script = loadCardEffect(inst.name);
         if (!script?.isPostTargetBoardReaction) continue;
+        if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
         if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn()) continue;
         if (inst.zone === 'support' && this.isCreatureEffectSuppressed(inst)) continue;
         let ok = false;
@@ -44263,6 +44270,76 @@ this._deathWatch = (this._deathWatchStack || []).length
     return key != null && set.has(key);
   }
 
+  /** „Affected"-Fenster: Geltungsbereich = die laufende Auflösung (nur gespielte Spells/Attacks und aktive Kreatureneffekte), sonst `null`. */
+  _affectScope() {
+    const cur = this._currentEffectSource;
+    if (!cur?.cardName || !isSeat(this, cur.owner)) return null;
+    if (cur.cardType !== 'Spell' && cur.cardType !== 'Attack' && cur.cardType !== 'CreatureEffect') return null;
+    return cur;
+  }
+
+  /** Vormerkung „für diesen Helden lief das Fenster dieser Auflösung schon" (am Auflösungs-Objekt). `merken` = eintragen, sonst nur lesen. */
+  _affectGesehen(heroSeite, heroIdx, merken) {
+    const scope = this._affectScope();
+    if (!scope) return false;
+    if (!this._affectOffen) this._affectOffen = new WeakMap();
+    let set = this._affectOffen.get(scope);
+    if (!set) { set = new Set(); this._affectOffen.set(scope, set); }
+    const key = `${heroSeite}-${heroIdx}`;
+    const war = set.has(key);
+    if (merken) set.add(key);
+    return war;
+  }
+
+  /**
+   * ★ „AFFECTED"-FENSTER (Spielgestalter-Entscheidung 17.11.2026): Reaktionen, deren Kartentext auf „would be AFFECTED" lautet (Future Tech Escape Device, Barrier of Faith, Divine Gift of
+   * Rain, Castling, Future Tech Weathercock — Skript-Flag `affectFenster: true`), werden auch angeboten, wenn die Attack/der Spell KEINE Zielwahl hat: nur ein legales Ziel (Auto-Wahl),
+   * Zauber ohne Zielfenster (Healing Melody), Anhängsel-Spells auf eigene Helden, Divine Gift of Coolness … „Wählt/target"-Reaktionen (Surprises, Invisibility Cloak, Cool Tech Jetpack …) und
+   * „hit"-Reaktionen bleiben unverändert.
+   *
+   * ZENTRAL, an den Wegen, auf denen ein Effekt einen Helden verändert (Heilung, Buff setzen/entfernen, Status, Nicht-Schadens-Effekt über `heroNonDamageEffectBlocked` — z. B. Anhänge, Max-HP; die synchrone Status-Reinigung `cleanseHeroStatuses` bleibt ohne Fenster): JE betroffenem
+   * lebendem Helden EIN Fenster, VOR dem Effekt (der Aufrufer prüft danach `hasEffectImmunity` wie bisher — eine Zusage gibt dem Helden die Effekt-Immunität dieser Auflösung). Wie bei den
+   * Zielwahl-Fenstern entscheidet der Spieler je Held (Mehrfach-Betroffene: je Held ein eigenes Fenster, wie dort eine Reaktion je Held).
+   *
+   * KEIN Doppelfenster: ein Held, für den das Zielwahl-/Flächen-Fenster dieser Auflösung (`_checkPostTargetHandReactions`) schon lief, bekommt keines mehr — die Vormerkung hängt am
+   * Auflösungs-Objekt (`_currentEffectSource`) und endet damit von selbst. Gefallene Helden bekommen nie eines (Entscheidung Punkt 2). Nur Spells, Attacks und aktive Kreatureneffekte
+   * (`_affectScope`); CPU-Reagierende und MCTS-Läufe bekommen das Fenster nicht (kein neuer Prompt für die CPU).
+   * @param {number} heroSeite  Brettseite des Helden
+   * @returns {Promise<void>}
+   */
+  async heroAffectWindow(heroSeite, heroIdx) {
+    if (this._inMctsSim || this._fastMode) return;
+    if (this._inPostTargetWindow || this._inPostTargetReaction) return;
+    const scope = this._affectScope();
+    if (!scope) return;
+    const hero = this.gs.players[heroSeite]?.heroes?.[heroIdx];
+    if (!hero?.name || !(hero.hp > 0)) return;   // Entscheidung Punkt 2: ein gefallener Held ist kein Ziel
+    if (this._affectGesehen(heroSeite, heroIdx, true)) return;
+    const quelle = this._umgebungsQuelle(scope.owner);
+    if (!quelle) return;
+    this._inPostTargetWindow = true;   // Rekursionssperre wie im Zielwahl-Dispatcher (die Reaktionen zielen selbst über ihn)
+    try {
+      const res = await this._checkPostTargetHandReactions(
+        [{ type: 'hero', owner: heroSeite, heroIdx, cardName: hero.name }], quelle,
+        { affect: true, dealsDamage: false, weitereZiele: loadCardEffect(scope.cardName)?.hitsMultipleTargets === true });
+      if (res?.effectNegated) {
+        // Eine Reaktion, die die GANZE Karte negiert (Divine Gift of Rain, einseitig: „Negate any effects … on targets you control"), lässt sich mitten in der Auflösung nicht mehr zurücknehmen:
+        // sie wirkt hier als Effekt-Immunität ALLER Ziele des Reagierenden (Helden und Kreaturen) gegen diese Auflösung.
+        const kontrolleur = this.heroSideOf(heroSeite, hero);
+        for (const { physOwner, heroIdx: hi, hero: h } of this.heroesControlledBy(kontrolleur)) {
+          if (h?.name && h.hp > 0) this.grantEffectImmunity(physOwner, hi, quelle, { ueberFenster: true });
+        }
+        for (const inst of this.cardInstances) {
+          if (inst.zone === ZONES.SUPPORT && !inst.faceDown && (inst.controller ?? inst.owner) === kontrolleur && this._istKreaturenInstanz?.(inst)) {
+            this.grantCreatureEffectImmunity(inst, quelle, { ueberFenster: true });
+          }
+        }
+      }
+    } finally {
+      this._inPostTargetWindow = false;
+    }
+  }
+
   /**
    * Post-target hand-reaction hub. ONE call per damage source per
    * resolution: the loop offers every eligible `isPostTargetReaction`
@@ -44282,6 +44359,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `processCreatureDamageBatch`.
    */
   async _checkPostTargetHandReactions(targetedHeroesAlle, sourceCard, opts = {}) {
+    // ★ Spielgestalter-Entscheidung 17.11.2026: Gefallene Helden sind keine legitimen Ziele — auch nicht der gewählte tote Held einer Wiederbelebung (Divine Gift of Death/Equality):
+    // keine Reaktion dieses Fensters (Escape Device, Barrier of Faith, Test Flight …) wird für ihn angeboten.
+    if (Array.isArray(targetedHeroesAlle) && targetedHeroesAlle.some(t => t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0))) {
+      targetedHeroesAlle = targetedHeroesAlle.filter(t => !(t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0)));
+    }
+    // „Affected"-Fenster (`heroAffectWindow`): ein Held, für den dieses Fenster in der laufenden Auflösung schon lief (Zielwahl, Fläche), bekommt kein zweites.
+    if (!opts.affect) for (const t of (targetedHeroesAlle || [])) if (t?.type === 'hero') this._affectGesehen(t.owner, t.heroIdx, true);
     // ★ v1368: `opts.ausZielwahl` — die Liste kann Kreaturen enthalten;
     // nur Reaktionen mit `postTargetKreaturWahl` sehen sie (siehe unten).
     let targetedHeroes = targetedHeroesAlle;
@@ -44289,7 +44373,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _gesammelt = [];   // v1368: Umlenkungen (`newTargets`) aller Reaktionen
     // Effekt-Immunitaeten gelten fuer GENAU EINE Aufloesung. Ein neues
     // Zielfenster heisst: die vorige ist vorbei.
-    if (this.gs._effectImmunities?.length) this.gs._effectImmunities = this.gs._effectImmunities.filter(e => e.ueberFenster);   // Welle 6b: Surprise-Immunitäten (`ueberFenster`) bleiben
+    if (this.gs._effectImmunities?.length && !opts.affect) this.gs._effectImmunities = this.gs._effectImmunities.filter(e => e.ueberFenster);   // Welle 6b: Surprise-Immunitäten (`ueberFenster`) bleiben; das „Affected"-Fenster (`opts.affect`) beginnt keine neue Auflösung
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
     if (this._inPostTargetReaction) return null;
 
@@ -44297,6 +44381,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // gewaehren Immunitaeten fuer genau diese Aufloesung.
     await this._checkPostTargetBoardReactions(targetedHeroes, sourceCard, {
       damageType: opts.damageType, dealsDamage: opts.dealsDamage !== false,
+      ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}),
     });
 
     // Demon's Gate-style "Creature casts a Spell": annotate the source
@@ -44338,6 +44423,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Turn-1 lockout: the first-turn-protected player cannot activate any
       // hand cards during the opening turn (no interaction allowed).
       if (this.gs.firstTurnProtectedPlayer === pi) continue;
+      if (opts.affect && this.isCpuPlayer(pi)) continue;   // „Affected"-Fenster: kein neuer Prompt für die CPU
 
       // Dark Ocean gilt AUCH hier: dieses Fenster ist ein VIERTER Weg
       // zu einer Reaktion (`isPostTargetReaction`, feuert nach der
@@ -44351,6 +44437,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
+        if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
         if (opts.cannotBeNegated && script.negatesWholeCard) continue;   // „cannot be negated" (`config.cannotBeNegated` der Zielwahl): kein Angebot fuer ganz negierende Reaktionen
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
         // Kreatur-Reaktionen die gewaehlten Kreaturen.
@@ -44382,7 +44469,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // damage tag so reactions can detect Hero-effect damage that
         // is "treated as a Spell" (Alice the Puppeteer Girl, …).
         if (script.postTargetCondition &&
-            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true })) continue;
+            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}) })) continue;
 
         // Spell/Attack reactions: at least 1 hero must be able to cast it
         // Artifacts: skip hero check (only need gold). `spellInHand: true`
@@ -44424,7 +44511,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType,
             dealsDamage,
           },
-          message: `${srcName} is targeting ${targetNames}! Activate ${cardName}?`,
+          message: `${srcName} ${opts.affect ? 'would affect' : 'is targeting'} ${targetNames}! Activate ${cardName}?`,
           showCard: cardName,
           confirmLabel: '✨ Activate!',
           cancelLabel: 'No',
@@ -44665,10 +44752,11 @@ this._deathWatch = (this._deathWatchStack || []).length
             // `loadCardEffect(cardName)` wurde sie nie angeboten.
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
+            if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
             // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
             // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
             targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
-            const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
+            const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite, ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}) };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
 
@@ -44681,7 +44769,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               title: anzeigeName,
               // Als Ruling (Al 26.10., Winged Skeleton): die Karte kann eine eigene Frage formulieren (`postTargetMessage`) — „your Hero" passt nicht, wenn eine KREATUR gewählt wurde.
               message: (typeof script.postTargetMessage === 'function' ? script.postTargetMessage(this, srcName2, rxOpts, targetedHeroes) : null)
-                || `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
+                || `${srcName2} ${opts.affect ? 'would affect' : 'is targeting'} your Hero! Activate ${anzeigeName}?`,
               confirmLabel: '🛡️ Activate!',
               cancellable: true,
               _handReactionWindow: true,
@@ -56097,6 +56185,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // „ALLE Effekte" wirklich alle sind und nicht nur der Schaden.
     // BEWUSST ohne `opts.source`-Vorbedingung: die meisten Statuswege
     // reichen ihre Quelle gar nicht mit (Divine Gift of Fire).
+    if (!schutzAus) await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Status ohne Zielwahl
     if (!schutzAus && this.hasEffectImmunity(playerIdx, heroIdx, opts.source)) {
       this.log('effect_immunity', { hero: hero.name, status: statusName });
       return;

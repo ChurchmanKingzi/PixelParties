@@ -126,6 +126,8 @@ module.exports = {
   canActivate: () => false,
 
   isPostTargetReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`: Healing Melody, Anhänge, nur ein Empfänger …).
+  affectFenster: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
     if (!targetedHeroes || targetedHeroes.length === 0) return false;

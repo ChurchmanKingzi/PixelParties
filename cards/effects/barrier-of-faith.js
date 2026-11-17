@@ -84,6 +84,8 @@ module.exports = {
   neverPlayable: true,
   activeIn: ['hand'],
   isPostTargetReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`).
+  affectFenster: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes /*, sourceCard, opts */) {
     const eigene = ownHeroTargets(engine, pi, targetedHeroes);
@@ -182,7 +184,8 @@ module.exports = {
       player: ps.username, hero: hero?.name || ziel.cardName, sent: n,
       negated: sourceCard?.name || 'a card or effect',
     });
-    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard, { ueberFenster: true });
     engine.sync();
     return {};
   },
