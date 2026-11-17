@@ -47,6 +47,9 @@
 //    nicht umgeleitet werden darf (`cannotBeRedirected`, Acid Vial), loest nichts aus.
 //    Umgeleiteter Schaden traegt `_meanCatRedirected` und wird von KEINER
 //    Mean Cute Cat nochmal umgeleitet (keine Ketten).
+//  • ★ Spielgestalter-Entscheidung 17.11.2026: Gegen Quellen, auf die der Gegner nicht
+//    reagieren darf („cannot be reacted to": Surefire Shot, Midnight Assault —
+//    `engine._reaktionGesperrt`), bietet die Katze die Umleitung NICHT an.
 //  • „Once per turn": je Exemplar (`counters._catTurn` / `_catLeft`).
 //    Ablehnen („No") oder Zielwahl-Abbruch verbraucht nichts.
 //  • „If that Creature is defeated by that damage, you may use this effect
@@ -363,6 +366,7 @@ module.exports = {
       const cat = ctx.card;
       const pi = cat.controller ?? cat.owner;
       if (!gs.players[pi]) return;
+      if (engine._reaktionGesperrt(pi)) return;   // „cannot be reacted to" (Surefire Shot): keine Umleitung angeboten (Spielgestalter-Entscheidung 17.11.2026)
 
       for (const e of (ctx.entries || [])) {
         if (einsaetzeUebrig(cat, gs) <= 0) break;
@@ -401,6 +405,7 @@ async function umleitungHeld(ctx, istTrue) {
   const cat = ctx.card;
   const pi = cat.controller ?? cat.owner;
   if (!gs.players[pi]) return;
+  if (engine._reaktionGesperrt(pi)) return;   // „cannot be reacted to" (Surefire Shot): keine Umleitung angeboten (Spielgestalter-Entscheidung 17.11.2026)
 
   const hero = ctx.target;
   if (!hero || hero.hp === undefined || !(hero.hp > 0)) return;

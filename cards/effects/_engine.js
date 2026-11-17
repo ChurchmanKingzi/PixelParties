@@ -19239,6 +19239,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _checkSpellPerformedHandReactions(raw) {
     if (!raw || !Number.isInteger(raw.performerOwner)) return;
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `opponentCannotReact`) — auch das Fenster NACH der Auflösung bleibt zu (Nasty Prank).
+    try { if (raw.spellName && loadCardEffect(baseCardName(raw.spellName))?.opponentCannotReact) return; } catch { /* unbekannte Karte: normal */ }
     return this._rxEreignisFenster({
       flag: 'isSpellPerformedReaction', cond: 'spellPerformedCondition', res: 'spellPerformedResolve', tiefe: '_spellPerformedWindowDepth',
       log: 'spell_performed_window_reaction', ausloeser: raw.performerOwner, info: raw,
@@ -36752,7 +36754,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // uebernommene der Gegenspalte; ein abgegebener eigener beschuetzt
     // nicht. `physOwner` (Brettseite) geht als letztes Argument an
     // `canHeroRedirect`/`onHeroRedirect`.
-    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(targetOwnerIdx)) {
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (`_reaktionZu`: Surefire Shot, Midnight Assault) — Helden-Umleiter (Alleria, Monia Bot) sind Reaktionen und bieten
+    // NICHTS an (anders als bei „cannot be redirected/negated": dort Warnungsprinzip).
+    for (const { physOwner, heroIdx: hi, hero } of (_reaktionZu ? [] : this.heroesControlledBy(targetOwnerIdx))) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
 
@@ -36863,7 +36867,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((bInst.counters?.negated || bInst.counters?.nulled || bInst.counters?.stunned) && !this._creatureNegationProof(bInst)) continue;
       for (const g of guardsB) {
       if (!g?.isBoardRedirect || typeof g.onBoardRedirect !== 'function') continue;
-      if (g.isBoardNegation && _reaktionZu) continue;   // „cannot react" (Surefire Shot, Midnight Assault): kein Negierer; „cannot be negated" laesst ihn dagegen zu (nutzlose Aktivierung, s. oben)
+      // „cannot react" (Surefire Shot, Midnight Assault): KEIN Brett-Waechter — weder Negierer noch Umleiter (Anti-Magnetic Armor, Empty Armor [auch die Pflicht-Umleitung], Winged Haressassin,
+      // Laki, Redirecting Aura; Spielgestalter-Entscheidung 17.11.2026); „cannot be negated/redirected" laesst sie dagegen zu (nutzlose Aktivierung, s. oben).
+      if (_reaktionZu) continue;
       if (typeof g.canBoardRedirect === 'function'
           && !g.canBoardRedirect(this.gs, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, this)) continue;
 
@@ -44972,7 +44978,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Helden, die `pi` kontrolliert (auch geliehene der Gegenspalte;
       // ein abgegebener eigener Held faellt heraus). Reagierender = `pi`,
       // die Brettseite des Traegers geht als `rxOpts.heroOwner` mit.
-      for (const { physOwner: seite, heroIdx: hi } of this.heroesControlledBy(pi)) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Midnight Assault: `ohneGegnerReaktion`) — auch ausgeruestete Reaktionen (Winged Skeleton, Cool Tech Jetpack,
+      // Future Tech Weathercock) bieten nichts an (die Hand-Reaktionen oben sperrt `_handPlayLockedFor`).
+      for (const { physOwner: seite, heroIdx: hi } of (this._reaktionGesperrt(pi) ? [] : this.heroesControlledBy(pi))) {
         const zonenPs = this.gs.players[seite];
         const _rxBenutzt = new Set();   // Darion: gleichnamige Ausruestung im Stapel — jede Instanz kommt einzeln dran (nicht zweimal die erste)
         for (const slot of (zonenPs?.supportZones?.[hi] || [])) {

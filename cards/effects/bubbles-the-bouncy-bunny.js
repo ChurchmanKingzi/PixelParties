@@ -181,6 +181,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — keine Umleitung angeboten.
+      if (engine._reaktionGesperrt(pi)) return;
 
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;

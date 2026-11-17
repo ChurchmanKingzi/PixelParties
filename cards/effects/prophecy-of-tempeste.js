@@ -37,6 +37,10 @@
 //    nicht gedeckelt (unreduzierbarer Schaden toppt den Deckel, wie jeden Schild).
 //    Normaler Schaden: unveraendert (Umleitung mit Deckel 100).
 //    Quellen mit `cannotBeRedirected` (Acid Vial, Glasowt) werden nie umgeleitet.
+//  • ★ Spielgestalter-Entscheidung 17.11.2026: Gegen Quellen, auf die der Gegner nicht
+//    reagieren darf („cannot be reacted to": Surefire Shot, Midnight Assault —
+//    `engine._reaktionGesperrt`), wird die Umleitung GAR NICHT angeboten (anders als bei
+//    „cannot be reduced": dort Warnungsprinzip). Der Dauer-Deckel am Traeger bleibt.
 //  • Once per turn: HOPT key scoped per
 //    Tempeste instance (`tempeste_redirect:
 //    <instId>`). Each Tempeste fires once per
@@ -295,6 +299,9 @@ module.exports = {
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — keine Umleitung angeboten (der Deckel am
+      // Traeger oben bleibt: Passiv, keine Reaktion).
+      if (engine._reaktionGesperrt(ownerIdx)) return;
       // Quellen, die nicht umgeleitet werden duerfen (Acid Vial, Glasowt): keine Umleitung.
       if (nichtUmleitbar(ctx.source, ctx.cannotBeRedirected)) return;
 
@@ -400,6 +407,7 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
       // W27a: kein Ruhe-Prüfer mehr — Anhänge liegen bei Frost/Betäubung/Negation des Wirts nicht still (s. beforeDamage).
+      if (engine._reaktionGesperrt(ownerIdx)) return;   // „cannot be reacted to" (Surefire Shot, Midnight Assault): keine Umleitung angeboten (Spielgestalter-Entscheidung 17.11.2026)
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
