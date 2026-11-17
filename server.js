@@ -9625,7 +9625,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // `onPlay` bleiben, bezahlte Kosten bleiben bezahlt (früher Z7b: `_stempelZurueck`); kein `afterSpellResolved`, Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
     // Negation nach der Zielwahl: `onPlay` ist früh ausgestiegen — Marken, die er sonst erst NACH der Zielwahl setzt, meldet die Karte über `onFizzledPlay` (idempotent, `_noteFizzledPlay`).
     if (gs._spellNegatedByEffect && !_gefizzelt) {
-      await room.engine._noteFizzledPlay(pi, cardName, heroIdx, cardData.cardType, heroOwner);
+      await room.engine._noteFizzledPlay(pi, cardName, heroIdx, cardData.cardType, heroOwner, { viaAdditionalProvider: additionalConsumed ? consumedInst : null });   // Friendship: „then draw" trotz Negation
     }
     if (cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
     if (!gs._spellNegatedByEffect) {

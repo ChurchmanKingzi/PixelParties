@@ -48675,7 +48675,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * stempelt die Engine, Rundensperren meldet die Karte über den optionalen Haken `onFizzledPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (dieselbe Marke, die sie sonst im
    * `onPlay`/`resolve` setzt), und Zähler-Lauscher (Kogarasu) hören bei Spells auf `afterSpellPrevented`.
    */
-  async _noteFizzledPlay(owner, cardName, heroIdx, cardType, casterOwner) {
+  async _noteFizzledPlay(owner, cardName, heroIdx, cardType, casterOwner, extra = null) {
     const ps = this.gs.players?.[owner];
     if (!ps || !cardName) return;
     const script = loadCardEffect(cardName);
@@ -48690,7 +48690,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (cardType === 'Spell') this.thaliaNotiereSupportZauber(owner, cardName);   // W49a: auch eine negierte/fizzelnde Kopie zählt für „1 Kopie je Support Spell pro Zug"
     if (cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
-      await this._meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner);
+      await this._meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner, extra);
     }
   }
 
@@ -48698,11 +48698,14 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ★ „Der Zauber wurde gespielt, löst aber nicht (ganz) auf" (Fizzle, Teil-Negierung wie Accidental Dodge/Test Flight, oder — Spielgestalter-Entscheidung 16.11.2026 — Negation in der Kette).
    * `afterSpellResolved` feuert dort nie; Hörer dieses Gegenstücks (nur Zähler, z. B. Kogarasu „1 Spell pro Zug" — der Zauber wurde BENUTZT) lauschen auf `afterSpellPrevented`.
    */
-  async _meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner) {
+  async _meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner, extra = null) {
     try {
       await this.runHooks('afterSpellPrevented', {
         heroOwner: Number.isInteger(casterOwner) ? casterOwner : owner,
         spellName: cardName, spellCardData: this._getCardDB()[cardName], heroIdx, casterIdx: owner,
+        // Spielgestalter-Entscheidung 17.11.2026 (Friendship): ein negierter Support-Spell, der als Zusatzaktion eines Gebers gespielt wurde, bleibt ein EINGESETZTER Zusatzaktions-Zauber — der Geber
+        // (`consumedInst`, wie bei `afterSpellResolved`) wird mitgegeben, damit sein „then draw" trotzdem feuern kann. Ohne `extra` (Kettennegation, Sofort-Guss): wie bisher kein Geber.
+        viaAdditionalProvider: extra?.viaAdditionalProvider ?? null,
         _skipReactionCheck: true,
       });
     } catch (err) { console.error(`[Engine] afterSpellPrevented for ${cardName} failed:`, err.message); }

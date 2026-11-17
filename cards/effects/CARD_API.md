@@ -12168,7 +12168,8 @@ Divine Gifts) NICHT; dazu `_stempelAbzug`/`_stempelZurueck`, `link._opgNeu`, `re
   Kettenfenster) — auch eine danach negierte Surprise ist verbraucht.
 * *Fizzle* (Wirker beim Auflösen eingefroren/besiegt/betäubt/negiert, v1328) und *Negation*: `_noteFizzledPlay` (aus `executeCardWithChain`; nur Initialkarten aus der Hand, nicht Board-Aktivierungen/Platzierungen).
 * *Zähler-Lauscher* („Held hat einen Zauber BENUTZT": Kogarasu „1 Spell pro Zug"): `afterSpellResolved` plus der Hook **`afterSpellPrevented`** (`_meldeZauberVerhindert`): feuert bei Fizzle, Teil-Negierung UND
-  ganzer Negation.
+  ganzer Negation. Bei einer Negation NACH der Zielwahl (MOE Shield …) traegt er `viaAdditionalProvider` (der Geber, dessen Zusatzaktion der Zauber verbraucht hat — wie bei `afterSpellResolved`;
+  Spielgestalter-Entscheidung 17.11.2026): Friendship Lv2/3 zieht daher auch bei einem negierten Support Spell („then draw"). Bei Fizzle und Kettennegation (Zusatzaktion zurueck) ist er `null`.
 * Unverändert: Creature-Beschwörungen stempeln `oncePerGame` bei der **Landung** (v1030) — und, seit dieser Entscheidung, auch bei einer negierten Beschwörung; zielende Artefakte (`doConfirmPotion`) und
   Normal-Artefakte (`doUseArtifactEffect`) haben Tor **und** Stempel für `oncePerGame` (Perfect Disguise); `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit `opts.pruefen`); Item-/Zieh-Sperren
   aus Z6 (`drawWouldBeBlocked` in Squire/Albrecht/Pteranos/Raptoren).

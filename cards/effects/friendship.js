@@ -275,5 +275,13 @@ module.exports = {
 
       engine.log('friendship_draw', { player: ps.username, hero: hps.heroes[heroIdx]?.name, cards: drawCount, level });
     },
+
+    /**
+     * ★ Spielgestalter-Entscheidung 17.11.2026 (FRI-03): „use a Support Magic Spell as an additional Action with this Hero, then draw X cards" — die Zusatzaktion ist mit dem Einsatz
+     * des Spells VERBRAUCHT. Wird der Spell negiert (nach der Zielwahl: MOE Shield, Storm Ring …), trifft die Negation nur den Spell: `afterSpellResolved` feuert dann nie, also feuert
+     * dasselbe Ziehen (Lv2: 1, Lv3: 3) hier trotzdem. Der Geber (`viaAdditionalProvider`) kommt nur aus dem Weg „negiert nach der Zielwahl"; wird die ganze Karte in der Kette
+     * negiert (The Master's Plan …), bekommt der Spieler die Zusatzaktion zurueck und es gibt keinen Geber (kein Ziehen).
+     */
+    afterSpellPrevented: async (ctx) => module.exports.hooks.afterSpellResolved(ctx),
   },
 };
