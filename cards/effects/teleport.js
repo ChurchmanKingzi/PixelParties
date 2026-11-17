@@ -327,6 +327,14 @@ module.exports = {
       const hb = gs.players[seite].heroes[b.heroIdx];
       if (!ha?.name || !hb?.name || ha.hp <= 0 || hb.hp <= 0) { gs._spellCancelled = true; return; }
 
+      // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — ein Tausch braucht beide Helden;
+      // ist einer immun, bleibt der Tausch ganz aus (der Held wandert nicht, also kann auch der andere nicht auf seinen Platz).
+      if (engine.hasEffectImmunity(seite, a.heroIdx, ctx.card) || engine.hasEffectImmunity(seite, b.heroIdx, ctx.card)) {
+        engine.log('effect_immunity', { hero: ha.name, other: hb.name, source: CARD_NAME });
+        engine.sync();
+        return;
+      }
+
       // Portale auf beiden Plätzen; der Tausch geschieht in der Mitte der Animation.
       engine._broadcastEvent('play_zone_animation', { type: 'portal_warp', owner: seite, heroIdx: a.heroIdx, zoneSlot: -1 });
       engine._broadcastEvent('play_zone_animation', { type: 'portal_warp', owner: seite, heroIdx: b.heroIdx, zoneSlot: -1 });

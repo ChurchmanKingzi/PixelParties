@@ -66,6 +66,13 @@ module.exports = {
         return;
       }
 
+      // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — der Held wird nicht übernommen.
+      if (engine.hasEffectImmunity(target.owner, target.heroIdx, ctx.card)) {
+        engine.log('effect_immunity', { hero: tgtHero.name, source: 'Controlled Attack' });
+        engine.sync();
+        return;
+      }
+
       // Apply controlled status
       tgtHero.controlledBy = pi;
 
