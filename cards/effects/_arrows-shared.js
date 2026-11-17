@@ -137,6 +137,10 @@ function arrowTriggerCondition(gs, pi, engine, chainCtx, _opts = {}) {
   const initial = chainCtx.chain.find(l => l.isInitialCard);
   if (!initial) return false;
   if (initial.cardType !== 'Attack') return false;
+  // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten." Eine gespielte Attack mit Zielwahl (`requiresTarget`) bietet die Pfeil-Klasse
+  // (alle `isArrow`-Karten und Magic Topaz) erst im Fenster NACH der Zielwahl an (`engine._pfeilFensterNachZielwahl`, dort ist das Basisglied ohne dieses Merkmal) — nicht im Fenster beim Ausspielen.
+  // Attacks ohne Zielwahl behalten die Pfeile hier.
+  if (initial._pfeileNachZielwahl) return false;
   // Als Ruling (Al 26.10.): Hydra Blood Arrow („when a Hero hits …", ohne „you control") darf auf die Attack JEDES Helden auslösen (`opts.anyHero`).
   if (initial.owner !== pi && !_opts.anyHero) return false;
 

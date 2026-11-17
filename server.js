@@ -9251,6 +9251,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') room.engine._popResolvingPlay();
   };
 
+  // 17.11.2026 (ARW-01): Zustand des Pfeil-Fensters nach der Zielwahl (`gs._pfeilFenster`, siehe unten) — bei jedem Ausgang zuruecksetzen (verschachtelte Wuerfe behalten den Stand der aeusseren Karte).
+  const _pfeilVorher = gs._pfeilFenster;
+  const _pfeilAufraeumen = () => { if (_pfeilVorher) gs._pfeilFenster = _pfeilVorher; else delete gs._pfeilFenster; };
+
   try {
     // ★ v1277: `_spellFreeAction` gehoert zu GENAU EINER Aufloesung — jeder
     // Setzer ist das `onPlay` des Zaubers selbst. Ein Rest aus einem
@@ -9293,10 +9297,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // gleich nummerierten eigenen Helden. Verschachtelt → wiederherstellen.
     const _wirkerVorher = gs._wirkerSeite;
     gs._wirkerSeite = { pi, heroIdx: heroIdxPub, heroOwner };
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten! Nach der Zielwahl kann man dann nicht mehr abbrechen." Eine Attack mit Zielwahl
+    // (`requiresTarget`) bietet Pfeile/Magic Topaz/Bow of the Hunt Goddess nicht in diesem Fenster an, sondern erst nach der bestätigten Zielwahl (`engine._pfeilFensterNachZielwahl`); der Zustand dafür
+    // (`gs._pfeilFenster`) steht unten, sobald die Karte nicht in der Kette negiert wurde. Ohne Zielwahl (Flächen-/Ohne-Ziel-Attacks), ohne Helden oder über eine Kreatur gewirkt: wie bisher.
+    const _pfeileNachZiel = cardData.cardType === 'Attack' && script?.requiresTarget === true && !heroless && !_viaCreature && Number.isInteger(heroIdxPub) && heroIdxPub >= 0;
     let chainResult;
     try {
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx: heroIdxPub,
+      pfeileNachZielwahl: _pfeileNachZiel,
       resolve: null,
       // Handkarte des Initialglieds: fliegt beim AUFLOESEN des Glieds (nicht erst nach der ganzen Aufloesung). Nur eigene Karten aus der Hand (keine Creation-Karte, keine fremde Herkunft).
       handFlug: (() => {
@@ -9367,6 +9376,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // follow-up attack this turn would inherit them.
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
+        _pfeilAufraeumen();
       } else if (cardData.cardType === 'Spell') {
         await room.engine.zaehleAlsArt('spell', { pi, heroIdx: heroIdxPub, heroOwner, name: cardName, karte: true });   // W36a: EIN Zählschritt für jede gespielte Spell-Karte (wie die Attack-Karten)
       }
@@ -9386,6 +9396,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._spellDamageLog = [];
     gs._spellExcludeTargets = [];
     gs._spellCancelled = _kostenAbbruch;   // Z7c
+    // 17.11.2026 (ARW-01): die Attack wurde nicht negiert/fizzelt nicht — das Pfeil-Fenster wartet auf die Zielwahl (`engine._zielwahlAbschliessen`, Rueckfall `_fireAttackDeclare`).
+    if (_pfeileNachZiel && !_gefizzelt && !_kostenAbbruch) gs._pfeilFenster = { cardName, owner: pi, heroIdx: heroIdxPub, casterOwner: heroOwner, geoeffnet: false };
 
     // (W63d: vorgemerkt wird oben, vor der Kostenwahl. Ist inzwischen etwas dazwischengekommen, das die Vormerkung verbraucht hat — z. B. das Reaktionsfenster des Gegners —,
     //  bleibt es dabei: der Auftritt ist dann längst gezeigt.)
@@ -9476,6 +9488,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // v1313: gerettetes Opfer (Barrier of Undying) → der Spell fizzelt,
     // ist aber GESPIELT — kein Abbruch, keine Rueckgabe auf die Hand.
     if (room.engine.nimmOpferFizzle()) delete gs._spellCancelled;
+    // ★ 17.11.2026 (ARW-01): sobald das Pfeil-Fenster nach der Zielwahl offen war, gibt es keinen Abbruch mehr — Pfeile/Gold sind verbraucht, die Attack ist gespielt (spaetere Abbrueche der
+    // Skripte lassen nur den restlichen Effekt aus, geben die Karte aber nicht auf die Hand zurueck).
+    if (gs._pfeilFenster?.geoeffnet && gs._spellCancelled) delete gs._spellCancelled;
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
       // Player aborted the spell mid-resolve (target cancel, etc.) —
@@ -9497,6 +9512,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
       }
+      _pfeilAufraeumen();
       // Roll back ALL action-economy bookkeeping — the Spell never
       // resolved, so the Action resource wasn't actually spent. Without
       // this, a cancelled action-2 attempt leaves _actionsPlayedThisPhase
@@ -9702,6 +9718,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
       await clearArmedArrows(room.engine, pi);
     }
+    _pfeilAufraeumen();
 
     await room.engine.resolveDeferredRecoil();
     await room.engine._executeDeferredSurprises();
@@ -10057,6 +10074,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // this is a no-op if resolution already released normally above. Only
     // fires on error / early returns that skipped the explicit release.
     _releaseSpellDepth();
+    _pfeilAufraeumen();   // 17.11.2026 (ARW-01)
     // Always clear the spell-caster animation override so it never
     // leaks into a subsequent cast.
     if (gs._spellCasterOverride) delete gs._spellCasterOverride;
