@@ -42,6 +42,11 @@
 //       Target list restricted to QUALIFYING
 //       Heroes only (status + no spell).
 //
+//  Status-Immunität (Spielgestalter-Entscheidung 17.11.2026, ATT-15): Ist der Wirt beim Anlegen gegen negative Status immun (Light Ball, Johanna,
+//  `negative_status_immune` …), bleibt die Karte wirkungslos in der Support Zone liegen (kein Status, ATK unberührt) — ABER sobald die Immunität
+//  endet, greift der Fluch (ATK auf 0, Status `cursed`); kommt sie später dazu, ruht er wieder (ATK kommt zurück). Vertrag `statusFolgtImmunitaet`
+//  (`_attachment-shared.js`, Abgleich in `engine.sync`).
+//
 //  Boolean status — multiple Curse copies on the
 //  same Hero all bind the same single `cursed`
 //  status (no extra suppression from a second
@@ -56,7 +61,7 @@
 // ═══════════════════════════════════════════
 
 const { getNegativeStatuses } = require('./_hooks');
-const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { candidateHosts, pickAttachmentHost, placeAttachment, statusErgebnisBuchen } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Curse';
@@ -175,11 +180,39 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   return true;
 }
 
+/**
+ * Zustands-Abgleich (`statusFolgtImmunitaet`): die ATK-Sperre des Fluchs wie in `fluchAnlegen` — der Abgleich setzt den Status `cursed` selbst (vor `einsetzen`), diese Funktion sichert die ATK
+ * in den Zwischenspeicher und setzt sie auf 0. Idempotent (zweite Kopie, Doomed Pirate halten den Zwischenspeicher schon).
+ */
+function atkSperreEinsetzen(engine, hero, owner, heroIdx) {
+  if (hero._cursedAtkSuppressed !== undefined) return;
+  const alt = hero.atk || 0;
+  hero._cursedAtkSuppressed = alt;
+  hero.atk = 0;
+  if (alt > 0) engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -alt });
+}
+
+/** Gegenstück: der Abgleich hat `cursed` schon genommen — die gesicherte ATK kommt zurück (wie beim Abgang der letzten Kopie; Doomed Pirate hält sie weiter fest). Idempotent. */
+function atkSperreLoesen(engine, hero, owner, heroIdx) {
+  if (hero._cursedAtkSuppressed === undefined || engine._isHeroAtkSuppressed(hero)) return;
+  const restored = hero._cursedAtkSuppressed || 0;
+  delete hero._cursedAtkSuppressed;
+  if (restored > 0) engine._applyHeroAtkDelta(hero, owner, heroIdx, restored);
+}
+
 module.exports = {
   /** Umhaengen (Inheritance Ceremony): der Fluch liegt jetzt an einem anderen Helden — dort anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await fluchAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const ok = await fluchAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, ok || !!engine.gs.players[toOwner]?.heroes?.[toHeroIdx]?.statuses?.cursed, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
+  },
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status (und mit ihm die ATK-Sperre) folgt der Status-Immunität des Wirts.
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    einsetzen(engine, inst, hero, owner, heroIdx) { atkSperreEinsetzen(engine, hero, owner, heroIdx); },
+    ruhen(engine, inst, hero, owner, heroIdx) { atkSperreLoesen(engine, hero, owner, heroIdx); },
   },
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -305,7 +338,8 @@ module.exports = {
       const inst = await placeAttachment(ctx, CARD_NAME, { owner: targetOwner, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipEnterHook: true });
       if (!inst) { engine.sync(); return; }
       if (!targetHero.statuses?.cursed) {
-        await fluchAnlegen(engine, pi, targetOwner, targetHeroIdx);
+        const ok = await fluchAnlegen(engine, pi, targetOwner, targetHeroIdx);
+        statusErgebnisBuchen(engine, inst, ok || !!targetHero.statuses?.cursed, targetOwner, targetHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       } else {
         engine.log('curse_extra_copy_noop', {
           player: gs.players[pi]?.username,

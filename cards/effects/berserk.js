@@ -21,6 +21,10 @@
 //      (hard cap on `hero._attacksThisTurn` in
 //      validateActionPlay).
 //
+//  Status-Immunität (Spielgestalter-Entscheidung 17.11.2026, ATT-15): Ist der Wirt beim Anlegen gegen negative Status immun (Light Ball, Johanna,
+//  `negative_status_immune` …), bleibt die Karte wirkungslos in der Support Zone liegen — ABER sobald die Immunität endet, greift Berserk;
+//  kommt sie später dazu, ruht der Status wieder (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`, Abgleich in `engine.sync`).
+//
 //  Boolean status — multiple Berserk Attachments
 //  on the same Hero all bind the same single
 //  `berserked` status (no extra charge from a
@@ -60,7 +64,7 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
   return n;
 }
 
-const { candidateHosts, attachToHero } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, statusErgebnisBuchen } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
 /** Berserk am Wirt anlegen — fuer das Spielen der Karte UND das Umhaengen (Inheritance Ceremony, 12.10.). */
@@ -84,8 +88,12 @@ module.exports = {
   /** Umhaengen (Inheritance Ceremony): den Status am neuen Wirt wieder anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
     await berserkAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, !!engine.gs.players[toOwner]?.heroes?.[toHeroIdx]?.statuses?.berserked, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
   },
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts.
+  statusFolgtImmunitaet: { status: STATUS_NAME },
 
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -138,6 +146,7 @@ module.exports = {
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero.statuses?.berserked) {
         await berserkAnlegen(engine, pi, targetOwner, targetHeroIdx);
+        statusErgebnisBuchen(engine, inst, !!targetHero.statuses?.berserked, targetOwner, targetHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       } else {
         engine.log('berserk_extra_copy_noop', {
           player: gs.players[pi]?.username,

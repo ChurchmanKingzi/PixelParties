@@ -409,7 +409,7 @@ async function attachToHero(ctx, CARD_NAME, opts = {}) {
 //        nicht mehr (`engine._attachmentStatusHaelt`).
 // ═══════════════════════════════════════════
 
-function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, extras) {
+function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, extras, appliedBy) {
   const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!wirt?.name || wirt.hp <= 0) return false;
   // W12 (Al, Q114): Karian wird NIE durch Negation (oder Frost/Betaeubung) am Handeln gehindert — der Anhaengsel-Status wird bei ihr nicht angelegt.
@@ -423,7 +423,7 @@ function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, e
     ...(extras || {}),   // S1: z. B. `abilitiesNegated` (Stowaway: harte Form „effect and Abilities")
   };
   if (STATUS_NAME === 'negated' && alt && !alt._fromAttachment) wirt.statuses[STATUS_NAME]._fremd = alt;   // W24a (N1-09): laufende fremde Negierung bleibt darunter erhalten
-  engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME });   // v1399
+  engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME, ...(Number.isInteger(appliedBy) ? { appliedBy } : {}) });   // v1399 (`appliedBy`: der Spieler, der die Karte gespielt hat — beim Nachholen nach einer Immunität)
   return true;
 }
 
@@ -599,7 +599,7 @@ function _abgleichGruppe(engine, g) {
     // Karten mit Zusatzfeldern (Stowaway: harte Negierung) bestimmen den Eintrag.
     const erste = ruhende.find(i => loadCardEffect(i.name).statusFolgtImmunitaet.extras) || ruhende[0];
     const extras = Object.assign({}, ...ruhende.map(i => loadCardEffect(i.name).statusFolgtImmunitaet.extras || {}));
-    if (!setzeAnhaengselStatus(engine, owner, heroIdx, erste.name, status, extras)) return false;   // z. B. Karian: bleibt ruhend
+    if (!setzeAnhaengselStatus(engine, owner, heroIdx, erste.name, status, extras, erste.originalOwner)) return false;   // z. B. Karian: bleibt ruhend
     for (const i of ruhende) delete i.counters[RUHT];
     engine.log('status_add', { target: hero.name, status, owner, source: erste.name });   // Immunität beendet: der Status greift jetzt
     for (const i of insts) loadCardEffect(i.name).statusFolgtImmunitaet.einsetzen?.(engine, i, hero, owner, heroIdx);

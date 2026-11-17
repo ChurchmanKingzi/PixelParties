@@ -17,7 +17,9 @@
 //     Effekt-Immunität laufen im Baustein. Heldenwahl abbrechbar — dann bleibt die Karte auf der Hand. Helden, die schon unter Orders stehen, stehen ausgegraut in der Liste.
 //  2. Der Status `ordered` („Under Orders", negativ, heilbar) wird angelegt — wie bei Berserk als ECHTER Status über `addHeroStatus` (Immunität gegen negative Status, Resistance,
 //     Charme-Schutz … gelten). Er trägt die Karte: wird er GEHEILT (Juice, Beer, Cure …), fallen ALLE Orders-Kopien am Helden in die Ablage ihres Besitzers; verlässt die letzte Kopie den
-//     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts.
+//     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts. Spielgestalter-Entscheidung 17.11.2026 (ATT-15): unter Status-Immunität des Wirts
+//     liegt die Karte wirkungslos da, ABER sobald die Immunität endet, greift der Status (die Übernahme beginnt dann mit dem nächsten Zugbeginn des Anhängers); kommt sie später dazu, ruht er wieder
+//     und eine laufende Übernahme endet (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`).
 //  3. KONTROLLE: am Beginn jedes Zuges des Anhängers (`onTurnStart`) — und sofort, wenn die Karte in seinem EIGENEN Zug angelegt wird — übernimmt er den Helden für den Rest des
 //     Zuges: dieselbe Übernahme wie Charme/Love Shot/Control Device (`temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed`), OHNE Schutzklausel
 //     (`ohneSchutz`: der Text verspricht keinen), Rechte „beschwören + ausrüsten" (keine Abilities hinlegen). Die Rückgabe am nächsten Zugbeginn ist generisch (Engine). Während der
@@ -43,7 +45,7 @@
 //  gewöhnliche Übernahme-Logik der Engine.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, statusErgebnisBuchen } = require('./_attachment-shared');
 const { temporaereKontrolle } = require('./_charm-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -153,8 +155,20 @@ module.exports = {
 
   /** Umhängen (Inheritance Ceremony, Secret Spell Book): den Status am neuen Wirt wieder anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await ordersAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const ok = await ordersAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, ok, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
+  },
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts; beginnt sie mitten im Zug, endet die laufende Übernahme (sie hing am Status).
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    ruhen(engine, inst, hero) {
+      if (hero.charmedBy != null && hero.statuses?.charmed?.quelle === CARD_NAME && hero.permaControlBy == null) {
+        delete hero.charmedBy; delete hero.charmedFromOwner; delete hero.charmedHeroIdx;
+        delete hero.statuses.charmed; delete hero._kontrollRechte;
+      }
+    },
   },
 
   /**
@@ -199,6 +213,7 @@ module.exports = {
       const { host, inst } = res;
       const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
       const gesetzt = await ordersAnlegen(engine, pi, host.owner, host.heroIdx);
+      statusErgebnisBuchen(engine, inst, gesetzt || !!hero?.statuses?.[STATUS_NAME], host.owner, host.heroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       if (!gesetzt && !hero?.statuses?.[STATUS_NAME]) {
         engine.log('masters_orders_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       }
