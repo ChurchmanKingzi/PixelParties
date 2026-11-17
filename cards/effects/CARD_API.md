@@ -2171,6 +2171,11 @@ info)` — läuft VOR dem Hand-Fenster, Verteidiger zuerst, Reichweite wie
 Escape Device. Castling (Held negieren + Beschwörung als Zusatzaktion),
 Rook [B] (≥ 2 eigene Ziele → alle eigenen Ziele immun).
 
+**Gefallene Helden sind keine Ziele dieser Fenster** (Spielgestalter-Entscheidung
+17.11.2026): `_checkPostTargetHandReactions` filtert Helden mit `hp <= 0` aus
+der Zielliste — auch der gewählte tote Held von Divine Gift of Death/Equality
+bekommt weder Escape Device noch Barrier of Faith & Co. angeboten.
+
 **EIN Stummschalt-Prädikat:** `engine.isCreatureEffectSuppressed(inst,
 { honorNegStatusImmune })` ersetzt die verstreuten
 `negated/nulled/frozen/stunned`-Abfragen (runHooks, isCardEffectActive,

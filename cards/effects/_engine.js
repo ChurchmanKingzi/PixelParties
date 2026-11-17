@@ -44282,6 +44282,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `processCreatureDamageBatch`.
    */
   async _checkPostTargetHandReactions(targetedHeroesAlle, sourceCard, opts = {}) {
+    // ★ Spielgestalter-Entscheidung 17.11.2026: Gefallene Helden sind keine legitimen Ziele — auch nicht der gewählte tote Held einer Wiederbelebung (Divine Gift of Death/Equality):
+    // keine Reaktion dieses Fensters (Escape Device, Barrier of Faith, Test Flight …) wird für ihn angeboten.
+    if (Array.isArray(targetedHeroesAlle) && targetedHeroesAlle.some(t => t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0))) {
+      targetedHeroesAlle = targetedHeroesAlle.filter(t => !(t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0)));
+    }
     // ★ v1368: `opts.ausZielwahl` — die Liste kann Kreaturen enthalten;
     // nur Reaktionen mit `postTargetKreaturWahl` sehen sie (siehe unten).
     let targetedHeroes = targetedHeroesAlle;
