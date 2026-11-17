@@ -64,6 +64,8 @@ module.exports = {
 
   // ── Brett-Post-Target-Reaktion ──
   isPostTargetBoardReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`).
+  affectFenster: true,
 
   postTargetBoardCondition(gs, pi, engine, targets, source, inst, info) {
     const host = hostHeroOf(engine, inst);

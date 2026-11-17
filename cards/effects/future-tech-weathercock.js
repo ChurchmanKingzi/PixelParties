@@ -95,6 +95,8 @@ module.exports = {
   //   angeboten. Das eigene Flag laesst die Handkarten unberuehrt und
   //   oeffnet einen zweiten Durchgang ueber die Support-Zonen.
   isEquippedPostTargetReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`; „affects at least 1 other target": die Karte meldet sich als Mehrfachtreffer).
+  affectFenster: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
     // Bezahlt wird mit einer Kopie AUS der Ablage — ohne geht nichts.
@@ -113,7 +115,7 @@ module.exports = {
     if (!treffer) return false;
     // … UND mindestens ein weiteres Ziel („that also affects at least
     // 1 other target") — egal wem es gehört.
-    if ((targetedHeroes || []).length < 2) return false;
+    if ((targetedHeroes || []).length < 2 && !opts?.weitereZiele) return false;   // `weitereZiele`: „Affected"-Fenster ohne Zielwahl — der Zauber ist als Mehrfachtreffer deklariert (`hitsMultipleTargets`)
 
     // Kartentyp-Filter wie bei Invisibility Cloak.
     const srcData = sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null;

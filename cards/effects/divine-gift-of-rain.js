@@ -36,6 +36,8 @@
 
 module.exports = {
   isPostTargetReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`; dort wird die Negation der ganzen Karte zur Immunität aller eigenen Ziele).
+  affectFenster: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 

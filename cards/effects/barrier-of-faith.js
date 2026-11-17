@@ -84,6 +84,8 @@ module.exports = {
   neverPlayable: true,
   activeIn: ['hand'],
   isPostTargetReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`).
+  affectFenster: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes /*, sourceCard, opts */) {
     const eigene = ownHeroTargets(engine, pi, targetedHeroes);

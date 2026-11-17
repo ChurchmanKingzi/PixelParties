@@ -2171,6 +2171,25 @@ info)` — läuft VOR dem Hand-Fenster, Verteidiger zuerst, Reichweite wie
 Escape Device. Castling (Held negieren + Beschwörung als Zusatzaktion),
 Rook [B] (≥ 2 eigene Ziele → alle eigenen Ziele immun).
 
+**„Would be affected" ohne Zielwahl (Spielgestalter-Entscheidung 17.11.2026):**
+Reaktionen, deren Kartentext auf „affected" lautet (Escape Device, Barrier of
+Faith, Divine Gift of Rain, Castling, Weathercock), tragen das Skript-Flag
+`affectFenster: true` und werden auch angeboten, wenn die Attack/der Spell
+keinen Helden wählt (Auto-Wahl, Healing Melody, Anhänge auf eigene Helden,
+Divine Gift of Sacrifice mit einem Empfänger …): `engine.heroAffectWindow(
+heroSeite, heroIdx)` läuft zentral in `_actionHealHeroImpl`, `actionAddBuff`/
+`actionRemoveBuff`, `addHeroStatus` und `heroNonDamageEffectBlocked` — JE
+Held ein Fenster, VOR dem Effekt (danach prüft der Weg wie bisher
+`hasEffectImmunity`). Neue Nicht-Schadens-Wege, die einen Helden verändern,
+fragen deshalb `heroNonDamageEffectBlocked`. Kein Doppelfenster: ein Held,
+den das Zielwahl-/Flächenfenster derselben Auflösung schon hatte
+(`_checkPostTargetHandReactions` merkt ihn am `_currentEffectSource`), bekommt
+keins mehr. Nur Spells, Attacks und aktive Kreatureneffekte; kein Fenster für
+die CPU als Reagierenden und in MCTS. „Target/chosen"- und „hit"-Reaktionen
+(Surprises, Invisibility Cloak, Test Flight …) bleiben unverändert. Eine
+Reaktion, die die ganze Karte negiert (Divine Gift of Rain), wirkt hier als
+Immunität aller eigenen Ziele gegen diese Auflösung.
+
 **Gefallene Helden sind keine Ziele dieser Fenster** (Spielgestalter-Entscheidung
 17.11.2026): `_checkPostTargetHandReactions` filtert Helden mit `hp <= 0` aus
 der Zielliste — auch der gewählte tote Held von Divine Gift of Death/Equality
