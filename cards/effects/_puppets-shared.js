@@ -449,7 +449,8 @@ const LUCK_GUARD = {
     // Kontrolle statt Seite (Styx 28.9.).
     if (!selected || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
     if (!hasLuck(engine, ownerIdx, selected)) return false;
-    return (validTargets || []).some(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
+    // ★ Spielgestalter-Entscheidung 17.11.2026: kein Ziel, das derselbe Effekt schon gewählt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert; Doppeltreffer nur bei Redirecting Aura).
+    return (validTargets || []).some(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id && !t._bereitsGewaehlt
       && (t.type === 'hero' || t.type === 'equip'));
   },
   // ★ Spielgestalter-Entscheidung 16.11.2026: die KOSTEN (ALLE Luck Counter entfernen) sind VOR dem Kettenfenster der Auslösung zu bezahlen und bleiben bei Negation bezahlt
@@ -461,7 +462,7 @@ const LUCK_GUARD = {
     return { removed };
   },
   async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard, bezahlt) {
-    const options = (validTargets || []).filter(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
+    const options = (validTargets || []).filter(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id && !t._bereitsGewaehlt
       && (t.type === 'hero' || t.type === 'equip'));   // Kontrolle statt Seite
     if (options.length === 0) return null;   // (Kosten sind dann schon bezahlt — der Hub zahlt vor dem Kettenfenster)
     let pick = null;

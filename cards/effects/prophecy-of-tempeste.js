@@ -291,6 +291,8 @@ module.exports = {
       const target = ctx.target;
       if (!target || target.hp === undefined || target.hp <= 0) return;
       if (target === host) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag (Fireball auf den Traeger UND einen anderen Helden, Flaechenschlag) den Traeger ohnehin selbst, wird nichts auf ihn umgeleitet.
+      if (engine.schlagTrifftZiel(host)) return;
       const targetOwnerIdx = engine._findHeroOwner(target);
       // Kontrolle statt Seite (Styx 28.9.): „another target you control".
       if (targetOwnerIdx < 0 || engine.heroSideOf(targetOwnerIdx, target) !== ownerIdx) return;
@@ -411,6 +413,7 @@ module.exports = {
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+      if (engine.schlagTrifftZiel(host)) return;   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer (derselbe Mehrziel-Schlag trifft den Traeger ohnehin selbst)
 
       const entries = ctx.entries || [];
       // First eligible entry whose target belongs to the controller.

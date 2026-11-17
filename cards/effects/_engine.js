@@ -20976,14 +20976,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @param quellenSeite Spielerindex der Quelle (oder null/-1)
    * @param opts.loveShotOhneSchutz  true am SCHADENSpfad — dort hebt
-   *        `_loveShot` den Schutz auf; beim Status bleibt er.
+   *        `_loveShot` den Schutz auf (`nurSchadenSchutz` bleibt davon getrennt).
    */
   _charmBlocksFrom(target, quellenSeite, opts = {}) {
     const ch = target?.statuses?.charmed;
     if (!ch) return false;
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
-    if (ch._loveShot && opts.loveShotOhneSchutz) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (LOVE-01): der von Love Shot GELIEHENE Held ist weder schadens- noch status-immun — nur die Kontrolle ist geliehen. Frozen/Poisoned/Stunned …
+    // (Frost Rune, Toxic Trap & Co. am Angreifer) wirken wie bei jedem anderen Helden; die Immunität echter Charme-Helden (Charme Lv3, Marke ohne `_loveShot`) bleibt unverändert.
+    if (ch._loveShot) return false;
     // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
     // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
     if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
@@ -27160,6 +27162,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „'performs' ist nur eine Abart von 'plays', die impliziert, dass der Zauber beim Nutzen vom Hero selbst 'bereitgestellt' wurde, statt aus der Hand zu kommen.
+   * Sollte von den Fenstern her identisch zu einem normalen Ausspielen sein." Ein Spell/eine Attack, die ein Held PERFORMT (Timeless King Zi, Love Shot, Time Distortion, Chaos Magic, Zusatzaktions-Güsse
+   * über `_castSpellImmediately`, Ghostly Warning/Atta-Rückkehr, Archibald, Taio, Nieht, Chaorc Friendly Fireballer …), öffnet dasselbe Kettenfenster wie ein normal gespielter: Silence, Ghostly Warning,
+   * Anti-Magic-Reaktionen der Kette, Master's Plan/Lunar Eclipse (nur bei Herkunft HAND: Kartentext „from their hand"), Cute Camera, Hand-Reaktionen auf Attacks (Pfeile, Magic Topaz) usw.
+   * Nichts wird erneut bezahlt (`goldCost: 0`, keine Aktion): die Quelle ist der Held, der sie „bereitgestellt" hat. Einmal-Limits stempelt die Kette wie sonst ab Aktivierungsbeginn.
+   * Wie `alsSpellKette`: mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und im MCTS-Rollout (`_inMctsSim`) öffnet kein neues Fenster.
+   * Der Aufrufer löst NICHT auf, wenn `negated` (Zauberrumpf überspringen, Karte in die Ablage — bzw. in den Löschstapel bei `negatedToDeleted`: Ghostly Warning, Lunar Eclipse; keine Wisdom-Kosten).
+   * Der Wirker ist ein HELD (`casterCheck`, wie beim normalen Spielen: Ghostly Warning/Celia/Shamanic Curse lesen ihn): wird er WÄHREND der Kette handlungsunfähig, fizzelt der Guss wie beim normalen Spielen.
+   * Ausnahme `trotzStatus` („in spite of any negative status effects": verzögerter Guss von Ghostly Warning/Atta): keine Wirkerprüfung.
+   * @param {object} o  { cardName, pi (Spieler), heroIdx, heroOwner (Brettseite des Wirkers, Standard pi), ausHand (Herkunft Hand/Vorrat: kein `fromBoard`), trotzStatus }
+   * @returns {Promise<{ negated: boolean, negatedToDeleted: boolean, fizzled: boolean, kette: object|null }>}
+   */
+  async performKettenfenster({ cardName, pi, heroIdx, heroOwner, ausHand = false, trotzStatus = false }) {
+    const keine = { negated: false, negatedToDeleted: false, fizzled: false, kette: null };
+    if (this._inReactionCheck || this._inMctsSim) return keine;
+    const cd = this._getCardDB()[cardName];
+    if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return keine;
+    const kette = await this.executeCardWithChain({
+      cardName, owner: pi, cardType: cd.cardType, goldCost: 0, heroIdx,
+      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi, casterCheck: !trotzStatus,
+      fromBoard: !ausHand, resolve: null,
+    });
+    // Ein Wirker, der während der Kette handlungsunfähig wurde (`fizzled`), wirkt wie beim normalen Spielen NICHT: der Aufrufer behandelt es wie eine Negation (Rumpf läuft nie, die Karte ist gespielt).
+    return { negated: !!kette.negated || !!kette.fizzled, negatedToDeleted: !!kette.negatedToDeleted && !!kette.negated, fizzled: !!kette.fizzled && !kette.negated, kette };
+  }
+
   async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
     const ps = this.gs.players[playerIdx];
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
@@ -27179,7 +27208,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { cancelled: true };
     }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
-    const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
+    let _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
     const _silenceBonusVorher = ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell === this.gs.turn;
     // ★ Z7 (S01-11, H04-05/-17): EINMAL PRO SPIEL gilt für JEDEN Sofort-Guss (Zi, Saya, Call for
@@ -27236,7 +27265,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand (damit man sie nicht selbst abwirft) und tauchte danach wieder
     // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
-    const _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
+    let _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
       ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData,
           (fromZone === 'hand' && pool === ps.hand) ? poolIndex : undefined,
           wirkerSeite !== playerIdx ? playerIdx : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie; W16a (Frage 6): auch beim geliehenen Helden (Hand des Kontrolleurs)
@@ -27297,6 +27326,21 @@ this._deathWatch = (this._deathWatchStack || []).length
           catch (err) { console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message); }
         }
       }
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `performKettenfenster`): der Sofort-Guss öffnet dasselbe Kettenfenster wie ein normal gespielter Spell/eine Attack (Silence, Ghostly
+      // Warning, Master's Plan [nur aus der Hand] …). Wird er in der Kette negiert, löst sein Rumpf nie auf: der Guss gilt als gespielt (zählt, Zusatzaktion verbraucht, Einmal-Stempel), die Karte geht in die
+      // Ablage (Ghostly Warning/Lunar Eclipse: in den Löschstapel), es fallen keine Wisdom-Kosten an (wie in `doPlaySpell`). `opts.ohneKette`: der Aufrufer hat die Kette schon geöffnet.
+      let _kettenNegiert = false;
+      let _pfeileVorher = 0;
+      if (!opts.ohneKette && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+        _pfeileVorher = (hero._armedArrows || []).length;
+        const _pk = await this.performKettenfenster({ cardName, pi: playerIdx, heroIdx, heroOwner: wirkerSeite, ausHand: fromZone === 'hand' && pool === ps.hand, trotzStatus: this.gs._verzoegertWirkt != null || !!this.gs._spellCasterCreature });   // Kreatur als Wirker (Skeleton Wizard …): kein Held-Wirker, wie `doPlaySpell` (`casterCheck`)
+        if (_pk.negated) {
+          _kettenNegiert = true;
+          this.gs._spellNegatedByEffect = true;
+          _wisdomKosten = 0;
+          if (_pk.negatedToDeleted) _attaLoescht = true;
+        }
+      }
       const _onPlay = () => this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       // ★★ v1364 (Als Befund Sticky Wand + Call of the Deepsea): legt sich
       // der Sofort-Guss selbst aufs Brett (Attachment → `placeAttachment`
@@ -27308,11 +27352,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // gehen. Jetzt: Stempel des aeusseren Wegs retten, eigenen auswerten.
       _placedVorher = this.gs._spellPlacedOnBoard;
       delete this.gs._spellPlacedOnBoard;
-      if (fromZone === 'hand' && pool === ps.hand) {
+      if (_kettenNegiert) {
+        // in der Kette negiert: der Rumpf läuft nie
+      } else if (fromZone === 'hand' && pool === ps.hand) {
         await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
       } else {
         await _onPlay();
       }
+      // Pfeile, die in DIESEM Kettenfenster einer Attack scharf wurden (Magic Topaz, Angelfeather Arrow …), gelten nur für sie (wie am Ende von `doPlaySpell`).
+      if (cardData.cardType === 'Attack' && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(this, playerIdx);
       if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
       if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
@@ -36417,11 +36465,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Rolling Boulder) — v701. Nur eine Kopie, das Original bleibt
     // unangetastet.
     config = { ...config, _redirectPickCount: liste.length };
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Ein Umleiter (Martyry, Challenge, Anti-Magnet, Anti-Magnetic Armor, Empty Armor, Laki, Shield of
+    // Wisdom, Alleria, Monia Bot …) bietet KEIN Ziel an, das derselbe Spell/Effekt schon gewählt oder (durch eine frühere Umleitung) schon getroffen hat — ein „up to 2 targets" meint verschiedene
+    // Ziele. Die Fenster bekommen dafür eine Kopie der Zielliste, in der diese Ziele `ineligible` UND `_bereitsGewaehlt` sind (ausgegraut: „zählt nicht als Ausweichziel"; Skripte, die `ineligible`
+    // nicht lesen, prüfen `_bereitsGewaehlt`). AUSNAHME: Redirecting Aura („even if that target was already hit by the same Spell/effect") liest das Flag und bietet sie weiter an (der Effekt trifft
+    // dann zweimal). `config._bereitsGewaehlt`: weitere schon gewählte/getroffene Ziele des Effekts, die nicht in `pickedIds` stehen (Chain Lightning: die übrigen Glieder der Kette).
+    const _vorBelegt = Array.isArray(config._bereitsGewaehlt) ? config._bereitsGewaehlt : [];
     this._inRedirectWindow = true;
     try {
       for (let i = 0; i < liste.length; i++) {
         const sel = (validTargets || []).find(t => t && t.id === liste[i]);
         if (!sel) continue;
+        const _belegt = new Set(_vorBelegt);
+        for (let j = 0; j < liste.length; j++) if (j !== i) _belegt.add(liste[j]);
+        _belegt.delete(sel.id);
+        const _vtUml = (_belegt.size > 0 && Array.isArray(validTargets))
+          ? validTargets.map(t => (t && _belegt.has(t.id) && !t.ineligible) ? { ...t, ineligible: true, _bereitsGewaehlt: true } : t)
+          : validTargets;
         // v704 (Puppets, Vinny): Brett-Waechter sehen die GANZE aktuelle
         // Auswahl, um alle geschuetzten Ziele in einem Zug fallen zu lassen.
         config._redirectPickedIds = liste.slice();
@@ -36430,7 +36490,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (sel.type !== 'hero' && sel.type !== 'equip') continue;
         if (typeof sel.owner !== 'number' || sel.owner < 0) continue;
         const redirected = await this._checkTargetRedirect(
-          sel.owner, sel, validTargets, config, sourceCard
+          sel.owner, sel, _vtUml, config, sourceCard
         );
         if (!redirected) continue;
         // Negation (v701): der GANZE Effekt ist negiert — leere Auswahl
@@ -44376,7 +44436,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W15a (Al, R01-10): Zauber OHNE Schaden (`opts.dealsDamage === false`, Status-Flächenzauber) melden das den Reaktionen
     // (Schadens-Reaktionen springen ab) und geben den Schulen-Tag mit (Anti Magic Shield: „hit by an opponent's Spell").
     const ptResult = await this._checkPostTargetHandReactions(normalized, source,
-      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : {});
+      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : (opts.nurTreffer ? { damageType: opts.damageType, nurTreffer: true } : {}));
     // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
     // actionAoeHit (which set `_spellNegatedByEffect` and return an
     // empty target list so the caster's onPlay deals nothing), the
@@ -44638,6 +44698,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Overheat): reagiert diese Reaktion laut Kartentext auf eine WAHL („is chosen by …", „chooses a target …": Invisibility Cloak, Chaorc Interception,
+   * Dream Dust, Dream World Switcheroo, Deepsea Encounter, Cool Tech Jetpack, Winged Skeleton, Flesh-Eating Swarm Trap)? Fenster für einen reinen TREFFER ohne Wahl (`opts.nurTreffer`,
+   * `preDamageMultiTargetWindow`) lassen solche Karten aus — „hit / would take damage / would be affected"-Karten (Anti Magic Shield, Test Flight, Unreasonable Anger, Barrier of Faith, Divine Gift
+   * of Rain, Future Tech Escape Device, MOE Shield, Spectral Armor, Bamboo Shield …) kommen dran. Gelesen wird der gedruckte Kartentext (wie beim Surprise-Filter „chosen/targeted by").
+   */
+  _waehltZielKarte(cardName) {
+    return /\b(chosen|chooses)\b/i.test(this._getCardDB()[cardName]?.effect || '');
+  }
+
+  /**
    * Post-target hand-reaction hub. ONE call per damage source per
    * resolution: the loop offers every eligible `isPostTargetReaction`
    * card in both players' hands (defender first), letting multiple
@@ -44735,6 +44805,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
         if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+        if (opts.nurTreffer && this._waehltZielKarte(cardName)) continue;   // „Treffer ohne Wahl" (Overheat-Träger): nur „hit/affect/damage"-Reaktionen, keine „is chosen"-Reaktionen
         // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — bei „cannot be negated" (`config.cannotBeNegated` der Zielwahl: Exorcism mit Decay Magic 2) werden auch
         // ganz negierende Reaktionen angeboten (Hinweis in der Frage, CPU waehlt sie nicht); ihre Negation wird unten verworfen (die Karte ist bezahlt, der Effekt laeuft).
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
@@ -45067,6 +45138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
             if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+            if (opts.nurTreffer && this._waehltZielKarte(rxInst?.counters?._ftCopyOf || cardName)) continue;   // „Treffer ohne Wahl": keine „is chosen"-Reaktion (Cool Tech Jetpack, Winged Skeleton)
             // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
             // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
             targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
@@ -49463,7 +49535,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * to it" ist ab zwei erfuellt.
    */
   beginMultiHit(anzahl) {
-    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1, ...(this._multiHitScope?._umleitZiele ? { _umleitZiele: this._multiHitScope._umleitZiele } : {}) };
     // Al 26.10. (Idej Sword - Onima „exactly 1 Hero und kein anderes Ziel"): `afterSpellResolved.damageTargets` kennt nur die GEWÄHLTEN Ziele
     // (Whirlwind Strikes Kreaturen im Support fehlen); die Klammer ist dann schon zu. Die größte Zielzahl einer Mehrziel-Klammer dieses Gusses
     // bleibt deshalb am Zielprotokoll (`gs._spellDamageLog._mehrziel`) lesbar, solange der Guss auflöst.
@@ -49501,6 +49573,41 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else this._multiHitScope.tiefe -= 1;
       }
     }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Schadensumleiter, die den Schaden eines Ziels auf ein ANDERES Ziel verlegen (Mean Cute Cat,
+   * Gigantisaur Brachion, Johanna, Bubbles, Prophecy of Tempeste), bieten das Ziel NICHT an, das derselbe Mehrziel-Schlag ohnehin selbst trifft (Fireball auf Held UND Kreatur, Chain Lightning, Flächenschlag).
+   * Die Klammer `beginAoeStrike` merkt dafür ihre Ziele am Scope (Helden-OBJEKTE, Kreaturen-Ids); `schlagTrifftZiel(ziel)` fragt sie ab. Ohne laufende Klammer (Einzelziel-Treffer) immer false.
+   * Gegenstück im Zielwahl-Fenster: `applyRedirectWindows` (`_bereitsGewaehlt`). Ausnahme wie dort: Redirecting Aura (Text: „even if that target was already hit by the same Spell/effect").
+   */
+  _schlagZieleFuerUmleiter(scope, opts) {
+    try {
+      const helden = new Set(), insts = new Set();
+      for (const h of (opts.heroes || [])) {
+        const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+        if (hero?.name) helden.add(hero);
+      }
+      for (const k of (opts.creatures || [])) {
+        const inst = (k && k.inst) ? k.inst : k;
+        if (inst && inst.id != null) insts.add(inst.id);
+      }
+      const vorher = scope._umleitZiele;   // verschachtelte Schläge (Booby Trap im Fireball …): die Ziele des äußeren bleiben stehen, es gilt die Vereinigung
+      if (vorher) { for (const h of vorher.helden) helden.add(h); for (const i of vorher.insts) insts.add(i); }
+      scope._umleitZiele = { helden, insts };
+    } catch { /* Buchführung darf den Schlag nie stören */ }
+  }
+
+  /**
+   * Trifft der laufende Mehrziel-Schlag dieses Ziel (Heldenobjekt, Kreaturen-Instanz oder Picker-Ziel `{type:'hero',owner,heroIdx}`) selbst? Siehe `_schlagZieleFuerUmleiter`.
+   * Ohne laufenden Schlag oder ohne Ziellisten-Merker: false (Verhalten wie bisher).
+   */
+  schlagTrifftZiel(ziel) {
+    const z = this._multiHitScope?._umleitZiele;
+    if (!z || !ziel) return false;
+    const t = this._todgeweihtZiel(ziel);
+    if (!t) return false;
+    return t.hero ? z.helden.has(t.hero) : (t.inst && t.inst.id != null && z.insts.has(t.inst.id));
   }
 
   /**
@@ -49544,6 +49651,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    this._schlagZieleFuerUmleiter(scope, opts);   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer durch Schadensumleiter (s. `schlagTrifftZiel`)
     // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
     if (opts.heroes?.length) await this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)

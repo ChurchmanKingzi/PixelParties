@@ -359,6 +359,7 @@ module.exports = {
       await engine.zeigeFizzle(oppChoice, { playerIdx: pi, grund: 'cannot_cast_now' });
     }
 
+    let _negiertGeloescht = false;   // in der Kette negiert + „delete it" (Ghostly Warning)
     if (canPerform) {
       engine.log('timeless_king_zi_perform', { player: ps.username, spell: oppChoice });
       // Direct runHooks('onPlay') sub-cast bypasses validateActionPlay,
@@ -385,13 +386,18 @@ module.exports = {
       const _zwangVorher = gs._forcedCommitPlayer;
       // „Diese Karte wird gerade gespielt" (`_currentResolvingPlayName`, wie `doPlaySpell`/`_castSpellImmediately`): Cheering Rabbit („first Attack or Spell it uses each turn") erkennt daran
       // den Wurf des Helden, Luck zaehlt einen sich selbst legenden Area-/Anhangs-Spell nur einmal.
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays"): Zis Spell öffnet dasselbe Kettenfenster wie ein normal gespielter (Silence, Ghostly Warning, … — nicht Master's Plan/Lunar Eclipse:
+      // der Spell kommt aus dem Deck, „bereitgestellt" vom Helden). Wird er negiert, löst sein Rumpf nie auf; er zählt als benutzt und geht in die Ablage (Ghostly Warning: in den Löschstapel).
+      const _pk = await engine.performKettenfenster({ cardName: oppChoice, pi, heroIdx, heroOwner: feld, ausHand: false });
+      if (_pk.negated) gs._spellNegatedByEffect = true;
+      _negiertGeloescht = !!_pk.negatedToDeleted;
       engine._pushResolvingPlay(oppChoice);
       try {
         // Der Zwang gilt nur für die Auflösung des Zauberkörpers (`onPlay`), nicht für die Nachwirkungs-Haken (`afterSpellResolved`: Heldenpassive mit eigenen "may"-Abfragen).
         gs._forcedCommitPlayer = pi;
         try {
           require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
-          await engine.runHooks('onPlay', {
+          if (!_pk.negated) await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: oppChoice, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
@@ -405,7 +411,7 @@ module.exports = {
         for (const t of (gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
-        await engine.runHooks('afterSpellResolved', {
+        if (!_pk.negated) await engine.runHooks('afterSpellResolved', {
           spellName: oppChoice, spellCardData: cardDB[oppChoice],
           heroIdx, heroOwner: feld, casterIdx: pi, damageTargets: uniqueTargets,
           isSecondCast: false, _skipReactionCheck: true,
@@ -440,8 +446,9 @@ module.exports = {
 
     // Normal performed Spell (resolved, not a board fixture) — or one
     // that couldn't be performed — goes to discard. Only the OTHER
-    // Spells are deleted per the card text.
-    ps.discardPile.push(oppChoice);
+    // Spells are deleted per the card text. (Ghostly Warning/Lunar Eclipse: der in der Kette negierte Spell wird gelöscht.)
+    if (_negiertGeloescht) { if (!ps.deletedPile) ps.deletedPile = []; ps.deletedPile.push(oppChoice); }
+    else ps.discardPile.push(oppChoice);
     engine.sync();
     return true;
   },
