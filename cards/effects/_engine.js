@@ -21,6 +21,10 @@ const AUSLOESER_HOOKS = new Set([
 // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Haltepunkte, an denen zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger aufgelöst werden
 // (dieselben wie beim Elixir of Immortality; siehe `_loeseOpferWiederbelebungen`).
 const OPFER_REVIVE_HALTEPUNKTE = new Set(['afterAllStatusDamage', 'afterSpellResolved', 'afterCreatureEffect', 'onAnyActionResolved', 'onActiveEffectUsed', 'onPhaseEnd']);
+// Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): Meldungen, bei denen sich die Status-Immunität eines Helden ändern kann (Johanna fällt, Light Ball kommt/geht, Zugbeginn nach dem Ende von Schutz/Buff) —
+// vor ihnen gleicht `statusAnhaengselAbgleichen` die Status der Anhängsel (Stowaway, Curse …) sofort ab, statt erst im nächsten `sync()`. Bewusst NICHT bei `onStatusRemoved`/`onStatusApplied`:
+// Johannas Heilung der Verbündeten (Auftauen) läuft über diese Meldung und soll VOR dem Ruhen laufen (geheilte Anhängsel gehen in die Ablage); den Rest holt das nächste `sync()`.
+const STATUS_ABGLEICH_HOOKS = new Set(['onHeroKO', 'onCardEnterZone', 'onCardLeaveZone', 'onTurnStart']);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
 const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
@@ -3303,6 +3307,7 @@ class GameEngine {
         }
       } finally { this._playSignaleLaeuft = false; }
     }
+    if (STATUS_ABGLEICH_HOOKS.has(hookName)) require('./_attachment-shared').statusAnhaengselAbgleichen(this);   // 17.11.2026: Status-Anhängsel folgen der Status-Immunität des Wirts (auch vor `sync`)
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
     // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)

@@ -518,7 +518,7 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
 //  UND der Wirt im Moment nicht status-immun ist (`engine.heroBlocksStatusNow`: Johanna, Light Ball, Immunitäts-Anhängsel, Buff `negative_status_immune`,
 //  Erstzug-Schutz, Einzel-Immunität; ohne Charme-Schutz und ohne die kurzlebige Nach-CC-Immunität `immune` — beide gehören nicht zur Status-Immunität).
 //    • Beim Anlegen unter Immunität: der Status wird nicht gesetzt, die Karte liegt wirkungslos in der Zone (`counters._statusRuht`).
-//    • `statusAnhaengselAbgleichen` (läuft in jedem `engine.sync()`) holt ihn nach, sobald die Immunität endet (Johanna stirbt, Light Ball weg, Buff läuft ab …),
+//    • `statusAnhaengselAbgleichen` (läuft in jedem `engine.sync()` und vor den Meldungen, bei denen sich eine Immunität ändern kann — `STATUS_ABGLEICH_HOOKS` in `_engine.js`) holt ihn nach, sobald die Immunität endet (Johanna stirbt, Light Ball weg, Buff läuft ab …),
 //      und nimmt ihn wieder weg, wenn sie später dazukommt (Marke wieder gesetzt). Gegen Immunitäten, die einander bedingen (Johanna selbst negiert), läuft der
 //      Abgleich bis zu 3 Durchgänge.
 //    • Geheilt (Cleanse) und Abgang der Karte laufen wie bisher über die Karten-Haken: ein geheilter Status wirft die Karte ab (Marke bleibt aus); ruhende Karten
@@ -540,12 +540,6 @@ const RUHT = '_statusRuht';
 function wirtStatusImmun(engine, owner, heroIdx, statusName) {
   if (typeof engine?.heroBlocksStatusNow !== 'function') return false;
   return !!engine.heroBlocksStatusNow(owner, heroIdx, statusName, { festesZiel: true, bypassImmune: true, ohneCharme: true });
-}
-
-/** Alle Kopien von Status-Anhängseln (Vertrag `statusFolgtImmunitaet`) am Wirt, die diesen Status tragen sollen. */
-function statusKopienAmWirt(engine, owner, heroIdx, statusName) {
-  return (engine.cardInstances || []).filter(c => c.zone === 'support' && !c.faceDown && c.owner === owner && c.heroIdx === heroIdx
-    && loadCardEffect(c.name)?.statusFolgtImmunitaet?.status === statusName);
 }
 
 /**
@@ -652,5 +646,5 @@ function statusAnhaengselAbgleichen(engine) {
 module.exports = {
   freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero,
   setzeAnhaengselStatus, anhaengselStatusHooks,
-  setzeOderRuhe, statusErgebnisBuchen, statusAnhaengselAbgleichen, statusKopienAmWirt, wirtStatusImmun,
+  setzeOderRuhe, statusErgebnisBuchen, statusAnhaengselAbgleichen, wirtStatusImmun,
 };
