@@ -2185,6 +2185,13 @@ Zielwahlen von Ricochet/Duel/Divine Gift of Equality) und endet mit ihr
 (`endeEffektImmunitaeten`) — nicht schon beim nächsten Zielfenster und nie in
 die nächste Karte hinein. Neue Karten dieser Bauart setzen das Flag.
 
+**Teleport × Resistance** (Spielgestalter-Entscheidung 17.11.2026): der Tausch
+ist ein Nicht-Schadens-Effekt auf BEIDE Helden und fragt deshalb
+`heroNonDamageEffectBlocked` für jeden von ihnen (Effekt-Immunität, Spell-
+Immunität, Resistance: Lv1/Lv2 verbrauchen je Held eine Ladung, Lv3 blockt
+alles). Blockt einer der beiden, entfällt der Tausch ganz. Phoenix Bombardment
+(Schaden) bleibt unberührt — Resistance schützt nicht vor Schaden.
+
 **EIN Stummschalt-Prädikat:** `engine.isCreatureEffectSuppressed(inst,
 { honorNegStatusImmune })` ersetzt die verstreuten
 `negated/nulled/frozen/stunned`-Abfragen (runHooks, isCardEffectActive,

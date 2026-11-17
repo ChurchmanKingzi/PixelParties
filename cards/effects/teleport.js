@@ -329,7 +329,13 @@ module.exports = {
 
       // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — ein Tausch braucht beide Helden;
       // ist einer immun, bleibt der Tausch ganz aus (der Held wandert nicht, also kann auch der andere nicht auf seinen Platz).
-      if (engine.hasEffectImmunity(seite, a.heroIdx, ctx.card) || engine.hasEffectImmunity(seite, b.heroIdx, ctx.card)) {
+      // Spielgestalter-Entscheidung 17.11.2026: auch Resistance schützt (der Tausch ist ein Nicht-Schadens-Effekt auf BEIDE Helden): `heroNonDamageEffectBlocked` fragt die Effekt-Immunität (wie oben),
+      // Resistance (Lv1/Lv2 verbrauchen je Held eine Ladung, Lv3 blockt alles) und Spell-Immunität. Beide Helden werden gefragt (beide sind betroffen, jede Resistance fängt ihren Held ab);
+      // blockt einer, entfällt der Tausch ganz.
+      const _blkOpts = { sourceOwner: pi, source: ctx.card };
+      const _blkA = await engine.heroNonDamageEffectBlocked(seite, a.heroIdx, 'swap_positions', _blkOpts);
+      const _blkB = await engine.heroNonDamageEffectBlocked(seite, b.heroIdx, 'swap_positions', _blkOpts);
+      if (_blkA || _blkB) {
         engine.log('effect_immunity', { hero: ha.name, other: hb.name, source: CARD_NAME });
         engine.sync();
         return;
