@@ -26,7 +26,9 @@
 //    Effekt"). Sperren: Distracting Crystal sperrt die ganze Karte
 //    (`shufflesFromHandOrDiscardIntoDeck`, der Effekt „enthält" das
 //    Zurückmischen); Hatusbal (`shuffleBackIntoOwnDeckBlocked`) lässt
-//    nur den Weg ohne Zurückmischen offen.
+//    nur den Weg ohne Zurückmischen offen. Unter der Stab-Sperre (Staff of the Teleporter: kein Ziehen, kein Karten-Aus-der-Ablage-Nehmen) ist der Weg „auf die Hand"
+//    verboten; Meditation bleibt spielbar und läuft dann ohne Menü automatisch über „zurückmischen" (ausdrücklich erlaubt, Spielgestalter-Entscheidung 17.11.2026) —
+//    gezogen wird wegen der Zieh-Sperre nichts.
 //  ⑤ Zweiter Weg: Karten einzeln auf die Hand (`addCardFromDiscardToHand`,
 //    Ablage-/Such-Sperren, Bamboo-Listener), danach EIN Fenster für den
 //    Gegner mit ALLEN aufgenommenen Karten (`revealSearchedCards` mit
@@ -70,11 +72,22 @@ function handWegOffen(engine, pi) {
   return spellsInAblage(engine, pi).length > 0;
 }
 
-/** Darf der erste Weg Karten zurückmischen? (ohne: reines „zieh 1 Karte") */
+/**
+ * Gilt für `pi` gerade die harte Stab-Sperre (Staff of the Teleporter / Staff of Uncontrollable Destruction: „cannot draw cards or move any cards out of your
+ * discard pile for the rest of the turn")?
+ */
+const stabSperre = (engine, pi) => engine.gs.players[pi]?._discardLockHard === engine.gs.turn;
+
+/**
+ * Darf der erste Weg Karten zurückmischen? (ohne: reines „zieh 1 Karte")
+ * Spielgestalter-Entscheidung 17.11.2026: unter der Stab-Sperre bleibt Meditation spielbar und folgt AUTOMATISCH dem Weg „zurück ins Deck mischen" (der Weg „auf die
+ * Hand" ist dort verboten, `handWegOffen`) — dieser Weg ist ausdrücklich erlaubt, obwohl die Karten dabei die Ablage verlassen; gezogen wird wegen der Zieh-Sperre nichts.
+ * Andere Ablage-Sperren (Knight of Kings [B], Hatusbal, Eye of Ren ohne Freikauf) gelten weiter.
+ */
 function mischWegOffen(engine, pi) {
   if (engine.shuffleBackIntoOwnDeckBlocked(pi)) return false;        // Hatusbal
   if (!engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
-  if (engine.isDiscardOutHardLocked?.(pi)) return false;
+  if (engine.isDiscardOutHardLocked?.(pi) && !stabSperre(engine, pi)) return false;
   return spellsInAblage(engine, pi).length > 0;
 }
 
@@ -143,7 +156,8 @@ module.exports = {
           title: CARD_NAME,
           description: hand
             ? `Choose up to ${MAX_TO_HAND} Spells from your discard pile to add to your hand.`
-            : 'Choose any number of Spells from your discard pile to shuffle back into your deck — then you draw 1 card.',
+            : 'Choose any number of Spells from your discard pile to shuffle back into your deck — then you draw 1 card.'
+              + (engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked ? ' You cannot draw cards right now, so you will not draw.' : ''),
           confirmLabel: hand ? '✋ Take!' : '🔄 Shuffle & Draw!',
           ...(hand ? { searchToHand: true, searchPile: 'discard' } : {}),
           cancellable: true,
@@ -177,7 +191,7 @@ module.exports = {
             owner: pi, cardName: name, from: 'discard', to: 'deck', sfx: 'draw',
           });
           await engine._delay(180);
-          const genommen = await engine.takeFromPile(pi, 'discard', name, { source: CARD_NAME });
+          const genommen = await engine.takeFromPile(pi, 'discard', name, { source: CARD_NAME, ...(stabSperre(engine, pi) ? { _bypassDiscardLock: true } : {}) });
           if (!genommen) break;
           ps.mainDeck.push(genommen.name);
           zurueck++;
