@@ -7964,6 +7964,11 @@ einen gerade getoeteten Helden wiederbeleben wuerde). Die einzigen
 `maxHp = 0` sind das Leeren eines Helden-Slots nach Entfernung
 (Initiation Ritual, Quetzahuitl) — kein lebender Held.
 
+**Toughness (Spielgestalter-Entscheidung 17.11.2026):** Der Abgang einer Toughness-Kopie — egal wie (Madame Guillotine, Abwurf, Memory Wipe, Forgetting …) — zieht den
+Betrag dieser Kopie von Max-HP UND aktuellen HP ab, die aktuellen HP nie unter 1 (`engine.decreaseMaxHp(hero, betrag, { alsoReduceCurrent: true })`; ohne die Option klemmt
+die Primitive wie bisher nur auf das neue Maximum). Die Rückkehr gibt `increaseMaxHp(…, { alsoHealCurrent })` wieder aktuell UND max: 650/800 → 450/600 → 650/800 (keine
+Gratis-Heilung). Nur Toughness nutzt die Option; Voodoo Curse (Boni bleiben bei ihren Karten) und Compulsory Body Swap (Abziehen/Aufschlagen beim Tausch) bleiben beim alten Klemmen.
+
 ## Modul `_ability-cost-shared` — Bezahlen mit Abilities/Equips (v804)
 
 `sendCardsLoop(engine, pi, heroIdx, { cardName, kinds, min, max, amount,
