@@ -53,6 +53,8 @@ module.exports = {
         }
       }
     }
+    // Warnungsprinzip (Spielgestalter-Entscheidung 17.11.2026): gift-immune Ziele bleiben wählbar, die Zielwahl warnt („… is immune to poison and will not be affected."), die CPU wählt sie nicht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(targets, 'poisoned', playerIdx, 'Poison Vial');
     return targets;
   },
 

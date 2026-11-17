@@ -12854,7 +12854,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi, cardType, goldCost,
-      validTargets: freshTargets, config,
+      validTargets: freshTargets, config: mitWirkungslosHinweis(config, freshTargets),
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -13184,6 +13184,20 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
 }
 
 /**
+ * Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): Ziele einer Ziel-Karte, auf die der Effekt NICHT wirken wird (Status-Immunitaet, z. B. freeze_immune bei Snow Cannon), bleiben
+ * waehlbar — die Karte traegt am Ziel `wirkungslos` (Hinweissatz, `engine.markiereStatusWirkungslos`). Die Zielwahl haengt die Saetze an ihren Beschreibungstext, damit der Spieler
+ * VOR dem Klick gewarnt ist. Gibt eine Kopie der Konfiguration zurueck (das Skript-Objekt bleibt unveraendert); ohne markierte Ziele die Konfiguration selbst.
+ */
+function mitWirkungslosHinweis(config, validTargets) {
+  const hinweise = [];
+  for (const t of (validTargets || [])) {
+    if (t && !t.ineligible && typeof t.wirkungslos === 'string' && t.wirkungslos && !hinweise.includes(t.wirkungslos)) hinweise.push(t.wirkungslos);
+  }
+  if (hinweise.length === 0) return config;
+  return { ...config, description: `${config?.description || 'Select targets'} Warning: ${hinweise.join(' ')}` };
+}
+
+/**
  * Rewrite `equip`-type validTargets so their `id` and `owner` fields
  * point at the creature's PHYSICAL side rather than `inst.owner`. Two
  * paths produce a controller / owner mismatch:
@@ -13396,7 +13410,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi,
-      cardType: 'Potion', validTargets, config: cfg,
+      cardType: 'Potion', validTargets, config: mitWirkungslosHinweis(cfg, validTargets),
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -13704,7 +13718,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
       // Handindex spaeter auf und muss dieselbe Liste treffen.
       fromCreation, ownerIdx: pi,
-      cardType: 'Artifact', goldCost: cost, validTargets, config,
+      cardType: 'Artifact', goldCost: cost, validTargets, config: mitWirkungslosHinweis(config, validTargets),
     };
     for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;

@@ -56475,6 +56475,42 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip, Snow Cannon × freeze-immune Held): Ziele, auf die ein Status schon wegen einer Zustands-Immunitaet NICHT wirken
+   * wird (freeze_immune, burn_immune, `immune`, Charme, Johanna, Light Ball, Kreaturen-Schutz …), bleiben als Ziel WAEHLBAR — der Effekt verpufft, die Karte ist verbraucht. Der Picker
+   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz), `server.js` (`mitWirkungslosHinweis`) haengt ihn an den Beschreibungstext der Zielwahl; die CPU waehlt solche
+   * Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
+   * Gibt den Hinweissatz fuer EIN Picker-Ziel (`{type:'hero', owner, heroIdx}` bzw. `{type:'equip', cardInstance}`) zurueck, '' wenn der Status landen kann.
+   * `pi` = Seite der Quelle (Charme-Schutz, Golden Wings), `quelleName` = Name der Karte.
+   */
+  statusWirkungslosHinweis(ziel, statusName, pi, quelleName) {
+    if (!ziel) return '';
+    const GERUND = { frozen: 'freezing', burned: 'burning', stunned: 'stunning', negated: 'negation', bound: 'binding', poisoned: 'poison' };
+    let blockt = false;
+    let name = ziel.cardName || '';
+    if (ziel.type === 'hero') {
+      const hero = this.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+      if (!hero?.name) return '';
+      name = name || hero.name;
+      blockt = this.heroBlocksStatusNow(ziel.owner, ziel.heroIdx, statusName, { appliedBy: pi });
+    } else {
+      const inst = ziel.cardInstance || ziel._cardInstance || this.kreaturAnBrett(ziel.owner, ziel.heroIdx, ziel.slotIdx);   // Listen ohne Instanz (Poison Vial) loesen ueber (Brettseite, Held, Zone) auf
+      if (!inst?.counters) return '';
+      name = name || inst.name;
+      blockt = !this.canApplyCreatureStatus(inst, statusName, { name: quelleName, owner: pi }, { gwSourceOwner: pi });
+    }
+    return blockt ? `${name} is immune to ${GERUND[statusName] || statusName} and will not be affected.` : '';
+  }
+
+  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos`). Rueckgabe: dieselbe Liste. */
+  markiereStatusWirkungslos(ziele, statusName, pi, quelleName) {
+    for (const t of (ziele || [])) {
+      const h = this.statusWirkungslosHinweis(t, statusName, pi, quelleName);
+      if (h) t.wirkungslos = h;
+    }
+    return ziele;
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;

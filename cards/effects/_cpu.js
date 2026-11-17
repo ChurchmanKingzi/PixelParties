@@ -3069,6 +3069,7 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   // calls doConfirmPotion to finish resolution.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return null;
+  if (isTargeted && nurWirkungsloseZiele(engine, pi, script, handIdx)) return null;   // Spielgestalter-Entscheidung 17.11.2026: nur immune Ziele — der Mensch darf, die CPU spielt nichts Nutzloses
   // Per-card CPU sanity gate. Cards whose value is strictly conditional
   // on board state (Golden Ankh's "only revive if I'll use the Hero
   // this turn", any future "useless without a follow-up" artifact)
@@ -3341,6 +3342,15 @@ async function playPotions(engine, helpers) {
   }   // Ende des zweiten Quellen-Durchgangs
 }
 
+// Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): Ziele, auf die ein Status nicht wirken wird (freeze_immune …), bleiben fuer den MENSCHEN waehlbar (der Picker warnt, `wirkungslos` am Ziel,
+// `engine.markiereStatusWirkungslos`); die CPU waehlt sie nie und spielt die Karte nicht, wenn ALLE Ziele so markiert sind.
+function nurWirkungsloseZiele(engine, pi, script, handIdx) {
+  if (!script?.getValidTargets) return false;
+  let ziele;
+  try { ziele = script.getValidTargets(engine.gs, pi, engine, handIdx); } catch { return false; }
+  return Array.isArray(ziele) && ziele.length > 0 && ziele.every(t => t && t.wirkungslos);
+}
+
 function isPotionPlayable(engine, pi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -3354,6 +3364,7 @@ function isPotionPlayable(engine, pi, cardName) {
   // Targeted Potions play via doUsePotion → gs.potionTargeting → resolveTargetingPrompt.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return false;
+  if (isTargeted && nurWirkungsloseZiele(engine, pi, script)) return false;   // Spielgestalter-Entscheidung 17.11.2026: nur immune Ziele — die CPU spielt nichts Nutzloses
   // First-turn shield: damage / debuff / forced-discard Potions (Bottled
   // Flame, Bottled Lightning, …) waste their effect under the opponent's
   // turn-1 immunity. The same gate that filters Spells/Attacks applies.
@@ -3480,11 +3491,13 @@ async function resolveTargetingPrompt(engine, helpers) {
     // nie kaputt — die Markierung wurde hier schlicht nicht gelesen.
     // `promptEffectTarget` filtert fuer seinen eigenen CPU-Zweig laengst
     // (`_waehlbar`); dieser zweite Eingang tat es nicht.
-    const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible);
+    // Spielgestalter-Entscheidung 17.11.2026: `wirkungslos` (immunes Ziel, der Mensch bekommt einen Hinweis) waehlt die CPU nie; bleibt nichts anderes, bricht sie die Zielwahl ab (die Karte bleibt auf der Hand).
+    const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible && !t?.wirkungslos);
+    if (waehlbar.length === 0 && (tgt.validTargets || []).some(t => t?.wirkungslos)) { engine.gs.potionTargeting = null; return; }
     const picks = engine._getCpuTargetResponse(waehlbar, cfg);
     // W7b (Nachtrag 2, Al 15.10.): die CPU unterliegt denselben Picker-Regeln wie ein Spieler - eine regelwidrige Wahl wird auf eine gueltige
     // reduziert/aufgefuellt (`korrigiereZielAuswahl`), statt am Server-Tor abzuprallen (sonst 4 Fehlversuche, dann Abbruch).
-    const korrigiert = engine.korrigiereZielAuswahl(tgt.validTargets, { ...engine.pickerRegelKonfig(tgt), cancellable: false }, Array.isArray(picks) ? picks : []);
+    const korrigiert = engine.korrigiereZielAuswahl((tgt.validTargets || []).filter(t => !t?.wirkungslos), { ...engine.pickerRegelKonfig(tgt), cancellable: false }, Array.isArray(picks) ? picks : []);   // ohne `wirkungslos`: die Auffuellung greift nie zu einem immunen Ziel
     const selectedIds = Array.isArray(korrigiert) ? korrigiert : [];
     cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
     await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });
