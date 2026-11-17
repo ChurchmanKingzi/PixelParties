@@ -140,7 +140,7 @@ async function payOpferKosten(engine, pi, inst) {
   // captured in `sacMaxHp`), the buff below still lands, and the Hero
   // comes back. We deliberately do NOT gate the rest of the effect on
   // the return value: a revived sacrifice is still a completed Gift.
-  await engine.actionDefeatHero(
+  const _opferErg = await engine.actionDefeatHero(
     { name: 'Divine Gift of Sacrifice', owner: pi },
     sacHero,
     // `isSacrifice` flags the KO as a voluntary Hero sacrifice so
@@ -148,6 +148,14 @@ async function payOpferKosten(engine, pi, inst) {
     // can react to it specifically, not to ordinary defeats.
     { reason: 'Divine Gift of Sacrifice', respectFirstTurnProtection: false, isSacrifice: true }
   );
+  // Spielgestalter-Entscheidung 16.11.2026 (Vor-Niederlage-Fenster bei Helden-Opfern): ersetzt/negiert eine Hand-Reaktion die Niederlage des Opfers
+  // (`opferErsetzt`), ist das Opfer NICHT bezahlt — die Wirkung braucht das Opfer („max HP of the sacrificed Hero"), also fizzelt die Karte, ist aber GESPIELT
+  // (`gs._opferFizzle`, wie beim gerade noch geretteten Bull; Kostenwahl-Abbruch-Zweig der Engine). Ein Extra-Life-Opfer gilt weiter als besiegt (kein `opferErsetzt`).
+  if (_opferErg?.opferErsetzt) {
+    delete gs._kostenOpferWirker;
+    gs._opferFizzle = true;
+    return null;
+  }
 
   return { heroIdx: sacTarget.heroIdx, name: sacHero.name, maxHp: sacMaxHp };
 }

@@ -11831,11 +11831,17 @@ class GameEngine {
     // dieser Karten pruefen auf „toedlich", und toedlicher als das geht
     // es nicht. `instaKill` filtert das Angebot auf die Reaktionen,
     // die einen Tod wirklich ersetzen koennen (s. dort).
-    // Ein Selbstopfer (`isSacrifice`) oeffnet kein Fenster: der
-    // Kontrolleur gibt den Helden absichtlich her.
-    if (!opts.isSacrifice && !opts.skipDefeatReactions && !_u) {
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat", Heldenopfer): auch ein Helden-OPFER (`isSacrifice`: Divine Gift of Sacrifice, Pharaoh,
+    // Teocuilatl, Pythia) öffnet dieses Fenster — das Opfer ist als Kosten/Effekt gezahlt, die Hand darf auf die bevorstehende Niederlage reagieren. Das Fenster ist für
+    // künftige Karten da: im Fenster steht `opts.isSacrifice`/`cause: 'sacrifice'`, und NUR Karten mit `firesOnSacrifice: true` werden überhaupt angeboten (Homerun!, Escape,
+    // Emergency Spell Armor, Paraseed Zombie, Point-Blank Annihilation tragen es nicht: ihr Text meint „defeated by an effect/Spell/opponent's card", nicht die eigene Opfergabe —
+    // Escape/Emergency Spell Armor würden den Spell-Typ der Opferkarte sonst fälschlich als Auslöser lesen). Ersetzt/negiert eine Reaktion die Niederlage, ist das Opfer NICHT
+    // bezahlt (`opferErsetzt`): Karten, deren Wirkung das Opfer voraussetzt (Divine Gift of Sacrifice, Teocuilatl), fizzeln wie bei einem gerade noch geretteten Kreaturen-Opfer.
+    // Ausgenommen bleibt der HP-Kosten-Tod (`hpKosten`, Foresta): kein Opfer, kein Fenster.
+    if (!(opts.isSacrifice && opts.hpKosten) && !opts.skipDefeatReactions && !_u) {
+      const _opferFenster = !!opts.isSacrifice;
       const rx = await this._checkPreDamageHandReactions(
-        target, source, target.hp, 'defeat', { instaKill: true });
+        target, source, target.hp, 'defeat', { instaKill: true, ...(_opferFenster ? { isSacrifice: true, cause: 'sacrifice' } : {}) });
       // `negated` deckt beide Faelle ab: die reine Negation (Escape)
       // und die Ersetzung, bei der die Reaktion die HP selbst setzt
       // (Paraseed Zombie: „that Hero's HP drop to 1 instead").
@@ -11843,7 +11849,7 @@ class GameEngine {
         this.log('defeat_negated', {
           hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat',
         });
-        return { defeated: false };
+        return { defeated: false, ...(_opferFenster ? { opferErsetzt: true } : {}) };
       }
       // Hat eine Reaktion den Helden zwischenzeitlich geheilt oder
       // entfernt, gilt derselbe Abbruch.
@@ -39540,6 +39546,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Cloud in a Bottle), haetten hier nichts zu halbieren — sie
       // anzubieten hiesse, sie fuer nichts zu verbrauchen.
       if (opts.instaKill && !script.firesOnDefeat) continue;
+      // ★ Spielgestalter-Entscheidung 16.11.2026: Helden-OPFER (`opts.isSacrifice`, `cause: 'sacrifice'`) öffnen dieses Fenster, aber NUR Karten, die ausdrücklich auf ein Opfer
+      // hören (`firesOnSacrifice: true`), werden gefragt — alle bisherigen Karten meinen „defeated by an effect/Attack/Spell/opponent's card", nicht die eigene Opfergabe.
+      // Ihre `preDamageCondition` bekommt `opts.isSacrifice` und `opts.cause` (9. Argument) und prüft ihr Auslöse-Ereignis selbst.
+      if (opts.isSacrifice && !script.firesOnSacrifice) continue;
 
       const cardData = allCards[cardName];
       // Boomerang's "no Artifacts for the rest of this turn" lockout —
@@ -39577,7 +39587,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Karte, die nur AUFHEBT (Homerun!), bietet sich dann gar nicht
           // erst an, statt bezahlt und hinterher verworfen zu werden.
           !script.preDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type,
-            { cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })) continue;
+            { cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced, ...(opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : {}) })) continue;
 
       // Prompt
       const srcName = source?.name || 'An effect';
@@ -39586,7 +39596,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
-        message: opts.instaKill
+        message: opts.isSacrifice
+          ? `${heroName} is about to be sacrificed by ${srcName}! Activate ${cardName}?`
+          : opts.instaKill
           ? `${heroName} is about to be defeated by ${srcName}! Activate ${cardName}?`
           : `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
@@ -39604,6 +39616,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           targetSeite: zielPhys,   // W20c: Brettseite des Zielhelden (uebernommener Held der Gegenspalte)
           sourceName: srcName,
           sourceOwner: source?.owner ?? -1,
+          ...(opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : {}),
         },
       });
       if (!this._confirmSaidYes(confirmed)) continue;
@@ -39732,7 +39745,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._inPreDamageReaction = true;
       try {
         if (script.preDamageResolve) {
-          const result = await script.preDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type);
+          const result = await script.preDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type, opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : undefined);
           negated = !!result?.negated;
           if (result && typeof result.amountOverride === 'number') {
             amountOverride = Math.max(0, result.amountOverride);

@@ -7085,8 +7085,11 @@ und wuerden fuer nichts verbraucht.
 
 Ein `{ negated: true }` aus `preDamageResolve` bricht die Niederlage
 ab; die Karte darf die HP dabei selbst setzen (Paraseed Zombie: „that
-Hero's HP drop to 1 instead"). Ein Selbstopfer (`opts.isSacrifice`)
-oeffnet kein Fenster.
+Hero's HP drop to 1 instead"). Ein Helden-OPFER (`opts.isSacrifice`)
+oeffnet das Fenster seit 16.11.2026 ebenfalls, aber nur Skripte mit
+`firesOnSacrifice: true` werden dort gefragt (Absatz „Helden-Opfer öffnen das
+Vor-Niederlage-Fenster der Hand" bei „Opfern gilt als defeat"); der HP-Kosten-Tod
+(`hpKosten`) und `unaufhaltsam` oeffnen es nicht.
 
 ## Creature-Rettung bei JEDER Niederlage — `preDefeatOnDestroy` / `preDefeatAnySide` (v1313)
 
@@ -7124,10 +7127,23 @@ inzwischen belegt („place it into the same Support Zone": Garius, Rottweiler, 
 zurück (`ausweichen`), ohne freie Zone gar nicht. Handgebaute Opferwege, die nicht über `actionDestroyCard` laufen (Tausch-Kreaturen), rufen
 `engine.opferExtraLebenVormerken(inst, { heroIdx, zoneSlot })`. Retter, die den Tod ERSETZEN (Barrier, Hydra, Pythia), machen das Opfer
 zunichte: der Effekt fizzelt (`gs._opferFizzle`). Unverändert: Opfer als Beschwörungskosten und Tausch-Opfer öffnen kein Rettungsfenster
-(Welle 4/W19a); Helden-Opfer öffnen kein Vor-Niederlage-Fenster der Hand (Homerun!, Escape …: nur der Opferer selbst könnte reagieren) — Extra Life, Elixir und
-Corpse Explosion (Quelle Attack/Spell) greifen bei ihnen.
+(Welle 4/W19a); Extra Life, Elixir und Corpse Explosion (Quelle Attack/Spell) greifen bei Helden-Opfern; Helden-Opfer öffnen das Vor-Niederlage-Fenster der Hand (nächster Absatz).
 
 Vorbild: Barrier of Undying.
+
+**Helden-Opfer öffnen das Vor-Niederlage-Fenster der Hand (Spielgestalter-Entscheidung 16.11.2026; vorher geschlossen).** Jedes Opfer eines HELDEN
+(`actionDefeatHero(…, { isSacrifice: true })`: Divine Gift of Sacrifice, Pharaoh, Teocuilatl, Infallible Oracle Pythia, künftige Karten) ruft wie ein Insta-Kill
+`_checkPreDamageHandReactions(…, 'defeat', { instaKill: true, isSacrifice: true, cause: 'sacrifice' })` — das Opfer ist da schon als Kosten/Effekt gezahlt, die
+Niederlage steht noch bevor. Die Kennzeichnung steht in `opts.isSacrifice`/`opts.cause` (9. Argument von `preDamageCondition`, 8. Argument von `preDamageResolve`) und
+im Confirm-Kontext (`_preDamageContext.isSacrifice`/`.cause`). **Angeboten werden nur Karten mit `firesOnSacrifice: true`** (zusätzlich zu `isPreDamageReaction` +
+`firesOnDefeat`); keine bestehende Karte trägt es: Homerun! („defeated by an effect"), Escape („by an Attack or Spell"), Emergency Spell Armor, Paraseed Zombie, Point-Blank
+Annihilation und alle reinen Schadens-Reaktionen (Bamboo/Strong Shield, Sculpture Guards … — sie stehen in diesem Insta-Kill-Fenster ohnehin nicht, `firesOnDefeat` fehlt; Future Tech Escape Device ist eine Nach-Zielwahl-Reaktion, kein Teil dieses Fensters) meinen ausdrücklich keine eigene Opfergabe — ohne das Gate läsen
+Escape/Emergency Spell Armor den Spell-Typ von Divine Gift of Sacrifice als Auslöser. Eine neue Karte, die auf Opfer antworten soll, setzt `firesOnSacrifice: true` und prüft in
+`preDamageCondition` selbst `opts.isSacrifice` (nur Opfer) bzw. schließt es aus. Ersetzt/negiert eine Reaktion die Niederlage, liefert `actionDefeatHero`
+`{ defeated: false, opferErsetzt: true }` und `onHeroSacrificed` feuert nicht: das Opfer ist NICHT bezahlt — wie beim gerade noch geretteten Kreaturen-Opfer (M3, `_opferFizzle`)
+fizzeln Karten, deren Wirkung das Opfer voraussetzt (Divine Gift of Sacrifice: `gs._opferFizzle`, Karte gespielt und verbraucht; Teocuilatl: kein Gold, kein Zugende, Einmal-Marken
+verbraucht; Pythia: sie wird normal besiegt); Karten, die nur „… then …" nacheinander ausführen (Pharaoh: Counter, 2 Karten), laufen weiter. Ausgenommen bleibt der HP-Kosten-Tod
+(`hpKosten`, Foresta: kein Opfer, kein Fenster) und `unaufhaltsam`/`skipDefeatReactions`. Extra Life/Elixir greifen unverändert NACH dem Fenster.
 
 ## Zustandsgebundene Status — `noAbsorb` (v718)
 
