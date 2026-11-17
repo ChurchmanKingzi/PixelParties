@@ -3420,6 +3420,15 @@ Defined in `_hooks.js`. Use with `ctx.addStatus()` / `ctx.removeStatus()`.
 | `immune` | ❌ | 🛡️ | — |
 | `shielded` | ❌ | ✨ | — |
 
+### Reihenfolge am Zugbeginn: Status-Ticks zuerst (Spielgestalter-Entscheidung 17.11.2026)
+
+Am Beginn des Zuges laufen **zuerst die Status-Ticks** (Statusablauf, Brand `processBurnDamage`, Gift `processPoisonDamage`, danach `afterAllStatusDamage` und der Ablauf der übrigen Buffs), **erst danach** die `onTurnStart`-Hooks der Karten
+(Regeneration, Spell Shackle, Heilungen & Co.). Ein Held mit 50 HP, Regeneration Lv 3 und 2 Gift-Stapeln (60 Schaden) stirbt also am Gift, bevor die Regeneration greift; Spell Shackle schlägt ebenfalls erst nach dem Tick zu.
+Neue Zugbeginn-Effekte gehören an `onTurnStart` (nie vor den Tick); ein Effekt, der VOR den Ticks etwas zurückbringen soll (Teleportation Powder), nutzt `onTurnStartEarly`.
+
+**Gift-Tick mit Umwandlung (Medea × Deadly Poison):** der Tick-Betrag ist `calculatePoisonDamage` (Stapel × 30, danach `modifyPoisonDamage`-Hooks wie Medeas Verdopplung). Bei Deadly Poison („heals that Hero instead of dealing damage") wird dieser
+**komplette, schon verdoppelte Betrag** zu Heilung (2 Stapel + Medea = +120). Zuschläge, die an `beforeDamage` hängen (Bloom/Paraseed), wirken nur auf echten Schaden, nicht auf die Heilung. Reihenfolge: verdoppeln → in Heilung wandeln.
+
 ### Keine Erneuerung von Betäubung und Frost (Regel)
 
 Hat ein Held `stunned` oder `frozen` bereits, **ersetzt ein neuer Auftrag den laufenden Status nicht** — ein 1-Runden-Stun wird nicht gegen einen

@@ -28380,6 +28380,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Burn/poison damage BEFORE regular buff expiry — so buffs like Cloudy still
     // halve status damage on the turn they expire
+    // Spielgestalter-Entscheidung 17.11.2026 (ATT-12): Status-Ticks ZUERST — Regeneration, Spell Shackle & Co. (ON_TURN_START) laufen erst danach; ein Held, der am Tick stirbt, bekommt sie nicht mehr.
     await this.processBurnDamage();
     await this.processPoisonDamage();
 
@@ -59635,6 +59636,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
       const damage = await this.calculatePoisonDamage(ap, stacks);
+      // Spielgestalter-Entscheidung 17.11.2026 (MED-01): Medeas Verdopplung steckt schon in `damage` (modifyPoisonDamage) — bei Deadly Poison wird dieser KOMPLETTE, erhöhte Betrag zu Heilung (Bloom/Paraseed-Zuschläge hängen an `beforeDamage` und wirken nur auf Schaden).
       // ★ 24.10. „Deadly Poison": solange der Giftstatus die Marke `deadly` trägt, HEILT der Tick statt zu schaden (nie über die Max-HP). Weitere Stapel erhöhen nur den Heilbetrag; wird das Gift entfernt
       // (Beer, Cure …), geht die Marke mit ihm, und neues Gift schadet wieder normal.
       if (hero.statuses.poisoned.deadly) {
