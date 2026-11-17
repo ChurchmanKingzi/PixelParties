@@ -23053,10 +23053,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Liste `gs._effectImmunities` (wird zu Beginn jedes Zielfensters
    * geleert), quellenblind wie beim Helden (Als Befund 21.8.).
    */
-  grantCreatureEffectImmunity(inst, sourceObj) {
+  grantCreatureEffectImmunity(inst, sourceObj, opts = {}) {
     if (!inst || !sourceObj || typeof sourceObj !== 'object') return false;
     if (!this.gs._effectImmunities) this.gs._effectImmunities = [];
-    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj });
+    // Spielgestalter-Entscheidung 17.11.2026: `opts.ueberFenster` wie beim Helden — übersteht die Leerung beim nächsten Zielfenster und endet mit der Auflösung (`endeEffektImmunitaeten`).
+    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj, ...(opts.ueberFenster ? { ueberFenster: true } : {}) });
     return true;
   }
 

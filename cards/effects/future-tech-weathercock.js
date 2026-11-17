@@ -158,7 +158,8 @@ module.exports = {
     });
     await engine._delay(420);
 
-    engine.grantEffectImmunity(seite, heroIdx, sourceCard);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(seite, heroIdx, sourceCard, { ueberFenster: true });
     engine.log('ft_weathercock', {
       player: ps.username, hero: gs.players[seite]?.heroes?.[heroIdx]?.name,
       negated: sourceCard?.name || 'an Attack or Spell',

@@ -96,13 +96,13 @@ module.exports = {
     const quelle = (sourceCard && typeof sourceCard === 'object') ? sourceCard : { name: 'effect' };
     for (const t of eigene) {
       if (t.type === 'hero') {
-        engine.grantEffectImmunity(t.owner, t.heroIdx, quelle);
+        engine.grantEffectImmunity(t.owner, t.heroIdx, quelle, { ueberFenster: true });   // Spielgestalter-Entscheidung 17.11.2026: gilt für die ganze Auflösung dieser einen Karte, danach vorbei
       } else {
         const inst = t.cardInstance || (engine.cardInstances || []).find(c =>
           c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
           && engine.physicalSide(c) === t.owner && !c.faceDown)
           || null;
-        if (inst) engine.grantCreatureEffectImmunity(inst, quelle);
+        if (inst) engine.grantCreatureEffectImmunity(inst, quelle, { ueberFenster: true });
       }
     }
     return {};

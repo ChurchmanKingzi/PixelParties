@@ -2176,6 +2176,15 @@ Rook [B] (≥ 2 eigene Ziele → alle eigenen Ziele immun).
 der Zielliste — auch der gewählte tote Held von Divine Gift of Death/Equality
 bekommt weder Escape Device noch Barrier of Faith & Co. angeboten.
 
+**Dauer der Schwester-Immunitäten** (Spielgestalter-Entscheidung 17.11.2026):
+Barrier of Faith, Castling, Divine Gift of Rain, Test Flight, Weathercock,
+Glass Wall, Rook [B], Man-Eater Birds und Escape Device gewähren ihre
+Immunität mit `{ ueberFenster: true }` (auch `grantCreatureEffectImmunity`):
+sie gilt für die GANZE Auflösung der einen Karte/des einen Effekts (alle
+Zielwahlen von Ricochet/Duel/Divine Gift of Equality) und endet mit ihr
+(`endeEffektImmunitaeten`) — nicht schon beim nächsten Zielfenster und nie in
+die nächste Karte hinein. Neue Karten dieser Bauart setzen das Flag.
+
 **EIN Stummschalt-Prädikat:** `engine.isCreatureEffectSuppressed(inst,
 { honorNegStatusImmune })` ersetzt die verstreuten
 `negated/nulled/frozen/stunned`-Abfragen (runHooks, isCardEffectActive,
