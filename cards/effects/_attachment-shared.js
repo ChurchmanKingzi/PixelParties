@@ -426,6 +426,15 @@ function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, e
   return true;
 }
 
+/**
+ * ★ Spielgestalter-Entscheidung 17.11.2026 (Reflection × Anhängsel-Status): hat eine Reflection die Karte während des Statusfensters an einen anderen Helden umgelenkt (sie liegt nicht mehr am
+ * gewählten Wirt)? Dann hat `attachmentMovedToHost` dort schon alles angelegt (Status, Wirkung, Eintritts-Ereignis) — der Rest des Anlegens (Bild, `onCardEnterZone`, Log) gehört nicht mehr an den alten Wirt.
+ * @param {{owner:number, heroIdx:number}} host  der gewählte Wirt (Brettseite + Index)
+ */
+function anhaengselUmgelenkt(engine, inst, host) {
+  return !inst || inst.zone !== 'support' || engine.physicalSide(inst) !== host.owner || inst.heroIdx !== host.heroIdx;
+}
+
 function kopienAmWirt(engine, CARD_NAME, owner, heroIdx, ausser) {
   return (engine.cardInstances || []).filter(c =>
     c !== ausser && c.name === CARD_NAME && c.zone === 'support'
@@ -506,5 +515,5 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
 
 module.exports = {
   freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero,
-  setzeAnhaengselStatus, anhaengselStatusHooks,
+  setzeAnhaengselStatus, anhaengselStatusHooks, anhaengselUmgelenkt,
 };

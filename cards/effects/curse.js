@@ -56,7 +56,7 @@
 // ═══════════════════════════════════════════
 
 const { getNegativeStatuses } = require('./_hooks');
-const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { candidateHosts, pickAttachmentHost, placeAttachment, anhaengselUmgelenkt } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Curse';
@@ -312,6 +312,8 @@ module.exports = {
           target: targetHero.name,
         });
       }
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection den Fluch samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, { owner: targetOwner, heroIdx: targetHeroIdx })) { engine.log('curse_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
 
       // ── Attach burst animation ──
       engine._broadcastEvent('play_zone_animation', {
