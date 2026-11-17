@@ -255,6 +255,8 @@ function zielAnzeigeFuer(engine, validTargets, viewer) {
     const huelle = { id: inst.id, zone: inst.zone, faceDown: true, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot };
     const out = { ...t, cardName: '' };
     if ('name' in out) out.name = '';
+    // Spielgestalter-Entscheidung 17.11.2026 (Warntext am Ziel): der Hinweissatz nennt den Kartennamen und verriete die verdeckte Karte (z. B. „… is immune to freezing") — maskierte Ziele tragen keinen.
+    delete out.hinweis; delete out.hinweisArt; delete out.wirkungslos;   // `wirkungslos` (Satz mit Namen, nur fuer die CPU) liest der Client nie
     if (t.cardInstance) out.cardInstance = huelle;
     if (t._cardInstance) out._cardInstance = huelle;
     return out;

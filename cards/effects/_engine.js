@@ -35196,6 +35196,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return await this._zielwahlAbschliessen(playerIdx, validTargets, config, cpuPicked);
     }
     this.beginHumanWait();   // v848: Uhren der CPU anhalten
+    this.ersterZugHinweisSetzen(validTargets, playerIdx, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel (Erste-Runden-Schutz), vom Client nur beim angewaehlten Ziel gezeigt
     const picked = await new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
@@ -56808,8 +56809,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip, Snow Cannon × freeze-immune Held): Ziele, auf die ein Status schon wegen einer Zustands-Immunitaet NICHT wirken
    * wird (freeze_immune, burn_immune, `immune`, Charme, Johanna, Light Ball, Kreaturen-Schutz …), bleiben als Ziel WAEHLBAR — der Effekt verpufft, die Karte ist verbraucht. Der Picker
-   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz), `server.js` (`mitWirkungslosHinweis`) haengt ihn an den Beschreibungstext der Zielwahl; die CPU waehlt solche
-   * Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
+   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz, nur fuer die CPU) und `hinweis` (`setzeZielHinweis`: der Client zeigt ihn, solange DIESES Ziel angewaehlt und noch nicht
+   * bestaetigt ist); die CPU waehlt solche Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
    * Gibt den Hinweissatz fuer EIN Picker-Ziel (`{type:'hero', owner, heroIdx}` bzw. `{type:'equip', cardInstance}`) zurueck, '' wenn der Status landen kann.
    * `pi` = Seite der Quelle (Charme-Schutz, Golden Wings), `quelleName` = Name der Karte.
    */
@@ -56832,11 +56833,42 @@ this._deathWatch = (this._deathWatchStack || []).length
     return blockt ? `${name} is immune to ${GERUND[statusName] || statusName} and will not be affected.` : '';
   }
 
-  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos`). Rueckgabe: dieselbe Liste. */
+  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos` + `ziel.hinweis`). Rueckgabe: dieselbe Liste. */
   markiereStatusWirkungslos(ziele, statusName, pi, quelleName) {
     for (const t of (ziele || [])) {
       const h = this.statusWirkungslosHinweis(t, statusName, pi, quelleName);
-      if (h) t.wirkungslos = h;
+      if (h) { t.wirkungslos = h; this.setzeZielHinweis(t, h, 'warnung'); }
+    }
+    return ziele;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warntext-UX: „Der soll nur erscheinen, wenn ein immunes Ziel angewählt wird, also zwischen ‚Ziel gewählt' und ‚Confirm target'"):
+   * Hinweise der Zielwahl (Warnungsprinzip) gehoeren an das einzelne ZIEL, nicht an den Beschreibungstext. Ein Kandidat in `validTargets` traegt `hinweis` (englischer Satz, nennt den Zielnamen
+   * selbst) und `hinweisArt`: 'warnung' = die Wahl verpufft (immun, volle HP, Erstrunden-Schutz), 'info' = die Wirkung ist anders als erwartet, aber NICHT nutzlos (Overheal Shock: Heilung wird zu
+   * Schaden). Der Client zeigt den Satz NUR, solange dieses Ziel angewaehlt und noch nicht bestaetigt ist (`app-board.jsx`, Zielwahl-Fenster); er rechnet nichts selbst. Die CPU liest `hinweis`
+   * nicht (sie meidet nur `wirkungslos`). Bereits gesetzte Hinweise bleiben (der speziellere gewinnt), ausser `opts.ueberschreiben`.
+   */
+  setzeZielHinweis(ziel, text, art = 'warnung', opts = {}) {
+    if (!ziel || typeof text !== 'string' || !text) return ziel;
+    if (typeof ziel.hinweis === 'string' && ziel.hinweis && !opts.ueberschreiben) return ziel;
+    ziel.hinweis = text;
+    ziel.hinweisArt = art === 'info' ? 'info' : 'warnung';
+    return ziel;
+  }
+
+  /**
+   * Erste-Runden-Immunitaet (`_ersterZugZiel`, wie `_ersterZugZielAbziehen` nach der Wahl): jedes WAEHLBARE Ziel des geschuetzten Spielers bekommt einen Hinweis (nur gegenueber dem Zugspieler,
+   * nicht bei `config.ignoreFirstTurnProtection`; ein schon gesetzter speziellerer Hinweis bleibt). Rueckgabe: dieselbe Liste.
+   */
+  ersterZugHinweisSetzen(ziele, waehler, config = {}) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    if (!Array.isArray(ziele) || prot == null || waehler === prot || config?.ignoreFirstTurnProtection) return ziele;
+    for (const t of ziele) {
+      if (!t || t.ineligible || t.hinweis || !this._ersterZugZiel(t, waehler)) continue;
+      const inst = t.cardInstance || t._cardInstance;
+      const name = t.cardName || t.name || inst?.name || 'This target';
+      this.setzeZielHinweis(t, `${name} is protected during the first turn and will not be affected.`, 'warnung');
     }
     return ziele;
   }
