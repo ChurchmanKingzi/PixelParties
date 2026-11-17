@@ -140,9 +140,23 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   const _cancelVorher = gs._spellCancelled;
   gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Guss
   let abgebrochen = false;
+  let kettenNegiert = false;
 
   try {
-    await engine.runHooks('onPlay', {
+    // ★ Spielgestalter-Entscheidung 17.11.2026 („performs/uses" = „plays", `engine.performKettenfenster`): der Nachguss öffnet dasselbe Kettenfenster wie ein normal gespielter Spell (Silence, Ghostly
+    // Warning, … — die Karte kommt aus der Ablage, nicht aus der Hand: kein Master's Plan). Negiert: der Rumpf läuft nie; der Nachguss zählt als gespielt, keine Wisdom-Kosten (Ghostly Warning/Lunar
+    // Eclipse: die Karte wird aus der Ablage gelöscht).
+    const _pk = await engine.performKettenfenster({ cardName, pi: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: feld, ausHand: false });
+    if (_pk.negated) {
+      kettenNegiert = true;
+      gs._spellNegatedByEffect = true;
+      if (_pk.negatedToDeleted) {
+        const _ablage = gs.players[ctx.cardOwner]?.discardPile || [];
+        const _i = _ablage.lastIndexOf(cardName);
+        if (_i >= 0) { _ablage.splice(_i, 1); (gs.players[ctx.cardOwner].deletedPile || (gs.players[ctx.cardOwner].deletedPile = [])).push(cardName); }
+      }
+    }
+    if (!kettenNegiert) await engine.runHooks('onPlay', {
       _onlyCard: synthInst, playedCard: synthInst,
       cardName, zone: 'hand',
       heroIdx: ctx.cardHeroIdx,
@@ -197,7 +211,7 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   // regulaeren Zauber-Weg; ein abgebrochener Guss kostet nichts. Die Hoehe
   // richtet sich weiter nach dem GEHOBENEN Level.
   const wisdomCost = engine.getWisdomDiscardCost(feld, ctx.cardHeroIdx, boostedCd);
-  if (wisdomCost > 0 && !gs.result && !gs._spellCancelled) {
+  if (wisdomCost > 0 && !gs.result && !gs._spellCancelled && !kettenNegiert) {
     gs._archibaldCasting = true;
     try {
       await engine.actionPromptForceDiscard(ctx.cardOwner, wisdomCost, {

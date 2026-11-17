@@ -27144,6 +27144,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „'performs' ist nur eine Abart von 'plays', die impliziert, dass der Zauber beim Nutzen vom Hero selbst 'bereitgestellt' wurde, statt aus der Hand zu kommen.
+   * Sollte von den Fenstern her identisch zu einem normalen Ausspielen sein." Ein Spell/eine Attack, die ein Held PERFORMT (Timeless King Zi, Love Shot, Time Distortion, Chaos Magic, Zusatzaktions-Güsse
+   * über `_castSpellImmediately`, Ghostly Warning/Atta-Rückkehr, Archibald, Taio, Nieht, Chaorc Friendly Fireballer …), öffnet dasselbe Kettenfenster wie ein normal gespielter: Silence, Ghostly Warning,
+   * Anti-Magic-Reaktionen der Kette, Master's Plan/Lunar Eclipse (nur bei Herkunft HAND: Kartentext „from their hand"), Cute Camera, Hand-Reaktionen auf Attacks (Pfeile, Magic Topaz) usw.
+   * Nichts wird erneut bezahlt (`goldCost: 0`, keine Aktion): die Quelle ist der Held, der sie „bereitgestellt" hat. Einmal-Limits stempelt die Kette wie sonst ab Aktivierungsbeginn.
+   * Wie `alsSpellKette`: mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und im MCTS-Rollout (`_inMctsSim`) öffnet kein neues Fenster.
+   * Der Aufrufer löst NICHT auf, wenn `negated` (Zauberrumpf überspringen, Karte in die Ablage — bzw. in den Löschstapel bei `negatedToDeleted`: Ghostly Warning, Lunar Eclipse; keine Wisdom-Kosten).
+   * Der Wirker ist ein HELD (`casterCheck`, wie beim normalen Spielen: Ghostly Warning/Celia/Shamanic Curse lesen ihn): wird er WÄHREND der Kette handlungsunfähig, fizzelt der Guss wie beim normalen Spielen.
+   * Ausnahme `trotzStatus` („in spite of any negative status effects": verzögerter Guss von Ghostly Warning/Atta): keine Wirkerprüfung.
+   * @param {object} o  { cardName, pi (Spieler), heroIdx, heroOwner (Brettseite des Wirkers, Standard pi), ausHand (Herkunft Hand/Vorrat: kein `fromBoard`), trotzStatus }
+   * @returns {Promise<{ negated: boolean, negatedToDeleted: boolean, fizzled: boolean, kette: object|null }>}
+   */
+  async performKettenfenster({ cardName, pi, heroIdx, heroOwner, ausHand = false, trotzStatus = false }) {
+    const keine = { negated: false, negatedToDeleted: false, fizzled: false, kette: null };
+    if (this._inReactionCheck || this._inMctsSim) return keine;
+    const cd = this._getCardDB()[cardName];
+    if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return keine;
+    const kette = await this.executeCardWithChain({
+      cardName, owner: pi, cardType: cd.cardType, goldCost: 0, heroIdx,
+      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi, casterCheck: !trotzStatus,
+      fromBoard: !ausHand, resolve: null,
+    });
+    // Ein Wirker, der während der Kette handlungsunfähig wurde (`fizzled`), wirkt wie beim normalen Spielen NICHT: der Aufrufer behandelt es wie eine Negation (Rumpf läuft nie, die Karte ist gespielt).
+    return { negated: !!kette.negated || !!kette.fizzled, negatedToDeleted: !!kette.negatedToDeleted && !!kette.negated, fizzled: !!kette.fizzled && !kette.negated, kette };
+  }
+
   async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
     const ps = this.gs.players[playerIdx];
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
@@ -27163,7 +27190,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { cancelled: true };
     }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
-    const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
+    let _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
     const _silenceBonusVorher = ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell === this.gs.turn;
     // ★ Z7 (S01-11, H04-05/-17): EINMAL PRO SPIEL gilt für JEDEN Sofort-Guss (Zi, Saya, Call for
@@ -27220,7 +27247,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand (damit man sie nicht selbst abwirft) und tauchte danach wieder
     // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
-    const _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
+    let _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
       ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData,
           (fromZone === 'hand' && pool === ps.hand) ? poolIndex : undefined,
           wirkerSeite !== playerIdx ? playerIdx : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie; W16a (Frage 6): auch beim geliehenen Helden (Hand des Kontrolleurs)
@@ -27281,6 +27308,21 @@ this._deathWatch = (this._deathWatchStack || []).length
           catch (err) { console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message); }
         }
       }
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `performKettenfenster`): der Sofort-Guss öffnet dasselbe Kettenfenster wie ein normal gespielter Spell/eine Attack (Silence, Ghostly
+      // Warning, Master's Plan [nur aus der Hand] …). Wird er in der Kette negiert, löst sein Rumpf nie auf: der Guss gilt als gespielt (zählt, Zusatzaktion verbraucht, Einmal-Stempel), die Karte geht in die
+      // Ablage (Ghostly Warning/Lunar Eclipse: in den Löschstapel), es fallen keine Wisdom-Kosten an (wie in `doPlaySpell`). `opts.ohneKette`: der Aufrufer hat die Kette schon geöffnet.
+      let _kettenNegiert = false;
+      let _pfeileVorher = 0;
+      if (!opts.ohneKette && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+        _pfeileVorher = (hero._armedArrows || []).length;
+        const _pk = await this.performKettenfenster({ cardName, pi: playerIdx, heroIdx, heroOwner: wirkerSeite, ausHand: fromZone === 'hand' && pool === ps.hand, trotzStatus: this.gs._verzoegertWirkt != null || !!this.gs._spellCasterCreature });   // Kreatur als Wirker (Skeleton Wizard …): kein Held-Wirker, wie `doPlaySpell` (`casterCheck`)
+        if (_pk.negated) {
+          _kettenNegiert = true;
+          this.gs._spellNegatedByEffect = true;
+          _wisdomKosten = 0;
+          if (_pk.negatedToDeleted) _attaLoescht = true;
+        }
+      }
       const _onPlay = () => this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       // ★★ v1364 (Als Befund Sticky Wand + Call of the Deepsea): legt sich
       // der Sofort-Guss selbst aufs Brett (Attachment → `placeAttachment`
@@ -27292,11 +27334,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // gehen. Jetzt: Stempel des aeusseren Wegs retten, eigenen auswerten.
       _placedVorher = this.gs._spellPlacedOnBoard;
       delete this.gs._spellPlacedOnBoard;
-      if (fromZone === 'hand' && pool === ps.hand) {
+      if (_kettenNegiert) {
+        // in der Kette negiert: der Rumpf läuft nie
+      } else if (fromZone === 'hand' && pool === ps.hand) {
         await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
       } else {
         await _onPlay();
       }
+      // Pfeile, die in DIESEM Kettenfenster einer Attack scharf wurden (Magic Topaz, Angelfeather Arrow …), gelten nur für sie (wie am Ende von `doPlaySpell`).
+      if (cardData.cardType === 'Attack' && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(this, playerIdx);
       if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
       if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')

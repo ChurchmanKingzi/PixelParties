@@ -282,7 +282,10 @@ module.exports = {
     let castError = null;
     try {
       const script = loadCardEffect(spellName);
-      if (typeof script?.hooks?.onPlay === 'function') {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs/casts" = „plays", `engine.performKettenfenster`): der von der KREATUR gewirkte Spell öffnet dasselbe Kettenfenster wie ein normal gespielter
+      // (Silence, The Master's Plan [aus der Hand], …); Wirker ist die Kreatur (`trotzStatus`: kein Helden-Wirker). Negiert: der Rumpf läuft nie; der Spell gilt als gespielt und geht (wie sonst) in die Ablage.
+      const _pk = await engine.performKettenfenster({ cardName: spellName, pi, heroIdx, heroOwner: feld, ausHand: true, trotzStatus: true });
+      if (!_pk.negated && typeof script?.hooks?.onPlay === 'function') {
         await script.hooks.onPlay(spellCtx);
       }
     } catch (err) {

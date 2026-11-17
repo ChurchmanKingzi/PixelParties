@@ -464,15 +464,23 @@ module.exports = {
         if (chosenCd.cardType === 'Spell') engine._pushResolvingSpell(chosenName);
 
         let innerCancelled = false;
+        let kettenNegiert = false, kettenGeloescht = false;
         // v1339: der innere Spell/Attack wird dem Gegner gezeigt wie beim
         // normalen Spielen (gemeinsamer Engine-Helfer).
         const _auftritt = engine.gussAuftrittBeginnen(chosenName, pi);
         try {
-          await engine.runHooks('onPlay', {
+          // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): der performte Spell/die performte Attack öffnet dasselbe Kettenfenster wie ein normal
+          // gespielter — Silence, Ghostly Warning, The Master's Plan (die Karte kommt aus der HAND), Hand-Reaktionen auf Attacks … Wirker der Kette ist der geliehene Held. Negiert: der Rumpf läuft nie;
+          // der Guss zählt als gespielte Zusatzaktion, die Karte geht in die Ablage (Ghostly Warning/Lunar Eclipse: Löschstapel), keine Wisdom-Kosten.
+          const _pfeileVorher = (targetHero._armedArrows || []).length;
+          const _pk = await engine.performKettenfenster({ cardName: chosenName, pi, heroIdx: sel.heroIdx, heroOwner: heroSeite, ausHand: true });
+          if (_pk.negated) { kettenNegiert = true; kettenGeloescht = !!_pk.negatedToDeleted; gs._spellNegatedByEffect = true; }
+          if (!kettenNegiert) await engine.runHooks('onPlay', {
             _onlyCard: inst, playedCard: inst,
             cardName: chosenName, zone: 'hand',
             heroIdx: sel.heroIdx, _skipReactionCheck: true,
           });
+          if (chosenCd.cardType === 'Attack' && _pfeileVorher === 0 && (targetHero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile aus diesem Kettenfenster gelten nur für diese Attack
           delete gs._immediateActionContext;
 
           if (gs._spellCancelled && !gs._spellNegatedByEffect) {
@@ -520,7 +528,7 @@ module.exports = {
         // ★ v1323 (Tester-Befund 23.9.): Wisdom erst NACH dem Guss und nur,
         // wenn er nicht abgebrochen wurde — vorher zahlte man vor der
         // Zielwahl und verlor die Abwuerfe bei einem Abbruch.
-        if (!innerCancelled && chosenCd.cardType === 'Spell' && !gs.result) {
+        if (!innerCancelled && !kettenNegiert && chosenCd.cardType === 'Spell' && !gs.result) {   // in der Kette negiert: keine Wisdom-Kosten (wie in `doPlaySpell`)
           const wisdomCost = wisdomCostVorab;
           if (wisdomCost > 0) {
             await engine.actionPromptForceDiscard(pi, wisdomCost, {
@@ -546,7 +554,11 @@ module.exports = {
           if (inst.zone === 'hand') {
             // „Delete this card" (Forbidden Zone, Meditation, Liberation): das Kartenskript hat die Karte schon in den Löschstapel des Besitzers gelegt
             // und `_spellPlacedOnBoard` gestempelt — dann nicht zusätzlich in die Ablage (Dublette), nur die Instanz austragen.
-            if (!_nachgussSelbstEntsorgt) engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
+            if (!_nachgussSelbstEntsorgt) {
+              const _besitzerPs = engine.handKartenBesitzerPs(ps, chosenName);   // W63c: Ablage des permanenten Besitzers
+              if (kettenGeloescht) { if (!_besitzerPs.deletedPile) _besitzerPs.deletedPile = []; _besitzerPs.deletedPile.push(chosenName); }   // in der Kette negiert + „delete it" (Ghostly Warning)
+              else _besitzerPs.discardPile.push(chosenName);
+            }
             engine._untrackCard(inst.id);
           }
           engine.log('love_shot_action', {
