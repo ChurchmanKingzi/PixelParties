@@ -34,7 +34,10 @@ module.exports = {
   // Spielgestalter-Entscheidung 16.11.2026: Idas Stempel (`canBeNegated = false`, `ignoreUnaffected`) muss VOR den Schutz-Hooks anderer Karten stehen, die Schaden
   // an Kreaturen verhindern/negieren (Wowkyrie, Guardian Beast Gou …) — sonst entscheidet die Reihenfolge (Zugspieler zuerst), ob Ida durchkommt, wenn sie
   // NICHT am Zug ist (Reaktion). Der Hook ändert keinen Betrag, die Vorrang-Stufe verschiebt nur den Stempel nach vorn.
-  hookPriority: { beforeCreatureDamageBatch: 1 },
+  // Dasselbe fuer Helden-Schaden (`beforeDamage`): Idas Stempel `cannotBeReduced`/`cannotBeNegated` muss VOR den Schild-Hooks anderer Helden stehen (Chuck: `setAmount(0)`, Inya,
+  // Tazune …), sonst haengt der Durchschlag davon ab, wer am Zug ist — reagiert Ida im Zug des Gegners (Booby Trap), liefe Chucks Schild zuerst und haelt den Treffer ab.
+  // „Unreduzierbarer Schaden toppt Schilde" (Spielgestalter-Entscheidung 16.11.2026). Der Hook aendert keinen Betrag, die Vorrang-Stufe schiebt nur den Stempel nach vorn.
+  hookPriority: { beforeCreatureDamageBatch: 1, beforeDamage: 1 },
 
   // Spielgestalter-Entscheidung 16.11.2026 („Da soll sie überall durchschlagen!"): Idas Destruction-Zauberschaden gegen Ziele des GEGNERS ignoriert auch die „takes no damage"-FORMEN
   // am HELDEN — Kontrolle durch Deepsea Succubus/Little Lyta (`charmed.nurSchadenSchutz`), `damage_proof` (Storm Piano, Cheat Chair) und Versteinerung (Baihu, Petrifier). Diese Wege
