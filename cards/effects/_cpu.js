@@ -8790,9 +8790,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Threshold 50 ≈ "not scarce, not a tracked combo piece" — safe to return.
     // Past minSelect, stop once we'd be shuffling back something useful.
     const selected = [];
+    const typBenutzt = {};
     for (const s of scored) {
       if (selected.length >= maxSelect) break;
       if (selected.length >= minSelect && s.value >= 50) break;
+      // Typ-Obergrenzen des Prompts (`cardTypes`/`typeLimits`, Shard of Chaos): nie mehr Karten eines Typs waehlen, als zulaessig (der Server prueft sie, 17.11.2026).
+      const typ = promptData.cardTypes?.[s.idx];
+      if (typ != null && promptData.typeLimits?.[typ] != null) {
+        if ((typBenutzt[typ] || 0) >= promptData.typeLimits[typ]) continue;
+        typBenutzt[typ] = (typBenutzt[typ] || 0) + 1;
+      }
       selected.push({ cardName: s.name, handIndex: s.idx });
     }
     return { selectedCards: selected };

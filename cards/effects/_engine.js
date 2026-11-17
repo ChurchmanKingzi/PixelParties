@@ -2182,7 +2182,19 @@ class GameEngine {
 
       // Generic: take the first `pickN` eligible indices.
       const pickN = Math.min(maxSelect, eligible.length);
-      const selectedIndices = eligible.slice(0, pickN);
+      let selectedIndices = eligible.slice(0, pickN);
+      // Typ-Obergrenzen (`cardTypes`/`typeLimits`, Shard of Chaos): nie mehr Karten eines Typs, als der Prompt zulaesst (der Server prueft sie, 17.11.2026).
+      if (promptData.typeLimits && promptData.cardTypes) {
+        const benutzt = {};
+        selectedIndices = [];
+        for (const idx of eligible) {
+          if (selectedIndices.length >= pickN) break;
+          const t = promptData.cardTypes[idx];
+          if (t != null && promptData.typeLimits[t] != null && (benutzt[t] || 0) >= promptData.typeLimits[t]) continue;
+          benutzt[t] = (benutzt[t] || 0) + 1;
+          selectedIndices.push(idx);
+        }
+      }
       return {
         selectedCards: selectedIndices.map(idx => ({
           handIndex: idx, cardName: ps.hand?.[idx] ?? null,
