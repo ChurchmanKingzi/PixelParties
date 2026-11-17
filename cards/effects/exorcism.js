@@ -26,8 +26,10 @@
 //
 //  ── DECAY MAGIC 2: UNVERHINDERBAR, UNNEGIERBAR, ZUSATZAKTION ────────────
 //  • Unnegierbar: die Zielwahl trägt `cannotBeNegated` — negierende Surprises und Brett-Wächter schweigen (Midnight-Assault-Muster).
-//  • Unverhinderbar: Resistance („the first effect that would affect this Hero …") und Zauber-Immunität („unaffected by all Spells") greifen nicht; die Prüfung entfällt. Nicht davon erfasst
-//    sind Sperren, die das WÄHLEN verhindern (Zielschutz) und unentfernbare Status.
+//  • Unverhinderbar: Resistance („the first effect that would affect this Hero …"), Zauber-Immunität („unaffected by all Spells") und Anti Magic (`magic_immune`) greifen nicht; die Prüfung entfällt.
+//    Nicht davon erfasst sind Sperren, die das WÄHLEN verhindern (Zielschutz) und unentfernbare Status.
+//  • Ohne Decay Magic 2 gilt Anti Magic wie bei jedem anderen Spell (Spielgestalter-Entscheidung 17.11.2026): ein Held mit Anti Magic (Stufe >= 1) bleibt wählbar, der Zauber löst auf und entfernt
+//    nichts — auch nicht die Anti Magic selbst (Log `exorcism_blocked`, reason `magic_immune`, Schutzblase).
 //  • Zusatzaktion: `inherentAction` als Funktion je Held (`effectiveSchoolLevelForCaster('Decay Magic') >= 2`). Das Support-Level hat damit nichts zu tun; die Karte bleibt auch ohne Decay 2
 //    spielbar und kostet dann die Aktion.
 //
@@ -202,6 +204,16 @@ module.exports = {
         return;
       }
 
+      // ── Anti Magic (Spielgestalter-Entscheidung 17.11.2026): mit Decay Magic 1 schützt Anti Magic wie gegen jeden anderen Spell der Stufe <= X — der Held bleibt wählbar, der Zauber
+      //    löst auf, entfernt aber NICHTS (weder Anti Magic noch andere Anhängsel noch Status). Erst Decay Magic 2 („cannot be prevented or negated") bricht durch. Vor der Resistance-Frage,
+      //    damit eine Immunität, die den Zauber ohnehin abfängt, kein Resistance verbraucht (gleiche Reihenfolge wie `placeAttachment`). ──
+      if (!hart && tHero && engine._isHeroSpellProtected(tHero, CARD_NAME)) {
+        engine.log('exorcism_blocked', { player: ps.username, target: ziel.cardName, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(tHero);
+        engine.sync();
+        return;
+      }
+
       // ── Schutzfenster (Resistance, Zauber-Immunität) — fällt bei Decay Magic 2 weg ──
       if (!hart) {
         const blockiert = ziel.type === 'hero'
@@ -359,6 +371,8 @@ module.exports = {
       let best = null, bestV = 0;
       for (const t of frei) {
         let v = 0;
+        // Anti Magic fängt den Zauber ohne Decay Magic 2 ab (`config.cannotBeNegated` = Decay 2): nutzlose Wahl, die CPU lässt sie aus.
+        if (!config.cannotBeNegated && t.type === 'hero' && engine._isHeroSpellProtected(engine.gs.players[t.owner]?.heroes?.[t.heroIdx], CARD_NAME)) continue;
         if (meins(t)) v = statusEintraege(engine, t).length * 10;
         else if (t.type === 'hero') v = anhaengsel(engine, t.owner, t.heroIdx).filter(i => !fluch(i.name)).length;
         if (v > bestV) { bestV = v; best = t; }

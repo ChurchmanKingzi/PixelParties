@@ -21,6 +21,10 @@ const AUSLOESER_HOOKS = new Set([
 // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Haltepunkte, an denen zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger aufgelöst werden
 // (dieselben wie beim Elixir of Immortality; siehe `_loeseOpferWiederbelebungen`).
 const OPFER_REVIVE_HALTEPUNKTE = new Set(['afterAllStatusDamage', 'afterSpellResolved', 'afterCreatureEffect', 'onAnyActionResolved', 'onActiveEffectUsed', 'onPhaseEnd']);
+// Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): Meldungen, bei denen sich die Status-Immunität eines Helden ändern kann (Johanna fällt, Light Ball kommt/geht, Zugbeginn nach dem Ende von Schutz/Buff) —
+// vor ihnen gleicht `statusAnhaengselAbgleichen` die Status der Anhängsel (Stowaway, Curse …) sofort ab, statt erst im nächsten `sync()`. Bewusst NICHT bei `onStatusRemoved`/`onStatusApplied`:
+// Johannas Heilung der Verbündeten (Auftauen) läuft über diese Meldung und soll VOR dem Ruhen laufen (geheilte Anhängsel gehen in die Ablage); den Rest holt das nächste `sync()`.
+const STATUS_ABGLEICH_HOOKS = new Set(['onHeroKO', 'onCardEnterZone', 'onCardLeaveZone', 'onTurnStart']);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
 const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
@@ -3303,6 +3307,7 @@ class GameEngine {
         }
       } finally { this._playSignaleLaeuft = false; }
     }
+    if (STATUS_ABGLEICH_HOOKS.has(hookName)) require('./_attachment-shared').statusAnhaengselAbgleichen(this);   // 17.11.2026: Status-Anhängsel folgen der Status-Immunität des Wirts (auch vor `sync`)
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
     // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)
@@ -28393,6 +28398,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Burn/poison damage BEFORE regular buff expiry — so buffs like Cloudy still
     // halve status damage on the turn they expire
+    // Spielgestalter-Entscheidung 17.11.2026 (ATT-12): Status-Ticks ZUERST — Regeneration, Spell Shackle & Co. (ON_TURN_START) laufen erst danach; ein Held, der am Tick stirbt, bekommt sie nicht mehr.
     await this.processBurnDamage();
     await this.processPoisonDamage();
 
@@ -59745,6 +59751,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
       const damage = await this.calculatePoisonDamage(ap, stacks);
+      // Spielgestalter-Entscheidung 17.11.2026 (MED-01): Medeas Verdopplung steckt schon in `damage` (modifyPoisonDamage) — bei Deadly Poison wird dieser KOMPLETTE, erhöhte Betrag zu Heilung (Bloom/Paraseed-Zuschläge hängen an `beforeDamage` und wirken nur auf Schaden).
       // ★ 24.10. „Deadly Poison": solange der Giftstatus die Marke `deadly` trägt, HEILT der Tick statt zu schaden (nie über die Max-HP). Weitere Stapel erhöhen nur den Heilbetrag; wird das Gift entfernt
       // (Beer, Cure …), geht die Marke mit ihm, und neues Gift schadet wieder normal.
       if (hero.statuses.poisoned.deadly) {
@@ -61650,6 +61657,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): der Status von Anhängseln wie Stowaway/Decisive Defeat/Curse/Berserk/Polymorph/Shrink folgt fortlaufend der
+    // Status-Immunität des Wirts (Johanna, Light Ball, Buff …) — s. `_attachment-shared.js` (`statusAnhaengselAbgleichen`). Vor den ATK-Abgleichen (Fluch/Polymorph buchen ATK).
+    require('./_attachment-shared').statusAnhaengselAbgleichen(this);
     this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)

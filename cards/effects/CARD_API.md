@@ -3429,6 +3429,15 @@ Defined in `_hooks.js`. Use with `ctx.addStatus()` / `ctx.removeStatus()`.
 | `immune` | ❌ | 🛡️ | — |
 | `shielded` | ❌ | ✨ | — |
 
+### Reihenfolge am Zugbeginn: Status-Ticks zuerst (Spielgestalter-Entscheidung 17.11.2026)
+
+Am Beginn des Zuges laufen **zuerst die Status-Ticks** (Statusablauf, Brand `processBurnDamage`, Gift `processPoisonDamage`, danach `afterAllStatusDamage` und der Ablauf der übrigen Buffs), **erst danach** die `onTurnStart`-Hooks der Karten
+(Regeneration, Spell Shackle, Heilungen & Co.). Ein Held mit 50 HP, Regeneration Lv 3 und 2 Gift-Stapeln (60 Schaden) stirbt also am Gift, bevor die Regeneration greift; Spell Shackle schlägt ebenfalls erst nach dem Tick zu.
+Neue Zugbeginn-Effekte gehören an `onTurnStart` (nie vor den Tick); ein Effekt, der VOR den Ticks etwas zurückbringen soll (Teleportation Powder), nutzt `onTurnStartEarly`.
+
+**Gift-Tick mit Umwandlung (Medea × Deadly Poison):** der Tick-Betrag ist `calculatePoisonDamage` (Stapel × 30, danach `modifyPoisonDamage`-Hooks wie Medeas Verdopplung). Bei Deadly Poison („heals that Hero instead of dealing damage") wird dieser
+**komplette, schon verdoppelte Betrag** zu Heilung (2 Stapel + Medea = +120). Zuschläge, die an `beforeDamage` hängen (Bloom/Paraseed), wirken nur auf echten Schaden, nicht auf die Heilung. Reihenfolge: verdoppeln → in Heilung wandeln.
+
 ### Keine Erneuerung von Betäubung und Frost (Regel)
 
 Hat ein Held `stunned` oder `frozen` bereits, **ersetzt ein neuer Auftrag den laufenden Status nicht** — ein 1-Runden-Stun wird nicht gegen einen
@@ -3436,6 +3445,21 @@ frischen 2+-Runden-Stun getauscht, die Laufzeit beginnt nicht von vorn (`addHero
 `already_active`). Kreaturen erneuern ohnehin nicht (`applyCreatureStatus` gibt bei vorhandenem Status `false` zurück). Soll eine Karte ausdrücklich
 erneuern dürfen, übergibt sie `{ renew: true }`. Gezielte Verlängerungen (Gon, Frost-Verlängerung in `_frost-shared.js`) schreiben die Laufzeit selbst
 und sind nicht betroffen. Test: `scripts/skilltest-e2e/status-renewal.test.js`.
+
+### Status-Anhängsel folgen der Status-Immunität des Wirts (Spielgestalter-Entscheidung 17.11.2026)
+
+Ein Anhängsel, dessen Status eine NEGATIVE Wirkung auf den Helden hat (Stowaway, Decisive Defeat: `negated`; Curse, Berserk, Polymorph, Shrink, The Master's Orders: eigener Status), legt den Status nur an, solange der Wirt im Moment **nicht status-immun** ist
+(`engine.heroBlocksStatusNow`: Johanna, Light Ball, Immunitäts-Anhängsel, Buff `negative_status_immune`, Erstzug-Schutz, Einzel-Immunität). Die Negierung ist ein **Dauerzustand, der fortlaufend ausgewertet
+wird**: Stowaway unter Johanna beschworen → Alex nicht negiert; Johanna stirbt, während er da ist → Alex wird negiert; kommt die Immunität später dazu → die Negierung ruht wieder. Die Karte liegt in der Zwischenzeit
+wirkungslos in der Support Zone (Marke `inst.counters._statusRuht`), eine ruhende Karte mit `countsAsNegativeStatus` steht weiter als `attach:`-Eintrag in den Heil-Listen. Status-Anhängsel, die einen Status
+anlegen, den ein Held mit Immunität nicht tragen soll, nutzen denselben Vertrag; nicht erfasst (Anlegen ignoriert die Immunität weiter): Forbidden Curse of Aging („counts as a status effect", nicht „negative") und Mind Control
+(Kontrollübernahme).
+
+* **Vertrag am Kartenskript:** `statusFolgtImmunitaet: { status, extras?, einsetzen?(engine, inst, hero, seite, heroIdx), ruhen?(…) }` (`_attachment-shared.js`). `einsetzen`/`ruhen` sind synchrone Nebenwirkungen
+  nach dem Setzen bzw. Wegnehmen des Status (Idempotenz!; Beispiele: Polymorph bucht/nimmt den +100-ATK-Bonus, Curse sichert/gibt die ATK). Das Anlegen läuft über `setzeOderRuhe(engine, inst, status, extras)` bzw. meldet sein Ergebnis mit `statusErgebnisBuchen(engine, inst, gesetzt, owner, heroIdx, status)`.
+* **Der Abgleich** `statusAnhaengselAbgleichen` läuft in jedem `engine.sync()` (auch in Simulationen): holt ruhende Status nach, sobald die Immunität endet, und nimmt sie weg, wenn sie beginnt (bis zu 3 Durchgänge, weil Johannas
+  Schutz selbst an ihrer Negierung hängt). Er legt nur Status an/ab, die eine Karte der Gruppe trägt (`_fromAttachment`); Heilen/Abgang der Karte laufen wie bisher über ihre Haken (`anhaengselStatusHooks`) und setzen die Marke nicht.
+* **Nicht** zur Status-Immunität zählen der Charme-Schutz (er gehört zur Kontrolle) und die kurzlebige Nach-CC-Immunität `immune`.
 
 ### Applying creature statuses### Applying creature statuses
 
