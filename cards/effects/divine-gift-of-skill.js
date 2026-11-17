@@ -122,6 +122,14 @@ module.exports = {
         return;
       }
 
+      // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — der Held bekommt weder die
+      // Zusatz-Abilities noch die Aktionssperre noch den Buff (ein unteilbarer Effekt); der Einmal-Slot `divineGift` bleibt verbraucht.
+      if (engine.hasEffectImmunity(pi, t.heroIdx, ctx.card)) {
+        engine.log('effect_immunity', { hero: hero.name, source: 'Divine Gift of Skill' });
+        engine.sync();
+        return;
+      }
+
       // Grant bonus ability attachments. Stacks if multiple cards somehow apply.
       if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
       ps._bonusAbilityAttachments[t.heroIdx] =

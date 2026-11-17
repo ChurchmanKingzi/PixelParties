@@ -316,7 +316,7 @@ module.exports = {
           if (h?.name && h.hp > 0) {
             for (const k of entfernen) {
               if (!h.statuses?.[k]) continue;                     // mit einem Anhängsel schon gegangen
-              geheilt.push(...engine.cleanseHeroStatuses(h, ziel.owner, ziel.heroIdx, [k], CARD_NAME));
+              geheilt.push(...engine.cleanseHeroStatuses(h, ziel.owner, ziel.heroIdx, [k], CARD_NAME, { piercing: hart }));   // Decay Magic 2: nicht negierbar, auch nicht durch eine Effekt-Immunität (Escape Device)
             }
           }
         } else if (tInst.zone === 'support') {

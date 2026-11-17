@@ -176,6 +176,14 @@ module.exports = {
       if (target.type === 'hero') {
         const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (!h?.name || h.hp <= 0) { gs._spellCancelled = true; return; }
+        // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — die Marke wird nicht gestempelt;
+        // die Zugsperre unten gilt weiter (sie trifft den Spieler, nicht den Helden, und die Karte ist gespielt).
+        if (engine.hasEffectImmunity(target.owner, target.heroIdx, ctx.card)) {
+          engine.log('effect_immunity', { hero: h.name, source: CARD_NAME });
+          stampTrialLock(gs, pi);
+          engine.sync();
+          return;
+        }
         engine.addExtraLife(h, lifeMark);
         stampedName = h.name;
         stampedOwner = target.owner;

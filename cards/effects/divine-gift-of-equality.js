@@ -182,6 +182,13 @@ module.exports = {
           engine.sync();
           return;
         }
+        // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — wie bei Resistance unten: nicht halbiert,
+        // also keine HP übrig und keine Wiederbelebung (die Karte ist gespielt, der Einmal-Slot verbraucht).
+        if (engine.hasEffectImmunity(secondT.owner, secondT.heroIdx, ctx.card)) {
+          engine.log('divine_gift_equality_blocked', { target: tgtHero.name, reason: 'effect_immunity' });
+          engine.sync();
+          return;
+        }
         // Resistance gate. The halving is a non-damage HP mutation
         // (it's not routed through actionDealDamage), so neither the
         // damage path nor `actionHealHero`'s `beforeHeroEffect` gate
