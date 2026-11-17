@@ -1155,7 +1155,11 @@
     "gold",
     8
    ]
-  ]
+  ],
+  "px": 18,
+  "journeyshow": true,
+  "opener": "wind",
+  "showLoops": 10
  },
  "Mary Crestmas": {
   "particles": [

@@ -1384,3 +1384,230 @@ class Zug:
         if r < 1:
             return
         R1(m).ring(cx, cy, max(0, r - th), r, c, 1.0)
+
+
+# ═════════════════════════════ Heilimpuls (app-fx-50): Säule steigt an der Heilerin auf, Säule schlägt am Ziel ein, grüner Heil-Burst ═════════════════════════════
+C50 = dict(creme=hexc('#fffbd2'), tinte=hexc('#12101f'), g0=hexc('#167927'), g1=hexc('#00cc50'), g2=hexc('#4ceb70'), g3=hexc('#75f091'), g4=hexc('#b3f9b8'))
+SCHRUMPF50 = [1, 0.75, 0.5, 0.25]
+
+
+def _teilchen50(m, T, t):
+    fr = Fl(t)
+    for s in T:
+        dt = t - s['t0']
+        if dt < 0 or dt >= s['life']:
+            continue
+        if dt > s['life'] * 0.72 and (Fl(dt) % 2):
+            continue
+        x = rd(s['x'] + s['vx'] * dt + 0.5 * s['ax'] * dt * dt)
+        y = rd(s['y'] + s['vy'] * dt + 0.5 * s['ay'] * dt * dt)
+        kind = s['kind']
+        if kind == 3:
+            kind = 1 if Fl(dt) % 4 < 2 else 0
+        if kind == 0:
+            m.rect(x, y, s['sz'], s['sz'], s['c'])
+        elif kind == 1:
+            m.rect(x - 1, y, 3, 1, s['c']); m.rect(x, y - 1, 1, 3, s['c'])
+        else:
+            m.rect(x - 2, y, 5, 1, s['c']); m.rect(x, y - 2, 1, 5, s['c']); m.rect(x - 1, y - 1, 3, 3, s['c'])
+
+
+def _ellipse50(m, cx, cy, rx, ry, th, c, dith):
+    if rx < 1:
+        return
+    n = int(math.ceil(math.pi * 2 * max(rx, ry) * 1.1))
+    lx = ly = None
+    k = 0
+    for i in range(n):
+        a = i / float(n) * math.pi * 2
+        x, y = rd(cx + math.cos(a) * rx), rd(cy + math.sin(a) * ry)
+        if (x, y) == (lx, ly):
+            continue
+        lx, ly = x, y
+        k += 1
+        if not dith or (k & 1):
+            m.rect(x, y, th, th, c)
+
+
+def _saeule50(m, cx, y0, y1, hw, fr, kopf):
+    if y1 <= y0 or hw < 1:
+        return
+    C = C50
+    hgt = y1 - y0
+    eb = max(1, rd(hw * 0.32))
+    hl = max(1, rd(hw * 0.62))
+    kw = max(1, rd(hw * 0.3))
+    m.rect(cx - hw - 1, y0, 1, hgt, C['g0']); m.rect(cx + hw + 1, y0, 1, hgt, C['g0'])
+    m.rect(cx - hw, y0, 2 * hw + 1, hgt, C['g2'])
+    m.rect(cx - hw, y0, 1, hgt, C['g1']); m.rect(cx + hw, y0, 1, hgt, C['g1'])
+    for e in range(1, eb):
+        for y in range(y0, y1):
+            if bayer(cx + e, y) < 0.5 + 0.15 * (eb - e):
+                m.rect(cx - hw + e, y, 1, 1, C['g1'])
+            if bayer(cx - e, y) < 0.5 + 0.15 * (eb - e):
+                m.rect(cx + hw - e, y, 1, 1, C['g1'])
+    m.rect(cx - hl, y0, 2 * hl + 1, hgt, C['g3'])
+    for y in range(y0, y1):
+        if bayer(cx + hl + 1, y) < 0.5:
+            m.rect(cx + hl + 1, y, 1, 1, C['g3'])
+        if bayer(cx - hl - 1, y) < 0.5:
+            m.rect(cx - hl - 1, y, 1, 1, C['g3'])
+    y = y0
+    while y < y1:
+        kk = int(math.floor((y + fr * 2) / 4.0))
+        ny = min(y1, (kk + 1) * 4 - fr * 2)
+        if ny <= y:
+            ny = y + 1
+        m.rect(cx - kw, y, 2 * kw + 1, ny - y, C['g3'] if kk & 1 else C['g4'])
+        y = ny
+    if kopf and hgt >= 3:
+        oben = kopf == 'oben'
+        ya = y0 if oben else y1 - 3
+        z = [C['creme'], C['g4'], C['g3']] if oben else [C['g3'], C['g4'], C['creme']]
+        for i in range(3):
+            m.rect(cx - hw, ya + i, 2 * hw + 1, 1, z[i])
+
+
+class HealPulse:
+    """Nachbau von `ppFx50` (heal_sparkle): RISE = Säule schießt an der Quelle nach oben (0,5 s), STRIKE = Säule fällt auf das Ziel (0,42 s), TREFFER = Heil-Burst (Ringe, Splitter, Kreuze, Spirale, 0,92 s).
+    src = (cx, boden) in Zellen; tgt = (cx, boden) des Ziels; zone = (x0, y0, x1, y1) der Zielkarte in Zellen; rc = Maßstab (Karte 35 Zellen = 1), hw = Halbbreite der Säulen."""
+    T_STRIKE, T_HIT = 0.5, 0.85
+
+    def __init__(self, src, tgt, zone, rc=0.8, hw=3, salt=5, top=0):
+        self.src, self.tgt, self.zone, self.rc, self.hw, self.salt, self.top = src, tgt, zone, rc, hw, salt, top
+        self.ende = self.T_HIT + 0.95
+        C = C50
+        cols = [C['g3'], C['g4'], C['creme'], C['g2']]
+        v = lambda w: w / 4.8 * rc
+        # RISE-Teilchen
+        self.rise_T = []
+        CX, YB = src
+        L = max(4, YB - top)
+        self.L = L
+        idc = [0]
+
+        def R(k, base):
+            return H(salt + base, idc[0] * 13 + k)
+        t2 = 0.0
+        while t2 < 0.42:
+            lo = max(top, self._tip(t2))
+            seite = -1 if R(1, 11) < 0.5 else 1
+            sk = R(9, 11)
+            yy = YB - R(2, 11) * (YB - lo)
+            self.rise_T.append(dict(t0=t2, life=0.22 + R(3, 11) * 0.2, x=CX + seite * (hw + 2 + R(4, 11) * 3), y=yy, vx=seite * v(R(5, 11) * 40), vy=-v(60 + R(6, 11) * 160), ax=0, ay=0,
+                                    kind=1 if sk < 0.45 else (3 if sk < 0.6 else 0), sz=1, c=cols[int(R(7, 11) * 4)]))
+            t2 += 1 / 40.0
+            idc[0] += 1
+        for k in range(22):
+            an = -math.pi * (0.1 + R(1, 11) * 0.8)
+            sp = v(90 + R(2, 11) * 260)
+            self.rise_T.append(dict(t0=0, life=0.2 + R(5, 11) * 0.2, x=CX + (R(3, 11) - 0.5) * 2 * hw, y=YB, vx=math.cos(an) * sp, vy=math.sin(an) * sp, ax=-math.cos(an) * sp * 1.4,
+                                    ay=-math.sin(an) * sp * 1.4 + v(160), kind=1 if R(6, 11) < 0.35 else 0, sz=2 if R(3, 11) < 0.4 else 1, c=cols[int(R(7, 11) * 4)]))
+            idc[0] += 1
+        # STRIKE-Teilchen
+        self.strike_T = []
+        TX, TB = tgt
+        TI = 0.16
+        for k in range(40):
+            an = -math.pi * (0.02 + R(1, 13) * 0.96)
+            sp = v(140 + R(2, 13) * 420)
+            self.strike_T.append(dict(t0=TI + R(8, 13) * 0.03, life=0.18 + R(5, 13) * 0.22, x=TX + (R(3, 13) - 0.5) * hw, y=TB, vx=math.cos(an) * sp, vy=math.sin(an) * sp * 0.9,
+                                      ax=-math.cos(an) * sp * 1.2, ay=v(220), kind=1 if R(6, 13) < 0.3 else 0, sz=2 if R(3, 13) < 0.4 else 1, c=cols[int(R(7, 13) * 4)]))
+            idc[0] += 1
+        t2 = 0.04
+        while t2 < 0.34:
+            seite = -1 if R(1, 13) < 0.5 else 1
+            tipy = top + (TB - top) * (kl(t2 / TI, 0, 1) ** 2)
+            sk = R(9, 13)
+            self.strike_T.append(dict(t0=t2, life=0.2 + R(3, 13) * 0.15, x=TX + seite * (hw + 2 + R(4, 13) * 3), y=top + R(2, 13) * max(1, tipy - top), vx=seite * v(R(5, 13) * 30), vy=v(20 + R(6, 13) * 60),
+                                      ax=0, ay=0, kind=1 if sk < 0.45 else (3 if sk < 0.6 else 0), sz=1, c=cols[int(R(7, 13) * 4)]))
+            t2 += 1 / 40.0
+            idc[0] += 1
+        # TREFFER-Teilchen (Profil grün)
+        self.hit_T = []
+        zx0, zy0, zx1, zy1 = zone
+        self.CX, self.CY = rd((zx0 + zx1) / 2.0), rd((zy0 + zy1) / 2.0)
+        for k in range(46):
+            an = R(1, 7) * math.pi * 2
+            sp = v(150 + R(2, 7) * 480)
+            self.hit_T.append(dict(t0=R(8, 7) * 0.06, life=0.3 + R(5, 7) * 0.4, x=self.CX, y=self.CY, vx=math.cos(an) * sp, vy=math.sin(an) * sp * 0.9, ax=-math.cos(an) * sp * 1.4, ay=-math.sin(an) * sp * 1.4 * 0.9,
+                                   kind=1 if R(6, 7) < 0.3 else 0, sz=2 if R(3, 7) < 0.4 else 1, c=cols[int(R(7, 7) * 4)]))
+            idc[0] += 1
+        for k in range(14):
+            self.hit_T.append(dict(t0=R(1, 7) * 0.2, life=0.5 + R(2, 7) * 0.2, x=self.CX + (R(3, 7) - 0.5) * v(90), y=self.CY + (R(4, 7) - 0.5) * v(70) + v(10), vx=v((R(5, 7) - 0.5) * 70),
+                                   vy=-v(60 + R(6, 7) * 120), ax=0, ay=0, kind=2 if R(7, 7) < 0.2 else (1 if R(7, 7) < 0.7 else 0), sz=1, c=cols[int(R(9, 7) * 4)]))
+            idc[0] += 1
+
+    def _tip(self, t):
+        return self.src[1] - self.L * (kl(t / 0.38, 0, 1) ** 1.15)
+
+    def _foot(self, t):
+        return self.src[1] if t < 0.16 else self.src[1] - self.L * (kl((t - 0.16) / 0.34, 0, 1) ** 2)
+
+    def draw(self, m, t):
+        if t < 0 or t >= self.ende:
+            return
+        C = C50
+        rc = self.rc
+        th = lambda w: max(1, rd(w * rc))
+        q = Fl(t)
+        # RISE
+        if t < 0.5:
+            CX, YB = self.src
+            if t <= 0.4:
+                _ellipse50(m, CX, YB, max(1, rd(ease(t / 0.4) * 24 * rc)), max(1, rd(ease(t / 0.4) * 10 * rc)), th(2) if t < 0.1 else th(1), C['creme'], False)
+            if 0.05 < t <= 0.5:
+                _ellipse50(m, CX, YB, max(1, rd(ease((t - 0.05) / 0.45) * 34 * rc)), max(1, rd(ease((t - 0.05) / 0.45) * 14 * rc)), th(2), C['g2'], True)
+            y0 = max(self.top, rd(self._tip(t)))
+            y1 = rd(self._foot(t)) + 1
+            ende = kl((t - 0.4) / 0.1, 0, 1)
+            hw = max(1, rd(self.hw * SCHRUMPF50[min(3, int(ende * 4))]))
+            if y1 > y0:
+                _saeule50(m, CX, y0, min(y1, YB + 1), hw, q, 'oben' if self._tip(t) > self.top else None)
+            _teilchen50(m, self.rise_T, t)
+        # STRIKE
+        ts = t - self.T_STRIKE
+        if 0 <= ts < 0.9:
+            TX, TB = self.tgt
+            TI = 0.16
+            if ts < 0.42:
+                tip = rd(self.top + (TB - self.top) * (kl(ts / TI, 0, 1) ** 2))
+                ende = kl((ts - 0.3) / 0.12, 0, 1)
+                hw = max(1, rd(self.hw * SCHRUMPF50[min(3, int(ende * 4))]))
+                _saeule50(m, TX, self.top, tip + 1, hw, Fl(ts), 'unten')
+            dt = ts - TI
+            if 0 <= dt <= 0.3:
+                _ellipse50(m, TX, TB, max(1, rd(ease(dt / 0.26) * 26 * rc)), max(1, rd(ease(dt / 0.26) * 11 * rc)), th(2) if dt < 0.08 else th(1), C['creme'], False)
+            if 0.04 < dt <= 0.3:
+                _ellipse50(m, TX, TB, max(1, rd(ease((dt - 0.04) / 0.26) * 36 * rc)), max(1, rd(ease((dt - 0.04) / 0.26) * 15 * rc)), th(2), C['g2'], True)
+            _teilchen50(m, self.strike_T, ts)
+        # TREFFER
+        th_ = t - self.T_HIT
+        if 0 <= th_ < 0.92:
+            zx0, zy0, zx1, zy1 = self.zone
+            qq = Fl(th_)
+            if qq < 2:
+                lv = 0.5 if qq == 0 else 0.25
+                for y in range(zy0, zy1):
+                    for x in range(zx0, zx1):
+                        if bayer(x, y) < lv:
+                            m.rect(x, y, 1, 1, C['creme'])
+            R1(m)
+            if th_ <= 0.4:
+                R1(m).ring(self.CX, self.CY, max(0, max(1, rd(ease(th_ / 0.4) * 24 * rc)) - (th(2) if th_ < 0.1 else th(1))), max(1, rd(ease(th_ / 0.4) * 24 * rc)), C['creme'], 1.0)
+            if 0.05 < th_ <= 0.55:
+                r_ = max(1, rd(ease((th_ - 0.05) / 0.5) * 34 * rc))
+                R1(m).ring(self.CX, self.CY, max(0, r_ - th(2)), r_, C['g2'], 0.5)
+            if 0.1 < th_ <= 0.7:
+                r_ = max(1, rd(ease((th_ - 0.1) / 0.6) * 44 * rc))
+                R1(m).ring(self.CX, self.CY, max(0, r_ - th(2)), r_, C['g1'], 0.5)
+            _teilchen50(m, self.hit_T, th_)
+            if th_ < 0.8:
+                for k in range(5):
+                    if th_ > 0.55 and qq % 2:
+                        break
+                    a = k * (math.pi * 2 / 5) + th_ * 3
+                    rr = (8 + th_ * 36) * rc
+                    hx, hy = rd(self.CX + math.cos(a) * rr), rd(self.CY - th_ * 22 * rc + math.sin(a) * rr * 0.6)
+                    c = C['g3'] if k % 2 else C['g4']
+                    m.rect(hx - 1, hy, 3, 1, c); m.rect(hx, hy - 1, 1, 3, c); m.rect(hx, hy, 1, 1, C['creme'])
