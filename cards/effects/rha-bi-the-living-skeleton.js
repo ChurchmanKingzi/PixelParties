@@ -194,6 +194,19 @@ module.exports = {
     return [bestes.id];
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Aktivierung verbraucht, was sie verbraucht hätte. Der Effekt hat KEIN Limit pro Aktivierung („as many times as you want") — nur jeder
+   * gegnerische Held darf je Zug einmal gewählt werden (`merkeWahl`). Wird die Aktivierung in der Kette negiert, ist noch kein Held gewählt: nichts zu buchen. Wird sie NACH der Zielwahl negiert
+   * (`ziele` = die negierten Ziele), ist dieser Held „chosen by this effect" und für den Rest des Zuges gesperrt; die Kosten (HP, Deckkarte) werden erst NACH der Zielwahl gezahlt und
+   * sind damit nicht angefallen. Rückgabe `false`: die Engine stempelt keine Rundensperre (der Effekt ist beliebig oft nutzbar).
+   */
+  stempelNegierteAktivierung(engine, rhabiHeld, { pi, ziele } = {}) {
+    for (const z of (ziele || [])) {
+      if (z && z.type === 'hero' && Number.isInteger(z.heroIdx) && z.owner !== pi) merkeWahl(engine, pi, z.heroIdx);
+    }
+    return false;
+  },
+
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;

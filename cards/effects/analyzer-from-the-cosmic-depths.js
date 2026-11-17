@@ -93,6 +93,51 @@ function allFreeSupportSlotsBothSides(engine) {
   return [...geteilteSlotsBeiderSeiten(engine, INVADER_TOKEN), ...out];
 }
 
+/** Welche der beiden Optionen sind gerade benutzbar (je Option eigenes Einmal-Limit, Counter, Ziele/freie Zonen)? */
+function verfuegbareModi(ctx) {
+  const inst = ctx.card;
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const have = getChangeCounters(inst);
+  const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
+    && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
+  const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
+    && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
+  return { moveAvail, spawnAvail };
+}
+
+/**
+ * ★ Spielgestalter-Entscheidung 16.11.2026 — der Modus wird VOR dem Kettenfenster gewählt (Skript-Vertrag `waehleModus`, gerufen von `doActivateCreatureEffect`): jeder Modus hat sein
+ * EIGENES Einmal-Limit, eine Negation der Aktivierung (Kette oder Zielfenster) muss also wissen, WELCHER Modus verbraucht wird (`stempelNegierteAktivierung` unten). Liefert die Modus-Kennung
+ * ('move' | 'spawn') oder `null` (Abbruch durch den Spieler / nichts verfügbar). Ohne Vorwahl (geliehene Verwendung: Grimoire, Kohta) wählt `onCreatureEffect` wie bisher selbst.
+ */
+async function waehleModus(ctx) {
+  const engine = ctx._engine;
+  const inst = ctx.card;
+  const pi = inst.controller ?? inst.owner;
+  const { moveAvail, spawnAvail } = verfuegbareModi(ctx);
+  if (!moveAvail && !spawnAvail) return null;
+  // If exactly one is available, skip the picker and go straight to it.
+  if (moveAvail && !spawnAvail) return 'move';
+  if (spawnAvail && !moveAvail) return 'spawn';
+  const opts = [];
+  opts.push({ id: 'move',  label: 'Move Change Counters to another card' });
+  opts.push({ id: 'spawn', label: 'Spend Counters → Invader Tokens (either side)' });
+  const pick = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    title: CARD_NAME,
+    description: 'Choose which once-per-turn ability to activate.',
+    options: opts,
+    cancellable: true,
+    // Sub-ability picker — Move vs Spawn are distinct effects.
+    // The count pickers below are parameters, NOT distinct
+    // effects, so they intentionally lack this flag.
+    gerrymanderEligible: true,
+  });
+  if (!pick || pick.cancelled) return null;
+  return pick.optionId;
+}
+
 // ── ACTIVE 1: Move counters ────────────────────────────────────────
 async function runMove(engine, inst, ctx) {
   const gs = engine.gs;
@@ -277,56 +322,33 @@ module.exports = {
   // ★ W12 (Al, Q5): eine GELIEHENE/WIEDERHOLTE Verwendung (Spirit of the Forbidden Grimoire, Kohta: `ctx._borrowedUse`) ignoriert das
   // eigene Einmal-Limit je Option — auch mit beiden Optionen schon benutzt darf sie noch einmal laufen (Counter-/Platz-Voraussetzungen bleiben).
   canActivateCreatureEffect(ctx) {
-    const inst = ctx.card;
-    const engine = ctx._engine;
-    const gs = engine.gs;
-    const have = getChangeCounters(inst);
-
-    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
-      && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
-
-    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
-      && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
-
+    const { moveAvail, spawnAvail } = verfuegbareModi(ctx);
     return moveAvail || spawnAvail;
+  },
+
+  waehleModus,
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: wird die Aktivierung NEGIERT (Kette oder nach der Zielwahl), ist der gewählte Modus verbraucht — dieselbe Buchung wie im Erfolgsweg
+   * (`stampHopt`). Die Engine-Sperre bleibt hier immer offen (`_skipCreatureEffectHopt`): die Modi sperren sich selbst. Rückgabe `false` = keine Engine-Rundensperre.
+   */
+  stempelNegierteAktivierung(engine, inst, { modus } = {}) {
+    if (modus === 'move') stampHopt(engine.gs, HOPT_MOVE, inst.id);
+    else if (modus === 'spawn') stampHopt(engine.gs, HOPT_SPAWN, inst.id);
+    return false;
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const gs = engine.gs;
     const inst = ctx.card;
-    const pi = inst.controller ?? inst.owner;
-    const have = getChangeCounters(inst);
-
-    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
-      && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
-    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
-      && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
+    const { moveAvail, spawnAvail } = verfuegbareModi(ctx);
 
     if (!moveAvail && !spawnAvail) return false;
 
-    // If exactly one is available, skip the picker and go straight to it.
-    let pickedAbility;
-    if (moveAvail && !spawnAvail) pickedAbility = 'move';
-    else if (spawnAvail && !moveAvail) pickedAbility = 'spawn';
-    else {
-      const opts = [];
-      opts.push({ id: 'move',  label: 'Move Change Counters to another card' });
-      opts.push({ id: 'spawn', label: 'Spend Counters → Invader Tokens (either side)' });
-      const pick = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Choose which once-per-turn ability to activate.',
-        options: opts,
-        cancellable: true,
-        // Sub-ability picker — Move vs Spawn are distinct effects.
-        // The count pickers below are parameters, NOT distinct
-        // effects, so they intentionally lack this flag.
-        gerrymanderEligible: true,
-      });
-      if (!pick || pick.cancelled) return false;
-      pickedAbility = pick.optionId;
-    }
+    // Modus: vorgewählt (`ctx.modus`, regulärer Weg über `waehleModus`) oder — geliehene Verwendung — hier gewählt.
+    const pickedAbility = ctx.modus || await waehleModus(ctx);
+    if (!pickedAbility) return false;
+    if ((pickedAbility === 'move' && !moveAvail) || (pickedAbility === 'spawn' && !spawnAvail)) return false;   // zwischen Vorwahl und Auflösung nicht mehr benutzbar
 
     if (pickedAbility === 'move')  return await runMove(engine, inst, ctx);
     if (pickedAbility === 'spawn') return await runSpawn(engine, inst, ctx);

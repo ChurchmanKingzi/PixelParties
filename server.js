@@ -8111,10 +8111,10 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
   ps.supportZones[heroIdx][supIdx].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill) — gemerkt, damit ein Negieren den richtigen zurückgibt.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill). ★ Spielgestalter-Entscheidung 16.11.2026: mit dem Beginn des Anlegens ist der Platz verbraucht — wird die Ability
+  // danach negiert, bekommt der Held ihn NICHT zurück (wie bei jedem Einmal-Limit, siehe CARD_API „Einmal-Limits werden bei Aktivierungsbeginn verbraucht"). Ein Abbruch VOR diesem Punkt
+  // (Held-/Zonenwahl abbrechen) hat noch nichts verbraucht.
   engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const inst = engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
   engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, zone: 'support' });
@@ -8133,17 +8133,8 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'support', fromHeroIdx: heroIdx, fromSlotIdx: supIdx });
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        hero.buffs.blessed_skill.remaining++;
-        hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      }
+      // Der Platz bleibt verbraucht (s. o.); nur die Sperrmarke des Blessed-Buffs wird neu gelesen (die Ability liegt nicht mehr in der Zone, Magic-Arts-Stufe kann gefallen sein).
+      if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
       engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -8269,13 +8260,12 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   room.engine.notePlayedFromHand(pi);
   // Consume the standard slot first; if it's already used, spend a bonus
-  // attachment from Divine Gift of Skill instead. Track which slot was
-  // consumed so a negation refund can return it cleanly.
+  // attachment from Divine Gift of Skill instead.
   // v1356: Verbrauch (Standard zuerst, sonst Bonus-Platz) und Blessed-Buff
   // an EINER Stelle — derselbe Helfer wie im Engine-Anlegeweg.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Platz ist mit dem Beginn des Anlegens verbraucht und kommt bei einer Negation der Ability NICHT zurück (Standard- wie Bonus-Platz);
+  // ein Abbruch vor diesem Punkt (Zonen-/Heldenwahl) hat nichts verbraucht.
   room.engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -8304,26 +8294,10 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       // `zoneSlotFound` merkt sich, aus welchem Slot sie entfernt wurde.
       await room.engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: zoneSlotFound });
-      // Refund whichever slot was consumed (regular vs Skill bonus).
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        // Restore the Blessed buff: re-add the slot to the visible
-        // counter, and re-create the buff entry if it was deleted when
-        // remaining hit 0 mid-resolve.
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) {
-          hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        }
-        hero.buffs.blessed_skill.remaining++;
+      // Kein Zurückgeben des Platzes (s. o.). Die Ability liegt nicht mehr in der Zone — Magic Arts
+      // kann unter 1 gefallen sein, also die Sperrmarke des Blessed-Buffs neu lesen.
+      if (hero.buffs?.blessed_skill) {
         hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        // The regular slot was the consumer — Magic Arts level may have
-        // dropped back below 1, so re-evaluate the lock flag.
-        if (hero.buffs?.blessed_skill) {
-          hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-        }
       }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -10336,6 +10310,39 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     gs._pendingCardReveal = { cardName: creatureName, ownerIdx: pi };
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026 — Effekte mit MEHREREN, je für sich einmal-pro-Zug-begrenzten Modi (Analyzer, Gatherer, Sparkfly Queen; optionaler Skript-Vertrag `waehleModus`):
+    // der Modus wird VOR dem Kettenfenster gewählt. Eine Negation der Aktivierung (Kette oder nach der Zielwahl) verbraucht dann genau diesen Modus (`stempelNegierteAktivierung`); ohne Vorwahl
+    // ließe sich der negierte Modus nicht zuordnen. Abbruch der Modus-Wahl = Abbruch vor dem Beginn: nichts verbraucht (Gerrymander-Veto wie bisher verbraucht).
+    let _modus;
+    if (typeof script.waehleModus === 'function') {
+      const _modusCtx = room.engine._createContext(inst, {});
+      room.engine._promptCardStack.push(inst.name);
+      try { _modus = await room.engine._alsAkteur(_modusCtx, () => script.waehleModus(_modusCtx)); }
+      finally { room.engine._promptCardStack.pop(); }
+      if (_modus == null || _modus === false) {
+        room.engine.beendeDarkDeal(inst);
+        if (charmedHeroCreature) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        } else if (isStolenByPi) {
+          delete inst.heroOwner;
+        }
+        delete gs._pendingCardReveal;
+        delete gs._pendingPlayLog;
+        if (room.engine._lastPromptGerryDeclined) {
+          room.engine._lastPromptGerryDeclined = false;
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+          room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+        } else if (consumedAdditionalCreatureInst) {
+          room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
+        }
+        for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+        return true;
+      }
+    }
+
     // Open a reaction window around the creature-effect activation so
     // Reaction Artifacts that target THIS event (Gigantisaur Skull) can
     // chain in. `cardType: 'CreatureEffect'` keeps existing reactions
@@ -10378,14 +10385,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       }
       // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Spearman …) verbraucht die Rundensperre (HOPT), „1 pro Spiel" und bei
       // „up to N times per turn" (3-Headed Giant, `chargesPerTurn`) eine Nutzung; bezahlte Kosten bleiben bezahlt. (Früher Z7b: ganz negiert = nie aufgelöst = nichts verbraucht.)
-      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst);
+      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { modus: _modus });
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
-    const ctx = room.engine._createContext(inst, {});
+    const ctx = room.engine._createContext(inst, _modus != null ? { modus: _modus } : {});
     // Mark this Creature as the ambient prompt source so any confirm /
     // optionPicker its activated effect opens via promptGeneric shows its
     // image (general "which card is prompting" rule; ctx helpers already
@@ -10426,6 +10433,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     const _vorigerCasterCreature = gs._spellCasterCreature;
     gs._spellCasterCreature = inst;
     let resolved;
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
@@ -10522,11 +10530,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them. Stamp HOPT so
       // the activation can't be retried this turn.
+      const _negZiele = room.engine.negiertSeit(_negStand);
       if (room.engine._lastPromptGerryDeclined) {
         room.engine._lastPromptGerryDeclined = false;
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      } else if (_negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Rolling Boulder, Frost Rune, Chaorc Interception, Cool Tech Jetpack …; der Picker lieferte
+        // `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei der Negation in der Kette sind die Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung);
+        // der Zusatzaktions-Geber wird wie dort zurückgegeben.
+        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele, modus: _modus });
+        if (consumedAdditionalCreatureInst) room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       } else if (consumedAdditionalCreatureInst) {
         // Standard cancel — refund the additional-action provider
         // consumed upfront. The action-counter increment / heroesActedThisTurn
@@ -10844,6 +10859,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): die Kette hat die Stufe gesenkt → die Auflösung ist Pflicht (kein Abbrechen)
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     const resolved = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, aufLevel)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
@@ -10921,6 +10937,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
         hoptReserved = false;
         if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
         room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert (Zielfenster-Reaktion/-Surprise/-Wächter) ist kein Abbruch durch den Spieler — die Rundensperre bleibt verbraucht,
+        // wie bei der Negation in der Kette (oben).
+        hoptReserved = false;
       } else {
         releaseHopt();
       }
@@ -11750,6 +11770,19 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     return false;
   }
   let _heroCostFinalized = false;
+  // Ausgang einer NEGIERTEN Aktivierung (Kette/Surprise-Fenster ODER Negation nach der Zielwahl): Helden-Vorkosten zurück (Saint Nicolas behält den markierten Trank), eine ZUSATZaktion bleibt
+  // unverbraucht (Anbieter zurück, Aktionszähler zurückgedreht), die Hauptaktion bleibt — wie bei jeder negierten Karte — verbraucht.
+  const negierterAusgang = async () => {
+    await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+    _heroCostFinalized = true;
+    if (consumedAdditionalInst) {
+      // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+      // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+      room.engine.restoreAdditionalAction(consumedAdditionalInst);
+      if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+    } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+  };
 
   try {
     // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
@@ -11787,17 +11820,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
       // ★ Spielgestalter-Entscheidung 16.11.2026: negiert = Aktivierung begonnen → die Rundensperre (oben vorab gestempelt) bleibt verbraucht.
-      // Negated — refund the Hero pre-action cost (Saint Nicolas
-      // keeps the marked Potion).
-      await room.engine.refundHeroActionCost(heroOwner, heroIdx);
-      _heroCostFinalized = true;
-      if (consumedAdditionalInst) {
-        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
-        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
-        room.engine.restoreAdditionalAction(consumedAdditionalInst);
-        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
-        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
-      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+      // Negated — refund the Hero pre-action cost (Saint Nicolas keeps the marked Potion); Zusatzaktion/Hauptaktion s. `negierterAusgang`.
+      await negierterAusgang();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -11832,6 +11856,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): gesenkte Auflösung = Pflicht, kein Abbrechen
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let result = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onActivate(ctx, aufLevel)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
@@ -11869,6 +11894,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
           room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
         }
         room.engine._lastPromptGerryDeclined = false;
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch durch den Spieler — die Rundensperre (oben vorab gestempelt) bleibt verbraucht und der Ausgang ist
+        // derselbe wie bei der Negation in der Kette (`negierterAusgang`).
+        await negierterAusgang();
       } else {
         // Player cancelled — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(heroOwner, heroIdx);
