@@ -26,18 +26,19 @@ def ease_out(x):
 
 class JourneyShow(CaptionMixin):
     CW, CH = 160, 224
-    AX = [270, 540, 810]
+    AX = [270, 810]                                                                    # zwei verbündete Helden (3 Helden pro Seite, Tarleinn ist einer davon)
+    SELF_X = 540
     AY = 1700
     EN_X, EN_Y = 540, 140
     OW, OH = 160, 224
     SPELL_POS = (900, 780)
-    ACTS = [dict(T=1.0, lv=1, heal=40, ally=0, name='BURNING FINGER'), dict(T=6.6, lv=2, heal=80, ally=1, name='FIREBALL'), dict(T=11.6, lv=3, heal=150, ally=2, name='CHAIN LIGHTNING')]
-    HP = [(120, 400), (100, 300), (200, 500)]                                          # (HP vor dem Heilen, Maximum)
+    ACTS = [dict(T=1.0, lv=1, heal=40, ally=0, name='BURNING FINGER'), dict(T=6.6, lv=2, heal=80, ally=1, name='FIREBALL'), dict(T=11.6, lv=3, heal=150, ally=2, name='CHAIN LIGHTNING')]   # ally 2 = Tarleinn selbst
+    HP = [(120, 400), (100, 300), (250, 400)]                                          # (HP vor dem Heilen, Maximum)
     CAPTIONS = [
         (0.2, 2.6, '*Tarleinn* the Traveler is on the road...'),
-        (2.8, 6.4, 'With *two Spell Schools*, every *Spell* she casts *heals* an ally - once per turn!'),
+        (2.8, 6.4, 'With *two Spell Schools*, every *Spell* she casts *heals* one of her heroes - once per turn!'),
         (6.6, 11.4, 'The higher the Spell\'s *level*, the more she heals: *40*, *80*, up to *150*!'),
-        (11.6, 15.6, 'A *level 3* Spell? Her friends feel *150* better!'),
+        (11.6, 15.6, 'A *level 3* Spell heals *150* - and she can heal *herself*, too!'),
         (15.8, 20.4, '*Tarleinn* just wants to *see the world* - and her *music* cheers everyone up.'),
     ]
     SND = {
@@ -61,7 +62,7 @@ class JourneyShow(CaptionMixin):
         ld = lambda n: Image.open('%s/%s.png' % (base, n)).convert('RGBA')
         ow, oh = self.OW // U, self.OH // U
         pix = lambda im: im.convert('RGB').resize((ow, oh), Image.BOX).resize((ow * U, oh * U), Image.NEAREST).convert('RGBA')
-        self.allies = [pix(ld('a%d' % (i + 1))) for i in range(3)]
+        self.allies = [pix(ld('a%d' % (i + 1))) for i in range(2)]
         self.en = pix(ld('e-doq'))
         self.spells = [ld('s%d' % (i + 1)).resize((190, 266), Image.BOX) for i in range(3)]
         for a in self.ACTS:
@@ -153,27 +154,32 @@ class JourneyShow(CaptionMixin):
                 if 0 <= t - a['t_hit'] < 0.4:
                     sh = 8 if int(t * 30) % 2 else -8
             canvas.paste(self.en, (int(round((self.EN_X - self.en.width / 2 + sh) / U) * U), int(round((y - self.en.height / 2) / U) * U)), self.en)
-        for i in range(3):
+        for i in range(2):
             if t < 0.5 + 0.12 * i:
                 continue
             y = self.AY + 200 * (1 - ease_out((t - 0.5 - 0.12 * i) / 0.3))
             canvas.paste(self.allies[i], (int(round((self.AX[i] - self.allies[i].width / 2) / U) * U), int(round((y - self.allies[i].height / 2) / U) * U)), self.allies[i])
             if t < 0.9 + 0.12 * i:
                 continue
-            h, mx = self.hp(i, t)
-            bw = 160
-            x0, y0 = self.AX[i] - bw // 2, self.AY + 125
-            self.pix_rect(d, x0 - 4, y0 - 4, x0 + bw + 3, y0 + 18 + 3, (20, 10, 30))
-            a = self.ACTS[i]
-            frac = h / float(mx)
-            if a['t_heal'] - 0.0 <= t < a['t_heal'] + 0.6:                            # beim Heilen wächst der Balken in Stufen
-                u = smooth((t - a['t_heal']) / 0.5)
-                frac = (h - a['heal'] + a['heal'] * u) / float(mx)
-            wf = int(round(bw * frac / self.U) * self.U)
-            col = (255, 90, 90) if frac < 0.35 else GREEN
-            if wf > 0:
-                self.pix_rect(d, x0, y0, x0 + wf - 1, y0 + 17, col)
-            self.draw_text(canvas, '%d/%d' % (h, mx), 2, (self.AX[i], y0 + 44), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+            self._hp_bar(canvas, d, t, i, self.AX[i], self.AY + 125, 160)
+        if t >= 0.9:                                                                    # Tarleinn selbst: Balken in der Mitte (ihre Karte ist die große Heldenkarte)
+            self.draw_text(canvas, 'TARLEINN', 3, (self.SELF_X, self.AY - 40), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+            self._hp_bar(canvas, d, t, 2, self.SELF_X, self.AY - 10, 220)
+
+    def _hp_bar(self, canvas, d, t, i, cx, y0, bw):
+        h, mx = self.hp(i, t)
+        x0 = cx - bw // 2
+        self.pix_rect(d, x0 - 4, y0 - 4, x0 + bw + 3, y0 + 18 + 3, (20, 10, 30))
+        a = self.ACTS[i]
+        frac = h / float(mx)
+        if a['t_heal'] <= t < a['t_heal'] + 0.6:                                        # beim Heilen wächst der Balken in Stufen
+            u = smooth((t - a['t_heal']) / 0.5)
+            frac = (h - a['heal'] + a['heal'] * u) / float(mx)
+        wf = int(round(bw * frac / self.U) * self.U)
+        col = (255, 90, 90) if frac < 0.35 else GREEN
+        if wf > 0:
+            self.pix_rect(d, x0, y0, x0 + wf - 1, y0 + 17, col)
+        self.draw_text(canvas, '%d/%d' % (h, mx), 2, (cx, y0 + 44), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
 
     # ───────── Zauber ─────────
     def _fxs(self):
@@ -188,9 +194,14 @@ class JourneyShow(CaptionMixin):
         top = self._ci(540, -40)[1]
         hl = []
         for i, a in enumerate(self.ACTS):
-            tx, ty = self._ci(self.AX[i], self.AY + 112)
-            zx0, zy0 = self._ci(self.AX[i] - self.CW / 2, self.AY - self.CH / 2)
-            zx1, zy1 = self._ci(self.AX[i] + self.CW / 2, self.AY + self.CH / 2)
+            if i < 2:
+                tx, ty = self._ci(self.AX[i], self.AY + 112)
+                zx0, zy0 = self._ci(self.AX[i] - self.CW / 2, self.AY - self.CH / 2)
+                zx1, zy1 = self._ci(self.AX[i] + self.CW / 2, self.AY + self.CH / 2)
+            else:                                                                       # Selbstheilung: beide Säulen am selben Ort (Tarleinn)
+                tx, ty = self._ci(540, 1000)
+                zx0, zy0 = self._ci(340, 560)
+                zx1, zy1 = self._ci(740, 1000)
             sx, sy = self._ci(540, 1000)
             hl.append(gamefx.HealPulse((sx, sy), (tx, ty), (zx0, zy0, zx1, zy1), rc=0.9, hw=max(2, int(3 * self.K)), salt=7 + i, top=top))
         fx['heal'] = hl
@@ -220,7 +231,10 @@ class JourneyShow(CaptionMixin):
             fx['heal'][i].draw(m, t - a['t_hit'])
             tau = t - a['t_heal']
             if 0 <= tau < 1.3:
-                self.draw_text(canvas, '+%d' % a['heal'], 7, (self.AX[a['ally']], self.AY - 150 - 70 * smooth(tau / 1.2)), color=GREEN, outline=(10, 60, 20), shadow=None)
+                if a['ally'] < 2:
+                    self.draw_text(canvas, '+%d' % a['heal'], 7, (self.AX[a['ally']], self.AY - 150 - 70 * smooth(tau / 1.2)), color=GREEN, outline=(10, 60, 20), shadow=None)
+                else:
+                    self.draw_text(canvas, '+%d' % a['heal'], 7, (540, 600 - 60 * smooth(tau / 1.2)), color=GREEN, outline=(10, 60, 20), shadow=None)
 
     # ───────── Zähler ─────────
     def _draw_hud(self, canvas, d, t):
@@ -296,7 +310,7 @@ class JourneyShow(CaptionMixin):
         def add(t, kind):
             for item in self.SND[kind]:
                 ev.append((t + (item[2] if len(item) > 2 else 0.0), item[0], item[1]) + tuple(item[3:]))
-        for i in range(3):
+        for i in range(2):
             add(0.5 + 0.12 * i, 'ally')
         for i, a in enumerate(self.ACTS):
             T = a['T']
