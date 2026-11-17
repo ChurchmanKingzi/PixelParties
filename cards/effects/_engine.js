@@ -8526,6 +8526,104 @@ class GameEngine {
     catch (err) { console.error(`[piercesDamageProtection] ${sHero.name}:`, err.message); return false; }
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 (Chuck, the Crazy Veteran: „unless all other Heroes you control are immune to that source of damage" — JEDE Form von Schadensimmunität
+   * des Mitstreiters zählt): GEMEINSAMES Prädikat „nimmt der Held (Brettseite `physOwner`, Platz `heroIdx`) von DIESER Quelle gerade keinen Schaden?" — gespiegelt aus dem Helden-
+   * Schadenspfad (`_actionDealDamageImpl`), nur statische/lesende Prüfungen (nichts wird verbraucht, kein Prompt). Ein neuer Schutz im Schadenspfad gehört hier mit hinein; Skripte
+   * mit einem „takes no damage"-Hook, den die Engine nicht von außen lesen kann, melden ihn per Heldenskript-Vertrag `heroTakesNoDamage(engine, { hero, physOwner, heroIdx, controller,
+   * source, type })` (Inya: lebender Fantasy Buddy).
+   *
+   * Gezählt wird: tot (außer Todesaufschub im Flächenschlag), Erstrunden-Schutz, Effekt-Immunität/Zielschutz „or HIT" gegen diese Quelle, Schadens-Status (`blocksDamage`: Storm Piano,
+   * Cheat Chair), Kontrolle durch Succubus/Lyta/Charme, Versteinerung, Anti Magic/Spell-Immunität, Carris, Damus (Quellen-Immunität), Submerged, Interference (Flächenschlag),
+   * Buff-Multiplikator 0 (Damage Immune, Medusa's Curse), Heldenskript-Vertrag, Status-Immunitäten bei Brenn-/Gift-Ticks.
+   * Unreduzierbarer/unnegierbarer Schaden („cannot be reduced or negated": `opts.cannotBeNegated`/`cannotBeReduced`) schlägt Anti Magic, Carris, Multiplikator-Buffs und Hook-Schilde
+   * durch (Spielgestalter-Entscheidung 16.11.2026: „Unreduzierbarer Schaden toppt Schilde"); ein durchschlagender Quellheld (`_quelleDurchschlaegtHeldenSchutz`, Ida) zusätzlich Storm Piano,
+   * Succubus-/Lyta-Kontrolle und Versteinerung — gegen diese Quelle gilt der Held dann als NICHT immun. Nicht erfasst (kein Zustand, den man von außen lesen kann): einmalige Karten-Schilde
+   * (Energy Aura …) und Hook-Reduktionen ohne Vertrag.
+   * @param {object} [opts] `{ festesZiel, cannotBeNegated, cannotBeReduced }` — wie im Schadenspfad (`istEinzelzielTreffer`, Flaggen des Treffers)
+   */
+  heroTakesNoDamageFromSource(physOwner, heroIdx, source, type, opts = {}) {
+    const hero = this.gs.players[physOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp === undefined) return false;
+    // Tot zählt als immun — AUSSER der Tod ist im laufenden Flächenschlag nur vorgemerkt (Todes-Aufschub 28.9.): dann steht der Held für die Schadensberechnung noch im Spiel.
+    if (hero.hp <= 0) return !this.heldTodAufgeschoben(hero);
+    const festesZiel = !!opts.festesZiel;
+    const idaDurch = this._quelleDurchschlaegtHeldenSchutz(source, hero, type);
+    // Idas Hook stempelt `cannotBeReduced` + `cannotBeNegated` auf die Helden des Gegners — `_quelleDurchschlaegtHeldenSchutz` gilt unter genau diesen Bedingungen.
+    const nichtNegierbar = !!opts.cannotBeNegated || idaDurch;
+    const nichtReduzierbar = !!opts.cannotBeReduced || idaDurch;
+    const stumm = this._isHeroEffectSilenced(physOwner, heroIdx);
+    const qName = (typeof source === 'string') ? source : source?.name;
+
+    // Erstrunden-Schutz: absolut, gegen jeden Schaden.
+    const fts = this.gs.firstTurnProtectedPlayer;
+    if (fts != null && (this.gs.players[fts]?.heroes || []).includes(hero)) return true;
+    if (hero.statuses?.shielded || hero.buffs?.gou_protected) return true;
+    // Effekt-Immunität (Escape Device …) und Zielschutz „cannot be chosen or HIT" (Dive Down, Jetpack …): gelten nicht für Status-Ticks (wie der Schadenspfad).
+    if (type !== 'status' && type !== 'burn' && type !== 'poison') {
+      if (this.hasEffectImmunity(physOwner, heroIdx, source)) return true;
+      try {
+        if (this.heroBlocksTargeting(physOwner, heroIdx, {
+          sourceData: qName ? this._getCardDB()[qName] : null, damageType: type, cardName: qName || null, source,
+          chooserIdx: source?.controller ?? source?.owner ?? null, hit: true, festesZiel,
+        })) return true;
+      } catch { /* eine defekte Karte darf die Prüfung nicht sprengen */ }
+    }
+    // Generische Immunität (nach CC) und Status-Immunität je Schadenstyp (burn → burn_immune …).
+    if (hero.statuses?.immune) return true;
+    const statusByType = STATUS_EFFECTS?.[type] || STATUS_EFFECTS?.[type + 'ed'];
+    if (statusByType?.immuneKey && hero.statuses?.[statusByType.immuneKey]) return true;
+    // Burn-/Gift-Tick (Quelle „Burn"/„Poison"): ist der Held gegen den STATUS immun (Light Ball, Johanna, `negative_status_immune` …), gilt er als immun gegen diese Quelle.
+    const tick = Object.keys(STATUS_EFFECTS || {}).find(k => STATUS_EFFECTS[k].dealsTickDamage && qName && STATUS_EFFECTS[k].damageSourceName === qName) || null;
+    if (tick && this.heroBlocksStatusNow(physOwner, heroIdx, tick, { festesZiel })) return true;
+    // „Prevent any damage the Hero would take" (Storm Piano, Cheat Chair): `blocksDamage`-Status; Idas Zauberschaden schlägt ihn durch.
+    if (!idaDurch && this._schadensSchutzStatus(hero)) return true;
+    // Anti Magic (Stufenschranke) und „unaffected by all Spells" (Black-Thorn Dragon): unnegierbarer Schaden schlägt durch.
+    if (!nichtNegierbar && qName) {
+      if (this._wouldHeroDamageBeVoided(hero, source, type)) return true;
+      if (this._spellLevelAlsQuelle(qName, type, source) != null && this.heroHasSpellImmunity(physOwner, heroIdx)) return true;
+    }
+    // Carris: „any damage this Hero would take becomes 0" — unreduzierbarer/unnegierbarer Schaden trifft ihn (v1444).
+    if (!nichtNegierbar && !nichtReduzierbar && this._isHeroSelfDamageImmune(hero)) return true;
+    // Kontrolle (Deepsea Succubus/Little Lyta: „cannot take any damage") und Charme Lv 3; Ida durchschlägt nur die reine Schadens-Kontrolle.
+    if (this._charmBlocksFrom(hero, source?.controller ?? source?.owner, { loveShotOhneSchutz: true })
+        && !(hero.statuses?.charmed?.nurSchadenSchutz && idaDurch)) return true;
+    // Quellen-Immunität (Damus: „unaffected by Armageddon", solange …).
+    {
+      const sc = this.heroScript(hero);
+      const liste = sc?.immuneToSourceNames;
+      if (Array.isArray(liste) && typeof qName === 'string' && !stumm && liste.some(n => qName.includes(n))) {
+        let gilt = true;
+        if (typeof sc.immuneToSourceCondition === 'function') {
+          try { gilt = !!sc.immuneToSourceCondition(this, physOwner, heroIdx); } catch { gilt = false; }
+        }
+        if (gilt) return true;
+      }
+    }
+    // Versteinerung („takes no damage from any sources": Baihu, Petrifier); Ida durchschlägt sie.
+    if ((hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) && !idaDurch) return true;
+    // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
+    if (hero.buffs?.submerged && this.isSubmergedProtected(physOwner, hero, { festesZiel })) return true;
+    // Interference: voller Schutz (Stufe 2/3) gegen Flächenquellen, die mehrere Ziele treffen.
+    if ((this._multiHitScope?.total || 0) >= 2 && this.interferenceShare(physOwner, hero) >= 1) return true;
+    // Buff-Multiplikator 0 („Damage Immune" von String of Fine, Medusa's Curse): Senkungen wirken nicht gegen unreduzierbaren/unnegierbaren Schaden.
+    if (!nichtNegierbar && !nichtReduzierbar) {
+      for (const bd of Object.values(hero.buffs || {})) {
+        if (bd && bd.damageMultiplier === 0) return true;
+      }
+    }
+    // Heldenskript-Vertrag `heroTakesNoDamage` (Inya: lebender Fantasy Buddy). Ein Hook-Schild ruht bei Frost/Betäubung/Negierung und gegen unreduzierbaren Schaden.
+    if (!stumm && !nichtReduzierbar) {
+      const f = this.heroScript(hero)?.heroTakesNoDamage;
+      if (typeof f === 'function') {
+        try {
+          if (f(this, { hero, physOwner, heroIdx, controller: this.heroSideOf(physOwner, hero), source, type })) return true;
+        } catch (err) { console.error(`[heroTakesNoDamage] ${hero.name}:`, err.message); }
+      }
+    }
+    return false;
+  }
+
   _isHeroSelfDamageImmune(target) {
     if (!target || target.hp === undefined) return false;
     const owner = this._findHeroOwner(target);

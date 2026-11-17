@@ -10,19 +10,31 @@
 //    living Heroes (or every survivor immune to
 //    THIS source), the damage lands on Chuck.
 //
-//    "Immune to that source" matches the engine's
-//    own immunity catalogue:
-//     • dead (hp ≤ 0) — counted as immune (can't
-//       take damage). Ausnahme (28.9.): im selben
-//       Flaechenschlag gefallen = Tod nur vorgemerkt,
-//       zaehlt fuer die Berechnung noch als lebend.
-//     • full damage protections: shielded (turn-1),
-//       buffs.gou_protected, buffs.submerged
-//     • generic CC immune (statuses.immune)
-//     • per-status `_immune` flags routed by the
-//       damage type → STATUS_EFFECTS lookup
-//       (burn → burn_immune, poison → poison_immune,
-//       etc.)
+//    ★ Spielgestalter-Entscheidung 16.11.2026: JEDE Form von
+//    Schadensimmunitaet der anderen Helden zaehlt als „immune
+//    to that source". Chuck fragt dafuer das gemeinsame
+//    Praedikat der Engine (`engine.heroTakesNoDamageFromSource`,
+//    gespiegelt aus dem Helden-Schadenspfad): tot, Erstrunden-
+//    Schutz, Storm Piano/Cheat Chair (`blocksDamage`),
+//    Versteinerung (Baihu, Petrifier), Succubus-/Lyta-
+//    Kontrolle, Charme Lv 3, Carris, Inyas Fantasy Buddy
+//    (Heldenskript-Vertrag `heroTakesNoDamage`), Anti Magic,
+//    Light Ball/Status-Immunitaet bei Burn-/Gift-Ticks,
+//    Effekt-Immunitaet/Zielschutz „or HIT", Submerged,
+//    Interference, `damage_immune`/Medusa's Curse usw. Ein
+//    durchschlagender Quellheld (Ida) macht den Partner gegen
+//    SEINE Quelle NICHT immun (K1: `piercesDamageProtection`).
+//    Reine Reduktionen (Cloudy ×0.5 …) zaehlen nicht, sonst
+//    verlore Chuck seinen Schild gegen jede Quelle, die sein
+//    Team nur teilweise abmildert. Solange auch nur EIN anderer
+//    Held gegen die Quelle verwundbar ist, bleibt Chuck
+//    geschuetzt.
+//    „Unreduzierbarer Schaden toppt Schilde" (Spielgestalter-
+//    Entscheidung 16.11.2026): ist der Treffer unreduzierbar/
+//    unnegierbar („cannot be reduced or negated": Ida, Club of
+//    Gobbo …), greift Chucks Schild nicht; True Damage
+//    (Rockfall, Pressure Projectile, Surefire Shot, Acid Vial)
+//    laeuft ohnehin am `beforeDamage`-Pfad vorbei.
 //
 //  ② `ignoresOppUntargetable`: a generic engine
 //    flag (consumed in `_engine.js` ~line 2748)
@@ -51,48 +63,20 @@
 //  mirrors that with its own status check.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS } = require('./_hooks');
-
 const CARD_NAME = 'Chuck, the Crazy Veteran';
 
 /**
- * True iff `hero` is immune to damage of `type`. Mirrors the engine's
- * own check sites — we deliberately keep this conservative: only flags
- * the engine ALREADY uses to fully suppress damage are counted as
- * "immune". Buffs that merely reduce damage (Cloudy ×0.5, etc.) don't
- * qualify, otherwise Chuck would lose his shield against any source
- * his team has even partial mitigation for.
+ * True iff `hero` (Brettseite/Platz in `ort`) is immune to this damage source —
+ * delegiert an das gemeinsame Praedikat der Engine (siehe Kopfkommentar). Nur
+ * Zustaende, die den Schaden GANZ verhindern, zaehlen; Reduktionen nicht.
  */
-function _isImmuneToSource(hero, type, engine, festesZiel = false, source = null, durchschlag = false, ort = null) {
+function _isImmuneToSource(engine, hero, ort, ctx) {
   if (!hero) return true;
-  // Tot zaehlt als immun — AUSSER der Tod ist im laufenden
-  // Flaechenschlag nur vorgemerkt: dann steht der Held fuer die
-  // Schadensberechnung noch im Spiel (Todes-Aufschub 28.9.).
-  if (hero.hp <= 0 && !engine?.heldTodAufgeschoben?.(hero)) return true;
-  // Full damage protections — every one of these makes the hero take
-  // 0 damage from the engine's pipeline.
-  if (hero.statuses?.shielded) return true;
-  if (hero.buffs?.gou_protected) return true;
-  // Submerged schuetzt nicht gegen Einzelziel-Quellen und Rueckstoss
-  // (`engine.istEinzelzielTreffer`, Als Ruling 9.10.).
-  if (hero.buffs?.submerged && !festesZiel) return true;
-  // Generic immune (post-CC `immune` status, e.g. after a Frozen wears off).
-  if (hero.statuses?.immune) return true;
-  // Per-status immune flag, routed via the damage type. STATUS_EFFECTS
-  // is keyed by status NAME (e.g. 'burned'); the damage type tag is
-  // the past-tense root (e.g. 'burn'), so we match either the type
-  // itself or the type+'ed' form.
-  const statusByType = STATUS_EFFECTS?.[type] || STATUS_EFFECTS?.[type + 'ed'];
-  if (statusByType?.immuneKey && hero.statuses?.[statusByType.immuneKey]) return true;
-  // N5-06 (Al, Welle 25, „ja"): Anti Magic (`magic_immune`) macht den Helden gegen Zauber bis Stufe N immun - das zaehlt als „immun gegen diese
-  // Quelle" (dieselbe Pruefung wie die Engine-Schadenssperre, `_wouldHeroDamageBeVoided`; unabwehrbarer Schaden - `cannotBeNegated` - schlaegt durch).
-  if (!durchschlag && source && engine?._wouldHeroDamageBeVoided?.(hero, source, type)) return true;
-  // N5-06 Nachtrag (Al, Welle 25): Burn-/Gift-Schaden (Statustick, Quelle „Burn"/„Poison") - ist der Held gegen den STATUS immun (Light Ball, Immunitaets-Anhaengsel
-  // wie Petrification Break, Johanna, `negative_status_immune`, `burn_immune`/`poison_immune` ...), gilt er als immun gegen diese Quelle (`heroBlocksStatusNow`,
-  // dieselbe Pruefung wie beim Setzen des Status). `ort` = { physOwner, heroIdx } des Helden (Brettseite und Index).
-  const tick = Object.keys(STATUS_EFFECTS || {}).find(k => STATUS_EFFECTS[k].dealsTickDamage && source?.name && STATUS_EFFECTS[k].damageSourceName === source.name) || null;   // Quelle Burn -> burned, Poison -> poisoned
-  if (tick && ort && engine?.heroBlocksStatusNow?.(ort.physOwner, ort.heroIdx, tick, { festesZiel })) return true;
-  return false;
+  return !!engine.heroTakesNoDamageFromSource(ort.physOwner, ort.heroIdx, ctx.source, ctx.type, {
+    festesZiel: ctx.festesZiel,
+    cannotBeNegated: !!ctx.cannotBeNegated,
+    cannotBeReduced: !!ctx.cannotBeReduced,
+  });
 }
 
 module.exports = {
@@ -150,6 +134,10 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps) return;
 
+      // Spielgestalter-Entscheidung 16.11.2026: „Unreduzierbarer Schaden toppt Schilde" — ist der Treffer unreduzierbar/unnegierbar, hilft Chucks Schild nicht
+      // (`setAmount(0)` waere bei `cannotBeReduced` ohnehin wirkungslos; hier auch bei reinem `cannotBeNegated`, unabhaengig von der Hook-Reihenfolge).
+      if (ctx.cannotBeNegated || ctx.cannotBeReduced) { _diag('schild-durchschlagen'); return; }
+
       // Vacuous-truth case: no other living Heroes ⇒ "all others immune"
       // is trivially true ⇒ Chuck takes the hit. Game-balance lever:
       // Chuck-alone isn't an unbreakable wall.
@@ -166,7 +154,7 @@ module.exports = {
         // Mitspieler, der frueher im selben Flaechenschlag gefallen ist,
         // ist nur vorgemerkt und zaehlt hier noch als lebend.
         if (!h?.name || (h.hp <= 0 && !engine.heldTodAufgeschoben(h))) continue;
-        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated, ort)) {
+        if (!_isImmuneToSource(engine, h, ort, ctx)) {
           anyVulnerable = true;
           verwundbarerName = h.name;
           break;
@@ -178,7 +166,7 @@ module.exports = {
       } else {
         _diag('schild-faellt', {
           mitspieler: heroes.map(h => (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated, { physOwner: eintraege[heroes.indexOf(h)]?.physOwner, heroIdx: eintraege[heroes.indexOf(h)]?.heroIdx }) ? ' IMMUN' : ''}` : 'leer')),
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(engine, h, { physOwner: eintraege[heroes.indexOf(h)]?.physOwner, heroIdx: eintraege[heroes.indexOf(h)]?.heroIdx }, ctx) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },
