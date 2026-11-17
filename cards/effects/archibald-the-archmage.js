@@ -237,6 +237,9 @@ async function resolveTrigger(ctx, candidateNames) {
   // discarded as part of THAT can't kick off another resolveTrigger.
   if (gs._archibaldCasting) return;
 
+  // Spielgestalter-Entscheidung 17.11.2026 (G-01): "as an additional Action" ist eine Aktion — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar.
+  if (engine.areActionsBlocked(ctx.cardOwner)) return;
+
   // Filter to currently-eligible spells (re-evaluate at prompt time).
   // Dedupe by name — a player who discards two copies of the same
   // Normal Spell still gets only one gallery entry (and once cast,

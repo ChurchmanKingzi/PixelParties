@@ -3310,6 +3310,11 @@ Illusion is a Spell, and a Spell is an Action).
 The client receives the answer as the computed `actionLocked` boolean
 on the player state — same pattern as `potionLocked`.
 
+**„as an additional Action" ist eine Aktion (Spielgestalter-Entscheidung 17.11.2026, G-01):** Ein FREIER Effekt (Kreatur-Effekt, Held-Trigger), der
+einen Zauber/Angriff/eine Kreatur „as an additional Action" wirkt, unterliegt der Aktionssperre — er fragt `engine.areActionsBlocked(pi)` selbst, sobald er
+eine EIGENE Auswahlliste baut (Demon's Gate, Skeleton Wizard, Skeleton Priest: `canActivateCreatureEffect` + `onCreatureEffect`; Archibald, Rubin: am Auslöser).
+Wer `engine.getHeroEligibleActionCards`/`performImmediateAction` benutzt (Yukana, Junshi, Ellie, Coffee, Mana Beacon …), bekommt die Sperre dort schon geschenkt.
+
 ### Cancelling out of an additional Action
 
 Picking an Action and then backing out of **that Action's own** prompt
