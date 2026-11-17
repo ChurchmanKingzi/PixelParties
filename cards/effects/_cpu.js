@@ -3546,7 +3546,8 @@ function cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cardData) {
   // Any own-side or ownerless target = usable (buff / heal / area).
   if (targets.some(t => t.owner === cpuIdx || t.owner == null)) return true;
   // All remaining targets are enemy-side. At least one must be non-immune.
-  return targets.some(t => !isTargetImmune(engine, t));
+  const _td = cardDealsTrueDamage(cardName);
+  return targets.some(t => !isTargetImmune(engine, t, _td));
 }
 
 // ─── Ascension / virtual-school helpers ─────────────────────────────────
@@ -7425,6 +7426,7 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // blieben.
   const cardName = config.source || config.title;
   const cd = cardName ? engine._getCardDB()[cardName] : null;
+  const _trueDmg = cardDealsTrueDamage(cardName);
 
   // Per-card target override: cards can export `cpuResponse(engine, 'target',
   // { validTargets, config })` and return an array of selected IDs. Falls
@@ -7486,7 +7488,7 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // Simulate-and-score across the full pool. Drop fully immune
     // candidates first (sim would just return ~no delta for them),
     // then rank by eval delta, take top N for multi-select.
-    const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t));
+    const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t, _trueDmg));
     if (pool.length > 0) {
       // Maßstab „nichts passiert": `evaluateState` liegt in der Größenordnung von Tausend, ein Treffer ändert sie um Zehner. Ein
       // eigenes Ziel zählt nur, wenn der Treffer die Stellung gegenüber diesem Ausgangswert VERBESSERT (Soul Shard in der Ablage
@@ -7622,13 +7624,14 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
       quelle: cardName ? { name: cardName, owner: cpuIdx, controller: cpuIdx, heroIdx: -1 } : null,
       damageType: config.damageType || (cd?.cardType === 'Attack' ? 'attack' : 'destruction_spell'),
       cancellable: config.cancellable !== false,
+      trueDamage: _trueDmg,
     };
     const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz, _aoeOpts);
     if (picks.length) return picks.map(p => p.id);
     // All enemy targets are immune. If the prompt is cancellable, decline
     // to avoid wasting the Attack/Spell/effect; the card stays in hand.
     // If it's not cancellable, fall through so we still pick SOMETHING.
-    const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t));
+    const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t, _trueDmg));
     if (allEnemyImmune && config.cancellable !== false) return [];
   }
 
@@ -9218,7 +9221,16 @@ function simulateDamageTargetScore(engine, target, damage, ownerIdx) {
 //   • creature that's face-down (surprise), targeting_immune, control_immune,
 //     _cardinalImmune, or _baihuPetrify
 // Conservative: when in doubt, treat as non-immune so we don't over-skip.
-function isTargetImmune(engine, target) {
+// Spielgestalter-Entscheidung 17.11.2026: True Damage („cannot be reduced or negated": Rockfall, Pressure Projectile, Acid Vial, Surefire Shot …) durchschlaegt die Versteinerung
+// (Baihu/Petrifier) – die CPU betrachtet versteinerte Kreaturen (und Helden) dafuer als regulaere Ziele.
+const CPU_TRUE_DAMAGE_KARTEN = new Set(['Rockfall', 'Pressure Projectile', 'Acid Vial', 'Surefire Shot', 'Piercer of Heavens', 'Glasowt']);   // Quellen ueber `engine.actionDealTrueDamage` („cannot be reduced or negated", Versteinerung durchschlagen)
+function cardDealsTrueDamage(cardName) {
+  if (!cardName) return false;
+  if (CPU_TRUE_DAMAGE_KARTEN.has(cardName)) return true;
+  try { return !!loadCardEffect(cardName)?.damageCannotBeReducedOrNegated; } catch { return false; }
+}
+
+function isTargetImmune(engine, target, trueDamage = false) {
   const gs = engine.gs;
   if (!target) return false;
   if (target.owner != null && gs.firstTurnProtectedPlayer === target.owner) return true;
@@ -9227,7 +9239,7 @@ function isTargetImmune(engine, target) {
     const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero || hero.hp <= 0) return true;
     if (hero.statuses?.immune) return true;
-    if (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) return true;   // v1085
+    if (!trueDamage && (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify)) return true;   // v1085 (True Damage durchschlaegt, s. cardDealsTrueDamage)
     if (hero.charmedBy != null && hero.charmedBy !== target.owner) return true;
     // Submerged (Als Demo-Befund, damage_blocked reason 'submerged'):
     // die Engine blockt Schaden UND Status-Effekte auf getauchte
@@ -9249,7 +9261,7 @@ function isTargetImmune(engine, target) {
     if (inst.counters?.targeting_immune) return true;
     if (inst.counters?.control_immune) return true;
     if (inst.counters?._cardinalImmune) return true;
-    if (inst.counters?._petrified || inst.counters?._baihuPetrify) return true;   // v1085
+    if (!trueDamage && (inst.counters?._petrified || inst.counters?._baihuPetrify)) return true;   // v1085 (True Damage durchschlaegt, s. cardDealsTrueDamage)
     // Registry-Audit (Als Auftrag): golden_wings setzt zusätzlich
     // untargetable_by_opponent — für Ziele der GEGENSEITE immun (eigene
     // Kreaturen mit dem Counter bleiben für den Besitzer wählbar).
@@ -9374,7 +9386,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
   // and the user explicitly wants to avoid wasting effects on them. If this
   // empties the pool, the caller (cpuPickTargets) will decline cancellable
   // prompts, which cancels the spell and leaves the card in hand.
-  let viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
+  let viable = enemyTargets.filter(t => !isTargetImmune(engine, t, !!aoeOpts?.trueDamage));
   if (viable.length === 0) return [];
   // ★ W83a (Al 27.10.2026: "Geschuetzte, die bereits zum Zeitpunkt der Evaluation geschuetzt sind, sollen ueberall nicht einbezogen werden"): Kreaturen, die die Wirkung nachweislich nicht
   // nehmen (SICHERER Schutz laut `engine.kreaturGeschuetztVor`: Schadensimmunitaet, Anti Magic, Erstrunden-Schutz, Zielschutz …), fallen als Ziel heraus; WEICH Geschuetzte (bereite
