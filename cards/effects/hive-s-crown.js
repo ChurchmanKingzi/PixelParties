@@ -22,6 +22,7 @@
 // ═══════════════════════════════════════════
 
 const { HOOKS } = require('./_hooks');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 const {
   QUEEN_NAME,
   findControlledQueen,
@@ -44,9 +45,12 @@ function queenSourcesFor(gs, ps, candidateInst, engine) {
     || (!!engine && pi >= 0 && engine.isCreationZoneUsable(pi) && (ps?.creationZone || []).includes(QUEEN_NAME));
   const inDeck = (ps?.mainDeck || []).includes(QUEEN_NAME);
   const wasSummonedThisTurn = candidateInst?.turnPlayed === (gs.turn || 0);
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, ist nur einer frei, wird er automatisch genommen — `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck
+  // verlassen; der Weg „aus dem Deck" ist dann zu (früher wurde er angeboten, das Opfer gebracht und die Queen blieb im Deck: `deck_locked`).
+  const deckGesperrt = !!engine && pi >= 0 && deckAusgangGesperrt(engine, pi);
   return {
     hand: inHand,
-    deck: inDeck && !wasSummonedThisTurn,
+    deck: inDeck && !wasSummonedThisTurn && !deckGesperrt,
   };
 }
 
