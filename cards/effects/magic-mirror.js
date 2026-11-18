@@ -24,6 +24,11 @@
 //  • Zauber, die sich selbst in einen Stapel schreiben („Delete this card": Forbidden Zone, Liberation, Meditation …): `kopieStapelBereinigen` nimmt
 //    nach dem Wirken genau die Einträge wieder heraus, die der Stapelstand des Spiegel-Besitzers durch die Kopie zusätzlich bekam.
 //  Das ORIGINAL des negierten Zaubers geht wie immer in den Stapel seines Besitzers.
+//
+//  ── AKTIONSSPERRE (Spielgestalter-Entscheidung 18.11.2026) ──
+//  „the user immediately performs a copy of it as an additional Action" ist eine Aktion: ist der Besitzer des Spiegels aktionsgesperrt (`engine.areActionsBlocked(ownerIdx)`:
+//  Overflowing Chalice, Kents Negativ-Gold-Sperre, `_playerActionLockedTurn`, `ps.actionLocked`), wird die KOPIE nicht gewirkt (keine Kosten, kein Einmal-Stempel, kein Kettenfenster).
+//  Der Zauber wird trotzdem negiert und die Pollution Tokens werden trotzdem gelegt — nur die Kopie entfällt.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -176,6 +181,11 @@ module.exports = {
     // mehr (`spellPlayCondition` der Kostenzahler) oder bricht der Spieler die Kostenwahl ab (`false`), gibt es keine Kopie —
     // das Original bleibt negiert.
     let kopieMoeglich = !!script?.hooks?.onPlay;
+    // Spielgestalter-Entscheidung 18.11.2026: unter einer Aktionssperre des Besitzers entfällt NUR die Kopie (Negation und Pollution Tokens bleiben) — siehe Kopf.
+    if (kopieMoeglich && engine.areActionsBlocked(ownerIdx)) {
+      kopieMoeglich = false;
+      engine.log('magic_mirror_copy_blocked', { player: gs.players[ownerIdx]?.username, spell: sourceCard, reason: 'actions_blocked' });
+    }
     let synthInstVorab = null;
     if (kopieMoeglich && eigenesLimitVerbraucht(gs, ownerIdx, script, sourceCard)) kopieMoeglich = false;
     if (kopieMoeglich && typeof script.payActivationCost === 'function' && script.payActivationCost.length <= 1) {

@@ -3319,6 +3319,12 @@ einen Zauber/Angriff/eine Kreatur „as an additional Action" wirkt, unterliegt 
 eine EIGENE Auswahlliste baut (Demon's Gate, Skeleton Wizard, Skeleton Priest: `canActivateCreatureEffect` + `onCreatureEffect`; Archibald, Rubin: am Auslöser).
 Wer `engine.getHeroEligibleActionCards`/`performImmediateAction` benutzt (Yukana, Junshi, Ellie, Coffee, Mana Beacon …), bekommt die Sperre dort schon geschenkt.
 
+**Aktionssperre bei Ghostly Warning, Atta und Magic Mirror (Spielgestalter-Entscheidung 18.11.2026):** (1) Die verzögerte RÜCKKEHR des Zaubers (`_verzoegert-zauber-shared.js`; Kartentext „… and even if you could not perform any Actions that turn") wird von keiner
+Aktionssperre blockiert — dort bewusst kein `areActionsBlocked`-Tor, und der Guss läuft über `_castSpellImmediately` ohne `opts.pruefen`. Das VORMERKEN ist dagegen nur ohne Sperre möglich: Ghostly Warning (`reactionCondition`) wird nicht angeboten, Atta
+(`onCardsRevealed`) löscht nicht (Einmal-Sperre bleibt frei); ein schon vorgemerkter Zauber bleibt vorgemerkt. Gemeint ist die spielerweite Sperre (`areActionsBlocked`), nicht die einzelner Helden (`hero._actionLockedTurn`). Zusatzaktionen, die der zurückgekehrte
+Zauber SELBST wirkt (Time Distortion, Chaos Magic …), unterliegen weiter ihren normalen Regeln. (2) Magic Mirror: ist sein Besitzer aktionsgesperrt, entfällt NUR die Kopie („performs a copy of it as an additional Action"); der Zauber wird weiter negiert, die Pollution Tokens
+werden weiter gelegt. Clone, Idej Sword Kunagi und `_second-target-shared` (Bartas, Grisgar, Andras) prüfen die spielerweite Sperre (`areActionsBlocked`) bei ihrer Kopie/Wiederholung bisher nicht (Saya schon) — offen, keine Entscheidung.
+
 ### Cancelling out of an additional Action
 
 Picking an Action and then backing out of **that Action's own** prompt
