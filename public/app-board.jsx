@@ -2839,6 +2839,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     // preventDefault: der Browser behaelt den Wisch fuers native
     // Scrollen. Maus-Drag am Desktop war nie betroffen.
     if (e.touches && _ppPanelHatScrollbaresKind(panelRef.current)) return;
+    // ★ X2: Mausdruck auf der Bildlaufleiste eines Scrollbereichs im Fenster (Text, Antwortliste, Innenschicht): die Leiste ziehen, nicht das Fenster.
+    { const t = e.target; if (!e.touches && t && t.nodeType === 1 && t.scrollHeight > t.clientHeight + 1 && e.nativeEvent && e.nativeEvent.offsetX > t.clientWidth && /(auto|scroll)/.test(getComputedStyle(t).overflowY)) return; }
     // Don't start a drag when the pointer-down lands on an interactive
     // form control. `preventDefault()` below would otherwise swallow the
     // native mousedown that opens a <select> dropdown, focuses an <input>,
@@ -2869,11 +2871,24 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
     : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
+  // ★ Handy-Befund X2 (Duell-Dialoge höher als der Bildschirm): Jedes Duell-Fenster der Familie `.first-choice-panel` bekommt eine INNENSCHICHT (`.fcp-inhalt`), die höchstens bis
+  // zur Bildschirmhöhe wächst und darüber innen scrollt (CSS bei `.fcp-hat-inhalt`). Der Rahmen mit Eck-Ornamenten (`::after`) bleibt am Außenelement und scrollt nicht mit.
+  // Ausgenommen: die Zielwahl-Fenster (`zielwahl`; ihre Lage, die randbündige Kartenvorschau und die Griffe hängen an der Außenform) und die Fenster mit eigener Aufteilung
+  // (`fcp-begrenzt`: Auswahl/Ja-Nein/Spieler-/Statuswahl scrollen Text und Antwortliste getrennt, Titel und Knöpfe bleiben stehen). Die Zeilen-Aufteilung, die ein Aufrufer am
+  // Fenster setzt (`display: flex; gap; alignItems` …), gehört an die Innenschicht, alles andere bleibt am Außenelement.
+  const fcpInnen = !zielwahl && /(^|\s)first-choice-panel(\s|$)/.test(className || '') && !/(^|\s)fcp-begrenzt(\s|$)/.test(className || '');
+  let aussenStil = style, innenStil;
+  if (fcpInnen && style) {
+    aussenStil = { ...style }; innenStil = {};
+    for (const k of ['display', 'flexDirection', 'flexWrap', 'gap', 'rowGap', 'columnGap', 'alignItems', 'alignContent', 'justifyContent']) {
+      if (k in aussenStil) { innenStil[k] = aussenStil[k]; delete aussenStil[k]; }
+    }
+  }
   return (
-    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '') + (fcpInnen ? ' fcp-hat-inhalt' : '')} style={{ ...aussenStil, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
       data-zieht={dragging ? '1' : undefined}
       onMouseDown={onDown} onTouchStart={phoneP ? undefined : onDown} onClick={e => e.stopPropagation()}>
-      {children}
+      {fcpInnen ? <div className="fcp-inhalt" style={innenStil}>{children}</div> : children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
     </div>
@@ -37301,10 +37316,11 @@ function StatusSelectPrompt({ ep, onRespond }) {
   }, [localSelected, onRespond]);
 
   return (
-    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#3ddc57', minWidth: 260 }}>
+    // ★ X2: `fcp-begrenzt` (Aufteilung wie Auswahl/Ja-Nein): bei vielen Status scrollt NUR die Liste, Titel, Text und „Confirm"/„Back" bleiben sichtbar.
+    <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: '#3ddc57', minWidth: 260, display: 'flex', flexDirection: 'column' }}>
       <div className="orbit-font" style={{ fontSize: 13, color: '#3ddc57', marginBottom: 4 }}>{ep.title}</div>
-      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+      <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+      <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {(ep.statuses || []).map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
             background: localSelected.includes(s.key) ? 'rgba(61,220,87,.15)' : 'rgba(255,255,255,.03)',
@@ -37318,7 +37334,7 @@ function StatusSelectPrompt({ ep, onRespond }) {
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14 }}>
         <button className="btn btn-success" style={{ padding: '6px 20px', fontSize: 11 }}
           onClick={() => onRespond({ selectedStatuses: localSelected })}>
           {ep.confirmLabel || 'Confirm'}
@@ -62675,10 +62691,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Player Picker ── */}
       {isMyEffectPrompt && ep.type === 'playerPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+        // ★ X2: `fcp-begrenzt` wie Auswahl/Ja-Nein (Text und Spielerliste scrollen getrennt, Titel und „Abbrechen" bleiben stehen) — bei vielen Mitspielern wurde die Liste höher als der Bildschirm.
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
-          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {ep.description && <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(Array.isArray(ep.allowedPlayers) && ep.allowedPlayers.length ? ep.allowedPlayers : gameState.players.map((_, i) => i))
               // `opponentFirst`: die Gegner zuerst, man selbst zuletzt (Divine Gift of Fire)
               .slice().sort((a, b) => (ep.opponentFirst ? (a === myIdx) - (b === myIdx) : 0))
@@ -62710,11 +62727,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </button>
               );
             })}
-            {ep.cancellable !== false && (
-              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
-            )}
           </div>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 14 }}
+              onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
+          )}
         </DraggablePanel>
       )}
 
@@ -62740,7 +62757,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // don't need to lift state; the initial value is the first option.
             <OptionPickerDropdown ep={ep} respondToPrompt={respondToPrompt} />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            // ★ X2: Antwortliste (`fcp-liste`) und „Abbrechen" getrennt: Passen Titel + Text + Optionen + Abbrechen nicht in den Bildschirm, scrollt NUR die Liste (und der Text, siehe
+            // style.css bei `.fcp-begrenzt`); „Abbrechen" und der Titel bleiben sichtbar.
+            <>
+              <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(ep.options || []).map(opt => {
                 // Resolve a tooltip card: explicit `opt.tooltipCardName` wins,
                 // else auto-detect any CARDS_BY_NAME key mentioned in the
@@ -62763,11 +62783,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </button>
                 );
               })}
+              </div>
               {ep.cancellable !== false && (
-                <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 12 }}
                   onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
-            </div>
+            </>
           )}
           </div>
           {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
@@ -63729,8 +63750,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#66ffa2' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4, textShadow: '0 0 8px rgba(102,255,162,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          {/* ★ X2: `.attach-pick-kartenzeile` (style.css): auf niedrigen Fenstern (Handy quer) entfällt die Karte — das Fenster war mit ihr 327 px hoch (Bildschirm 320 px); die Beschreibung nennt die Fähigkeit ("Attach Fighting to …"), wie bei den übrigen Zielwahl-Fenstern, bei denen die Vorschau dort entfällt. */}
           {ep.cardName && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+            <div className="attach-pick-kartenzeile" style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
               <BoardCard cardName={ep.cardName} rarity={ppRarityLookup(ep.cardName, myIdx)} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
             </div>
           )}
