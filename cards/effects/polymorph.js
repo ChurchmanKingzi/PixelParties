@@ -19,6 +19,12 @@
 //  (`anhaengselStatusHooks`, `heilenWirftAb`): wird er GEHEILT (Juice, Beer, Cure, Exorcism …), fällt Polymorph in die Ablage seines Besitzers (der Spieler, der es gespielt hat);
 //  verlässt die Karte den Helden aus anderem Grund, endet der Status mit ihr.
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ────────────────
+//  „Polymorphed" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen `attach:<instId>`-Eintrag
+//  („Polymorphed (Polymorph)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers (der +100-ATK-Bonus ruht mit dem Status und
+//  wird dabei nicht angefasst); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `polymorphed` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt,
+//  solange der Wirt `polymorphed` trägt).
+//
 //  ── „CANNOT USE ANY SPELLS" ─────────────────────────────────────────────
 //  Dieselben Sperr-Stellen wie `magic_silenced`/`frightened` (`validateActionPlay`, Hand-Grau, Reaktions-/Surprise-Wirker, `heroKannZaubern` für sofortige Zauber): der Held wirkt weder
 //  Spells aus der Hand noch Reaction-/Surprise-Spells, noch zusätzliche Aktionen als Spell. Attacks, Creatures, Abilities, Artefakte und Heldeneffekte bleiben frei.
@@ -110,6 +116,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,            // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Polymorphed (Polymorph)',
+  negativeStatusIcon: '🐱',
   // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts; der +100-ATK-Bonus hängt am Status (kommt mit ihm, geht mit ihm).
   statusFolgtImmunitaet: {
     status: STATUS_NAME,
