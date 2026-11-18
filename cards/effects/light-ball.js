@@ -31,6 +31,25 @@
 //    cleansable negative status. The host Hero is
 //    NOT cleansed (own card text — "all OTHER
 //    targets").
+//  • Spielgestalter-Entscheidung 18.11.2026: Die Anlege-
+//    Heilung räumt auch alle im Moment des Anlegens AKTIVEN
+//    Status-Anhängsel ab (Curse, Berserk, Polymorph, Shrink,
+//    The Master's Orders, Forbidden Curse of Aging, Mind
+//    Control, Stowaway, Decisive Defeat): die Karte geht in
+//    die Ablage ihres ursprünglichen Besitzers (Stowaway:
+//    gelöscht), der Status endet samt Nebenwirkungen. Damit die
+//    neue Immunität sie nicht vorher ruhen lässt, hält die
+//    Karte den Status-Abgleich der Anhängsel (`abgleichHalten`,
+//    `_attachment-shared.js`) von der Platzierung bis zum Ende
+//    der Heilung an; danach läuft er nach (was die Heilung
+//    stehen ließ — z. B. wegen der Sperre eines aktiven Forbidden
+//    Curse of Aging —, ruht dann unter der Immunität). Schon
+//    RUHENDE Anhängsel (Held steht z. B. unter Johannas Schutz)
+//    nimmt die Heilung mit: sie stehen in denselben Heil-Listen
+//    (`heroHatRuhendesAnhaengsel`). Ein Held unter Mind Control
+//    zählt wie bei der Immunität als Held seines früheren
+//    Kontrolleurs (`heldenFuerImmunitaet`): die Karte geht ab,
+//    die Kontrolle kehrt zurück.
 //  • No card-side hook handles the persistent
 //    protection — the engine gates are
 //    sufficient. When Light Ball leaves the
@@ -60,7 +79,7 @@
 
 const { getCleansableStatuses } = require('./_hooks');
 
-const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { attachmentHostsFor, attachToHero, abgleichHalten, heldenFuerImmunitaet } = require('./_attachment-shared');
 const CARD_NAME = 'Light Ball';
 
 /** First free Support Zone slot on `heroIdx` of `ps`, or -1. */
@@ -70,6 +89,64 @@ function findFreeSlot(ps, heroIdx) {
     if (((sz[si] || []).length) === 0) return si;
   }
   return -1;
+}
+
+/**
+ * Anlege-Heilung: „Heal all other targets you control from all negative status effects" (siehe Kopf). Läuft bei angehaltenem Status-Abgleich (`abgleichHalten`),
+ * sieht also die im Moment des Anlegens aktiven Status-Anhängsel. `destSeite`/`destHero` = der Wirt der Karte (nicht betroffen).
+ */
+async function heileAndereZiele(engine, pi, destSeite, destHero) {
+  const ps = engine.gs.players[pi];
+  const cleansable = getCleansableStatuses();
+  let anyCleansed = false;
+
+  // Kontrolle statt Seite (Styx 28.9.): alle Helden, die ich
+  // KONTROLLIERE — Statuszugriff ueber die physische Seite.
+  // Dazu ein Held unter Mind Control, der fuer die Immunitaet als mein Held gilt (18.11.2026).
+  const helden = engine.heroesControlledBy(pi).slice();
+  for (const e of heldenFuerImmunitaet(engine, pi)) if (!helden.some(h => h.hero === e.hero)) helden.push(e);
+  for (const { physOwner, heroIdx: hi, hero: ally } of helden) {
+    if (physOwner === destSeite && hi === destHero) continue; // host not covered
+    if (!ally?.name || ally.hp <= 0) continue;
+    if (!ally.statuses) continue;
+    // 18.11.2026: auch ein Held, der nur ein RUHENDES Status-Anhaengsel traegt (z. B. unter Johannas Schutz), ist ein Ziel der Heilung.
+    const ruhend = engine.heroHatRuhendesAnhaengsel(physOwner, hi);
+    if (!ruhend && !cleansable.some(k => ally.statuses[k])) continue;
+    const removed = engine.cleanseHeroStatuses(
+      ally, physOwner, hi, cleansable, CARD_NAME,
+    );
+    if ((removed || []).length === 0 && !ruhend) continue;
+    anyCleansed = true;
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'gold_sparkle', owner: physOwner, heroIdx: hi, zoneSlot: -1,
+    });
+  }
+
+  for (const allyInst of engine.cardInstances) {
+    if (allyInst.zone !== 'support') continue;
+    if ((allyInst.controller ?? allyInst.owner) !== pi) continue;
+    if (allyInst.faceDown) continue;
+    // Light Ball itself + Bakhm-attached Surprises aren't
+    // creatures — getCleansableCreatureStatusKeys filters them
+    // out naturally (it reads inst.counters and the engine's
+    // creature-status convention).
+    const keys = engine.getCleansableCreatureStatusKeys(allyInst);
+    if (keys.length === 0) continue;
+    const removed = await engine.cleanseCreatureStatusesGefragt(
+      allyInst, keys, CARD_NAME,
+    );
+    if ((removed || []).length === 0) continue;
+    anyCleansed = true;
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'gold_sparkle', owner: allyInst.owner,
+      heroIdx: allyInst.heroIdx, zoneSlot: allyInst.zoneSlot,
+    });
+  }
+
+  if (anyCleansed) {
+    engine.log('light_ball_cleanse', { player: ps.username });
+    await engine._delay(350);
+  }
 }
 
 module.exports = {
@@ -120,86 +197,48 @@ module.exports = {
       // (`_autoSlot`); clicking a specific empty slot attaches there
       // directly. Same shape Modnir / Bill / Curse / Berserk all use.
       // v650: Anlegen ueber den geteilten Vorgang (eigene Helden).
-      const res = await attachToHero(ctx, CARD_NAME, {
-        preferCaster: true,
-        description: 'Choose a Hero you control (leftmost free Support Zone) or a specific empty Support Zone to attach Light Ball to.',
-        confirmLabel: '💡 Attach!', skipEnterHook: true,
-      });
-      if (!res) return;
-      const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
-      const destSeite = res.host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
-      const destHeroObj = gs.players[destSeite]?.heroes?.[destHero];
-
-      // Attach burst — warm gold sparkles on the host Hero.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: destSeite, heroIdx: destHero, zoneSlot: -1,
-      });
-      await engine._delay(400);
-
-      await engine.runHooks('onCardEnterZone', {
-        enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
-        _skipReactionCheck: true, _anhaengselAnleger: pi,
-      });
-
-      // ── On-attach cleanse ──
-      // "Heal all other targets you control from all negative status
-      // effects" — fires once at attach. Iterates OTHER own Heroes
-      // (alive) and every face-up Creature on the caster's side.
-      // Uses the engine's standard `cleanseHeroStatuses` /
-      // `cleanseCreatureStatuses` helpers so `_viaCleanse`-aware
-      // listeners (Curse's onStatusRemoved, Berserk's destroy
-      // cascade, …) fire correctly. Each cleansed slot gets a small
-      // golden sparkle so the heal reads visually per-target.
-      const cleansable = getCleansableStatuses();
-      let anyCleansed = false;
-
-      // Kontrolle statt Seite (Styx 28.9.): alle Helden, die ich
-      // KONTROLLIERE — Statuszugriff ueber die physische Seite.
-      for (const { physOwner, heroIdx: hi, hero: ally } of engine.heroesControlledBy(pi)) {
-        if (physOwner === destSeite && hi === destHero) continue; // host not covered
-        if (!ally?.name || ally.hp <= 0) continue;
-        if (!ally.statuses) continue;
-        if (!cleansable.some(k => ally.statuses[k])) continue;
-        const removed = engine.cleanseHeroStatuses(
-          ally, physOwner, hi, cleansable, CARD_NAME,
-        );
-        if ((removed || []).length === 0) continue;
-        anyCleansed = true;
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'gold_sparkle', owner: physOwner, heroIdx: hi, zoneSlot: -1,
+      // 18.11.2026: ab der Platzierung ruht der Status-Abgleich der Anhaengsel, bis die Anlege-Heilung gelaufen ist (s. Kopf).
+      let abgleichFrei = null;
+      try {
+        const res = await attachToHero(ctx, CARD_NAME, {
+          preferCaster: true,
+          description: 'Choose a Hero you control (leftmost free Support Zone) or a specific empty Support Zone to attach Light Ball to.',
+          confirmLabel: '💡 Attach!', skipEnterHook: true,
+          nachPlatzierung: () => { abgleichFrei = abgleichHalten(engine); },
         });
-      }
+        if (!res) return;
+        const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
+        const destSeite = res.host.owner;   // Brettseite (Als Vorgabe 29.9.: auch ein uebernommener Held)
+        const destHeroObj = gs.players[destSeite]?.heroes?.[destHero];
 
-      for (const allyInst of engine.cardInstances) {
-        if (allyInst.zone !== 'support') continue;
-        if ((allyInst.controller ?? allyInst.owner) !== pi) continue;
-        if (allyInst.faceDown) continue;
-        // Light Ball itself + Bakhm-attached Surprises aren't
-        // creatures — getCleansableCreatureStatusKeys filters them
-        // out naturally (it reads inst.counters and the engine's
-        // creature-status convention).
-        const keys = engine.getCleansableCreatureStatusKeys(allyInst);
-        if (keys.length === 0) continue;
-        const removed = await engine.cleanseCreatureStatusesGefragt(
-          allyInst, keys, CARD_NAME,
-        );
-        if ((removed || []).length === 0) continue;
-        anyCleansed = true;
+        // Attach burst — warm gold sparkles on the host Hero.
         engine._broadcastEvent('play_zone_animation', {
-          type: 'gold_sparkle', owner: allyInst.owner,
-          heroIdx: allyInst.heroIdx, zoneSlot: allyInst.zoneSlot,
+          type: 'gold_sparkle', owner: destSeite, heroIdx: destHero, zoneSlot: -1,
         });
-      }
+        await engine._delay(400);
 
-      if (anyCleansed) {
-        engine.log('light_ball_cleanse', { player: ps.username });
-        await engine._delay(350);
-      }
+        await engine.runHooks('onCardEnterZone', {
+          enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
+          _skipReactionCheck: true, _anhaengselAnleger: pi,
+        });
 
-      engine.log('light_ball_attached', {
-        player: ps.username, hero: destHeroObj.name,
-      });
-      engine.sync();
+        // ── On-attach cleanse ──
+        // "Heal all other targets you control from all negative status
+        // effects" — fires once at attach. Iterates OTHER own Heroes
+        // (alive) and every face-up Creature on the caster's side.
+        // Uses the engine's standard `cleanseHeroStatuses` /
+        // `cleanseCreatureStatuses` helpers so `_viaCleanse`-aware
+        // listeners (Curse's onStatusRemoved, Berserk's destroy
+        // cascade, …) fire correctly. Each cleansed slot gets a small
+        // golden sparkle so the heal reads visually per-target.
+        await heileAndereZiele(engine, pi, destSeite, destHero);
+
+        engine.log('light_ball_attached', {
+          player: ps.username, hero: destHeroObj.name,
+        });
+      } finally {
+        if (abgleichFrei) { abgleichFrei(); engine.sync(); }   // Abgleich laeuft nach: was die Heilung stehen liess, ruht jetzt unter der Immunitaet
+      }
     },
   },
 };
