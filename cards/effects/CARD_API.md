@@ -3465,7 +3465,7 @@ Mind Control: die **Kontrolle** hängt am Status, ist aber asynchron — `kontro
 Zugbeginn/-ende, nach jeder aufgelösten Aktion); der Status-Abgleich der Engine (`sync`) setzt/nimmt nur den Status. Die Kontrolle, die die Karte selbst ausübt, zählt für die Immunität des Wirts nicht (`kontrolleAls`, s. u.).
 
 * **Vertrag am Kartenskript:** `statusFolgtImmunitaet: { status, extras?, einsetzen?(engine, inst, hero, seite, heroIdx), ruhen?(…), kontrolleAls?(engine, inst, seite, heroIdx) }` (`_attachment-shared.js`).
-  `kontrolleAls` (nur Mind Control) liefert den Spieler, als dessen Held der Wirt für die Immunitäts-Prüfung beurteilt wird (`heroBlocksStatusNow(…, { kontrolleAls })`: Johanna und Light Ball schützen „Heroes you control") — sonst schützte die Johanna/der Light Ball des Übernehmers den
+  `kontrolleAls` (Mind Control, The Master's Orders) liefert den Spieler, als dessen Held der Wirt für die Immunitäts-Prüfung beurteilt wird (`heroBlocksStatusNow(…, { kontrolleAls })`: Johanna und Light Ball schützen „Heroes you control") — sonst schützte die Johanna/der Light Ball des Übernehmers den
   übernommenen Helden vor der Übernahme selbst, und sie flackerte an und aus. `einsetzen`/`ruhen` sind synchrone Nebenwirkungen
   nach dem Setzen bzw. Wegnehmen des Status (Idempotenz!; Beispiele: Polymorph bucht/nimmt den +100-ATK-Bonus, Curse sichert/gibt die ATK). Das Anlegen läuft über `setzeOderRuhe(engine, inst, status, extras)` bzw. meldet sein Ergebnis mit `statusErgebnisBuchen(engine, inst, gesetzt, owner, heroIdx, status)`.
 * **Der Abgleich** `statusAnhaengselAbgleichen` läuft in jedem `engine.sync()` (auch in Simulationen): holt ruhende Status nach, sobald die Immunität endet, und nimmt sie weg, wenn sie beginnt (bis zu 3 Durchgänge, weil Johannas
