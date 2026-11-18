@@ -364,6 +364,9 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
     if (hi >= 0) { pool.splice(hi, 1); engine.notePlayedFromHand?.(pi); }
     ps._resolvingCard = null;
   }
+  // 18.11.2026 (Light Ball): die Karte liegt in der Zone, der Status-Abgleich (`engine.sync`) ist noch nicht gelaufen — `opts.nachPlatzierung(inst)` darf ihn anhalten (`abgleichHalten`),
+  // damit eine Anlege-Heilung die in diesem Moment AKTIVEN Status-Anhängsel noch sieht, bevor die neue Immunität sie ruhen lässt.
+  if (typeof opts.nachPlatzierung === 'function') opts.nachPlatzierung(inst);
   engine.sync();
   if (opts.animationType) {
     engine._broadcastEvent('play_zone_animation', { type: opts.animationType, owner: host.owner, heroIdx: host.heroIdx, zoneSlot: opts.animOnHero ? -1 : slot });
@@ -635,7 +638,7 @@ function _abgleichGruppe(engine, g) {
  * solche Karten auf dem Brett ein Durchlauf der Kartenliste. Sperre gegen Selbstaufruf (die Nebenwirkungen rufen `sync`).
  */
 function statusAnhaengselAbgleichen(engine) {
-  if (engine._anhStatusLaeuft) return;
+  if (engine._anhStatusLaeuft || engine._anhAbgleichHalt > 0) return;
   let gruppen = null;
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
@@ -662,8 +665,42 @@ function statusAnhaengselAbgleichen(engine) {
   }
 }
 
+/**
+ * Spielgestalter-Entscheidung 18.11.2026 (Light Ball: „Heal all other targets you control …" räumt auch Curse, Berserk, Polymorph, Shrink … ab, die im Moment des Anlegens AKTIV sind):
+ * hält den Status-Abgleich an, bis die zurückgegebene Freigabe aufgerufen wird (Zähler; immer in `try/finally` freigeben). Solange er ruht, bleibt ein Status, den die neue Immunität
+ * gleich ruhen ließe, aktiv — die Heilung sieht ihn und kann die Karte abräumen; die Freigabe lässt den Abgleich nachlaufen (danach ruht, was die Heilung stehen ließ, z. B. durch die Sperre von Aged).
+ */
+function abgleichHalten(engine) {
+  engine._anhAbgleichHalt = (engine._anhAbgleichHalt || 0) + 1;
+  let frei = false;
+  return () => {
+    if (frei) return;
+    frei = true;
+    engine._anhAbgleichHalt = Math.max(0, (engine._anhAbgleichHalt || 0) - 1);
+  };
+}
+
+/**
+ * Helden, die für `pi` als SEINE Ziele gelten, obwohl eine Status-Karte sie gerade führt: ein Held unter Mind Control gilt für die Status-Immunität als Held seines Kontrolleurs VOR der
+ * Übernahme (`statusFolgtImmunitaet.kontrolleAls`) — Light Ball (`pi`) schützt und heilt ihn also, obwohl `engine.heroesControlledBy(pi)` ihn nicht mehr führt. Gibt [{ physOwner, heroIdx, hero }].
+ */
+function heldenFuerImmunitaet(engine, pi) {
+  const out = [];
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown || !(inst.heroIdx >= 0)) continue;
+    const kontrolleAls = loadCardEffect(inst.name)?.statusFolgtImmunitaet?.kontrolleAls;
+    if (typeof kontrolleAls !== 'function') continue;
+    const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+    if (!hero?.name || !(hero.hp > 0) || out.some(o => o.hero === hero)) continue;
+    if (kontrolleAls(engine, inst, inst.owner, inst.heroIdx) !== pi) continue;
+    out.push({ physOwner: inst.owner, heroIdx: inst.heroIdx, hero });
+  }
+  return out;
+}
+
 module.exports = {
   freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero,
   setzeAnhaengselStatus, anhaengselStatusHooks, anhaengselUmgelenkt,
   setzeOderRuhe, statusErgebnisBuchen, statusAnhaengselAbgleichen, wirtStatusImmun,
+  abgleichHalten, heldenFuerImmunitaet,
 };
