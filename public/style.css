@@ -24206,6 +24206,19 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
 }
 
+/* ★ Handy-Befund (Playwright, Galaxy S9+ quer 658×320, Deutsch): Die Auswahl (`optionPicker`) und die Ja/Nein-Abfrage (`confirm`) wuchsen mit ihrem Text auf 357 px bei 320 px
+   Fensterhöhe — Titel oben und „Abbrechen" unten waren abgeschnitten (das Panel steht bei top: 52,5 % mittig und hatte keine Höhengrenze). Jetzt ist es nie höher als der sichtbare
+   Bildschirm: Mitte bei 52,5 % → höchstens 95 % der Höhe, abzüglich 8 px Rand (`dvh` mit `vh` als Rückfall; die Obergrenze trifft nur, wo das Panel sonst nicht mehr ins Bild passt). Der
+   Beschreibungstext (`.fcp-text`) schrumpft als Erster und scrollt innen; Titel und alle Knöpfe bleiben stehen. Ohne Überlauf ändert sich nichts. Die Leiste ist die Pixel-Leiste von
+   oben, nur schmaler (10 px: die Rillen passen noch hinein). Kein `touch-action`: auf dem Handy scrollt der Text mit dem Finger; scrollt er, lässt `DraggablePanel` das Fenster dort nicht
+   ziehen (`_ppPanelHatScrollbaresKind`). Grenze: Hat die Antwortliste selbst (viele Optionen) keinen Platz, schrumpft nur der Beschreibungstext (bis auf 0) — die Liste scrollt nicht. */
+.first-choice-panel.fcp-begrenzt {
+  max-height: calc(95vh - 8px);
+  max-height: calc(95dvh - 8px);
+}
+.fcp-begrenzt .fcp-text { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.fcp-begrenzt .fcp-text::-webkit-scrollbar { width: 10px; }
+
 /* ════════════════════════════════════════════════════════════════════
    EIGENE KARTENANIMATIONEN (Als Auswahl 26.9.)
    Accusation, Baby Spider, Chaorc Interception, Crimson Web, Divine

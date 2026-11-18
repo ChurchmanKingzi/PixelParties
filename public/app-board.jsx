@@ -62594,7 +62594,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           {/* `showCardLeft`: zweites Kartenbild LINKS neben dem Text. Fuer
               Abfragen, in denen zwei Karten eine Rolle spielen — Bubbles
               zeigt links die betroffene Kreatur, rechts sich selbst. */}
@@ -62615,11 +62615,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
+            <div className="fcp-text" style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
             {/* `warning`: Zusatzzeile in Warnfarbe unter der Nachricht —
                 fuer Folgen, die der Spieler nicht uebersehen soll. */}
             {ep.warning && (
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
+              <div className="fcp-text" style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
             )}
             {/* `equalButtons` (Als Vorgabe 5.10.): bei einer Wahl zwischen ZWEI gleichwertigen Wegen
                 („Zusatzaktion" / „normale Aktion") sind die Knoepfe gleich breit, unabhaengig von der
@@ -62713,11 +62713,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={ep.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
-          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          {ep.description && <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           {ep.renderAs === 'slider' ? (
             // Slider-Variante fuer freie Betraege (Logan's Invest
             // Counters). Eine Dropdown-Liste mit 40 Eintraegen ist zum
