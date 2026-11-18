@@ -5,9 +5,9 @@
 //  "The HP of the Hero this Spell is attached to cannot be healed, and
 //   its other status effects cannot be removed. Additionally, negate
 //   the effects of all "Charme" Abilities attached to it. This counts as
-//   a status effect. If the target has any "Charme" Abilities attached
-//   to it or has not taken any damage yet this game, this counts as an
-//   additional Action."
+//   a negative status effect. If the target has any "Charme" Abilities
+//   attached to it or has not taken any damage yet this game, this counts
+//   as an additional Action."
 //
 //  ── ★★ v1143: DER STATUS „AGED" ──────────────────────────────────
 //  Bis v1142 wirkte die Karte ohne Status, allein ueber drei Karten-
@@ -32,6 +32,15 @@
 //  (`anhaengselStatusHooks`): faellt die Karte, faellt der Status; wird
 //  der Status geheilt, geht die Karte in die Ablage ihres
 //  urspruenglichen Besitzers.
+//
+//  ── STATUS-IMMUNITAET (Spielgestalter-Entscheidung 18.11.2026) ────
+//  „This counts as a negative status effect": ist der Wirt im Moment
+//  gegen negative Status immun (Johanna, Light Ball, `negative_status_immune`,
+//  Immunitaets-Anhaengsel …), liegt die Karte wirkungslos am Helden — kein
+//  `aged`, also Heilung, Status-Entfernen und Charme wie gewohnt. Endet die
+//  Immunitaet, greift die Karte; kommt sie spaeter dazu, ruht sie wieder
+//  (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`; Abgleich in
+//  `engine.sync`, wie bei Curse, Berserk und Stowaway).
 //
 //  ── DIE ZUSATZ-AKTION (Als Regel 15.9., bestaetigt 17.9.) ─────────
 //  ① ANGEBOTEN wird die Karte als Zusatz-Aktion, solange mindestens ein
@@ -107,6 +116,8 @@ module.exports = {
   cpuMeta: { optionalInherent: true },
 
   attachmentStatus: STATUS_NAME,
+  // Spielgestalter-Entscheidung 18.11.2026: der Status (und mit ihm Heilsperre, Status-Sperre und Charme-Negierung) folgt der Status-Immunitaet des Wirts.
+  statusFolgtImmunitaet: { status: STATUS_NAME },
   blocksHostHeal: true,
   blocksHostStatusRemoval: true,
   negatesHostAbilities: NEGIERT,
@@ -170,8 +181,9 @@ module.exports = {
 
       // Der Eintritts-Hook hat `aged` bereits angelegt; hier nur der
       // Gurt, falls ein Eintrittsweg ohne `onCardEnterZone` kam.
+      // 18.11.2026: unter Status-Immunitaet des Wirts ruht die Karte (Marke vom Eintritts-Hook) — der Abgleich legt `aged` an, sobald die Immunitaet endet.
       const wirt = gs.players[res.host.owner]?.heroes?.[res.host.heroIdx];
-      if (wirt?.name && !wirt.statuses?.[STATUS_NAME]) {
+      if (wirt?.name && !wirt.statuses?.[STATUS_NAME] && !res.inst?.counters?._statusRuht) {
         setzeAnhaengselStatus(engine, res.host.owner, res.host.heroIdx, CARD_NAME, STATUS_NAME);
       }
 
