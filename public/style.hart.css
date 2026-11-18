@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN b3953c3b3570f2b8 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN fa8caf1ac9acae33 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -23924,7 +23924,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 /* ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026): Hinweis des ANGEWÄHLTEN Ziels (`validTargets[].hinweis`) — steht über der Knopfzeile und erscheint nur zwischen „Ziel
    gewählt" und „Confirm" (app-board.jsx, Zielwahl-Fenster). Normaler Oberflächentext, harte Pixelkante links statt Schein/Verlauf, keine Alpha-Fläche, kein Symbol; nur Palettenfarben.
    Warnung (die Wahl verpufft: immun, volle HP, Erstrunden-Schutz) = Bernstein, Info (Wirkung anders als erwartet, aber nicht nutzlos: Overheal Shock) = Akzentblau. */
-.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; }
+/* Handy-Befund (Playwright, iPhone 13/Pixel 7 quer): Der Dialog ist `width: max-content`, ein langer Hinweissatz weitete ihn bis auf die Höchstbreite und deckte alle Helden zu — kein
+   anderes Ziel mehr antippbar. `contain: inline-size` nimmt den Hinweis aus der Breitenberechnung heraus: Er bricht in der Breite um, die der übrige Dialog vorgibt. */
+.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; width: 100%; contain: inline-size; }
 .panel-zielwahl-hinweis { font-size: 12px; line-height: 1.35; padding: 1px 0 1px 8px; border-left: 3px solid var(--accent4); color: var(--accent4); }
 .panel-zielwahl-hinweis-info { border-left-color: var(--accent); color: var(--accent); }
 /* Seitliche Kartenvorschau: `.card-mini` hat sonst feste Masse
