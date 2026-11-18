@@ -23,6 +23,10 @@
 //  • Unspielbar (statt wirkungslos), wenn die Karte nichts bewirken könnte: leere eigene Ablage (`spellPlayCondition`), Ablage-Sperre (`blockedByPileLock`), Hand-Sperre des Gegners
 //    („cannot add cards to your hand" — wie `actionTransferCardToOppHand`), Erste-Runden-Schutz des Gegners (`blockedByFirstTurnProtection`), Spreading Rumor / Slow
 //    (`_oppHandInteractionLockedTurn`: „cannot interact with your opponent's hand").
+//  • ★ Spielgestalter-Entscheidung 18.11.2026: UNTER JEDER Ablage-Ausgangssperre des Wirkers ist Transmission unspielbar (ausgegraut, nicht aktivierbar, keine Galerie, die dann nichts
+//    tut) — Stab-Sperre (Staff of the Teleporter/Uncontrollable Destruction), Sperre des Eye of Ren (nicht bezahlte Zusatzkosten), Knight of Kings [B], Hatusbal & Co. Gate ist der
+//    gemeinsame Helfer `ablageAusgangGesperrt` (`_pfad-shared.js`) in `wirkbar`; die Karte verschiebt ja eine Karte aus der EIGENEN Ablage. Ohne Sperre unverändert (spielbar mit
+//    Karte in der Ablage, ohne unspielbar).
 //  • Kein „von der Hand in die Gegnerhand"-Hook (Mary Crestmas) und kein „aus DEINER Ablage"-Hook (Bamboo Staff): die Karte kommt aus der Ablage des Wirkers, nicht des Empfängers,
 //    und nicht aus dessen Hand. Der Empfänger meldet den Zuwachs über `onHandGrew` (Handlimit-Wächter, Charm of Balance).
 //  • „Your opponent" = `engine.opponentOf(pi)` (im Skill Test mit mehreren Gegnern der Fokus-Gegner).
@@ -31,6 +35,8 @@
 //  Spielt die Karte nie von sich aus (`cpuSkipProactive`): ein Geschenk an den Gegner ohne Wert-Rechnung wäre nur eine verschenkte Karte. Die Antwort auf die Galerie ist trotzdem
 //  da (der wertloseste Kandidat).
 // ═══════════════════════════════════════════
+
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Transmission';
 const FLUG_MS = 650;      // Flugzeit Ablage → Gegnerhand, bis die Karte "landet"
@@ -54,6 +60,7 @@ function wirkbar(engine, pi, oi) {
   // (Erstrunden-Schutz des Gegners: Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — spielbar, verpufft in `onPlay`.)
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor / Slow
   if (engine.handZugangGesperrt?.(oi)) return false;                       // Hand-Sperre des Empfängers
+  if (ablageAusgangGesperrt(engine, pi)) return false;                     // Spielgestalter-Entscheidung 18.11.2026: Ablage-Ausgangssperre (Stab, Eye of Ren, Knight of Kings [B] …) → unspielbar
   return (ps.discardPile || []).length > 0;
 }
 
