@@ -228,8 +228,12 @@ module.exports = {
       engine._spiegelKopieName = sourceCard;   // `_trackCard` stempelt die beim Wirken entstehende Brettinstanz (Anhängsel) als Kopie
 
       try {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): „the user performs a copy of it" ist ein Spielen der Kopie
+        // (`engine.performKettenfenster`): Silence, Anti-Magic-Reaktionen usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Kosten/Limit sind oben schon bezahlt/verbraucht,
+        // Tokens liegen schon. Wird die Kopie in der Kette negiert, löst ihr Rumpf nie auf (die Instanz verschwindet unten wie sonst; das Original bleibt negiert).
+        const _pk = await engine.performKettenfenster({ cardName: sourceCard, pi: ownerIdx, heroIdx: hostHeroIdx, heroOwner: ctx.cardHeroOwner ?? ownerIdx, ausHand: false });
         // Fire the Spell's onPlay hook scoped to this instance.
-        await engine.runHooks('onPlay', {
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: synthInst, playedCard: synthInst,
           cardName: sourceCard, zone: 'hand',
           heroIdx: hostHeroIdx,
