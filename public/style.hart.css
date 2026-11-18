@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 919e8d9cec3b660b — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 85c1226d3270def5 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -24013,6 +24013,17 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 .fcp-begrenzt .fcp-text { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .fcp-begrenzt .fcp-text::-webkit-scrollbar { width: 10px; }
+/* ★ X2 (W7 ließ das offen: „Hat die Antwortliste selbst keinen Platz, scrollt sie nicht"): Die Antworten stehen als LISTE (`.fcp-liste`: Optionen / Spieler / Status) zwischen dem Text und den festen
+   Knöpfen („Abbrechen", „Confirm"/„Back"). Passt alles nicht auf den Bildschirm, scrollen Text UND Liste innen, Titel und Knöpfe bleiben stehen. Aufteilung: Die LISTE schrumpft zuerst (ihr
+   Schrumpf-Faktor ist 100 gegen 1 beim Text — der Text verliert dabei nicht einmal einen Pixel und bekommt keine Leiste für 1–2 px), aber nie unter ihre Mindesthöhe — 1 Eintrag 26 px, 2 Einträge 56 px, ab 3 Einträgen 90 px (≈ 2,5 Optionen, damit man sieht, dass mehr kommt);
+   erst wenn die Liste dort steht, schrumpft der Text (scrollt innen). Die Mindesthöhen liegen unter der natürlichen Höhe der Einträge, ohne Überlauf entsteht also kein Leerraum. Die Liste trägt einen
+   Innenrand mit gleich großem negativen Außenrand (8 px seitlich/oben, 10 px unten): die Pixelringe und Hover-Ringe der Knöpfe (bis ~7 px über ihren Rand hinaus) werden vom Scrollbereich nicht
+   abgeschnitten, das Bild ohne Überlauf bleibt unverändert. */
+.fcp-begrenzt .fcp-liste { flex: 0 100 auto; min-height: 26px; overflow-y: auto; overscroll-behavior: contain; padding: 8px 8px 10px; margin: -8px -8px -10px; }
+.fcp-begrenzt .fcp-liste:has(> :nth-child(2)) { min-height: 56px; }
+.fcp-begrenzt .fcp-liste:has(> :nth-child(3)) { min-height: 90px; }
+.fcp-begrenzt .fcp-liste > * { flex-shrink: 0; }
+.fcp-begrenzt .fcp-liste::-webkit-scrollbar { width: 10px; }
 /* Ursache der meisten Überläufe auf dem Telefon: ein `position: fixed`-Element bei `left: 50%` bekommt nur den Rest bis zum rechten Rand als Breite (hier ~330 px auf dem S9+), der
    Textspalte bleiben neben dem 100-px-Kartenbild ~160 px — der Text bricht in acht Zeilen, die Knöpfe in zwei. Auf niedrigen Fenstern (gleiche Grenze wie die Zielwahl-Boxen, 560 px)
    nimmt der Dialog deshalb wie am Desktop seine natürliche Breite bis zur Höchstbreite von `.first-choice-panel` (620 px / 92 %): breiter, aber deutlich niedriger, der Eye-of-Ren-Text
