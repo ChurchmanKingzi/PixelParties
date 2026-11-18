@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findBugfixes, readNotes, readSkips, applySkips, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
+const { findBugfixes, readNotes, parseSkips, readCommitChanges, changedFiles, applySkips, applyCommitSkips, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
 const { guild, setup, config } = require('./helpers');
 
 const real = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'cards.json'), 'utf8'));
@@ -256,7 +256,7 @@ test('Neue, noch nicht live gegangene Karte: kein Bugfix, auch nicht mit Bugfix-
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
 });
 
-test('Bugfix-Skip: reine Anpassung an eine neue Karte erscheint nicht im Bugfix-Kanal (Vorrang vor Bugfix-Note, auch für Bausteine)', async () => {
+test('Bugfix-Skip im Feed: unterdrückt nur die Änderung des eigenen Commits (auch für Bausteine); ein anderer Commit ohne Skip bringt das Ziel zurück', async () => {
   const r = makeRepo();
   try {
     r.write('data/cards.json', JSON.stringify(real));
@@ -270,45 +270,228 @@ test('Bugfix-Skip: reine Anpassung an eine neue Karte erscheint nicht im Bugfix-
     await ctx._feeds.pollBugfixes();                          // merkt den Stand
     assert.equal(sent.length, 0);
 
-    // Fireball nur an eine neue Karte angepasst (Skip), Acid Rain echter Fix; ein schmaler und ein breiter Baustein ebenfalls angepasst (Skip)
+    // EIN Commit passt Fireball und zwei Bausteine nur an eine neue Karte an (Skip, die Note desselben Commits entfällt); Acid Rain ist ein echter Fix in einem eigenen Commit
     r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
-    r.write(r.E('acid-rain'), "module.exports = { effect: 'fix' };\n");
     r.write(r.E('_alice-shared'), "exports.x = 'z';\n"); r.write(r.E('_big-shared'), "exports.big = 'z';\n");
-    r.commit('Neue Karte\n\nBugfix-Note: Fireball | Eine zu Unrecht geschriebene Beschreibung.\nBugfix-Note: Acid Rain | Damage was dealt once too often.');
-    r.write('server.js', '// angepasst\n');
-    r.commit('Anpassung\n\nBugfix-Skip: Fireball | nur an die neue Karte angepasst\n- Bugfix-Skip: _alice-shared\nBugfix-Skip: _big-shared');
+    r.commit('Neue Karte\n\nBugfix-Note: Fireball | Eine zu Unrecht geschriebene Beschreibung.\nBugfix-Skip: Fireball | nur an die neue Karte angepasst\n- Bugfix-Skip: _alice-shared\nBugfix-Skip: _big-shared');
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'fix' };\n");
+    r.commit('Fix\n\nBugfix-Note: Acid Rain | Damage was dealt once too often.');
     await ctx._feeds.pollBugfixes();
     assert.equal(sent.length, 1, 'nur eine Nachricht (Karten); der breite Baustein ist abgemeldet');
     assert.match(sent[0].content, /Bug fixes\*\* — 1 card\n/);
     assert.match(sent[0].content, /\*\*Acid Rain\*\*\n {2}↳ Damage was dealt once too often\./);
-    assert.ok(!/Fireball/.test(sent[0].content), 'Fireball (Skip) erscheint nicht — auch nicht mit der Note');
+    assert.ok(!/Fireball/.test(sent[0].content), 'Fireball (Skip im eigenen Commit) erscheint nicht — auch nicht mit der Note dieses Commits');
     assert.ok(!/Alice/.test(sent[0].content), 'über den abgemeldeten Baustein betroffene Karten erscheinen nicht');
+
+    // Ein SPÄTERER Commit mit Skip rettet frühere Änderungen nicht: Fireball und der breite Baustein wurden vorher ohne Skip geändert (Fireball sogar mit Note)
+    r.write(r.E('fireball'), "module.exports = { effect: 'echter fix' };\n"); r.write(r.E('_big-shared'), "exports.big = 'echt';\n");
+    r.commit('Echter Fix\n\nBugfix-Note: Fireball | Damage was dealt twice when the target had a shield.');
+    r.write(r.E('fireball'), "module.exports = { effect: 'noch eine anpassung' };\n"); r.write(r.E('_big-shared'), "exports.big = 'anpassung';\n");
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball\nBugfix-Skip: _big-shared');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 3, 'Karten-Nachricht und Baustein-Nachricht');
+    assert.match(sent[1].content, /\*\*Fireball\*\*\n {2}↳ Damage was dealt twice when the target had a shield\./);
+    assert.match(sent[2].content, /• `_big-shared` \(14 cards\)$/);
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
 });
 
-test('readSkips/applySkips: Zeilenformat mit und ohne Grund, Aufzählungszeichen; Karten und Bausteine werden entfernt', async () => {
+// ── Skip und Note gelten je Commit ─────────────────────────────────
+/** Wie der Feed: Fund → Skips der eigenen Commits abziehen; dazu die Notes. */
+async function pipeline(r, last, opts = {}) {
+  const head = r.sync('rev-parse', 'HEAD').trim();
+  const found = await applyCommitSkips({ git: r.git, last, head, found: await findBugfixes({ git: r.git, last, head, cards: real, ...opts }) });
+  const notes = await readNotes({ git: r.git, last, head });
+  return { found, notes };
+}
+const cardsOf = f => [...new Set([...f.direct.map(d => d.card.name), ...f.shared.flatMap(sh => sh.cards.map(c => c.name))])].sort();
+
+test('Skip je Commit (a): Note in Commit 1, Skip in Commit 2 für dasselbe Ziel → gemeldet, mit der Note aus Commit 1', async () => {
   const r = makeRepo();
   try {
     const from = r.head;
-    r.write(r.E('fireball'), "module.exports = { effect: 'b' };\n");
-    r.commit('Eins\n\nBugfix-Skip: Fireball | nur angepasst\n- Bugfix-Skip: acid rain\nBugfix-Skip:   \nBugfix-Skip: _alice-shared');
-    const head = r.sync('rev-parse', 'HEAD').trim();
-    const sk = await readSkips({ git: r.git, last: from, head });
-    assert.deepEqual([...sk].sort(), ['acidrain', 'alicesshared'.replace('alicesshared', 'aliceshared'), 'fireball'].sort());
-    assert.deepEqual(await readSkips({ git: r.git, last: 'deadbeef', head }), new Set(), 'unbekannter Stand → keine Ausnahmen, kein Absturz');
-
-    const found = {
-      direct: [{ card: { name: 'Fireball' }, file: 'fireball' }, { card: { name: 'Deadly Poison' }, file: 'deadly-poison' }],
-      shared: [{ module: '_alice-shared', cards: [{ name: 'Alice' }], count: 1, broad: false },
-        { module: '_outer-shared', cards: [{ name: 'Acid Rain' }, { name: 'Chain Lightning' }], count: 2, broad: false }],
-    };
-    const out = applySkips(found, sk);
-    assert.deepEqual(out.direct.map(d => d.card.name), ['Deadly Poison']);
-    assert.deepEqual(out.shared.map(x => x.module), ['_outer-shared'], 'abgemeldeter Baustein fällt weg');
-    assert.deepEqual(out.shared[0].cards.map(c => c.name), ['Chain Lightning'], 'abgemeldete Karte fällt aus den Baustein-Karten');
-    assert.equal(out.shared[0].count, 1);
-    assert.equal(applySkips(found, new Set()), found, 'ohne Ausnahmen unverändert');
+    r.write(r.E('fireball'), "module.exports = { effect: 'fix' };\n");
+    r.commit('Fix\n\nBugfix-Note: Fireball | Damage was dealt twice when the target had a shield.');
+    r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball | nur an die neue Karte angepasst');
+    const { found, notes } = await pipeline(r, from);
+    assert.deepEqual(names(found.direct), ['Fireball']);
+    assert.equal(notes.get('fireball'), 'Damage was dealt twice when the target had a shield.');
   } finally { r.clean(); }
+});
+
+test('Skip je Commit (b): nur ein Commit mit Skip → unterdrückt', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball');
+    const { found } = await pipeline(r, from);
+    assert.deepEqual([found.direct, found.shared], [[], []]);
+    // ein Skip in einem Commit, der das Skript nicht ändert, unterdrückt nichts
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'fix' };\n");
+    r.commit('Fix');
+    r.write('server.js', '// anders\nfoo();\n');
+    r.commit('Anderes\n\nBugfix-Skip: Acid Rain');
+    assert.deepEqual(names((await pipeline(r, from)).found.direct), ['Acid Rain'], 'Skip im Commit ohne Skript-Änderung greift nicht');
+  } finally { r.clean(); }
+});
+
+test('Skip je Commit (c): Skip in Commit 2, aber Commit 1 ändert das Skript ohne Skip und ohne Note → gemeldet, ohne Erklärung', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'fix' };\n");
+    r.commit('Fix');
+    r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball');
+    const { found, notes } = await pipeline(r, from);
+    assert.deepEqual(names(found.direct), ['Fireball']);
+    assert.ok(!notes.has('fireball'));
+  } finally { r.clean(); }
+});
+
+test('Skip je Commit (d): Baustein — Skip auf den Baustein unterdrückt die Karte; Skip auf die Karte nur diese Änderung; ein weiterer Commit ohne Skip bringt sie zurück', async () => {
+  const r = makeRepo();
+  try {
+    const Y = 'Alice, the Transfer Student';
+    let from = r.head;
+    r.write(r.E('_alice-shared'), "exports.x = 2;\n");
+    r.commit('Baustein\n\nBugfix-Skip: _alice-shared | neue Karte');
+    let f = (await pipeline(r, from)).found;
+    assert.deepEqual([f.direct, f.shared], [[], []], 'Skip auf den Baustein: weder der Baustein noch seine Karten');
+
+    from = r.sync('rev-parse', 'HEAD').trim();
+    r.write(r.E('_alice-shared'), "exports.x = 3;\n");
+    r.commit('Baustein, nur für Y abgemeldet\n\nBugfix-Skip: Alice, the Transfer Student');
+    f = (await pipeline(r, from)).found;
+    assert.deepEqual(cardsOf(f), ['Alice, the Puppeteer Girl', 'Anti Grav Trap'], 'Skip auf die Karte Y entfernt nur Y');
+    assert.equal(f.shared[0].count, 2);
+
+    r.write(r.E('_alice-shared'), "exports.x = 4;\n");
+    r.commit('Baustein nochmal, ohne Skip');
+    f = (await pipeline(r, from)).found;
+    assert.ok(cardsOf(f).includes(Y), 'ein weiterer Commit ändert den Baustein ohne Skip → Y wird gemeldet');
+    assert.equal(f.shared[0].count, 3);
+
+    // Skip auf den Baustein im einen, Skip auf Y im anderen Commit: jede Änderung ist abgemeldet → nichts
+    from = r.sync('rev-parse', 'HEAD').trim();
+    r.write(r.E('_alice-shared'), "exports.x = 5;\n"); r.commit('A\n\nBugfix-Skip: _alice-shared');
+    r.write(r.E('_alice-shared'), "exports.x = 6;\n"); r.commit('B\n\nBugfix-Skip: Alice, the Transfer Student');
+    f = (await pipeline(r, from)).found;
+    assert.deepEqual(cardsOf(f), ['Alice, the Puppeteer Girl', 'Anti Grav Trap'], 'Commit B zählt für alle außer Y, Commit A für niemanden');
+  } finally { r.clean(); }
+});
+
+test('Skip je Commit (e): Note und Skip für dasselbe Ziel im selben Commit → der Skip gewinnt; andere Ziele und andere Commits bleiben unberührt', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'v1' };\n"); r.write(r.E('acid-rain'), "module.exports = { effect: 'v1' };\n");
+    r.commit('Beides\n\nBugfix-Note: Fireball | Wrong text.\nBugfix-Skip: Fireball\nBugfix-Note: Acid Rain | Damage was dealt once too often.');
+    let { found, notes } = await pipeline(r, from);
+    assert.deepEqual(names(found.direct), ['Acid Rain']);
+    assert.deepEqual([...notes.keys()], ['acidrain'], 'die Note des Commits mit Skip fällt weg');
+
+    r.write(r.E('fireball'), "module.exports = { effect: 'v2' };\n");
+    r.commit('Echter Fix\n\nBugfix-Note: Fireball | Damage was dealt twice.');
+    ({ found, notes } = await pipeline(r, from));
+    assert.deepEqual(names(found.direct), ['Acid Rain', 'Fireball'], 'der zweite Commit hat keinen Skip → Fireball gemeldet');
+    assert.equal(notes.get('fireball'), 'Damage was dealt twice.', 'nur die Note des Commits ohne Skip');
+  } finally { r.clean(); }
+});
+
+test('Skip je Commit (f): reine Kommentar-Änderung ohne Skip ändert nichts, wenn die inhaltliche Änderung in einem Commit mit Skip steht', async () => {
+  const r = makeRepo();
+  try {
+    let from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'angepasst' };\n");
+    r.commit('Anpassung\n\nBugfix-Skip: Fireball');
+    r.write(r.E('fireball'), "// jetzt kommentiert\nmodule.exports   =   { effect: 'angepasst' };   // und eingerückt\n");
+    r.commit('Nur Kommentare');
+    let f = (await pipeline(r, from)).found;
+    assert.deepEqual([f.direct, f.shared], [[], []]);
+
+    // umgekehrte Reihenfolge, und auch über einen Baustein
+    from = r.sync('rev-parse', 'HEAD').trim();
+    r.write(r.E('_alice-shared'), "// nur Kommentar\nexports.x = 1;\n"); r.write(r.E('acid-rain'), "// auch\nmodule.exports = { effect: 1 };\n");
+    r.commit('Nur Kommentare');
+    r.write(r.E('_alice-shared'), "// nur Kommentar\nexports.x = 7;\n");
+    r.commit('Baustein angepasst\n\nBugfix-Skip: _alice-shared');
+    f = (await pipeline(r, from)).found;
+    assert.deepEqual([f.direct, f.shared], [[], []]);
+  } finally { r.clean(); }
+});
+
+test('Skip je Commit: Merge-Commits tragen keine eigene Änderung (Skip in der Merge-Nachricht greift nicht), Commits auf Seitenzweigen zählen; Notes in Merge-Nachrichten gelten', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.sync('checkout', '-q', '-b', 'feature');
+    r.write(r.E('fireball'), "module.exports = { effect: 'feature' };\n");
+    r.commit('Auf dem Seitenzweig (ohne Skip)');
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'feature' };\n");
+    r.commit('Auf dem Seitenzweig\n\nBugfix-Skip: Acid Rain');
+    r.sync('checkout', '-q', 'main');
+    r.write('server.js', '// main\n');
+    r.commit('Auf main');
+    r.sync('merge', '--no-ff', '-q', '-m', 'Merge feature\n\nBugfix-Skip: Fireball\nBugfix-Note: Fireball | Damage was dealt twice.', 'feature');
+    const { found, notes } = await pipeline(r, from);
+    assert.deepEqual(names(found.direct), ['Fireball'], 'Acid Rain: Skip im eigenen Commit; Fireball: der Skip der Merge-Nachricht ändert nichts');
+    assert.equal(notes.get('fireball'), undefined, 'die Note im selben Merge-Commit wie der Skip entfällt');
+    r.sync('commit', '-q', '--amend', '-m', 'Merge feature\n\nBugfix-Note: Fireball | Damage was dealt twice.');
+    assert.equal((await readNotes({ git: r.git, last: from, head: r.sync('rev-parse', 'HEAD').trim() })).get('fireball'), 'Damage was dealt twice.');
+  } finally { r.clean(); }
+});
+
+test('readCommitChanges: je Datei die inhaltlich ändernden Commits mit ihren Skips; Grenzen (maxPairs) gelten im Zweifel als Änderung', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'a' };\n");
+    const c1 = r.commit('Eins\n\nBugfix-Skip: Fireball');
+    r.write(r.E('fireball'), "// Kommentar\nmodule.exports = { effect: 'a' };\n");
+    r.commit('Zwei (nur Kommentar)');
+    r.write(r.E('fireball'), "module.exports = { effect: 'b' };\n"); r.write(r.E('acid-rain'), "module.exports = { effect: 'b' };\n"); r.write(r.E('chain-lightning'), "module.exports = {};\n");
+    const c3 = r.commit('Drei');
+    const head = r.sync('rev-parse', 'HEAD').trim();
+
+    const ch = await readCommitChanges({ git: r.git, last: from, head, files: ['fireball', 'acid-rain', 'chain-lightning', 'nicht-angefragt'] });
+    assert.deepEqual([...ch.keys()].sort(), ['acid-rain', 'fireball'], 'neue Datei (chain-lightning) zählt nicht');
+    assert.deepEqual(ch.get('fireball').map(c => c.hash), [c3, c1], 'neueste zuerst; der Kommentar-Commit fehlt');
+    assert.deepEqual([...ch.get('fireball')[1].skips], ['fireball']);
+    assert.equal(ch.get('fireball')[0].skips.size, 0);
+    assert.deepEqual((await readCommitChanges({ git: r.git, last: from, head, files: [] })), new Map());
+    assert.deepEqual(await readCommitChanges({ git: r.git, last: 'deadbeef', head, files: ['fireball'] }), new Map(), 'unbekannter Stand → leer, kein Absturz');
+
+    const grob = await readCommitChanges({ git: r.git, last: from, head, files: ['fireball'], maxPairs: 0 });
+    assert.equal(grob.get('fireball').length, 3, 'über der Grenze: der Kommentar-Commit gilt vorsichtshalber als Änderung');
+    assert.deepEqual(parseSkips('Text\nBugfix-Skip: Fireball | Grund\n* Bugfix-Skip: _alice-shared\nBugfix-Skip:  '), new Set(['fireball', 'aliceshared']));
+  } finally { r.clean(); }
+});
+
+test('applySkips (rein): je Commit; ohne Commit-Angaben wird nichts unterdrückt, Karten ohne Angaben bleiben', () => {
+  const sk = (...t) => new Set(t);
+  const found = {
+    direct: [{ card: { name: 'Fireball' }, file: 'fireball' }, { card: { name: 'Deadly Poison' }, file: 'deadly-poison' }, { card: { name: 'Acid Rain' }, file: 'acid-rain' }],
+    shared: [{ module: '_alice-shared', cards: [{ name: 'Alice' }, { name: 'Bob' }], count: 2, broad: false },
+      { module: '_outer-shared', cards: [{ name: 'Acid Rain' }], count: 1, broad: false },
+      { module: '_leer-shared', cards: [], count: 0, broad: false }],
+  };
+  const changes = new Map([
+    ['fireball', [{ hash: 'a', skips: sk('fireball') }]],                                  // alles abgemeldet
+    ['deadly-poison', [{ hash: 'b', skips: sk('fireball') }, { hash: 'c', skips: sk() }]],  // Commit c ohne Skip
+    ['_alice-shared', [{ hash: 'd', skips: sk('alice') }, { hash: 'e', skips: sk('aliceshared') }]],
+    ['_outer-shared', [{ hash: 'f', skips: sk('outershared') }]],
+    ['_leer-shared', [{ hash: 'g', skips: sk() }]],
+  ]);
+  const out = applySkips(found, changes);
+  assert.deepEqual(out.direct.map(d => d.card.name), ['Deadly Poison', 'Acid Rain'], 'Acid Rain: keine Angaben zur Datei → bleibt');
+  assert.deepEqual(out.shared.map(x => x.module), ['_alice-shared', '_leer-shared'], '_outer-shared: Skip auf den Baustein im einzigen Commit');
+  assert.deepEqual(out.shared[0].cards.map(c => c.name), ['Bob'], 'Commit d zählt nur für Bob (Alice abgemeldet), Commit e (Skip auf den Baustein) für niemanden → Alice fällt weg');
+  assert.equal(out.shared[0].count, 1);
+  assert.equal(applySkips(found, new Map()), found, 'ohne Commit-Angaben unverändert');
+  assert.equal(applySkips(found, null), found);
+  assert.deepEqual(changedFiles(found).sort(), ['_alice-shared', '_leer-shared', '_outer-shared', 'acid-rain', 'deadly-poison', 'fireball']);
 });
 
 test('readNotes: Zeilenformat, Aufzählungszeichen, Kürzung, mehrere Zeilen pro Ziel; findBugfixes lässt balancierte Karten aus', async () => {
