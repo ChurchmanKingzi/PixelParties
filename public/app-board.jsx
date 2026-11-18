@@ -161,6 +161,10 @@ window._boardTooltipLock = (an) => { _boardTooltipLocked = !!an; };
 // den Fehler nicht behoben und den Tooltip spuerbar klebrig gemacht —
 // auf Als Wunsch zurueckgebaut. Siehe die Notiz bei `StatusBadges` in
 // app-shared.jsx.
+// Handy-Befund (Eye of Ren): „Cancel (Esc)" — auf Touch-Geräten (grober Zeiger) gibt es keine Esc-Taste, dort steht nur „Cancel". Beide Texte stehen im Wörterbuch (data/i18n/*-ui.json).
+function ppCancelEsc() {
+  try { return window.matchMedia('(pointer: coarse)').matches ? 'Cancel' : 'Cancel (Esc)'; } catch (e) { return 'Cancel (Esc)'; }
+}
 function setBoardTooltip(card) {
   if (card && card.name) window._boardTooltipLast = card;
   // When locked (prompt card hovered), ignore external clears
@@ -36492,7 +36496,7 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
         {ep.cancellable !== false && (
           <button className="btn" style={{ padding: '10px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
         )}
       </div>
     </div>
@@ -62708,7 +62712,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })}
             {ep.cancellable !== false && (
               <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
             )}
           </div>
         </DraggablePanel>
@@ -62761,7 +62765,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })}
               {ep.cancellable !== false && (
                 <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
             </div>
           )}
@@ -63327,7 +63331,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return `To spend the Action, ${satz}.`;
           })()}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
           </div>
           {/* Bild des Helden, dem die Aktion gehoert — gleiche Bauform
               wie in confirm/optionPicker, samt Tooltip beim Ueberfahren. */}
@@ -63356,7 +63360,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
         </DraggablePanel>
       )}
 
@@ -63370,7 +63374,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Play an Artifact with a set Cost from your hand without paying its Cost.</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Click a highlighted Artifact in your hand.</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>Cancel (Esc)</button>
+            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>{ppCancelEsc()}</button>
         </DraggablePanel>
       )}
 
@@ -63617,7 +63621,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>{ep.instruction || 'Click a card in your hand to discard it.'}</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || ppCancelEsc()}</button>
           {ep.altLabel && (
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#f87420', color: '#f87420' }}
               onClick={() => respondToPrompt({ alt: true })}>{ep.altLabel}</button>
@@ -63689,7 +63693,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>{ep.confirmLabel || '🫳 Steal!'}</button>
               {cancellable && (
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
             </div>
           </DraggablePanel>
@@ -63708,7 +63712,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={() => respondToPrompt({ finished: true })}>Done</button>
             )}
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-              onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+              onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
           </div>
         </DraggablePanel>
       )}
@@ -63739,7 +63743,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.cancellable !== false && (
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
             </div>
           )}
         </DraggablePanel>
