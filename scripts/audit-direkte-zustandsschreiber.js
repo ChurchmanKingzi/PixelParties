@@ -167,7 +167,7 @@ const PRIMITIVE = {
   C: ['actionPlaceCreature', 'safePlaceInSupport', 'summonCreatureWithHooks', 'summonFromDiscard', 'beschwoerZonenFuer', 'hatBeschwoerZone',
       'ersteBeschwoerZone', 'getFreeSupportZones', 'eligibleSummonZones', 'zoneEintragen', 'actionTransferCreature', 'actionStealCreature', 'actionMoveCard',
       'placeArea', 'actionAttachHeroToCreature', 'returnSupportCreatureToHand', 'actionTakeHeroPermanently', 'actionStealHero', 'actionTransferAttachment'],
-  D: ['heroHoptKey', 'heldenSperreKey', 'heldenSperreFreigeben', 'claimHOPT', 'oncePerGameEffectUsed', 'markOncePerGameEffect', '_hoptAbzug', '_hoptWiederherstellen'],
+  D: ['heroHoptKey', 'heldenSperreKey', 'heldenSperreFreigeben', 'claimHOPT', 'oncePerGameEffectUsed', 'markOncePerGameEffect'],
   E: ['actionSpendGold', 'actionGainGold', 'actionSetGold', 'actionStealGold', 'canAffordGold', 'goldBudget'],   // (`payActivationCost`/`paySummonCost`/`payArtifactCost` sind Skript-Hooks, keine Engine-Primitive)
   F: ['commitAppearance', 'emitToOpponentsGs', 'sendToSpectators', 'revealToOpponent', 'revealSearchedCards', 'revealTop', 'revealHandCopy', '_broadcastEvent'],
   G: ['beschwoerZonenFuer', 'hatBeschwoerZone', 'ersteBeschwoerZone', 'getFreeSupportZones', 'eligibleSummonZones', 'zoneEintragen', 'mitGeteilten', 'geteiltZuerst',

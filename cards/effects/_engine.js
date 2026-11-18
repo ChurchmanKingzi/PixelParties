@@ -2962,16 +2962,17 @@ class GameEngine {
    *
    * „You cannot move cards out of your discard pile for the rest of the
    * turn" (Staff of the Teleporter, Staff of Uncontrollable Destruction,
-   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn`.
+   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn` und
+   * HART: kein Freikauf, keine Ausnahme (die Stäbe setzen zusätzlich
+   * `_discardLockHard` — nur Meditation unterscheidet die Stab-Sperre).
    *
-   * The Eye of Ren haengt einen FREIKAUF daran (`ps._discardLockBuyout`):
-   * „unless you pay an additional 6 Gold" — nach Als Ruling (29.8.)
-   * EINMALIG je Zug: erste Bewegung aus dem Discard kostet 6, danach ist
-   * der Rest des Zuges frei. Ist der Effekt PFLICHT (`opts.mandatory`,
-   * z.B. The First Circle of Hell), zahlt der Spieler, was er hat (auch
-   * 0), und die Bewegung findet statt. Ist er optional, wird bei
-   * ausreichend Gold gefragt; ohne Gold oder bei Ablehnung bleibt die
-   * Sperre. Ohne Freikauf (Staebe) ist die Sperre hart.
+   * Spielgestalter-Entscheidung 18.11.2026 (The Eye of Ren): die 6 Gold
+   * sind Zusatzkosten der Aktivierung („Pay 6 extra Gold or lock your
+   * discard pile?", siehe `the-eye-of-ren.js`) — gezahlt, gibt es keine
+   * Sperre; sonst setzt das Auge die Sperre wie die Stäbe. Der frühere
+   * Freikauf je Zugriff (`_discardLockBuyout`, Abfrage „Pay 6 Gold to move
+   * cards out of it?", Pflicht-Variante `mandatory`, Ablehnung = Abbruch der
+   * Karte) ist entfallen.
    *
    * Alle Wege aus dem Discard fragen HIER: addCardFromDiscardToHand,
    * actionRecycleCards, actionPlaceCreature (source 'discard'),
@@ -2987,88 +2988,7 @@ class GameEngine {
       this.log('pile_out_blocked', { player: ps.username, pile: 'discard' });
       return false;
     }
-    if (ps._discardLockedTurn !== this.gs.turn) return true;
-    // Z6 (F03-10): die HARTE Stab-Sperre (`_discardLockHard`, Staebe) hebt auch der 6-Gold-Freikauf des Eye of Ren
-    // nicht auf - gelten beide im selben Zug, gilt die strengere (der Stab hat keine Ausnahme), in beiden Reihenfolgen.
-    if (ps._discardLockHard === this.gs.turn) return false;
-    const buy = ps._discardLockBuyout;
-    if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
-    if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
-    const gold = ps.gold || 0;
-    const spend = async (amount) => {
-      if (amount <= 0) return true;
-      const ok = await this.actionSpendGold(pi, amount, { cardName: buy.source, reason: 'discard_lock_buyout' });
-      return ok !== false;
-    };
-    if (opts.mandatory) {
-      const pay = Math.min(buy.cost, gold);
-      let paid = 0;   // G1: TATSAECHLICH gezahlt (goldLocked → 0), nicht der Wunschbetrag
-      if (pay > 0 && await spend(pay)) paid = pay; // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
-      buy.paidTurn = this.gs.turn;
-      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid, mandatory: true });
-      this.sync();
-      return true;
-    }
-    if (!this.canAffordGold(pi, buy.cost, buy.source)) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', needGold: buy.cost });
-      return false;
-    }
-    const yes = opts.silent ? true : await this.promptGeneric(pi, {
-      type: 'confirm',
-      title: buy.source,
-      message: `Your discard pile is locked by ${buy.source}. Pay ${buy.cost} Gold to move cards out of it for the rest of this turn?`,
-      showCard: buy.source,
-      confirmLabel: `💰 Pay ${buy.cost} Gold`,
-      cancelLabel: 'No',
-      cancellable: true,
-    });
-    if (!yes) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', declined: true });
-      this.gs._discardOutDeclined = this.gs.turn; // → `_applyDiscardOutDecline`
-      return false;
-    }
-    if (!(await spend(buy.cost))) return false;
-    buy.paidTurn = this.gs.turn;
-    this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: buy.cost, mandatory: false });
-    this.sync();
-    return true;
-  }
-
-  /**
-   * v627 (Als Regel 29.8.): Lehnt der Spieler den Eye-of-Ren-Freikauf ab,
-   * gilt das Ausspielen der Karte als ABGEBROCHEN wie jede andere
-   * Cancellation — die Karte bleibt in der Hand, die Kosten kommen
-   * zurueck. Das Gate stempelt `gs._discardOutDeclined = gs.turn`; der
-   * Chain-Auflöser ruft dies nach `resolve()` und macht aus dem Ergebnis
-   * `{ cancelled: true }`, sofern das Skript nicht `discardOutDeclineConsumes`
-   * setzt (fuer Karten, die VOR der Discard-Bewegung schon etwas Bleibendes
-   * getan haben — dann ist die Karte verbraucht).
-   */
-  _applyDiscardOutDecline(cardName, result, hoptVorher) {
-    if (this.gs._discardOutDeclined !== this.gs.turn) return result;
-    delete this.gs._discardOutDeclined;
-    if (result && (result.aborted || result.cancelled)) return result;
-    const script = cardName ? loadCardEffect(cardName) : null;
-    if (script?.discardOutDeclineConsumes) return result;
-    // ★ Z7 (F02-20): „Abbruch heißt: nichts ist passiert" — auch die Rundensperren (`claimHOPT`), die
-    // das Skript vor dem abgelehnten Ablage-Zugriff gestempelt hat (Relic in the Sky, Magic Gems),
-    // gehen zurück. `hoptVorher` = Abzug von `gs.hoptUsed` vor dem `resolve()`.
-    if (hoptVorher) this._hoptWiederherstellen(hoptVorher);
-    this.log('play_cancelled', { card: cardName, reason: 'discard_lock_declined' });
-    return { cancelled: true };
-  }
-
-  /** ★ Z7: flacher Abzug der Rundensperren (für `_hoptWiederherstellen`). */
-  _hoptAbzug() { return { ...(this.gs.hoptUsed || {}) }; }
-
-  /** ★ Z7: Rundensperren auf den Stand `abzug` zurücksetzen (nur Schlüssel, die sich seither geändert haben). */
-  _hoptWiederherstellen(abzug) {
-    const h = this.gs.hoptUsed;
-    if (!h) return;
-    for (const k of Object.keys(h)) {
-      if (!(k in abzug)) delete h[k];
-      else if (h[k] !== abzug[k]) h[k] = abzug[k];
-    }
+    return ps._discardLockedTurn !== this.gs.turn;
   }
 
   async addCardFromDiscardToHand(toPlayerIdx, cardName, fromOwnerIdx, opts = {}) {
@@ -16506,8 +16426,7 @@ class GameEngine {
     }
     // v626: Discard-out-Sperre (Staebe, The Eye of Ren) — auch fuer
     // generische Bewegungen aus dem eigenen Discard (nach Deleted, Deck,
-    // Brett …). `opts.mandatory` fuer Pflichteffekte (Freikauf mit allem
-    // vorhandenen Gold), `opts._bypassDiscardLock` fuer Engine-Wege.
+    // Brett …). `opts._bypassDiscardLock` fuer Engine-Wege.
     if (fromZone === ZONES.DISCARD && cardInstance
         && !(await this._discardOutAllowed(cardInstance.owner, opts))) {
       this.log('discard_out_blocked', { card: cardInstance.name, to: toZone, reason: 'discard_locked' });
@@ -23874,8 +23793,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Synchrone Form fuer Stellen ohne `await` (CPU-Bewertungsproben,
-   * Hilfsfunktionen). Deck: identisch. Ablage: die Stab-Sperre gilt als
-   * hart (kein Freikauf-Prompt moeglich) — vorher umgingen diese Stellen
+   * Hilfsfunktionen). Deck: identisch. Ablage: die Discard-out-Sperre
+   * (Staebe, The Eye of Ren) gilt hart — vorher umgingen diese Stellen
    * sie ganz.
    */
   takeFromPileSync(pi, pile, what, opts = {}) {
@@ -23903,11 +23822,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
     if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
-      const buy = ps._discardLockBuyout;
-      if (ps._discardLockHard === this.gs.turn || !(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
-        this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
-        return null;
-      }
+      this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
+      return null;
     }
     return this._takeFromPileCore(pi, ps, arr, pile, idx, name, opts);
   }
@@ -24413,16 +24329,13 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre ohne Freikauf
-   * (Staff of the Teleporter/Uncontrollable Destruction) bzw. Stab + Eye of Ren? Synchrones Gegenstueck zu
-   * `_discardOutAllowed` fuer Spielbarkeits-Gates (die Eye-Sperre allein ist freikaufbar und zaehlt NICHT).
+   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre (Staff of the Teleporter/
+   * Uncontrollable Destruction) oder die Sperre des Eye of Ren (nicht bezahlt)? Synchrones Gegenstueck zu `_discardOutAllowed`
+   * fuer Spielbarkeits-Gates. Spielgestalter-Entscheidung 18.11.2026: auch die Eye-Sperre ist hart (kein Freikauf mehr).
    */
   isDiscardOutHardLocked(pi) {
     const ps = this.gs?.players?.[pi];
-    if (!ps || ps._discardLockedTurn !== this.gs.turn) return false;
-    if (ps._discardLockHard === this.gs.turn) return true;
-    const buy = ps._discardLockBuyout;
-    return !buy || buy.turn !== this.gs.turn;
+    return !!ps && ps._discardLockedTurn === this.gs.turn;
   }
 
   /**
@@ -30421,7 +30334,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * G1: darf `playerIdx` gerade KEIN Gold ausgeben? Golden Arrow: "You cannot gain or spend Gold for the rest of the turn
    * afterwards." (`ps.goldLocked`, faellt zum Zugwechsel). Als Regel: unter dieser Sperre ist auch alles mit Gold-KOSTEN > 0
-   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold", Freikauf) nicht spielbar/aktivierbar; Kosten 0
+   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold") nicht spielbar/aktivierbar; Kosten 0
    * bleiben moeglich. Gegenstueck zu `goldGainWouldBeBlocked` (_gold-block-shared.js, Gewinn-Seite) - hier die Ausgabe-Seite.
    * `actionSpendGold`, `canAffordGold` und `goldBudget` fragen HIER.
    * @param {number} playerIdx
@@ -34482,7 +34395,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   • Gibt es MEHR Kopien als Plaetze UND liefern mindestens zwei Quellen welche, waehlt der Spieler JE KOPIE die Quelle (Galerie `pickAusQuellen`,
    *     ein Eintrag je Quelle mit Herkunfts-Abzeichen DECK / HAND / DISCARD; CPU: `cpuSourceOrder` Ablage, Deck, Hand - die Ablage kostet nichts).
    *   • Die Ablage ist ein Stapel-Ausgang wie jeder andere: `takeFromPile(pi, 'discard', …)` (Knight-of-Kings-Sperre `pileOutAllowed`, Lethe-Stempel, verwaiste Instanz
-   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle (keine Freikauf-Frage mitten im Aufstieg).
+   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle.
    *
    * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
    * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
@@ -47144,10 +47057,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // No reactions — resolve normally (no chain visualization)
         this._inReactionCheck = false;
         let resolveResult = null;
-        delete this.gs._discardOutDeclined;
-        const _hoptVorher = resolve ? this._hoptAbzug() : null;
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolving', { linkIndex: 0, cardName, owner }); await this._delay(400); }
-        if (resolve) resolveResult = this._applyDiscardOutDecline(cardName, await resolve(), _hoptVorher);
+        if (resolve) resolveResult = await resolve();
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolved', { linkIndex: 0, cardName, owner }); await this._delay(300); this._broadcastEvent('reaction_chain_done', {}); }
         result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
       } else {
@@ -48625,7 +48536,6 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (link.resolve) {
           try {
-            delete this.gs._discardOutDeclined;
             // Wer gerade aufloest, ist der Negierer, falls das Glied
             // ein anderes negiert (`negateChainLink` liest das).
             const _vorherAufloeser = this._rxResolvingOwner;
@@ -48635,7 +48545,6 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._rxResolvingCard = link.cardName;
             this._rxResolvingLink = link;
             let result;
-            const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
             // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
             const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
@@ -48648,7 +48557,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               this._rxResolvingLink = _vorherGlied;
               if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
-            if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
+            if (link.isInitialCard) link.resolveResult = result;
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
           }

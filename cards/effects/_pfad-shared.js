@@ -70,21 +70,14 @@ async function waehlePfad(engine, pi, pfade, prompt = {}) {
 // ── Bausteine für die häufigsten Sperren (eine Auslegungsstelle statt je Karte eine eigene Fassung) ──
 
 /**
- * Kann `pi` gerade keine Karten aus der Ablage bewegen? Stab-Sperre (Staff of the Teleporter/Uncontrollable Destruction, „cannot move any cards out of your discard pile";
- * der Freikauf des Eye of Ren zählt nicht — er ist ein Preis, kein Verbot) oder Knight of Kings [B]. `opts.sourceOwner`: wer bewegt (Standard: `pi`).
- * `opts.auchFreikaufbar`: auch die (noch nicht freigekaufte) Eye-of-Ren-Sperre zählt — für Kosten, die SYNCHRON aus der Ablage gezahlt werden (`takeFromPileSync`, z. B.
- * `payRebelliokaiCost`) und deshalb keine Freikauf-Abfrage stellen können.
+ * Kann `pi` gerade keine Karten aus der Ablage bewegen? Ablage-Ausgangssperre dieses Zuges (Staff of the Teleporter/Uncontrollable Destruction, „cannot move any cards out of
+ * your discard pile"; The Eye of Ren, wenn die Zusatzkosten nicht bezahlt wurden — Spielgestalter-Entscheidung 18.11.2026: auch die Eye-Sperre ist hart, kein Freikauf) oder
+ * Knight of Kings [B]. `opts.sourceOwner`: wer bewegt (Standard: `pi`).
  */
 function ablageAusgangGesperrt(engine, pi, opts = {}) {
-  const ps = engine?.gs?.players?.[pi];
-  if (!ps) return false;
+  if (!engine?.gs?.players?.[pi]) return false;
   if (typeof engine.pileOutAllowed === 'function' && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: opts.sourceOwner ?? pi })) return true;
-  if (engine.isDiscardOutHardLocked?.(pi)) return true;
-  if (opts.auchFreikaufbar && ps._discardLockedTurn === engine.gs.turn) {
-    const kauf = ps._discardLockBuyout;
-    return !(kauf && kauf.turn === engine.gs.turn && kauf.paidTurn === engine.gs.turn);
-  }
-  return false;
+  return !!engine.isDiscardOutHardLocked?.(pi);
 }
 
 /** Kann `pi` gerade keine Karten aus dem Deck bewegen? (Knight of Kings [B]; Ziehen zählt hier nicht.) */
