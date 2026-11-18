@@ -5,8 +5,8 @@
 //
 //  „Once per turn, when you reveal exactly 1 Normal Spell from your deck or hand that this Hero can use, except by the effect of an Ability, you
 //   may delete that Spell. At the end of your opponent's next turn, if this Hero is not defeated and that Spell is still deleted, this Hero
-//   immediately uses it as an additional Action, regardless of its level and in spite of any negative status effects. Spells this Hero uses that
-//   would be sent to the discard pile are deleted instead."
+//   immediately uses it as an additional Action, regardless of its level, in spite of any negative status effects and even if you could not perform any
+//   Actions that turn. Spells this Hero uses that would be sent to the discard pile are deleted instead."
 //
 //  ── Bausteine ─────────────────────────────────────────────────────
 //  • Aufdecken: Hook `onCardsRevealed` (`engine.meldeAufgedeckt`, gesammelt je Wirkung, EIN Aufruf am Ende der Wirkung). Aufdecken durch den Effekt einer
@@ -22,6 +22,12 @@
 //  • „exactly 1 Normal Spell … that this Hero can use": unter den zusammen aufgedeckten Karten ist GENAU EINE ein Normal Spell, den Atta wirken kann
 //    (Stufe/Schulen wie beim Ausspielen, auch ueber Wisdom). Andere aufgedeckte Karten (Creatures, nicht wirkbare Zauber) stoeren nicht.
 //  • „Once per turn": hart, je Spieler und Karte (Ruling 22.9., `_hero-hopt-shared.js`); wird abgelehnt oder verpufft der Effekt, ist sie wieder frei.
+//  • ★ Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre): „… even if you could not perform any Actions that turn." Die RUECKKEHR wird von keiner Aktionssperre blockiert
+//    (Overflowing Chalice, Kent, `_playerActionLockedTurn`, `ps.actionLocked` — alles, was `engine.areActionsBlocked(pi)` liefert; siehe `_verzoegert-zauber-shared.js`).
+//    Umgekehrt darf das LOESCHEN („you may delete that Spell") nur geschehen, solange der SPIELER nicht aktionsgesperrt ist: unter der Sperre wird es weder angeboten noch ausgefuehrt,
+//    die Karte bleibt unberuehrt (Hand/Deck) und die Einmal-Sperre unverbraucht. Gemeint ist die spielerweite Sperre (`areActionsBlocked`); ist nur ATTA selbst gesperrt
+//    (`hero._actionLockedTurn`: Cute Familiar, Lethe …) oder ein anderer Held, kann der Spieler weiter handeln — dann wird wie bisher geloescht. Ein bereits vorgemerkter Zauber bleibt
+//    vorgemerkt, auch wenn der Spieler spaeter gesperrt wird.
 //  • „you may delete": Ja/Nein. Geloescht wird die aufgedeckte Karte da, wo sie JETZT liegt (Hand, sonst Deck). Ist sie weg, passiert nichts.
 //  • „At the end of your opponent's next turn": der Zug, in dem sie ausloest, zaehlt nicht (Ende des naechsten echten Gegnerzuges nach der Vormerkung).
 //  • Das spaetere Wirken ist ein Zauber, den Atta wirkt — er wird danach also wieder geloescht statt abgelegt.
@@ -54,6 +60,9 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
+      // ★ Spielgestalter-Entscheidung 18.11.2026: gelöscht wird nur, solange der Spieler NICHT aktionsgesperrt ist (Overflowing Chalice, Kent, … = `areActionsBlocked`) — siehe Kopf.
+      if (engine.areActionsBlocked(pi)) return;
+
       // „exactly 1 Normal Spell … that this Hero can use"
       const db = engine._getCardDB();
       const kandidaten = (ctx.cardNames || []).filter(n => {
@@ -82,6 +91,7 @@ module.exports = {
         cancelLabel: 'No',
       });
       if (!confirmed) { heldenSperreFreigeben(gs, HOPT, pi); return; }
+      if (engine.areActionsBlocked(pi)) { heldenSperreFreigeben(gs, HOPT, pi); return; }   // zweite Absicherung: die Sperre kam während der Abfrage (Einmal-Sperre bleibt frei)
 
       // Die Karte kann sich waehrend der Abfrage bewegt haben.
       const jetzt = liegt(wo) ? wo : (reihenfolge.find(liegt) || null);
