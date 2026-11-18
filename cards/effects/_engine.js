@@ -4600,7 +4600,15 @@ class GameEngine {
         if (!(opt && opt.schild)) hookCtx._kFlat = (hookCtx._kFlat || 0) + delta;
         // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
         // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
-        if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
+        // Spielgestalter-Entscheidung 18.11.2026 (Wealth Lv3 × Royal Treasury): der Zuschlag EINES Ability-Stapels ist EIN Effekt — Wealth Lv3 gibt „12 additional Gold" als einen Gewinn, nicht drei zu je 4
+        // (die Kopien des Stapels hören je einen Hook): die Beträge desselben Stapels (Held, Zone, Slot; Performance-Kopien liegen im selben Stapel) werden zu EINEM Eintrag und damit einem Ereignis.
+        if (hookCtx._isResourceGain && delta > 0) {
+          const boni = hookCtx._einkommensBoni || (hookCtx._einkommensBoni = []);
+          const stapel = engine.istWirksameAbility(cardInstance) ? `${cardInstance.zone}:${cardInstance.owner}:${cardInstance.heroIdx}:${cardInstance.zoneSlot}` : null;
+          const gleicher = stapel && boni.find(b => b.stapel === stapel);
+          if (gleicher) gleicher.delta += delta;
+          else boni.push({ card: cardInstance, delta, stapel, name: stapel ? (engine.abilityStapelVon(cardInstance).find(n => n !== 'Performance') || cardInstance.name) : cardInstance.name });
+        }
       },
       multiplyAmount(factor) {
         if (hookCtx.amount === undefined) return;
@@ -30040,7 +30048,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const wirksameBoni = [];
     if (hookCtx._isResourceGain && hookCtx._einkommensBoni?.length) {
       for (const bonus of hookCtx._einkommensBoni) {
-        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
+        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.name, cancelled: false, _skipReactionCheck: true };
         await this.runHooks('onIncomeBonusGain', bonusCtx);
         if (bonusCtx.cancelled) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
         else if (bonus.delta > 0) {
@@ -30101,7 +30109,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           rest -= betrag;
           if (!(betrag > 0)) continue;
           await this.runHooks(HOOKS.AFTER_RESOURCE_GAIN, {
-            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.card?.name,
+            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.name,
             _goldSource: { playerIdx, amount: betrag, consumed: false },
           });
         }

@@ -19091,6 +19091,9 @@ Dafür geändert:
   **Neue Karten, die „additional Gold during your Resource Phase" geben, gaten
   genauso** — oder, wenn das Gold ein eigener Effekt ist, rufen sie
   `actionGainGold(pi, n, { source })`.
+* Jeder Einkommens-Zuschlag ist ein eigenes Gold-Ereignis (`_einkommensBoni`, `afterResourceGain` mit `_einkommensBonus`) — **je Quelle ein Ereignis, bei Abilities je Stapel**
+  (Spielgestalter-Entscheidung 18.11.2026): Wealth Lv3 gibt „12 additional Gold" einmal (die drei Kopien des Stapels werden in `modifyAmount` zusammengefasst), Royal Treasury
+  triggert dafür einmal (4 + 12 + 6 = 22 statt 34 bei Magic Arts 2). Mehrere Helden mit Wealth bleiben je ein Ereignis.
 
 **★ BESCHWÖRUNGSSPERREN in `_summon-eligibility.js` (Lückenfix).** Bis v1343
 prüften `canHeroSummon` / `eligibleSummonZones` weder `summonLocked` noch eine
