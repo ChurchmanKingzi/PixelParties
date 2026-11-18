@@ -240,7 +240,7 @@ module.exports = {
           owner: pi, cardName: chosenName, from: 'discard', to: 'deleted',
         });
         const entnommen = await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
-        // Gesperrt (z. B. Freikauf des Eye of Ren abgelehnt): die Karte bleibt in der Ablage — NICHT zusätzlich in den Löschstapel legen (das verdoppelte sie) und keine Kopien holen.
+        // Gesperrt (z. B. Stab-/Eye-of-Ren-Sperre mitten im Effekt): die Karte bleibt in der Ablage — NICHT zusätzlich in den Löschstapel legen (das verdoppelte sie) und keine Kopien holen.
         if (!entnommen) {
           engine.log('mass_multiplication_fizzle', { player: ps.username, reason: 'discard_locked' });
           engine.sync();

@@ -9,7 +9,7 @@
 //  1. Wahl (`cardGallery`, abbrechbar → die Karte bleibt auf der Hand): JEDE Karte der eigenen Ablage, ohne Typfilter (entduplizierte Galerie mit Stückzahl, wie Shooting Star).
 //     Transmission selbst liegt beim Auflösen noch NICHT in der Ablage und kann sich nicht selbst verschicken; eine zweite Kopie darin ist ein gültiges Ziel.
 //  2. Reaktionsfenster „Hand-Interaktion / insert" (Ambush the Scout) — erst NACH der Wahl, wie bei Live Show. Wird es negiert, ist der Zauber verbraucht, die Karte bleibt in der Ablage.
-//  3. Die Karte verlässt die Ablage (`takeFromPile`: Stapel-Ausgangssperre, Stab-Sperre mit Freikauf), fliegt in die Hand des Gegners (`play_pile_transfer` Ablage → Hand über die
+//  3. Die Karte verlässt die Ablage (`takeFromPile`: Stapel-Ausgangssperre, Stab-/Eye-of-Ren-Sperre), fliegt in die Hand des Gegners (`play_pile_transfer` Ablage → Hand über die
 //     Brettmitte) und Transmission selbst fliegt zeitgleich in die Ablage (`aufloesenderSpellInDieAblage`, wie Shooting Star).
 //
 //  4. Aufdecken beim Eintritt: die Karte kommt über `handZugang` auf die Hand des Gegners — Karten mit `revealOnEnterHand` (Crystals, Great Vanguard Demon …) liegen dort sofort aufgedeckt, ihre
@@ -120,7 +120,7 @@ module.exports = {
       // ── 3. Die Karte verlässt die Ablage ──
       const genommen = await engine.takeFromPile(pi, 'discard', gewaehlt, { source: CARD_NAME });
       if (!genommen) {
-        // Ablage gesperrt (Stab-Sperre ohne Freikauf …): nichts passiert, die Karte bleibt auf der Hand.
+        // Ablage gesperrt (Stab-/Eye-of-Ren-Sperre …): nichts passiert, die Karte bleibt auf der Hand.
         gs._spellCancelled = true;
         return;
       }

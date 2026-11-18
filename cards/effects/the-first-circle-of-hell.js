@@ -45,11 +45,10 @@ const CARD_NAME = 'The First Circle of Hell';
 async function massDeleteDiscardPile(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps?.discardPile?.length) return [];
-  // v626: Discard-out-Sperre (Staebe / The Eye of Ren). Diese Loeschung
-  // ist PFLICHT — beim Eye zahlt der Spieler den Freikauf mit allem
-  // Gold, das er hat (auch 0), und es wird geloescht; bei den Staeben
-  // bleibt die Sperre hart und nichts wird geloescht.
-  if (!(await engine._discardOutAllowed(pi, { mandatory: true }))) {
+  // v626: Discard-out-Sperre (Staebe / The Eye of Ren). Spielgestalter-Entscheidung 18.11.2026: auch die Sperre des Eye ist hart (die
+  // Zusatzkosten des Eye werden bei seiner Aktivierung bezahlt, es gibt keinen Freikauf je Zugriff mehr) — unter jeder Sperre bleibt
+  // die Ablage unberuehrt und nichts wird geloescht.
+  if (!(await engine._discardOutAllowed(pi))) {
     engine.log('first_circle_blocked', { player: ps.username, reason: 'discard_locked' });
     return [];
   }

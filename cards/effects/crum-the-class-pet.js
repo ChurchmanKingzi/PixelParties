@@ -85,7 +85,7 @@ module.exports = {
     const handIdx = pick.handIndex;
     // ★ v1312 (Als Befund 23.9.) — die Reihenfolge, auf die der Client
     // angewiesen ist:
-    //  ⓪ Spell aus der Ablage nehmen (Sperren, ggf. Freikauf-Dialog) —
+    //  ⓪ Spell aus der Ablage nehmen (Sperren) —
     //    scheitert das, ist noch nichts geflogen;
     //  ① Anflug Ablage → Hand ansagen, SOLANGE der Client den Spell noch
     //    oben auf der Ablage sieht (er verdeckt ihn dort);
