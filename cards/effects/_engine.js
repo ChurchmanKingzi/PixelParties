@@ -11156,7 +11156,13 @@ class GameEngine {
    *   • Cardinal Beast immunity (absolute "unaffected by all cards and effects").
    *     Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung von
    *     Baihu/Petrifier („takes no damage from any sources" / „Damage … becomes 0") hält True Damage bei KREATUREN nicht mehr ab (`durchschlagVersteinerung`,
-   *     wie beim Helden, wo sie nie griff); Time Bomblebee/Succubus-Kontrolle („cannot take damage") bleiben für True Damage immun.
+   *     wie beim Helden, wo sie nie griff).
+   *     Spielgestalter-Entscheidung 18.11.2026 („Ja" — wenn Elixir of Strength und Ida das schon tun): True Damage schlägt bei KREATUREN auch die übrigen „takes no damage"-Schutz-Immunitäten
+   *     durch (`durchschlagSchutz`, derselbe Stempel wie das Elixir): Time Bomblebee mit Bomb Counters („cannot take damage or be defeated") und die Succubus-gestohlene Kreatur. Cardinal Beasts
+   *     („unaffected by ALL cards and effects"), Erstrunden-Schutz und die „unaffected by …"-Effekt-Immunitäten bleiben (anders als bei Ida wird `ignoreUnaffected` NICHT gesetzt).
+   *     `opts.durchschlagen === false` schaltet nur das Durchschlagen der Schutz-Immunitäten ab (kein Aufrufer setzt es: alle Kreaturen-Aufrufer — Acid Vial, Rockfall, Pressure Projectile, Surefire
+   *     Shot, Piercer of Heavens, Glasowt — tragen im Text „cannot be reduced or negated"; Johanna, Bubbles, Prophecy of Tempeste, Deepsea Siren, Rioting Village treffen nur Helden). Eine künftige
+   *     Karte, die technisch True Damage nutzt, ohne dass ihr Text unreduzierbaren Schaden nennt, setzt es.
    *
    * Behavior preserved vs. actionDealDamage:
    *   • Sets `_damagedOnTurn` on the target (used by Medusa's Curse etc.)
@@ -11339,6 +11345,7 @@ class GameEngine {
     // Guardian, and buff multipliers. Cardinal Beast absolutes
     // still block — "unaffected by all cards and effects", not a reduction.
     // Spielgestalter-Entscheidung 17.11.2026: die Versteinerung (Baihu/Petrifier) gilt hier nicht mehr als Schutz (`durchschlagVersteinerung`).
+    // Spielgestalter-Entscheidung 18.11.2026: ebenso Time Bomblebee („cannot take damage") und die Succubus-gestohlene Kreatur (`durchschlagSchutz`, wie Elixir of Strength/Ida); Cardinal Beasts bleiben.
     if (target.counters) {
       await this.processCreatureDamageBatch([{
         inst: target,
@@ -11348,6 +11355,7 @@ class GameEngine {
         sourceOwner,
         canBeNegated: false,
         durchschlagVersteinerung: true,
+        ...(opts.durchschlagen === false ? {} : { durchschlagSchutz: true }),
         trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
