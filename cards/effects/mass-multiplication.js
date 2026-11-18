@@ -32,6 +32,7 @@
 
 const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { HOOKS } = require('./_hooks');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const MAX_COPIES = 3;
 
@@ -57,7 +58,7 @@ module.exports = {
   blockedBySearchLock: true,
   blockedByPileLock: true,
 
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (!hasFreeZone(gs, pi)) return false;
@@ -73,6 +74,8 @@ module.exports = {
       if (n === 'Mass Multiplication') continue;
       if ((deckCounts[n] || 0) > 0) return true;
     }
+    // Quelle „Ablage" nur, solange die Ablage nicht gesperrt ist (Spielgestalter-Entscheidung 18.11.2026, `_pfad-shared.js`; siehe `onPlay`).
+    if (engine && ablageAusgangGesperrt(engine, pi)) return false;
     for (const n of (ps.discardPile || [])) {
       if ((deckCounts[n] || 0) > 0) return true;
     }
@@ -116,10 +119,14 @@ module.exports = {
         if ((deckCounts[name] || 0) === 0) continue; // No deck copies → not multipliable
         handCountMap[name] = (handCountMap[name] || 0) + 1;
       }
+      // „Delete a card from your hand or discard pile": zwei Quellen. Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar): unter der Stab-Sperre (Staff of the Teleporter)
+      // und Knight of Kings [B] darf nichts die Ablage verlassen — dann gibt es nur noch die Hand als Quelle. (Früher blieb die Karte in der Ablage UND landete im Löschstapel: Verdopplung.)
       const discardCountMap = {};
-      for (const name of (ps.discardPile || [])) {
-        if ((deckCounts[name] || 0) === 0) continue;
-        discardCountMap[name] = (discardCountMap[name] || 0) + 1;
+      if (!ablageAusgangGesperrt(engine, pi)) {
+        for (const name of (ps.discardPile || [])) {
+          if ((deckCounts[name] || 0) === 0) continue;
+          discardCountMap[name] = (discardCountMap[name] || 0) + 1;
+        }
       }
 
       const gallery = [];
@@ -232,7 +239,13 @@ module.exports = {
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: chosenName, from: 'discard', to: 'deleted',
         });
-        await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
+        const entnommen = await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
+        // Gesperrt (z. B. Freikauf des Eye of Ren abgelehnt): die Karte bleibt in der Ablage — NICHT zusätzlich in den Löschstapel legen (das verdoppelte sie) und keine Kopien holen.
+        if (!entnommen) {
+          engine.log('mass_multiplication_fizzle', { player: ps.username, reason: 'discard_locked' });
+          engine.sync();
+          return;
+        }
       } else {
         const idx = ps.hand.indexOf(chosenName);
         if (idx >= 0) { engine.takeFromPileSync(ps, 'hand', idx); delPs = engine.handKartenBesitzerPs(ps, chosenName); }   // W3/W5a: Stapel des permanenten Besitzers (gestohlene Handkarte)
