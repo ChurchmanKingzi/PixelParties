@@ -9041,14 +9041,15 @@ class GameEngine {
    * doesn't break the protection — only physically removing Light
    * Ball from the board does.
    */
-  _lightBallProtects(playerIdx, targetType, targetHeroIdx) {
+  _lightBallProtects(playerIdx, targetType, targetHeroIdx, kontrolleAls = null) {
     // ★ Styx 28.9.: nach KONTROLLE — „other targets you control". Bei
     // 'hero' ist `playerIdx` die Brettseite des Zielhelden (Kontrolleur
     // ueber `heroSideOf`), bei 'creature' bereits der Kontrolleur.
+    // `kontrolleAls` (18.11.2026, nur Status-Anhaengsel-Abgleich): beurteilt den Helden, als stuende er unter der Kontrolle dieses Spielers (s. `heroBlocksStatusNow`).
     let ctrl = playerIdx, zielHeld = null;
     if (targetType === 'hero') {
       zielHeld = this.gs.players[playerIdx]?.heroes?.[targetHeroIdx] || null;
-      if (zielHeld) ctrl = this.heroSideOf(playerIdx, zielHeld);
+      if (zielHeld) ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(playerIdx, zielHeld);
     }
     for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(ctrl)) {
       if (hero.hp <= 0) continue;
@@ -9086,10 +9087,10 @@ class GameEngine {
    * Negated). ★ Styx 28.9.: nach Kontrolle — eine geliehene Johanna
    * schuetzt die Helden ihres Kontrolleurs, nicht mehr die ihrer Spalte.
    */
-  _johannaSchuetzt(zielHeld) {
+  _johannaSchuetzt(zielHeld, kontrolleAls = null) {
     const phys = this._findHeroOwner(zielHeld);
     if (phys < 0) return false;
-    const ctrl = this.heroSideOf(phys, zielHeld);
+    const ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(phys, zielHeld);   // `kontrolleAls`: s. `heroBlocksStatusNow`
     for (const { hero: johanna } of this.heroesControlledBy(ctrl)) {
       if (johanna.name !== 'Johanna, Crusader of Light') continue;
       if (johanna === zielHeld) continue;   // schuetzt sich nicht selbst
@@ -56800,6 +56801,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Einzel-Immunitaet wie `poison_immune`, CC-`immune`) - keine Quellen-/Aufloesungs-Schutze (Effekt-Immunitaet, Anti Magic).
    * Fuer Kosten-Karten, die einen Status auf den eigenen Helden legen MUESSEN (Sickly Cheese): ein solcher Held ist kein
    * waehlbares Ziel. `opts.appliedBy` = Seite der Quelle (Charme-Schutz), `opts.bypassImmune` wie dort.
+   * `opts.kontrolleAls` (18.11.2026, Mind Control im Status-Anhaengsel-Abgleich): Johanna und Light Ball schuetzen „Heroes you control" — der Held wird so beurteilt, als stuende er unter der Kontrolle
+   * dieses Spielers (bei Mind Control: sein Kontrolleur VOR der Uebernahme), damit die Uebernahme nicht durch den Schutz des Uebernehmers selbst wieder erlischt.
    */
   heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
@@ -56811,8 +56814,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.ohneCharme && statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
     if (hero.statuses?.shielded && statusName !== 'shielded') return true;
     if (statusDef?.negative) {
-      if (this._johannaSchuetzt(hero)) return true;
-      if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
+      if (this._johannaSchuetzt(hero, opts.kontrolleAls)) return true;
+      if (this._lightBallProtects(playerIdx, 'hero', heroIdx, opts.kontrolleAls)) return true;
       if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName)) return true;
     }
     if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
