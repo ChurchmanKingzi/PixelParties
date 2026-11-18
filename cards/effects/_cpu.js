@@ -9223,6 +9223,8 @@ function simulateDamageTargetScore(engine, target, damage, ownerIdx) {
 // Conservative: when in doubt, treat as non-immune so we don't over-skip.
 // Spielgestalter-Entscheidung 17.11.2026: True Damage („cannot be reduced or negated": Rockfall, Pressure Projectile, Acid Vial, Surefire Shot …) durchschlaegt die Versteinerung
 // (Baihu/Petrifier) – die CPU betrachtet versteinerte Kreaturen (und Helden) dafuer als regulaere Ziele.
+// Spielgestalter-Entscheidung 18.11.2026: ebenso Time Bomblebee (Bomb Counters) und Succubus-gestohlene Kreaturen (`durchschlagSchutz`) — die Bilanz (`_kreaturen-bilanz.js`, `opts.trueDamage`) wertet sie
+// fuer diese Karten nicht mehr als geschuetzt; `isTargetImmune` kennt diese beiden Schutzformen nie (nur die Pruefung, die der Kreaturenpfad wirklich ueberspringt, faellt weg).
 const CPU_TRUE_DAMAGE_KARTEN = new Set(['Rockfall', 'Pressure Projectile', 'Acid Vial', 'Surefire Shot', 'Piercer of Heavens', 'Glasowt']);   // Quellen ueber `engine.actionDealTrueDamage` („cannot be reduced or negated", Versteinerung durchschlagen)
 function cardDealsTrueDamage(cardName) {
   if (!cardName) return false;
@@ -9398,7 +9400,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
       if (t.type !== 'creature' && t.type !== 'equip') continue;
       const inst = t.cardInstance || findSupportInstance(engine, t);
       if (!inst) continue;
-      const sa = KreaturenBilanz.schutzAnteil(engine, aoeOpts.quelle, inst, 'damage', { amount: damage, damageType: aoeOpts.damageType, sourceOwner: aoeOpts.quelle.owner, gerichtet: true, nurSicher: !!engine._inMctsSim });   // im Rollout nur der billige sichere Teil
+      const sa = KreaturenBilanz.schutzAnteil(engine, aoeOpts.quelle, inst, 'damage', { amount: damage, damageType: aoeOpts.damageType, sourceOwner: aoeOpts.quelle.owner, gerichtet: true, nurSicher: !!engine._inMctsSim, trueDamage: !!aoeOpts.trueDamage });   // im Rollout nur der billige sichere Teil; True Damage schlägt die Schutz-Immunitäten durch (Spielgestalter-Entscheidung 18.11.2026)
       if (sa.geschuetzt) schutzVon.set(t, sa);
     }
     const ungeschuetzt = viable.filter(t => !(schutzVon.get(t)?.faktor === 0));

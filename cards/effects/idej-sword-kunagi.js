@@ -136,16 +136,24 @@ module.exports = {
         gs._spellCancelled = false;
         const tempInst = engine._trackCard(attackName, pi, 'hand', heroIdx, -1);
         if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: geliehener Held
+        let negiert = false;
         try {
-          await engine.runHooks('onPlay', {
+          // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): „perform that Attack again" ist ein Spielen der Wiederholung
+          // (`engine.performKettenfenster`): Hand-Reaktionen auf Attacks (Pfeile, Magic Topaz …) und die Kettenglieder kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand).
+          // Nichts wird erneut bezahlt. Wird die Wiederholung in der Kette negiert, löst ihr Rumpf nie auf (kein Treffer, keine Karte, die Kette endet) — als gespielte Attack zählt sie trotzdem.
+          const _pk = await engine.performKettenfenster({ cardName: attackName, pi, heroIdx, heroOwner: feld, ausHand: false });
+          negiert = _pk.negated;
+          if (!negiert) await engine.runHooks('onPlay', {
             _onlyCard: tempInst, playedCard: tempInst,
             cardName: attackName, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
           });
+          await clearArmedArrows(engine, pi);   // Pfeile aus dem Fenster dieser Wiederholung gelten nur für sie
         } catch (err) {
           console.error(`[${CARD_NAME}] repeat-attack error for "${attackName}":`, err.message);
         }
         const targets = [...(gs._spellDamageLog || [])];
+        if (negiert) targets.negiert = true;
         engine._untrackCard(tempInst.id);
         delete gs._spellDamageLog;
         delete gs._spellExcludeTargets;
@@ -200,7 +208,7 @@ module.exports = {
         && guard++ < LOOP_CAP
       ) {
         const repeatTargets = await repeatAttack(lastTargets[0]?.id || null);
-        if (repeatTargets.length > 0) {
+        if (repeatTargets.length > 0 || repeatTargets.negiert) {
           // W41a (Al, 22.10.2026, Punkt 6): auch die Wiederholung einer Attack-KARTE ist eine eigene Attack-Instanz (Zähler, Mirjam, Berserk, Rioting Village …)
           await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: attackName, karte: true });
         }

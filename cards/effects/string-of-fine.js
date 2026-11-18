@@ -22,6 +22,8 @@ module.exports = {
   spellVisual: { impact: { type: 'johanna_cleanse' }, impactMs: 260 },
 
   playableFromCoolnessStack: true,
+  // Spielgestalter-Entscheidung 18.11.2026: das Spielen vom Stapel ist eine Zusatzaktion — die Aktionssperre (Overflowing Chalice, Kent: `areActionsBlocked`) sperrt es (`actionPlayTopOfCoolnessStack`).
+  stackPlayIstZusatzaktion: true,
   // Hand-grey: Stack-only. Plays from hand do nothing.
   neverPlayable: true,
 

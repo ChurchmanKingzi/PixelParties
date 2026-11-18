@@ -181,9 +181,15 @@ module.exports = {
       const geloeschtVor = (gs.players[pi].deletedPile || []).filter(n => n === name).length;
       const fireBoltsAlt = engine._fireBoltsEntscheid;   // W75a: Entscheidung 200/50 des äußeren Fire Bolts (Zweitwurf) — die Kopie entscheidet für sich
       try {
-        await engine.runHooks('onPlay', {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): die Kopie ist wie jedes „performs" ein Spielen (`engine.performKettenfenster`):
+        // Silence, Anti-Magic-Reaktionen, Hand-Reaktionen auf Attacks (Pfeile) usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Wirker ist die KREATUR (`trotzStatus`: kein
+        // Helden-Wirker, wie Demon's Gate). Nichts wird erneut bezahlt; das Limit „1 pro Zug" ist ab dem Ja verbraucht. Wird die Kopie in der Kette negiert, löst ihr Rumpf nie auf.
+        const _pfeileVorher = (hero._armedArrows || []).length;
+        const _pk = await engine.performKettenfenster({ cardName: name, pi, heroIdx: inst.heroIdx, heroOwner: feld, ausHand: false, trotzStatus: true });
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: synth, playedCard: synth, cardName: name, zone: 'hand', heroIdx: inst.heroIdx, _skipReactionCheck: true,
         });
+        if (cd.cardType === 'Attack' && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile, die erst in DIESEM Fenster scharf wurden, gelten nur für die Kopie
       } catch (err) {
         console.error(`[Clone] copy of "${name}" failed:`, err.message);
       } finally {

@@ -7,6 +7,8 @@
 //  ★ Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung
 //  (Baihu/Petrifier) hält den Schaden auch bei KREATUREN nicht ab (wie beim Helden) — `engine.actionDealTrueDamage` stempelt den Treffer mit
 //  `durchschlagVersteinerung` (gilt für alle True-Damage-Quellen: Rockfall, Pressure Projectile, Surefire Shot, Piercer of Heavens, Glasowt).
+//  ★ Spielgestalter-Entscheidung 18.11.2026: True Damage schlägt auch Time Bomblebee („cannot take damage") und Succubus-gestohlene Kreaturen durch (`durchschlagSchutz`, wie
+//  Elixir of Strength/Ida); Cardinal Beasts („unaffected by all cards and effects") bleiben unberührt.
 //  Damage type: 'other'.
 //  Hard once per turn.
 //  Animation (Pixelart, public/app-fx-70.jsx): Spuckkugel wie im Trailer — die Kugel LÄDT über der Handkarte der gespielten Potion (0,7 s, Radius 2 → 7; die Karte fliegt nach einem Drittel der Animation (ca. 0,8 s) in den Gelöscht-Stapel, `_potion-hand-flight.js`),

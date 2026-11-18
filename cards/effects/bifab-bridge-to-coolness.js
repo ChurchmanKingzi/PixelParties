@@ -43,6 +43,8 @@ module.exports = {
   blockedBySearchLock: true,
 
   playableFromCoolnessStack: true,
+  // Spielgestalter-Entscheidung 18.11.2026: das Spielen vom Stapel ist eine Zusatzaktion — die Aktionssperre (Overflowing Chalice, Kent: `areActionsBlocked`) sperrt es (`actionPlayTopOfCoolnessStack`).
+  stackPlayIstZusatzaktion: true,
   // Greys out the card in hand — it has no effect when played from
   // there. Stack-top play remains available via the dedicated
   // `play_from_coolness_stack` socket flow, which doesn't consult

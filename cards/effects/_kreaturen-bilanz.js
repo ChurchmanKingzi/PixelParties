@@ -554,9 +554,13 @@ function kreaturGeschuetztVor(engine, quelle, inst, art, opts = {}) {
     const q = normQuelle(quelle, opts);
     const seite = inst.controller ?? inst.owner;
     const verursacher = typeof q.owner === 'number' ? q.owner : gs.activePlayer;
-    const piercing = opts.canBeNegated === false;
     const schaden = art === 'damage';
     const zerstoeren = art === 'destroy';
+    // Spielgestalter-Entscheidung 18.11.2026: True Damage („cannot be reduced or negated": Rockfall, Pressure Projectile, Acid Vial, Surefire Shot, Piercer of Heavens, Glasowt — `opts.trueDamage`)
+    // schlägt bei KREATUREN die „takes no damage"-Schutz-Immunitäten durch (`engine.actionDealTrueDamage`: `durchschlagSchutz` — Versteinerung, Time Bomblebee mit Bomb Counters, Succubus-gestohlene
+    // Kreatur); Cardinal Beasts, Erstrunden-Schutz und „unaffected by …" bleiben. Die Bilanz bewertet nur, was die Engine wirklich überspringt.
+    const wahrerSchaden = schaden && opts.trueDamage === true;
+    const piercing = opts.canBeNegated === false || wahrerSchaden;
     if (inst.zone !== 'support') return nein;
     if (inst.faceDown) return ja('verdeckt');
 
@@ -564,12 +568,12 @@ function kreaturGeschuetztVor(engine, quelle, inst, art, opts = {}) {
     const prot = gs.firstTurnProtectedPlayer;
     if (prot != null && seite === prot && verursacher !== prot) return ja('Erstrunden-Schutz');
     if (engine.isOmniImmune?.(inst, q.obj, { sourceOwner: q.owner, damageType: opts.damageType, piercing })) return ja('unaffected');
-    if ((schaden || zerstoeren) && !engine.isCardPassiveDormant?.(inst) && inst.counters?._damageDestroyImmune) return ja('Schaden-/Zerstoeren-Immunitaet');
-    if ((schaden || zerstoeren) && inst.counters?._stealImmortal) return ja('gestohlen (unverwundbar)');
+    if ((schaden || zerstoeren) && !wahrerSchaden && !engine.isCardPassiveDormant?.(inst) && inst.counters?._damageDestroyImmune) return ja('Schaden-/Zerstoeren-Immunitaet');
+    if ((schaden || zerstoeren) && !wahrerSchaden && inst.counters?._stealImmortal) return ja('gestohlen (unverwundbar)');
     if (zerstoeren && inst.counters?.immovable) return ja('unzerstoerbar');
     if (typeof q.owner === 'number' && q.owner !== seite && art !== 'damage' && engine.isOppEffectImmuneFrom?.(inst, q.obj)) return ja('immun gegen gegnerische Effekte');
     if (schaden) {
-      const ee = { inst, amount: opts.amount ?? 1, type: opts.damageType || 'other', source: q.obj, sourceOwner: q.owner ?? -1, canBeNegated: !piercing };
+      const ee = { inst, amount: opts.amount ?? 1, type: opts.damageType || 'other', source: q.obj, sourceOwner: q.owner ?? -1, canBeNegated: !piercing, ...(wahrerSchaden ? { durchschlagSchutz: true, durchschlagVersteinerung: true, trueDamage: true } : {}) };
       leise(engine, () => engine._markCreatureDamageImmunity([ee]));
       if (ee._immuneCreature) return ja('Schadensimmunitaet');
       if (schadensFaktor(inst) === 0) return ja('Schaden wirkungslos (Buff)');
