@@ -8019,6 +8019,9 @@ class GameEngine {
       // heilen schickt die Karte in die Ablage, uebertragen nimmt sie mit
       // (Als allgemeine Regel 17.9.).
       if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      // Spielgestalter-Entscheidung 18.11.2026: eine ruhende Karte, die als Status zaehlt, steht unter derselben Sperre wie ein Status
+      // („its other status effects cannot be removed", Forbidden Curse of Aging) — sie steht dann nicht in der Liste.
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
       out.push({
         key: `attach:${inst.id}`,
         label: script.negativeStatusLabel || inst.name,
@@ -8030,6 +8033,25 @@ class GameEngine {
       });
     }
     return out;
+  }
+
+  /**
+   * Spielgestalter-Entscheidung 18.11.2026: traegt der Held ein RUHENDES Status-Anhaengsel (Stowaway, Decisive Defeat, Forbidden Curse of Aging, Mind Control unter Status-Immunitaet),
+   * das die Heil-Listen als `attach:`-Eintrag fuehren? Ein solcher Held ist auch ohne echten Status ein Ziel der Heilkarten (Cure fragt `cleansableHeroEntries` ohnehin selbst).
+   */
+  heroHatRuhendesAnhaengsel(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.statuses) return false;
+    // Dieselben Bedingungen wie die `attach:`-Eintraege in `cleansableHeroEntries`, aber ohne die Liste zu bauen (laeuft in Zielfiltern und CPU-Planung oft).
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== pi || inst.faceDown) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.countsAsNegativeStatus) continue;
+      if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -8125,11 +8147,12 @@ class GameEngine {
     return this.sendBoardCardToDiscard(inst, { source: typeof source === 'string' ? { name: source } : source });
   }
 
-  async cleanseAttachmentByKey(key, source) {
+  async cleanseAttachmentByKey(key, source, gesperrt) {
     const id = String(key || '').startsWith('attach:') ? String(key).slice(7) : null;
     if (!id) return false;
     const inst = this.cardInstances.find(c => String(c.id) === id && c.zone === ZONES.SUPPORT);
     if (!inst) return false;
+    if (gesperrt?.has(inst.id)) return false;   // 18.11.2026: Sperre des Wirts (s. `cleanseHeroStatuses`)
     this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
     // ★★ v1143b: ueber den EINEN Brett→Ablage-Weg — vorher fehlte der
     // Flug, und `{ source }` landete im Parameter `toHeroIdx`.
@@ -8137,10 +8160,10 @@ class GameEngine {
     return true;
   }
 
-  async cleanseNegativeAttachments(pi, heroIdx, source) {
+  async cleanseNegativeAttachments(pi, heroIdx, source, gesperrt) {
     const treffer = this.cardInstances.filter(inst =>
       inst.zone === ZONES.SUPPORT && inst.heroIdx === heroIdx && inst.owner === pi
-      && !inst.faceDown
+      && !inst.faceDown && !gesperrt?.has(inst.id)
       && loadCardEffect(inst.name)?.countsAsNegativeStatus);
     for (const inst of treffer) {
       this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
@@ -21233,6 +21256,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bewegung auch die Status ab, die der Fluch gerade noch schuetzt.
     const sperrtZuBeginn = new Map(statusKeys.map(k =>
       [k, this._heroStatusRemovalBlocked(playerIdx, heroIdx, k)]));
+    // Spielgestalter-Entscheidung 18.11.2026: Karten, die „als negativer Status zaehlen" (Stowaway, Decisive Defeat, Aged, Mind Control), stehen unter derselben Sperre wie ihr Status —
+    // auch die Vollheilung (Cure) raeumt sie nicht ab, solange „its other status effects cannot be removed" gilt (Stand zu Beginn, wie oben; der eigene Status von Aged bleibt entfernbar).
+    const anhGesperrt = new Set();
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== playerIdx || inst.faceDown) continue;
+      const sc = loadCardEffect(inst.name);
+      if (sc?.countsAsNegativeStatus && this._heroStatusRemovalBlocked(playerIdx, heroIdx, sc.attachmentStatus)) anhGesperrt.add(inst.id);
+    }
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (this._statusUnentfernbar(key, hero.statuses[key])) continue;
@@ -21313,7 +21344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const gewaehlt = (statusKeys || []).filter(k => String(k).startsWith('attach:'));
       if (gewaehlt.length > 0) {
         queueMicrotask(() => {
-          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source); })()
+          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source, anhGesperrt); })()
             .catch(err => console.error('[cleanseAttachmentByKey]', err.message));
         });
       }
@@ -21323,7 +21354,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const alleDabei = voll.length > 0 && voll.every(k => statusKeys.includes(k));
       if (alleDabei) {
         queueMicrotask(() => {
-          this.cleanseNegativeAttachments(playerIdx, heroIdx, source)
+          this.cleanseNegativeAttachments(playerIdx, heroIdx, source, anhGesperrt)
             .catch(err => console.error('[cleanseNegativeAttachments]', err.message));
         });
       }

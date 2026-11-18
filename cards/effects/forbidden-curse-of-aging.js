@@ -42,6 +42,16 @@
 //  (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`; Abgleich in
 //  `engine.sync`, wie bei Curse, Berserk und Stowaway).
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ──────────
+//  „Aged" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die
+//  Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen
+//  `attach:<instId>`-Eintrag („Aged (Forbidden Curse of Aging)"), wie Stowaway und
+//  Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres
+//  ursprünglichen Besitzers; Cure zählt ihn als einen entfernten Effekt (+100 HP).
+//  Aktiv steht nur der Status `aged` in der Liste (kein Doppeleintrag; der
+//  `attach:`-Eintrag entfällt, solange der Wirt `aged` trägt). Ruhend sperrt die
+//  Karte nichts („its other status effects cannot be removed" gilt nur aktiv).
+//
 //  ── DIE ZUSATZ-AKTION (Als Regel 15.9., bestaetigt 17.9.) ─────────
 //  ① ANGEBOTEN wird die Karte als Zusatz-Aktion, solange mindestens ein
 //     LEGALES Ziel (lebt, freie Support Zone) eine der beiden
@@ -116,6 +126,10 @@ module.exports = {
   cpuMeta: { optionalInherent: true },
 
   attachmentStatus: STATUS_NAME,
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Aged (Forbidden Curse of Aging)',
+  negativeStatusIcon: '⏳',
   // Spielgestalter-Entscheidung 18.11.2026: der Status (und mit ihm Heilsperre, Status-Sperre und Charme-Negierung) folgt der Status-Immunitaet des Wirts.
   statusFolgtImmunitaet: { status: STATUS_NAME },
   blocksHostHeal: true,

@@ -33,6 +33,12 @@
 //  Heldentod/-wiederbelebung, Zugbeginn/-ende, nach jeder aufgelösten Aktion), mit dem Status ab. Die Kontrolle, die die Karte selbst ausübt, zählt für die Immunität des Wirts nicht (`kontrolleAls`): sonst
 //  schützten die Johanna/der Light Ball des Übernehmers den übernommenen Helden vor der Übernahme selbst, und sie flackerte an und aus.
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ────────────────
+//  „Mind Controlled" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen `attach:<instId>`-Eintrag
+//  („Mind Controlled (Mind Control)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers; Cure zählt ihn als einen entfernten
+//  Effekt (+100 HP). Die ruhende Karte übt keine Kontrolle aus — Heilen gibt also nichts zurück und ändert die Kontrolle nicht (`gibZurueck` findet keinen Eintrag in `mcZiele`). Aktiv steht nur der
+//  Status `mind_controlled` in der Liste (kein Doppeleintrag); ihn zu heilen wirft die Karte ab und gibt die Kontrolle zurück wie bisher.
+//
 //  ── OBERGRENZE ──────────────────────────────────────────────────────────
 //  „If either player controls more than 2 Heroes, immediately send this card to the discard pile." Gezählt werden die UNBESIEGTEN Helden, die ein Spieler kontrolliert (besiegte Helden zählen
 //  nicht — sonst wäre die Karte nach der Spielbedingung [2 eigene Helden besiegt + ein Held] nie legal: 3 + 1 > 2). Geprüft nach jeder Wiederbelebung, jedem Kontrollwechsel, zu jedem Zugbeginn und nach
@@ -195,6 +201,10 @@ module.exports = {
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Mind Controlled (Mind Control)',
+  negativeStatusIcon: '🧠',
   // Spielgestalter-Entscheidung 18.11.2026: der Status (und mit ihm die Kontrolle) folgt der Status-Immunität des Wirts (Curse/Berserk-Muster). `kontrolleAls`: die Übernahme, die diese Karte selbst
   // ausübt, zählt für die Immunität des Wirts nicht — er wird als Held seines Kontrolleurs VOR der Übernahme beurteilt (sonst Flackern bei eigener Johanna/eigenem Light Ball).
   statusFolgtImmunitaet: {
