@@ -171,6 +171,9 @@ function _matchesKind(cd, kind) {
 function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action"): die Hand-Seite filtert `getHeroEligibleActionCards` schon, die Deck-Seite unten nicht — unter der
+  // Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) gibt es gar keine Kandidaten.
+  if (engine.areActionsBlocked(pi)) return [];
   const cardDB = engine._getCardDB();
   const out = [];
   const seen = new Set();

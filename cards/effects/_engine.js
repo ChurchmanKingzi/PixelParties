@@ -60916,6 +60916,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const isSummonable = script.summonableFromCoolnessStack === true;
     if (!isPlayable && !isSummonable) return { aborted: true, reason: 'not_playable_from_stack' };
     if (typeof script.resolveFromCoolnessStack !== 'function') return { aborted: true, reason: 'no_resolver' };
+    // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action", wie Cooldin): das Beschwoeren vom Coolness Stack (Hipdall, Swagdri, Wildur: "summon it as an additional
+    // Action from there") und das Spielen von String of Fine/Bifab (`stackPlayIstZusatzaktion`: "play it from there as an additional Action" / "This counts as an additional Action") sind
+    // Zusatzaktionen — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) passiert nichts, die Karte bleibt oben auf dem Stapel.
+    // Modnir/Swellpnir (Ausruestung anlegen) sind keine Aktion und bleiben spielbar.
+    if ((isSummonable || script.stackPlayIstZusatzaktion === true) && this.areActionsBlocked(playerIdx)) return { aborted: true, reason: 'actions_blocked' };
     const inst = this.getCoolnessStackTopInst(playerIdx);
     if (!inst) return { aborted: true, reason: 'no_inst' };
     const ctx = this._createContext(inst, { event: 'playFromCoolnessStack' });
