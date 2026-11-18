@@ -24244,6 +24244,8 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    passt dann auf dem S9+ ohne Scrollen. */
 @media (max-height: 560px) {
   .first-choice-panel.fcp-begrenzt { width: max-content; }
+  /* ★ X2: dieselbe Ursache bei ALLEN Duell-Fenstern (Zielwahl hat es schon): `left: 50%` lässt nur die halbe Fensterbreite — Text bricht in viele Zeilen, das Fenster wird hoch. */
+  .first-choice-panel { width: max-content; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
