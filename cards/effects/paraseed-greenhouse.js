@@ -39,6 +39,8 @@ const {
 } = require('./_paraseed-shared');
 const { isAreaImmuneHero, isAreaImmuneInst } = require('./_diver-helmet-shared');   // Diver Helmet + W82 Shipwrecked
 
+const { waehlePfad, deckAusgangGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Paraseed Greenhouse';
 
 /** ALLE freien Zonen eines Helden (place: Heldenzustand egal). */
@@ -117,8 +119,15 @@ function umzugsZiele(engine, ausserHost, inst = null) {
   return ziele;
 }
 
+/**
+ * Weg „Paraseed suchen und pflanzen": braucht eine Paraseed im Deck und ein Ziel — und ein offenes Deck: die Hand-Sperre sperrt jede Suche, Knight of Kings [B] lässt nichts das Deck verlassen
+ * (Z6 A08-24; die Such-Sperre meint nur Karten AUF DIE HAND und gilt hier nicht).
+ * Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): diese Sperren schliessen NUR diesen Weg; der Weg „Paraseeds umziehen" bleibt frei (früher sperrten sie den ganzen
+ * Area-Effekt). Genau ein freier Weg → automatisch, ohne Menü.
+ */
 function kannPflanzen(engine, pi) {
   const ps = engine.gs.players[pi];
+  if (ps?.handLocked || deckAusgangGesperrt(engine, pi)) return false;
   return (ps?.mainDeck || []).some(n => isParaseedCreature(n, engine))
     && pflanzZiele(engine, pi).length > 0;
 }
@@ -272,10 +281,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (!ps) return false;
     if ((ps.hand || []).length === 0) return false;        // Abwurf ist Pflichtkosten
-    if (ps.handLocked) return false;
-    // Z6 (A08-24): Stapel-Sperre (Knight of Kings [B]) - das Deck darf nicht verlassen werden, dann waere der Abwurf reine Kosten.
-    // (Die Such-Sperre meint nur Karten AUF DIE HAND - Paraseed kommt ins Spiel, Gruppe Garius, Al 14.9.: nicht betroffen.)
-    if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return false;
+    // Hand-Sperre und Stapel-Sperre (Knight of Kings [B]) schliessen nur den Pflanz-Weg (`kannPflanzen`); der Umzug bleibt (Spielgestalter-Entscheidung 18.11.2026).
     return kannPflanzen(engine, pi) || kannUmziehen(engine);
   },
 
@@ -290,20 +296,12 @@ module.exports = {
     if (!pflanzbar && !umziehbar) return false;
 
     // Nur bei echter Wahl ein Menue; sonst direkt zu den Kosten.
-    let modus = pflanzbar ? 'plant' : 'move';
-    if (pflanzbar && umziehbar) {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'optionPicker', title: CARD_NAME,
-        description: 'Discard 1 card from your hand to use the Greenhouse.',
-        options: [
-          { id: 'plant', label: '🌱 Search a "Paraseed" and plant it' },
-          { id: 'move', label: '🪴 Move "Paraseeds" to other Heroes' },
-        ],
-        cancellable: true,
-      });
-      if (!wahl || wahl.cancelled) return false;
-      modus = wahl.optionId || wahl.id || wahl.selected || wahl.option || 'plant';
-    }
+    const wahl = await waehlePfad(engine, pi, [
+      { id: 'plant', label: '🌱 Search a "Paraseed" and plant it', offen: pflanzbar },
+      { id: 'move', label: '🪴 Move "Paraseeds" to other Heroes', offen: umziehbar },
+    ], { title: CARD_NAME, description: 'Discard 1 card from your hand to use the Greenhouse.', cancellable: true });
+    if (wahl.abgebrochen || wahl.keiner) return false;
+    const modus = wahl.id;
 
     // Kosten. Ein Abbruch hier beendet den Effekt, ohne ihn zu
     // verbrauchen — Standard fuer Abwurf-Kosten ab v718.

@@ -31,6 +31,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Potion Juggler';
 const DELETE_TOP = 2;
@@ -46,7 +47,9 @@ function loeschbarePotions(engine, pi) {
     for (const n of (liste || [])) { if (hasCardType(db[n], 'Potion')) map[n] = (map[n] || 0) + 1; }
     return Object.entries(map).map(([name, count]) => ({ name, source, count }));
   };
-  return [...zaehle(ps.hand, 'hand'), ...zaehle(ps.discardPile, 'discard')]
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand OR discard pile" — unter der Stab-Sperre (Staff of the Teleporter) und
+  // Knight of Kings [B] ist die Ablage als Quelle zu (früher angeboten, das Löschen scheiterte danach); die Hand bleibt.
+  return [...zaehle(ps.hand, 'hand'), ...(ablageAusgangGesperrt(engine, pi) ? [] : zaehle(ps.discardPile, 'discard'))]
     .sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
 }
 const hatPotion = (engine, pi) => loeschbarePotions(engine, pi).length > 0;

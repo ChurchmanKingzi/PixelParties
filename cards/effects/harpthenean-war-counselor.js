@@ -35,6 +35,7 @@
 // Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
 // solange der Gewinn gesperrt ist. Auslegung in `_gold-block-shared.js`.
 const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+const { waehlePfad } = require('./_pfad-shared');
 
 const {
   WC,
@@ -84,30 +85,19 @@ module.exports = {
     const gold = Math.max(0, (ps.gold || 0) - offeneGatheringGebuehr(engine, inst));
     let damage = Math.min(DAMAGE_CAP, DAMAGE_PER_GOLD * gold);
 
-    const choice = await engine.promptGeneric(pi, {
-      type: 'optionPicker',
-      title: CARD_NAME,
-      description: 'Choose which counsel to follow.',
-      showCard: CARD_NAME,
-      options: [
-        // Gold-Option nur, wenn der Gewinn nicht gesperrt ist
-        // (Als Ruling 17.8., "Tuscan Aristocrat").
-        ...(goldGainWouldBeBlocked(engine, pi) ? [] : [{
-          id: 'gold',
-          label: `💰 Gain ${goldGain} Gold`,
-          description: `${GOLD_PER_COUNSELLOR} × ${counselors} "${WC}" Creature${counselors !== 1 ? 's' : ''} you control.`,
-          color: '#ffd700',
-        }]),
-        {
-          id: 'damage',
-          label: `🔥 Deal ${damage} damage`,
-          description: `${DAMAGE_PER_GOLD} × your ${gold} Gold, capped at ${DAMAGE_CAP}. Your Gold is not spent.`,
-          color: '#ff4444',
-        },
-      ],
-      cancellable: true,
-    });
-    if (!choice || choice.cancelled || !choice.optionId) return false;
+    // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): jede Option fällt weg, solange ihr Weg gesperrt ist — Gold bei gesperrtem Goldgewinn (Ruling 17.8., „Tuscan
+    // Aristocrat"), Schaden bei Schadenssperre (`damageLocked`); genau ein freier Weg wird automatisch genommen (die folgende Zielwahl ist abbrechbar), kein
+    // freier Weg: nichts passiert.
+    const wahl = await waehlePfad(engine, pi, [
+      { id: 'gold', label: `💰 Gain ${goldGain} Gold`,
+        description: `${GOLD_PER_COUNSELLOR} × ${counselors} "${WC}" Creature${counselors !== 1 ? 's' : ''} you control.`,
+        color: '#ffd700', offen: !goldGainWouldBeBlocked(engine, pi) },
+      { id: 'damage', label: `🔥 Deal ${damage} damage`,
+        description: `${DAMAGE_PER_GOLD} × your ${gold} Gold, capped at ${DAMAGE_CAP}. Your Gold is not spent.`,
+        color: '#ff4444', offen: !ps.damageLocked },
+    ], { title: CARD_NAME, description: 'Choose which counsel to follow.', showCard: CARD_NAME, cancellable: true });
+    if (wahl.abgebrochen || wahl.keiner) return false;
+    const choice = { optionId: wahl.id };
 
     // ── Gold ──
     if (choice.optionId === 'gold') {

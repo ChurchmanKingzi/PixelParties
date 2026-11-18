@@ -33,6 +33,8 @@
 
 const { istAusruestTraeger, freieBasisZonen, ruesteAusStapelAus } = require('./_equip-shared');
 
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Looting';
 const BILD_MS = 900;        // Länge der Animation (deckt sich mit `looting_grab` im Client)
 const BILD_VOR_MS = 560;    // bis der Sack ausgeschüttet hat, dann fliegt die Karte
@@ -52,6 +54,9 @@ function kandidaten(engine, pi, seite, heroIdx) {
   const gesehen = new Set();
   const piles = [engine.opponentOf(pi), pi];
   for (const besitzer of piles) {
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from either discard pile" sind zwei Quellen — eine gesperrte Ablage (Stab-Sperre des
+    // Staff of the Teleporter, Knight of Kings [B]) taucht nicht auf, die andere bleibt (früher stand die Ausrüstung der gesperrten Ablage in der Galerie und die Wahl lief ins Leere).
+    if (ablageAusgangGesperrt(engine, besitzer, { sourceOwner: pi })) continue;
     for (const name of (engine.gs.players[besitzer]?.discardPile || [])) {
       if (gesehen.has(name) || !istEquip(engine, name)) continue;
       if (!istAusruestTraeger(engine, pi, heroIdx, name, seite, besitzer)) continue;   // W14b (Q153): Control Device nur aus der Gegner-Ablage

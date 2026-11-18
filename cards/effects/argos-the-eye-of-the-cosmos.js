@@ -32,6 +32,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 const {
   COSMIC_DEPTHS_CREATURES,
   getChangeCounters, addChangeCounters, removeChangeCounters,
@@ -74,7 +75,8 @@ function cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl) {
   };
   // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
   scan(engine.handUndVorratListe(pi), 'hand');
-  scan(ps?.mainDeck, 'deck');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+  if (!deckAusgangGesperrt(engine, pi)) scan(ps?.mainDeck, 'deck');
   return out;
 }
 
@@ -83,6 +85,7 @@ function cdEintraegeAtLevel(engine, pi, lvl) {
   const ps = engine.gs.players[pi];
   const out = [];
   for (const quelle of ['hand', 'deck']) {
+    if (quelle === 'deck' && deckAusgangGesperrt(engine, pi)) continue;   // Knight of Kings [B]: Quelle Deck zu
     const liste = quelle === 'hand' ? engine.handUndVorratListe(pi) : ps?.mainDeck;
     const names = new Set();
     for (const c of cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl)) names.add(c.name);

@@ -40,6 +40,8 @@
 //  (Alex, Cute Starlet Megu) follow.
 // ═══════════════════════════════════════════
 
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Pressed Skill';
 const PILES = ['hand', 'deck', 'discard'];
 
@@ -83,6 +85,10 @@ function buildGallery(engine, pi) {
   const cardDB = engine._getCardDB();
   const entries = [];
   for (const source of PILES) {
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your deck, hand or discard pile" — Deck unter Knight of Kings [B], Ablage unter der
+    // Stab-Sperre (Staff of the Teleporter) / Knight of Kings [B] sind als Quelle zu (früher angeboten, die Entnahme scheiterte danach).
+    if (source === 'deck' && deckAusgangGesperrt(engine, pi)) continue;
+    if (source === 'discard' && ablageAusgangGesperrt(engine, pi)) continue;
     const counts = {};
     for (const name of pileArr(ps, source, engine)) {
       const cd = cardDB[name];

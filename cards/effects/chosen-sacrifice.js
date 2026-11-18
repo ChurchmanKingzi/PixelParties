@@ -40,6 +40,7 @@
 // solange der Gewinn gesperrt ist — statt eine Wahl anzubieten, die
 // nichts bringt. Auslegung in `_gold-block-shared.js`.
 const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+const { waehlePfad, ziehenGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Chosen Sacrifice';
 
@@ -59,20 +60,18 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps) return;
 
-      const res = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+      // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): jede Option fällt weg, solange ihr Weg gesperrt ist — Gold bei gesperrtem Goldgewinn (Ruling 17.8.), Karte bei
+      // Hand-/Zieh-Sperre (früher blieb „Draw" wählbar und zog nichts). Genau ein freier Weg → automatisch, ohne Menü; kein Weg frei → wie bisher „draw" (läuft ins Leere, kein Menü mehr).
+      const res = await waehlePfad(engine, pi, [
+        { id: 'draw', label: '🃏 Draw 1 card', offen: !ziehenGesperrt(engine, pi, 1) },
+        { id: 'gold', label: '💰 Gain 4 Gold', offen: !goldGainWouldBeBlocked(engine, pi) },
+      ], {
         title: CARD_NAME,
         description: 'You sacrificed Chosen Sacrifice — choose your reward:',
-        options: [
-          { id: 'draw', label: '🃏 Draw 1 card' },
-          // Gold-Option nur, wenn der Gewinn nicht gesperrt ist.
-          ...(goldGainWouldBeBlocked(engine, pi)
-            ? [] : [{ id: 'gold', label: '💰 Gain 4 Gold' }]),
-        ],
         cancellable: false,
         gerrymanderEligible: true,
       });
-      const mode = res?.optionId || 'draw';
+      const mode = res.id || 'draw';
       if (mode === 'gold') {
         await engine.actionGainGold(pi, 4);
       } else {

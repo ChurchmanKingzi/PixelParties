@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════
 const { isTutorableArea } = require('./_area-shared');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 //  CARD EFFECT: "Cooldin, King of Coolness"
 //  Hero — Activated effect, once per turn.
 //
@@ -233,7 +234,8 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
     if (fromHand.length > 0) return true;
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     return fromDeck.length > 0;
   },
 
@@ -248,7 +250,7 @@ module.exports = {
 
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);   // Knight of Kings [B]: Quelle Deck zu
     const all = [...fromHand, ...fromDeck];
     if (all.length === 0) return false;
 

@@ -18,6 +18,7 @@
 // ═══════════════════════════════════════════
 
 const { isEquipArtifact, equipDestinations, equipArtifactToHero } = require('./_orchestra-shared');
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
 
 const BASE_LOLEK    = 'Lolek, the Shard Knight';
 const ASCEND_TARGET = 'Lolek, Mender of the Shattered Trident';
@@ -68,6 +69,10 @@ function equippableEntries(engine, pi, sources, filter) {
   const cardDB = engine._getCardDB();
   const out = [];
   for (const source of sources) {
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): Quellen, aus denen gerade nichts herausgenommen werden darf, tauchen nicht auf —
+    // Ablage unter der Stab-Sperre (Staff of the Teleporter) / Knight of Kings [B], Deck unter Knight of Kings [B]. Früher kam die Galerie, die Wahl lief ins Leere (kein Ausrüsten, nichts bezahlt).
+    if (source === 'discard' && ablageAusgangGesperrt(engine, pi)) continue;
+    if (source === 'deck' && deckAusgangGesperrt(engine, pi)) continue;
     // 12.11.: „aus der Hand“ = Hand + Crestinas Vorrat (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf die Extra-Hand zu)
     const pool = source === 'deck' ? ps.mainDeck : source === 'discard' ? ps.discardPile : engine.handUndVorratListe(pi);
     const seen = new Set();

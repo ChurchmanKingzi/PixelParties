@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════
 
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const { getCardDB: _getCardDB } = require('./_card-db');
 
@@ -108,7 +109,9 @@ function getEligibleCreatures(gs, pi, engine = null) {
   };
 
   checkSource(ps.hand || [], 'hand');
-  checkSource(ps.discardPile || [], 'discard');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand OR discard pile" — unter der Stab-Sperre (Staff of the Teleporter) und
+  // Knight of Kings [B] ist die Ablage als Quelle zu (früher angeboten, dann brach die Entnahme ab); die Hand bleibt, sonst ist der Trank nicht aktivierbar.
+  if (!(engine && ablageAusgangGesperrt(engine, pi))) checkSource(ps.discardPile || [], 'discard');
   return { eligible, cardDB };
 }
 
@@ -178,7 +181,7 @@ module.exports = {
       };
 
       checkSrc(ps.hand || [], 'hand');
-      checkSrc(ps.discardPile || [], 'discard');
+      if (!ablageAusgangGesperrt(engine, pi)) checkSrc(ps.discardPile || [], 'discard');   // Ablage-Quelle gesperrt: siehe `getEligibleCreatures`
 
       if (eligible.length === 0) return { cancelled: true };
 
