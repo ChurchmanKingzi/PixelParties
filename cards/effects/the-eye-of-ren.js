@@ -188,8 +188,9 @@ module.exports = {
       ? await engine.actionMillCards(pi, 1, { targetCardName: karte, source: CARD_NAME, selfInflicted: true })
       : [];
 
-    // Nicht bezahlt: harte Ablage-Ausgangssperre für den Rest des Zuges (wie die Stäbe).
-    if (!wahl.bezahlt) ps._discardLockedTurn = gs.turn;
+    // Nicht bezahlt: harte Ablage-Ausgangssperre für den Rest des Zuges (wie die Stäbe). `_discardLockEyeTurn` ist die Eye-Marke: Meditation unterscheidet die reine Stab-Sperre
+    // (dort ist „zurückmischen" erlaubt) von einer Eye-Sperre, auch wenn beide im selben Zug liegen.
+    if (!wahl.bezahlt) { ps._discardLockedTurn = gs.turn; ps._discardLockEyeTurn = gs.turn; }
     engine.log('eye_of_ren', {
       player: ps.username, sent: (gemillt && gemillt[0]) || karte, paid: !!wahl.bezahlt, locked: !wahl.bezahlt,
     });
