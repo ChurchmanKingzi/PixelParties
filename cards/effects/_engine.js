@@ -27253,6 +27253,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inReactionCheck || this._inMctsSim) return keine;
     const cd = this._getCardDB()[cardName];
     if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return keine;
+    // ★ Spielgestalter-Entscheidung 18.11.2026 (Zweitziel von Bartas/Grisgar/Andras, Saya, Kunagi …): der performte Wurf ist wie ein eigenständiges Ausspielen eine NEUE Schadensquelle —
+    // Reaktionen, die einzelne Ziele schützen (Bamboo Shield, Sculpture Guards …), werden für ihn erneut angeboten. Ihre „schon gefragt"-Merker gelten nur für EINE Auflösung und werden sonst erst
+    // NACH dem Ende des Hauptzaubers (`afterSpellResolved`, hinter dem Held-Haken) geräumt: der Zweitwurf sah sie noch stehen und bekam kein Angebot. Geräumt wird über den Aufräum-Haken, den die Karten
+    // ohnehin registrieren (`onChainResolve`, wie am Ende einer Kette); Einmal-Regeln („1 pro Zug", `gs.hoptUsed`) bleiben unberührt.
+    await this.runHooks(HOOKS.ON_CHAIN_RESOLVE, {});
     const kette = await this.executeCardWithChain({
       cardName, owner: pi, cardType: cd.cardType, goldCost: 0, heroIdx,
       casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi, casterCheck: !trotzStatus,
