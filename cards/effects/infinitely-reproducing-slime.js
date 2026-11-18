@@ -61,6 +61,7 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Infinitely Reproducing Slime';
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 
 /**
  * Plaetze, auf die ein weiterer Slime darf.
@@ -123,7 +124,8 @@ module.exports = {
       // Kandidaten aus Hand UND Deck, Hand zuerst.
       // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
       const inHand = engine.handUndVorratListe(pi).filter(n => n === CARD_NAME).length;
-      const inDeck = (ps.mainDeck || []).filter(n => n === CARD_NAME).length;
+      // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+      const inDeck = deckAusgangGesperrt(engine, pi) ? 0 : (ps.mainDeck || []).filter(n => n === CARD_NAME).length;
       if (inHand === 0 && inDeck === 0) return;
       const cards = [];
       if (inHand > 0) cards.push({ name: CARD_NAME, source: 'hand', count: inHand });
