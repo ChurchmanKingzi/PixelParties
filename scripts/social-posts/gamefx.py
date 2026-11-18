@@ -1611,3 +1611,113 @@ class HealPulse:
                     hx, hy = rd(self.CX + math.cos(a) * rr), rd(self.CY - th_ * 22 * rc + math.sin(a) * rr * 0.6)
                     c = C['g3'] if k % 2 else C['g4']
                     m.rect(hx - 1, hy, 3, 1, c); m.rect(hx, hy - 1, 1, 3, c); m.rect(hx, hy, 1, 1, C['creme'])
+
+
+# ═════════════════════════════ Whirlpool (app-fx-8, `whirlpool`: Silent Water Mizune, Aquatic Arrows …) ═════════════════════════════
+W8 = dict(ring=hexc('#399edf'), schein=hexc('#1ca9fd'), hell=hexc('#b6eff7'), tropfen=hexc('#66b6ff'), kern=hexc('#b6eff7'), weiss=hexc('#e5f5fa'),
+          welle=[hexc(h) for h in ('#b6eff7', '#68c6fd', '#399edf', '#2f539d')])
+
+
+def _kf(q, st, e=None):
+    if q <= st[0][0]:
+        return st[0][1]
+    for i in range(1, len(st)):
+        if q <= st[i][0]:
+            a, b = st[i - 1], st[i]
+            u = (q - a[0]) / ((b[0] - a[0]) or 1)
+            if e:
+                u = e(u)
+            return a[1] + (b[1] - a[1]) * u
+    return st[-1][1]
+
+
+def _kreis8(g, cx, cy, R, dicke, c, a=1.0, w0=0.0, w1=math.pi * 2):
+    if R < 0.6:
+        g.put(cx, cy, c, a)
+        return
+    n = int(math.ceil((w1 - w0) * R * 1.7)) + 1
+    for k in range(n + 1):
+        th = w0 + (w1 - w0) * k / float(n)
+        co, si = math.cos(th), math.sin(th)
+        for d in range(dicke):
+            g.put(cx + co * (R - d), cy + si * (R - d), c, a)
+
+
+class Whirlpool:
+    """Nachbau von `ppFx8Whirlpool`: neun blaue Ringe ziehen sich strudelnd zur Mitte zusammen (jeder mit hellem Bogen, der umläuft), 24 Wassertropfen spiralen nach innen, in der Mitte eine Welle.
+    scale rechnet die Spielmaße (Ringe bis 148 px bei Karten von etwa 64 px Breite) auf die Rasterzellen der Show um. Dauer 1 s."""
+
+    def __init__(self, cx, cy, scale=0.3, salt=5):
+        self.cx, self.cy, self.scale = cx, cy, scale
+        self.ende = 1.0
+        n, nd = 9, 24
+
+        def kap(delay, dur):
+            return max(140, min(dur, 985 - delay))
+        self.ringe = []
+        for i in range(n):
+            f = i / float(n - 1)
+            delay = f * 480
+            self.ringe.append(dict(radius=20 + f * 128, delay=delay, dur=kap(delay, 900 - f * 320), op=1 - f * 0.64, breite=4 - f * 2, richtung=-1 if i % 2 else 1))
+        self.tropfen = []
+        for i in range(nd):
+            delay = H(salt, i * 3 + 1) * 300
+            self.tropfen.append(dict(angle=(i / float(nd)) * math.pi * 2 + H(salt, i * 3 + 2) * 0.26, dist=35 + H(salt, i * 3 + 3) * 55, delay=delay, dur=kap(delay, 700 + H(salt, i * 3 + 4) * 300),
+                                     size=5 + H(salt, i * 3 + 5) * 8))
+
+    def draw(self, m, t):
+        if t < 0 or t >= self.ende:
+            return
+        ms = t * 1000.0
+        g = R1(m)
+        cx, cy, S, sc0 = self.cx, self.cy, 3.0, self.scale
+        ein = lambda u: u * u
+        for r in self.ringe:
+            q = (ms - r['delay']) / r['dur']
+            if q < 0 or q > 1:
+                continue
+            sc = _kf(q, [(0, 1.8), (0.2, 1.2), (0.55, 0.55), (1, 0.03)], ein)
+            op = min(1.0, _kf(q, [(0, 0), (0.2, 1), (0.55, 0.9), (1, 0)], ein) * r['op'] * 1.3)
+            Rr = r['radius'] * sc / S * sc0 * 3.0
+            if op <= 0.03 or Rr < 0.8:
+                continue
+            dick = max(1, rd(r['breite'] / S))
+            _kreis8(g, cx, cy, Rr + 1.4, 2, W8['schein'], op * 0.3)
+            _kreis8(g, cx, cy, Rr, dick, W8['ring'], op)
+            ph = _kf(q, [(0, 0), (0.2, math.pi), (0.55, 3 * math.pi), (1, 6 * math.pi)]) * r['richtung']
+            _kreis8(g, cx, cy, Rr, dick, W8['hell'], op, ph, ph + 1.3)
+            _kreis8(g, cx, cy, Rr, dick, W8['hell'], op * 0.8, ph + math.pi, ph + math.pi + 0.6)
+        for d in self.tropfen:
+            q = (ms - d['delay']) / d['dur']
+            if q < 0 or q > 1:
+                continue
+            lauf = _kf(q, [(0, 0), (0.4, 0.4), (1, 1)], ein)
+            rad = d['dist'] * (1 - 0.9 * lauf)
+            ang = d['angle'] + 1.1 * lauf
+            sc = _kf(q, [(0, 1), (0.4, 0.8), (1, 0.05)], ein)
+            a = _kf(q, [(0, 0.9), (0.4, 0.8), (1, 0)], ein)
+            rr = d['size'] * sc / 2.0 / S * 1.3
+            if a <= 0.05 or rr < 0.35:
+                continue
+            x, y = cx + math.cos(ang) * rad / S * sc0 * 3.0, cy + math.sin(ang) * rad / S * sc0 * 3.0
+            g.disc(x, y, rr, W8['tropfen'], a)
+            if rr > 1.4:
+                g.put(x - 0.5, y - 0.5, W8['kern'], a)
+        wq = (ms - 50) / 900.0
+        if 0 <= wq <= 1:
+            sc = _kf(wq, [(0, 0.6), (0.2, 1.8), (0.55, 1), (1, 0.1)], ein)
+            a = _kf(wq, [(0, 0), (0.2, 1), (0.55, 0.8), (1, 0)], ein)
+            if a > 0.04:
+                self._welle(g, cx, cy, 20 * sc / S * sc0 * 3.0, ms / 90.0, a)
+
+    def _welle(self, g, cx, cy, Wd, ph, a):
+        C = W8['welle']
+        amp = max(1, Wd * 0.22)
+        band = max(1, rd(Wd * 0.18))
+        for b in range(3):
+            for i in range(-rd(Wd), rd(Wd) + 1):
+                u = i / float(Wd or 1)
+                huell = math.sqrt(max(0, 1 - u * u * 0.85))
+                y = cy + (b - 1) * Wd * 0.5 + math.sin(u * 4.2 + ph + b * 0.9) * amp * huell
+                for d in range(band):
+                    g.put(cx + i, y + d - band / 2.0, W8['weiss'] if (d == 0 and b == 0) else C[min(b + (1 if d > 0 else 0), 3)], a)

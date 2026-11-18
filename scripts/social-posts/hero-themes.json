@@ -1096,7 +1096,11 @@
     "holy_white",
     6
    ]
-  ]
+  ],
+  "px": 16,
+  "flowshow": true,
+  "opener": "wind",
+  "showLoops": 5
  },
  "Timeless King Zi": {
   "name": "Zi",
