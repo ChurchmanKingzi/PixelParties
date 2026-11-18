@@ -3323,7 +3323,9 @@ Wer `engine.getHeroEligibleActionCards`/`performImmediateAction` benutzt (Yukana
 Aktionssperre blockiert — dort bewusst kein `areActionsBlocked`-Tor, und der Guss läuft über `_castSpellImmediately` ohne `opts.pruefen`. Das VORMERKEN ist dagegen nur ohne Sperre möglich: Ghostly Warning (`reactionCondition`) wird nicht angeboten, Atta
 (`onCardsRevealed`) löscht nicht (Einmal-Sperre bleibt frei); ein schon vorgemerkter Zauber bleibt vorgemerkt. Gemeint ist die spielerweite Sperre (`areActionsBlocked`), nicht die einzelner Helden (`hero._actionLockedTurn`). Zusatzaktionen, die der zurückgekehrte
 Zauber SELBST wirkt (Time Distortion, Chaos Magic …), unterliegen weiter ihren normalen Regeln. (2) Magic Mirror: ist sein Besitzer aktionsgesperrt, entfällt NUR die Kopie („performs a copy of it as an additional Action"); der Zauber wird weiter negiert, die Pollution Tokens
-werden weiter gelegt. Clone, Idej Sword Kunagi und `_second-target-shared` (Bartas, Grisgar, Andras) prüfen die spielerweite Sperre (`areActionsBlocked`) bei ihrer Kopie/Wiederholung bisher nicht (Saya schon) — offen, keine Entscheidung.
+werden weiter gelegt.
+
+**Kopier-/Wiederholungs-Effekte unter Aktionssperre — Prinzip (Spielgestalter-Entscheidung 18.11.2026):** *Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre (`engine.areActionsBlocked(pi)`) blockiert. Ein zusätzliches ZIEL für denselben, schon ausgegebenen Spell/Angriff dagegen ist dieselbe Aktion und geht auch unter Aktionssperre.* Angewendet: **Saya** (Zweitguss), **Magic Mirror** (Kopie), **Clone** (Kopie) und **Idej Sword - Kunagi** (Wiederholung des Angriffs gegen ein anderes Ziel; der Gestalter hat Kunagi nicht namentlich genannt, es ist eine Anwendung des Prinzips) prüfen `areActionsBlocked(pi)` des Besitzers/Kontrolleurs: unter der Sperre entfällt die Kopie/Wiederholung komplett (kein Angebot, keine Kosten, kein Einmal-Stempel, kein Kettenfenster; das Original läuft normal weiter, bei Kunagi bleibt „draw 1 card" für die besiegten Kreaturen des ersten Angriffs). **Bartas, Grisgar, Andras** (`_second-target-shared.js`, „choose a second target … to hit afterwards") sind das zusätzliche Ziel derselben Aktion: dort steht bewusst KEIN `areActionsBlocked`-Tor. Ihr Zweitwurf öffnet ein eigenes Kettenfenster (`performKettenfenster`). Neue Kopier-/Wiederholungs-Karten entscheiden nach diesem Prinzip: neue Instanz (eigener Wurf, eigene Kosten/Zählung) → Sperre prüfen; weiteres Ziel desselben Wurfs → nicht prüfen.
 
 ### Cancelling out of an additional Action
 
@@ -4187,7 +4189,10 @@ gestempelt.
 
 „You cannot move cards out of your discard pile for the rest of the
 turn" = `ps._discardLockedTurn = gs.turn` (Staebe; `_discardLockHard` ist
-nur die Stab-Marke, die Meditation von der Eye-Sperre unterscheidet).
+nur die Stab-Marke, `_discardLockEyeTurn` die des Eye of Ren — beide nur
+fuer Meditation, die die reine Stab-Sperre — „zurueckmischen" bleibt
+erlaubt — von der Eye-Sperre unterscheidet; liegen beide im selben Zug,
+gewinnt die Eye-Sperre: Meditation zieht dann nur 1 Karte).
 Die Sperre ist **hart** — kein Freikauf, keine Ausnahme. **Spielgestalter-
 Entscheidung 18.11.2026 (The Eye of Ren):** die 6 Gold des Eye sind
 Zusatzkosten der Aktivierung („Pay 6 extra Gold or lock your discard
@@ -4207,6 +4212,11 @@ Spielbarkeits-Gates fragen synchron `engine.isDiscardOutHardLocked(pi)`
 bzw. `ablageAusgangGesperrt(engine, pi)` (`_pfad-shared.js`). Wer Karten
 aus dem Discard bewegt, geht durch einen dieser Wege — nie per
 `discardPile.splice` vorbei.
+
+**Karten, deren EINZIGER Nutzen eine Entnahme aus der eigenen Ablage ist, sind unter der Sperre unspielbar bzw. nicht aktivierbar (Spielgestalter-Entscheidung 18.11.2026):**
+Transmission (`spellPlayCondition` → `wirkbar` liest `ablageAusgangGesperrt`) und Crum, the Class Pet (`canActivateCreatureEffect` + Vorabprüfung in
+`onCreatureEffect`) — in der Hand ausgegraut bzw. nicht aktivierbar, keine Galerie, die dann nichts tut; ohne Sperre unverändert. Nur Karten mit `blockedByPileLock`
+reichen dafür nicht: `isPileLockedFor` kennt nur Knight of Kings [B] (`pileOutAllowed`), nicht die harte Stab-/Eye-Sperre.
 
 ### Artefakte aus Skripten ausruesten (v628) — `_orchestra-shared.js`
 
@@ -12287,7 +12297,7 @@ bleibt für Wege ohne `paySummonCost` bestehen. Archer/Guardian/Warrior zahlen a
 vorab.
 *Artefakte Angry Cheese / Sickly Cheese (Al, Nachtrag):* 100 Schaden bzw. 1 Gift am eigenen Helden sind Kosten (`payArtifactCost`), bei
 Ganz-Negierung bleiben sie bezahlt, die Suche entfällt.
-*Artefakt The Eye of Ren (Spielgestalter-Entscheidung 18.11.2026):* Deck-Wahl und die Zusatzkosten („Pay 6 extra Gold or lock your discard pile?", gezahlt = keine Sperre) liegen in `payArtifactCost`; bei Ganz-Negierung bleiben bezahlte 6 Gold bezahlt, es kommt weder Karte in die Ablage noch eine Sperre.
+*Artefakt The Eye of Ren (Spielgestalter-Entscheidung 18.11.2026):* Deck-Wahl und die Zusatzkosten („Pay 6 extra Gold or lock your discard pile?", gezahlt = keine Sperre) liegen in `payArtifactCost`; bei Ganz-Negierung bleiben bezahlte 6 Gold bezahlt, es kommt weder Karte in die Ablage noch eine Sperre (auch nicht bei gewähltem „Lock"); kostenlos gespielt (Gratis-Scope, z. B. Sky Archeologist) gibt es keine Frage und keine Sperre (gilt als bezahlt). Kartentext seit 18.11.2026: „… When you activate this Artifact, you may spend an additional 6 Gold. If you do not, you cannot move cards out of your discard pile for the rest of the turn." Meditation unter der Eye-Sperre: komplett gesperrt, nur „zieh 1 Karte" ohne Zurückmischen.
 *Bewusst NICHT umgestellt:* Temple of Sacrifice (optionales Opfer), Basketskull (Doom Counter).
 
 *Tharxian Horse (Antwort i):* ist so, wie von Al gewollt — beliebig viele Kopien dürfen gesetzt werden (auch nach der ersten Aktivierung),
@@ -25658,7 +25668,7 @@ Text: „Attach this card to a Hero your opponent controls. While this card is a
 ### Transmission (Spell, Support Magic Lv1)
 Text: „Choose any card from your discard pile and add it to your opponent's hand. This counts as an additional Action.“
 * `inherentAction: true`. Galerie der eigenen Ablage (abbrechbar), dann Fenster „Hand-Interaktion / insert“ (Ambush the Scout), `takeFromPile` (Stapelsperren), Flug `play_pile_transfer` Ablage → Gegnerhand, `handZugang(oi, name, { originalOwner: pi })` — die Karte bleibt Eigentum des Wirkers.
-* Unspielbar bei leerer Ablage, Ablage-Sperre, Hand-Sperre/Erste-Runden-Schutz des Gegners, Spreading Rumor/Slow. CPU spielt sie nie von sich aus (`cpuSkipProactive`).
+* Unspielbar bei leerer Ablage, Ablage-Sperre (Knight of Kings [B] UND — seit 18.11.2026 — jede harte Ablage-Ausgangssperre: Stab, Eye of Ren; `ablageAusgangGesperrt` in `wirkbar`), Hand-Sperre/Erste-Runden-Schutz des Gegners, Spreading Rumor/Slow. CPU spielt sie nie von sich aus (`cpuSkipProactive`).
 * **Aufdecken beim Eintritt**: `handZugang` stempelt `revealOnEnterHand` (Crystals, Great Vanguard Demon, Grinning Cat …) auf die Hand des EMPFÄNGERS — die Karte liegt dort sofort aufgedeckt (im Puzzle mit der `permanent`-Marke in `revealedHandCards`), und Weakening Crystal negiert schon beim Eintritt. Nichts davon muss die Karte selbst tun.
 
 ### Trap Sabotage (Spell, Destruction Magic Lv0)
