@@ -262,6 +262,9 @@ module.exports = {
           if (sk) statusDerGewaehlten.add(sk);
         }
         if (statusDerGewaehlten.size > 0) eintraege = eintraege.filter(e => !statusDerGewaehlten.has(e.key));
+        // 18.11.2026: ein RUHENDES Status-Anhaengsel steht als `attach:<instId>`-Eintrag in der Liste (kein Status am Helden) — ein gewaehltes faellt ebenfalls heraus.
+        const idsGewaehlt = new Set(weg.map(z => `attach:${z.cardInstance?.id}`));
+        eintraege = eintraege.filter(e => !idsGewaehlt.has(String(e.key)));
         if (eintraege.length > 0) {
           // Als Ruling (Al 26.10.): „any number" heißt auch 0 — bei GENAU EINEM Status wählt die Engine die Statuswahl (`statusSelect`) sonst von selbst
           // (`status_select_auto`): man könnte dann nur das Anhängsel entfernen wollen und der Status ginge trotzdem mit. Darum hier eine eigene Ja/Nein-Frage.
@@ -327,7 +330,7 @@ module.exports = {
           const h = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
           if (h?.name && h.hp > 0) {
             for (const k of entfernen) {
-              if (!h.statuses?.[k]) continue;                     // mit einem Anhängsel schon gegangen
+              if (!h.statuses?.[k] && !String(k).startsWith('attach:')) continue;   // mit einem Anhängsel schon gegangen (`attach:`-Schlüssel: ruhendes Status-Anhängsel, kein Status am Helden)
               geheilt.push(...engine.cleanseHeroStatuses(h, ziel.owner, ziel.heroIdx, [k], CARD_NAME, { piercing: hart }));   // Decay Magic 2: nicht negierbar, auch nicht durch eine Effekt-Immunität (Escape Device)
             }
           }

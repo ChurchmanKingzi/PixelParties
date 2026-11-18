@@ -36,7 +36,8 @@ function getValidTargets(gs, engine) {
   for (let pi = 0; pi < gs.players.length; pi++) {
     const heroes = engine.getHeroTargets(pi).filter(t => {
       const hero = gs.players[pi].heroes[t.heroIdx];
-      return hero.statuses && negKeys.some(k => hero.statuses[k]);
+      // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag) macht den Helden zum Ziel
+      return hero.statuses && (negKeys.some(k => hero.statuses[k]) || engine.heroHatRuhendesAnhaengsel(pi, t.heroIdx));
     });
     const creatures = engine.getCreatureTargets(pi).filter(t => {
       const inst = t.cardInstance;

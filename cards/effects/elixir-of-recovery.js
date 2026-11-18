@@ -54,7 +54,8 @@ function getOwnTargetsWithStatuses(gs, pi, engine) {
   for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
     if (!hero.statuses) continue;
-    if (!negKeys.some(k => hero.statuses[k])) continue;
+    // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag der Heil-Liste) macht den Helden zum Ziel
+    if (!negKeys.some(k => hero.statuses[k]) && !engine.heroHatRuhendesAnhaengsel(physOwner, hi)) continue;
     targets.push({
       id: `hero-${physOwner}-${hi}`,
       type: 'hero',
@@ -148,7 +149,9 @@ module.exports = {
         if (hero?.statuses) {
           const entfernt = engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, selectedStatuses, 'Elixir of Recovery');
           // „draw a card for each effect removed": nur was WIRKLICH entfernt wurde zählt (Stinky Stables hält Gift fest, unentfernbare Status …).
-          heroStatusesRemoved += Array.isArray(entfernt) ? entfernt.length : selectedStatuses.length;
+          // 18.11.2026: ein gewaehltes RUHENDES Status-Anhaengsel (`attach:`-Schluessel) zaehlt als ein entfernter Effekt (wie bei Cure); `entfernt` fuehrt nur echte Status.
+          const nAnhaengsel = selectedStatuses.filter(k => String(k).startsWith('attach:')).length;
+          heroStatusesRemoved += (Array.isArray(entfernt) ? entfernt.length : selectedStatuses.length - nAnhaengsel) + nAnhaengsel;
         }
         engine._broadcastEvent('play_zone_animation', {
           type: 'recovery_drops', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,

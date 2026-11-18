@@ -78,7 +78,8 @@ function buildOwnStatusedHeroes(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (!h.statuses) continue;
-    if (!negKeys.some(k => h.statuses[k])) continue;
+    // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag der Heil-Liste) zaehlt als Status
+    if (!negKeys.some(k => h.statuses[k]) && !engine.heroHatRuhendesAnhaengsel(physOwner, hi)) continue;
     out.push({
       id: `hero-${physOwner}-${hi}`, type: 'hero',
       owner: physOwner, heroIdx: hi, cardName: h.name,
