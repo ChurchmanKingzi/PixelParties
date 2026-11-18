@@ -47,6 +47,12 @@
 //  endet, greift der Fluch (ATK auf 0, Status `cursed`); kommt sie später dazu, ruht er wieder (ATK kommt zurück). Vertrag `statusFolgtImmunitaet`
 //  (`_attachment-shared.js`, Abgleich in `engine.sync`).
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ──────────
+//  „Cursed" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen
+//  `attach:<instId>`-Eintrag („Cursed (Curse)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers
+//  (die ATK bleibt unberührt — ein ruhender Fluch hat sie nie gesperrt); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `cursed` in
+//  der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt, solange der Wirt `cursed` trägt).
+//
 //  Boolean status — multiple Curse copies on the
 //  same Hero all bind the same single `cursed`
 //  status (no extra suppression from a second
@@ -231,6 +237,10 @@ module.exports = {
   // gesetzt. `attachmentStatus` sagt dem Puzzle-Aufbau, welcher Status
   // dazugehoert; er legt ihn beim Start an.
   attachmentStatus: 'cursed',
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Cursed (Curse)',
+  negativeStatusIcon: '🧿',
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
