@@ -72,11 +72,19 @@ async function waehlePfad(engine, pi, pfade, prompt = {}) {
 /**
  * Kann `pi` gerade keine Karten aus der Ablage bewegen? Stab-Sperre (Staff of the Teleporter/Uncontrollable Destruction, „cannot move any cards out of your discard pile";
  * der Freikauf des Eye of Ren zählt nicht — er ist ein Preis, kein Verbot) oder Knight of Kings [B]. `opts.sourceOwner`: wer bewegt (Standard: `pi`).
+ * `opts.auchFreikaufbar`: auch die (noch nicht freigekaufte) Eye-of-Ren-Sperre zählt — für Kosten, die SYNCHRON aus der Ablage gezahlt werden (`takeFromPileSync`, z. B.
+ * `payRebelliokaiCost`) und deshalb keine Freikauf-Abfrage stellen können.
  */
 function ablageAusgangGesperrt(engine, pi, opts = {}) {
-  if (!engine || engine.gs?.players?.[pi] == null) return false;
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps) return false;
   if (typeof engine.pileOutAllowed === 'function' && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: opts.sourceOwner ?? pi })) return true;
-  return !!engine.isDiscardOutHardLocked?.(pi);
+  if (engine.isDiscardOutHardLocked?.(pi)) return true;
+  if (opts.auchFreikaufbar && ps._discardLockedTurn === engine.gs.turn) {
+    const kauf = ps._discardLockBuyout;
+    return !(kauf && kauf.turn === engine.gs.turn && kauf.paidTurn === engine.gs.turn);
+  }
+  return false;
 }
 
 /** Kann `pi` gerade keine Karten aus dem Deck bewegen? (Knight of Kings [B]; Ziehen zählt hier nicht.) */
