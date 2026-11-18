@@ -31,6 +31,12 @@
 //  ATK und Fähigkeitsstufen sind die des Helden. Test: `docs/niche-tests/repro/W72/c-05`.
 //  Die Kopie ist KEIN Gebrauch einer Karte durch den Helden: keine Zähler (gespielte Attacks/Spells), kein `afterSpellResolved`, keine Aktion, keine Ablage — die Instanz verschwindet danach.
 //
+//  ── AKTIONSSPERRE (Spielgestalter-Entscheidung 18.11.2026) ───────────────
+//  Prinzip: Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre (`engine.areActionsBlocked(pi)`: Overflowing Chalice, Kents Schulden,
+//  `_playerActionLockedTurn`, `ps.actionLocked`) blockiert. Die Kopie des Clone („may perform an exact copy of it") ist so eine zweite Instanz: ist der Kontrolleur des Klons
+//  aktionsgesperrt, entfällt die Kopie KOMPLETT — kein Angebot, keine Kosten, kein Einmal-Stempel „once per turn", kein Kettenfenster; das Original läuft normal weiter (wie Magic Mirror).
+//  Ohne Sperre unverändert.
+//
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  Keine eigene Zonen-Animation (das Echo-Abbild am Helden ist entfallen, Al 24.10.): nur der Auftritt der Karte (`showTriggeredEffect`) und das Glühen am Klon beim Auslösen — danach die Kopie selbst.
 // ═══════════════════════════════════════════
@@ -137,6 +143,13 @@ module.exports = {
       // Einschränkungen der Karte gelten für die Kopie (Al, 24.10.): die Voraussetzungen des SPIELENS (`spellPlayCondition`) müssen jetzt noch erfüllt sein.
       try { if (script.spellPlayCondition && !script.spellPlayCondition(gs, pi, engine)) { dbg('spellPlayCondition false'); return; } }
       catch (err) { console.error('[Clone] spellPlayCondition', name, err.message); return; }
+
+      // ── Aktionssperre (Spielgestalter-Entscheidung 18.11.2026): die Kopie ist eine zweite Instanz = neue Aktion → entfällt komplett (siehe Kopf) ──
+      if (engine.areActionsBlocked(pi)) {
+        engine.log('clone_copy_blocked', { player: gs.players[pi]?.username, card: name, reason: 'actions_blocked' });
+        dbg('Aktionssperre');
+        return;
+      }
 
       // ── „may": der Spieler entscheidet ──
       const ja = await ctx.promptConfirmEffect({
