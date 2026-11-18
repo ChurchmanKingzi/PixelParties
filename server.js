@@ -9432,7 +9432,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // „then draw" feuert trotzdem (`zusatzaktionNachKettennegation`); jeder andere Geber bekommt die Zusatzaktion wie bisher zurück.
         const _geberSkript = loadCardEffect(consumedInst.name);
         if (typeof _geberSkript?.zusatzaktionNachKettennegation === 'function') {
-          await _geberSkript.zusatzaktionNachKettennegation(room.engine, consumedInst, { spellName: cardName, spellCardData: cardData });
+          try { await _geberSkript.zusatzaktionNachKettennegation(room.engine, consumedInst, { spellName: cardName, spellCardData: cardData }); }
+          catch (err) { console.error(`[doPlaySpell] zusatzaktionNachKettennegation (${consumedInst.name}):`, err.message); }
         } else {
           room.engine.restoreAdditionalAction(consumedInst);
         }
