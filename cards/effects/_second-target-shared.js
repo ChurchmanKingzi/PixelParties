@@ -31,6 +31,13 @@
 //
 //  `gs._bartasSecondCast` bleibt der allgemeine Zweitwurf-Marker (Saya, Idej Kunagi, Fire Bolts lesen ihn); `gs._zweitzielWurf` ist die engere Marke
 //  „ZWEITES ZIEL" (nur diese Helden): Einzelziel-Deckel + Ausschluss ohne Ausnahme.
+//
+//  ── AKTIONSSPERRE: wird hier bewusst NICHT geprüft (Spielgestalter-Entscheidung 18.11.2026) ──
+//  Prinzip des Gestalters: „Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre (`engine.areActionsBlocked(pi)`: Overflowing Chalice,
+//  Kents Schulden, `_playerActionLockedTurn`, `ps.actionLocked`) blockiert (Saya, Clone, Magic Mirror, Idej Sword Kunagi). Ein zusätzliches ZIEL für denselben, schon ausgegebenen
+//  Spell/Angriff dagegen ist dieselbe Aktion und geht auch unter Aktionssperre." Der Zweitwurf von Bartas/Grisgar/Andras („choose a second target for the Attack/Spell to hit afterwards")
+//  ist genau das zweite Ziel desselben Wurfs — darum steht in `zweitzielAngebot` KEIN `areActionsBlocked`-Tor (Chalice und Kent belegt: das Angebot kommt, der Zweitwurf läuft).
+//  Wer hier ein Tor einbaut, bricht diese Entscheidung. (Das Kettenfenster des Zweitwurfs, `performKettenfenster`, bleibt: Silence & Co. können auch ihn negieren.)
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
