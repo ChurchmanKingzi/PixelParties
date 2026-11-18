@@ -32,11 +32,11 @@ class FlowShow(CaptionMixin):
     HAND0 = 2
     T_SIB = 17.0
     CAPTIONS = [
-        (0.2, 2.6, '*Silent Water Mizune* is on his way...'),
+        (0.2, 2.7, '*Silent Water Mizune* is bringing his *siblings* home...'),
         (2.8, 6.6, 'Once per turn he *flushes* one of his own *Surprises* away - and *draws* a card.'),
         (6.8, 11.2, 'The hero could have *activated* it? *One more* card!'),
         (11.4, 16.0, 'And a *face-up* Surprise gives *another* - up to *3 cards* from one Surprise.'),
-        (16.2, 20.6, '*Mizune* clears the way, calm and patient - his *siblings* are waiting to be found.'),
+        (16.2, 20.6, '*Mizune* clears the way, calm and patient - the search for his *siblings* goes on.'),
     ]
     SND = {
         'slot':   [('placement', -10)],
@@ -68,6 +68,8 @@ class FlowShow(CaptionMixin):
         self.small = mkback(*self.SMALL)
         self.faces = [ld('s%d' % (i + 1)).resize((self.CW, self.CH), Image.BOX) for i in range(3)]
         self.kaz = ld('kazena')
+        self.sil_t = self._sil(ld('tazune'))
+        self.sil_y = self._sil(ld('yukana'))
         for a in self.ACTS:
             a['t_whirl'] = a['T'] + 0.3
             a['t_gone'] = a['T'] + 0.6
@@ -215,34 +217,51 @@ class FlowShow(CaptionMixin):
                         self._card_at(canvas, self.small, px * gp + self.ox, py * gp + self.oy)
 
     # ───────── Geschwister ─────────
+    def _sil(self, im):
+        """Silhouette: alles Sichtbare einfarbig dunkelblau, Form bleibt erhalten."""
+        a = np.asarray(im).copy()
+        m = a[..., 3] > 40
+        a[..., :3] = (74, 90, 160)
+        a[..., 3] = np.where(m, 255, 0)
+        return Image.fromarray(a, 'RGBA')
+
     def _draw_siblings(self, canvas, d, t):
-        if t < self.T_SIB - 0.6:
+        if t < 0.2:
             return
         m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
-        self.draw_text(canvas, 'SIBLINGS', 3, (540, 60), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
-        cx0 = 540 - 130
+        self.draw_text(canvas, 'SIBLINGS', 3, (540, 50), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+        names = ['KAZENA', 'TAZUNE', 'YUKANA']
+        ics = [self.kaz, self.sil_t, self.sil_y]
+        cx0 = 540 - 160
+        endb = t >= self.T_SIB
         for k in range(3):
-            x = cx0 + 130 * k
-            self.pix_rect(d, x - 52, 90, x + 52, 214, (20, 10, 40))
-            col = (110, 190, 255) if k == 0 and t >= self.T_SIB else (90, 100, 130)
-            for (a, b, c, e) in ((x - 52, 90, x + 52, 93), (x - 52, 211, x + 52, 214), (x - 52, 90, x - 49, 214), (x + 49, 90, x + 52, 214)):
-                self.pix_rect(d, a, b, c, e, col)
-            if k == 0 and t >= self.T_SIB:
-                ic = self.kaz.resize((self.kaz.width * 3, self.kaz.height * 3), Image.NEAREST)
-                u = ease_out((t - self.T_SIB) / 0.4)
-                canvas.paste(ic, (int(x - ic.width / 2), int(152 - ic.height / 2 + 30 * (1 - u))), ic)
-            else:
-                self.draw_text(canvas, '?', 7, (x, 152), color=(150, 160, 190), outline=None, shadow=(20, 10, 30))
+            x = cx0 + 160 * k
+            u = ease_out((t - 0.2 - 0.12 * k) / 0.3)
+            if u <= 0:
+                continue
+            dy = int(round(40 * (1 - u) / self.U)) * self.U
+            self.pix_rect(d, x - 64, 74 + dy, x + 64, 198 + dy, (20, 10, 40))
+            col = (110, 190, 255) if k == 0 else (80, 90, 125)
+            if endb and k == 0 and int(t * 6) % 2 == 0:
+                col = (255, 230, 120)
+            for (a, b, c, e) in ((x - 64, 74, x + 64, 77), (x - 64, 195, x + 64, 198), (x - 64, 74, x - 61, 198), (x + 61, 74, x + 64, 198)):
+                self.pix_rect(d, a, b + dy, c, e + dy, col)
+            ic = ics[k].resize((ics[k].width * 3, ics[k].height * 3), Image.NEAREST)
+            bob = 0
+            if k == 0:
+                bob = -3 * (int(t * 2) % 2)                                          # Kazena atmet leicht
+            canvas.paste(ic, (int(x - ic.width / 2), int(137 - ic.height / 2 + dy + bob)), ic)
+            if k > 0 and int(t * 1.5 + k) % 3 == 0:                                      # Silhouetten: ein Fragezeichen blinkt kurz auf
+                self.draw_text(canvas, '?', 4, (x + 44, 98 + dy), color=(150, 160, 190), outline=None, shadow=(20, 10, 30))
+            self.draw_text(canvas, names[k], 2, (x, 214 + dy), color=(170, 230, 255) if k == 0 else (130, 140, 175), outline=None, shadow=(20, 10, 30))
         tau = t - self.T_SIB
         if 0 <= tau < 0.8:
-            cx, cy = self._ci(cx0, 152)
+            cx, cy = self._ci(cx0, 137)
             g = gamefx.R1(m)
-            r = gamefx.rd(gamefx.ease(tau / 0.6) * 12)
+            r = gamefx.rd(gamefx.ease(tau / 0.6) * 14)
             g.ring(cx, cy, max(0, r - 2), r, WATER[3], 1.0)
-        if self.T_SIB + 0.5 <= t < self.T_SIB + 2.5 and int(t * 6) % 2 == 0:
-            self.draw_text(canvas, 'KAZENA FOUND!', 4, (540, 260), color=GOLD_HL, outline=(20, 10, 30), shadow=None)
-        if t >= self.T_SIB + 0.5:
-            self.draw_text(canvas, '1/3', 4, (540, 232 if False else 240), color=(170, 230, 255), outline=None, shadow=(10, 40, 70)) if not (self.T_SIB + 0.5 <= t < self.T_SIB + 2.5 and int(t * 6) % 2 == 0) else None
+        if self.T_SIB + 0.5 <= t < self.T_SIB + 3.0 and int(t * 6) % 2 == 0:
+            self.draw_text(canvas, 'BRING THEM HOME!', 4, (540, 236), color=GOLD_HL, outline=(20, 10, 30), shadow=None)
 
     # ───────── Zähler ─────────
     def _draw_hud(self, canvas, d, t):
