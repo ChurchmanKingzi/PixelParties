@@ -41205,7 +41205,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
     // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
     // Als Ruling (Al 26.10., Flame Avalanche): dieselbe Liste graut unter der Schadenssperre die reinen Gegner-Schadenskarten aus (`blockedByDamageLock`).
-    if ((me.searchLocked || me.damageLocked) && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
+    // Handy-Befund (Eye of Ren): `searchLockBlockedCards` ist die Ausgrau-Liste des Servers (`_cardBlockedBySearchLock`) und nur gefuellt, wenn eine Sperre wirkt — auch die harte
+    // Ablage-Ausgangssperre (Stäbe, Auge von Ren) und die Hand-Sperre, die KEINE der beiden Flaggen `searchLocked`/`damageLocked` setzen. Die Flaggen als Bedingung liessen
+    // Spontaneous Reappearance & Co. dort spielbar aussehen (der Server verweigert still); die Liste selbst ist die Wahrheit, andere Karten werden nicht beruehrt.
+    if (card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
