@@ -18,9 +18,13 @@
 //    ohne Abwurf-Hooks in die Ablage.
 //  • „delete it …": `markiereZugendeLoeschung` (Engine) — gilt auch, wenn
 //    Crum bis dahin weg ist.
+//  • ★ Spielgestalter-Entscheidung 18.11.2026: der Tausch verschiebt eine Karte aus der EIGENEN Ablage → unter JEDER Ablage-Ausgangssperre (Stab-Sperre, Sperre des Eye of Ren,
+//    Knight of Kings [B], Hatusbal & Co.; gemeinsamer Helfer `ablageAusgangGesperrt`, `_pfad-shared.js`) ist die Aktivierung nicht verfügbar (`canActivateCreatureEffect`), und
+//    der Effekt prüft die Sperre vor dem Flug noch einmal. Ohne Sperre unverändert.
 // ═══════════════════════════════════════════
 const { istDoppelSpell, kontrolliert } = require('./_double-shared');
 const { searchBlocked } = require('./_search-shared');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Crum, the Class Pet';
 
@@ -40,6 +44,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     if ((engine.gs.players[pi]?.hand || []).length === 0) return false;
     if (!engine.pileOutAllowed(pi, 'discard', {})) return false;
+    if (ablageAusgangGesperrt(engine, pi)) return false;   // Spielgestalter-Entscheidung 18.11.2026: Stab-/Eye-Sperre & Co. (siehe Kopf)
     // Such-Template Bauform ②: Schritt 1 holt aus der Ablage auf die Hand.
     if (searchBlocked(engine, pi, 'discard')) return false;
     return doppelInAblage(engine, pi).length > 0;
@@ -53,6 +58,7 @@ module.exports = {
 
     const kandidaten = doppelInAblage(engine, pi);
     if (kandidaten.length === 0 || (ps.hand || []).length === 0) return false;
+    if (ablageAusgangGesperrt(engine, pi)) return false;   // Spielgestalter-Entscheidung 18.11.2026: gar keine Galerie unter einer Ablage-Ausgangssperre
     const wahl = await engine.promptGeneric(pi, {
       type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
       description: 'Choose a Double Spell in your discard pile to swap into your hand.',
@@ -79,6 +85,7 @@ module.exports = {
     // der Hand-Hook (Albrecht) noch VOR dem Flug. Sperren werden VOR den
     // Fluegen geprueft, damit nie eine Karte fliegt, die dann bleibt.
     if (!engine.pileOutAllowed(pi, 'discard', {})) return false;
+    if (ablageAusgangGesperrt(engine, pi)) return false;
     if (searchBlocked(engine, pi, 'discard')) return false;
     if (!(ps.discardPile || []).includes(spell)) return false;
 
