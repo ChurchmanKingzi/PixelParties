@@ -79,9 +79,9 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
-    // Stab-Sperre (Staff of the Teleporter) und nicht freigekaufte Eye-of-Ren-Sperre: `payRebelliokaiCost` zahlt synchron — die Kosten wären unzahlbar (Spielgestalter-Entscheidung 18.11.2026:
+    // Ablage-Ausgangssperre (Staff of the Teleporter, nicht bezahlte Eye-of-Ren-Sperre — beide hart): `payRebelliokaiCost` zahlt synchron — die Kosten wären unzahlbar (Spielgestalter-Entscheidung 18.11.2026:
     // ein gesperrter Weg ist nicht wählbar; hier ist es der einzige Weg → Karte nicht spielbar, statt wirkungslos auf der Hand zu bleiben).
-    if (engine && ablageAusgangGesperrt(engine, pi, { auchFreikaufbar: true })) return false;
+    if (engine && ablageAusgangGesperrt(engine, pi)) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 
