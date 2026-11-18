@@ -38,6 +38,7 @@
 
 const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 
 function getOwnControlledCreatureInsts(engine, pi) {
   const cardDB = engine._getCardDB();
@@ -76,7 +77,8 @@ function buildReplacementGallery(engine, ps, pi, maxLevel, excludeName) {
     if (lvl > maxLevel) return;
     seen.set(baseCardName(cn), { name: cn, source, level: lvl });
   };
-  for (const cn of (ps.mainDeck || [])) tryAdd(cn, 'deck');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+  if (!deckAusgangGesperrt(engine, pi)) for (const cn of (ps.mainDeck || [])) tryAdd(cn, 'deck');
   // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
   for (const cn of engine.handUndVorratListe(pi)) tryAdd(cn, 'hand');
   return [...seen.values()].sort(
