@@ -26,17 +26,21 @@ const {
   PROJECTION_NAME, isIdejHero, freeSupportSlots, attachIdejCardToHero,
 } = require('./_idej-shared');
 
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Idej Projector';
 // Chain links the Projector may react to — opponent's Attack / Spell /
 // Creature. (Hero effects, Abilities, Artifacts, Potions are excluded.)
 const REACTABLE_TYPES = ['Attack', 'Spell', 'Creature'];
 
 /** Piles (hand / deck / discard) that hold ≥1 Idej Projection. */
-function projectionSources(ps) {
+function projectionSources(ps, engine, pi) {
   const out = [];
   if ((ps.hand || []).includes(PROJECTION_NAME)) out.push('hand');
-  if ((ps.mainDeck || []).includes(PROJECTION_NAME)) out.push('deck');
-  if ((ps.discardPile || []).includes(PROJECTION_NAME)) out.push('discard');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand, deck or discard pile" — Deck unter Knight of Kings [B], Ablage unter der
+  // Stab-Sperre (Staff of the Teleporter) / Knight of Kings [B] sind als Quelle zu. (Der Projector entnahm die Karte per `splice` direkt und umging die Sperre.)
+  if ((ps.mainDeck || []).includes(PROJECTION_NAME) && !(engine && deckAusgangGesperrt(engine, pi))) out.push('deck');
+  if ((ps.discardPile || []).includes(PROJECTION_NAME) && !(engine && ablageAusgangGesperrt(engine, pi))) out.push('discard');
   return out;
 }
 
@@ -63,7 +67,7 @@ function eligibleIdejHeroes(engine, pi) {
 function canUseProjector(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps || !engine) return false;
-  if (projectionSources(ps).length === 0) return false;
+  if (projectionSources(ps, engine, pi).length === 0) return false;
   return eligibleIdejHeroes(engine, pi).length > 0;
 }
 
@@ -102,7 +106,7 @@ module.exports = {
     const isReactionUse = Array.isArray(chain) && chain.length > 0;
     const canCancel = !isReactionUse;
 
-    const sources = projectionSources(ps);
+    const sources = projectionSources(ps, engine, pi);
     if (sources.length === 0) return { aborted: true };
     const heroes = eligibleIdejHeroes(engine, pi);
     if (heroes.length === 0) return { aborted: true };
