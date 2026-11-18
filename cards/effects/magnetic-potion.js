@@ -7,6 +7,9 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT('magnetic-potion', pi); },
+
   blockedByHandLock: true,
   isPotion: true,
 

@@ -12,6 +12,9 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   canActivate(gs, playerIdx, engine) {
+    // Spielgestalter-Entscheidung 17.11.2026 (Arcane Eyes): das Einsargen IST das Setzen einer Surprise — unter wirksamen Arcane Eyes des Gegners ist die Karte
+    // gesperrt (ausgegraut, bleibt auf der Hand, kein Gold) statt nach der Zielwahl wirkungslos verbraucht zu werden.
+    if (engine && engine.surprisesLockedFor(playerIdx)) return false;
     return _getEligibleCreatures(gs, engine || null).length > 0;
   },
 
@@ -19,6 +22,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = playerIdx;
 
+    if (engine.surprisesLockedFor(pi)) return { cancelled: true };   // Arcane Eyes erst in der Auflösung wirksam geworden: nichts bezahlt, Karte bleibt
     const targets = _getEligibleCreatures(gs, engine);
     if (targets.length === 0) return false;
 

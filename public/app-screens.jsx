@@ -5823,7 +5823,7 @@ function RulesScreen({ onBack }) {
             </div>
             <div className="rules-status-entry rules-status-blinded">
               <div className="rules-status-name">Blinded</div>
-              <p>The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.</p>
+              <p>Cannot choose a target the opponent controls with Attacks, Spells or effects.</p>
             </div>
             <div className="rules-status-entry rules-status-poisoned">
               <div className="rules-status-name">Poisoned</div>

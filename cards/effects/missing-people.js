@@ -64,6 +64,8 @@ function gegnerCreatures(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hand'],
   requiresTarget: true,
   // ^ Tagged for Blinded gating — siehe cards/effects/_hooks.js.
@@ -74,7 +76,7 @@ module.exports = {
   spellPlayCondition(gs, playerIdx, engine) {
     if (!engine) return true;
     const oi = opponentOfGs(gs, playerIdx);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — spielbar, verpufft in `onPlay`.)
     return gegnerCreatures(engine, playerIdx).length > 0;
   },
 

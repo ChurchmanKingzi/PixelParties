@@ -15,6 +15,14 @@
 //  free Support Zones to place the resulting
 //  Pollution Tokens into.
 //
+//  Schutz (Spielgestalter-Entscheidung 16.11.2026):
+//    • Resistance fängt den Effekt JE HELD ab (der Effekt wirkt auf den Helden): ein Held mit Resistance behält alle Abilities,
+//      die übrigen Helden verlieren ihre wie gehabt. Je Held EINMAL gefragt (`heroNonDamageEffectBlocked`, 'ability_discard'),
+//      nicht je Ability — eine Ladung = ein Effekt. Auch eigene Helden des Wirkers.
+//    • Leafagami Snake schützt je Ability („don't remove them and draw a card for each affected Ability instead"): die Ability
+//      bleibt liegen, der Kontrolleur der Schlange zieht 1 Karte. Reihenfolge: erst Resistance (Held), dann Snake (Ability).
+//    • Geschützte Abilities gelten NICHT als „removed" — sie zählen nicht für die Pollution Tokens (nur wirklich entfernte).
+//
 //  "Starting Ability" definition:
 //    • Determined per hero, by COUNT. If the hero
 //      normally starts with N copies of ability X,
@@ -112,6 +120,24 @@ function collectRemovableAbilities(engine, playerIdx) {
   return result;
 }
 
+/**
+ * Würde Resistance (bzw. die Spell-Immunität des Black-Thorn Dragon) den Helden JETZT vor Rain of Death schützen? Nur LESEN (verbraucht keine Ladung) — für `spellPlayCondition`:
+ * geschützte Abilities werden nicht entfernt, brauchen also keine Pollution Tokens. Gespiegelt vom Resistance-Skript (Stufe = Stapelhöhe, Ladungen je Held und Zug in `gs._resistanceBlocks`);
+ * beim Wirken entscheidet `engine.heroNonDamageEffectBlocked` verbindlich.
+ */
+function heldGeschuetztVorab(engine, seite, heroIdx) {
+  const gs = engine.gs;
+  const hero = gs.players[seite]?.heroes?.[heroIdx];
+  if (!hero?.name || !(hero.hp > 0)) return false;
+  if (engine.heroHasSpellImmunity?.(seite, heroIdx)) return true;
+  if (engine._isHeroAbilityPassiveSilenced?.(seite, heroIdx)) return false;
+  const eintrag = engine.abilityStapelEintrag?.(seite, heroIdx, 'Resistance');
+  const stufe = eintrag ? eintrag.namen.length : 0;
+  if (stufe === 0) return false;
+  const benutzt = gs._resistanceBlocks?.[`${seite}:${heroIdx}`] || 0;
+  return benutzt < (stufe >= 3 ? Infinity : stufe);
+}
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -129,8 +155,10 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true; // Can't compute without engine; permissive fallback.
     const oppIdx = opponentOfGs(gs, pi);
-    const oppRemovable = collectRemovableAbilities(engine, oppIdx);
-    const excess = oppRemovable.length - collectRemovableAbilities(engine, pi).length;
+    // Von der Leafagami Snake oder der Resistance des Helden geschützte Abilities werden nicht entfernt und brauchen keine Pollution Tokens (Stand jetzt; beim Wirken entscheiden die Engine-Prüfer).
+    const entfernbar = (inst) => !engine.laubSchlangeFuer?.(inst.owner, inst.heroIdx) && !heldGeschuetztVorab(engine, inst.owner, inst.heroIdx);
+    const oppRemovable = collectRemovableAbilities(engine, oppIdx).filter(entfernbar);
+    const excess = oppRemovable.length - collectRemovableAbilities(engine, pi).filter(entfernbar).length;
     if (excess <= 0) return true;
     return excess <= countFreeZones(gs, pi);
   },
@@ -142,8 +170,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oppIdx = engine.opponentOf(pi);
 
-      const myRemovable  = collectRemovableAbilities(engine, pi);
-      const oppRemovable = collectRemovableAbilities(engine, oppIdx);
+      let myRemovable  = collectRemovableAbilities(engine, pi);
+      let oppRemovable = collectRemovableAbilities(engine, oppIdx);
 
       if (myRemovable.length === 0 && oppRemovable.length === 0) {
         engine.log('rain_of_death_fizzle', {
@@ -161,6 +189,37 @@ module.exports = {
         });
       }
       await engine._delay(1400);
+
+      // ── Schutz: Resistance je Held, danach Leafagami Snake je Ability (Spielgestalter-Entscheidung 16.11.2026, siehe Kopf) ──
+      {
+        const verschont = new Set();
+        const gefragt = new Set();
+        for (const inst of [...myRemovable, ...oppRemovable]) {
+          const key = `${inst.owner}-${inst.heroIdx}`;
+          if (gefragt.has(key)) continue;
+          gefragt.add(key);
+          if (await engine.heroNonDamageEffectBlocked(inst.owner, inst.heroIdx, 'ability_discard', { sourceOwner: pi, source: 'Rain of Death' })) verschont.add(key);
+        }
+        const nichtVerschont = (inst) => !verschont.has(`${inst.owner}-${inst.heroIdx}`);
+        myRemovable = myRemovable.filter(nichtVerschont);
+        oppRemovable = oppRemovable.filter(nichtVerschont);
+        const ohneSchlange = async (liste) => {
+          const bleibt = [];
+          for (const inst of liste) {
+            // Snake: die Ability bleibt liegen, der Kontrolleur der Schlange zieht 1 Karte; nicht „removed" → zählt nicht für die Pollution Tokens.
+            if (await engine.abilityEntfernungVerhindert(inst, 'deleted', { source: { name: 'Rain of Death', owner: pi } })) continue;
+            bleibt.push(inst);
+          }
+          return bleibt;
+        };
+        myRemovable = await ohneSchlange(myRemovable);
+        oppRemovable = await ohneSchlange(oppRemovable);
+        if (myRemovable.length === 0 && oppRemovable.length === 0) {
+          engine.log('rain_of_death_fizzle', { player: gs.players[pi].username, reason: 'protected' });
+          engine.sync();
+          return;
+        }
+      }
 
       // ── Self-cleanup hooks FIRST, then state mutation ──
       // Abilities like Toughness and Fighting use onCardLeaveZone to undo

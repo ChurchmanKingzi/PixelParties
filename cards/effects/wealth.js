@@ -26,6 +26,7 @@ module.exports = {
     onResourceGain: (ctx) => {
       // Only boost during Resource Phase
       if (ctx.phaseIndex !== 1) return;
+      // Spielgestalter-Entscheidung 17.11.2026: der Zuschlag ist Effekt-Gold (je Stufe ein eigenes Ereignis nach der Buchung, siehe `actionGainGold`/`_einkommensBonus`).
       // v1344: NUR das Rundeneinkommen erhoehen (`_isResourceGain`), nicht
       // jeden Gewinn in der Resource Phase. Seit Golden Ladybug gibt es dort
       // auch Effekt-Gold — der Bonus haette sich sonst je Gewinn wiederholt.

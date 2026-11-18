@@ -3,8 +3,13 @@
 //  Ability — Grants bonus current + max HP to
 //  the attached Hero based on stack level.
 //  Lv1: +100, Lv2: +100, Lv3: +200 (total +400).
-//  On removal, subtracts the granted HP (min 1).
+//  On removal, subtracts the granted HP from max AND current HP (current never below 1).
 //  Works for starting abilities (onGameStart).
+//
+//  ★ Spielgestalter-Entscheidung 17.11.2026: Toughness zu entfernen — egal wie (Madame Guillotine, Abwurf, Memory Wipe, Forgetting …) — zieht die
+//  HP ab, die diese eine Kopie beschert hat: Max −Bonus UND aktuelle HP −Bonus, gecappt bei 1 HP (der Held kann an diesem Verlust nie sterben).
+//  Kehrt die Kopie zurueck (Guillotine am Zugende), steigen aktuelle und Max-HP wieder um den Bonus: 650/800 → 450/600 → 650/800 (vorher
+//  600/600 → 800/800 = Gratis-Heilung). Die Gutschrift (`applyBonus`) ist das Gegenstueck: `increaseMaxHp(…, { alsoHealCurrent })`.
 // ═══════════════════════════════════════════
 
 const { abgangsBetrag, kopienIndex } = require('./_stufenbonus-shared');
@@ -99,7 +104,7 @@ module.exports = {
       const hero = ctx.players[seite]?.heroes?.[ctx.cardHeroIdx];
       if (!hero || !hero.name) return;
 
-      const effective = ctx._engine.decreaseMaxHp(hero, hpGranted);
+      const effective = ctx._engine.decreaseMaxHp(hero, hpGranted, { alsoReduceCurrent: true });
 
       ctx._engine._broadcastEvent('toughness_hp_change', {
         owner: seite, heroIdx: ctx.cardHeroIdx, amount: -effective,

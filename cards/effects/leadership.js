@@ -12,6 +12,8 @@
 //  multi-select with dynamic max.
 // ═══════════════════════════════════════════
 
+const { tuscanArtistHinweis } = require('./_draw-block-shared');
+
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
@@ -64,20 +66,42 @@ module.exports = {
       .filter(i => waehlbar.has(i));
     if (eligibleIndices.length === 0) return false;
 
-    const result = await engine.promptGeneric(pi, {
-      type: 'handPick',
-      title: `Leadership Lv${level}`,
-      description: `Select up to ${actualMax} card${actualMax !== 1 ? 's' : ''} to shuffle back and redraw.${bonusDraw ? ' (+1 bonus draw!)' : ''}`,
-      eligibleIndices,
-      maxSelect: actualMax,
-      minSelect: 1,
-      confirmLabel: '🔄 Mulligan!',
-      cancellable: true,
-    });
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Leadership x Tuscan Artist): Das Mischen von genau 2/3 Karten bleibt unter Tuscan Artist erlaubt (nur das Nachziehen
+    // von genau 2/3 ist negiert), aber der Auswahldialog warnt (Warnungsprinzip, wie `_nutzlosHinweis`): sind genau so viele Karten gewaehlt, dass die Ziehmenge
+    // (zurueckgemischte Nicht-Traenke + Bonus) 2 oder 3 betraegt, fragt eine Bestaetigung mit Hinweis nach; "Back" fuehrt zur Auswahl zurueck. Die CPU waehlt solche
+    // Mengen nicht (`_nutzlos`) und bricht dann ab. Kein Ausgrauen, kein Verbrauch beim Abbruch.
+    const cardDB = engine._getCardDB();
+    let selectedCards;
+    for (;;) {
+      const result = await engine.promptGeneric(pi, {
+        type: 'handPick',
+        title: `Leadership Lv${level}`,
+        description: `Select up to ${actualMax} card${actualMax !== 1 ? 's' : ''} to shuffle back and redraw.${bonusDraw ? ' (+1 bonus draw!)' : ''}`,
+        eligibleIndices,
+        maxSelect: actualMax,
+        minSelect: 1,
+        confirmLabel: '🔄 Mulligan!',
+        cancellable: true,
+      });
 
-    if (!result || result.cancelled || !result.selectedCards || result.selectedCards.length === 0) return false;
+      if (!result || result.cancelled || !result.selectedCards || result.selectedCards.length === 0) return false;
 
-    const selectedCards = result.selectedCards;
+      const gewaehlt = result.selectedCards;
+      const nichtTraenke = gewaehlt.filter(c => cardDB[c.cardName]?.cardType !== 'Potion').length;
+      const hinweis = tuscanArtistHinweis(engine, pi, nichtTraenke + bonusDraw);
+      if (!hinweis) { selectedCards = gewaehlt; break; }
+      const frage = await engine.promptGeneric(pi, {
+        type: 'confirm',
+        title: `Leadership Lv${level}`,
+        message: `${hinweis} Shuffle anyway?`,
+        confirmLabel: '🔄 Mulligan!',
+        cancelLabel: 'Back',
+        cancellable: true,
+        _nutzlos: true,
+      });
+      if (engine._confirmSaidYes(frage)) { selectedCards = gewaehlt; break; }
+      if (engine.isCpuPlayer?.(pi) || engine._inMctsSim || engine._fastMode) return false;
+    }
     const count = selectedCards.length;
 
     // Sort indices descending so splicing doesn't shift later indices

@@ -46,6 +46,7 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Front Soldier';
 const DRAW = 2;
+const imFlug = new Set();   // Instanz-IDs der Soldaten, die gerade gespielt werden (Gegenfenster offen)
 const BLOCK_MS = 560;        // bis zum Aufprall des Schildes (deckt sich mit `front_soldier_block` im Client; +100 ms Einbau-Versatz)
 
 /** Plätze, auf die der Soldat JETZT als Zusatzaktion beschworen werden könnte (leer = Handfalle nicht einsetzbar). */
@@ -91,6 +92,7 @@ async function handfalle(ctx, { gegnerKarte, gegnerName, art, schon, negiere }) 
   if (schon()) return false;                                        // schon negiert (frühere Kopie / anderer Effekt)
   const inst = ctx.card;
   if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return false;   // Hand oder Crestinas Vorrat
+  if (imFlug.has(inst.id)) return false;                            // diese Kopie wird gerade selbst gespielt (Gegenantwort auf den Soldaten)
   const ps = gs.players[pi];
   if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return false;
   if (zonen(engine, pi).length === 0) return false;                 // kein tauglicher Beschwörer / Platz → nicht einsetzbar
@@ -115,9 +117,20 @@ async function handfalle(ctx, { gegnerKarte, gegnerName, art, schon, negiere }) 
   let platz = null;
   const ok = await sofortAusHandBeschwoeren(engine, pi, CARD_NAME, {
     source: CARD_NAME,
-    nachZonenwahl: async (z) => { platz = z; await schildKracht(engine, z.owner ?? pi, z.heroIdx, z.slotIdx); },
+    nachZonenwahl: async (z) => {
+      // ★ Spielgestalter-Entscheidung 16.11.2026: der Soldat ist selbst eine Reaction (Creature) aus der Hand — sobald der Platz feststeht, gilt er als gespielt und der Gegner darf mit dem regulären
+      // Gegenreaktions-Fenster antworten (The Master's Plan, Front Soldier, Reverse Trap …, `_reaktionGespielt`, `ort: 'hand'`: die Engine legt den negierten Soldaten selbst ab). Negiert: er wird nicht
+      // beschworen, nichts wird negiert, niemand zieht.
+      // Die gerade gespielte Kopie bleibt bis zur Entscheidung auf der Hand; als Zuhörerin der Gegenantwort (`onReactionPlayed`) darf sie sich nicht selbst noch einmal anbieten (`imFlug`).
+      imFlug.add(inst.id);
+      let negiert = false;
+      try { negiert = await engine._reaktionGespielt(pi, CARD_NAME, 'Creature', { sourceOwner: gegnerKarte, ort: 'hand' }); }
+      finally { imFlug.delete(inst.id); }
+      if (negiert) return 'negiert';
+      platz = z; await schildKracht(engine, z.owner ?? pi, z.heroIdx, z.slotIdx);
+    },
   });
-  if (!ok) return false;                                            // Abbruch in der Zonenwahl: nichts negiert, nichts gezogen
+  if (!ok) return false;                                            // Abbruch in der Zonenwahl bzw. Soldat negiert: nichts negiert, nichts gezogen
 
   negiere();
   engine.log('front_soldier', { player: ps.username, negated: gegnerName, via: art });

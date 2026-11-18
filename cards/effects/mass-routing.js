@@ -39,7 +39,7 @@
 //    nicht fuer das Ziehen.
 // ═══════════════════════════════════════════
 
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { cardinalNameImmun } = require('./_cardinal-shared');
 const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 const CARD_NAME = 'Mass Routing';
@@ -91,7 +91,7 @@ async function insDeck(engine, inst, maxLevel, pi, ankhotaVorab = null) {
     type: 'deep_sea_bubbles', owner: kontrolleur, heroIdx, zoneSlot: slotIdx,
   });
 
-  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi) || isCardinalBeastByName(inst.name)) {   // W17b: Golden Wings nur gegen den Gegner
+  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi) || cardinalNameImmun(engine, inst)) {   // W17b: Golden Wings nur gegen den Gegner
     engine.log('cardinal_immune_block', { card: cardName, by: CARD_NAME, action: 'shuffle_into_deck' });
     return null;
   }
@@ -164,7 +164,7 @@ module.exports = {
     const hi = Number.isInteger(link?.heroIdx) ? link.heroIdx : -1;
     const dm = hi >= 0 ? engine.effectiveSchoolLevelForCaster(SCHULE, pi, hi) : 3;
     const maxLevel = Math.max(1, Math.min(3, dm));
-    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !engine.kreaturGegnerEffektImmun(i, pi) && !isCardinalBeastByName(i.name));
+    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !engine.kreaturGegnerEffektImmun(i, pi) && !cardinalNameImmun(engine, i));
   },
 
   hooks: {

@@ -12,7 +12,14 @@
 //       Option B — Discard 1 card from hand,
 //       then search deck for an Ability and
 //       attach it to this Hero. This DOES
-//       consume the hero's per-turn attachment.
+//       consume the hero's per-turn attachment —
+//       Standardplatz zuerst, sonst ein Bonus-Platz
+//       von Divine Gift of Skill (Spielgestalter-
+//       Entscheidung 17.11.2026: Option B darf einen
+//       Bonus-Platz einloesen, wenn das Standard-
+//       Anlegen verbraucht ist; wie der Hand-Weg
+//       und Ska: `kannAbilityAnlegen` /
+//       `verbraucheAbilityAnlegen`).
 //
 //  Lv3: Option A — Attach up to 3 Abilities
 //       from hand (same rules as Lv1).
@@ -358,9 +365,9 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingOrt, feld
 
   if (!ort) return false; // No valid zone — shouldn't happen if canAttach was checked
 
-  // Level 2 consumes abilityGivenThisTurn; Level 3 does not
+  // Level 2 consumes the hero's attachment of the turn (Standardplatz, sonst ein Bonus-Platz von Divine Gift of Skill); Level 3 does not
   if (level === 2) {
-    if (feld === playerIdx) ps.abilityGivenThisTurn[heroIdx] = true;
+    if (feld === playerIdx) engine.verbraucheAbilityAnlegen(playerIdx, heroIdx);
     else {
       // Geliehener Held: sein Anlegen dieses Zuges ist die Styx-Marke.
       const h = hps.heroes?.[heroIdx];
@@ -471,7 +478,7 @@ module.exports = {
     const ps = ctx.players[pi];
     const hasCardsInHand = (ps.hand || []).length > 0;
     const anlegenVerbraucht = feld === pi
-      ? !!(ps.abilityGivenThisTurn || [])[heroIdx]
+      ? !engine.kannAbilityAnlegen(pi, heroIdx)   // Standard-Anlegen ODER ein Bonus-Platz (Divine Gift of Skill) — Spielgestalter-Entscheidung 17.11.2026
       : !engine.darfFremdAbilityAnlegen(pi, feld, heroIdx);
 
     switch (level) {
@@ -520,7 +527,7 @@ module.exports = {
     const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
     const hasCardsInHand = (ps.hand || []).length > 0;
     const abilityGivenBlocked = feld === pi
-      ? (ps.abilityGivenThisTurn || [])[heroIdx]
+      ? !engine.kannAbilityAnlegen(pi, heroIdx)   // Standard-Anlegen ODER ein Bonus-Platz (Divine Gift of Skill) — Spielgestalter-Entscheidung 17.11.2026
       : !engine.darfFremdAbilityAnlegen(pi, feld, heroIdx);
     const canOptionA = hasHandAbilities;
     const canOptionB = level === 3

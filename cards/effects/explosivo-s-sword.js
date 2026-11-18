@@ -89,6 +89,15 @@
 //  Diver Helmet is NOT consulted — it only grants
 //  immunity to AREAS; Explosivo's Sword is an
 //  Equipment's triggered damage, not an Area.
+//
+//  ── Spielgestalter-Entscheidung 17.11.2026 ──
+//  Trifft der Angriff des Traegers mehrere Ziele (Whirlwind Strike & Co.,
+//  Flaechenklammer offen), loest das Schwert NICHT schon nach dem ersten
+//  Kill aus: erst wird der Flaechenschaden komplett als EINE Schadens-
+//  instanz abgewickelt (alle Treffer, alle Tode samt Triggern — Wanted
+//  Poster zieht fuer jeden Kill des Angriffs), DANN die 100 auf alle
+//  uebrigen Ziele des Gegners (`engine.nachFlaechenschlagTode`). Ein
+//  Einzelziel-Angriff loest wie bisher sofort aus.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Explosivo\'s Sword';
@@ -166,6 +175,16 @@ async function _explode(ctx, excludeKey) {
   engine.sync();
 }
 
+/**
+ * Aus den Treffer-Hooks: laeuft gerade ein Flaechenschlag (Klammer offen), wird die Explosion bis NACH dem
+ * kompletten Schlag aufgeschoben (der gefallene Held/die gefallene Kreatur ist dann schon vom Brett, hp <= 0
+ * bzw. entfernt — `_explode` laesst Tote ohnehin aus); sonst sofort wie bisher.
+ */
+async function _ausloesen(ctx, excludeKey) {
+  if (ctx._engine.nachFlaechenschlagTode?.(() => _explode(ctx, null))) return;
+  await _explode(ctx, excludeKey);
+}
+
 module.exports = {
   // Equipment-artifact convention (Blade of the Swamp Witch / Wanted
   // Poster): placement is driven by the cards.json "Equipment" subtype;
@@ -224,7 +243,7 @@ module.exports = {
         if (hi >= 0) { excludeKey = `hero-${tpi}-${hi}`; break; }
       }
 
-      await _explode(ctx, excludeKey);
+      await _ausloesen(ctx, excludeKey);
     },
 
     // ── ② Equipped Hero defeats a CREATURE with an Attack ──
@@ -245,7 +264,7 @@ module.exports = {
         // A Creature this equipped Hero's Attack defeated → explode.
         // claimHOPT inside _explode dedupes if multiple entries (or
         // the hero-path above) already fired this turn.
-        await _explode(ctx, `creature-${inst.id}`);
+        await _ausloesen(ctx, `creature-${inst.id}`);
         return;
       }
     },

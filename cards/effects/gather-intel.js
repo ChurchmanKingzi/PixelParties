@@ -51,7 +51,7 @@ function wirkbar(gs, pi, oi) {
   const ps = gs.players[pi], ops = gs.players[oi];
   if (!ps || !ops) return false;
   if ((ops.hand || []).length === 0) return false;
-  if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
+  // (Erstrunden-Schutz des Gegners: Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — spielbar, verpufft in `onPlay`.)
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor
   return true;
 }
@@ -98,6 +98,8 @@ async function zusatzaktionKlaeren(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Immer gratis spielbar; ob sie als Zusatzaktion gilt, entscheidet `onPlay`.
   inherentAction: () => true,
 
@@ -122,6 +124,8 @@ module.exports = {
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) return;
+      // Erstrunden-Schutz: die Hand des Geschuetzten ist tabu — die Karte ist gespielt, die Wirkung verpufft (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt)
+      if (gs.firstTurnProtectedPlayer === oi) { engine.log('gather_intel_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return; }
       if (!wirkbar(gs, pi, oi)) { gs._spellCancelled = true; return; }
 
       // Die gespielte Karte JETZT dem Gegner zeigen, nicht erst nach den Abfragen.

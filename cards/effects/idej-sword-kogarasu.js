@@ -71,9 +71,8 @@ module.exports = {
     // Record that the equipped Hero has cast a Spell this turn so
     // canPlayCard blocks the next one.
     afterSpellResolved: (ctx) => stampSpellUsed(ctx),
-    // ★ Z7b (A09-17, Als Entscheidung, Welle 3): „1 Spell pro Zug" zählt, wenn der Zauber AUFLÖSEN
-    // durfte — auch mit verhindertem Ergebnis (Teil-Negierung, Fizzle): `afterSpellPrevented`.
-    // Ein GANZ negierter Zauber (Silence …) hat nie aufgelöst und verbraucht den Zug-Zauber nicht.
+    // ★ „1 Spell pro Zug" zählt, sobald der Zauber GESPIELT wurde — auch mit verhindertem Ergebnis (Teil-Negierung, Fizzle) und, seit der Spielgestalter-Entscheidung 16.11.2026,
+    // wenn er ganz negiert wird (Silence …; früher Z7b: nicht): `afterSpellPrevented`.
     afterSpellPrevented: (ctx) => stampSpellUsed(ctx),
   },
 };

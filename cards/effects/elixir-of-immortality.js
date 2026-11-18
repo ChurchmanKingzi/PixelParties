@@ -9,6 +9,37 @@
 //  If multiple targets die at once, player picks
 //  which to revive via gallery prompt.
 //
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („nur der aktuelle Kontrolleur eines Ziels kann dieses per Immortality
+//  wiederbeleben"): das Elixir loest nur fuer ein Ziel aus, das sein Spieler im Moment des Falls KONTROLLIERT
+//  (Helden: `engine.heroSideOf` = Charme/Love Shot/dauerhafte Uebernahme vor der Spalte; Kreaturen: `controller`).
+//  Das Elixir des Besitzers bleibt liegen, wenn ein anderer den Helden kontrolliert; hat der Kontrolleur selbst ein
+//  Elixir offen, loest DAS aus und belebt den Helden in seiner Spalte (`pending.seite`). Gilt fuer Besitzer wie Dieb.
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („destroyed zählt als defeated"): auch ein Tod durch eine ZERSTÖRUNG löst das Elixir aus
+//  (Plant Golems Aufräum-Effekt, Zerstör-/Defeat-Effekte, `actionDestroyCard`) — nicht nur der Schadenstod. Helden fielen schon immer über
+//  `onHeroKO` (jeder Heldentod, auch `actionDefeatHero`); Kreaturen kommen ZUSÄTZLICH über `onCreatureDeath` (nur Nicht-Schadens-Tode:
+//  der Schadenstod bleibt bei `afterCreatureDamageBatch`).
+//  Eine NICHT LEBENSFÄHIGE Kreatur löst das Elixir nie aus und verbraucht es nicht (`kreaturLebensfaehig`, EINE Prüfung für beide Wege): ohne
+//  Landeplatz (kein lebender Wirtshelden / keine freie oder erlaubte Zone — EOI-03), wenn die Karte nicht mehr in ihrem Stapel liegt (schon
+//  anders zurückgeholt) und für eine an ihren Helden gebundene Kreatur (`sharesHpWithHero`: Bonded Companion) bei totem Helden.
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („Opfer löst das Elixir aus"): wird eine Kreatur, die der Spieler kontrolliert, GEOPFERT (als Kosten oder als
+//  Effekt: `resolveSacrificeCost`, `opfereKreatur`, die Tausch-Wege Suspicious Monster / Guardian of Teocuilatl, Selbstopfer wie Loyal Rottweiler,
+//  Occultism, Brackle …), gilt sie als besiegt — das Elixir belebt sie wie bei jedem anderen Tod (halbe Max-HP, aufgerundet). Der Tod wird nur
+//  VORGEMERKT (`onCreatureDeath`); aufgelöst wird erst am nächsten Haltepunkt (`onAnyActionResolved`, `afterSpellResolved`, `afterCreatureEffect` …),
+//  also NACHDEM die Kosten bezahlt sind und der Effekt der Karte gelaufen ist. Mehrere zugleich Geopferte: EINE Kreatur kehrt zurück (Galerie-Wahl).
+//  Ein von Barrier of Undying gerettetes Opfer stirbt nie (kein Todes-Hook) und löst nichts aus; die Lebensfähigkeitsprüfung unten gilt unverändert
+//  (Bonded Companion bei totem Helden, fehlender Landeplatz, Karte nicht mehr im Stapel: kein Auslösen, Elixir bleibt liegen). Der frühere
+//  Ausschluss („ein Opfer ist kein defeated", Auslegung nach Extra Life, W16d) gilt nirgends mehr: auch Extra Life, Loyal Bone Dog, Great Immortal Hydra, Infallible Oracle Pythia und
+//  Corpse Explosion zählen ein Opfer als „defeated" (Spielgestalter-Entscheidung 16.11.2026, „Opfern gilt als defeat"). Trägt das Opfer ein Extra Life, kehrt es über
+//  `_loeseOpferWiederbelebungen` (Engine) an demselben Haltepunkt zurück — VOR den Zuhörern, also vor diesem Elixir, das dann liegen bleibt (die Karte liegt nicht mehr im Stapel).
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („Insel-Zonenentfernung"): stirbt eine Kreatur, WEIL IHRE ZONE ENTFERNT WIRD (Flying Island in the Sky
+//  verlässt das Brett → `removeIslandZones`; `engine._inselEntfernung` markiert die Entfernung, solange die Todes-Hooks laufen), greift das Elixir NUR,
+//  wenn derselbe Held (der, in dessen Zone sie stand) noch mindestens EINE andere freie Zone für sie hat; belebt wird in einer freien Zone DIESES Helden
+//  (nie bei einem anderen). Gibt es keine, löst das Elixir nicht aus und wird nicht verbraucht (`findeLandeplatz`, Eintrag `zoneEntfernt`). Mehrzonen-
+//  Kreaturen sterben dabei nicht (`_multizone-shared`), alle anderen Todesarten (auch ein Tod IN einer Inselzone, die bleibt) laufen wie sonst.
+//
 //  Death collection: onHeroKO collects dead heroes
 //  without immediately reviving. The actual revive
 //  prompt happens at the NEXT batch checkpoint
@@ -19,6 +50,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getResolvingHandIndex } = require('./_hand-resolve');
+const { loadCardEffect } = require('./_loader');
 
 /**
  * ★ v1282 — EIN Helfer fuer alle Ausloesepunkte.
@@ -57,9 +90,29 @@ module.exports = {
   // Nur solange das Elixir fuer mindestens einen toten Helden auch wirklich
   // ausloesen kann (`onHeroKO` verwirft nicht wiederbelebbare Helden, z. B.
   // Mirjam) — sonst bliebe die Partie ohne lebenden Helden ewig offen.
-  preventsAllHeroesDeadLoss: (engine, pi) => {
-    return engine.heroesControlledBy(pi, { permanentOnly: true })
-      .some(({ hero }) => hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true }));
+  // Massgeblich ist, was das Elixir fuer DIESEN Tod vorgemerkt hat
+  // (`perm._pendingHeroes`), nicht jeder tote Held: ein Held, der schon VOR
+  // dem Ablegen des Elixirs gefallen war, ist fuer es nie vorgemerkt worden
+  // und wird nie belebt. Waehrend die Wiederbelebung laeuft (`_triggered`)
+  // bleibt die Niederlage ebenfalls ausgesetzt.
+  preventsAllHeroesDeadLoss: (engine, pi, perm) => {
+    if (!perm) return false;
+    if (perm._triggered) return true;
+    return (perm._pendingHeroes || []).some(ph => {
+      const hero = engine.gs.players[ph.seite ?? pi]?.heroes?.[ph.heroIdx];
+      return hero?.name && hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true });
+    });
+  },
+  // Spielgestalter-Entscheidung 16.11.2026: das Elixir des KONTROLLEURS belebt einen uebernommenen Helden in der Spalte des Gegners. Faellt dessen
+  // letzter Held, haelt dieses Elixir die Niederlage der Seite `seite` (= Spalte des Helden) ebenfalls auf (`checkAllHeroesDead`, nur fremde Seiten).
+  preventsAllHeroesDeadLossForSide: (engine, pi, perm, seite) => {
+    if (!perm) return false;
+    if (perm._triggered) return (perm._triggeredSeiten || []).includes(seite);
+    return (perm._pendingHeroes || []).some(ph => {
+      if ((ph.seite ?? pi) !== seite) return false;
+      const hero = engine.gs.players[seite]?.heroes?.[ph.heroIdx];
+      return hero?.name && hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true });
+    });
   },
 
   // CPU evaluation hint — Elixir's value is a multi-turn safety net
@@ -89,11 +142,27 @@ module.exports = {
     engine.commitAppearance();   // W64b: zentral (Gegner + Zuschauer)
     await engine._delay(100);
 
+    // ★ Besitzer-Regel (CARD_API, Al 14.10.): die Karte kommt aus der Hand des Spielers, kann aber GESTOHLEN sein (Thieving Strike, Gather Intel,
+    // Love-Shot-Zug aus dem Gegnerdeck …) — dann gehoert sie weiter ihrem Besitzer und geht beim Verbrauch in DESSEN Loeschstapel. Zum Zeitpunkt
+    // von `resolve` liegt die Karte noch auf ihrem Handplatz (aufgeschobene Entnahme), dessen Herkunft jetzt gelesen wird; der Server verbraucht die
+    // Herkunftsmarke danach, das Permanent muss sie sich also selbst merken. Aus Deck/Trankdeck (Colored Snow, Potion Launcher, Tuscan Mystic)
+    // oder Crestinas Vorrat gibt es keine Fremdherkunft.
+    let besitzer = pi;
+    const rc = ps._resolvingCard;
+    if (rc && rc.name === 'Elixir of Immortality' && !rc.fromCreation) {
+      const handIdx = getResolvingHandIndex(ps);
+      if (handIdx >= 0) {
+        const o = engine._handCardPileOwner(pi, 'Elixir of Immortality', handIdx);
+        if (Number.isInteger(o)) besitzer = o;
+      }
+    }
+
     if (!ps.permanents) ps.permanents = [];
     const permId = 'perm-' + Date.now() + '-' + Math.random();
-    ps.permanents.push({ name: 'Elixir of Immortality', id: permId });
+    ps.permanents.push({ name: 'Elixir of Immortality', id: permId, besitzer });
 
     const inst = engine._trackCard('Elixir of Immortality', pi, 'permanent', -1, -1);
+    inst.originalOwner = besitzer;   // `kartenBesitzerVon(inst)`: jeder spaetere Weg ins Loeschen/Ablegen (auch ein Fremd-Zugriff) landet im Stapel des Besitzers
     // Play-Beleg für Recorder/Einsatz-Report: "Place openly"-Potions
     // erzeugen keinen Discard-ZoneEnter — ohne dieses Event war der
     // Play unsichtbar (0/836 im Report trotz regelmäßiger Nutzung).
@@ -141,8 +210,16 @@ module.exports = {
       const hero = ctx.hero;
       if (!hero || !hero.name) return;
 
-      const heroIdx = ps.heroes.findIndex(h => h === hero);
+      // Spielgestalter-Entscheidung 16.11.2026: nur der AKTUELLE Kontrolleur des Helden (`heroSideOf`: Charme, Love Shot, dauerhafte Uebernahme
+      // schlagen die Spalte; Styx' „bis zum Tod"-Kontrolle ist hier schon zurueckgegeben) loest sein Elixir aus — der Held steht dabei in der
+      // Spalte `seite`, die nicht die des Elixirs sein muss.
+      let seite = -1, heroIdx = -1;
+      for (let p = 0; p < (engine.gs.players || []).length && heroIdx < 0; p++) {
+        const i = (engine.gs.players[p]?.heroes || []).indexOf(hero);
+        if (i >= 0) { seite = p; heroIdx = i; }
+      }
       if (heroIdx < 0) return;
+      if (engine.heroSideOf(seite, hero) !== pi) return;
       // ★ v1466: „heal that target's HP for half their maximum" — bei 0
       // max HP gaebe es nichts zu heilen. Der Held wird nicht vorgemerkt,
       // das Elixir loest fuer ihn nicht aus und bleibt liegen
@@ -159,8 +236,8 @@ module.exports = {
       if (!perm || perm._triggered) return;
 
       if (!perm._pendingHeroes) perm._pendingHeroes = [];
-      if (!perm._pendingHeroes.some(ph => ph.heroIdx === heroIdx)) {
-        perm._pendingHeroes.push({ name: hero.name, heroIdx, maxHp: hero.maxHp || 400 });
+      if (!perm._pendingHeroes.some(ph => ph.heroIdx === heroIdx && (ph.seite ?? pi) === seite)) {
+        perm._pendingHeroes.push({ name: hero.name, heroIdx, seite, maxHp: hero.maxHp || 400 });
       }
 
       // Single-shot deaths: resolve right here. Spells / Attacks / Surprises
@@ -204,43 +281,37 @@ module.exports = {
         // controller, not original owner, so cross-side-placed
         // Creatures dying on opp's side don't feed your Elixir.
         if ((e.inst.controller ?? e.inst.owner) !== pi) continue;
-        if (e.inst.counters.currentHp !== undefined && e.inst.counters.currentHp <= 0) {
-          // v847 (Als Befund): TOKENS landen im GELOESCHT-Stapel, nicht in
-          // der Ablage (`processCreatureDamageBatch`: Token → deletedPile).
-          // Die alte Pruefung sah nur `discardPile` — ein sterbender
-          // Biomancy-Token wurde deshalb nie eingesammelt und das Elixir
-          // loeste gar nicht aus. Der Stapel wird jetzt mitgefuehrt, damit
-          // die Wiederbelebung ihn aus dem richtigen holt.
-          let pile = ps.discardPile.includes(e.inst.name) ? 'discard'
-                   : ps.deletedPile.includes(e.inst.name) ? 'deleted'
-                   : null;
-          // M01-18: In einer Flächenklammer (Fireball & Co.) wird der Tod erst beim
-          // Schließen der Klammer abgewickelt (Vorgabe 26.9., `_kreaturTodMelden`) — dieser
-          // Hook läuft davor, die Kreatur liegt noch auf dem Brett. Dann ohne Stapel
-          // vormerken; `pileAufloesen` ergänzt ihn, sobald die Karte wirklich liegt.
-          const aufgeschoben = !pile && !!engine._todesAufschub && e.inst.zone === 'support';
-          if (aufgeschoben) pile = 'offen';
-          // v1389: „cannot be revived by any effects" (Gigantisaur) —
-          // dann löst das Elixir gar nicht erst aus und bleibt liegen.
-          if (pile && engine.darfAusAblageAufsFeld(e.inst.name)) {
-            if (!perm._pendingCreatures) perm._pendingCreatures = [];
-            if (!perm._pendingCreatures.some(pc => pc.name === e.inst.name && pc.heroIdx === e.inst.heroIdx && pc.zoneSlot === e.inst.zoneSlot)) {
-              perm._pendingCreatures.push({
-                name: e.inst.name,
-                heroIdx: e.inst.heroIdx,
-                zoneSlot: e.inst.zoneSlot,
-                pile: pile === 'offen' ? null : pile,
-                // Token-Identitaet mitnehmen (siehe TOKEN_STATE_KEYS):
-                // ohne sie kaeme die Potion als sie selbst zurueck, ohne
-                // Kreatur-Kartendaten, ohne Aktiveffekt und mit den
-                // 100 HP des Rueckfallwerts.
-                tokenState: captureTokenState(e.inst),
-              });
-            }
-          }
-        }
+        if (e.inst.counters.currentHp !== undefined && e.inst.counters.currentHp <= 0) sammleKreatur(engine, pi, perm, e.inst);
       }
       // Collection only — resolve happens at afterAllStatusDamage / afterSpellResolved / onPhaseEnd
+    },
+
+    /**
+     * ★ Spielgestalter-Entscheidung 16.11.2026: ein Tod OHNE Schaden („destroyed" = „defeated" — Plant Golems Aufräum-Effekt, Zerstör-Effekte,
+     * `actionDestroyCard`) wird wie der Schadenstod vorgemerkt und an den Haltepunkten unten aufgelöst. Schadens-Tode (`ctx.type` gesetzt) sammelt
+     * `afterCreatureDamageBatch`; ein doppelter Eintrag wäre ohnehin ausgeschlossen (gleicher Name/Held/Zone).
+     */
+    onCreatureDeath: async (ctx) => {
+      if (ctx.card?.zone !== 'permanent') return;
+      if (ctx.type !== undefined) return;
+      const engine = ctx._engine;
+      const pi = ctx.cardOwner;
+      const ps = engine.gs.players[pi];
+      const permId = ctx.card.counters?.permId;
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
+      if (!perm || perm._triggered) return;
+      // Die sterbende Instanz steht während des Hooks noch auf dem Brett (`actionMoveCard`: Hooks zwischen Splice und Zonenwechsel).
+      const inst = engine.cardInstances.find(c => c.id === ctx.creature?.instId);
+      if (!inst) return;
+      let ansicht = inst;
+      if (inst.zone !== 'support') {
+        // Spielgestalter-Entscheidung 16.11.2026 (Opfer löst das Elixir aus): die handgebauten Tausch-Wege (Suspicious Monster, Guardian of Teocuilatl) schieben
+        // den Geopferten VOR dem Todes-Hook in die Ablage (`zone` 'discard', Platz nur noch in `ctx.creature`) — Opfer-Stempel (`onCreatureSacrificed`) vorausgesetzt.
+        if (!(inst.zone === 'discard' && inst.counters?._sacrificedTurn === engine.gs.turn && ctx.creature?.heroIdx >= 0)) return;
+        ansicht = Object.assign(Object.create(inst), { heroIdx: ctx.creature.heroIdx, zoneSlot: ctx.creature.zoneSlot });
+      }
+      if ((inst.controller ?? inst.owner) !== pi) return;                      // nur der aktuelle Kontrolleur
+      sammleKreatur(engine, pi, perm, ansicht);
     },
 
     /** After all status damage: resolve pending hero deaths from burn/poison. */
@@ -266,6 +337,16 @@ module.exports = {
      * Beschwoerungen, Ability- und Artefakt-Aktivierungen, Traenke).
      */
     onAnyActionResolved: async (ctx) => {
+      await loeseAusstehende(ctx);
+    },
+
+    /**
+     * Spielgestalter-Entscheidung 16.11.2026 (Opfer löst das Elixir aus): eine FREIE Ability-Aktivierung (Occultism: Kreatur opfern → Schaden) kennt kein
+     * `onAnyActionResolved`; `onActiveEffectUsed` meldet sie NACH ihrem Effekt — so kehrt das Opfer gleich danach zurück statt erst beim nächsten Haltepunkt.
+     */
+    onActiveEffectUsed: async (ctx) => {
+      // Nur auf oberster Ebene: mitten in einem Zauber / Flächentreffer löst dessen Nachlauf-Punkt auf (gleichzeitige Tode bleiben gebündelt).
+      if ((ctx._engine.gs._spellResolutionDepth || 0) > 0 || ctx._engine._multiHitScope) return;
       await loeseAusstehende(ctx);
     },
 
@@ -300,6 +381,85 @@ function captureTokenState(inst) {
   return out;
 }
 
+// ── Eine gefallene Kreatur fuer das Elixir vormerken (Schadens- UND Zerstoerungstod) ──────────────────────────────────────────────────────────
+// `inst` = die sterbende Instanz (Kontrolle ist beim Aufrufer geprueft). Ohne Stapel-Eintrag (Token ohne Stapel, beanspruchter Kadaver) wird nichts vorgemerkt.
+function sammleKreatur(engine, pi, perm, inst) {
+  const ps = engine.gs.players[pi];
+  // Spielgestalter-Entscheidung 16.11.2026: nur der aktuelle KONTROLLEUR (vom Aufrufer geprueft) — auch fuer eine Kreatur, die ihm nicht gehoert (Plant Golem, gestohlene
+  // Kreatur): die Karte liegt nach dem Tod im Stapel ihres BESITZERS (Besitzer-Stapel-Regel), nicht in dem des Kontrolleurs; `seite` = Brettseite, auf der sie stand.
+  const besitzer = engine.kartenBesitzerVon(inst);
+  const seite = engine.physicalSide(inst);
+  const bps = engine.gs.players[besitzer] || ps;
+  // An ihren Helden gebundene Kreatur (`sharesHpWithHero`: Bonded Companion, geteilter HP-Pool): stirbt sie bei totem Wirtshelden (sie folgt ihm in den Tod), ist sie nicht lebensfaehig.
+  const gebunden = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+  // Spielgestalter-Entscheidung 16.11.2026 (Insel-Zonenentfernung): stirbt die Kreatur, WEIL ihre Zone entfernt wird (`removeIslandZones` setzt `engine._inselEntfernung`
+  // um die Todes-Hooks), gibt es ihre Zone beim Auflösen nicht mehr — dann zählt nur noch eine andere freie Zone DESSELBEN Helden (`findeLandeplatz`).
+  const ins = engine._inselEntfernung;
+  const zoneEntfernt = !!(ins && ins.seite === seite && ins.heroIdx === inst.heroIdx && inst.zoneSlot >= ins.ab);
+  if (gebunden) {
+    const wirt = engine.gs.players[seite]?.heroes?.[inst.heroIdx];
+    if (!(wirt?.name && wirt.hp > 0)) return;
+  }
+  // v847 (Als Befund): TOKENS landen im GELOESCHT-Stapel, nicht in
+  // der Ablage (`processCreatureDamageBatch`: Token → deletedPile).
+  // Die alte Pruefung sah nur `discardPile` — ein sterbender
+  // Biomancy-Token wurde deshalb nie eingesammelt und das Elixir
+  // loeste gar nicht aus. Der Stapel wird jetzt mitgefuehrt, damit
+  // die Wiederbelebung ihn aus dem richtigen holt.
+  let pile = bps.discardPile.includes(inst.name) ? 'discard'
+           : bps.deletedPile.includes(inst.name) ? 'deleted'
+           : null;
+  // M01-18: In einer Flächenklammer (Fireball & Co.) wird der Tod erst beim
+  // Schließen der Klammer abgewickelt (Vorgabe 26.9., `_kreaturTodMelden`) — dieser
+  // Hook läuft davor, die Kreatur liegt noch auf dem Brett. Dann ohne Stapel
+  // vormerken; `pileAufloesen` ergänzt ihn, sobald die Karte wirklich liegt.
+  const aufgeschoben = !pile && !!engine._todesAufschub && inst.zone === 'support';
+  if (aufgeschoben) pile = 'offen';
+  // v1389: „cannot be revived by any effects" (Gigantisaur) —
+  // dann löst das Elixir gar nicht erst aus und bleibt liegen.
+  if (pile && engine.darfAusAblageAufsFeld(inst.name)) {
+    if (!perm._pendingCreatures) perm._pendingCreatures = [];
+    if (!perm._pendingCreatures.some(pc => pc.name === inst.name && pc.heroIdx === inst.heroIdx && pc.zoneSlot === inst.zoneSlot)) {
+      perm._pendingCreatures.push({
+        name: inst.name,
+        heroIdx: inst.heroIdx,
+        zoneSlot: inst.zoneSlot,
+        pile: pile === 'offen' ? null : pile,
+        ...(gebunden ? { gebunden: true } : {}),
+        ...(zoneEntfernt ? { zoneEntfernt: true } : {}),
+        // Nur bei fremdem Besitzer/fremder Brettseite gefuellt (sonst bleibt der Eintrag wie bisher): Stapel-Besitzer, Brettseite und die Kontroll-Identitaet der Instanz
+        // (`owner`/`originalOwner`/`controller`/`stolenBy`), die `reviveCreature` an der neuen Instanz wiederherstellt.
+        ...((besitzer !== pi || seite !== pi) ? {
+          besitzer, seite,
+          ident: { owner: inst.owner, originalOwner: inst.originalOwner, controller: inst.controller, stolenBy: inst.stolenBy, stolenFromOwner: inst.stolenFromOwner },
+        } : {}),
+        // Token-Identitaet mitnehmen (siehe TOKEN_STATE_KEYS):
+        // ohne sie kaeme die Potion als sie selbst zurueck, ohne
+        // Kreatur-Kartendaten, ohne Aktiveffekt und mit den
+        // 100 HP des Rueckfallwerts.
+        tokenState: captureTokenState(inst),
+      });
+    }
+  }
+}
+
+// ★ Spielgestalter-Entscheidung 16.11.2026: EINE Lebensfaehigkeitspruefung fuer jede vorgemerkte Kreatur (Schadens- und Zerstoerungstod) — beim Aufloesen. Nicht lebensfaehig
+// = das Elixir loest dafuer nie aus und wird dafuer nicht verbraucht: (a) kein Landeplatz (kein lebender Wirtshelden, keine freie/erlaubte Zone — EOI-03), (b) eine an ihren
+// Helden gebundene Kreatur (`gebunden`, Bonded Companion) ohne lebenden Helden, (c) die Karte liegt nicht mehr in ihrem Stapel (Extra Life, Bone Dog & Co. haben sie schon zurueckgeholt).
+function kreaturLebensfaehig(engine, pi, c) {
+  const seite = c.seite ?? pi;
+  if (c.pile) {
+    const bps = engine.gs.players[c.besitzer ?? pi];
+    const stapel = c.pile === 'deleted' ? bps?.deletedPile : bps?.discardPile;
+    if (!(stapel || []).includes(c.name)) return false;
+  }
+  if (c.gebunden) {
+    const wirt = engine.gs.players[seite]?.heroes?.[c.heroIdx];
+    if (!(wirt?.name && wirt.hp > 0)) return false;
+  }
+  return !!findeLandeplatz(engine, seite, c);
+}
+
 // M01-18: Stapel für Kreaturen nachtragen, die beim Einsammeln noch nicht lagen
 // (Tod in einer Flächenklammer). Landet die Karte nicht (Tod verhindert) und die
 // Klammer ist zu, fällt der Eintrag weg.
@@ -308,8 +468,9 @@ function pileAufloesen(engine, ps, perm) {
   const aufschub = !!engine._todesAufschub;
   perm._pendingCreatures = perm._pendingCreatures.filter(pc => {
     if (pc.pile) return true;
-    pc.pile = ps.discardPile.includes(pc.name) ? 'discard'
-            : ps.deletedPile.includes(pc.name) ? 'deleted'
+    const bps = engine.gs.players[pc.besitzer ?? engine.gs.players.indexOf(ps)] || ps;   // Stapel des BESITZERS (fremde Kreatur: nicht der des Kontrolleurs)
+    pc.pile = bps.discardPile.includes(pc.name) ? 'discard'
+            : bps.deletedPile.includes(pc.name) ? 'deleted'
             : null;
     return !!pc.pile || aufschub;
   });
@@ -318,7 +479,18 @@ function pileAufloesen(engine, ps, perm) {
 async function resolveElixirPending(engine, pi, perm) {
   const ps = engine.gs.players[pi];
   pileAufloesen(engine, ps, perm);
-  const pendingHeroes = perm._pendingHeroes || [];
+  // ★ Nur, was JETZT noch wiederbelebt werden kann — das Elixir wird sonst ohne Wirkung verbraucht:
+  //   • Held: nicht mehr gefallen (Cheat Chair, Guardian Angel & Co. haben ihn schon gerettet) → das Elixir bleibt liegen;
+  //   • Kreatur: nicht lebensfaehig (`kreaturLebensfaehig`: ohne lebenden Wirtshelden gibt es keinen Landeplatz — letzter Held + seine Kreatur fallen zugleich —,
+  //     Bonded Companion bei totem Helden, Karte nicht mehr im Stapel) — sie steht dann gar nicht erst in der Galerie, sonst waere das Elixir weg, ohne dass etwas zurueckkehrt.
+  // Verworfene Eintraege fliegen aus der Vormerkung (sonst loeste jeder spaetere Haltepunkt erneut aus); Kreaturen ohne Stapel (Tod noch in
+  // der Flaechenklammer) bleiben, bis `pileAufloesen` sie einordnet.
+  perm._pendingHeroes = (perm._pendingHeroes || []).filter(h => {
+    const hero = engine.gs.players[h.seite ?? pi]?.heroes?.[h.heroIdx];
+    return hero?.name && hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true });
+  });
+  if (perm._pendingCreatures) perm._pendingCreatures = perm._pendingCreatures.filter(c => !c.pile || kreaturLebensfaehig(engine, pi, c));
+  const pendingHeroes = perm._pendingHeroes;
   const pendingCreatures = (perm._pendingCreatures || []).filter(c => c.pile);
   const allDead = [
     ...pendingHeroes.map(h => ({ ...h, deathType: 'hero' })),
@@ -328,6 +500,7 @@ async function resolveElixirPending(engine, pi, perm) {
   if (allDead.length === 0) return;
 
   perm._triggered = true;
+  perm._triggeredSeiten = allDead.filter(d => d.deathType === 'hero').map(d => d.seite ?? pi);   // `preventsAllHeroesDeadLossForSide`: Spalten, deren Niederlage die laufende Wiederbelebung aufhaelt
   perm._pendingHeroes = [];
   perm._pendingCreatures = [];
 
@@ -357,7 +530,7 @@ async function resolveElixirPending(engine, pi, perm) {
   await engine._delay(1000);
 
   if (chosen.deathType === 'hero') {
-    await engine.actionReviveHero(pi, chosen.heroIdx, Math.ceil(chosen.maxHp / 2), {
+    await engine.actionReviveHero(chosen.seite ?? pi, chosen.heroIdx, Math.ceil(chosen.maxHp / 2), {
       source: 'Elixir of Immortality',
       heilt: true,   // v1467
       animDelay: 800,
@@ -367,17 +540,17 @@ async function resolveElixirPending(engine, pi, perm) {
   }
 
   await removeElixir(engine, pi, perm);
+  // Kam nichts zurueck (Wiederbelebung gescheitert) und lebt kein Held mehr, haelt das Elixir die Niederlage nicht laenger auf — sie wird jetzt
+  // entschieden, nicht erst beim naechsten Tod (sonst blieb die Partie ohne lebenden Helden stehen).
+  await engine.checkAllHeroesDead();
 }
 
-async function reviveCreature(engine, pi, chosen) {
+/**
+ * Wo kaeme die Kreatur zurueck? `{ targetHi, targetSi }` oder `null` (kein Landeplatz). Reine Abfrage ohne Nebenwirkung —
+ * die Galerie bietet nur Kreaturen an, die auch landen koennen, und `reviveCreature` platziert dort.
+ */
+function findeLandeplatz(engine, pi, chosen) {
   const ps = engine.gs.players[pi];
-
-  // v847: Tokens liegen im Geloescht-Stapel (siehe Sammelstelle oben).
-  const pile = chosen.pile === 'deleted' ? 'deleted' : 'discard';
-  const pileArr = pile === 'deleted' ? ps.deletedPile : ps.discardPile;
-  const discIdx = pileArr.indexOf(chosen.name);
-  if (discIdx < 0) return;
-
   let targetHi = -1, targetSi = -1;
 
   // Per-Hero `canSummon` filter (`_bypassBeforeSummon: true`) — this
@@ -387,11 +560,19 @@ async function reviveCreature(engine, pi, chosen) {
   const canPlaceOn = (hi) =>
     engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
 
+  // ★ Spielgestalter-Entscheidung 16.11.2026 (Insel-Zonenentfernung): ein Tod durch die Entfernung der eigenen Zone belebt NUR bei einer anderen freien Zone DESSELBEN Helden und NUR dort —
+  // nie der (nicht mehr vorhandene) alte Platz, nie ein anderer Held. Ohne solche Zone: kein Landeplatz, das Elixir löst nicht aus und bleibt liegen.
+  if (chosen.zoneEntfernt) {
+    if (!(ps.heroes[chosen.heroIdx]?.hp > 0) || !canPlaceOn(chosen.heroIdx)) return null;
+    const z = engine.beschwoerZonenFuer(pi, chosen.name, { heroIdx: chosen.heroIdx, livingHeroesOnly: true })[0];
+    return z ? { targetHi: chosen.heroIdx, targetSi: z.slotIdx } : null;
+  }
+
   // ★ W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (W63a: der alte Platz, sonst geteilt vor frei) — `engine.zoneEintragen` legt dazu.
   const { canShareInto } = require('./_alice-shared');
   const teilbar = (hi, z) => z < 3 && canShareInto(engine, pi, hi, z, chosen.name);
-  const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if ((origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
+  const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot];   // `undefined` = die Zone gibt es nicht mehr (Inselzone abgebaut) — nicht „frei"
+  if (origSlot && (origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
@@ -409,26 +590,45 @@ async function reviveCreature(engine, pi, chosen) {
     if (kand.length) { targetHi = kand[0].heroIdx; targetSi = kand[0].slotIdx; }
   }
 
-  if (targetHi < 0) {
+  return targetHi < 0 ? null : { targetHi, targetSi };
+}
+
+async function reviveCreature(engine, pi, chosen) {
+  const ps = engine.gs.players[pi];
+  // Spielgestalter-Entscheidung 16.11.2026: das Elixir des KONTROLLEURS belebt auch eine Kreatur, die ihm nicht gehoert (Plant Golem, gestohlene Kreatur): die Karte
+  // liegt im Stapel ihres BESITZERS (`chosen.besitzer`) und kehrt auf die Brettseite zurueck, auf der sie stand (`chosen.seite`) — unter derselben Kontrolle.
+  const besitzer = chosen.besitzer ?? pi;
+  const seite = chosen.seite ?? pi;
+  const bps = engine.gs.players[besitzer] || ps;
+
+  // v847: Tokens liegen im Geloescht-Stapel (siehe Sammelstelle oben).
+  const pile = chosen.pile === 'deleted' ? 'deleted' : 'discard';
+  const pileArr = pile === 'deleted' ? bps.deletedPile : bps.discardPile;
+  const discIdx = pileArr.indexOf(chosen.name);
+  if (discIdx < 0) return;
+
+  const platz = findeLandeplatz(engine, seite, chosen);
+  if (!platz) {
     engine.log('elixir_fizzle', { reason: 'no_free_zone', creature: chosen.name });
     return;
   }
+  const { targetHi, targetSi } = platz;
 
   // v1389: aus der ABLAGE über die EINE Stelle (Sperre „cannot be
   // revived", Lethe, Signal, SC); der Deleted Pile bleibt direkt.
   let ab = null;
   if (pile === 'discard') {
-    ab = await engine.ablageEntnahme(pi, pi, discIdx, { source: 'Elixir of Immortality' });
+    ab = await engine.ablageEntnahme(pi, besitzer, discIdx, { source: 'Elixir of Immortality' });
     if (!ab) {
       engine.log('elixir_fizzle', { reason: 'discard_locked_or_unrevivable', creature: chosen.name });
       return;
     }
-  } else if (!(await engine.takeFromPile(ps, pile, discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
+  } else if (!(await engine.takeFromPile(bps, pile, discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
     engine.log('elixir_fizzle', { reason: 'discard_locked', creature: chosen.name });
     return;
   }
 
-  engine.zoneEintragen(pi, targetHi, targetSi, chosen.name, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
+  engine.zoneEintragen(seite, targetHi, targetSi, chosen.name, seite);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
   // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
   // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.
@@ -440,7 +640,14 @@ async function reviveCreature(engine, pi, chosen) {
   const maxHp = tokenState?.maxHp ?? tokenState?._cardDataOverride?.hp ?? cd?.hp ?? 100;
   const reviveHp = Math.ceil(maxHp / 2);
 
-  const newInst = engine._trackCard(chosen.name, pi, 'support', targetHi, targetSi);
+  const newInst = engine._trackCard(chosen.name, chosen.ident ? chosen.ident.owner : pi, 'support', targetHi, targetSi);
+  if (chosen.ident) {
+    // Kontroll-Identitaet der gefallenen Instanz wiederherstellen (Plant Golem: Besitzer ≠ Kontrolleur = Brettseite; gestohlene Kreatur: Dieb bis Zugbeginn).
+    const id = chosen.ident;
+    if (id.originalOwner !== undefined) newInst.originalOwner = id.originalOwner;
+    if (id.controller !== undefined) newInst.controller = id.controller;
+    if (id.stolenBy != null) { newInst.stolenBy = id.stolenBy; newInst.stolenFromOwner = id.stolenFromOwner; }
+  }
   // Token-Zaehler VOR den Eintritts-Hooks setzen: der Loader entscheidet
   // ueber `_effectOverride`, welches Skript die Karte ueberhaupt hat.
   if (tokenState) {
@@ -457,8 +664,8 @@ async function reviveCreature(engine, pi, chosen) {
 
   engine.log('creature_revived', { card: chosen.name, player: ps.username, hp: reviveHp, heroIdx: targetHi, zoneSlot: targetSi, by: 'Elixir of Immortality' });
 
-  engine._broadcastEvent('summon_effect', { owner: pi, heroIdx: targetHi, zoneSlot: targetSi, cardName: chosen.name });
-  engine._broadcastEvent('play_zone_animation', { type: 'holy_revival', owner: pi, heroIdx: targetHi, zoneSlot: targetSi });
+  engine._broadcastEvent('summon_effect', { owner: seite, heroIdx: targetHi, zoneSlot: targetSi, cardName: chosen.name });
+  engine._broadcastEvent('play_zone_animation', { type: 'holy_revival', owner: seite, heroIdx: targetHi, zoneSlot: targetSi });
   engine.sync();
   await engine._delay(800);
 
@@ -474,13 +681,17 @@ async function removeElixir(engine, pi, perm) {
   // Permanent einfach, statt sichtbar in den Deleted Pile zu fliegen.
   // Feldform wie im Permanent-Zweig von `actionDestroyCard`:
   // `fromPermId` ist die INSTANZ-Id, nicht die des Permanents.
+  // Besitzer-Regel (CARD_API): eine gestohlene Karte geht in den Loeschstapel ihres BESITZERS (`resolve` hat ihn am Permanent vermerkt).
+  const besitzerIdx = Number.isInteger(perm.besitzer) ? perm.besitzer : (inst ? engine.kartenBesitzerVon(inst) : pi);
+  const pilePs = engine.gs.players[besitzerIdx] || ps;
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: 'Elixir of Immortality',
     from: 'permanent', to: 'deleted',
     fromPermId: inst ? inst.id : perm.id,
+    ...(pilePs !== ps ? { toOwner: besitzerIdx } : {}),
   });
   if (idx >= 0) ps.permanents.splice(idx, 1);
-  ps.deletedPile.push('Elixir of Immortality');
+  pilePs.deletedPile.push('Elixir of Immortality');
   if (inst) engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
   engine.log('permanent_removed', { card: 'Elixir of Immortality', player: ps.username });
   engine.sync();

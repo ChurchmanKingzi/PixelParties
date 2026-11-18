@@ -83,6 +83,9 @@ module.exports = {
     return hasRevealedCopy(ps) ? REVEALED_COST : BASE_COST;
   },
 
+  // Spielgestalter-Entscheidung 16.11.2026: „You can only play 1 per turn" gilt ab dem Ausspielen (vor dem Gegenreaktions-Fenster, auch bei Negation), nicht erst mit der Wirkung.
+  stempelBeiAktivierung(engine, pi) { engine.claimHOPT(HOPT_KEY_PREFIX, pi); },
+
   // ── Batch-level (consolidated multi-target prompt) ──────────────
   isPostTargetReaction: true,
 
@@ -106,13 +109,11 @@ module.exports = {
     if (candidates.length === 0) return { effectNegated: false };
     _markPrompted(engine.gs, pi);
 
-    // Claim the once-per-turn HOPT here so a declined picker after the
-    // accept can't fail. The HOPT is independent of the per-source
-    // dedup flag (it persists across chains).
-    if (!engine.claimHOPT(HOPT_KEY_PREFIX, pi)) {
-      // Defensive — postTargetCondition should have already rejected.
-      return { effectNegated: false };
-    }
+    // The once-per-turn HOPT is stamped with the ACTIVATION (`stempelBeiAktivierung`,
+    // Spielgestalter-Entscheidung 16.11.2026: auch ein negierter Bamboo Shield ist verbraucht);
+    // here only as a safety net. It is independent of the per-source dedup flag
+    // (it persists across chains).
+    engine.claimHOPT(HOPT_KEY_PREFIX, pi);
 
     let picked;
     if (candidates.length === 1) {
@@ -153,9 +154,7 @@ module.exports = {
   },
 
   async preDamageResolve(engine, ownerIdx /*, target, heroIdx, source, amount, type */) {
-    if (!engine.claimHOPT(HOPT_KEY_PREFIX, ownerIdx)) {
-      return { amountOverride: undefined };
-    }
+    engine.claimHOPT(HOPT_KEY_PREFIX, ownerIdx);   // schon bei der Aktivierung gestempelt (`stempelBeiAktivierung`)
     _markPrompted(engine.gs, ownerIdx);
     const ps = engine.gs.players[ownerIdx];
     engine.log('bamboo_shield_negate', { player: ps?.username });

@@ -32,7 +32,9 @@ function abgleichen(engine, ausserId) {
   const aktiv = new Set();
   for (const c of engine.cardInstances) {
     if (c.name !== 'The Sun Sword' || c.zone !== 'support' || c.faceDown || c.id === ausserId) continue;
-    aktiv.add(c.controller ?? c.owner);
+    // „the player controls": der Kreis gehört dem KONTROLLEUR der Karte — an einem übernommenen Träger (Golden Apple, Love Shot, Charme) der Übernehmer,
+    // nicht der Brettseite (`effektiveSeiten`, wie Heart of Ice). Ohne das bekäme der Gegner des Kontrolleurs den Kreis.
+    aktiv.add(engine.effektiveSeiten(c).controller ?? c.owner);
   }
   // Heroes — Kontrolle statt Seite (Styx 28.9.)
   for (let p = 0; p < (engine.gs.players || []).length; p++) {

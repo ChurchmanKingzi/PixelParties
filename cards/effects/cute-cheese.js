@@ -11,6 +11,9 @@ const { isPileCreature, hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT('cute-cheese', pi); },
+
   // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
   // einzigen Effekt und muessten entsprechend komplett geblockt und gar
   // nicht erst aktivierbar sein").

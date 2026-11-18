@@ -46,6 +46,8 @@ const TIEFE = 10;
 const REVEAL_TAKT = 190;      // Staffelung je Karte, gleich der Client-Animation
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Greift auf das GEGNER-Deck zu: eigene Bewegung des Wirkenden, von
   // der Stapel-Ausgangssperre (Knight of Kings [B]) nicht erfasst. Ohne
   // das haette die Loader-Erkennung die ganze Karte unter der Sperre
@@ -62,7 +64,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
     const oi = opponentOfGs(gs, pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — spielbar, verpufft in `resolve`.)
     return (gs.players[oi]?.mainDeck || []).length > 0;
   },
 
@@ -90,7 +92,7 @@ module.exports = {
     const ops = gs.players[oi];
     if (!ps || !ops) return false;
     if (ps.handLocked) return false;
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    if (gs.firstTurnProtectedPlayer === oi) { engine.log('spice_mortar_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return {}; }   // Spielgestalter-Entscheidung 16.11.2026: verpufft (gespielt)
     const oben = engine.revealTop(oi, TIEFE);
     if (oben.length === 0) return false;
 

@@ -11,7 +11,9 @@
 //
 //  ── DER STATUS `shrunk` ─────────────────────────────────────────────────
 //  „Treated as a negative status effect": ein ECHTER, heilbarer Status (`_hooks.js` → `STATUS_EFFECTS.shrunk`), angelegt über `addHeroStatus` (Immunität gegen negative Status,
-//  Resistance, Charme-Schutz gelten). Ist der Held immun, bleibt die Karte ohne Wirkung am Helden liegen. Der Status trägt die Karte (`anhaengselStatusHooks`, `heilenWirftAb`): wird er GEHEILT
+//  Resistance, Charme-Schutz gelten). Ist der Held immun, bleibt die Karte ohne Wirkung am Helden liegen — Spielgestalter-Entscheidung 17.11.2026: ABER sobald die
+//  Status-Immunität endet (Johanna stirbt, Light Ball weg, Buff läuft ab), greift der Status der liegenden Karte; kommt sie später dazu, ruht er wieder (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`,
+//  Abgleich in `engine.sync`). Der Status trägt die Karte (`anhaengselStatusHooks`, `heilenWirftAb`): wird er GEHEILT
 //  (Juice, Beer, Cure, Exorcism …), fällt Shrink in die Ablage seines Besitzers; verlässt die Karte den Helden aus anderem Grund, endet der Status mit ihr. Beide Hälften des Textes gelten
 //  nur, solange der Held den Status wirklich trägt.
 //
@@ -32,7 +34,7 @@
 //  `play_zone_animation` `shrink_squeeze` (Pixelart, ANIM_REGISTRY): ein Rahmen aus Pixeln presst sich in ganzen Schritten um den Helden zusammen, Pfeile weisen nach innen.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero, anhaengselStatusHooks } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, anhaengselStatusHooks, anhaengselUmgelenkt, statusErgebnisBuchen } = require('./_attachment-shared');
 const { isAttackSpellOrCreatureSource } = require('./_hooks');
 
 const CARD_NAME = 'Shrink';
@@ -75,6 +77,7 @@ module.exports = {
   requiresTarget: true,
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,            // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  statusFolgtImmunitaet: { status: STATUS_NAME },   // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts (beide Textteile hängen nur am Status)
   spellVisual: { impact: { type: 'shrink_squeeze' }, impactMs: 420 },
 
   spellPlayCondition(gs, pi, engine) {
@@ -85,7 +88,8 @@ module.exports = {
 
   /** Umhängen (Inheritance Ceremony, Secret Spell Book): den Status am neuen Wirt wieder anlegen (der alte Wirt hat ihn beim Abgang verloren). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await shrinkAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const gesetzt = await shrinkAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, gesetzt, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
   },
 
@@ -112,6 +116,9 @@ module.exports = {
       await engine._delay(ANIM_VOR_MS);
 
       const gesetzt = await shrinkAnlegen(engine, pi, host.owner, host.heroIdx);
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection Shrink samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, host)) { engine.log('shrink_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
+      statusErgebnisBuchen(engine, inst, gesetzt, host.owner, host.heroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       if (!gesetzt) engine.log('shrink_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       engine.sync();
       await engine._delay(ANIM_MS - ANIM_VOR_MS);

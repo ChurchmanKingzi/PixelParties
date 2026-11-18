@@ -50,7 +50,7 @@ function seiten(gs, pi) {
 
 /** Ausgegraut: Helden eines Gegners in der Erste-Runden-Sicherheit (kein Effekt kann sie betreffen). */
 function heldGedimmt(gs, pi, side) {
-  return side !== pi && gs.firstTurnProtectedPlayer != null && side === gs.firstTurnProtectedPlayer;
+  return false;   // Spielgestalter-Entscheidung 16.11.2026: auch der Erste-Runden-Geschuetzte ist waehlbar (die Wirkung verpufft) — frueher ausgegraut
 }
 
 /** Wirte, die jetzt wählbar sind (lebender Held mit freier Support Zone, beide Seiten, ohne ausgegraute). */

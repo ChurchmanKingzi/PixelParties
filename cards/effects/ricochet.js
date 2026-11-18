@@ -112,8 +112,10 @@ module.exports = {
     impact: { type: 'arrow_impact' }, impactMs: 260,
   },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Both players take turns choosing targets their opponent controls") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Blinded-Gate: die Karte oeffnet eine Zielwahl.
+  blindedEigeneZiele: false,
 
   spellPlayCondition(gs, pi, engine) {
     // Der Angreifer waehlt zuerst — ohne ein Ziel beim Gegner passiert

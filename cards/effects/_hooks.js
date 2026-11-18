@@ -192,6 +192,9 @@ const HOOKS = {
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
   BEFORE_CREATURE_AFFECTED: 'beforeCreatureAffected',
+  // Quellen-Immunitaet VOR der Pool-Umbuchung (Molinda: "Creatures take no damage from this Hero's Attacks and Spells").
+  // ctx: { entry } — Kopie des Schadenseintrags (Quelle in Klon-Sicht); ein Zuhoerer, dessen Effekt der Kreatur diesen Schaden nimmt, setzt `entry._quelleNegiert = true`.
+  BEFORE_POOLED_CREATURE_DAMAGE: 'beforePooledCreatureDamage',
   AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
   AFTER_ALL_STATUS_DAMAGE:      'afterAllStatusDamage',
 
@@ -356,12 +359,10 @@ const STATUS_EFFECTS = {
   // all keep firing. Distinct from Stunned which silences everything.
   // Cleansable like Stunned.
   bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
-  // `blinded` (Smoke Vial, future Blinded sources) prevents the bearer
-  // from using Attacks, Spells, or activated effects that need to pick
-  // one or more targets. AoE / area-wide effects keep working — the
-  // engine reads `blocksTargeting: true` plus the card script's
-  // `requiresTarget: true` flag to decide. Cleansable like Stunned.
-  // Status icon is rendered as 👁 with a CSS strikethrough line.
+  // `blinded` (Smoke Vial, future Blinded sources): „Cannot choose a target the opponent controls with Attacks, Spells or effects." (Spielgestalter-Entscheidung 16.11.2026.)
+  // Gilt fuer ALLE Effekte des Traegers (Attacks, Spells, Reaktionen, Surprises, Helden-, Ability-, Kreatur-, Ausruestungs-Effekte): Picker-Filter `engine.markiereBlindGesperrte`
+  // (gegnerische Ziele ausgegraut), Spielbarkeit/Aktivierbarkeit `engine.blindedEffektGesperrt` (gesperrt nur, wenn der Effekt keinen legalen EIGENEN Kandidaten hat).
+  // Effekte ohne Zielwahl und Platzierungen ignorieren Blinded. Cleansable like Stunned.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   // ★ v1059 (Als Befund 14.9.): ZWEITE Blendungs-Art mit anderer
   // Endbedingung — „until the next time it takes damage" („Trunk Sand")

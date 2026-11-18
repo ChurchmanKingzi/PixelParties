@@ -88,6 +88,13 @@ module.exports = {
       await module.exports.hooks.onAnyActionResolved({ ...ctx, actionType: ctx.art });
     },
 
+    // Hand-/Kettenreaktion, die dieser Held wirkt („even a Reaction Spell on the opponent's turn"): die Engine meldet sie NICHT über `onAnyActionResolved`
+    // (dort hängen Flashbang/Bleed, für die eine Reaktion keine Aktion ist), sondern über `onReactionResolved` (`_rxAufgeloest`, `actionType` 'spell'/'attack').
+    // Der Once-per-turn-Stempel unten verhindert ein Doppelt-Zählen, falls ein Weg beide Kanäle meldet.
+    onReactionResolved: async (ctx) => {
+      await module.exports.hooks.onAnyActionResolved(ctx);
+    },
+
     onAnyActionResolved: async (ctx) => {
       // Actor must be Güldefaber on Güldefaber's owning player.
       if (ctx.playerIdx !== ctx.cardOwner) return;

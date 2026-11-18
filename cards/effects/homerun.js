@@ -17,8 +17,14 @@
 //  aktuelle HP (nicht max HP); die Schwelle gilt dort deshalb nicht:
 //  jede Niederlage durch einen Effekt reicht. Eraser Beam laeuft
 //  weiter ueber 999999 Schaden und war schon vorher abgedeckt.
-//  Ein freiwilliges Opfer (`isSacrifice`) und Unaufhaltsames (Midnight
-//  Assault) oeffnen das Fenster gar nicht erst.
+//  Unaufhaltsames (Midnight Assault) oeffnet das Fenster gar nicht erst.
+//  Ein Helden-OPFER (`isSacrifice`: Divine Gift of Sacrifice, Pharaoh,
+//  Teocuilatl, Pythia) oeffnet es seit der Spielgestalter-Entscheidung
+//  16.11.2026 zwar (CARD_API „Helden-Opfer öffnen das Vor-Niederlage-
+//  Fenster"), Homerun! wird dort aber NICHT angeboten: „defeated by an
+//  effect" meint kein Opfer (Gestalter: „Homerun kann nicht auf Opfer
+//  reagieren") — kein `firesOnSacrifice`, und `preDamageCondition`
+//  schliesst `opts.isSacrifice` selbst aus.
 //
 //  ★ v1278 (Als Befund 22.9.: „Homerun wird mir KONSTANT als einsetzbare
 //  Reaktion angeboten, obwohl sie NUR einsetzbar sein sollte, wenn ein
@@ -41,8 +47,11 @@
 //  associated with it on that Hero". Gefragt wird die Hand des Spielers,
 //  dem der getroffene Held gehoert („a Hero you control").
 //
-//  Durchschlagender Schaden (`cannotBeNegated`, Ida & Co.) wird nicht
-//  angeboten — die Engine wuerde die Aufhebung ohnehin verwerfen.
+//  Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt.
+//  Auch durchschlagender Schaden (`cannotBeNegated`, Ida & Co., True Damage) wird
+//  angeboten (Hinweis in der Frage); die Karte wird bezahlt und verbraucht, die
+//  Engine verwirft die Aufhebung aber (der Treffer geht durch). Die CPU waehlt das nicht
+//  (`preDamageUseless`).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Homerun!';
@@ -55,8 +64,11 @@ module.exports = {
   // Auch im Vor-Niederlage-Fenster der Insta-Kills anbieten (s. Kopf).
   firesOnDefeat: true,
 
+  /** Die Aufhebung wuerde verworfen (`cannotBeNegated`): Angebot erlaubt, aber nutzlos — nur fuer die CPU-Sperre und den Hinweis in der Frage. */
+  preDamageUseless(opts) { return !!opts?.cannotBeNegated; },
+
   preDamageCondition(gs, pi, _engine, target, _heroIdx, _source, amount, type, opts = {}) {
-    if (opts?.cannotBeNegated) return false;
+    if (opts?.isSacrifice) return false;   // Spielgestalter-Entscheidung 16.11.2026: ein Opfer ist keine Niederlage „by an effect" (s. Kopf)
     if (!target || target.hp === undefined || target.hp <= 0) return false;
     // „or be defeated by an effect" — jede Effekt-Niederlage zaehlt.
     if (type === 'defeat') return true;

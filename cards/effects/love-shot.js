@@ -10,6 +10,9 @@
 //  controlled Hero cannot take any damage while
 //  it is controlled by this effect.
 //
+//  ★ Spielgestalter-Entscheidung 17.11.2026: „… perform an Attack or a Normal, Area, or Attachment Spell from your hand …" — Reactions und Surprises
+//  (Untertyp Reaction/Surprise, Spell wie Attack) sind keine legitimen Ziele und in der Kartenwahl ausgegraut (`_perform-shared.js`).
+//
 //  ★★ NEUER TEXT (Al 15.9.) — cards.json ist mitgeaendert:
 //
 //  „This Spell can be used by Heroes with the «Charme» Ability
@@ -37,6 +40,11 @@
 //
 //     Praktisch heisst das: waehrend der geliehenen Aktion kann der
 //     Held Rueckstoss, Gegenschlaege und Reaktionen abbekommen.
+//     ★ Spielgestalter-Entscheidung 17.11.2026: dasselbe gilt fuer
+//     negative STATUS — der geliehene Held ist nicht status-immun
+//     (Frost Rune friert ihn ein, Toxic Trap vergiftet ihn; sonst
+//     wirkte `_charmBlocksFrom` am Statustor weiter). Nur der echte
+//     Charme Lv3 (Marke ohne `_loveShot`) bleibt immun.
 //
 //  Implementation
 //  ──────────────
@@ -80,6 +88,8 @@
 const CARD_NAME = 'Love Shot';
 
 const { zieheAusGegnerDeck } = require('./_opponent-deck-shared');
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
+const { performbarerUntertyp } = require('./_perform-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -94,7 +104,10 @@ module.exports = {
   // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Deck-Zug, Heldenübernahme) — gegen den durch die Erste-Runden-Immunität
   // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
   blockedByFirstTurnProtection: true,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („choose a Hero your opponent controls and perform an Attack or Spell … with it") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
+  blindedEigeneZiele: false,
 
   /**
    * ★ „This Spell can be used by Heroes with the «Charme» Ability
@@ -162,6 +175,9 @@ module.exports = {
       // (school/level/Wisdom/etc.) is checked later via
       // getHeroPlayableCards once a Hero is locked in.
       const heroTargets = [];
+      // CARD_API „Ziel-Picker graut alles Nicht-Wählbare aus": Gegnerhelden, die nicht handeln können (Frost, Betäubung, Netz, Fessel, Negation,
+      // Fähigkeitssperre, Aktionsdeckel, Aktionssperre), bleiben SICHTBAR, aber ausgegraut (`ineligible`) — wählbar ist weiterhin nur, wer vorher schon wählbar war.
+      const gedimmteHelden = [];
       // W16g (S02-15): „a Hero your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`): ein Gegnerheld, den ich selbst
       // kontrolliere (Paraseed, Styx, Charme), ist kein Ziel mehr.
       // W17d (S02-15, Teil 2): ein vom Gegner kontrollierter Held MEINER Spalte (`physOwner === pi`) ist wählbar. „Held, den der Gegner
@@ -169,15 +185,18 @@ module.exports = {
       // eigener Guss (`playableMap.own`, `heroOwner` = Spalte; Hand, Wisdom-Abwurf und Aktion gehören ohnehin mir).
       for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
         if (!h?.name || h.hp <= 0) continue;
-        if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
-            || h.statuses?.bound || h.statuses?.negated) continue;
-        if (engine.isHeroSkillLocked(physOwner, hi)) continue;
-        if (engine.heroActionCapReached(physOwner, hi)) continue;   // W8: ruht bei Frost/Betäubung/Negation
-        if (h._actionLockedTurn === gs.turn) continue;
-        heroTargets.push({
+        const eintrag = {
           id: `hero-${physOwner}-${hi}`, type: 'hero',
           owner: physOwner, heroIdx: hi, cardName: h.name,
-        });
+        };
+        // W8: `heroActionCapReached` ruht bei Frost/Betäubung/Negation
+        const nichtWaehlbar = !!(h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
+            || h.statuses?.bound || h.statuses?.negated)
+          || engine.isHeroSkillLocked(physOwner, hi)
+          || engine.heroActionCapReached(physOwner, hi)
+          || h._actionLockedTurn === gs.turn;
+        if (nichtWaehlbar) gedimmteHelden.push({ ...eintrag, ineligible: true });
+        else heroTargets.push(eintrag);
       }
 
       if (heroTargets.length === 0) {
@@ -190,7 +209,9 @@ module.exports = {
       // resolves to that step. The follow-up "pick a Spell/Attack"
       // handPick remains cancellable so the player can still bail
       // before committing a card from hand.
-      const picked = await engine.promptEffectTarget(pi, heroTargets, {
+      // Alles Übrige (nicht handlungsfähige Gegnerhelden, eigene Helden, Karten der Support Zones) ausgegraut mitgeben — nichts wird verschwiegen.
+      const alleHelden = [...heroTargets, ...gedimmteHelden];
+      const picked = await engine.promptEffectTarget(pi, [...alleHelden, ...ausgegrauteRestkarten(engine, alleHelden)], {
         title: CARD_NAME,
         description: "Choose an opponent's Hero. You will perform a Spell or Attack from your hand with it.",
         confirmLabel: '💘 Choose!',
@@ -346,6 +367,9 @@ module.exports = {
           const cd = cardDB[name];
           if (!cd) continue;
           if (cd.cardType !== 'Spell' && cd.cardType !== 'Attack') continue;
+          // Spielgestalter-Entscheidung 17.11.2026: „… perform an Attack or a Normal, Area, or Attachment Spell" — Reactions und Surprises sind keine legitimen
+          // Ziele (ausgegraut in der Kartenwahl; vorher wählbar und dann ohne Wirkung abgelegt, die Karte war verloren). Siehe `_perform-shared.js`.
+          if (!performbarerUntertyp(cd)) continue;
           // No Love Shot inside Love Shot — would recurse and re-
           // pin the charm to itself.
           if (name === CARD_NAME) continue;
@@ -428,6 +452,16 @@ module.exports = {
 
         gs._immediateActionContext = true;
         gs._spellCancelled = false;
+        // Der Stempel `_spellPlacedOnBoard` („diese Karte hat ihren Weg selbst erledigt": Löschstapel, Area …) gehört dem NACHGUSS, nicht Love Shot:
+        // den Stempel des äußeren Wegs retten, den eigenen auswerten (Muster `performImmediateAction`, v1364). Sonst blieb er stehen — Love Shot
+        // selbst verschwand aus Hand und Ablage, und der Nachguss lag zugleich im Löschstapel UND in der Ablage.
+        const _placedVorher = gs._spellPlacedOnBoard;
+        let _nachgussSelbstEntsorgt = false;
+        delete gs._spellPlacedOnBoard;
+        // Wirker-Seite für Stufenabfragen (`effectiveSchoolLevelForCaster` ohne Seitenargument, `heldSeiteFuer`): der Nachguss läuft mit dem GELIEHENEN Helden,
+        // dessen Schulen zählen — nicht die des gleich nummerierten eigenen Helden (wie `performImmediateAction`/`doPlaySpell`).
+        const _wirkerVorher = gs._wirkerSeite;
+        gs._wirkerSeite = { pi, heroIdx: sel.heroIdx, heroOwner: heroSeite };
         // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
         // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
         // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
@@ -437,15 +471,23 @@ module.exports = {
         if (chosenCd.cardType === 'Spell') engine._pushResolvingSpell(chosenName);
 
         let innerCancelled = false;
+        let kettenNegiert = false, kettenGeloescht = false;
         // v1339: der innere Spell/Attack wird dem Gegner gezeigt wie beim
         // normalen Spielen (gemeinsamer Engine-Helfer).
         const _auftritt = engine.gussAuftrittBeginnen(chosenName, pi);
         try {
-          await engine.runHooks('onPlay', {
+          // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): der performte Spell/die performte Attack öffnet dasselbe Kettenfenster wie ein normal
+          // gespielter — Silence, Ghostly Warning, The Master's Plan (die Karte kommt aus der HAND), Hand-Reaktionen auf Attacks … Wirker der Kette ist der geliehene Held. Negiert: der Rumpf läuft nie;
+          // der Guss zählt als gespielte Zusatzaktion, die Karte geht in die Ablage (Ghostly Warning/Lunar Eclipse: Löschstapel), keine Wisdom-Kosten.
+          const _pfeileVorher = (targetHero._armedArrows || []).length;
+          const _pk = await engine.performKettenfenster({ cardName: chosenName, pi, heroIdx: sel.heroIdx, heroOwner: heroSeite, ausHand: true });
+          if (_pk.negated) { kettenNegiert = true; kettenGeloescht = !!_pk.negatedToDeleted; gs._spellNegatedByEffect = true; }
+          if (!kettenNegiert) await engine.runHooks('onPlay', {
             _onlyCard: inst, playedCard: inst,
             cardName: chosenName, zone: 'hand',
             heroIdx: sel.heroIdx, _skipReactionCheck: true,
           });
+          if (chosenCd.cardType === 'Attack' && _pfeileVorher === 0 && (targetHero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile aus diesem Kettenfenster gelten nur für diese Attack
           delete gs._immediateActionContext;
 
           if (gs._spellCancelled && !gs._spellNegatedByEffect) {
@@ -477,6 +519,11 @@ module.exports = {
             await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: heroSeite });
           }
         } finally {
+          // Stempel des Nachgusses auswerten, den des äußeren Wegs wiederherstellen (s. o.).
+          _nachgussSelbstEntsorgt = !!gs._spellPlacedOnBoard;
+          if (_placedVorher) gs._spellPlacedOnBoard = true;
+          else delete gs._spellPlacedOnBoard;
+          if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
           // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
           if (_aeussererLog === undefined) delete gs._spellDamageLog;
           else gs._spellDamageLog = _aeussererLog;
@@ -488,7 +535,7 @@ module.exports = {
         // ★ v1323 (Tester-Befund 23.9.): Wisdom erst NACH dem Guss und nur,
         // wenn er nicht abgebrochen wurde — vorher zahlte man vor der
         // Zielwahl und verlor die Abwuerfe bei einem Abbruch.
-        if (!innerCancelled && chosenCd.cardType === 'Spell' && !gs.result) {
+        if (!innerCancelled && !kettenNegiert && chosenCd.cardType === 'Spell' && !gs.result) {   // in der Kette negiert: keine Wisdom-Kosten (wie in `doPlaySpell`)
           const wisdomCost = wisdomCostVorab;
           if (wisdomCost > 0) {
             await engine.actionPromptForceDiscard(pi, wisdomCost, {
@@ -512,7 +559,13 @@ module.exports = {
           // Als Fix (Al 27.10.): legt sich eine AREA aus diesem Nachguss selbst aufs Brett, hat ihre Instanz die Hand verlassen (`zone` ≠ 'hand'; `placeArea` stempelt `_spellPlacedOnBoard` nur fuer die gerade
           // AUFLOESENDE Karte, hier Love Shot). Sie gehoert dann dem Brett: nicht zusaetzlich in die Ablage (Dublette) und die Instanz nicht austragen (Geisterkarte: Name in `areaZones` ohne Instanz).
           if (inst.zone === 'hand') {
-            engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
+            // „Delete this card" (Forbidden Zone, Meditation, Liberation): das Kartenskript hat die Karte schon in den Löschstapel des Besitzers gelegt
+            // und `_spellPlacedOnBoard` gestempelt — dann nicht zusätzlich in die Ablage (Dublette), nur die Instanz austragen.
+            if (!_nachgussSelbstEntsorgt) {
+              const _besitzerPs = engine.handKartenBesitzerPs(ps, chosenName);   // W63c: Ablage des permanenten Besitzers
+              if (kettenGeloescht) { if (!_besitzerPs.deletedPile) _besitzerPs.deletedPile = []; _besitzerPs.deletedPile.push(chosenName); }   // in der Kette negiert + „delete it" (Ghostly Warning)
+              else _besitzerPs.discardPile.push(chosenName);
+            }
             engine._untrackCard(inst.id);
           }
           engine.log('love_shot_action', {

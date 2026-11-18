@@ -87,7 +87,7 @@ const MIN_GAIN  = 25;   // darunter lohnt weder der Cast noch ein Tausch (Eval-P
 function heldWaehlbar(engine, pi, casterHeroIdx, h) {
   try {
     if (h.owner === pi) return true;
-    if (engine.gs.firstTurnProtectedPlayer === h.owner) return false;
+    // (Erstrunden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — waehlbar, die Wahl verpufft.)
     const cd = engine._getCardDB()[CARD_NAME];
     return !engine.heroBlocksTargeting(h.owner, h.heroIdx, {
       sourceData: cd, cardName: CARD_NAME, chooserIdx: pi, chooserHeroIdx: casterHeroIdx ?? -1,
@@ -118,9 +118,15 @@ function bestePaare(engine, pi, casterHeroIdx, okFn) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   paarMoeglich, verlagerungsPlan,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Helden waehlen; spielbar nur, wenn zwei eigene Helden ihre Abilities tauschen koennen.
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele({ engine, pi }) {
+    const eig = engine.heroesControlledBy(pi).filter(e => e.hero.hp > 0).map(e => ({ owner: e.physOwner, heroIdx: e.heroIdx }));
+    return eig.some((x, i) => eig.slice(i + 1).some(y => paarMoeglich(engine, x, y)));
+  },
   activeIn: ['hand'],
 
   /**
@@ -259,6 +265,25 @@ module.exports = {
       });
       // Swap state at the visual crossing point.
       await engine._delay(ANIM_MS / 2);
+
+      // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt; „unaffected by all cards and effects, except damage"): der Tausch wählt zwei HELDEN und nimmt ihnen
+      // ihre Abilities — jeder der beiden fragt den zentralen Prüfer (die Animation lief schon). Blockt einer, bleibt der Tausch ganz aus (eine Ability kann nicht nur
+      // in eine Richtung wandern); der Zusatzaktion-Zusatz unten hängt nur daran, dass der Wirker unter den gewählten Helden ist, nicht am Gelingen des Tauschs.
+      const blockA = await engine.heroNonDamageEffectBlocked(a.owner, a.heroIdx, 'ability_swap', { sourceOwner: pi, source: CARD_NAME });
+      const blockB = await engine.heroNonDamageEffectBlocked(b.owner, b.heroIdx, 'ability_swap', { sourceOwner: pi, source: CARD_NAME });
+      if (blockA || blockB) {
+        engine.log('compulsory_body_swap_blocked', { player: ps.username, a: aPs.heroes[a.heroIdx]?.name, b: bPs.heroes[b.heroIdx]?.name });
+        engine.sync();
+        await engine._delay(ANIM_MS / 2);
+        if ((a.owner === pi && a.heroIdx === userHeroId) || (b.owner === pi && b.heroIdx === userHeroId)) {
+          await engine.performImmediateAction(pi, userHeroId, {
+            title: CARD_NAME,
+            description: `You may perform an additional Action with ${ps.heroes?.[userHeroId]?.name || 'the user'}!`,
+          });
+        }
+        engine.sync();
+        return;
+      }
 
       // ── Step 3b: die Support-Zonen-Abilities (Xal, Xalibur) wandern mit ──
       // Plan erst JETZT (der Zustand kann sich während der Animation geändert haben); passt es nicht mehr, fizzelt der Tausch.

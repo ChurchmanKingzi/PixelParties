@@ -38,6 +38,8 @@ const CARD_NAME = 'Howling in the Night';
 const STATUS = 'frightened';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -54,7 +56,7 @@ module.exports = {
   /** Ohne einen erreichbaren gegnerischen Helden bewirkt die Karte nichts. */
   spellPlayCondition(gs, playerIdx, engine) {
     const oi = opponentOfGs(gs, playerIdx);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — spielbar, verpufft in `onPlay`.)
     // W16g (S02-02): „Heroes your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`).
     const eng = engine || gs._engineRef;
     if (eng?.heroesControlledBy) return eng.heroesControlledBy(oi).some(({ hero }) => hero?.name && hero.hp > 0);

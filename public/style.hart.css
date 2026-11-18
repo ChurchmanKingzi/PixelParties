@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 6149b6352bd1ba04 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN b3953c3b3570f2b8 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -3816,15 +3816,26 @@ body:has(.pz-layout) .pp-bg-particles { display: none; }
   100% { transform: translateY(-8px) rotate(45deg); opacity: .4; } /* pp-ok: drehung */
 }
 
-/* Stunned — lightning bolts */
+/* Stunned — lightning bolts (Rückfall, wenn die kreisenden Stun-Sterne aus app-fx-64 nicht laufen: Retro, reduzierte Bewegung, Animationen aus) */
 .status-stunned-overlay {
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  background: rgba(254,255,102,.08);
+  /* Kein Alpha-Hintergrund: `pixel-hart.js` mischt einen hellen `rgba(…)`-Hintergrund (Alpha ≤ .35) zu einer DECKENDEN Farbe mit dem dunklen Brettgrund (gedacht
+     für Zonen). Über einer Karte machte das die Karte unter den Blitzen einfarbig schwarz (Puzzle Creator, Helden ohne Figur im Spiel). */
+  background: none;
   border: 2px solid rgba(255,226,61,.5);
-  box-shadow: none; background-color: rgb(20, 20, 20);
+}
+/* Stun-Sterne einer Karte im Puzzle Creator (`PzStunEffekt`): Nullpunkt der Leinwand = obere Mitte der Zone; die Leinwand selbst legt `PpFx64Sterne` an. */
+.status-stunned-sterne {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 .stun-bolt {
   position: absolute;
@@ -23910,6 +23921,12 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
    Knoepfe sie flankieren. */
 .panel-zielwahl .panel-zielwahl-knoepfe > :only-child { grid-column: 1 / -1; justify-self: center; }
 .panel-zielwahl .btn { white-space: nowrap; }
+/* ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026): Hinweis des ANGEWÄHLTEN Ziels (`validTargets[].hinweis`) — steht über der Knopfzeile und erscheint nur zwischen „Ziel
+   gewählt" und „Confirm" (app-board.jsx, Zielwahl-Fenster). Normaler Oberflächentext, harte Pixelkante links statt Schein/Verlauf, keine Alpha-Fläche, kein Symbol; nur Palettenfarben.
+   Warnung (die Wahl verpufft: immun, volle HP, Erstrunden-Schutz) = Bernstein, Info (Wirkung anders als erwartet, aber nicht nutzlos: Overheal Shock) = Akzentblau. */
+.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; }
+.panel-zielwahl-hinweis { font-size: 12px; line-height: 1.35; padding: 1px 0 1px 8px; border-left: 3px solid var(--accent4); color: var(--accent4); }
+.panel-zielwahl-hinweis-info { border-left-color: var(--accent); color: var(--accent); }
 /* Seitliche Kartenvorschau: `.card-mini` hat sonst feste Masse
    (`--card-w`/`--card-h`) und ragte aus dem schmalen Kasten. */
 .panel-zielwahl-vorschau .card-mini {

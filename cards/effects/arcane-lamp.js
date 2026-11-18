@@ -13,11 +13,18 @@
 //  Wiring:
 //    • Targeting Artifact — `getValidTargets`
 //      enumerates opponent heroes (alive, not
-//      already burned, not burn-immune) and
-//      opponent face-up Creatures that can
-//      receive Burn per `canApplyCreatureStatus`.
+//      already burned) and opponent face-up
+//      Creatures (not already burned).
 //    • Already-Burned targets are filtered out
 //      so the player can't waste the play.
+//    • ★ Spielgestalter-Entscheidung 17.11.2026
+//      (Warnungsprinzip): gegen Brand immune Ziele
+//      (burn_immune, Charme, Cardinal Beasts …,
+//      Helden UND Kreaturen) bleiben WAEHLBAR — die
+//      Zielwahl warnt („… is immune to burning and
+//      will not be affected."), der Brand verpufft,
+//      die Karte ist verbraucht. Die CPU waehlt sie
+//      nicht (`engine.markiereStatusWirkungslos`).
 //    • Hero burn applies via `addHeroStatus(...,
 //      { permanent: true })` — fires
 //      `onStatusApplied` so Luna Pele's
@@ -36,15 +43,12 @@ const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Arcane Lamp';
 
-function heroCanBeBurned(hero, engine = null, quelle = null) {
+// Spielgestalter-Entscheidung 17.11.2026: Immunitaeten (burn_immune, Charme, Tearing-Mountain-Ausnahme …) nehmen den Helden NICHT mehr aus der Liste — nur tot/schon brennend.
+// Ob der Brand landen wird, meldet `engine.statusWirkungslosHinweis` (Warnung im Picker); `addHeroStatus` weist ihn bei Immunitaet ab (verpufft).
+// W16e (F01-20): `statuses.immune` (Auftau-Puffer) schuetzt nur vor Frozen/Stunned/Negated/Bound (`CC_STATUSES`), nicht vor Brand.
+function heroCanBeBurned(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
-  if (engine?.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn — jeder Held ist ein Ziel
-  // W16e (F01-20): `statuses.immune` (Auftau-Puffer) schuetzt nur vor Frozen/Stunned/Negated/Bound (`CC_STATUSES`), nicht vor Brand — kein Ausschluss.
-  // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
-  // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
-  if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;
-  if (hero.statuses?.burn_immune) return false;
   return true;
 }
 
@@ -67,12 +71,11 @@ module.exports = {
 
     // At least one hero target? Kontrolle statt Seite (Styx 28.9.)
     for (const { hero: h } of gegnerHelden(gs, oi, engine)) {
-      if (heroCanBeBurned(h, engine, pi)) return true;
+      if (heroCanBeBurned(h)) return true;
     }
-    // Or at least one creature target? Use the targeting-side gate
-    // so Cardinal Beasts (and other omni-immune creatures) appear as
-    // valid targets — the actual Burn application fizzles silently
-    // in `resolve` via `canApplyCreatureStatus`.
+    // Or at least one creature target? Immune Creatures (Cardinal Beasts,
+    // burn_immune, …) stay valid targets — the actual Burn application
+    // fizzles in `resolve` via `canApplyCreatureStatus`.
     if (engine) {
       const cardDB = engine._getCardDB();
       for (const inst of engine.cardInstances) {
@@ -81,7 +84,7 @@ module.exports = {
         if (inst.counters?.burned) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (engine.canTargetForStatus(inst, 'burned')) return true;
+        if (!inst.faceDown) return true;   // Spielgestalter-Entscheidung 17.11.2026: Immunitaet filtert nicht mehr (`canTargetForStatus`)
       }
     }
     return false;
@@ -95,7 +98,7 @@ module.exports = {
 
     // Kontrolle statt Seite (Styx 28.9.) — IDs bleiben physisch.
     for (const { physOwner, heroIdx: hi, hero: h } of gegnerHelden(gs, oi, engine)) {
-      if (!heroCanBeBurned(h, engine, pi)) continue;
+      if (!heroCanBeBurned(h)) continue;
       targets.push({
         id: `hero-${physOwner}-${hi}`,
         type: 'hero', owner: physOwner, heroIdx: hi,
@@ -110,7 +113,7 @@ module.exports = {
         if (inst.counters?.burned) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (!engine.canTargetForStatus(inst, 'burned')) continue;
+        if (inst.faceDown) continue;   // verdeckte Karten sind kein Ziel (`canTargetForStatus`); Immunitaet filtert nicht mehr (Spielgestalter-Entscheidung 17.11.2026)
         targets.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip',
@@ -119,6 +122,8 @@ module.exports = {
         });
       }
     }
+    // Immune Ziele markieren (`wirkungslos`): der Picker warnt, die CPU wählt sie nicht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(targets, 'burned', pi, CARD_NAME);
     return targets;
   },
 
@@ -146,7 +151,7 @@ module.exports = {
 
     if (target.type === 'hero') {
       const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-      if (!hero || !heroCanBeBurned(hero, engine, pi)) return { cancelled: true };
+      if (!heroCanBeBurned(hero)) return { cancelled: true };   // tot/schon brennend: abgebrochen; Immunitaet verpufft dagegen (`addHeroStatus` weist den Brand ab, Karte verbraucht)
       await engine.addHeroStatus(target.owner, target.heroIdx, 'burned', {
         permanent: true,
         appliedBy: pi,

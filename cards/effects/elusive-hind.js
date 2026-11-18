@@ -53,6 +53,8 @@ function oppFreeZones(engine, pi) {
 async function bezahlen(engine, inst, ctrl, was) {
   const ps = engine.gs.players[ctrl];
   if (!ps || (ps.hand || []).length < DISCARD_COST) return false;
+  // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — die Negation ist eine Reaktion, keine Abfrage.
+  if (engine._reaktionGesperrt(ctrl)) return false;
   const vorher = ps.hand.length;
   const kosten = await engine.zahleAbwurfKosten(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
@@ -100,6 +102,14 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oppIdx = engine.opponentOf(pi);
       if ((inst.controller ?? inst.owner) === oppIdx) return;   // liegt schon beim Gegner
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen den Erste-Runden-Geschuetzten ist die Karte spielbar, das Hinlegen in seine Zone verpufft
+      // (die Karte ist gespielt/bezahlt und geht in die Ablage, nichts liegt beim Gegner). Frueher: `blockedByFirstTurnProtection` = unspielbar.
+      if (engine.ersterZugGeschuetzt(oppIdx, pi)) {
+        engine.log('elusive_hind_fizzle', { player: gs.players[pi]?.username, reason: 'first-turn protection' });
+        await engine.sendBoardCardToDiscard(inst, { source: CARD_NAME, sourceOwner: pi });
+        engine.sync();
+        return;
+      }
 
       // Ziel: Server-Hinweis (Drag aufs Gegnerbrett) oder Abfrage.
       let dest = null;

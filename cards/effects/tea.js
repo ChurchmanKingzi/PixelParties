@@ -356,7 +356,7 @@ module.exports = {
         && secondTarget.type === 'hero'
         && inst.zone === 'support';
       const ok = umziehen
-        ? await engine.anhaengselUmziehen(inst, secondTarget.owner, secondTarget.heroIdx)
+        ? await engine.anhaengselUmziehen(inst, secondTarget.owner, secondTarget.heroIdx, { anleger: pi })
         : false;
       if (!ok && inst.zone === 'support') {
         await engine.sendBoardCardToDiscard(inst, { source: { name: 'Tea' } });

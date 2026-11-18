@@ -174,11 +174,14 @@ module.exports = {
       if (bull) {
         await engine.opfereKreatur(bull, { name: CARD_NAME, owner: pi, heroIdx: -1 }, { animation: false });
       } else {
-        await engine.actionDefeatHero(
+        const _opferErg = await engine.actionDefeatHero(
           { name: CARD_NAME, owner: pi },
           opfer,
           { reason: CARD_NAME, respectFirstTurnProtection: false, isSacrifice: true },
         );
+        // Spielgestalter-Entscheidung 16.11.2026 (Vor-Niederlage-Fenster bei Helden-Opfern): ersetzt/negiert eine Hand-Reaktion die Niederlage des Opfers (`opferErsetzt`),
+        // ist das Opfer nicht bezahlt — kein Gold, kein erzwungenes Zugende; der Effekt ist aber benutzt (Heldenopfer-Marke und Einmal je Zug bleiben verbraucht).
+        if (_opferErg?.opferErsetzt) { engine.sync(); return true; }
       }
 
       await ctx.gainGold(GOLD_HERO);

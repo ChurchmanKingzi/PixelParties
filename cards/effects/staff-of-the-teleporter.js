@@ -95,10 +95,13 @@ module.exports = {
       eligibleIndices.push(i);
     }
 
+    // Warnungsprinzip (D1): unter Hand-/Zieh-Sperre bleibt der Stab aktivierbar, nur das Nachziehen entfaellt — der Hinweis sagt es vorher.
+    const ziehGesperrt = require('./_draw-block-shared').drawBlockedFor(engine, pi);
     const result = await engine.promptGeneric(pi, {
       type: 'handPick',
       title: CARD_NAME,
-      description: 'Click cards in your hand to mark them. They will be shuffled into your deck and you will draw the same number — +1 if you commit your entire hand.',
+      description: 'Click cards in your hand to mark them. They will be shuffled into your deck and you will draw the same number — +1 if you commit your entire hand.'
+        + (ziehGesperrt ? ' You cannot draw cards right now, so nothing will replace the shuffled cards.' : ''),
       eligibleIndices,
       maxSelect: eligibleIndices.length,
       minSelect: 0,
@@ -133,7 +136,9 @@ module.exports = {
     }
 
     const count = selected.length;
-    const isAllHand = eligibleIndices.length > 0 && count === eligibleIndices.length;
+    // Spielgestalter-Entscheidung 17.11.2026: liegt ausser dem Stab nichts auf der Hand, gelten 0 Karten als GANZE Hand — wer dann ohne Wahl
+    // bestaetigt, zieht 1 Karte (+1-Bonus). Frueher verlangte die Pruefung `eligibleIndices.length > 0`, der Bonus entfiel bei leerer Rest-Hand.
+    const isAllHand = count === eligibleIndices.length;
 
     // Sort by descending hand index — actionMulliganCards iterates by
     // name and re-resolves the index each iteration, so technically

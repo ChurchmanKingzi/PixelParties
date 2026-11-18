@@ -162,7 +162,11 @@ module.exports = {
       // any sub-cast or follow-on play we trigger from here on out
       // could overwrite it (each cast computes its own), so snapshot
       // now and read the local at the end of resolve.
-      let wasInherent = gs._spellWasInherent === true;
+      // ★ Sofort-Guss (`gs._immediateActionContext`: Learning, Time Distortion, Chaos Diamond … wirken den Zauber als SEINE Zusatzaktion): `_castSpellImmediately`
+      // setzt den Stempel nicht neu, `_spellWasInherent` stammt dann vom AEUSSEREN Spiel (z. B. Detection) und gilt nicht fuer diesen Guss. Die Zusatzaktion ist
+      // hier schon da — keine Rueckfrage „Zugende oder normale Aktion?", die Hauptaktion bleibt frei und der Zug endet nicht (Konvention wie Frost Breaker,
+      // Divine Gift of Death, Spreading Rumor).
+      let wasInherent = !gs._immediateActionContext && gs._spellWasInherent === true;
 
       // ── v818: Wahl bei freiem Haupt-Slot (Als Ruling 6.9.) ──
       if (wasInherent && mainActionSlotFree(engine, pi, heroIdx)) {

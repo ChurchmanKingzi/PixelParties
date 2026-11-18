@@ -1,13 +1,59 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Cardinal Beast Zhuque"
-//  Creature (Lv5, 500HP) — Immune to opponent.
+//  Creature (Lv5, 500HP) — Unaffected by all cards and effects.
 //  Once per turn: Choose a target and Burn it.
 //  If Hero, also burn all Creatures in its
 //  Support Zones.
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026: „Nein, nicht gewollt. Bitte entsprechend dem Text fixen!" — der Text sagt „choose a target" (NICHT
+//  „your opponent controls", anders als Baihu): Zhuque darf JEDEN Helden und jede Kreatur beider Seiten wählen (auch eigene). Was nicht gewählt
+//  werden kann (schon brennend, tot, Stealth/Taunt-Schutz …), bleibt ausgegraut sichtbar. Unter Blinded wählt der Effekt damit nur eigene Ziele
+//  (Engine-Picker `markiereBlindGesperrte`; kein `blindedEigeneZiele`-Vertrag mehr nötig).
 // ═══════════════════════════════════════════
 
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 const { hasCardType } = require('./_hooks');
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
+
+/**
+ * Alle wählbaren Ziele („a target" = Held oder Kreatur, Al 25.10.2026) beider Seiten, die noch nicht brennen. Ziel-IDs/`owner` = Brettseite
+ * (`physicalSide`), nicht Besitz/Kontrolle (Styx 28.9.: seitenfremd beschworene Kreaturen).
+ */
+function sammleZiele(engine) {
+  const gs = engine.gs;
+  const cardDB = engine._getCardDB();
+  const targets = [];
+  for (let seite = 0; seite < (gs.players || []).length; seite++) {
+    const heroes = gs.players[seite]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp <= 0 || hero.statuses?.burned) continue;
+      targets.push({ id: `hero-${seite}-${hi}`, type: 'hero', owner: seite, heroIdx: hi, cardName: hero.name });
+    }
+  }
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if (inst.counters.burned) continue;
+    // Wirksame Daten (Tokens/Biomancy Token — Als AoE-Report): Ausruestung ist kein Ziel (Al, 25.10.2026).
+    const cd = engine.getEffectiveCardData?.(inst) || inst.counters?._cardDataOverride || cardDB[inst.name];
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+    if ((inst.counters?.currentHp ?? cd.hp ?? 0) <= 0) continue;
+    targets.push({
+      id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
+      type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx,
+      slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
+    });
+  }
+  return targets;
+}
+
+/** Steht das Ziel `t` unter der Kontrolle des Gegners von `pi`? (Held: Kontrolle des Helden; Kreatur: Kontrolleur der Instanz.) */
+function istGegnerZiel(engine, t, pi) {
+  const oi = engine.opponentOf(pi);
+  if (t.type === 'hero') return engine.kontrolleurVonHeld(t.owner, t.heroIdx) === oi;
+  const inst = t.cardInstance;
+  return !!inst && (inst.controller ?? inst.owner) === oi;
+}
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -19,21 +65,23 @@ module.exports = {
 
   // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
   // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
-  // Engine-Decline durch. Politik: Burn auf GEGNER-Held (brennt dessen Kreaturen mit)
+  // Engine-Decline durch. Politik: Burn auf GEGNER-Held (brennt dessen Kreaturen mit), sonst
+  // gegnerische Kreatur. Die Wahlliste enthält seit 16.11.2026 auch EIGENE Ziele (Text: „choose a
+  // target") — die CPU brennt nie die eigenen; gibt es kein gegnerisches Ziel, lehnt sie ab.
   cpuResponse(engine, kind, payload) {
     if (kind !== 'effectTarget') return undefined;
-    const vt = payload?.validTargets || [];
+    const vt = (payload?.validTargets || []).filter(t => t && !t.ineligible);
     if (vt.length === 0) return undefined;
     const pi = payload.playerIdx;
-    const oi = engine.opponentOf(pi);
-    const enemyHeroes = vt.filter(t => String(t.id || t).startsWith('hero-' + oi));
-    const pick = enemyHeroes[0] || vt[0];
-    return [typeof pick === 'object' ? pick.id : pick];
+    const gegner = (t) => istGegnerZiel(engine, t, pi);
+    const pick = vt.find(t => t.type === 'hero' && gegner(t)) || vt.find(t => gegner(t));
+    return pick ? [pick.id] : [];
   },
 
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Effekt; Zhuque wählt JEDES Ziel („choose a target") → unter Blinded nur eigene Ziele
+  // (kein `blindedEigeneZiele`: die Engine nimmt die Näherung „eigener lebender Held/eigene Kreatur").
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
 
   // Cardinal Beasts are signature win-condition pieces — their once-per-
@@ -55,29 +103,12 @@ module.exports = {
   },
 
   canActivateCreatureEffect(ctx) {
+    // Must have 1+ non-burned target (Held oder Kreatur, beide Seiten — Spielgestalter-Entscheidung 16.11.2026).
     const engine = ctx._engine;
-    const gs = engine.gs;
-    // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
-    const pi = ctx.cardOwner;
-    const oppIdx = engine.opponentOf(pi);
-    const ops = gs.players[oppIdx];
-    if (!ops) return false;
-
-    // Must have 1+ non-burned target
-    // Kontrolle statt Seite (Styx 28.9.)
-    for (const { hero } of engine.heroesControlledBy(oppIdx)) {
-      if (hero?.name && hero.hp > 0 && !hero.statuses?.burned) return true;
-    }
-    for (const inst of engine.cardInstances) {
-      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
-      if (inst.counters.burned) continue;
-      // Wie die Zielliste von `onCreatureEffect`: nur Kreaturen mit HP (Al, 25.10.2026: Ausruestung ist kein Ziel).
-      const cd = inst.counters?._cardDataOverride || engine._getCardDB()[inst.name];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
-      if ((inst.counters?.currentHp ?? cd.hp ?? 0) <= 0) continue;
-      return true;
-    }
-    return false;
+    const ziele = sammleZiele(engine);
+    // CPU/MCTS brennt nie die eigenen Ziele (`cpuResponse`): ohne gegnerisches Ziel waere die Aktivierung (`alwaysCommit`) ein leerer Zug.
+    if (engine.isCpuPlayer?.(ctx.cardOwner) || engine._inMctsSim) return ziele.some(t => istGegnerZiel(engine, t, ctx.cardOwner));
+    return ziele.length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -85,34 +116,15 @@ module.exports = {
     const gs = engine.gs;
     // Styx 28.9.: „you" = Kontrolleur (seitenfremd beschworen: cardOwner ≠ owner).
     const pi = ctx.cardOwner;
-    const oppIdx = engine.opponentOf(pi);
     const heroIdx = ctx.cardHeroIdx;
 
-    // Build targets: opponent's non-burned heroes and creatures
-    const targets = [];
-    // Kontrolle statt Seite (Styx 28.9.); IDs/owner bleiben physisch.
-    for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oppIdx)) {
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.burned) continue;
-      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
-    }
+    // Build targets: ALLE nicht brennenden Helden und Kreaturen beider Seiten (Text: „choose a target").
+    const targets = sammleZiele(engine);
     const cardDB = engine._getCardDB();
-    for (const inst of engine.cardInstances) {
-      if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
-      if (inst.counters.burned) continue;
-      const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
-      const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
-      if (hp <= 0) continue;
-      targets.push({
-        id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
-        type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx,
-        slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
-      });
-    }
     if (targets.length === 0) return false;
 
-    const selectedIds = await engine.promptEffectTarget(pi, targets, {
+    // Unwählbares (schon brennend, tot, Ausrüstung …) bleibt ausgegraut sichtbar (CARD_API „Zielwahl graut Unwählbares aus").
+    const selectedIds = await engine.promptEffectTarget(pi, [...targets, ...ausgegrauteRestkarten(engine, targets)], {
       title: 'Cardinal Beast Zhuque',
       description: 'Choose a target to Burn permanently.',
       confirmLabel: '🔥 Burn!',

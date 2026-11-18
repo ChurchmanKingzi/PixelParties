@@ -1,8 +1,10 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Poison Vial"
-//  Potion — Choose any target (not shielded
-//  or poison-immune) and apply 2 Poison stacks.
-//  Goes to deleted pile after use.
+//  Potion — Choose a target and inflict 2 Stacks
+//  of Poison to it. Goes to deleted pile after use.
+//  ★ Spielgestalter-Entscheidung 16.11.2026: gift-immune Ziele (Helden UND Kreaturen, `poison_immune`)
+//  bleiben WÄHLBAR — das Gift fizzelt einfach (der Trank wird normal verbraucht, kein Gift, `status_blocked`-Log
+//  wie sonst bei Immunität). Nur die Zielregeln (Stealth, Taunt, Erstzug-Schutz …) nehmen Ziele aus der Liste.
 // ═══════════════════════════════════════════
 
 const { STATUS_EFFECTS, hasCardType } = require('./_hooks');
@@ -21,15 +23,19 @@ module.exports = {
       const ps = gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.poison_immune) continue;
-        targets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
+        // Der HELD ist nur als Ziel waehlbar, solange er lebt. Gift-Immunitaet nimmt ihn NICHT aus der Liste (Spielgestalter-Entscheidung
+        // 16.11.2026): `addHeroStatus` weist das Gift ab (`status_blocked`), der Trank ist trotzdem gespielt …
+        if (hero?.name && hero.hp > 0) {
+          targets.push({
+            id: `hero-${pi}-${hi}`,
+            type: 'hero',
+            owner: pi,
+            heroIdx: hi,
+            cardName: hero.name,
+          });
+        }
+        // … seine Kreaturen aber unabhaengig von ihm (Acid Vial, Healing Potion & Co.: Kreaturen bleiben nach dem Tod ihres Helden auf dem Brett
+        // und gelten weiter als Ziele) — vorher stand hier ein `continue` fuer den ganzen Helden, das auch seine Kreaturen aussperrte.
         // Creatures in support zones
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
@@ -47,6 +53,8 @@ module.exports = {
         }
       }
     }
+    // Warnungsprinzip (Spielgestalter-Entscheidung 17.11.2026): gift-immune Ziele bleiben wählbar, die Zielwahl warnt („… is immune to poison and will not be affected."), die CPU wählt sie nicht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(targets, 'poisoned', playerIdx, 'Poison Vial');
     return targets;
   },
 
@@ -70,9 +78,14 @@ module.exports = {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target) return;
 
+    // Spielgestalter-Entscheidung 16.11.2026: ein gift-immunes Ziel ist waehlbar, das Gift fizzelt (kein Stapel, kein `poison_applied`).
+    let applied = false;
     if (target.type === 'hero') {
-      // Apply 2 stacks of poison
+      const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
+      const vorher = hero?.statuses?.poisoned?.stacks || 0;
+      // Apply 2 stacks of poison (`addHeroStatus` weist es bei Gift-Immunitaet, Schilden usw. ab und loggt `status_blocked`).
       await engine.addHeroStatus(target.owner, target.heroIdx, 'poisoned', { addStacks: 2, appliedBy: pi });
+      applied = (hero?.statuses?.poisoned?.stacks || 0) > vorher;
     } else if (target.type === 'equip') {
       const inst = engine.cardInstances.find(c =>
         c.owner === target.owner && c.zone === 'support' &&
@@ -87,16 +100,17 @@ module.exports = {
         // `potion_resolved` animation regardless of whether the status
         // actually applies, so a fizzle still gives the player visual
         // feedback that the throw landed.
-        await engine.applyCreatureStatus(inst, 'poisoned', {
+        applied = await engine.applyCreatureStatus(inst, 'poisoned', {
           stacks: 2, addStacks: true,
           sourceOwner: pi,
           source: 'Poison Vial',
         });
+        if (!applied) engine.log('status_blocked', { target: inst.name, status: 'poisoned', reason: 'immune' });
       }
     }
 
     // Animation is handled by the potion_resolved event
-    engine.log('poison_applied', { target: target.cardName, stacks: 2, by: 'Poison Vial' });
+    if (applied) engine.log('poison_applied', { target: target.cardName, stacks: 2, by: 'Poison Vial' });
     engine.sync();
   },
 

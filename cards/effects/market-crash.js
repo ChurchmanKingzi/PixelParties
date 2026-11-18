@@ -186,7 +186,9 @@ module.exports = {
 
       // Gegner zuerst: loest ein Fremd-Trigger (Logans 0-Gold-Regel) auf,
       // steht der eigene Stand noch so da, wie der Zauber ihn vorfand.
-      await engine.actionSetGold(oi, 0, { sourceName: CARD_NAME });
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen den Erste-Runden-Geschuetzten ist die Karte spielbar; sein Gold bleibt (Zwei-Seiten-Effekt:
+      // die geschuetzte Seite wird uebersprungen, `engine.ersterZugGeschuetzt`), das eigene Gold wird wie gedruckt 0. Frueher: `blockedByFirstTurnProtection` = unspielbar.
+      if (!engine.ersterZugGeschuetzt(oi, pi)) await engine.actionSetGold(oi, 0, { sourceName: CARD_NAME });
       await engine.actionSetGold(pi, 0, { sourceName: CARD_NAME });
 
       engine.log('market_crash', {

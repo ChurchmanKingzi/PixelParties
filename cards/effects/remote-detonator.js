@@ -54,6 +54,8 @@ async function loescheGolems(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an (das Löschen der Golems ist nur Kostenpunkt) —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
@@ -70,7 +72,7 @@ module.exports = {
     const eigene = new Set(meineGolems(engine, pi).map(c => c.id));
     const out = [];
     for (let p = 0; p < gs.players.length; p++) {
-      if (gs.firstTurnProtectedPlayer !== p) out.push(...engine.getHeroTargets(p));
+      out.push(...engine.getHeroTargets(p));   // Erste-Runden-Schutz: waehlbar, der Treffer verpufft (Spielgestalter-Entscheidung 16.11.2026)
       out.push(...engine.getCreatureTargets(p).filter(t => !eigene.has(t.cardInstance?.id)));
     }
     return out;

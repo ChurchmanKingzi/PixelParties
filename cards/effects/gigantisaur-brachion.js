@@ -14,6 +14,14 @@
 //    creature damage on this Creature with
 //    `cannotBeReduced` / `cannotBeNegated` flags.
 //
+//  ②b ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Der
+//    Umleiter wird AUCH gegen True Damage / „cannot be reduced or negated" angeboten (Rockfall,
+//    Pressure Projectile hören auf `beforeTrueDamage` — dort wurde er nie gefragt). Umleiten ist
+//    weder Senken noch Negieren: die Umleitung findet statt (`_umgeleitet`, wie Mean Cute Cat;
+//    der Held nimmt nichts, auch bei durchschlagendem Schaden). Gegen Quellen, deren Text „cannot
+//    be … redirected" sagt (Acid Vial: `cannotBeRedirected`), wird er ebenfalls angeboten (Hinweis
+//    in der Frage, die CPU waehlt es nicht): Kosten bezahlt, keine Umleitung, der Held nimmt den Schaden.
+//
 //  ③ UNREVIVABLE — `_summonedFromDiscard`-style
 //    summons are refused in `beforeSummon`. Hand-
 //    summon is still allowed (a fresh copy from
@@ -29,6 +37,7 @@
 const {
   gigantisaursCanSummon,
 } = require('./_gigantisaurs-shared');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Gigantisaur Brachion';
 
@@ -134,6 +143,8 @@ module.exports = {
       const hostHero = engine.gs.players[engine.physicalSide(inst)]?.heroes?.[inst.heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
       if (target !== hostHero) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag (Fireball auf Held UND Brachion, Flaechenschlag) Brachion ohnehin selbst, wird nichts umgeleitet.
+      if (engine.schlagTrifftZiel(inst)) return;
 
       // Re-entry guard — Brachion's redirect re-issues damage on
       // ITSELF (a creature damage event); without this guard, a
@@ -149,12 +160,18 @@ module.exports = {
       const amount = ctx.amount;
       if (!(amount > 0)) return;
 
+      // Quelle, die laut Kartentext nicht umgeleitet werden darf (Acid Vial, Glasowt: `cannotBeRedirected`): Angebot trotzdem (nutzlose Aktivierung, s. Kopf).
+      const nichtUmleitbar = !!(ctx.cannotBeRedirected || ctx.source?.cannotBeRedirected
+        || (ctx.source?.name && loadCardEffect(ctx.source.name)?.cannotBeRedirected));
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         protMeta: { d: amount, hp: target.hp, pi },
         title: CARD_NAME,
-        message: `${hostHero.name} is about to take ${amount} damage. Discard 1 card to redirect to ${CARD_NAME}?`,
+        message: nichtUmleitbar
+          ? `${hostHero.name} is about to take ${amount} damage. ${engine._nutzlosHinweis({ cannotBeRedirected: true }, 'damage')} Discard 1 card to redirect to ${CARD_NAME} anyway?`
+          : `${hostHero.name} is about to take ${amount} damage. Discard 1 card to redirect to ${CARD_NAME}?`,
         showCard: CARD_NAME,
+        ...(nichtUmleitbar ? { _nutzlos: true } : {}),
         confirmLabel: '🦕 Redirect!',
         cancelLabel: 'Take damage',
         cancellable: true,
@@ -172,8 +189,16 @@ module.exports = {
       });
       if (!kosten.bezahlt) return;
 
-      // Cancel the original damage on the Hero.
+      // Nutzlose Aktivierung: bezahlt, aber die Umleitung findet nicht statt — der Held nimmt den Schaden.
+      if (nichtUmleitbar) {
+        engine.log('brachion_redirect_blocked', { player: ps.username, hero: hostHero.name, amount, source: ctx.source?.name });
+        return;
+      }
+
+      // Cancel the original damage on the Hero. `_umgeleitet`: die Engine wertet das Abbrechen als UMLEITUNG und nimmt es bei „cannot be negated"-Schaden
+      // (Ida, True Damage) nicht zurueck (sonst nähmen Held UND Brachion den Treffer; wie Mean Cute Cat).
       ctx.cancelled = true;
+      if (typeof ctx.setFlag === 'function') ctx.setFlag('_umgeleitet', true);
       if (typeof ctx.setAmount === 'function') ctx.setAmount(0);
 
       // Quick redirect animation — a red beam from the host hero
@@ -204,6 +229,10 @@ module.exports = {
         player: ps.username, hero: hostHero.name, amount,
       });
     },
+
+    /** True Damage (Rockfall, Pressure Projectile, Acid Vial): derselbe Umleiter (s. Kopf ②b). */
+    // („Cannot be reacted to"-Quellen — Surefire Shot —: kein Angebot, wie bisher.)
+    beforeTrueDamage: async (ctx) => (ctx._engine._reaktionGesperrt?.(ctx.cardController ?? ctx.cardOwner) ? undefined : module.exports.hooks.beforeDamage(ctx)),
 
     /**
      * Damage-proof: every creature-damage entry that targets THIS

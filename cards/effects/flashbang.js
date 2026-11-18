@@ -47,6 +47,8 @@ const TARGET_KEY = 'flashbangTargetIdx';
 const ARMED_KEY  = 'flashbangArmedTurn';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   isPotion: true,
 
   // ── CPU-Gate-Bypass ──────────────────────────────────────────────
@@ -82,9 +84,9 @@ module.exports = {
   // ist in Runde 1 gegen ALLES geschuetzt — auch gegen eine Wirkung, die
   // erst in seinem naechsten Zug zuendet. Vorher war Flashbang in Runde 1
   // spielbar und umging den Schutz.
+  // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch in Runde 1 spielbar; gegen den Geschuetzten verpufft die Karte (`resolve`: gespielt, bezahlt, kein Effekt).
   canActivate(gs, pi) {
-    const oppIdx = opponentOfGs(gs, pi);
-    return gs.firstTurnProtectedPlayer !== oppIdx;
+    return true;
   },
 
   resolve: async (engine, pi) => {
@@ -93,7 +95,7 @@ module.exports = {
     const oppPs = gs.players[oppIdx];
     const ps    = gs.players[pi];
     if (!oppPs || !ps) return;
-    if (gs.firstTurnProtectedPlayer === oppIdx) return { cancelled: true };   // v1364
+    if (gs.firstTurnProtectedPlayer === oppIdx) return {};   // v1364; Spielgestalter-Entscheidung 16.11.2026: verpufft (gespielt), statt abzubrechen (Karte zurueck auf die Hand)
 
     // Track a Flashbang instance directly in the deleted pile so the
     // hooks below fire for it. We DON'T add the card name to ps.deletedPile

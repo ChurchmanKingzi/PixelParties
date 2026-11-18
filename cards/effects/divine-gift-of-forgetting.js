@@ -143,7 +143,7 @@ module.exports = {
 
       // Randomize order — sells the "scattered, confused forgetting"
       // read better than a deterministic walk. Fisher-Yates shuffle.
-      const order = removable.slice();
+      let order = removable.slice();
       for (let i = order.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [order[i], order[j]] = [order[j], order[i]];
@@ -164,6 +164,18 @@ module.exports = {
         });
       }
 
+      // Spielgestalter-Entscheidung 16.11.2026: Resistance fängt „Divine Gift of Forgetting" ab — der Effekt wirkt auf den HELDEN, nicht auf eine einzelne Ability. Je betroffenem Helden EINMAL fragen
+      // (nicht je Ability: eine Ladung der Resistance = ein Effekt), nach den Bildern und vor jeder Zustandsänderung. Ein Held mit Resistance bleibt unberührt (seine Abilities bleiben liegen, die
+      // Leafagami Snake zieht dort nichts); die übrigen Helden verlieren ihre Abilities wie gehabt. Reihenfolge: erst Resistance (Held), dann Snake (je Ability) in der Schleife unten.
+      {
+        const verschont = new Set();
+        for (const key of affectedHeroes) {
+          const [ow, hi] = key.split('-').map(Number);
+          if (await engine.heroNonDamageEffectBlocked(ow, hi, 'ability_discard', { sourceOwner: pi, source: 'Divine Gift of Forgetting' })) verschont.add(key);
+        }
+        if (verschont.size > 0) order = order.filter(inst => !verschont.has(`${inst.owner}-${inst.heroIdx}`));
+      }
+
       // ── Flight animation: each removed ability flies one-by-one
       // from its slot into the opponent's deck. Short staggered delay
       // between launches so they read as a sequence rather than a wall
@@ -180,8 +192,18 @@ module.exports = {
       // correct reference here. ──
       const STAGGER_MS = 220;       // gap between successive launches
       const FLIGHT_MS  = 1100;      // standard pile-transfer flight runtime
+      let bewegt = 0;               // wirklich ins Deck gemischte Abilities (die von der Leafagami Snake gehaltenen zählen nicht)
+      let letzteGehalten = false;
       for (let i = 0; i < order.length; i++) {
         const inst = order[i];
+        // Leafagami Snake („When Abilities would be removed from Heroes you control, don't remove them and draw a card for each affected Ability instead"):
+        // die Ability bleibt liegen, der Kontrolleur der Schlange zieht je Ability 1 Karte (Ability Zone ODER Support Zone), kein Flug.
+        if (await engine.abilityEntfernungVerhindert(inst, 'deck', { source: { name: 'Divine Gift of Forgetting', owner: pi } })) {
+          letzteGehalten = true;
+          continue;
+        }
+        letzteGehalten = false;
+        bewegt++;
         engine._broadcastEvent('play_pile_transfer', {
           owner: inst.owner,
           cardName: inst.name,
@@ -228,12 +250,15 @@ module.exports = {
         await engine._delay(wait);
       }
 
-      engine.shuffleDeck(oi);
+      // Zuletzt gehaltene Kopie: der Flug der letzten bewegten Karte hat seine volle Laufzeit noch nicht abgewartet.
+      if (letzteGehalten && bewegt > 0) await engine._delay(FLIGHT_MS);
+
+      if (bewegt > 0) engine.shuffleDeck(oi);
 
       engine.log('divine_gift_forgetting', {
         player: gs.players[pi].username,
         opponent: oppPs.username,
-        shuffled: removable.length,
+        shuffled: bewegt,
         heroesAffected: affectedHeroes.size,
       });
       engine.sync();

@@ -8180,10 +8180,10 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
   ps.supportZones[heroIdx][supIdx].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill) — gemerkt, damit ein Negieren den richtigen zurückgibt.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill). ★ Spielgestalter-Entscheidung 16.11.2026: mit dem Beginn des Anlegens ist der Platz verbraucht — wird die Ability
+  // danach negiert, bekommt der Held ihn NICHT zurück (wie bei jedem Einmal-Limit, siehe CARD_API „Einmal-Limits werden bei Aktivierungsbeginn verbraucht"). Ein Abbruch VOR diesem Punkt
+  // (Held-/Zonenwahl abbrechen) hat noch nichts verbraucht.
   engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const inst = engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
   engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, zone: 'support' });
@@ -8202,17 +8202,8 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'support', fromHeroIdx: heroIdx, fromSlotIdx: supIdx });
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        hero.buffs.blessed_skill.remaining++;
-        hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      }
+      // Der Platz bleibt verbraucht (s. o.); nur die Sperrmarke des Blessed-Buffs wird neu gelesen (die Ability liegt nicht mehr in der Zone, Magic-Arts-Stufe kann gefallen sein).
+      if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
       engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -8338,13 +8329,12 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   room.engine.notePlayedFromHand(pi);
   // Consume the standard slot first; if it's already used, spend a bonus
-  // attachment from Divine Gift of Skill instead. Track which slot was
-  // consumed so a negation refund can return it cleanly.
+  // attachment from Divine Gift of Skill instead.
   // v1356: Verbrauch (Standard zuerst, sonst Bonus-Platz) und Blessed-Buff
   // an EINER Stelle — derselbe Helfer wie im Engine-Anlegeweg.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Platz ist mit dem Beginn des Anlegens verbraucht und kommt bei einer Negation der Ability NICHT zurück (Standard- wie Bonus-Platz);
+  // ein Abbruch vor diesem Punkt (Zonen-/Heldenwahl) hat nichts verbraucht.
   room.engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -8373,26 +8363,10 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       // `zoneSlotFound` merkt sich, aus welchem Slot sie entfernt wurde.
       await room.engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: zoneSlotFound });
-      // Refund whichever slot was consumed (regular vs Skill bonus).
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        // Restore the Blessed buff: re-add the slot to the visible
-        // counter, and re-create the buff entry if it was deleted when
-        // remaining hit 0 mid-resolve.
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) {
-          hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        }
-        hero.buffs.blessed_skill.remaining++;
+      // Kein Zurückgeben des Platzes (s. o.). Die Ability liegt nicht mehr in der Zone — Magic Arts
+      // kann unter 1 gefallen sein, also die Sperrmarke des Blessed-Buffs neu lesen.
+      if (hero.buffs?.blessed_skill) {
         hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        // The regular slot was the consumer — Magic Arts level may have
-        // dropped back below 1, so re-evaluate the lock flag.
-        if (hero.buffs?.blessed_skill) {
-          hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-        }
       }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -8725,10 +8699,13 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
           }
-          const result = room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
+          // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — eine Ausruestung (Future Tech Control Device, Free-Side-Equip) an einen Helden des Geschuetzten wird gespielt und bezahlt,
+          // das Anlegen verpufft (Karte in die Ablage). Frueher: `blockedByFirstTurnProtection` machte nur FTCD unspielbar.
+          const result = (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi))
+            ? null : room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
           if (!result) {
             room.engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-            room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
+            room.engine.log('equip_fizzle', { card: cardName, reason: (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? 'first-turn protection' : 'zone_occupied_by_chain' });
             return true;
           }
           const { inst, actualSlot } = result;
@@ -8951,7 +8928,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // sieben laufe nicht durch `summonCreatureWithHooks`. Geprueft
           // hatte ich nur die KARTENSKRIPTE (Powder Keg) — nicht diesen
           // Zweig hier, der genau das tut. Dritte Auflage derselben Lehre.
-          const placed = await room.engine.summonCreatureWithHooks(
+          // Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — Powder Keg & Co. in die Zone des Geschuetzten: gespielt/bezahlt, die Platzierung verpufft (Fizzle-Zweig unten: Ablage).
+          const placed = (_isCrossSideArtifact && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? null : await room.engine.summonCreatureWithHooks(
             cardName, placementOwner, heroIdx, finalSlot,
             {
               source: 'Artifact-Creature play',
@@ -9342,6 +9320,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') room.engine._popResolvingPlay();
   };
 
+  // 17.11.2026 (ARW-01): Zustand des Pfeil-Fensters nach der Zielwahl (`gs._pfeilFenster`, siehe unten) — bei jedem Ausgang zuruecksetzen (verschachtelte Wuerfe behalten den Stand der aeusseren Karte).
+  const _pfeilVorher = gs._pfeilFenster;
+  const _pfeilAufraeumen = () => { if (_pfeilVorher) gs._pfeilFenster = _pfeilVorher; else delete gs._pfeilFenster; };
+
   try {
     // ★ v1277: `_spellFreeAction` gehoert zu GENAU EINER Aufloesung — jeder
     // Setzer ist das `onPlay` des Zaubers selbst. Ein Rest aus einem
@@ -9384,10 +9366,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // gleich nummerierten eigenen Helden. Verschachtelt → wiederherstellen.
     const _wirkerVorher = gs._wirkerSeite;
     gs._wirkerSeite = { pi, heroIdx: heroIdxPub, heroOwner };
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten! Nach der Zielwahl kann man dann nicht mehr abbrechen." Eine Attack mit Zielwahl
+    // (`requiresTarget`) bietet Pfeile/Magic Topaz/Bow of the Hunt Goddess nicht in diesem Fenster an, sondern erst nach der bestätigten Zielwahl (`engine._pfeilFensterNachZielwahl`); der Zustand dafür
+    // (`gs._pfeilFenster`) steht unten, sobald die Karte nicht in der Kette negiert wurde. Ohne Zielwahl (Flächen-/Ohne-Ziel-Attacks), ohne Helden oder über eine Kreatur gewirkt: wie bisher.
+    const _pfeileNachZiel = cardData.cardType === 'Attack' && script?.requiresTarget === true && !heroless && !_viaCreature && Number.isInteger(heroIdxPub) && heroIdxPub >= 0;
     let chainResult;
     try {
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx: heroIdxPub,
+      pfeileNachZielwahl: _pfeileNachZiel,
       resolve: null,
       // Handkarte des Initialglieds: fliegt beim AUFLOESEN des Glieds (nicht erst nach der ganzen Aufloesung). Nur eigene Karten aus der Hand (keine Creation-Karte, keine fremde Herkunft).
       handFlug: (() => {
@@ -9458,6 +9445,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // follow-up attack this turn would inherit them.
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
+        _pfeilAufraeumen();
       } else if (cardData.cardType === 'Spell') {
         await room.engine.zaehleAlsArt('spell', { pi, heroIdx: heroIdxPub, heroOwner, name: cardName, karte: true });   // W36a: EIN Zählschritt für jede gespielte Spell-Karte (wie die Attack-Karten)
       }
@@ -9477,6 +9465,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._spellDamageLog = [];
     gs._spellExcludeTargets = [];
     gs._spellCancelled = _kostenAbbruch;   // Z7c
+    // 17.11.2026 (ARW-01): die Attack wurde nicht negiert/fizzelt nicht — das Pfeil-Fenster wartet auf die Zielwahl (`engine._zielwahlAbschliessen`, Rueckfall `_fireAttackDeclare`).
+    if (_pfeileNachZiel && !_gefizzelt && !_kostenAbbruch) gs._pfeilFenster = { cardName, owner: pi, heroIdx: heroIdxPub, casterOwner: heroOwner, geoeffnet: false };
 
     // (W63d: vorgemerkt wird oben, vor der Kostenwahl. Ist inzwischen etwas dazwischengekommen, das die Vormerkung verbraucht hat — z. B. das Reaktionsfenster des Gegners —,
     //  bleibt es dabei: der Auftritt ist dann längst gezeigt.)
@@ -9495,9 +9485,6 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.maybeFireCpuRevealEarly();
     // Z1 (R02-21): Wirker-Seite auch um den onPlay-Lauf stempeln (vorher nur um die Kette) - sonst liest
     // `effectiveSchoolLevelForCaster` (ohne 4. Argument) die Zonen des gleich indizierten EIGENEN Helden.
-    // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
-    // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
-    const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
     let _wisdomVorab = false;   // die Karte hat ihre Wisdom-Kosten selbst schon gezahlt (`engine.zahleOffeneWisdom`)
     if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
@@ -9570,6 +9557,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // v1313: gerettetes Opfer (Barrier of Undying) → der Spell fizzelt,
     // ist aber GESPIELT — kein Abbruch, keine Rueckgabe auf die Hand.
     if (room.engine.nimmOpferFizzle()) delete gs._spellCancelled;
+    // ★ 17.11.2026 (ARW-01): sobald das Pfeil-Fenster nach der Zielwahl offen war, gibt es keinen Abbruch mehr — Pfeile/Gold sind verbraucht, die Attack ist gespielt (spaetere Abbrueche der
+    // Skripte lassen nur den restlichen Effekt aus, geben die Karte aber nicht auf die Hand zurueck).
+    if (gs._pfeilFenster?.geoeffnet && gs._spellCancelled) delete gs._spellCancelled;
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
       // Player aborted the spell mid-resolve (target cancel, etc.) —
@@ -9591,6 +9581,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
       }
+      _pfeilAufraeumen();
       // Roll back ALL action-economy bookkeeping — the Spell never
       // resolved, so the Action resource wasn't actually spent. Without
       // this, a cancelled action-2 attempt leaves _actionsPlayedThisPhase
@@ -9714,18 +9705,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
       _wisdomBezahlt = true;
     }
-    // ★ Z7b (Als Entscheidung, Welle 3): ob der Slot verbraucht ist, hängt daran, ob die Karte AUFLÖSEN
-    // durfte. GANZ negiert nach der Zielwahl („Negate that Spell": MOE Shield, Storm Ring, Invisibility
-    // Cloak, Frost Rune, Flooding …) → Stempel zurück (bezahlte Kosten bleiben bezahlt), kein
-    // `afterSpellResolved`. Nur Ergebnis verhindert (Schadens-/Teil-Negierung wie Test Flight,
-    // Fizzle v1328) → verbraucht; Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
-    const _ganzNegiert = !!(gs._spellNegatedByEffect && gs._negationWhole);
-    if (_ganzNegiert) room.engine._stempelZurueck(_stempelVorher);
-    else if (gs._spellNegatedByEffect && !_gefizzelt && Number.isInteger(heroIdx) && heroIdx >= 0
-             && cardData.cardType === 'Spell') {
-      await room.engine._meldeZauberVerhindert(pi, cardName, heroIdx, heroOwner);
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem BEGINN der Aktivierung verbraucht — auch wenn der Zauber nach der Zielwahl GANZ negiert wird („Negate that Spell":
+    // MOE Shield, Storm Ring, Invisibility Cloak, Frost Rune, Flooding …) oder nur sein Ergebnis verhindert wird (Schadens-/Teil-Negierung wie Test Flight, Fizzle v1328). Die Stempel aus dem
+    // `onPlay` bleiben, bezahlte Kosten bleiben bezahlt (früher Z7b: `_stempelZurueck`); kein `afterSpellResolved`, Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
+    // Negation nach der Zielwahl: `onPlay` ist früh ausgestiegen — Marken, die er sonst erst NACH der Zielwahl setzt, meldet die Karte über `onFizzledPlay` (idempotent, `_noteFizzledPlay`).
+    if (gs._spellNegatedByEffect && !_gefizzelt) {
+      await room.engine._noteFizzledPlay(pi, cardName, heroIdx, cardData.cardType, heroOwner, { viaAdditionalProvider: additionalConsumed ? consumedInst : null });   // Friendship: „then draw" trotz Negation
     }
-    if (!_ganzNegiert && cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug (ganz negiert stempelt nicht, Z7b)
+    if (cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
     if (!gs._spellNegatedByEffect) {
       // Per-player, whole-game record of Spell names whose effect has
       // successfully resolved (negated Spells are excluded — we're
@@ -9766,6 +9753,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Held der Gegenseite hat angegriffen" unterscheiden.
         heroOwner,
         spellName: cardName, spellCardData: cardData, heroIdx: _hookHeroIdx, casterIdx: pi,
+        // Spielgestalter-Entscheidung 17.11.2026 (Clone × Teleport): „Es gilt zum Zeitpunkt des Wirkens, also VOR dem Tausch" — `heroIdxWirkzeit` ist der Platz des Wirkers VOR der Auflösung
+        // (bei Teleport ≠ `heroIdx`). Spaltengebundene Kreaturen (Clone: „when the corresponding Hero uses …") vergleichen damit.
+        heroIdxWirkzeit: heroIdxPub,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         // The provider instance whose additional-action token was just
         // consumed by THIS spell-play, or null if the spell was cast as
@@ -9800,6 +9790,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
       await clearArmedArrows(room.engine, pi);
     }
+    _pfeilAufraeumen();
 
     await room.engine.resolveDeferredRecoil();
     await room.engine._executeDeferredSurprises();
@@ -10134,7 +10125,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
     delete gs._preventPhaseAdvance;
 
-    if (script?.oncePerGame && !_ganzNegiert) {   // Z7b: ganz negiert = nie aufgeloest
+    if (script?.oncePerGame) {
       const opgKey = script.oncePerGameKey || cardName;
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add(opgKey);
@@ -10155,6 +10146,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // this is a no-op if resolution already released normally above. Only
     // fires on error / early returns that skipped the explicit release.
     _releaseSpellDepth();
+    _pfeilAufraeumen();   // 17.11.2026 (ARW-01)
     // Always clear the spell-caster animation override so it never
     // leaks into a subsequent cast.
     if (gs._spellCasterOverride) delete gs._spellCasterOverride;
@@ -10272,10 +10264,9 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
-  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Kreatur ODER ihr Wirtsheld geblendet + Zielwahl-Effekt `requiresTarget`).
-  // Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
-  if (!anyPlayer && script.requiresTarget === true
-      && (room.engine._isCreatureBlinded(inst) || room.engine._isHeroBlinded(heroOwner, heroIdx))) return false;
+  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Spielgestalter-Entscheidung 16.11.2026: Kreatur ODER ihr Wirtsheld geblendet UND der Effekt kann NUR
+  // gegnerische Ziele wählen — `blindedKreaturGesperrt`). Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
+  if (!anyPlayer && room.engine.blindedKreaturGesperrt(inst, pi, effectName, script)) return false;
   // ★ EINMAL PRO SPIEL FUER DEN EFFEKT (v1030, Als Auftrag 12.9.).
   // Eigener Schluessel (`effect:…`), damit „1 Beschwoerung je Partie"
   // und „1 Aktivierung je Partie" nebeneinander stehen koennen.
@@ -10413,6 +10404,39 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     gs._pendingCardReveal = { cardName: creatureName, ownerIdx: pi };
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026 — Effekte mit MEHREREN, je für sich einmal-pro-Zug-begrenzten Modi (Analyzer, Gatherer, Sparkfly Queen; optionaler Skript-Vertrag `waehleModus`):
+    // der Modus wird VOR dem Kettenfenster gewählt. Eine Negation der Aktivierung (Kette oder nach der Zielwahl) verbraucht dann genau diesen Modus (`stempelNegierteAktivierung`); ohne Vorwahl
+    // ließe sich der negierte Modus nicht zuordnen. Abbruch der Modus-Wahl = Abbruch vor dem Beginn: nichts verbraucht (Gerrymander-Veto wie bisher verbraucht).
+    let _modus;
+    if (typeof script.waehleModus === 'function') {
+      const _modusCtx = room.engine._createContext(inst, {});
+      room.engine._promptCardStack.push(inst.name);
+      try { _modus = await room.engine._alsAkteur(_modusCtx, () => script.waehleModus(_modusCtx)); }
+      finally { room.engine._promptCardStack.pop(); }
+      if (_modus == null || _modus === false) {
+        room.engine.beendeDarkDeal(inst);
+        if (charmedHeroCreature) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        } else if (isStolenByPi) {
+          delete inst.heroOwner;
+        }
+        delete gs._pendingCardReveal;
+        delete gs._pendingPlayLog;
+        if (room.engine._lastPromptGerryDeclined) {
+          room.engine._lastPromptGerryDeclined = false;
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+          room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+        } else if (consumedAdditionalCreatureInst) {
+          room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
+        }
+        for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+        return true;
+      }
+    }
+
     // Open a reaction window around the creature-effect activation so
     // Reaction Artifacts that target THIS event (Gigantisaur Skull) can
     // chain in. `cardType: 'CreatureEffect'` keeps existing reactions
@@ -10438,7 +10462,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     // Negation path — Spearman / Skull negate the activation. Refund any
     // consumed additional-action provider and bail without running the
-    // script's onCreatureEffect. Z7b: no HOPT stamp (the effect never resolved).
+    // script's onCreatureEffect. The Einmal-Limits are used up (stamped below).
     if (creatureEffectChainResult?.negated) {
       room.engine.beendeDarkDeal(inst);
       if (charmedHeroCreature) {
@@ -10453,17 +10477,16 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       if (consumedAdditionalCreatureInst) {
         room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
-      // ★ Z7b (C01-12, Als Entscheidung, Welle 3): die GANZ negierte Aktivierung (Spearman …) hat nie
-      // aufgelöst — weder die Rundensperre (HOPT) noch eine Nutzung bei „up to N times per turn"
-      // (3-Headed Giant, `chargesPerTurn`) ist verbraucht; bezahlte Kosten bleiben bezahlt.
-      // (Früher: Z7 stempelte, vorher die Rundensperre ganz.)
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Spearman …) verbraucht die Rundensperre (HOPT), „1 pro Spiel" und bei
+      // „up to N times per turn" (3-Headed Giant, `chargesPerTurn`) eine Nutzung; bezahlte Kosten bleiben bezahlt. (Früher Z7b: ganz negiert = nie aufgelöst = nichts verbraucht.)
+      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { modus: _modus });
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
-    const ctx = room.engine._createContext(inst, {});
+    const ctx = room.engine._createContext(inst, _modus != null ? { modus: _modus } : {});
     // Mark this Creature as the ambient prompt source so any confirm /
     // optionPicker its activated effect opens via promptGeneric shows its
     // image (general "which card is prompting" rule; ctx helpers already
@@ -10504,6 +10527,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     const _vorigerCasterCreature = gs._spellCasterCreature;
     gs._spellCasterCreature = inst;
     let resolved;
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
@@ -10600,11 +10624,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them. Stamp HOPT so
       // the activation can't be retried this turn.
+      const _negZiele = room.engine.negiertSeit(_negStand);
       if (room.engine._lastPromptGerryDeclined) {
         room.engine._lastPromptGerryDeclined = false;
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      } else if (_negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Rolling Boulder, Frost Rune, Chaorc Interception, Cool Tech Jetpack …; der Picker lieferte
+        // `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei der Negation in der Kette sind die Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung);
+        // der Zusatzaktions-Geber wird wie dort zurückgegeben.
+        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele, modus: _modus });
+        if (consumedAdditionalCreatureInst) room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       } else if (consumedAdditionalCreatureInst) {
         // Standard cancel — refund the additional-action provider
         // consumed upfront. The action-counter increment / heroesActedThisTurn
@@ -10679,7 +10710,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
   // fallback covers puzzle setups: puzzle-placed Cardinals never
   // fire their onPlay, so `_cardinalImmune` is unset, and the
   // counter check alone would let them be stolen.
-  const { CARDINAL_NAMES } = require('./cards/effects/_cardinal-shared');
+  const { cardinalNameImmun } = require('./cards/effects/_cardinal-shared');
   let stolenCount = 0;
   for (const inst of room.engine.cardInstances) {
     if (inst.zone !== 'support') continue;
@@ -10688,7 +10719,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
     if (inst.stolenBy != null) continue;
     if (inst.counters?._cardinalImmune) continue;
     if (room.engine.kreaturGegnerEffektImmun(inst, pi)) continue;   // W17b: Golden Wings (eigene Marke `_gwImmune`)
-    if (CARDINAL_NAMES.includes(inst.name)) continue;
+    if (cardinalNameImmun(room.engine, inst)) continue;   // Spielgestalter-Entscheidung 16.11.2026: eine negierte Omikron-Illusion ist nicht immun
     // Restrict to Creature card type. Equipment / token instances
     // shouldn't be stealable, even if some future card flagged them
     // as supportable.
@@ -10794,6 +10825,8 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
@@ -10857,7 +10890,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   try {
     // v353: `'board'` — eine Ability liegt im Ability-Slot am Brett,
     // beide Seiten sehen den Auftritt.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');   // v349
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // v349; Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
@@ -10878,9 +10911,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       // sonst sieht der Gegner nie, WAS seine Negation getroffen hat.
       room.engine.announceActiveEffect();
       room.engine.clearEffectAnnounce();
-      // ★ Z7b (Als Entscheidung, Welle 3): GANZ negiert (Master's Plan, Cybug LADYBUG …) = die
-      // Aktivierung hat nie aufgelöst → die Rundensperre wird freigegeben (Auftritt/Kosten bleiben).
-      releaseHopt();
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Master's Plan, Cybug LADYBUG …) behält die Rundensperre
+      // (vorab gestempelt, siehe oben); Auftritt/Kosten bleiben. Nur Abbruch/Fehler geben sie frei. (Früher Z7b: ganz negiert = Sperre frei.)
+      hoptReserved = false;
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -10920,6 +10953,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): die Kette hat die Stufe gesenkt → die Auflösung ist Pflicht (kein Abbrechen)
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     const resolved = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, aufLevel)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
@@ -10997,6 +11031,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
         hoptReserved = false;
         if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
         room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert (Zielfenster-Reaktion/-Surprise/-Wächter) ist kein Abbruch durch den Spieler — die Rundensperre bleibt verbraucht,
+        // wie bei der Negation in der Kette (oben).
+        hoptReserved = false;
       } else {
         releaseHopt();
       }
@@ -11715,6 +11753,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -11824,6 +11864,19 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     return false;
   }
   let _heroCostFinalized = false;
+  // Ausgang einer NEGIERTEN Aktivierung (Kette/Surprise-Fenster ODER Negation nach der Zielwahl): Helden-Vorkosten zurück (Saint Nicolas behält den markierten Trank), eine ZUSATZaktion bleibt
+  // unverbraucht (Anbieter zurück, Aktionszähler zurückgedreht), die Hauptaktion bleibt — wie bei jeder negierten Karte — verbraucht.
+  const negierterAusgang = async () => {
+    await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+    _heroCostFinalized = true;
+    if (consumedAdditionalInst) {
+      // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+      // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+      room.engine.restoreAdditionalAction(consumedAdditionalInst);
+      if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+    } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+  };
 
   try {
     // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
@@ -11840,7 +11893,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
     // Luecke, keine Absicht. `'board'`: beide Seiten sehen sie.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
@@ -11860,19 +11913,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: gefeuert und gekontert = gespielt
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
-      // ★ Z7b: ganz negiert = nie aufgelöst → die Rundensperre (oben vorab gestempelt) wird frei.
-      if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
-      // Negated — refund the Hero pre-action cost (Saint Nicolas
-      // keeps the marked Potion).
-      await room.engine.refundHeroActionCost(heroOwner, heroIdx);
-      _heroCostFinalized = true;
-      if (consumedAdditionalInst) {
-        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
-        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
-        room.engine.restoreAdditionalAction(consumedAdditionalInst);
-        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
-        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
-      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+      // ★ Spielgestalter-Entscheidung 16.11.2026: negiert = Aktivierung begonnen → die Rundensperre (oben vorab gestempelt) bleibt verbraucht.
+      // Negated — refund the Hero pre-action cost (Saint Nicolas keeps the marked Potion); Zusatzaktion/Hauptaktion s. `negierterAusgang`.
+      await negierterAusgang();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -11907,6 +11950,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): gesenkte Auflösung = Pflicht, kein Abbrechen
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let result = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onActivate(ctx, aufLevel)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
@@ -11944,6 +11988,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
           room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
         }
         room.engine._lastPromptGerryDeclined = false;
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch durch den Spieler — die Rundensperre (oben vorab gestempelt) bleibt verbraucht und der Ausgang ist
+        // derselbe wie bei der Negation in der Kette (`negierterAusgang`).
+        await negierterAusgang();
       } else {
         // Player cancelled — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(heroOwner, heroIdx);
@@ -12162,6 +12210,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       script: { heroEffect: `Remove ${trueFormRevert.formName} (discard pile) and return to ${trueFormRevert.baseName}.` },
     });
   }
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg (wie `getActiveHeroEffects`) — ein Effekt, der nur gegnerische Ziele waehlen kann, faellt aus der Auswahl.
+  for (let i = availableEffects.length - 1; i >= 0; i--) {
+    const e = availableEffects[i];
+    if (!e.trueFormRevert && room.engine.blindedEffektGesperrt(pi, heroOwner, heroIdx, e.name, { script: e.script })) availableEffects.splice(i, 1);
+  }
   if (availableEffects.length === 0) return false;
 
   // ── Re-entry guard ─────────────────────────────────────────────────
@@ -12372,6 +12425,7 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
 
   const perm = (ownerPs.permanents || []).find(p => p.id === permId);
   if (!perm) return false;
+  if (perm.teleportalUntil != null) return false;   // Teleportal: die wartende Karte ist inert, bis sie auf der Hand liegt und gespielt wird
 
   const script = loadCardEffect(perm.name);
   if (!script?.canActivatePermanent || !script?.onActivatePermanent) return false;
@@ -12529,6 +12583,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
   if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg — gesperrt nur, wenn der Traeger-Held (Kontrolleur `pi`) den Effekt nur gegen Gegner richten koennte.
+  if (!_crossInst && room.engine.blindedEffektGesperrt(pi, _brett, heroIdx, inst.counters?._effectOverride || cardName, { script })) return false;
   // W27a (Al, 21.10.2026): Spell-Anhängsel (Prayer) liegen bei Frozen/Stunned nicht still; W29a (Al, 21.10.2026: „Webbed negiert NICHT Attachments!"): auch nicht bei Webbed.
   if (!script.bypassHostStatusFilter) {
     const _anhaengsel = room.engine._istSpellAnhaengsel(inst);
@@ -12573,7 +12629,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
     // v353: Auftritt — das Artefakt liegt ausgeruestet am Brett
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
-    room.engine.armEffectAnnounce(cardName, pi, 'board');
+    room.engine.armEffectAnnounce(cardName, pi, 'board', _crossInst ? undefined : { seite: _brett, heroIdx });
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
@@ -12590,6 +12647,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
         room.engine._lastPromptGerryDeclined = false;
         hoptReserved = false; // keep HOPT consumed
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, equip: cardName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Zielfenster-Reaktion/-Surprise/-Wächter: Cool Tech Jetpack, Rolling Boulder, Glass Wall …;
+        // der Picker lieferte `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei Kreatur-/Helden-/Ability-Aktivierungen ist die Einmal-pro-Zug-Sperre verbraucht.
+        // (Ausrüstungs-Effekte haben kein Kettenfenster; Abbruch/„Nein" gibt die Sperre weiter frei.)
+        hoptReserved = false; // keep HOPT consumed
       } else {
         releaseHopt();
       }
@@ -12674,7 +12736,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
 
-  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation } = gs.potionTargeting;
+  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation, config: _ptConfig } = gs.potionTargeting;
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
   if (script.validateSelection && !script.validateSelection(selectedIds, validTargets, room.engine, pi)) return false;   // W29a: Engine/Spieler fuer Paarregeln (Sword in a Bottle × Alliance)
@@ -12701,11 +12763,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   //   Als Befund vom 31.8. (Book of Doom auf 1 Ziel: Monia Bot meldet
   //   sich; auf 2+: gar nichts). Die Schleife ueber alle gewaehlten
   //   Ziele steht jetzt EINMAL in `engine.applyRedirectWindows`.
-  if (!script.cannotBeRedirected) {
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — auch eine Quelle mit `cannotBeRedirected` (Acid Vial) oeffnet das Fenster: die Umleiter werden angeboten
+  // (Hinweis in der Frage), die Umleitung selbst findet nicht statt (`config.cannotBeRedirected` → `_noRedirectOutcome` in `_checkTargetRedirectOnce`).
+  {
     const srcInst = { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' };
     try {
       selectedIds = await room.engine.applyRedirectWindows(
-        selectedIds, validTargets, { title: potionName, sourceCard: srcInst }, srcInst
+        selectedIds, validTargets, { title: potionName, sourceCard: srcInst, ...(script.cannotBeRedirected ? { cannotBeRedirected: true } : {}) }, srcInst
       );
     } catch (err) {
       console.error('[Engine] targeting-session redirect error:', err.message);
@@ -12810,6 +12874,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // Als Ruling (Al 26.10., Winged Skeleton): auch die GEWÄHLTEN KREATUREN eines Ziel-Tranks/-Artefakts öffnen das Wahl-Fenster der Kreaturen-Reaktionen (negiert: die Karte ist gespielt, wirkt aber nicht).
         const _kreaturWahl = await room.engine.kreaturenWahlFenster(pi, selectedIds, validTargets, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });
         if (_kreaturWahl?.effectNegated) return {};
+        // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — geschuetzte Ziele sind waehlbar und verpuffen: sie fallen aus der Auswahl; bleibt nichts uebrig, wirkt die Karte nicht (gespielt, bezahlt).
+        const _ftAuswahl = room.engine._ersterZugZielAbziehen(pi, validTargets, selectedIds, _ptConfig || {});
+        if (_ftAuswahl.abgezogen) {
+          if (_ftAuswahl.ids.length === 0) return {};
+          selectedIds = _ftAuswahl.ids;
+        }
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });
@@ -12869,6 +12939,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     }
     // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): die neu aufgebaute Liste der erneut geöffneten Zielwahl läuft sonst am Taunt vorbei (`normalizeValidTargets` wurde hier nie gerufen).
     if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });   // W43a: Quelle = die Karte der Zielwahl (Taunt nur für Attack/Spell/Creature effect)
+    if (Array.isArray(freshTargets) && typeof room.engine.ersterZugHinweisSetzen === 'function') room.engine.ersterZugHinweisSetzen(freshTargets, pi, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel
     gs.potionTargeting = {
       potionName, handIndex,
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
@@ -13236,20 +13307,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
       && typeof engine.filterSelbstKontrollierteGegnerHelden === 'function') {
     engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName);
   }
-  // Erst-Runden-Immunität — Gegenstück zum Filter in
-  // `promptEffectTarget`. Targeting-Karten (getValidTargets +
-  // targetingConfig) laufen NICHT durch diesen Prompt, sondern über die
-  // potionTargeting-Session, also muss die Regel auch hier greifen.
-  const ftProtected = engine?.gs?.firstTurnProtectedPlayer;
-  if (ftProtected != null && casterPi !== ftProtected
-      && !config?.ignoreFirstTurnProtection) {
-    for (let i = validTargets.length - 1; i >= 0; i--) {
-      const t = validTargets[i];
-      const inst = t?.cardInstance || t?._cardInstance;
-      const side = inst ? (inst.controller ?? inst.owner) : t?.owner;
-      if (side === ftProtected) validTargets.splice(i, 1);
-    }
-  }
+  // Erst-Runden-Immunität — Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Die Ziele des Geschützten bleiben in der Liste (früher hier entfernt, ebenso
+  // ausgegraut in `promptEffectTarget`): wählbar, der Effekt verpufft — `doConfirmPotion` zieht sie nach der Wahl ab (`engine._ersterZugZielAbziehen`, Karte gespielt/bezahlt, keine Wirkung).
   for (const t of validTargets) {
     if (t?.type !== 'equip') continue;
     const inst = t.cardInstance;
@@ -13361,6 +13420,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     }
     for (const t of geblockt2) t.ineligible = true;
   }
+  // Spielgestalter-Entscheidung 17.11.2026 (Warntext am Ziel): waehlbare Ziele des Erste-Runden-Geschuetzten tragen `hinweis` (nur der Client zeigt ihn, solange das Ziel angewaehlt und unbestaetigt ist).
+  if (engine && typeof casterPi === 'number' && typeof engine.ersterZugHinweisSetzen === 'function') engine.ersterZugHinweisSetzen(validTargets, casterPi, config);
   return validTargets;
 }
 

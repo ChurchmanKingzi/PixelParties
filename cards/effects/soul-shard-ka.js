@@ -185,6 +185,7 @@ module.exports = {
         {
           source: CARD_NAME,
           isPlacement: true,
+          alsBeschwoerung: true,   // summon as an additional Action: Beschwörungs-Voraussetzungen (Spirit-Ausrüstung) gelten (NECRO-02, Spielgestalter-Entscheidung 17.11.2026)
           ...(chosenHost.owner !== pi ? { controller: pi } : {}),   // Kontrolle statt Seite (Styx 28.9.)
           hookExtras: {
             ...engine.deckHookExtras(),

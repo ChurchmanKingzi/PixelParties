@@ -50,6 +50,8 @@ const PEEK = 5;
 function gegner(engine, pi) { return engine.opponentOf(pi); }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['support'],
   // Pflichtfahne: ohne sie haelt der Loader ein Skript ohne `hooks` fuer
   // leer und verwirft es ganz (Cannon-Tower-Bauart).
@@ -61,7 +63,8 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const oi = gegner(engine, pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — aktivierbar, verpufft in `onCreatureEffect`.)
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     return (gs.players[oi]?.mainDeck || []).length > 0;
   },
 
@@ -73,7 +76,7 @@ module.exports = {
     const ps = gs.players[pi];
     const ops = gs.players[oi];
     if (!ps || !ops) return false;
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    if (gs.firstTurnProtectedPlayer === oi) { engine.log('informant_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return true; }   // Spielgestalter-Entscheidung 16.11.2026: verpufft (Einsatz verbraucht)
 
     const anzahl = Math.min(PEEK, (ops.mainDeck || []).length);
     if (anzahl === 0) return false;

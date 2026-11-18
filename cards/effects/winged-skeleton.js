@@ -13,7 +13,7 @@
 //     Ein Flächenschlag („all targets": Flame Avalanche, Hole in the Sky, Heat Wave …) WÄHLT niemanden — er öffnet das Fenster nur mit `_isAoeCheck` bzw. ohne
 //     Auswahl-Ziele (kein `cardInstance`) und lässt die Karte schweigen (CARD_API „Ein Flächenschlag WÄHLT niemanden").
 //   • GANZER EFFEKT: die Rückgabe liefert `{ effectNegated: true }` — wie bei Anti Magic Shield & Co. bricht die auswählende Karte/der Effekt ab, auch die übrigen
-//     gewählten Ziele (Helden, andere Kreaturen) werden nicht mehr getroffen. `negatesWholeCard`: die gewirkte Karte löst nie auf (Einmal-Stempel zurück).
+//     gewählten Ziele (Helden, andere Kreaturen) werden nicht mehr getroffen. `negatesWholeCard`: die gewirkte Karte löst nie auf (Einmal-Stempel bleiben verbraucht).
 //   • Bisher lauschte die Karte an `beforeCreatureAffected` / `beforeCreatureDamageBatch` und negierte nur den Treffer auf das Skelett (bei Mehrzielwahl blieben die
 //     anderen Ziele getroffen) — und feuerte bei einem Flächenschlag, der zufällig nur ein Skelett traf. Beide Hooks sind weg.
 //
@@ -95,7 +95,7 @@ function gewaehlteSkelette(engine, pi, targets) {
 }
 
 module.exports = {
-  // „negate the card or effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben (Engine: `_merkeGanzeNegation`).
+  // „negate the card or effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026).
   negatesWholeCard: true,
 
   activeIn: ['support'],

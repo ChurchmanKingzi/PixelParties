@@ -48,6 +48,9 @@
 //      für Schaden, den ein anderer Effekt per `cannotBeReduced` schützt (Ida, Club of Gobbo).
 //      NICHT umleitbar: Quellen mit `cannotBeRedirected` (Acid Vial, Glasowt: „cannot be
 //      reduced, redirected or negated") — Konvention wie bei Mean Cute Cat.
+//    • ★ Spielgestalter-Entscheidung 17.11.2026: Gegen Quellen, auf die der Gegner nicht
+//      reagieren darf („cannot be reacted to": Surefire Shot, Midnight Assault — `engine._reaktionGesperrt`),
+//      wird die Umleitung der Haelfte NICHT angeboten.
 //    • HOPT key: `johanna_redirect:<ownerIdx>:<heroIdx>`.
 //      Per-instance (each Johanna copy is
 //      independent — multi-Johanna setups are rare
@@ -177,11 +180,14 @@ async function _heldUmleitung(ctx, istTrue) {
   const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
   if (!_johannaActive(johannaHero)) return;
   if (johannaHero === target) return; // self-target — no redirect
+  // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag Johanna ohnehin selbst (Fireball auf Johanna UND einen anderen Helden), wird nichts auf sie umgeleitet.
+  if (engine.schlagTrifftZiel(johannaHero)) return;
 
   // Target must be another Hero Johanna's CONTROLLER controls.
   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Ziels
   // nur noch fuer Animation/Index.
   const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
+  if (engine._reaktionGesperrt(ctrl)) return;   // „cannot be reacted to" (Surefire Shot): kein Angebot (Spielgestalter-Entscheidung 17.11.2026)
   const tgtOwner = engine._findHeroOwner(target);
   if (tgtOwner < 0 || engine.heroSideOf(tgtOwner, target) !== ctrl) return;
 
@@ -321,8 +327,10 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): „target you control" meint
       // Johannas Kontrolleur; auch die Einmal-Sperre liegt bei ihm.
       const ctrl = engine.heroSideOf(ownerIdx, johannaHero);
+      if (engine._reaktionGesperrt(ctrl)) return;   // „cannot be reacted to" (Surefire Shot): kein Angebot (Spielgestalter-Entscheidung 17.11.2026)
       const hoptKey = heldenSperreKey('johanna_redirect', ctrl);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+      if (engine.schlagTrifftZiel(johannaHero)) return;   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer (derselbe Mehrziel-Schlag trifft Johanna ohnehin selbst)
       const entries = ctx.entries || [];
       for (const e of entries) {
         if (gs.hoptUsed?.[hoptKey] === gs.turn) break; // accepted earlier

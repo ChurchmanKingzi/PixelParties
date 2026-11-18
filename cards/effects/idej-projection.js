@@ -70,6 +70,8 @@ module.exports = {
   },
 
   hooks: {
+    /** True Damage (Rockfall, Pressure Projectile, Acid Vial): dieselbe Funktion — Angebot ja, Wirkung nein (s. unten). */
+    beforeTrueDamage: async (ctx) => (ctx._engine._reaktionGesperrt?.(ctx.cardController ?? ctx.cardOwner) ? undefined : module.exports.hooks.beforeDamage(ctx)),   // „cannot be reacted to" (Surefire Shot): kein Angebot
     beforeDamage: async (ctx) => {
       if (ctx.cancelled) return;
       if (ctx.cardZone !== 'support') return;       // only while attached
@@ -78,16 +80,10 @@ module.exports = {
       if (ctx.target !== hero) return;              // the host Hero must be the target
       if (!(ctx.amount > 0)) return;                // "would take any damage"
 
-      // Piercing damage (Ida's Destruction Spells, future
-      // `cannotBeNegated` sources) bypasses Idej Projection. Bail
-      // BEFORE prompting / paying the discard cost — the engine has a
-      // universal safety net that undoes a beforeDamage cancellation
-      // under cannotBeNegated, but the player would still lose their
-      // Projection to a no-op trade. Same for `cannotBeReduced`-only
-      // sources (current card text reads "cannot be reduced OR
-      // negated" together; treat either as piercing for the
-      // Projection's negation lever).
-      if (ctx.cannotBeNegated || ctx.cannotBeReduced) return;
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Gegen durchschlagenden Schaden (Ida's Destruction Spells, True Damage: Rockfall, Pressure
+      // Projectile, `cannotBeNegated`) wird die Projection trotzdem angeboten (Hinweis in der Frage, die CPU waehlt es nicht): bezahlt/abgeworfen wird wie immer, der Schaden geht durch
+      // (die Engine nimmt das Abbrechen bei `cannotBeNegated` zurueck, `piercing_override`).
+      const unnegierbar = !!ctx.cannotBeNegated;
 
       // Already-voided incoming damage (Anti Magic's `magic_immune`
       // covers this Spell, future similar voids) — bail without
@@ -118,8 +114,10 @@ module.exports = {
         type: 'confirm',
         title: CARD_NAME,
         message: `${hero.name || 'Your Hero'} would take ${ctx.amount} damage${fromText}. `
-          + 'Discard Idej Projection from it to negate that damage and all associated effects?',
+          + (unnegierbar ? `${engine._nutzlosHinweis({ cannotBeNegated: true, cannotBeReduced: ctx.cannotBeReduced }, 'damage')} Discard Idej Projection from it to negate that damage and all associated effects anyway?`
+            : 'Discard Idej Projection from it to negate that damage and all associated effects?'),
         showCard: showCardName,
+        ...(unnegierbar ? { _nutzlos: true } : {}),
         protMeta: { d: ctx.amount, hp: hero.hp, pi },
         confirmLabel: '🛡️ Negate!',
         cancelLabel: 'No',

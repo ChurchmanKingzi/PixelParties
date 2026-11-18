@@ -120,7 +120,12 @@ module.exports = {
 
       if (ziel.type === 'hero') {
         const held = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
-        if (held) held.hp = 1;
+        // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) — die HP werden nicht gesenkt (kein Rückstoß, wie bei der geschützten Kreatur unten);
+        // „Immediately end your turn" gilt weiter, der Zauber hat aufgelöst.
+        if (held) {
+          if (engine.hasEffectImmunity(ziel.owner, ziel.heroIdx, ctx.card)) { gesenkt = 0; engine.log('effect_immunity', { hero: held.name, source: CARD_NAME }); }
+          else held.hp = 1;
+        }
       } else {
         const inst = ziel.cardInstance || engine.findCards({
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,

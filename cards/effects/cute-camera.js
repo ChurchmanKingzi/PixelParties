@@ -12,11 +12,18 @@
 //  (Post-Target, vor/nach Schaden, Held/Kreatur besiegt … – KEINE
 //  Kette): Hook `onReactionPlayed` (Bauform Front Soldier, Weg ③;
 //  CARD_API „FRONT SOLDIER"). Die Kamera wird angeboten, wenn der
-//  GEGNER eine Reaction (Spell/Attack/Artifact – keine Creature) auf
-//  eine Karte/einen Effekt des Kamerabesitzers spielt (Quelle bekannt:
-//  `ctx.sourceOwner`; W26a: unbekannt = KEIN Angebot), und negiert sie
+//  GEGNER in IRGENDEINEM Hand-Reaktionsfenster eine Reaction
+//  (Spell/Attack/Artifact – keine Creature) spielt, und negiert sie
 //  (`_reactionNegated`). Kosten 4 Gold (+3: der Gegner kann nicht
 //  reagieren – dann ohne `onReactionPlayed` für die Kamera selbst).
+//
+//  ★ Spielgestalter-Entscheidung 16.11.2026 („Camera soll auf alle Fenster reagieren können, sofern dort eine Reaktion möglich war"):
+//  KEINE Quellenbedingung mehr. Der Hook verlangte seit W26a (Welle 26) eine bekannte Quelle des Fensters, die dem Kamerabesitzer gehört
+//  (`ctx.sourceOwner === pi`, „in reaction to YOUR card or effect"); damit blieb die Kamera in allen Fenstern ohne bekannte gegnerische
+//  Quelle stumm (Resource Phase, Potion Draw, nach Beschwörung, Aktionsphase des Gegners, Tod-Fenster ohne Verursacher …). Jetzt zählt
+//  jede vom Gegner gespielte Reaction, wo immer ein Fenster sie meldet (`_reaktionGespielt`, auch die sieben Fenster ohne Quelle).
+//  Front Soldier und Reverse Trap kannten die Bedingung nie. Kein Doppelangebot: am zentralen Kettenfenster wird die Kamera nicht
+//  noch einmal gefragt (`_zentralBasis`, siehe `_reaktionGespielt`).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Cute Camera';
@@ -43,9 +50,8 @@ module.exports = {
       if (ctx.reactionOwner == null || ctx.reactionOwner === pi) return;   // nur Reaktionen des GEGNERS
       if (ctx._reactionNegated) return;                                     // schon negiert (andere Kamera / Front Soldier)
       if (ctx.reactionCardType === 'Creature') return;                      // Text: „Reaction Spell or Artifact"
-      // W26a (Al, Welle 26): NUR in Reaktion auf eine gespielte Gegner-Reaktion, die deine Karte/deinen Effekt beantwortet: ist die Quelle des Fensters unbekannt
-      // (z. B. Tod-Fenster ohne bekannten Verursacher), gibt es kein Angebot.
-      if (!Number.isInteger(ctx.sourceOwner) || ctx.sourceOwner !== pi) return;   // „in reaction to YOUR card or effect"
+      // Spielgestalter-Entscheidung 16.11.2026: jede Reaction des Gegners zählt, auch wenn die Quelle des Fensters unbekannt ist oder nicht dem Kamerabesitzer gehört
+      // (die frühere W26a-Bedingung `ctx.sourceOwner === pi` entfällt, siehe Kopfkommentar).
       const inst = ctx.card;
       if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return;   // Hand oder Crestinas Vorrat
       const ps = gs.players[pi];
@@ -63,7 +69,7 @@ module.exports = {
         title: CARD_NAME,
         _handReactionWindow: true,
         _kameraHandFenster: true,
-        message: `Your opponent played "${ctx.reactionCardName}" in reaction to your card or effect. Play ${CARD_NAME} to negate it?`,
+        message: `Your opponent played the Reaction "${ctx.reactionCardName}". Play ${CARD_NAME} to negate it?`,
         showCard: CARD_NAME,
         confirmLabel: '📸 Negate!',
         cancelLabel: 'No',

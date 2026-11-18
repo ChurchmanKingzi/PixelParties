@@ -116,6 +116,8 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Ability (choose a … Creature your opponent controls) → nur gegnerische Ziele, unter Blinded nicht aktivierbar (Text, `_textVerlangtGegnerziel`).
+  requiresTarget: true,
   // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
   // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
   // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.

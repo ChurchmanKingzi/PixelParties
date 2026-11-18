@@ -100,12 +100,14 @@ module.exports = {
     return true;
   },
 
+  // Spielgestalter-Entscheidung 16.11.2026: „You can only play 1 per turn" gilt ab dem Ausspielen (vor dem Gegenreaktions-Fenster, auch bei Negation), nicht erst mit der Wirkung.
+  stempelBeiAktivierung(engine, pi) { stampHopt(engine.gs, pi); },
+
   async postSummonReactionResolve(engine, pi, summonedInst, hookCtx) {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return;
-    if (hoptUsed(gs, pi)) return;
-    stampHopt(gs, pi);
+    stampHopt(gs, pi);   // schon bei der Aktivierung gestempelt (`stempelBeiAktivierung`); die Bedingung hat die Sperre davor geprüft
 
     const cardDB = engine._getCardDB();
     const cd = cardDB[summonedInst.name];

@@ -56,6 +56,9 @@ function trappingStufe(engine, pi, heroIdx, seite) {
 /** Kann dieser Held die Karte jetzt wirken? Lebend, freie echte Surprise Zone, Karte im Deck. */
 function heldTauglich(engine, pi, heroIdx) {
   const gs = engine.gs;
+  // Spielgestalter-Entscheidung 17.11.2026 (Arcane Eyes): der ganze Nutzen der Karte ist das Setzen einer Surprise — unter wirksamen Arcane Eyes des Gegners
+  // ist sie gesperrt (grau, bleibt auf der Hand, keine Aktion, kein Stempel) statt wirkungslos spielbar.
+  if (engine.surprisesLockedFor(pi)) return false;
   const seite = engine.heldSeiteFuer(pi, heroIdx);
   const hero = gs.players[seite]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;

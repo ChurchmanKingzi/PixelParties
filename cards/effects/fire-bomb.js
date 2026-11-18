@@ -27,9 +27,9 @@ module.exports = {
     const engine = engineArg || gs._engineRef || null;
     for (let pi = 0; pi < gs.players.length; pi++) {
       const ps = gs.players[pi];
-      // First-turn protection: cannot target opponent's abilities for removal (generic rule)
-      // See Engine.isAbilityRemovalProtected() — use in any card that removes abilities
-      const isOpponentProtected = pi !== playerIdx && gs.firstTurnProtectedPlayer === pi;
+      // First-turn protection: (ehemals) cannot target opponent's abilities for removal.
+      // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — die Abilities des Erste-Runden-Geschuetzten sind waehlbar, das Zerstoeren verpufft (`actionDestroyCard`: `destroy_blocked`).
+      const isOpponentProtected = false;
 
       // Abilities — any non-empty ability zone, INCLUDING dead heroes'
       // zones. Per card text, Fire Bomb can target any Hero's Ability,
@@ -136,6 +136,16 @@ module.exports = {
         // Remove one copy from the ability zone stack
         const zone = (ps.abilityZones[t.heroIdx] || [])[t.slotIdx] || [];
         if (zone.length > 0) {
+          // Leafagami Snake: „When Abilities would be removed from Heroes you control, don't remove them and draw a card for each affected Ability instead" —
+          // die oberste Kopie bleibt liegen, der Kontrolleur der Schlange zieht 1 Karte (der Trank ist trotzdem verbraucht).
+          const _kopf = zone[zone.length - 1];
+          const _kopfInst = engine.cardInstances.find(c =>
+            c.owner === t.owner && c.zone === 'ability' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === _kopf
+          );
+          if (_kopfInst && await engine.abilityEntfernungVerhindert(_kopfInst, 'discard', { source: { name: 'Fire Bomb', owner: playerIdx } })) {
+            engine.log('destroy_blocked', { card: _kopf, by: 'Fire Bomb', reason: 'leafagami_snake' });
+            continue;
+          }
           const removed = zone.pop(); // Remove top copy
           // Find and fire leave hook on the card instance
           const inst = engine.cardInstances.find(c =>

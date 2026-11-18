@@ -26,7 +26,9 @@
 //    erst angeboten (sie wuerde nichts bewirken).
 //  • „max 120" — Deckel ab Level 4.
 //  • „You can only play 1 per turn" — HART, je Spieler (Wortlaut-Regel
-//    v249), gestempelt beim Aufloesen.
+//    v249), gestempelt mit der Aktivierung (`stempelBeiAktivierung`,
+//    Spielgestalter-Entscheidung 16.11.2026) — auch eine danach negierte
+//    Core Explosion ist verbraucht.
 //
 //  ── WIRKUNG ───────────────────────────────────────────────────────
 //  Flaechenschlag auf ALLE gegnerischen Ziele (Helden und Creatures)
@@ -92,6 +94,9 @@ module.exports = {
 
   // KEIN `isReaction` (sonst meldet sie sich im generischen Kettenfenster).
   isCreatureDefeatedReaction: true,
+
+  // Spielgestalter-Entscheidung 16.11.2026: die Rundengrenze gilt ab dem Ausspielen (vor dem Gegenreaktions-Fenster), nicht erst mit der Wirkung.
+  stempelBeiAktivierung(engine, pi) { engine.claimHOPT('core-explosion', pi); },
 
   creatureDefeatedCondition(gs, pi, engine, deathInfo, source) {
     if (!deathInfo) return false;

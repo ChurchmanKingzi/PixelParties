@@ -326,6 +326,7 @@ async function sacrificeSwapAtomar(ctx) {
     source: { name: CARD_NAME, owner: pi, heroIdx },
     _skipReactionCheck: true,
   });
+  engine.opferExtraLebenVormerken(occ, { heroIdx, zoneSlot: slotIdx });   // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life des Geopferten
   engine._untrackCard(occ.id);
 
   // (6) Suspicious Monster's own on-summon lifecycle.
@@ -450,6 +451,7 @@ module.exports = {
       source: { name: CARD_NAME, owner: pi, heroIdx },
       _skipReactionCheck: true,
     });
+    engine.opferExtraLebenVormerken(occ, { heroIdx, zoneSlot: slotIdx });   // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life des Geopferten
     engine._untrackCard(occ.id);
     return { kind: 'swap', heroIdx, slotIdx, heroOwner, occName };
   },

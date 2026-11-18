@@ -110,7 +110,8 @@ module.exports = {
       player: gs.players[pi]?.username, hero: hero?.name || ziel.cardName,
       negated: sourceCard?.name || 'an Attack or Spell',
     });
-    engine.grantEffectImmunity(seite, hi, sourceCard);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(seite, hi, sourceCard, { ueberFenster: true });
     engine.sync();
     return {};
   },

@@ -3,8 +3,11 @@
 //  Potion — All Heroes the opponent controls are
 //  Blinded until the end of YOUR next turn.
 //
-//  Blinded silences targeted Attacks / Spells /
-//  effects but lets full-AoE plays through.
+//  Blinded: „Cannot choose a target the opponent
+//  controls with Attacks, Spells or effects."
+//  (Spielgestalter-Entscheidung 16.11.2026) — gilt fuer
+//  alle Effekte; Effekte ohne Zielwahl ignorieren es
+//  (CARD_API „Blinded").
 //  Duration is "until the end of the caster's
 //  next turn". Buff/status expiry runs at
 //  TURN-START only (_processBuffExpiry), and

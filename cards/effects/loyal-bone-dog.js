@@ -55,8 +55,10 @@ module.exports = {
   // Engine flag — surfaces this card in the creature pre-defeat hand
   // reaction window.
   isCreaturePreDefeatReaction: true,
-  // Welle 10 (Al, Q37 / A06-rebelliokai-02: „Zerstören ja, opfern nein“): Bone Dog wird auch gegen ZERSTÖREN-Effekte angeboten
-  // (zusätzlich zu tödlichem Schaden), aber nicht gegen ein Opfer (`info.isSacrifice`, siehe Bedingung).
+  // Welle 10 (Al, Q37 / A06-rebelliokai-02): Bone Dog wird auch gegen ZERSTÖREN-Effekte angeboten (zusätzlich zu tödlichem Schaden).
+  // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): das gilt jetzt AUCH für ein Opfer (Kosten oder Effekt, `info.isSacrifice`) — der frühere
+  // Ausschluss („Zerstören ja, opfern nein") entfällt. Das Opfer ist bezahlt; Bone Dog belebt die Kreatur sofort in IHREM Platz zurück (Kartentext „same Support Zone").
+  // Ausnahme bleibt, was die Engine ohnehin nie als Fenster öffnet: Opfer als Beschwörungskosten (Foresta, Blue-Ice Dragon …; Welle 4/W19a).
   preDefeatOnDestroy: true,
 
   // Strictly reactive: never proactively playable, never a chain-link
@@ -74,7 +76,6 @@ module.exports = {
    */
   creaturePreDefeatCondition(gs, ownerIdx, engine, creatureInst, source, amount, type, info) {
     if (!creatureInst) return false;
-    if (info?.isSacrifice) return false;   // Welle 10 (Q37): ein Opfer ist kein Zerstören
     // Dying creature must be on our side.
     const targetController = creatureInst.controller ?? creatureInst.owner;
     if (targetController !== ownerIdx) return false;

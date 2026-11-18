@@ -14,14 +14,17 @@
 //  Helden ausgelöst werden (`anyHero`; Schaden 0, Gift am Ziel der Attack,
 //  Quelle des Gifts = Spieler des Pfeils).
 //
-//  Als Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-
+//  Ruling (Al 26.10.): „Eine andere Regel, die dann für ALLE True-Damage-
 //  Sources gelten soll: Diese können Hydra Blood Arrow schlicht nicht aktivieren."
-//  Der Pfeil wird NICHT angeboten (auch nicht der CPU), wenn der Schaden der
-//  Attack QUELLEN-seitig unreduzierbar ist („cannot be reduced"): Surefire Shot,
-//  ein mit Elixir of Strength verstärkter Treffer, Club of Gobbo am Angreifer
-//  (auch für dessen Träger: „Club of Gobbo macht Hydra Blood Arrow für seinen
-//  Träger unbenutzbar, ja") — EIN Prädikat, `engine._attackSchadenUnreduzierbar`
-//  (Option `blockUnreducible` der Bedingung). Das Fenster öffnet VOR der Zielwahl.
+//  ★ ÜBERHOLT durch die Spielgestalter-Entscheidung 16.11.2026 („Nutzlose Aktivierungen
+//  müssen möglich sein"): Der Pfeil wird auch gegen Attacks angeboten, deren Schaden
+//  QUELLEN-seitig unreduzierbar ist („cannot be reduced": Club of Gobbo am Angreifer, ein
+//  Elixir-Treffer, True-Damage-Attacks) — mit Hinweis in der Frage (`reactionUselessHint`);
+//  die CPU wählt es nicht. Gespielt/bezahlt/verbraucht wird wie immer, der Pfeil wirkt dann
+//  aber nicht (`resolve`: weder Null noch Gift; der Schaden geht durch). Ausnahmen, die
+//  bleiben: Surefire Shot („cannot be reacted to": kein Reaktionsfenster überhaupt) und ein
+//  bereitstehender Elixir of Strength des Angreifers (Option `blockUnreducible` der Bedingung:
+//  „die müssen sich ausschließen", Ruling Al 26.10.). Das Fenster öffnet VOR der Zielwahl.
 //
 //  Als Ruling (Al 26.10.): „Hydra Arrow *darf nicht* zusammen mit Elixir of Strength an
 //  irgendwas angekettet werden, die müssen sich ausschließen." Ein bereitstehender
@@ -61,7 +64,20 @@ module.exports = {
   reactionCondition: (gs, pi, engine, chainCtx) =>
     arrowTriggerCondition(gs, pi, engine, chainCtx, { anyHero: true, blockUnreducible: true }),
 
+  /** Quellen-seitig unreduzierbarer Attack-Schaden: die Aktivierung bleibt erlaubt, wirkt aber nicht (Hinweis fuer die Frage; die Engine laesst die CPU sie nicht waehlen). */
+  reactionUselessHint: (gs, pi, engine, chainCtx) => {
+    const initial = chainCtx?.chain?.find(l => l.isInitialCard);
+    return (initial && engine?._attackSchadenUnreduzierbar?.({ link: initial })) ? 'This Attack\'s damage cannot be reduced.' : null;
+  },
+
   resolve: async (engine, pi, _sel, _val, chain, _idx) => {
+    // Spielgestalter-Entscheidung 16.11.2026: gegen unreduzierbaren Schaden bezahlt, aber wirkungslos (keine Null, kein Gift).
+    const _initial = chain?.find?.(l => l.isInitialCard);
+    if (_initial && engine._attackSchadenUnreduzierbar?.({ link: _initial })) {
+      engine.log('arrow_useless', { player: engine.gs.players[pi]?.username, arrow: CARD_NAME, reason: 'damage_cannot_be_reduced' });
+      engine.sync();
+      return;
+    }
     armAttackerWithArrow(engine, pi, chain, {
       setAmount0: true,
       poisonStacksPer: 30,

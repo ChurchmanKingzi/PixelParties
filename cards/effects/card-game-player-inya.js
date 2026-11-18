@@ -100,6 +100,13 @@ module.exports = {
 
   activeIn: ['hero'],
 
+  // Heldenskript-Vertrag `heroTakesNoDamage` (Engine: `heroTakesNoDamageFromSource`, Spielgestalter-Entscheidung 16.11.2026: Chucks Schild fragt, ob die anderen Helden
+  // gegen die Quelle IMMUN sind): „takes no damage" solange ein Fantasy Buddy lebt — dieselbe Bedingung wie der `beforeDamage`-Hook unten, von aussen lesbar.
+  // Die Engine ruft das nur, solange Inyas Heldeneffekt nicht stummgeschaltet ist und der Treffer reduzierbar ist (wie `ctx.setAmount(0)` unten).
+  heroTakesNoDamage(engine, { controller }) {
+    return _countBuddies(engine, controller) > 0;
+  },
+
   hooks: {
     /**
      * Spell-cast trigger — fires after the spell's effect has resolved

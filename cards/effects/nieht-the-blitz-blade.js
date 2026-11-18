@@ -204,13 +204,19 @@ module.exports = {
       // Clone (Welle 72): auch die Bonus-Attack ist ein „Normal Attack, den der Held benutzt" — die Zielwahlen (hier das erzwungene Ziel) werden aufgezeichnet; die Aufzeichnung der ersten Attack
       // (die Clone nach diesem Hook noch lesen kann) wird gesichert und danach wiederhergestellt.
       const klonAufnahmeAlt = gs._klonAufnahme;
+      let kettenNegiert = false, kettenGeloescht = false;
       gs._klonAufnahme = { pi, heroIdx, heroOwner: feld, name: bonusName, eintraege: [] };
       try {
-        await engine.runHooks('onPlay', {
+        // ★ Spielgestalter-Entscheidung 17.11.2026 („uses/performs" = „plays", `engine.performKettenfenster`): die Bonus-Attack öffnet dasselbe Kettenfenster wie eine normal gespielte Attack (aus der
+        // HAND: auch Master's Plan/Lunar Eclipse; Hand-Reaktionen auf Attacks wie Pfeile). Negiert: der Rumpf läuft nie, sie zählt als gespielte Zusatzaktion und geht in die Ablage (Lunar Eclipse: Löschstapel).
+        const _pk = await engine.performKettenfenster({ cardName: bonusName, pi, heroIdx, heroOwner: feld, ausHand: true });
+        if (_pk.negated) { kettenNegiert = true; kettenGeloescht = !!_pk.negatedToDeleted; }
+        if (!kettenNegiert) await engine.runHooks('onPlay', {
           _onlyCard: bonusInst, playedCard: bonusInst,
           cardName: bonusName, zone: 'hand', heroIdx,
           _skipReactionCheck: true,
         });
+        await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile aus diesem Kettenfenster gelten nur für die Bonus-Attack
 
         const bonusCardData = engine._getCardDB()[bonusName];
         const uniqueTargets = [];
@@ -218,7 +224,7 @@ module.exports = {
         for (const t of (gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
-        await engine.runHooks('afterSpellResolved', {
+        if (!kettenNegiert) await engine.runHooks('afterSpellResolved', {
           spellName: bonusName, spellCardData: bonusCardData, heroIdx, heroOwner: feld, casterIdx: pi,
           damageTargets: uniqueTargets, isSecondCast: true,
           _skipReactionCheck: true,
@@ -243,7 +249,9 @@ module.exports = {
       delete gs._forcedDamageTarget;
 
       engine._untrackCard(bonusInst.id);
-      engine.handKartenBesitzerPs(ps, bonusName).discardPile.push(bonusName);   // W63c: Ablage des permanenten Besitzers
+      const _bonusPs = engine.handKartenBesitzerPs(ps, bonusName);   // W63c: Ablage des permanenten Besitzers
+      if (kettenGeloescht) { if (!_bonusPs.deletedPile) _bonusPs.deletedPile = []; _bonusPs.deletedPile.push(bonusName); }   // in der Kette negiert + „delete it" (Lunar Eclipse)
+      else _bonusPs.discardPile.push(bonusName);
 
       engine.log('nieht_blitz_extra_attack', {
         player: ps.username, hero: hero.name,

@@ -16,10 +16,10 @@
 //  (wie bei Topaz/Amethyst). Die Sperre selbst gab es schon: `canActivate`
 //  fragt `canPlayMagicGem` (HOPT `Magic Ruby:<Spieler>`), der Stempel wird
 //  erst am Ende des Effekts in `maybeKeepGemInHand` gesetzt (gespielt und
-//  verpufft stempelt, ganz negiert nicht — Z7b).
+//  verpufft stempelt, ganz negiert ebenfalls über `onFizzledPlay` — Spielgestalter-Entscheidung 16.11.2026).
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Ruby';
@@ -33,6 +33,9 @@ function gegnerHelden(gs, pi, engine) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,
@@ -53,6 +56,9 @@ module.exports = {
       if (!h?.name || h.hp <= 0) continue;
       out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
+    // Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): betäubungs-immune Helden bleiben wählbar (so war es schon), die Zielwahl warnt jetzt
+    // („… is immune to stunning and will not be affected."), die CPU wählt sie nicht (`engine.markiereStatusWirkungslos`); die Karte ist verbraucht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(out, 'stunned', pi, CARD_NAME);
     return out;
   },
 
@@ -74,7 +80,9 @@ module.exports = {
     const tpi = parseInt(m[1]);
     const hi = parseInt(m[2]);
     const ziel = engine.gs.players[tpi]?.heroes?.[hi];
-    if (!ziel?.name || engine.heroSideOf(tpi, ziel) === pi) return { keepInHand: false }; // must be opponent (Kontrolle, W16e)
+    // Fizzle (CARD_API Z7b): ist das Ziel beim Auflösen kein Gegnerheld mehr (Kontrolle gewechselt), war die Karte trotzdem gespielt — Einmal-Stempel und Behalten-Angebot
+    // wie bei jedem anderen Verpuffen; nur der Abbruch durch den Spieler stempelt nie.
+    if (!ziel?.name || engine.heroSideOf(tpi, ziel) === pi) return await maybeKeepGemInHand(engine, pi, CARD_NAME); // must be opponent (Kontrolle, W16e)
 
     await engine.addHeroStatus(tpi, hi, 'stunned', {
       duration: STUN_DURATION,

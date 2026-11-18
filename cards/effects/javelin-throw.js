@@ -70,7 +70,7 @@ function eligibleHeroes(engine, pi) {
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (engine.isHeroIncapacitated(physOwner, hi)) continue;
     // W32a (Al, 22.10.2026): der Wurf ist ein Attack DES HELDEN — Frozen/Stunned/Webbed/Negated/Attack-Sperren blocken (`heroKannAngreifen`, wie `validateActionPlay`).
-    if (!engine.heroKannAngreifen(physOwner, hi, pi)) continue;
+    if (!engine.heroKannAngreifen(physOwner, hi, pi, { blindedName: CARD_NAME })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): ein geblendeter Werfer scheidet aus (nur Gegnerziele)
     if (equippedArtifacts(engine, physOwner, hi).length === 0) continue;
     out.push({ physOwner, heroIdx: hi });
   }
@@ -85,6 +85,9 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
@@ -129,7 +132,7 @@ module.exports = {
     const hi = sel.heroIdx;
     const heroOwner = sel.owner ?? pi;   // physische Seite des Helden
     const hero = gs.players[heroOwner]?.heroes?.[hi];
-    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi) || !engine.heroKannAngreifen(heroOwner, hi, pi)) return { aborted: true };   // W32a: nicht angriffsfähig → blockiert
+    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi) || !engine.heroKannAngreifen(heroOwner, hi, pi, { blindedName: CARD_NAME })) return { aborted: true };   // W32a: nicht angriffsfähig → blockiert
     if (engine.heroSideOf(heroOwner, hero) !== pi) return { aborted: true };
 
     // ── Artefakt waehlen ──────────────────────────────────────────

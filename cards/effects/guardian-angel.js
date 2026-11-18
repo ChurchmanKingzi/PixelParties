@@ -100,6 +100,11 @@ module.exports = {
       const gs = engine.gs;
       const hero = ctx.hero;
       if (!hero?.name) return;
+      // Jede Engel-Instanz entscheidet fuer SICH (der Haken laeuft je Instanz): haengen zwei Engel am selben Helden (je einer pro Spieler), verbraucht ein Tod nur EINEN —
+      // der Engel, der zuerst dran ist, verhindert den Tod, der zweite sieht den lebenden Helden und bleibt liegen.
+      const gaInst = ctx.card;
+      if (!gaInst || gaInst.name !== CARD_NAME || gaInst.zone !== 'support' || gaInst.faceDown) return;
+      if (hero.hp > 0) return;
 
       // Find which player/hero this is
       let heroPi = -1, heroHi = -1;
@@ -111,24 +116,20 @@ module.exports = {
       }
       if (heroPi < 0 || heroHi < 0) return;
 
-      // Check if this hero has Guardian Angel equipped
+      // Check that THIS Guardian Angel is the one equipped to this hero
       const supportZones = gs.players[heroPi].supportZones[heroHi] || [];
-      let gaSlot = -1;
-      for (let si = 0; si < supportZones.length; si++) {
-        if ((supportZones[si] || []).includes('Guardian Angel')) { gaSlot = si; break; }
-      }
-      if (gaSlot < 0) return;
+      if (engine.physicalSide(gaInst) !== heroPi || gaInst.heroIdx !== heroHi) return;
+      const gaSlot = gaInst.zoneSlot;
+      if (!(supportZones[gaSlot] || []).includes('Guardian Angel')) return;
 
       // ── Delete Guardian Angel FIRST (prevents infinite loop with Overheal Shock) ──
       supportZones[gaSlot] = supportZones[gaSlot].filter(c => c !== 'Guardian Angel');
-      const gaInst = engine.cardInstances.find(c =>
-        c.owner === heroPi && c.zone === 'support' && c.heroIdx === heroHi && c.zoneSlot === gaSlot && c.name === 'Guardian Angel'
-      );
       if (gaInst) {
         // W52a: der Engel loest sich selbst auf (ohne `onCardLeaveZone`) — der Anhaengsel-Verlust wird trotzdem gemeldet (`onEquipLost`).
         await engine.fireEquipLost(gaInst, { reason: 'deleted', toZone: 'deleted', fromOwner: heroPi, fromHeroIdx: heroHi, fromZoneSlot: gaSlot, source: 'Guardian Angel', bypassDeadHeroFilter: true });
+        // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): die Kopie eines gespiegelten Guardian Angel ist keine Karte — sie verschwindet (kein Gelöscht-Stapel).
+        if (!engine.tokenAbgang(gaInst)) gs.players[gaInst.originalOwner].deletedPile.push('Guardian Angel');
         engine._untrackCard(gaInst.id);
-        gs.players[gaInst.originalOwner].deletedPile.push('Guardian Angel');
       }
 
       // Set HP to 1 (prevent death)

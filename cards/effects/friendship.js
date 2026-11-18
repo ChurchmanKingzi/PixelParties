@@ -42,9 +42,13 @@ function getFriendshipLevel(engine, feld, heroIdx) {
  * Build the filter function for the additional action.
  * Captures engine + player references for dynamic checks.
  */
-function buildFilter(engine, pi, heroIdx, feld = pi) {
-  return (cardData) => {
+function buildFilter(engine, pi, heroIdx0, feld = pi) {
+  return (cardData, fctx) => {
     if (!cardData || cardData.cardType !== 'Spell' || !hasSpellSchool(cardData, 'Support Magic')) return false;
+    // ★ Der Anbieter kann den Helden gewechselt haben: Compulsory Body Swap tauscht die Abilities samt Instanzen, die Zusage traegt aber noch den
+    // Typ (und diesen Filter) des ALTEN Helden — dann hiess es „kein Geber passt zur Karte". Geprueft wird der Held, an dem die Anbieter-Instanz JETZT
+    // liegt (`fctx.heroIdx`, vom Engine-Aufruf mitgegeben; ohne Kontext der beim Registrieren gemerkte).
+    const heroIdx = fctx && fctx.heroIdx != null && fctx.heroIdx >= 0 ? fctx.heroIdx : heroIdx0;
 
     const ps = engine.gs.players[pi];
     if (!ps) return false;
@@ -100,6 +104,16 @@ function setupAdditionalAction(engine, pi, heroIdx, feld = pi) {
     c.owner === feld && engine.istWirksameAbility(c) && c.heroIdx === heroIdx && c.name === 'Friendship'
   );
   if (friendshipInst) {
+    // Zusagen mit dem Typ eines frueheren Helden (Compulsory Body Swap hat die Kopie umgehaengt) fallen weg — sonst gaebe die Kopie am neuen Helden
+    // zwei Zusatzaktionen je Zug (alter + neuer Typ).
+    for (const c of engine.cardInstances) {
+      if (c.owner !== feld || c.name !== 'Friendship' || c.heroIdx !== heroIdx || !c.counters?.aaGrants) continue;
+      let geloescht = false;
+      for (const k of Object.keys(c.counters.aaGrants)) {
+        if (k.startsWith(ADDITIONAL_TYPE_PREFIX + '_') && k !== typeId) { delete c.counters.aaGrants[k]; geloescht = true; }
+      }
+      if (geloescht) engine._syncAAMirror(c);
+    }
     engine.grantAdditionalAction(friendshipInst, typeId);
   }
 }
@@ -119,8 +133,39 @@ module.exports = {
   // doesn't actually live, so the level/draw resolves to 0. Phase 3
   // punch list.
   disableLizbethMirror: true,
+  // Buchfuehrung beim Abgang der EIGENEN Karte (Uebergabe der Zusatzaktion, s. `onCardLeaveZone`) laeuft in jedem Heldenzustand.
+  bypassStatusFilterOnLeave: true,
 
   hooks: {
+    /**
+     * ★ Abgang einer Kopie: Die Zusatzaktion haengt an EINER Instanz je Held (der ersten Friendship-Karte, `setupAdditionalAction`). Wirft ein Effekt
+     * eine Kopie ab (Weird Doll, Fire Bomb, Magic Amethyst … nehmen die Instanz nach Namen, also die ERSTE statt der obersten), kann das genau diese
+     * Instanz sein, obwohl Friendship (Lv3→2, 2→1) noch am Helden liegt — die Zusatzaktion verfiel samt Instanz. Sie wandert, mit dem Stand dieses
+     * Zuges (schon eingesetzt = 0), auf eine verbleibende Kopie desselben Helden. Liegt keine mehr da, erlischt sie mit der Karte (auch an der
+     * Ablage-Instanz, die `sendBoardCardToDiscard` in `cardInstances` zurueckliess: sie gab sonst weiter eine Zusatzaktion).
+     */
+    onCardLeaveZone: async (ctx) => {
+      const inst = ctx.card;
+      if (ctx.fromZone !== 'ability' && !(ctx.fromZone === 'support' && ctx._engine.istAbilityImSupport(inst))) return;   // auch ein Stapel in einer Support Zone (Xal, Xalibur)
+      const weg = ctx.leavingCard || ctx._onlyCard;
+      if (!inst || !weg || weg.id !== inst.id) return;   // nur die abgehende Karte selbst
+      const grants = inst.counters?.aaGrants;
+      if (!grants) return;
+      const typen = Object.keys(grants).filter(k => k.startsWith(ADDITIONAL_TYPE_PREFIX + '_'));
+      if (typen.length === 0) return;
+      const engine = ctx._engine;
+      const rest = engine.cardInstances.find(c =>
+        c.id !== inst.id && c.name === 'Friendship' && c.owner === inst.owner && c.heroIdx === inst.heroIdx
+        && engine.istWirksameAbility(c));
+      if (rest && !rest.counters.aaGrants) rest.counters.aaGrants = {};
+      for (const k of typen) {
+        if (rest) rest.counters.aaGrants[k] = grants[k];
+        delete grants[k];   // die abgegangene Instanz bleibt in `cardInstances` (Zone Ablage) — sie darf keine Zusatzaktion mehr geben
+      }
+      if (rest) engine._syncAAMirror(rest);
+      engine._syncAAMirror(inst);
+    },
+
     /**
      * On play: register and grant the additional action.
      */
@@ -230,5 +275,13 @@ module.exports = {
 
       engine.log('friendship_draw', { player: ps.username, hero: hps.heroes[heroIdx]?.name, cards: drawCount, level });
     },
+
+    /**
+     * ★ Spielgestalter-Entscheidung 17.11.2026 (FRI-03): „use a Support Magic Spell as an additional Action with this Hero, then draw X cards" — die Zusatzaktion ist mit dem Einsatz
+     * des Spells VERBRAUCHT. Wird der Spell negiert (nach der Zielwahl: MOE Shield, Storm Ring …), trifft die Negation nur den Spell: `afterSpellResolved` feuert dann nie, also feuert
+     * dasselbe Ziehen (Lv2: 1, Lv3: 3) hier trotzdem. Der Geber (`viaAdditionalProvider`) kommt nur aus dem Weg „negiert nach der Zielwahl"; wird die ganze Karte in der Kette
+     * negiert (The Master's Plan …), bekommt der Spieler die Zusatzaktion zurueck und es gibt keinen Geber (kein Ziehen).
+     */
+    afterSpellPrevented: async (ctx) => module.exports.hooks.afterSpellResolved(ctx),
   },
 };

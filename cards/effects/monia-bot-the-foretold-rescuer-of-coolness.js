@@ -39,8 +39,9 @@ const CARD_NAME = ASCEND_TARGET;
  */
 function moniaIsValidTarget(validTargets, ownerIdx, heroIdx) {
   const id = `hero-${ownerIdx}-${heroIdx}`;
-  return (validTargets || []).some(t => t?.id === id
-    || (t?.type === 'hero' && t.owner === ownerIdx && t.heroIdx === heroIdx));
+  // ★ Spielgestalter-Entscheidung 17.11.2026: war Monia selbst schon vom selben Effekt gewählt/getroffen (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert), lenkt niemand auf sie um (kein Doppeltreffer).
+  return (validTargets || []).some(t => !t?._bereitsGewaehlt && (t?.id === id
+    || (t?.type === 'hero' && t.owner === ownerIdx && t.heroIdx === heroIdx)));
 }
 
 module.exports = {

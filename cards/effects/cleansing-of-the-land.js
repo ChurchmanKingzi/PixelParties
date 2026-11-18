@@ -26,8 +26,8 @@
 //
 //  ★ Als Ruling (Al 27.10.): „You can only play 1 \"Cleansing of the Land\" per turn." — HOPT je Spieler
 //  (`claimHOPT`, Muster Big Oopsie): gestempelt, sobald der Effekt wirklich läuft (nach dem Prüfen von
-//  `_spellCancelled`, vor dem Abräumen) bzw. wenn die gespielte Karte fizzelt (`onFizzledPlay`); eine ganz
-//  NEGIERTE Karte stempelt nicht (Welle 3). `spellPlayCondition` graut die Karte danach aus.
+//  `_spellCancelled`, vor dem Abräumen) bzw. wenn die gespielte Karte fizzelt oder negiert wird (`onFizzledPlay`;
+//  Spielgestalter-Entscheidung 16.11.2026). `spellPlayCondition` graut die Karte danach aus.
 //
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: eine Feuerwalze ueber das komplette Spielfeld, „aber auf

@@ -42,6 +42,9 @@ module.exports = {
     // ★ Z4 (R02-07): die Karte, die der Gegner gerade spielt, ist keine Handkarte mehr.
     if (!oppPs || (engine ? engine._handIndizesOhneAufloesende(oppPs).length : (oppPs.hand || []).length) < 2) return false;
 
+    // Spielgestalter-Entscheidung 17.11.2026 (ANG-13): der ganze Nutzen ist ein Hand-Zugang — unter der Hand-Sperre ("cannot draw or add cards to your hand", `handLocked`) nicht anbieten.
+    if (engine?.handZugangGesperrt?.(pi)) return false;
+
     // At least 1 hero must be able to cast this (Decay Magic Lv1)
     if (engine) {
       // W20c: auch ein uebernommener Held der Gegenspalte wirkt (`reaktionsWirkerFuer`: eigene + kontrollierte).

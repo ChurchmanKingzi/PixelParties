@@ -292,6 +292,8 @@ module.exports = {
       for (const e of entries) {
         if (!e || e.cancelled) continue;
         if (!e.inst) continue;
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert jeden Schutz, der Schaden verhindert/negiert (nur „unaffected by ALL cards and effects" bleibt) — `e.ignoreUnaffected`.
+        if (e.ignoreUnaffected === true) continue;
         if (isStillProtected(engine, e.inst)) {
           e.amount = 0;
         }

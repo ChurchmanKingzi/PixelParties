@@ -68,6 +68,10 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   const ps = engine.gs.players[pi];
   if (!ps) return { keepInHand: false };
 
+  // Nicht aus der Hand gespielt (Legendary Explorer Dajan spielt aus dem Deck, `engine._deckSpielScope`): es gibt keine Handkarte,
+  // die man „behalten" koennte — also keine Abwurfkosten, der Edelstein geht regulaer in die Ablage.
+  if (engine._deckSpielScope && engine._deckSpielScope.pi === pi && engine._deckSpielScope.cardName === gemName) return { keepInHand: false };
+
   // No discardable cards → can't pay the keep-in-hand cost.
   // Reaction gems: hand has already had the gem spliced out by the
   // engine before resolve, so 0 means truly empty. Non-reaction gems:
@@ -120,4 +124,13 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   return { keepInHand: true };
 }
 
-module.exports = { canPlayMagicGem, maybeKeepGemInHand };
+/**
+ * Spielgestalter-Entscheidung 16.11.2026: das Einmal-pro-Zug-Limit eines Magic Gems ist mit dem Beginn der Aktivierung verbraucht — auch wenn der Edelstein danach
+ * negiert wird und sein `resolve` nie läuft. Die Gems melden das über `onFizzledPlay` (negierte Initialkarte, Engine: `_noteFizzledPlay`) bzw. `stempelBeiAktivierung`
+ * (Magic Topaz, Reaktion in der Kette).
+ */
+function stempelGem(engine, pi, gemName) {
+  engine.claimHOPT(gemName, pi);
+}
+
+module.exports = { canPlayMagicGem, maybeKeepGemInHand, stempelGem };

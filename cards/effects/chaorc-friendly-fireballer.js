@@ -98,6 +98,7 @@ module.exports = {
 
     // ── Kosten nach der bestätigten Zielwahl: das Opfer (not summoned this turn; Cannon Fodder exception via the shared filter). ──
     let bezahlt = false;
+    let kettenNegiert = false;   // der performte Fireball wurde in der Kette negiert (Silence …)
     const nachZielwahl = async () => {
       const paid = await engine.resolveSacrificeCost(ctx, {
         minCount: 1,
@@ -111,6 +112,11 @@ module.exports = {
       });
       if (!paid) return false;                 // Abbruch der Opferwahl: nichts bezahlt
       bezahlt = true;
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): der performte Fireball öffnet dasselbe Kettenfenster wie ein normal gespielter (Silence, The Master's
+      // Plan [aus der Hand], …) — NACH der bezahlten Wahl (Opfer), vor seiner Wirkung. Wirker ist die KREATUR (`trotzStatus`). Negiert: der Fireball wirkt nicht (die Rückgabe `false` beendet die Zielwahl
+      // ohne Ziele), das Opfer bleibt bezahlt und der Fireball wird wie sonst gelöscht („if you do, delete that Fireball").
+      const _pk = await engine.performKettenfenster({ cardName: FIREBALL, pi, heroIdx, heroOwner: pi, ausHand: true, trotzStatus: true });
+      if (_pk.negated) { kettenNegiert = true; return false; }
       // A Fireball could in theory have left the hand during the
       // sacrifice's reaction window — dann ist das Opfer bezahlt, der Fireball aber nicht mehr zu wirken.
       return engine.handUndVorratListe(pi).includes(FIREBALL);
@@ -137,13 +143,13 @@ module.exports = {
         for (const t of (gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
-        await engine.runHooks('afterSpellResolved', {
+        if (!kettenNegiert) await engine.runHooks('afterSpellResolved', {
           spellName: FIREBALL, spellCardData: cardDB[FIREBALL],
           heroIdx, casterIdx: pi, damageTargets: uniqueTargets,
           isSecondCast: false, _skipReactionCheck: true,
         });
-        // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-        if (!gs._spellCancelled) {
+        // v1364: „as an additional Action" — als ausgefuehrte Aktion melden (auch der in der Kette negierte Fireball ist gespielt).
+        if (!gs._spellCancelled || kettenNegiert) {
           await engine.zaehleAlsArt('spell', { pi, heroIdx, name: FIREBALL, karte: true });   // W36a (Al): der Fireball zaehlt als gespielter Spell
           await engine.meldeGussAlsAktion(pi, heroIdx, FIREBALL);
         }

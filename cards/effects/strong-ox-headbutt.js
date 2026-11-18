@@ -124,7 +124,7 @@ module.exports = {
       // „choose an Ability attached to the target and send it to the discard pile, if possible"
       // 24.10.2026: ALLE Abilities des Helden — die in den Ability Zonen und die Stapel in seinen Support Zonen (Xal, Xalibur). Abgeworfen wird ueber die
       // zentrale Engine-Primitive (`discardAbilityTopCopy`): sie nimmt die oberste Kopie, kennt Zonenart und Stapelhoehe, und „if possible" gilt wirklich
-      // (Leafagami Snake schuetzt die Karte, Resistance faengt den Effekt auf den Helden ab).
+      // (Leafagami Snake schuetzt die Karte; Resistance NICHT — Spielgestalter-Entscheidung 16.11.2026: die gewaehlte Ability umgeht Resistance).
       if (is3rd && target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
@@ -164,7 +164,9 @@ module.exports = {
                 // Nach der Abfrage neu einsammeln: das Brett kann sich bewegt haben, und die Primitive arbeitet auf Slot-Indizes.
                 const eintrag = sammeln().find(e => e.id === picked[0]);
                 if (eintrag) {
-                  const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: 'Strong Ox Headbutt', sourceOwner: pi, effectOnHero: true });
+                  // Spielgestalter-Entscheidung 16.11.2026: „choose an Ability attached to the target“ — die Karte WÄHLT eine Ability → Resistance blockt NICHT (kein `effectOnHero`;
+                  // frühere Regel W13/Q144 ersetzt). Der Attack-Schaden auf den Helden bleibt ein Schaden (Resistance schützt nie vor Schaden). Leafagami Snake schützt weiter.
+                  const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: 'Strong Ox Headbutt', sourceOwner: pi });
                   if (abgeworfen) engine.log('ability_removed', { card: eintrag.cardName, by: 'Strong Ox Headbutt', from: targetHero.name });
                 }
               }

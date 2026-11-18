@@ -22,7 +22,7 @@
 //    check the same flag.
 // ═══════════════════════════════════════════
 
-const { hasCardType, baseCardName, equipZustandHooks } = require('./_hooks');
+const { hasCardType, baseCardName, equipZustandHooks, isArtifactCreature } = require('./_hooks');
 
 const CARD_NAME = 'Toras, Master of all Weapons';
 const ATK_PER_ARTIFACT = 40;
@@ -54,6 +54,8 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
     if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
+    // „EQUIPPED" Artifact: eine Artifact Creature (Robird, Pollution Spewer, Powder Keg, Debt-O-Tron …) steht als Kreatur in der Zone, sie ist nicht ausgeruestet.
+    if (isArtifactCreature(cd)) continue;
     names.add(baseCardName(inst.name));   // v876
   }
   return names.size;

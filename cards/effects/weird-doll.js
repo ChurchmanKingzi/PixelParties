@@ -136,6 +136,28 @@ module.exports = {
     });
     await engine._delay(700);
 
+    // Leafagami Snake: „When Abilities would be removed from Heroes you control, don't remove them and draw a card for each affected Ability instead" —
+    // auch der eigene Abwurf per Weird Doll (wie die Kosten-Wege Barrier of Faith & Co.): die Kopie bleibt liegen, der Kontrolleur der Schlange zieht 1 Karte,
+    // die Doll wird trotzdem gelöscht (`deleteOnUse`).
+    {
+      const kopfName = zone[zone.length - 1];
+      const kopfInst = engine.cardInstances.find(c =>
+        c.owner === target.owner && c.zone === 'ability' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx && c.name === kopfName
+      );
+      if (kopfInst && await engine.abilityEntfernungVerhindert(kopfInst, 'discard', { source: { name: CARD_NAME, owner: pi } })) {
+        engine.log('weird_doll', {
+          player:     engine.gs.players[pi]?.username,
+          ability:    kopfName,
+          heroOwner:  target.owner,
+          heroIdx:    target.heroIdx,
+          slot:       target.slotIdx,
+          blocked:    'leafagami_snake',
+        });
+        engine.sync();
+        return true;
+      }
+    }
+
     // Pop the top copy off the stack — same convention as Fire Bomb /
     // Magic Amethyst: "send an Ability to discard" removes one copy,
     // not the whole stack.

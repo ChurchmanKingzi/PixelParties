@@ -78,6 +78,8 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   if (st.berserked) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
+  // Spielgestalter-Entscheidung 17.11.2026: die Helden-Voraussetzung der Beschwörung („can only be summoned by a Hero equipped with …", Spirits) gilt auf jedem Weg.
+  if (!engine.beschwoerHeldBedingungOk(cd.name, physOwner, heroIdx, pi)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
 }
 
@@ -177,7 +179,9 @@ function kopieFuerHeld(engine, pi, name, ziel) {
  *   `source`       — Quellname fuer Log/Prompt
  *   `zonenFilter`  — (zone) → bool, schraenkt die Zonen weiter ein
  *   `nachZonenwahl`— async () → void, laeuft NACH der bindenden Wahl und
- *                    VOR der Beschwoerung (Platz fuer den Auftritt)
+ *                    VOR der Beschwoerung (Platz fuer den Auftritt). Liefert
+ *                    es 'negiert' (die Beschwoerung wurde in einem Gegenreaktions-
+ *                    Fenster negiert, Front Soldier), findet sie nicht statt.
  * @returns {Promise<boolean>} beschworen? Abbruch in der Zonenwahl → false.
  */
 async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
@@ -201,7 +205,7 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
       && (z.owner ?? pi) === (wahl.owner ?? pi)) || null;
     if (!ziel) return false;
   }
-  if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
+  if (typeof nachZonenwahl === 'function' && (await nachZonenwahl(ziel)) === 'negiert') return false;
   // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `eligibleSummonZones` fragt namensweit („irgendeine Kopie genügt"), BESCHWOREN wird aber GENAU EINE Kopie:
   // die günstigste (niedrigste Handstufe), die der gewählte Held wirklich spielen darf — nicht die erste nach Namen (sonst käme eine ungesenkte Kopie durch das Tor der gesenkten).
   const _kopie = _q.ausVorrat ? -1 : kopieFuerHeld(engine, pi, name, ziel);

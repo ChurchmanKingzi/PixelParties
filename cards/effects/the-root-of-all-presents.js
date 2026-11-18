@@ -27,7 +27,8 @@ function moeglich(engine, pi) {
   const ps = gs.players[pi], ops = gs.players[oi];
   if (!ps || !ops) return false;
   if ((ps.hand || []).length === 0) return false;
-  if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
+  // (Erstrunden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — aktivierbar, verpufft in `onCreatureEffect`.)
+  if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor
   // Als Ruling (Al 26.10.): „Ja, unspielbar machen" — kann der GEGNER keine Karten auf die Hand nehmen (Hand-Sperre `handLocked`, Such-Sperre `searchLocked`/Siege …),
   // ist die Aktivierung nicht möglich: ausgegraut, nichts verbraucht (dieselbe Prüfung wie `actionTransferCardToOppHand`).
@@ -36,6 +37,8 @@ function moeglich(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['support'],
   creatureEffect: true,   // OHNE dieses Kennzeichen listet der Server die Creature nicht als aktivierbar
   hooks: {},
@@ -52,6 +55,7 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const ps = gs.players[pi], ops = gs.players[oi];
     if (!ps || !ops || !moeglich(engine, pi)) return false;
+    if (gs.firstTurnProtectedPlayer === oi) { engine.log('root_of_all_presents_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return true; }   // Spielgestalter-Entscheidung 16.11.2026: verpufft (Einsatz verbraucht)
 
     const alle = (ps.hand || []).map((_, i) => i);
     const wahl = await engine.promptGeneric(pi, {
