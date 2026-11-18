@@ -9428,7 +9428,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // Master's Plan …) — der Zauber hat nie gewirkt, also fallen auch
       // KEINE Wisdom-Kosten an. (Vorher wurden sie hier trotzdem gezahlt.)
       if (additionalConsumed && consumedInst) {
-        room.engine.restoreAdditionalAction(consumedInst);
+        // ★ Spielgestalter-Entscheidung 18.11.2026 (Friendship): „ja, Friendship zieht auch nach Negation" — die Zusatzaktion von Friendship bleibt bei Negation in der Kette VERBRAUCHT und
+        // „then draw" feuert trotzdem (`zusatzaktionNachKettennegation`); jeder andere Geber bekommt die Zusatzaktion wie bisher zurück.
+        const _geberSkript = loadCardEffect(consumedInst.name);
+        if (typeof _geberSkript?.zusatzaktionNachKettennegation === 'function') {
+          await _geberSkript.zusatzaktionNachKettennegation(room.engine, consumedInst, { spellName: cardName, spellCardData: cardData });
+        } else {
+          room.engine.restoreAdditionalAction(consumedInst);
+        }
       }
       if (cardData.cardType === 'Attack') {
         // ★ W35a (Al, 22.10.2026, Frage 4): EIN Zählschritt für jede gespielte Attack (auch inhärente/negierte): `engine.zaehleAlsArt` zählt Spieler-/Helden-Zähler UND meldet
