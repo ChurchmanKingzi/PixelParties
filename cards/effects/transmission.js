@@ -24,7 +24,7 @@
 //    („cannot add cards to your hand" — wie `actionTransferCardToOppHand`), Erste-Runden-Schutz des Gegners (`blockedByFirstTurnProtection`), Spreading Rumor / Slow
 //    (`_oppHandInteractionLockedTurn`: „cannot interact with your opponent's hand").
 //  • ★ Spielgestalter-Entscheidung 18.11.2026: UNTER JEDER Ablage-Ausgangssperre des Wirkers ist Transmission unspielbar (ausgegraut, nicht aktivierbar, keine Galerie, die dann nichts
-//    tut) — Stab-Sperre (Staff of the Teleporter/Uncontrollable Destruction), Sperre des Eye of Ren (nicht bezahlte Zusatzkosten), Knight of Kings [B], Hatusbal & Co. Gate ist der
+//    tut) — Stab-Sperre (Staff of the Teleporter/Uncontrollable Destruction), Sperre des Eye of Ren (nicht bezahlte Zusatzkosten), Knight of Kings [B] (Hatusbal sperrt nur das Zurückmischen ins Deck und gehört nicht dazu). Gate ist der
 //    gemeinsame Helfer `ablageAusgangGesperrt` (`_pfad-shared.js`) in `wirkbar`; die Karte verschiebt ja eine Karte aus der EIGENEN Ablage. Ohne Sperre unverändert (spielbar mit
 //    Karte in der Ablage, ohne unspielbar).
 //  • Kein „von der Hand in die Gegnerhand"-Hook (Mary Crestmas) und kein „aus DEINER Ablage"-Hook (Bamboo Staff): die Karte kommt aus der Ablage des Wirkers, nicht des Empfängers,

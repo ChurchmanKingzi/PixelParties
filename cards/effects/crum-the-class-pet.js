@@ -19,7 +19,7 @@
 //  • „delete it …": `markiereZugendeLoeschung` (Engine) — gilt auch, wenn
 //    Crum bis dahin weg ist.
 //  • ★ Spielgestalter-Entscheidung 18.11.2026: der Tausch verschiebt eine Karte aus der EIGENEN Ablage → unter JEDER Ablage-Ausgangssperre (Stab-Sperre, Sperre des Eye of Ren,
-//    Knight of Kings [B], Hatusbal & Co.; gemeinsamer Helfer `ablageAusgangGesperrt`, `_pfad-shared.js`) ist die Aktivierung nicht verfügbar (`canActivateCreatureEffect`), und
+//    Knight of Kings [B]; Hatusbal sperrt nur das Zurückmischen und gehört nicht dazu; gemeinsamer Helfer `ablageAusgangGesperrt`, `_pfad-shared.js`) ist die Aktivierung nicht verfügbar (`canActivateCreatureEffect`), und
 //    der Effekt prüft die Sperre vor dem Flug noch einmal. Ohne Sperre unverändert.
 // ═══════════════════════════════════════════
 const { istDoppelSpell, kontrolliert } = require('./_double-shared');
