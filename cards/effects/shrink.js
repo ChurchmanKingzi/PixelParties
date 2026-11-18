@@ -17,6 +17,11 @@
 //  (Juice, Beer, Cure, Exorcism …), fällt Shrink in die Ablage seines Besitzers; verlässt die Karte den Helden aus anderem Grund, endet der Status mit ihr. Beide Hälften des Textes gelten
 //  nur, solange der Held den Status wirklich trägt.
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ────────────────
+//  „Shrunk" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen `attach:<instId>`-Eintrag
+//  („Shrunk (Shrink)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers; Cure zählt ihn als einen entfernten Effekt
+//  (+100 HP). Aktiv steht nur der Status `shrunk` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt, solange der Wirt `shrunk` trägt).
+//
 //  ── „DAMAGE … DEALS WITH ATTACKS BECOMES 1" ─────────────────────────────
 //  `beforeDamage` (Heldenziele) und `beforeCreatureDamageBatch` (Kreaturenziele): jeder Schaden > 0 mit Schadenstyp ATTACK (oder einem Effekt, der als Attack ZÄHLT — Broghan & Co.),
 //  dessen Quelle der Wirt ist (`quelleIstHeld`: Brettseite + Index, also auch ein übernommener Held), WIRD 1 (`ctx.becomeAmount(1)`, Engine-Vertrag, s. dort): Verdopplungen und +X-Boni anderer Karten
@@ -77,6 +82,10 @@ module.exports = {
   requiresTarget: true,
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,            // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Shrunk (Shrink)',
+  negativeStatusIcon: '🤏',
   statusFolgtImmunitaet: { status: STATUS_NAME },   // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts (beide Textteile hängen nur am Status)
   spellVisual: { impact: { type: 'shrink_squeeze' }, impactMs: 420 },
 

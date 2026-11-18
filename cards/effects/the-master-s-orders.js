@@ -19,7 +19,13 @@
 //     Charme-Schutz … gelten). Er trägt die Karte: wird er GEHEILT (Juice, Beer, Cure …), fallen ALLE Orders-Kopien am Helden in die Ablage ihres Besitzers; verlässt die letzte Kopie den
 //     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts. Spielgestalter-Entscheidung 17.11.2026 (ATT-15): unter Status-Immunität des Wirts
 //     liegt die Karte wirkungslos da, ABER sobald die Immunität endet, greift der Status (die Übernahme beginnt dann mit dem nächsten Zugbeginn des Anhängers); kommt sie später dazu, ruht er wieder
-//     und eine laufende Übernahme endet (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`).
+//     und eine laufende Übernahme endet (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`). Dafür trägt der Status die Marke `_fromAttachment` (wie bei Berserk/Curse/Polymorph/Shrink; sie ist auch der
+//     Griff, an dem Tea die Karte beim Übertragen des Status mitnimmt) — ohne sie erkennt der Abgleich den aktiven Status nicht und lässt ihn trotz Immunität stehen. Die Übernahme, die die Karte selbst ausübt, zählt
+//     für die Immunität des Wirts nicht (`kontrolleAls`, wie Mind Control): er wird als Held seines Besitzers beurteilt, sonst schützte die Johanna/der Light Ball des Anhängers ihn vor seinem eigenen Status.
+//     HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026): „Under Orders" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie
+//     dann als eigenen `attach:<instId>`-Eintrag („Under Orders (The Master's Orders)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers
+//     (eine Übernahme gab es nie: sie hängt am Status); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `ordered` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag
+//     entfällt, solange der Wirt `ordered` trägt).
 //  3. KONTROLLE: am Beginn jedes Zuges des Anhängers (`onTurnStart`) — und sofort, wenn die Karte in seinem EIGENEN Zug angelegt wird — übernimmt er den Helden für den Rest des
 //     Zuges: dieselbe Übernahme wie Charme/Love Shot/Control Device (`temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed`), OHNE Schutzklausel
 //     (`ohneSchutz`: der Text verspricht keinen), Rechte „beschwören + ausrüsten" (keine Abilities hinlegen). Die Rückgabe am nächsten Zugbeginn ist generisch (Engine). Während der
@@ -85,9 +91,12 @@ async function ordersAnlegen(engine, appliedBy, owner, heroIdx) {
     appliedBy,
     source: CARD_NAME,
     animationType: 'dark_swarm',
+    _fromAttachment: CARD_NAME,   // Marke „dieser Status gehört dieser Karte" (wie Berserk/Curse/Polymorph/Shrink): ohne sie erkennt der Immunitäts-Abgleich (`statusFolgtImmunitaet`) den aktiven Status nicht
     festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewählt
   });
-  return !!hero.statuses?.[STATUS_NAME];
+  const st = hero.statuses?.[STATUS_NAME];
+  if (st && !st._fromAttachment) st._fromAttachment = CARD_NAME;
+  return !!st;
 }
 
 /** Orders-Kopien am Wirt (Brettseite `owner`). */
@@ -109,11 +118,17 @@ async function nimmKontrolle(engine, inst) {
   const pi = anhaenger(engine, inst);
   if (gs.activePlayer !== pi) return false;
   if (hero.charmedBy != null || hero.permaControlBy != null || hero.controlledBy != null) return false;   // schon übernommen (auch vom Anhänger selbst)
-  const ok = await temporaereKontrolle(engine, {
-    controllerPi: pi, ownerPi: owner, heroIdx, sourceName: CARD_NAME,
-    marker: 'ohneSchutz',          // der Kartentext verspricht keinen Schutz (wie Styx, Control Device)
-    supportZonesLocked: false,     // Rechte: beschwören + ausrüsten
-  });
+  // `_ordersUebernimmt`: solange `temporaereKontrolle` läuft (sie ruft `engine.sync()`), ist `charmed.quelle` noch nicht gesetzt — `kontrolleAls` (unten) erkennt die eigene Übernahme an dieser Marke.
+  if (!inst.counters) inst.counters = {};
+  inst.counters._ordersUebernimmt = true;
+  let ok;
+  try {
+    ok = await temporaereKontrolle(engine, {
+      controllerPi: pi, ownerPi: owner, heroIdx, sourceName: CARD_NAME,
+      marker: 'ohneSchutz',          // der Kartentext verspricht keinen Schutz (wie Styx, Control Device)
+      supportZonesLocked: false,     // Rechte: beschwören + ausrüsten
+    });
+  } finally { if (inst.counters) delete inst.counters._ordersUebernimmt; }
   if (!ok.ok) return false;
   if (hero.statuses?.charmed) hero.statuses.charmed.quelle = CARD_NAME;
   await engine.runHooks('onTakeControl', {
@@ -144,6 +159,10 @@ module.exports = {
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,           // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: "Under Orders (The Master's Orders)",
+  negativeStatusIcon: '📜',
   spellVisual: { impact: { type: 'dark_swarm' }, impactMs: 260 },
 
   spellPlayCondition(gs, pi, engine) {
@@ -168,6 +187,14 @@ module.exports = {
   // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts; beginnt sie mitten im Zug, endet die laufende Übernahme (sie hing am Status).
   statusFolgtImmunitaet: {
     status: STATUS_NAME,
+    // Wie Mind Control: die Übernahme, die diese Karte selbst ausübt, zählt für die Status-Immunität des Wirts nicht — er wird als Held seines Besitzers beurteilt. Sonst schützte die Johanna / der Light Ball /
+    // der Immunitäts-Buff des ANHÄNGERS den übernommenen Helden vor dem Status, der die Übernahme trägt, und sie erlösche im selben Augenblick, in dem sie beginnt.
+    kontrolleAls(engine, inst, seite, heroIdx) {
+      const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
+      if (!hero || hero.charmedBy == null || hero.permaControlBy != null) return null;
+      if (hero.statuses?.charmed?.quelle !== CARD_NAME && !inst.counters?._ordersUebernimmt) return null;   // eine fremde Übernahme (Love Shot, Charme …) bleibt, wie sie ist
+      return seite;
+    },
     ruhen(engine, inst, hero) {
       if (hero.charmedBy != null && hero.statuses?.charmed?.quelle === CARD_NAME && hero.permaControlBy == null) {
         delete hero.charmedBy; delete hero.charmedFromOwner; delete hero.charmedHeroIdx;
@@ -254,7 +281,8 @@ module.exports = {
       const engine = ctx._engine;
       const owner = ctx.heroOwner, heroIdx = ctx.heroIdx;
       if (typeof owner !== 'number' || typeof heroIdx !== 'number') return;
-      const kopien = kopienAmWirt(engine, owner, heroIdx);
+      // Tea überträgt den Status: die Karte, die mitzieht (`_anhaengselZiehtUm`), fällt nicht ab (Marke `_fromAttachment` am Status, `engine.anhaengselFuerStatus`); mit ihrem Abgang endet die Übernahme (`onCardLeaveZone`).
+      const kopien = kopienAmWirt(engine, owner, heroIdx).filter(c => !c.counters?._anhaengselZiehtUm);
       if (kopien.length === 0) return;
       engine.gs._ordersCleanseInProgress = true;
       try {

@@ -25,6 +25,12 @@
 //  `negative_status_immune` …), bleibt die Karte wirkungslos in der Support Zone liegen — ABER sobald die Immunität endet, greift Berserk;
 //  kommt sie später dazu, ruht der Status wieder (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`, Abgleich in `engine.sync`).
 //
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ──────────
+//  „Berserked" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen
+//  `attach:<instId>`-Eintrag („Berserked (Berserk)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers;
+//  Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `berserked` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt,
+//  solange der Wirt `berserked` trägt).
+//
 //  Boolean status — multiple Berserk Attachments
 //  on the same Hero all bind the same single
 //  `berserked` status (no extra charge from a
@@ -110,6 +116,10 @@ module.exports = {
   // gesetzt. `attachmentStatus` sagt dem Puzzle-Aufbau, welcher Status
   // dazugehoert; er legt ihn beim Start an.
   attachmentStatus: 'berserked',
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Berserked (Berserk)',
+  negativeStatusIcon: '😡',
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
