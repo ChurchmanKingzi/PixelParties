@@ -69,6 +69,7 @@ function buildContext() {
   };
   // loadImage() akzeptiert unsere NodeImage-Instanzen nicht direkt → drawImage bekommt das echte Bild.
   sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;          // seit der Zweisprachigkeit liest card-render.js `window.PP_I18N` (hier nicht gesetzt = Englisch); ohne `window` stürzte jede Karte ab
   const ctx = vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(RENDER_JS, 'utf8'), ctx, { filename: 'card-render.js' });
   return sandbox;
