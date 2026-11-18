@@ -22056,7 +22056,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "Choose a card from your deck and send it to your discard pile. You cannot move cards out of your discard pile for the rest of the turn unless you spend an additional 6 Gold.",
+    "effect": "Choose a card from your deck and send it to your discard pile. When you activate this Artifact, you may spend an additional 6 Gold. If you do not, you cannot move cards out of your discard pile for the rest of the turn.",
     "archetype": "",
     "setID": "PP MSEG",
     "banned": "",

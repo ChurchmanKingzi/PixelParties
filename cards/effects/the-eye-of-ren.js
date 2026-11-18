@@ -2,9 +2,10 @@
 //  CARD EFFECT: "The Eye of Ren"
 //  Artifact (Normal)
 //
-//  „Choose a card from your deck and send it to your discard pile. You
-//   cannot move cards out of your discard pile for the rest of the
-//   turn unless you spend an additional 6 Gold."
+//  „Choose a card from your deck and send it to your discard pile. When you
+//   activate this Artifact, you may spend an additional 6 Gold. If you do
+//   not, you cannot move cards out of your discard pile for the rest of the
+//   turn."
 //
 //  ── Spielgestalter-Entscheidung 18.11.2026 ────────────────────
 //  Die 6 Gold sind ZUSATZKOSTEN der Aktivierung und werden im Moment der Aktivierung bezahlt — kein Freikauf mehr bei jedem

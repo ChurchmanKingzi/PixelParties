@@ -5340,7 +5340,7 @@
 },
 "The Eye of Ren": {
 "name": "Das Auge von Ren",
-"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Du kannst für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen, außer du gibst zusätzlich 6 Gold aus."
+"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Wenn du dieses Artefakt aktivierst, darfst du zusätzlich 6 Gold ausgeben. Tust du das nicht, kannst du für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen."
 },
 "The Golden Abomination": {
 "name": "Die Goldene Abscheulichkeit",
