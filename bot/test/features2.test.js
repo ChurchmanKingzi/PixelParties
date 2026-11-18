@@ -240,11 +240,15 @@ test('Neue Karten: gepostet; ohne Kanal oder bei Sendefehler NICHT als bekannt v
   let msg = message({ guild: g, member: normal, content: '!announce Kidnapping' });
   await ctx.handleMessage(msg);
   assert.equal(sent.length, vorher, 'ohne Staff-Recht nichts');
-  msg = message({ guild: g, member: boss, content: '!announce Atta, Speaker of Desires; See through the Ruse; zzzzzz' });
+  // Eine echte Karte OHNE Kunst (die erste, die der Renderer nicht zeichnen kann) — fest benannte Karten bekommen irgendwann Kunst und kippen den Test
+  // (zuletzt „Atta, Speaker of Desires"). Gibt es gar keine mehr, bleibt „zzzzzz" als Nichtkarte.
+  const OHNE_KUNST = renderer.allCards().map(c => c.name).find(n => !renderer.canRender(n) && !n.includes(';')) || 'zzzzzz';
+  const OHNE_RE = OHNE_KUNST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  msg = message({ guild: g, member: boss, content: `!announce ${OHNE_KUNST}; See through the Ruse; zzzzzz` });
   await ctx.handleMessage(msg);
   assert.equal(sent.length, vorher + 1, 'Ruse gepostet');
   assert.match(msg.replies[0].content, /Posted 1 card/);
-  assert.match(msg.replies[0].content, /Not found.*Atta, Speaker of Desires|Not found.*zzzzzz/);
+  assert.match(msg.replies[0].content, new RegExp(`Not found.*${OHNE_RE}|Not found.*zzzzzz`));
 });
 
 test('Neue Karten: einmaliges Zurücksetzen der Wellenkarten — erscheinen beim nächsten Lauf genau einmal', async () => {
