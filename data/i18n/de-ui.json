@@ -1821,7 +1821,6 @@
 "You must {0} {1} more card{2}.": "Du musst noch {1} Karte{2:n} {0}.",
 "You would draw a card from your Potion Deck. Activate {0} instead?": "Du würdest eine Karte von deinem Trankdeck ziehen. Stattdessen {0} aktivieren?",
 "Your Hero": "Dein Held",
-"Your discard pile is locked by {0}. Pay {1} Gold to move cards out of it for the rest of this turn?": "Dein Ablagestapel ist durch {0} gesperrt. {1} Gold zahlen, um für den Rest dieses Zugs Karten daraus zu bewegen?",
 "Your opponent": "Dein Gegner",
 "Your opponent entered their Action Phase! Activate {0}?": "Dein Gegner ist in seine Aktionsphase eingetreten! {0} aktivieren?",
 "Your opponent's {0} is about to take {1} damage from {2}! Activate {3}?": "{0} deines Gegners erleidet gleich {1} Schaden durch {2}! {3} aktivieren?",
@@ -5180,7 +5179,11 @@
 "🥚 Sacrifice!": "🥚 Opfern!",
 "The Eighth Circle of Hell": "Der achte Kreis der Hölle",
 "🔥 Delete & draw {0}": "🔥 Löschen & {0} ziehen",
-"Choose a card from your deck and send it to your discard pile. For the rest of the turn, moving cards out of your discard pile costs an additional {0} Gold (paid once).": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Für den Rest des Zuges kostet das Bewegen von Karten aus deinem Ablagestapel zusätzlich {0} Gold (einmal zu zahlen).",
+"Choose a card from your deck and send it to your discard pile. Then pay {0} extra Gold or lock your discard pile for the rest of the turn.": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Danach zahlst du {0} Gold extra oder sperrst deinen Ablagestapel für den Rest des Zuges.",
+"Choose a card from your deck to send to your discard pile. You cannot pay {0} extra Gold, so your discard pile will be locked for the rest of the turn.": "Wähle eine Karte aus deinem Deck, die du auf deinen Ablagestapel legst. Du kannst die {0} Gold Zusatzkosten nicht bezahlen, daher wird dein Ablagestapel für den Rest des Zuges gesperrt.",
+"Pay {0} extra Gold or lock your discard pile?": "{0} Gold extra zahlen oder deinen Ablagestapel sperren?",
+"Pay {0} extra Gold or lock your discard pile? Your discard pile is already locked this turn, so paying will not lift the lock.": "{0} Gold extra zahlen oder deinen Ablagestapel sperren? Dein Ablagestapel ist in diesem Zug bereits gesperrt, die Zahlung hebt die Sperre nicht auf.",
+"🔒 Lock discard pile": "🔒 Ablagestapel sperren",
 "The Eye of Ren": "Das Auge von Ren",
 "👁️ Look!": "👁️ Hinsehen!",
 "The Fifth Circle of Hell": "Der fünfte Kreis der Hölle",
@@ -7613,5 +7616,7 @@
 "Jetpack Raccoon": "Jetpack-Waschbär",
 "Display Creatures": "Kreaturen anzeigen",
 "Shows animated Creatures standing on their cards on the board. Turn off for a calmer board or on low-power devices. Never shown on phones.": "Zeigt animierte Kreaturen, die auf ihren Karten auf dem Spielfeld stehen. Schalte es für ein ruhigeres Spielfeld oder auf schwachen Geräten aus. Wird auf Handys nie angezeigt.",
-"Shows animated Creatures standing on their cards on the board. Needs \"Display Heroes\".": "Zeigt animierte Kreaturen, die auf ihren Karten auf dem Spielfeld stehen. Benötigt \"Helden anzeigen\"."
+"Shows animated Creatures standing on their cards on the board. Needs \"Display Heroes\".": "Zeigt animierte Kreaturen, die auf ihren Karten auf dem Spielfeld stehen. Benötigt \"Helden anzeigen\".",
+"Aged (Forbidden Curse of Aging)": "Gealtert (Verbotener Fluch des Alterns)",
+"Mind Controlled (Mind Control)": "Gedankenkontrolliert (Gedankenkontrolle)"
 }

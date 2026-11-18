@@ -136,7 +136,7 @@ module.exports = {
 
     if (eligibleIndices.length === 0) return { cancelled: true };
 
-    // Z6 (F02-13): Ablage-Ausgang VOR dem Loeschen klaeren (Eye of Ren: 6-Gold-Freikauf anbieten; abgelehnt/hart gesperrt = sauberer
+    // Z6 (F02-13): Ablage-Ausgang VOR dem Loeschen klaeren (Stab-/Eye-of-Ren-Sperre, beide hart: gesperrt = sauberer
     // Abbruch, Karte bleibt in der Hand) - sonst waeren die Handkarten schon geloescht, wenn die Ablage zubleibt.
     if (!(await engine._discardOutAllowed(pi, { source: 'Shard of Chaos' }))) return { cancelled: true };
 

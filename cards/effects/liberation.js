@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { waehlePfad, ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Liberation';
 const MAX_PICKS = 3;
@@ -94,10 +95,30 @@ function freieZonen(engine, pi, name = null) {
   return zonen;
 }
 
-function kannBergen(engine, pi) {
+/**
+ * Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel: ist von mehreren Pfaden genau einer frei, wird automatisch dieser genommen, `_pfad-shared.js`):
+ * Die Sperren treffen nur den jeweiligen Weg, nicht die ganze Karte.
+ *  • Weg „Kreaturen auf die Hand", Quelle ABLAGE: gesperrt unter der Stab-Sperre (Staff of the Teleporter: „cannot move any cards out of your discard pile"), Knight of Kings [B],
+ *    Hand-Sperre („cannot draw or add cards") und der starken Such-Sperre (Siege) — `_isSearchBlocked(…, 'discard')`; die schwache Such-Sperre (Cats) lässt die Ablage offen.
+ *  • Quelle GELÖSCHT: derselbe Weg „auf die Hand", aber nicht die Ablage — die Stab-Sperre trifft sie nicht; Hand-/starke Such-Sperre sperren sie wie bisher (früher war die ganze
+ *    Karte darunter gesperrt).
+ *  • Weg „Take back": von all diesen Sperren unberührt.
+ */
+function ausAblageOffen(engine, pi) {
   const ps = engine.gs.players[pi];
   return kreaturenIn(engine, ps?.discardPile).length > 0
-    || kreaturenIn(engine, ps?.deletedPile).length > 0;
+    && !ablageAusgangGesperrt(engine, pi)
+    && !engine._isSearchBlocked(pi, {}, 'discard');
+}
+
+function ausGeloeschtOffen(engine, pi) {
+  const ps = engine.gs.players[pi];
+  return kreaturenIn(engine, ps?.deletedPile).length > 0
+    && !engine._isSearchBlocked(pi, {}, 'discard');
+}
+
+function kannBergen(engine, pi) {
+  return ausAblageOffen(engine, pi) || ausGeloeschtOffen(engine, pi);
 }
 
 function kannBefreien(engine, pi) {
@@ -113,21 +134,13 @@ async function bergen(engine, pi, ctx) {
   const ausAblage = kreaturenIn(engine, ps.discardPile);
   const ausDeleted = kreaturenIn(engine, ps.deletedPile);
 
-  // Stapel waehlen — nur fragen, wenn beide etwas hergeben.
-  let stapel = ausAblage.length > 0 ? 'discard' : 'deleted';
-  if (ausAblage.length > 0 && ausDeleted.length > 0) {
-    const wahl = await engine.promptGeneric(pi, {
-      type: 'optionPicker', title: CARD_NAME,
-      description: 'Take Creatures from which pile?',
-      options: [
-        { id: 'discard', label: `🗑️ Discard pile (${ausAblage.length})` },
-        { id: 'deleted', label: `❌ Deleted cards (${ausDeleted.length})` },
-      ],
-      cancellable: true,
-    });
-    if (!wahl || wahl.cancelled) { gs._spellCancelled = true; return false; }
-    stapel = wahl.optionId || wahl.id || wahl.selected || wahl.option || 'discard';
-  }
+  // Stapel waehlen — nur fragen, wenn beide etwas hergeben UND offen sind (gesperrter Weg: nicht wählbar; genau einer frei: automatisch).
+  const quellWahl = await waehlePfad(engine, pi, [
+    { id: 'discard', label: `🗑️ Discard pile (${ausAblage.length})`, offen: () => ausAblageOffen(engine, pi) },
+    { id: 'deleted', label: `❌ Deleted cards (${ausDeleted.length})`, offen: () => ausGeloeschtOffen(engine, pi) },
+  ], { title: CARD_NAME, description: 'Take Creatures from which pile?', cancellable: true });
+  if (quellWahl.abgebrochen || quellWahl.keiner) { gs._spellCancelled = true; return false; }
+  const stapel = quellWahl.id;
 
   // Einzeln picken, damit mehrere Kopien desselben Namens moeglich sind.
   //
@@ -233,13 +246,9 @@ async function befreien(engine, pi) {
 }
 
 module.exports = {
-  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
-  // dieser Karte (Creatures aus dem Ablagestapel auf die Hand.)
-  // — unter der starken Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
-  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
-  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
-  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
-  blockedBySearchLockDiscard: true,
+  // ★ v1070 (Als Ruling 14.9.) hatte die Karte unter der starken Such-Sperre ganz gesperrt (`blockedBySearchLockDiscard`), weil die Suche in der Ablage damals der GANZE Ertrag war.
+  // Spielgestalter-Entscheidung 18.11.2026: die Karte hat zwei Wege (Kreaturen aufnehmen / „Take back"); die Sperren (Stab-Sperre, Hand-Sperre, starke Such-Sperre, Knight of
+  // Kings [B]) schliessen nur den Aufnahme-Weg (Ablage), „Take back" bleibt frei — gesperrt ist die Karte erst, wenn KEIN Weg offen ist (`spellPlayCondition`).
   activeIn: ['hand'],
   // Holt Ziele auf die eigene Seite zurueck — dieselbe Marke, die
   // Boris & Co. lesen.
@@ -272,22 +281,14 @@ module.exports = {
       const befreibar = kannBefreien(engine, pi);
       if (!bergbar && !befreibar) { gs._spellCancelled = true; return; }
 
-      // Nur bei echter Wahl ein Menue.
-      let modus = bergbar ? 'recover' : 'free';
-      if (bergbar && befreibar) {
-        const anzahl = zurueckholbare(engine, pi).length;
-        const wahl = await engine.promptGeneric(pi, {
-          type: 'optionPicker', title: CARD_NAME,
-          description: 'Choose one of the following effects.',
-          options: [
-            { id: 'recover', label: '🗃️ Add up to 3 Creatures from a pile to your hand' },
-            { id: 'free', label: `⛓️‍💥 Take back ${anzahl} Creature${anzahl === 1 ? '' : 's'} of yours` },
-          ],
-          cancellable: true,
-        });
-        if (!wahl || wahl.cancelled) { gs._spellCancelled = true; return; }
-        modus = wahl.optionId || wahl.id || wahl.selected || wahl.option || 'recover';
-      }
+      // Nur bei echter Wahl ein Menue (genau ein offener Weg: automatisch).
+      const anzahl = zurueckholbare(engine, pi).length;
+      const wahl = await waehlePfad(engine, pi, [
+        { id: 'recover', label: '🗃️ Add up to 3 Creatures from a pile to your hand', offen: bergbar },
+        { id: 'free', label: `⛓️‍💥 Take back ${anzahl} Creature${anzahl === 1 ? '' : 's'} of yours`, offen: befreibar },
+      ], { title: CARD_NAME, description: 'Choose one of the following effects.', cancellable: true });
+      if (wahl.abgebrochen || wahl.keiner) { gs._spellCancelled = true; return; }
+      const modus = wahl.id;
 
       if (modus === 'free') await befreien(engine, pi);
       else await bergen(engine, pi, ctx);

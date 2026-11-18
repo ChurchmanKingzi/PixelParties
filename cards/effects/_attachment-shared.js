@@ -539,16 +539,26 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
 //      extras: { ... },                         // optional: Zusatzfelder des Statuseintrags (Stowaway: `abilitiesNegated`)
 //      einsetzen(engine, inst, hero, seite, heroIdx) {},   // optional, synchron: Nebenwirkungen NACH dem Setzen (Polymorph: ATK-Bonus, Fluch: ATK-Sperre)
 //      ruhen(engine, inst, hero, seite, heroIdx) {},       // optional, synchron: Nebenwirkungen NACH dem Wegnehmen (muss idempotent sein)
+//      kontrolleAls(engine, inst, seite, heroIdx) {},      // optional: Kontrolleur, als dessen Held der Wirt für die Immunitäts-Prüfung gilt (null = wie er jetzt steht; Mind Control, s. u.)
 //    }
 //  Die Karten melden das Ergebnis ihres Anlegens mit `statusErgebnisBuchen` (oder `setzeOderRuhe`), damit eine Karte, deren Status wegen Immunität ausblieb, markiert ist.
 // ═══════════════════════════════════════════
 
 const RUHT = '_statusRuht';
 
-/** Würde der Wirt diesen Anhängsel-Status wegen einer ZUSTANDS-Immunität gerade abweisen? (Brettseite `owner`.) */
-function wirtStatusImmun(engine, owner, heroIdx, statusName) {
+/**
+ * Würde der Wirt diesen Anhängsel-Status wegen einer ZUSTANDS-Immunität gerade abweisen? (Brettseite `owner`.)
+ * `insts`: die Karten, die den Status tragen/anlegen wollen — eine mit `statusFolgtImmunitaet.kontrolleAls` (Mind Control, 18.11.2026) bestimmt, als wessen Held der Wirt beurteilt wird: die Kontrolle, die
+ * die Karte selbst ausübt, darf die Immunität nicht ändern (sonst schützte die Johanna/der Light Ball des Übernehmers den übernommenen Helden vor der Übernahme selbst, und sie flackerte an und aus).
+ */
+function wirtStatusImmun(engine, owner, heroIdx, statusName, insts) {
   if (typeof engine?.heroBlocksStatusNow !== 'function') return false;
-  return !!engine.heroBlocksStatusNow(owner, heroIdx, statusName, { festesZiel: true, bypassImmune: true, ohneCharme: true });
+  const opts = { festesZiel: true, bypassImmune: true, ohneCharme: true };
+  for (const i of insts || []) {
+    const k = loadCardEffect(i.name)?.statusFolgtImmunitaet?.kontrolleAls?.(engine, i, owner, heroIdx);
+    if (k != null) { opts.kontrolleAls = k; break; }
+  }
+  return !!engine.heroBlocksStatusNow(owner, heroIdx, statusName, opts);
 }
 
 /**
@@ -558,7 +568,7 @@ function wirtStatusImmun(engine, owner, heroIdx, statusName) {
 function statusErgebnisBuchen(engine, inst, gesetzt, owner, heroIdx, statusName) {
   if (!inst) return;
   if (!inst.counters) inst.counters = {};
-  if (!gesetzt && wirtStatusImmun(engine, owner, heroIdx, statusName)) inst.counters[RUHT] = true;
+  if (!gesetzt && wirtStatusImmun(engine, owner, heroIdx, statusName, [inst])) inst.counters[RUHT] = true;
   else delete inst.counters[RUHT];
 }
 
@@ -571,7 +581,7 @@ function setzeOderRuhe(engine, inst, statusName, extras) {
   const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!wirt?.name || wirt.hp <= 0) return false;
   if (statusName === 'negated' && engine.heroIgnoresHaltStatuses?.(owner, heroIdx)) return false;   // W12: Karian wird nie durch Negation gehindert
-  if (wirtStatusImmun(engine, owner, heroIdx, statusName)) {
+  if (wirtStatusImmun(engine, owner, heroIdx, statusName, [inst])) {
     statusErgebnisBuchen(engine, inst, false, owner, heroIdx, statusName);
     engine.log('status_blocked', { target: wirt.name, status: statusName, reason: 'status immunity — takes effect when it ends' });
     return 'ruht';
@@ -593,7 +603,7 @@ function _abgleichGruppe(engine, g) {
   const namen = new Set(insts.map(i => i.name));
   const st = hero.statuses?.[status];
   const traegt = !!st && namen.has(st._fromAttachment);
-  const blockiert = wirtStatusImmun(engine, owner, heroIdx, status);
+  const blockiert = wirtStatusImmun(engine, owner, heroIdx, status, insts);
 
   if (ruhende.length > 0) {
     // Trägt der Wirt den Status schon (Übertragung, zweite Kopie) oder liegt ein fremder Status gleichen Namens — außer der überlagerbaren Negierung —, ist nichts nachzuholen.

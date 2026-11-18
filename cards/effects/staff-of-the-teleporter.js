@@ -181,10 +181,10 @@ module.exports = {
 
     // Locks land AFTER our own draws complete.
     // W16e (F03-18, Al Welle 3: "Staebe sperren nur das Ziehen"): reiner Zieh-Lock wie The Sacred Jewel (Suchen/Hinzufuegen bleibt erlaubt);
-    // das Verbot, Karten aus der Ablage zu bewegen, tragen `_discardLockedTurn`/`_discardLockHard`.
+    // das Verbot, Karten aus der Ablage zu bewegen, traegt `_discardLockedTurn` (+ die Stab-Marke `_discardLockHard`).
     ps.drawLocked = true;
     ps._discardLockedTurn = gs.turn;
-    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
+    ps._discardLockHard = gs.turn;   // Marke "Stab-Sperre" (nur Meditation unterscheidet sie von der Sperre des Eye of Ren; beide sind hart, `isDiscardOutHardLocked`)
 
     engine.log('staff_of_the_teleporter', {
       player: ps.username,

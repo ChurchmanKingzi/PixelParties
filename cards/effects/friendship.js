@@ -279,9 +279,31 @@ module.exports = {
     /**
      * ★ Spielgestalter-Entscheidung 17.11.2026 (FRI-03): „use a Support Magic Spell as an additional Action with this Hero, then draw X cards" — die Zusatzaktion ist mit dem Einsatz
      * des Spells VERBRAUCHT. Wird der Spell negiert (nach der Zielwahl: MOE Shield, Storm Ring …), trifft die Negation nur den Spell: `afterSpellResolved` feuert dann nie, also feuert
-     * dasselbe Ziehen (Lv2: 1, Lv3: 3) hier trotzdem. Der Geber (`viaAdditionalProvider`) kommt nur aus dem Weg „negiert nach der Zielwahl"; wird die ganze Karte in der Kette
-     * negiert (The Master's Plan …), bekommt der Spieler die Zusatzaktion zurueck und es gibt keinen Geber (kein Ziehen).
+     * dasselbe Ziehen (Lv2: 1, Lv3: 3) hier trotzdem. Der Geber (`viaAdditionalProvider`) kommt nur aus dem Weg „negiert nach der Zielwahl"; die Negation der GANZEN Karte in der Kette
+     * (Silence, The Master's Plan …) meldet `zusatzaktionNachKettennegation` (unten, server.js `doPlaySpell`) — dort gibt es keinen `afterSpellPrevented` mit Geber.
      */
     afterSpellPrevented: async (ctx) => module.exports.hooks.afterSpellResolved(ctx),
+  },
+
+  /**
+   * ★ Spielgestalter-Entscheidung 18.11.2026: „ja, Friendship zieht auch nach Negation". Wird der als Friendship-Zusatzaktion gespielte Support Spell IN DER KETTE ganz negiert (Silence,
+   * The Master's Plan, Rusty Touch … — `executeCardWithChain` negiert die Karte, ihr Rumpf läuft nie), ist die Zusatzaktion trotzdem VERBRAUCHT (M1: der Beginn der Aktivierung verbraucht;
+   * Friendships eigenes Once-per-turn gilt als genutzt) und der Spieler zieht trotzdem (Lv2: 1, Lv3: 3) — die Negation trifft nur den Spell, nicht Friendship. Lv1 setzt wie beim
+   * aufgelösten Spell die Sperre „keine weiteren Support Magic Spells in diesem Zug" (server.js setzt sie nur im Pfad ohne Kettennegation).
+   * Aufruf: server.js `doPlaySpell` im Zweig `chainResult.negated` anstelle von `restoreAdditionalAction` (Geber ohne diese Funktion bekommen die Zusatzaktion weiter zurück).
+   * @param {object} provider  die verbrauchte Friendship-Instanz (`consumedInst`)
+   * @param {{spellName:string, spellCardData:object}} info
+   */
+  async zusatzaktionNachKettennegation(engine, provider, info) {
+    if (!provider || provider.name !== 'Friendship') return;
+    const ctx = engine._createContext(provider, {
+      spellName: info.spellName, spellCardData: info.spellCardData, viaAdditionalProvider: provider,
+    });
+    const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+    if (getFriendshipLevel(engine, feld, ctx.cardHeroIdx) === 1 && hasSpellSchool(info.spellCardData, 'Support Magic')) {
+      const ps = engine.gs.players[ctx.cardOwner];
+      if (ps) { ps.supportSpellLocked = true; engine.log('support_spell_locked', { player: ps.username, by: 'Friendship' }); }
+    }
+    await module.exports.hooks.afterSpellResolved(ctx);   // Lv2/Lv3: Thalia-Prüfung, Funkeln, Ziehen — derselbe Pfad wie beim aufgelösten Spell
   },
 };

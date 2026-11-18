@@ -88,6 +88,7 @@ const { areaTargetId, coolnessSpitzeZiel, supportAbilityZiel } = require('./_tar
 const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
 
 const { payRebelliokaiCost } = require('./_rebelliokai-shared');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Tengu Windstorm';
 const COST_NAME = 'Rebelliokai Terror Tengu';
@@ -428,7 +429,9 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
-    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
+    // Ablage-Ausgangssperre (Staff of the Teleporter, nicht bezahlte Eye-of-Ren-Sperre — beide hart): `payRebelliokaiCost` zahlt synchron — die Kosten wären unzahlbar (Spielgestalter-Entscheidung 18.11.2026:
+    // ein gesperrter Weg ist nicht wählbar; hier ist es der einzige Weg → Karte nicht spielbar, statt wirkungslos auf der Hand zu bleiben).
+    if (engine && ablageAusgangGesperrt(engine, pi)) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 

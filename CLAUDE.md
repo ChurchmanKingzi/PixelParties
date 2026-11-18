@@ -28,9 +28,13 @@ Bugfix-Note: _alice-shared | Summons no longer stay on the board after their own
   (z. B. Skript passte nicht zum Kartentext), schreibe eine `Bugfix-Note` für diese Karte; dann erscheint sie auch im Bugfix-Kanal.
 * Ohne `Bugfix-Note` erscheint die Karte trotzdem (erkannt am geänderten Skript), nur ohne Erklärung.
 * **Reine Anpassung an eine NEUE Karte ist kein Bugfix:** Wird ein bestehendes Skript (oder ein gemeinsamer Baustein, auch `_engine`) nur geändert, damit es zu einer neuen Karte passt (neuer Engine-Vertrag, Wechselwirkung, Zielfilter für die neue Karte), schreibe pro betroffener Karte/Baustein eine Zeile
-  `Bugfix-Skip: <Kartenname oder _baustein>` (optional `| Grund`) in die Commit-Nachricht – **keine** `Bugfix-Note`. Der Bot meldet das Ziel dann nicht im Bugfix-Kanal. Dasselbe gilt für Nachbesserungen an einer neuen Karte, die für Spieler noch nicht
-  freigegeben ist, auch wenn sie schon in `data/cards.json` steht. Ein `Bugfix-Skip` hat Vorrang vor einer `Bugfix-Note` desselben Ziels im selben Bot-Zeitraum (so nimmt man eine zu Unrecht geschriebene Note in einem späteren Commit zurück) –
-  also nicht für eine Karte schreiben, an der im selben Zeitraum auch ein echter Fehler behoben wurde.
+  `Bugfix-Skip: <Kartenname oder _baustein>` (optional `| Grund`) in die Commit-Nachricht – **keine** `Bugfix-Note`. Der Bot meldet die Änderung dieses Commits dann nicht im Bugfix-Kanal. Dasselbe gilt für Nachbesserungen an einer neuen Karte, die für Spieler noch nicht
+  freigegeben ist, auch wenn sie schon in `data/cards.json` steht.
+  * **Ein `Bugfix-Skip` unterdrückt nur die Änderung seines eigenen Commits.** Ändert ein anderer Commit im selben Bot-Zeitraum dasselbe Skript (bzw. denselben Baustein) inhaltlich ohne eigenen Skip, wird das Ziel trotzdem gemeldet; auch eine `Bugfix-Note` eines anderen Commits bleibt davon unberührt
+    (der Skip hat **keinen** Vorrang vor Notes anderer Commits). Nur innerhalb EINES Commits gewinnt der Skip: Trägt ein Commit Note und Skip für dasselbe Ziel, entfällt die Note dieses Commits. Eine Karte, die nur über einen Baustein betroffen ist, unterdrückt der Commit mit `Bugfix-Skip: <Karte>` oder `Bugfix-Skip: <baustein>`.
+    Die Zeilen gehören in die Nachricht des Commits, der die Änderung enthält (bei Squash-Merge in die Squash-Nachricht); Skip-Zeilen in der Nachricht eines reinen Merge-Commits wirken nicht, weil er keine eigene Änderung trägt.
+  * **Eine zu Unrecht geschriebene `Bugfix-Note` lässt sich nicht mehr durch einen späteren Skip zurücknehmen.** Das Ziel erscheint dann im Bugfix-Kanal (der Bot zeigt eine Karte mit Note auch ohne erkannte Skript-Änderung) — im Zweifel die Meldung dort löschen; vor dem Merge lässt sich der Commit-Text noch korrigieren.
+    Einen Skip also nur in dem Commit schreiben, der selbst kein Bugfix ist — nie in dem Commit, der den echten Fehler behebt.
 
 ## Grafik-Regel: Jede Animation und jedes Highlight ist Pixelart
 

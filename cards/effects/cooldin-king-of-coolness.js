@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════
 const { isTutorableArea } = require('./_area-shared');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 //  CARD EFFECT: "Cooldin, King of Coolness"
 //  Hero — Activated effect, once per turn.
 //
@@ -218,6 +219,10 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
+    // Spielgestalter-Entscheidung 18.11.2026: "Aktionssperre sperrt Cooldin" — die Area wird "as an additional Action" gespielt, und eine Zusatzaktion ist eine Aktion: unter der Aktionssperre
+    // (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar. Das Ruling vom 16.8. ("Terraform ist kein Aktions-Effekt": der Heldeneffekt kostet selbst keine Aktion)
+    // bleibt unberuehrt — gesperrt ist das Spielen der Area.
+    if (engine.areActionsBlocked(pi)) return false;
     // Can only cast an Area if the caster's own Area zone is empty
     // (generic Area rule, enforced by validateActionPlay). We enforce it
     // here too so Cooldin's button grays out when the zone is occupied.
@@ -229,7 +234,8 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
     if (fromHand.length > 0) return true;
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     return fromDeck.length > 0;
   },
 
@@ -240,10 +246,11 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (engine.areActionsBlocked(pi)) return false;   // zweite Absicherung (Sperre nach dem Angebot gesetzt): Einmal-Stempel bleibt frei (siehe `canActivateHeroEffect`)
 
     const cardDB = engine._getCardDB();
     const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);   // Knight of Kings [B]: Quelle Deck zu
     const all = [...fromHand, ...fromDeck];
     if (all.length === 0) return false;
 

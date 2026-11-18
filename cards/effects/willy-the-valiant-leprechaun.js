@@ -12,6 +12,7 @@
 // solange der Gewinn gesperrt ist — statt eine Wahl anzubieten, die
 // nichts bringt. Auslegung in `_gold-block-shared.js`.
 const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+const { waehlePfad, ziehenGesperrt } = require('./_pfad-shared');
 
 module.exports = {
   activeIn: ['hero'],
@@ -97,21 +98,19 @@ module.exports = {
       await engine._delay(300);
 
       // Prompt for choice
-      const choice = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+      // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): jede Option fällt weg, solange ihr Weg gesperrt ist — Gold bei gesperrtem Goldgewinn (Ruling 17.8.), Karten bei
+      // Hand-/Zieh-Sperre; genau ein freier Weg wird automatisch genommen (kein Ein-Optionen-Menü mehr), kein freier: wie bisher „draw" (läuft ins Leere).
+      const choice = await waehlePfad(engine, pi, [
+        { id: 'draw', label: '🃏 Draw 5 Cards', description: 'Draw 5 cards from your deck.', color: '#4488ff', offen: !ziehenGesperrt(engine, pi, 5) },
+        { id: 'gold', label: '💰 Gain 30 Gold', description: 'Add 30 Gold to your treasury.', color: '#ffcc00', offen: !goldGainWouldBeBlocked(engine, pi) },
+      ], {
         title: 'Willy, the Valiant Leprechaun',
         description: "Willy's Luck! Choose your reward:",
-        options: [
-          { id: 'draw', label: '🃏 Draw 5 Cards', description: 'Draw 5 cards from your deck.', color: '#4488ff' },
-          // Gold-Option nur, wenn der Gewinn nicht gesperrt ist.
-          ...(goldGainWouldBeBlocked(engine, pi)
-            ? [] : [{ id: 'gold', label: '💰 Gain 30 Gold', description: 'Add 30 Gold to your treasury.', color: '#ffcc00' }]),
-        ],
         cancellable: false,
         gerrymanderEligible: true, // 5 cards vs 30 gold are distinct mechanical effects.
       });
 
-      const picked = choice?.optionId || 'draw';
+      const picked = choice.id || 'draw';
 
       // Leprechaun animation on Willy's hero zone (plays BEFORE effect resolves)
       engine._broadcastEvent('willy_leprechaun', { owner: ctx.cardHeroOwner ?? pi, heroIdx });   // Brettseite

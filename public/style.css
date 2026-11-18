@@ -24129,7 +24129,9 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 /* ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026): Hinweis des ANGEWÄHLTEN Ziels (`validTargets[].hinweis`) — steht über der Knopfzeile und erscheint nur zwischen „Ziel
    gewählt" und „Confirm" (app-board.jsx, Zielwahl-Fenster). Normaler Oberflächentext, harte Pixelkante links statt Schein/Verlauf, keine Alpha-Fläche, kein Symbol; nur Palettenfarben.
    Warnung (die Wahl verpufft: immun, volle HP, Erstrunden-Schutz) = Bernstein, Info (Wirkung anders als erwartet, aber nicht nutzlos: Overheal Shock) = Akzentblau. */
-.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; }
+/* Handy-Befund (Playwright, iPhone 13/Pixel 7 quer): Der Dialog ist `width: max-content`, ein langer Hinweissatz weitete ihn bis auf die Höchstbreite und deckte alle Helden zu — kein
+   anderes Ziel mehr antippbar. `contain: inline-size` nimmt den Hinweis aus der Breitenberechnung heraus: Er bricht in der Breite um, die der übrige Dialog vorgibt. */
+.panel-zielwahl-hinweise { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; text-align: left; width: 100%; contain: inline-size; }
 .panel-zielwahl-hinweis { font-size: 12px; line-height: 1.35; padding: 1px 0 1px 8px; border-left: 3px solid var(--accent4); color: var(--accent4); }
 .panel-zielwahl-hinweis-info { border-left-color: var(--accent); color: var(--accent); }
 /* Seitliche Kartenvorschau: `.card-mini` hat sonst feste Masse
@@ -24202,6 +24204,26 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 @media (pointer: coarse) and (max-height: 600px) {
   .first-choice-panel, .first-choice-panel.panel-zielwahl { pointer-events: auto; }
   .first-choice-panel[data-zieht] { outline: 3px solid var(--player-color, var(--accent)); outline-offset: 2px; }
+}
+
+/* ★ Handy-Befund (Playwright, Galaxy S9+ quer 658×320, Deutsch): Die Auswahl (`optionPicker`) und die Ja/Nein-Abfrage (`confirm`) wuchsen mit ihrem Text auf 357 px bei 320 px
+   Fensterhöhe — Titel oben und „Abbrechen" unten waren abgeschnitten (das Panel steht bei top: 52,5 % mittig und hatte keine Höhengrenze). Jetzt ist es nie höher als der sichtbare
+   Bildschirm: Mitte bei 52,5 % → höchstens 95 % der Höhe, abzüglich 8 px Rand (`dvh` mit `vh` als Rückfall; die Obergrenze trifft nur, wo das Panel sonst nicht mehr ins Bild passt). Der
+   Beschreibungstext (`.fcp-text`) schrumpft als Erster und scrollt innen; Titel und alle Knöpfe bleiben stehen. Ohne Überlauf ändert sich nichts. Die Leiste ist die Pixel-Leiste von
+   oben, nur schmaler (10 px: die Rillen passen noch hinein). Kein `touch-action`: auf dem Handy scrollt der Text mit dem Finger; scrollt er, lässt `DraggablePanel` das Fenster dort nicht
+   ziehen (`_ppPanelHatScrollbaresKind`). Grenze: Hat die Antwortliste selbst (viele Optionen) keinen Platz, schrumpft nur der Beschreibungstext (bis auf 0) — die Liste scrollt nicht. */
+.first-choice-panel.fcp-begrenzt {
+  max-height: calc(95vh - 8px);
+  max-height: calc(95dvh - 8px);
+}
+.fcp-begrenzt .fcp-text { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.fcp-begrenzt .fcp-text::-webkit-scrollbar { width: 10px; }
+/* Ursache der meisten Überläufe auf dem Telefon: ein `position: fixed`-Element bei `left: 50%` bekommt nur den Rest bis zum rechten Rand als Breite (hier ~330 px auf dem S9+), der
+   Textspalte bleiben neben dem 100-px-Kartenbild ~160 px — der Text bricht in acht Zeilen, die Knöpfe in zwei. Auf niedrigen Fenstern (gleiche Grenze wie die Zielwahl-Boxen, 560 px)
+   nimmt der Dialog deshalb wie am Desktop seine natürliche Breite bis zur Höchstbreite von `.first-choice-panel` (620 px / 92 %): breiter, aber deutlich niedriger, der Eye-of-Ren-Text
+   passt dann auf dem S9+ ohne Scrollen. */
+@media (max-height: 560px) {
+  .first-choice-panel.fcp-begrenzt { width: max-content; }
 }
 
 /* ════════════════════════════════════════════════════════════════════

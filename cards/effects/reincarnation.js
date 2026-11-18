@@ -40,6 +40,7 @@
 const { placePollutionTokens, countFreeZones, getFreeZones, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { canReviveHero } = require('./_revive-shared');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 // Free-zone requirements per mode. Reincarnation always costs 2 Pollution
 // Tokens, but the Creature-restore path ALSO needs a zone for the creature
@@ -93,6 +94,10 @@ function getReviveTargets(gs, pi, engine) {
  *  condition can't be paid right now. */
 function getRestoreCandidates(ps, cardDB, engine, pi) {
   const counts = {};
+  // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel „ein gesperrter Weg ist nicht wählbar, ist nur ein Weg frei, wird er automatisch genommen", `_pfad-shared.js`): unter der Stab-Sperre
+  // (Staff of the Teleporter) und Knight of Kings [B] kann keine Kreatur die Ablage verlassen — der Weg „Kreatur wiederbeleben" ist zu, „Revive Hero" bleibt (früher kam das Menü, die
+  // Pollution Tokens wurden gelegt und die Kreatur blieb in der Ablage).
+  if (engine && pi != null && ablageAusgangGesperrt(engine, pi)) return counts;
   for (const name of (ps?.discardPile || [])) {
     if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
     const cd = cardDB[name];

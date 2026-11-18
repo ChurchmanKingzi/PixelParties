@@ -23,7 +23,7 @@ const CARD_NAME = 'Guard Duty';
 
 /**
  * Darf `p` seine Ablage jetzt ins eigene Deck zurückmischen? Zurückmisch-Sperre (Hatusbal; Distracting Crystal in `p`s Hand) UND die
- * Ablage-Ausgangssperren (Knight of Kings [B], Stab-Sperre, Freikauf des Eye of Ren) — die Karte schob die Ablage sonst an allen vorbei.
+ * Ablage-Ausgangssperren (Knight of Kings [B], Stab-Sperre, nicht bezahlte Sperre des Eye of Ren) — die Karte schob die Ablage sonst an allen vorbei.
  * Ist es gesperrt, entfällt NUR dieser Teil (wie bei Meditation); der Teil des Gegners bleibt davon unberührt.
  */
 async function ablageMischenErlaubt(engine, p) {
@@ -43,8 +43,8 @@ module.exports = {
 
   // Als Ruling (Al 26.10.): „Die Karte soll nur spielbar sein, wenn der Discard Pile auch ins eigene Deck gemischt werden darf. Sperre beim Gegner ist
   // egal." — unspielbar (ausgegraut, nichts verbraucht), solange die EIGENE Ablage nicht ins eigene Deck zurück darf: Zurückmisch-Sperre (Hatusbal,
-  // Distracting Crystal), Stapel-Ausgang (Knight of Kings [B]) oder harte Stab-Ablagesperre (der freikaufbare Eye of Ren zählt NICHT, wie bei
-  // Meditation). Eine Sperre beim Gegner lässt nur DESSEN Teil entfallen (`onPlay`), die Karte bleibt spielbar.
+  // Distracting Crystal), Stapel-Ausgang (Knight of Kings [B]) oder harte Ablage-Ausgangssperre (Stab-Sperre, nicht bezahlte Sperre des Eye of Ren —
+  // Spielgestalter-Entscheidung 18.11.2026: beide hart, kein Freikauf). Eine Sperre beim Gegner lässt nur DESSEN Teil entfallen (`onPlay`), die Karte bleibt spielbar.
   spellPlayCondition(gs, pi, engine) {
     if (gs[ONCE_PER_GAME_KEY]?.[pi]) return false;
     const eng = engine || gs._engineRef;

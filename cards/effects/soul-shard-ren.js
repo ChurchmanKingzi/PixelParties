@@ -23,6 +23,8 @@ const {
   markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 
+const { waehlePfad } = require('./_pfad-shared');
+
 const CARD_NAME = 'Soul Shard Ren';
 
 module.exports = {
@@ -161,20 +163,18 @@ module.exports = {
       // Galerie mitgesperrt haette, haette der Karte auch ihren
       // legalen Teil genommen.
       const handGesperrt = engine._isSearchBlocked(pi, {}, 'deck');
-      const zielOptionen = [
-        ...(handGesperrt ? [] : [{ id: 'hand', label: 'Add it to your hand' }]),
-        { id: 'discard', label: 'Send it to your discard pile' },
-      ];
       if (handGesperrt) {
         engine.log('soul_shard_ren_hand_blocked', {
           player: engine.gs.players[pi]?.username, card: chosenName,
         });
       }
-      const dest = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
+      // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): bleibt nur der Ablage-Zweig, wird er automatisch genommen — kein Menü mehr mit einer einzigen Option.
+      const dest = await waehlePfad(engine, pi, [
+        { id: 'hand', label: 'Add it to your hand', offen: !handGesperrt },
+        { id: 'discard', label: 'Send it to your discard pile' },
+      ], {
         title: CARD_NAME,
         description: `What should happen to "${chosenName}"?`,
-        options: zielOptionen,
         cancellable: false,
         // Distinct effect paths — Gerrymander redirect eligible. Hand
         // is generally better for the searcher; discard fuels future
@@ -184,7 +184,7 @@ module.exports = {
       });
       // ★ Rueckfall auf 'discard', wenn die Hand gesperrt ist — sonst
       // liefe eine ausbleibende Antwort in den verbotenen Zweig.
-      const destId = dest?.optionId || (handGesperrt ? 'discard' : 'hand');
+      const destId = dest.id || (handGesperrt ? 'discard' : 'hand');
 
       if (destId === 'hand') {
         // Route through the canonical helper so ON_CARD_ADDED_TO_HAND

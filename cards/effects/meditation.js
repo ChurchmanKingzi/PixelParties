@@ -29,6 +29,10 @@
 //    nur den Weg ohne Zurückmischen offen. Unter der Stab-Sperre (Staff of the Teleporter: kein Ziehen, kein Karten-Aus-der-Ablage-Nehmen) ist der Weg „auf die Hand"
 //    verboten; Meditation bleibt spielbar und läuft dann ohne Menü automatisch über „zurückmischen" (ausdrücklich erlaubt, Spielgestalter-Entscheidung 17.11.2026) —
 //    gezogen wird wegen der Zieh-Sperre nichts.
+//    ★ Spielgestalter-Entscheidung 18.11.2026: unter der Sperre des Eye of Ren (Zusatzkosten nicht bezahlt) ist Meditation KOMPLETT gesperrt, was Karten aus der Ablage verschiebt —
+//    BEIDE Wege (Zurückmischen UND „auf die Hand") verlangen das. Erlaubt bleibt nur „zieh 1 Karte" mit 0 zurückgemischten Karten (wie unter Knight of Kings [B]): die Karte ist
+//    spielbar, zeigt keine Galerie, mischt nichts zurück und zieht 1. Die Ausnahme „zurückmischen" gilt NUR für die reine Stab-Sperre; liegt die Eye-Sperre zusätzlich darauf
+//    (Stab und Eye im selben Zug, gleich welche Reihenfolge), gewinnt die strengere (`ps._discardLockEyeTurn`, vom Eye gestempelt).
 //  ⑤ Zweiter Weg: Karten einzeln auf die Hand (`addCardFromDiscardToHand`,
 //    Ablage-/Such-Sperren, Bamboo-Listener), danach EIN Fenster für den
 //    Gegner mit ALLEN aufgenommenen Karten (`revealSearchedCards` mit
@@ -74,15 +78,18 @@ function handWegOffen(engine, pi) {
 
 /**
  * Gilt für `pi` gerade die harte Stab-Sperre (Staff of the Teleporter / Staff of Uncontrollable Destruction: „cannot draw cards or move any cards out of your
- * discard pile for the rest of the turn")?
+ * discard pile for the rest of the turn") — und NICHT zusätzlich die Sperre des Eye of Ren? (Nur die reine Stab-Sperre lässt das Zurückmischen zu, siehe Kopf.)
  */
-const stabSperre = (engine, pi) => engine.gs.players[pi]?._discardLockHard === engine.gs.turn;
+const stabSperre = (engine, pi) => {
+  const ps = engine.gs.players[pi];
+  return ps?._discardLockHard === engine.gs.turn && ps?._discardLockEyeTurn !== engine.gs.turn;
+};
 
 /**
  * Darf der erste Weg Karten zurückmischen? (ohne: reines „zieh 1 Karte")
  * Spielgestalter-Entscheidung 17.11.2026: unter der Stab-Sperre bleibt Meditation spielbar und folgt AUTOMATISCH dem Weg „zurück ins Deck mischen" (der Weg „auf die
  * Hand" ist dort verboten, `handWegOffen`) — dieser Weg ist ausdrücklich erlaubt, obwohl die Karten dabei die Ablage verlassen; gezogen wird wegen der Zieh-Sperre nichts.
- * Andere Ablage-Sperren (Knight of Kings [B], Hatusbal, Eye of Ren ohne Freikauf) gelten weiter.
+ * Andere Ablage-Sperren (Knight of Kings [B], Hatusbal, die — harte — Sperre des Eye of Ren, Spielgestalter-Entscheidung 18.11.2026) gelten weiter.
  */
 function mischWegOffen(engine, pi) {
   if (engine.shuffleBackIntoOwnDeckBlocked(pi)) return false;        // Hatusbal

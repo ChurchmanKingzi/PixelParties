@@ -12,6 +12,17 @@
 //
 //  Dead heroes are globally filtered by the
 //  engine — their abilities never fire.
+//
+//  Spielgestalter-Entscheidung 18.11.2026: der Zuschlag EINES Wealth-
+//  Stapels ist EIN Gold-Ereignis („Gain 12 additional Gold" ist ein
+//  Effekt, kein dreifacher): `modifyAmount` (`_engine.js`) fasst die
+//  Beträge der Kopien desselben Stapels (Held + Zone; Performance-
+//  Kopien eingeschlossen) zu einem Eintrag zusammen, und `actionGainGold`
+//  meldet ihn einmal. Wealth Lv3 + Royal Treasury (Magic Arts 2) gibt
+//  also 4 + 12 + 6 = 22 Gold statt 4 + 12 + 18; Monkees, Humby und
+//  Golden Vermin sehen den Zuschlag ebenfalls einmal. Die Gesamtsumme
+//  (4 je Stufe) ändert sich nicht, mehrere Helden mit Wealth bleiben
+//  je ein eigenes Ereignis.
 // ═══════════════════════════════════════════
 
 module.exports = {

@@ -163,7 +163,7 @@ function clearTapTooltip() { setTapTooltip(null); }
 
 // Zeitpunkt der letzten Beruehrung: ein Tooltip, der kurz danach erscheint (auch ueber die nachgeschobenen Maus-Ereignisse eines Tipps), gilt als
 // per Touch geoeffnet und bleibt (`_ppTipTouch`) — Maus-Verlassen-Ereignisse und der Sicherheits-Takt raeumen ihn dann nicht mehr ab.
-document.addEventListener('touchstart', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
+document.addEventListener('touchstart', (e) => { window._ppTouchAt = performance.now(); window._ppTouchTarget = e.target; }, { capture: true, passive: true });
 document.addEventListener('touchend', () => { window._ppTouchAt = performance.now(); }, { capture: true, passive: true });
 // Tooltip schliessen, auch wenn er per Touch festgehalten wird.
 window._ppTipSchliessen = () => {
@@ -8407,6 +8407,10 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   const show = (e) => {
     if (noTooltip) return;
     if (window.activeDragData || window.deckDragState) return;
+    // Touch (Handy-Befund, Eye of Ren): Ein Tipp schiebt Maus-Ereignisse nach — auch die Schein-Mausbewegung des Browsers, wenn sich unter dem ruhenden Finger das Bild ändert (die Galerie öffnet
+    // sich genau dort, wo eben „Bestätigen" angetippt wurde). Diese Karte war nie unter dem Finger: kein Tooltip, er bliebe per Touch festgehalten und deckte „Abbrechen" ab.
+    if (window._isTouchDevice && window._ppTouchTarget && performance.now() - (window._ppTouchAt || 0) < 900
+        && e && e.currentTarget && !e.currentTarget.contains(window._ppTouchTarget)) return;
     if (useSharedTooltip) {
       // Gewählter Skin gilt auch im Tooltip (CardTooltipContent liest `_skinUrl`).
       window._boardTooltipSetter(skins && skins[card.name] ? { ...ttCard, _skinUrl: imgUrl0 } : ttCard);

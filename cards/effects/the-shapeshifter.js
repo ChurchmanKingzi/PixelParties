@@ -57,6 +57,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, baseCardName } = require('./_hooks');
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
 
 const { loadCardEffect } = require('./_loader');
 
@@ -165,8 +166,10 @@ function waehlbareGestalten(engine, pi, hero) {
     }
   };
   sammle(ps.hand, 'hand');
-  sammle(ps.mainDeck, 'deck');
-  sammle(ps.discardPile, 'discard');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand, deck or discard pile" — Deck unter Knight of Kings [B], Ablage unter der
+  // Stab-Sperre (Staff of the Teleporter) / Knight of Kings [B] sind als Quelle zu (früher angeboten, die Entnahme scheiterte danach und die Verwandlung blieb aus).
+  if (!deckAusgangGesperrt(engine, pi)) sammle(ps.mainDeck, 'deck');
+  if (!ablageAusgangGesperrt(engine, pi)) sammle(ps.discardPile, 'discard');
   return raus;
 }
 

@@ -86,7 +86,11 @@ module.exports = {
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
       try {
-        await engine.runHooks('onPlay', {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): der Zweitguss ist wie jedes „performs/casts" ein Spielen
+        // (`engine.performKettenfenster`): Silence, Anti-Magic-Reaktionen usw. kommen zum Zug, Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Nichts wird erneut bezahlt. Wird der Zweitguss
+        // in der Kette negiert, löst sein Rumpf nie auf; der Erstguss ist davon unberührt.
+        const _pk = await engine.performKettenfenster({ cardName: ctx.spellName, pi, heroIdx, heroOwner: feld, ausHand: false });
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: tempInst, playedCard: tempInst,
           cardName: ctx.spellName, zone: 'hand', heroIdx,
           _skipReactionCheck: true,

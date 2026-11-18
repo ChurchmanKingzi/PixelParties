@@ -606,6 +606,9 @@ module.exports = {
       // HOPT — per-instance (player + hero + ability slot).
       const hoptKey = `learning:${pi}:${heroIdx}:${abilityZoneSlot}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+      // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action", G-01/Cooldin): der Nachguss ist eine Zusatzaktion — unter der Aktionssperre (Overflowing Chalice,
+      // Kents Negativ-Gold-Sperre, "Gather Intel" als Zusatzaktion: `areActionsBlocked`) wird er nicht angeboten; der Einmal-Stempel bleibt frei.
+      if (engine.areActionsBlocked(pi)) return;
 
       const hs = ctx.cardHeroOwner ?? pi;   // Als Befund 29.9.: Brettseite
       const eligibleIndices = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd, hs);

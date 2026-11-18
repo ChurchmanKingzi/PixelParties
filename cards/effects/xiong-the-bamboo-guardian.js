@@ -39,6 +39,8 @@
 //      "from which pile?" follow-up question.
 // ═══════════════════════════════════════════
 
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Xiong, the Bamboo Guardian';
 
 /**
@@ -84,8 +86,14 @@ async function tryTutor(ctx) {
   // BORIS-EINSCHRAENKUNG: hat der Gegner einen wirksamen Boris, faellt
   // SEINE Ablage als Quelle weg — die eigene bleibt nutzbar.
   const nurEigene = engine?.borisHidesOpponentSide?.(pi) === true;
+  // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel „ein gesperrter Weg ist nicht wählbar", `_pfad-shared.js`): „either player's discard pile" sind zwei Quellen. Ist eine gesperrt
+  // (eigene Ablage unter der Stab-Sperre des Staff of the Teleporter / Knight of Kings [B]), taucht sie nicht auf — es bleibt die andere. Früher stand die Karte der gesperrten Ablage in der
+  // Galerie und die Wahl lief ins Leere.
+  const offeneBesitzer = [];
   for (let owner = 0; owner < gs.players.length; owner++) {
     if (nurEigene && owner !== pi) continue;
+    if (ablageAusgangGesperrt(engine, owner, { sourceOwner: pi })) continue;
+    offeneBesitzer.push(owner);
     const dp = gs.players[owner]?.discardPile || [];
     for (const name of dp) {
       if (exclude.has(name)) continue;
@@ -111,10 +119,8 @@ async function tryTutor(ctx) {
   // Prefer own pile; fall back to opponent's. Card names are unique
   // per copy in a pile, so as long as the gallery offered the name,
   // at least one of the piles still has it.
-  const oi = ctx._engine.opponentOf(pi);
-  const fromOwner = (gs.players[pi]?.discardPile || []).includes(picked.cardName)
-    ? pi
-    : (gs.players[oi]?.discardPile || []).includes(picked.cardName) ? oi : -1;
+  // Quelle: der erste OFFENE Besitzer (eigene Ablage zuerst), dessen Ablage die Karte enthält.
+  const fromOwner = offeneBesitzer.find(o => (gs.players[o]?.discardPile || []).includes(picked.cardName)) ?? -1;
   if (fromOwner < 0) return;
 
   await engine.addCardFromDiscardToHand(pi, picked.cardName, fromOwner, {

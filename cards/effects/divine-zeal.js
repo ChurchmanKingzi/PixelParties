@@ -45,7 +45,9 @@ function getTargetStatuses(target, engine) {
     if (!hero?.statuses) return [];
     return Object.keys(hero.statuses)
       .filter(k => STATUS_EFFECTS[k]?.negative && STATUS_EFFECTS[k]?.cleansable !== false)
-      .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
+      .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }))
+      // 18.11.2026: dazu die RUHENDEN Status-Anhaengsel (`attach:`-Eintraege der Heil-Liste: Stowaway, Decisive Defeat, Aged, Mind Control unter Status-Immunitaet)
+      .concat(engine.cleansableHeroEntries(target.owner, target.heroIdx).filter(e => String(e.key).startsWith('attach:')));
   }
   if (target.type === 'equip') {
     const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -73,7 +75,7 @@ function getValidTargets(gs, engine) {
     for (const t of engine.getHeroTargets(p)) {
       const hero = gs.players[p]?.heroes?.[t.heroIdx];
       if (!hero?.statuses) continue;
-      if (negKeys.some(k => hero.statuses[k])) targets.push(t);
+      if (negKeys.some(k => hero.statuses[k]) || engine.heroHatRuhendesAnhaengsel(p, t.heroIdx)) targets.push(t);   // 18.11.2026: auch ein RUHENDES Status-Anhaengsel
     }
     for (const t of engine.getCreatureTargets(p)) {
       const inst = t.cardInstance;
@@ -191,7 +193,8 @@ module.exports = {
           if (!hero?.statuses) continue;
           const removed = engine.cleanseHeroStatuses(
             hero, target.owner, target.heroIdx, statuses, CARD_NAME);
-          totalRemoved += (removed || []).length;
+          // 18.11.2026: ein gewaehltes RUHENDES Status-Anhaengsel (`attach:`-Schluessel) zaehlt als ein entfernter Effekt (wie bei Cure); `removed` fuehrt nur echte Status.
+          totalRemoved += (removed || []).length + statuses.filter(k => String(k).startsWith('attach:')).length;
           engine._broadcastEvent('play_zone_animation', {
             type: 'super_saiyan_aura',
             owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,

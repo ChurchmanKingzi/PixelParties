@@ -21,6 +21,7 @@
 // ═══════════════════════════════════════════
 
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME  = 'Staff of Illusions';
 const COST_PER_LEVEL = 10;
@@ -33,7 +34,8 @@ function buildCreatureGallery(ps, cardDB, engine, pi) {
     ? engine.effectiveCardLevel(cd, pi)
     : (cd.level ?? 0));
 
-  for (const cn of (ps.mainDeck || [])) {
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+  for (const cn of (engine && deckAusgangGesperrt(engine, pi) ? [] : (ps.mainDeck || []))) {
     const cd = cardDB[cn];
     if (!cd || !isSummonablePileCreature(cd)) continue;
     const lvl = effLvl(cd);

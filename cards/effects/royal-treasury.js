@@ -13,7 +13,9 @@
 //  · Hook `afterResourceGain` NACH der Buchung (Monkee-Muster): nur
 //    eigener Gewinn, kein Rundeneinkommen (`_isResourceGain`; dessen Zuschlaege —
 //    Semi, Wealth — kommen als eigenes Ereignis ohne dieses Flag an, Spielgestalter-
-//    Entscheidung 17.11.2026), Betrag > 0,
+//    Entscheidung 17.11.2026; ein Wealth-Stapel ist dabei EIN Ereignis — Lv3 gibt
+//    „12 additional Gold" einmal, nicht dreimal 4, Spielgestalter-Entscheidung
+//    18.11.2026), Betrag > 0,
 //    und NICHT der eigene Bonus (Marker `gs._royalTreasuryGain`) — „through
 //    ANOTHER effect". Die Goldquelle wird nicht verbraucht (Monkees
 //    duerfen weiter darauf reagieren; der Bonus ist eine eigene Quelle).

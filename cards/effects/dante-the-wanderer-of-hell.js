@@ -29,6 +29,7 @@
 const { hasCardType } = require('./_hooks');
 const { isTutorableArea } = require('./_area-shared');
 const { ausGeloeschtEntnehmen } = require('./_hell-circles-shared');
+const { ziehenGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Dante, the Wanderer of Hell';
 const MAX_LEVEL = 3;
@@ -45,6 +46,10 @@ function spellsInHand(engine, pi) {
     if (!cd || !hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack')) continue;
     const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'hand' });
     if (level == null || level > MAX_LEVEL) continue;
+    // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): Weg 1 lebt vom Ziehen („draw cards equal to its level, then delete that many -1") — fällt das Ziehen ganz aus
+    // (Hand-/Zieh-Sperre, z. B. Staff of the Teleporter; Tuscan Artist bei genau 2/3), ist der Weg zu: sonst würden Spell und Handkarten ohne Gegenwert gelöscht. Bleibt nur Weg 2 (Areas),
+    // wird er genommen (nur mit der kurzen Bestätigung); sind beide zu, ist Dante nicht aktivierbar.
+    if (level >= 1 && ziehenGesperrt(engine, pi, level)) continue;
     out.push({ name, level });
   }
   return out;

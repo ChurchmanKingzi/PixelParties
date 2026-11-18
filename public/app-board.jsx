@@ -161,6 +161,10 @@ window._boardTooltipLock = (an) => { _boardTooltipLocked = !!an; };
 // den Fehler nicht behoben und den Tooltip spuerbar klebrig gemacht —
 // auf Als Wunsch zurueckgebaut. Siehe die Notiz bei `StatusBadges` in
 // app-shared.jsx.
+// Handy-Befund (Eye of Ren): „Cancel (Esc)" — auf Touch-Geräten (grober Zeiger) gibt es keine Esc-Taste, dort steht nur „Cancel". Beide Texte stehen im Wörterbuch (data/i18n/*-ui.json).
+function ppCancelEsc() {
+  try { return window.matchMedia('(pointer: coarse)').matches ? 'Cancel' : 'Cancel (Esc)'; } catch (e) { return 'Cancel (Esc)'; }
+}
 function setBoardTooltip(card) {
   if (card && card.name) window._boardTooltipLast = card;
   // When locked (prompt card hovered), ignore external clears
@@ -36492,7 +36496,7 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
         {ep.cancellable !== false && (
           <button className="btn" style={{ padding: '10px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
         )}
       </div>
     </div>
@@ -41205,7 +41209,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
     // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
     // Als Ruling (Al 26.10., Flame Avalanche): dieselbe Liste graut unter der Schadenssperre die reinen Gegner-Schadenskarten aus (`blockedByDamageLock`).
-    if ((me.searchLocked || me.damageLocked) && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
+    // Handy-Befund (Eye of Ren): `searchLockBlockedCards` ist die Ausgrau-Liste des Servers (`_cardBlockedBySearchLock`) und nur gefuellt, wenn eine Sperre wirkt — auch die harte
+    // Ablage-Ausgangssperre (Stäbe, Auge von Ren) und die Hand-Sperre, die KEINE der beiden Flaggen `searchLocked`/`damageLocked` setzen. Die Flaggen als Bedingung liessen
+    // Spontaneous Reappearance & Co. dort spielbar aussehen (der Server verweigert still); die Liste selbst ist die Wahrheit, andere Karten werden nicht beruehrt.
+    if (card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
@@ -62594,7 +62601,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           {/* `showCardLeft`: zweites Kartenbild LINKS neben dem Text. Fuer
               Abfragen, in denen zwei Karten eine Rolle spielen — Bubbles
               zeigt links die betroffene Kreatur, rechts sich selbst. */}
@@ -62615,11 +62622,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
+            <div className="fcp-text" style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
             {/* `warning`: Zusatzzeile in Warnfarbe unter der Nachricht —
                 fuer Folgen, die der Spieler nicht uebersehen soll. */}
             {ep.warning && (
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
+              <div className="fcp-text" style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
             )}
             {/* `equalButtons` (Als Vorgabe 5.10.): bei einer Wahl zwischen ZWEI gleichwertigen Wegen
                 („Zusatzaktion" / „normale Aktion") sind die Knoepfe gleich breit, unabhaengig von der
@@ -62705,7 +62712,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             })}
             {ep.cancellable !== false && (
               <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
             )}
           </div>
         </DraggablePanel>
@@ -62713,11 +62720,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={ep.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
-          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          {ep.description && <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           {ep.renderAs === 'slider' ? (
             // Slider-Variante fuer freie Betraege (Logan's Invest
             // Counters). Eine Dropdown-Liste mit 40 Eintraegen ist zum
@@ -62758,7 +62765,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })}
               {ep.cancellable !== false && (
                 <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
             </div>
           )}
@@ -63324,7 +63331,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return `To spend the Action, ${satz}.`;
           })()}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
           </div>
           {/* Bild des Helden, dem die Aktion gehoert — gleiche Bauform
               wie in confirm/optionPicker, samt Tooltip beim Ueberfahren. */}
@@ -63353,7 +63360,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
         </DraggablePanel>
       )}
 
@@ -63367,7 +63374,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Play an Artifact with a set Cost from your hand without paying its Cost.</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Click a highlighted Artifact in your hand.</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>Cancel (Esc)</button>
+            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>{ppCancelEsc()}</button>
         </DraggablePanel>
       )}
 
@@ -63614,7 +63621,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>{ep.instruction || 'Click a card in your hand to discard it.'}</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || ppCancelEsc()}</button>
           {ep.altLabel && (
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#f87420', color: '#f87420' }}
               onClick={() => respondToPrompt({ alt: true })}>{ep.altLabel}</button>
@@ -63686,7 +63693,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>{ep.confirmLabel || '🫳 Steal!'}</button>
               {cancellable && (
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
             </div>
           </DraggablePanel>
@@ -63705,7 +63712,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={() => respondToPrompt({ finished: true })}>Done</button>
             )}
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-              onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+              onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
           </div>
         </DraggablePanel>
       )}
@@ -63736,7 +63743,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.cancellable !== false && (
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
             </div>
           )}
         </DraggablePanel>

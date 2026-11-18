@@ -16,6 +16,7 @@
 // ═══════════════════════════════════════════
 
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { ziehenGesperrt } = require('./_pfad-shared');
 const CARD_NAME = 'Intrude';
 
 module.exports = {
@@ -156,7 +157,9 @@ module.exports = {
         title: 'Intrude',
         message: `${gs.players[drawingPlayer]?.username} is drawing ${drawCount} card${drawCount > 1 ? 's' : ''} from their ${deckLabel}.\nNegate the draw or copy it?`,
         confirmLabel: `🚫 Negate Draw`,
-        thirdOption: `📥 Draw ${drawCount} as well`,
+        // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „… OR draw the same number of cards" — kann der Intrude-Besitzer gerade gar nicht ziehen
+        // (Hand-/Zieh-Sperre, z. B. MOE Shield; Tuscan Artist bei genau 2/3), fehlt der Knopf; „Negate" und „Cancel" (die Reaktion ist ein „you may") bleiben.
+        ...(ziehenGesperrt(engine, intrudeOwner, drawCount) ? {} : { thirdOption: `📥 Draw ${drawCount} as well` }),
         cancelLabel: '❌ Cancel',
         showCard: 'Intrude',
         cancellable: true,

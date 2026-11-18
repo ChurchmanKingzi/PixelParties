@@ -2414,7 +2414,7 @@
 },
 "Atta, Speaker of Desires": {
 "name": "Atta, Sprecherin der Begierden",
-"effect": "Einmal pro Zug darfst du, wenn du genau 1 normalen Zauber aus deinem Deck oder deiner Hand aufdeckst, den dieser Held verwenden kann (außer durch den Effekt einer Fähigkeit), diesen Zauber löschen. Am Ende des nächsten Zuges deines Gegners verwendet dieser Held ihn sofort als zusätzliche Aktion, unabhängig von seinem Level und trotz negativer Statuseffekte, sofern dieser Held nicht besiegt ist und der Zauber noch gelöscht ist. Zauber, die dieser Held verwendet und die auf den Ablagestapel gelegt würden, werden stattdessen gelöscht."
+"effect": "Einmal pro Zug darfst du, wenn du genau 1 normalen Zauber aus deinem Deck oder deiner Hand aufdeckst, den dieser Held verwenden kann (außer durch den Effekt einer Fähigkeit), diesen Zauber löschen. Am Ende des nächsten Zuges deines Gegners verwendet dieser Held ihn sofort als zusätzliche Aktion, unabhängig von seinem Level, trotz negativer Statuseffekte und auch dann, wenn du in diesem Zug keine Aktionen ausführen könntest, sofern dieser Held nicht besiegt ist und der Zauber noch gelöscht ist. Zauber, die dieser Held verwendet und die auf den Ablagestapel gelegt würden, werden stattdessen gelöscht."
 },
 "Attack": {
 "name": "Angriff",
@@ -3526,7 +3526,7 @@
 },
 "Ghostly Warning": {
 "name": "Geisterwarnung",
-"effect": "Spiele diese Karte sofort, wenn ein Held deines Gegners einen normalen Zauber verwendet. Negiere diesen Zauber und lösche ihn. Am Ende deines nächsten Zuges führt dieser Held diesen Zauber sofort als zusätzliche Aktion aus, falls dieser Held nicht besiegt ist und dieser Zauber noch gelöscht ist, unabhängig von seinem Level und trotz negativer Statuseffekte."
+"effect": "Spiele diese Karte sofort, wenn ein Held deines Gegners einen normalen Zauber verwendet. Negiere diesen Zauber und lösche ihn. Am Ende deines nächsten Zuges führt dieser Held diesen Zauber sofort als zusätzliche Aktion aus, falls dieser Held nicht besiegt ist und dieser Zauber noch gelöscht ist, unabhängig von seinem Level, trotz negativer Statuseffekte und auch dann, wenn du in diesem Zug keine Aktionen ausführen könntest."
 },
 "Ghoul Guard": {
 "name": "Ghulwächter",
@@ -5340,7 +5340,7 @@
 },
 "The Eye of Ren": {
 "name": "Das Auge von Ren",
-"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Du kannst für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen, außer du gibst zusätzlich 6 Gold aus."
+"effect": "Wähle eine Karte aus deinem Deck und lege sie auf deinen Ablagestapel. Wenn du dieses Artefakt aktivierst, darfst du zusätzlich 6 Gold ausgeben. Tust du das nicht, kannst du für den Rest des Zuges keine Karten aus deinem Ablagestapel bewegen."
 },
 "The Golden Abomination": {
 "name": "Die Goldene Abscheulichkeit",

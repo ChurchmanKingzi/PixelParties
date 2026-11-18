@@ -2962,16 +2962,17 @@ class GameEngine {
    *
    * „You cannot move cards out of your discard pile for the rest of the
    * turn" (Staff of the Teleporter, Staff of Uncontrollable Destruction,
-   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn`.
+   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn` und
+   * HART: kein Freikauf, keine Ausnahme (die Stäbe setzen zusätzlich
+   * `_discardLockHard` — nur Meditation unterscheidet die Stab-Sperre).
    *
-   * The Eye of Ren haengt einen FREIKAUF daran (`ps._discardLockBuyout`):
-   * „unless you pay an additional 6 Gold" — nach Als Ruling (29.8.)
-   * EINMALIG je Zug: erste Bewegung aus dem Discard kostet 6, danach ist
-   * der Rest des Zuges frei. Ist der Effekt PFLICHT (`opts.mandatory`,
-   * z.B. The First Circle of Hell), zahlt der Spieler, was er hat (auch
-   * 0), und die Bewegung findet statt. Ist er optional, wird bei
-   * ausreichend Gold gefragt; ohne Gold oder bei Ablehnung bleibt die
-   * Sperre. Ohne Freikauf (Staebe) ist die Sperre hart.
+   * Spielgestalter-Entscheidung 18.11.2026 (The Eye of Ren): die 6 Gold
+   * sind Zusatzkosten der Aktivierung („Pay 6 extra Gold or lock your
+   * discard pile?", siehe `the-eye-of-ren.js`) — gezahlt, gibt es keine
+   * Sperre; sonst setzt das Auge die Sperre wie die Stäbe. Der frühere
+   * Freikauf je Zugriff (`_discardLockBuyout`, Abfrage „Pay 6 Gold to move
+   * cards out of it?", Pflicht-Variante `mandatory`, Ablehnung = Abbruch der
+   * Karte) ist entfallen.
    *
    * Alle Wege aus dem Discard fragen HIER: addCardFromDiscardToHand,
    * actionRecycleCards, actionPlaceCreature (source 'discard'),
@@ -2987,88 +2988,7 @@ class GameEngine {
       this.log('pile_out_blocked', { player: ps.username, pile: 'discard' });
       return false;
     }
-    if (ps._discardLockedTurn !== this.gs.turn) return true;
-    // Z6 (F03-10): die HARTE Stab-Sperre (`_discardLockHard`, Staebe) hebt auch der 6-Gold-Freikauf des Eye of Ren
-    // nicht auf - gelten beide im selben Zug, gilt die strengere (der Stab hat keine Ausnahme), in beiden Reihenfolgen.
-    if (ps._discardLockHard === this.gs.turn) return false;
-    const buy = ps._discardLockBuyout;
-    if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
-    if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
-    const gold = ps.gold || 0;
-    const spend = async (amount) => {
-      if (amount <= 0) return true;
-      const ok = await this.actionSpendGold(pi, amount, { cardName: buy.source, reason: 'discard_lock_buyout' });
-      return ok !== false;
-    };
-    if (opts.mandatory) {
-      const pay = Math.min(buy.cost, gold);
-      let paid = 0;   // G1: TATSAECHLICH gezahlt (goldLocked → 0), nicht der Wunschbetrag
-      if (pay > 0 && await spend(pay)) paid = pay; // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
-      buy.paidTurn = this.gs.turn;
-      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid, mandatory: true });
-      this.sync();
-      return true;
-    }
-    if (!this.canAffordGold(pi, buy.cost, buy.source)) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', needGold: buy.cost });
-      return false;
-    }
-    const yes = opts.silent ? true : await this.promptGeneric(pi, {
-      type: 'confirm',
-      title: buy.source,
-      message: `Your discard pile is locked by ${buy.source}. Pay ${buy.cost} Gold to move cards out of it for the rest of this turn?`,
-      showCard: buy.source,
-      confirmLabel: `💰 Pay ${buy.cost} Gold`,
-      cancelLabel: 'No',
-      cancellable: true,
-    });
-    if (!yes) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', declined: true });
-      this.gs._discardOutDeclined = this.gs.turn; // → `_applyDiscardOutDecline`
-      return false;
-    }
-    if (!(await spend(buy.cost))) return false;
-    buy.paidTurn = this.gs.turn;
-    this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: buy.cost, mandatory: false });
-    this.sync();
-    return true;
-  }
-
-  /**
-   * v627 (Als Regel 29.8.): Lehnt der Spieler den Eye-of-Ren-Freikauf ab,
-   * gilt das Ausspielen der Karte als ABGEBROCHEN wie jede andere
-   * Cancellation — die Karte bleibt in der Hand, die Kosten kommen
-   * zurueck. Das Gate stempelt `gs._discardOutDeclined = gs.turn`; der
-   * Chain-Auflöser ruft dies nach `resolve()` und macht aus dem Ergebnis
-   * `{ cancelled: true }`, sofern das Skript nicht `discardOutDeclineConsumes`
-   * setzt (fuer Karten, die VOR der Discard-Bewegung schon etwas Bleibendes
-   * getan haben — dann ist die Karte verbraucht).
-   */
-  _applyDiscardOutDecline(cardName, result, hoptVorher) {
-    if (this.gs._discardOutDeclined !== this.gs.turn) return result;
-    delete this.gs._discardOutDeclined;
-    if (result && (result.aborted || result.cancelled)) return result;
-    const script = cardName ? loadCardEffect(cardName) : null;
-    if (script?.discardOutDeclineConsumes) return result;
-    // ★ Z7 (F02-20): „Abbruch heißt: nichts ist passiert" — auch die Rundensperren (`claimHOPT`), die
-    // das Skript vor dem abgelehnten Ablage-Zugriff gestempelt hat (Relic in the Sky, Magic Gems),
-    // gehen zurück. `hoptVorher` = Abzug von `gs.hoptUsed` vor dem `resolve()`.
-    if (hoptVorher) this._hoptWiederherstellen(hoptVorher);
-    this.log('play_cancelled', { card: cardName, reason: 'discard_lock_declined' });
-    return { cancelled: true };
-  }
-
-  /** ★ Z7: flacher Abzug der Rundensperren (für `_hoptWiederherstellen`). */
-  _hoptAbzug() { return { ...(this.gs.hoptUsed || {}) }; }
-
-  /** ★ Z7: Rundensperren auf den Stand `abzug` zurücksetzen (nur Schlüssel, die sich seither geändert haben). */
-  _hoptWiederherstellen(abzug) {
-    const h = this.gs.hoptUsed;
-    if (!h) return;
-    for (const k of Object.keys(h)) {
-      if (!(k in abzug)) delete h[k];
-      else if (h[k] !== abzug[k]) h[k] = abzug[k];
-    }
+    return ps._discardLockedTurn !== this.gs.turn;
   }
 
   async addCardFromDiscardToHand(toPlayerIdx, cardName, fromOwnerIdx, opts = {}) {
@@ -4600,7 +4520,15 @@ class GameEngine {
         if (!(opt && opt.schild)) hookCtx._kFlat = (hookCtx._kFlat || 0) + delta;
         // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
         // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
-        if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
+        // Spielgestalter-Entscheidung 18.11.2026 (Wealth Lv3 × Royal Treasury): der Zuschlag EINES Ability-Stapels ist EIN Effekt — Wealth Lv3 gibt „12 additional Gold" als einen Gewinn, nicht drei zu je 4
+        // (die Kopien des Stapels hören je einen Hook): die Beträge desselben Stapels (Held, Zone, Slot; Performance-Kopien liegen im selben Stapel) werden zu EINEM Eintrag und damit einem Ereignis.
+        if (hookCtx._isResourceGain && delta > 0) {
+          const boni = hookCtx._einkommensBoni || (hookCtx._einkommensBoni = []);
+          const stapel = engine.istWirksameAbility(cardInstance) ? `${cardInstance.zone}:${cardInstance.owner}:${cardInstance.heroIdx}:${cardInstance.zoneSlot}` : null;
+          const gleicher = stapel && boni.find(b => b.stapel === stapel);
+          if (gleicher) gleicher.delta += delta;
+          else boni.push({ card: cardInstance, delta, stapel, name: stapel ? (engine.abilityStapelVon(cardInstance).find(n => n !== 'Performance') || cardInstance.name) : cardInstance.name });
+        }
       },
       multiplyAmount(factor) {
         if (hookCtx.amount === undefined) return;
@@ -8091,6 +8019,9 @@ class GameEngine {
       // heilen schickt die Karte in die Ablage, uebertragen nimmt sie mit
       // (Als allgemeine Regel 17.9.).
       if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      // Spielgestalter-Entscheidung 18.11.2026: eine ruhende Karte, die als Status zaehlt, steht unter derselben Sperre wie ein Status
+      // („its other status effects cannot be removed", Forbidden Curse of Aging) — sie steht dann nicht in der Liste.
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
       out.push({
         key: `attach:${inst.id}`,
         label: script.negativeStatusLabel || inst.name,
@@ -8102,6 +8033,25 @@ class GameEngine {
       });
     }
     return out;
+  }
+
+  /**
+   * Spielgestalter-Entscheidung 18.11.2026: traegt der Held ein RUHENDES Status-Anhaengsel (Stowaway, Decisive Defeat, Forbidden Curse of Aging, Mind Control unter Status-Immunitaet),
+   * das die Heil-Listen als `attach:`-Eintrag fuehren? Ein solcher Held ist auch ohne echten Status ein Ziel der Heilkarten (Cure fragt `cleansableHeroEntries` ohnehin selbst).
+   */
+  heroHatRuhendesAnhaengsel(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.statuses) return false;
+    // Dieselben Bedingungen wie die `attach:`-Eintraege in `cleansableHeroEntries`, aber ohne die Liste zu bauen (laeuft in Zielfiltern und CPU-Planung oft).
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== pi || inst.faceDown) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.countsAsNegativeStatus) continue;
+      if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -8197,11 +8147,12 @@ class GameEngine {
     return this.sendBoardCardToDiscard(inst, { source: typeof source === 'string' ? { name: source } : source });
   }
 
-  async cleanseAttachmentByKey(key, source) {
+  async cleanseAttachmentByKey(key, source, gesperrt) {
     const id = String(key || '').startsWith('attach:') ? String(key).slice(7) : null;
     if (!id) return false;
     const inst = this.cardInstances.find(c => String(c.id) === id && c.zone === ZONES.SUPPORT);
     if (!inst) return false;
+    if (gesperrt?.has(inst.id)) return false;   // 18.11.2026: Sperre des Wirts (s. `cleanseHeroStatuses`)
     this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
     // ★★ v1143b: ueber den EINEN Brett→Ablage-Weg — vorher fehlte der
     // Flug, und `{ source }` landete im Parameter `toHeroIdx`.
@@ -8209,10 +8160,10 @@ class GameEngine {
     return true;
   }
 
-  async cleanseNegativeAttachments(pi, heroIdx, source) {
+  async cleanseNegativeAttachments(pi, heroIdx, source, gesperrt) {
     const treffer = this.cardInstances.filter(inst =>
       inst.zone === ZONES.SUPPORT && inst.heroIdx === heroIdx && inst.owner === pi
-      && !inst.faceDown
+      && !inst.faceDown && !gesperrt?.has(inst.id)
       && loadCardEffect(inst.name)?.countsAsNegativeStatus);
     for (const inst of treffer) {
       this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
@@ -9033,14 +8984,15 @@ class GameEngine {
    * doesn't break the protection — only physically removing Light
    * Ball from the board does.
    */
-  _lightBallProtects(playerIdx, targetType, targetHeroIdx) {
+  _lightBallProtects(playerIdx, targetType, targetHeroIdx, kontrolleAls = null) {
     // ★ Styx 28.9.: nach KONTROLLE — „other targets you control". Bei
     // 'hero' ist `playerIdx` die Brettseite des Zielhelden (Kontrolleur
     // ueber `heroSideOf`), bei 'creature' bereits der Kontrolleur.
+    // `kontrolleAls` (18.11.2026, nur Status-Anhaengsel-Abgleich): beurteilt den Helden, als stuende er unter der Kontrolle dieses Spielers (s. `heroBlocksStatusNow`).
     let ctrl = playerIdx, zielHeld = null;
     if (targetType === 'hero') {
       zielHeld = this.gs.players[playerIdx]?.heroes?.[targetHeroIdx] || null;
-      if (zielHeld) ctrl = this.heroSideOf(playerIdx, zielHeld);
+      if (zielHeld) ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(playerIdx, zielHeld);
     }
     for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(ctrl)) {
       if (hero.hp <= 0) continue;
@@ -9078,10 +9030,10 @@ class GameEngine {
    * Negated). ★ Styx 28.9.: nach Kontrolle — eine geliehene Johanna
    * schuetzt die Helden ihres Kontrolleurs, nicht mehr die ihrer Spalte.
    */
-  _johannaSchuetzt(zielHeld) {
+  _johannaSchuetzt(zielHeld, kontrolleAls = null) {
     const phys = this._findHeroOwner(zielHeld);
     if (phys < 0) return false;
-    const ctrl = this.heroSideOf(phys, zielHeld);
+    const ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(phys, zielHeld);   // `kontrolleAls`: s. `heroBlocksStatusNow`
     for (const { hero: johanna } of this.heroesControlledBy(ctrl)) {
       if (johanna.name !== 'Johanna, Crusader of Light') continue;
       if (johanna === zielHeld) continue;   // schuetzt sich nicht selbst
@@ -11156,7 +11108,13 @@ class GameEngine {
    *   • Cardinal Beast immunity (absolute "unaffected by all cards and effects").
    *     Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung von
    *     Baihu/Petrifier („takes no damage from any sources" / „Damage … becomes 0") hält True Damage bei KREATUREN nicht mehr ab (`durchschlagVersteinerung`,
-   *     wie beim Helden, wo sie nie griff); Time Bomblebee/Succubus-Kontrolle („cannot take damage") bleiben für True Damage immun.
+   *     wie beim Helden, wo sie nie griff).
+   *     Spielgestalter-Entscheidung 18.11.2026 („Ja" — wenn Elixir of Strength und Ida das schon tun): True Damage schlägt bei KREATUREN auch die übrigen „takes no damage"-Schutz-Immunitäten
+   *     durch (`durchschlagSchutz`, derselbe Stempel wie das Elixir): Time Bomblebee mit Bomb Counters („cannot take damage or be defeated") und die Succubus-gestohlene Kreatur. Cardinal Beasts
+   *     („unaffected by ALL cards and effects"), Erstrunden-Schutz und die „unaffected by …"-Effekt-Immunitäten bleiben (anders als bei Ida wird `ignoreUnaffected` NICHT gesetzt).
+   *     `opts.durchschlagen === false` schaltet nur das Durchschlagen der Schutz-Immunitäten ab (kein Aufrufer setzt es: alle Kreaturen-Aufrufer — Acid Vial, Rockfall, Pressure Projectile, Surefire
+   *     Shot, Piercer of Heavens, Glasowt — tragen im Text „cannot be reduced or negated"; Johanna, Bubbles, Prophecy of Tempeste, Deepsea Siren, Rioting Village treffen nur Helden). Eine künftige
+   *     Karte, die technisch True Damage nutzt, ohne dass ihr Text unreduzierbaren Schaden nennt, setzt es.
    *
    * Behavior preserved vs. actionDealDamage:
    *   • Sets `_damagedOnTurn` on the target (used by Medusa's Curse etc.)
@@ -11339,6 +11297,7 @@ class GameEngine {
     // Guardian, and buff multipliers. Cardinal Beast absolutes
     // still block — "unaffected by all cards and effects", not a reduction.
     // Spielgestalter-Entscheidung 17.11.2026: die Versteinerung (Baihu/Petrifier) gilt hier nicht mehr als Schutz (`durchschlagVersteinerung`).
+    // Spielgestalter-Entscheidung 18.11.2026: ebenso Time Bomblebee („cannot take damage") und die Succubus-gestohlene Kreatur (`durchschlagSchutz`, wie Elixir of Strength/Ida); Cardinal Beasts bleiben.
     if (target.counters) {
       await this.processCreatureDamageBatch([{
         inst: target,
@@ -11348,6 +11307,7 @@ class GameEngine {
         sourceOwner,
         canBeNegated: false,
         durchschlagVersteinerung: true,
+        ...(opts.durchschlagen === false ? {} : { durchschlagSchutz: true }),
         trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
@@ -16489,8 +16449,7 @@ class GameEngine {
     }
     // v626: Discard-out-Sperre (Staebe, The Eye of Ren) — auch fuer
     // generische Bewegungen aus dem eigenen Discard (nach Deleted, Deck,
-    // Brett …). `opts.mandatory` fuer Pflichteffekte (Freikauf mit allem
-    // vorhandenen Gold), `opts._bypassDiscardLock` fuer Engine-Wege.
+    // Brett …). `opts._bypassDiscardLock` fuer Engine-Wege.
     if (fromZone === ZONES.DISCARD && cardInstance
         && !(await this._discardOutAllowed(cardInstance.owner, opts))) {
       this.log('discard_out_blocked', { card: cardInstance.name, to: toZone, reason: 'discard_locked' });
@@ -21297,6 +21256,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bewegung auch die Status ab, die der Fluch gerade noch schuetzt.
     const sperrtZuBeginn = new Map(statusKeys.map(k =>
       [k, this._heroStatusRemovalBlocked(playerIdx, heroIdx, k)]));
+    // Spielgestalter-Entscheidung 18.11.2026: Karten, die „als negativer Status zaehlen" (Stowaway, Decisive Defeat, Aged, Mind Control), stehen unter derselben Sperre wie ihr Status —
+    // auch die Vollheilung (Cure) raeumt sie nicht ab, solange „its other status effects cannot be removed" gilt (Stand zu Beginn, wie oben; der eigene Status von Aged bleibt entfernbar).
+    const anhGesperrt = new Set();
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== playerIdx || inst.faceDown) continue;
+      const sc = loadCardEffect(inst.name);
+      if (sc?.countsAsNegativeStatus && this._heroStatusRemovalBlocked(playerIdx, heroIdx, sc.attachmentStatus)) anhGesperrt.add(inst.id);
+    }
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (this._statusUnentfernbar(key, hero.statuses[key])) continue;
@@ -21377,7 +21344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const gewaehlt = (statusKeys || []).filter(k => String(k).startsWith('attach:'));
       if (gewaehlt.length > 0) {
         queueMicrotask(() => {
-          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source); })()
+          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source, anhGesperrt); })()
             .catch(err => console.error('[cleanseAttachmentByKey]', err.message));
         });
       }
@@ -21387,7 +21354,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const alleDabei = voll.length > 0 && voll.every(k => statusKeys.includes(k));
       if (alleDabei) {
         queueMicrotask(() => {
-          this.cleanseNegativeAttachments(playerIdx, heroIdx, source)
+          this.cleanseNegativeAttachments(playerIdx, heroIdx, source, anhGesperrt)
             .catch(err => console.error('[cleanseNegativeAttachments]', err.message));
         });
       }
@@ -23857,8 +23824,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Synchrone Form fuer Stellen ohne `await` (CPU-Bewertungsproben,
-   * Hilfsfunktionen). Deck: identisch. Ablage: die Stab-Sperre gilt als
-   * hart (kein Freikauf-Prompt moeglich) — vorher umgingen diese Stellen
+   * Hilfsfunktionen). Deck: identisch. Ablage: die Discard-out-Sperre
+   * (Staebe, The Eye of Ren) gilt hart — vorher umgingen diese Stellen
    * sie ganz.
    */
   takeFromPileSync(pi, pile, what, opts = {}) {
@@ -23886,11 +23853,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
     if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
-      const buy = ps._discardLockBuyout;
-      if (ps._discardLockHard === this.gs.turn || !(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
-        this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
-        return null;
-      }
+      this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
+      return null;
     }
     return this._takeFromPileCore(pi, ps, arr, pile, idx, name, opts);
   }
@@ -24396,16 +24360,13 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre ohne Freikauf
-   * (Staff of the Teleporter/Uncontrollable Destruction) bzw. Stab + Eye of Ren? Synchrones Gegenstueck zu
-   * `_discardOutAllowed` fuer Spielbarkeits-Gates (die Eye-Sperre allein ist freikaufbar und zaehlt NICHT).
+   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre (Staff of the Teleporter/
+   * Uncontrollable Destruction) oder die Sperre des Eye of Ren (nicht bezahlt)? Synchrones Gegenstueck zu `_discardOutAllowed`
+   * fuer Spielbarkeits-Gates. Spielgestalter-Entscheidung 18.11.2026: auch die Eye-Sperre ist hart (kein Freikauf mehr).
    */
   isDiscardOutHardLocked(pi) {
     const ps = this.gs?.players?.[pi];
-    if (!ps || ps._discardLockedTurn !== this.gs.turn) return false;
-    if (ps._discardLockHard === this.gs.turn) return true;
-    const buy = ps._discardLockBuyout;
-    return !buy || buy.turn !== this.gs.turn;
+    return !!ps && ps._discardLockedTurn === this.gs.turn;
   }
 
   /**
@@ -27292,6 +27253,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inReactionCheck || this._inMctsSim) return keine;
     const cd = this._getCardDB()[cardName];
     if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return keine;
+    // ★ Spielgestalter-Entscheidung 18.11.2026 (Zweitziel von Bartas/Grisgar/Andras, Saya, Kunagi …): der performte Wurf ist wie ein eigenständiges Ausspielen eine NEUE Schadensquelle —
+    // Reaktionen, die einzelne Ziele schützen (Bamboo Shield, Sculpture Guards …), werden für ihn erneut angeboten. Ihre „schon gefragt"-Merker gelten nur für EINE Auflösung und werden sonst erst
+    // NACH dem Ende des Hauptzaubers (`afterSpellResolved`, hinter dem Held-Haken) geräumt: der Zweitwurf sah sie noch stehen und bekam kein Angebot. Geräumt wird über den Aufräum-Haken, den die Karten
+    // ohnehin registrieren (`onChainResolve`, wie am Ende einer Kette); Einmal-Regeln („1 pro Zug", `gs.hoptUsed`) bleiben unberührt.
+    await this.runHooks(HOOKS.ON_CHAIN_RESOLVE, {});
     const kette = await this.executeCardWithChain({
       cardName, owner: pi, cardType: cd.cardType, goldCost: 0, heroIdx,
       casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi, casterCheck: !trotzStatus,
@@ -30032,7 +29998,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const wirksameBoni = [];
     if (hookCtx._isResourceGain && hookCtx._einkommensBoni?.length) {
       for (const bonus of hookCtx._einkommensBoni) {
-        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
+        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.name, cancelled: false, _skipReactionCheck: true };
         await this.runHooks('onIncomeBonusGain', bonusCtx);
         if (bonusCtx.cancelled) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
         else if (bonus.delta > 0) {
@@ -30093,7 +30059,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           rest -= betrag;
           if (!(betrag > 0)) continue;
           await this.runHooks(HOOKS.AFTER_RESOURCE_GAIN, {
-            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.card?.name,
+            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.name,
             _goldSource: { playerIdx, amount: betrag, consumed: false },
           });
         }
@@ -30404,7 +30370,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * G1: darf `playerIdx` gerade KEIN Gold ausgeben? Golden Arrow: "You cannot gain or spend Gold for the rest of the turn
    * afterwards." (`ps.goldLocked`, faellt zum Zugwechsel). Als Regel: unter dieser Sperre ist auch alles mit Gold-KOSTEN > 0
-   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold", Freikauf) nicht spielbar/aktivierbar; Kosten 0
+   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold") nicht spielbar/aktivierbar; Kosten 0
    * bleiben moeglich. Gegenstueck zu `goldGainWouldBeBlocked` (_gold-block-shared.js, Gewinn-Seite) - hier die Ausgabe-Seite.
    * `actionSpendGold`, `canAffordGold` und `goldBudget` fragen HIER.
    * @param {number} playerIdx
@@ -34465,7 +34431,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   • Gibt es MEHR Kopien als Plaetze UND liefern mindestens zwei Quellen welche, waehlt der Spieler JE KOPIE die Quelle (Galerie `pickAusQuellen`,
    *     ein Eintrag je Quelle mit Herkunfts-Abzeichen DECK / HAND / DISCARD; CPU: `cpuSourceOrder` Ablage, Deck, Hand - die Ablage kostet nichts).
    *   • Die Ablage ist ein Stapel-Ausgang wie jeder andere: `takeFromPile(pi, 'discard', …)` (Knight-of-Kings-Sperre `pileOutAllowed`, Lethe-Stempel, verwaiste Instanz
-   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle (keine Freikauf-Frage mitten im Aufstieg).
+   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle.
    *
    * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
    * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
@@ -47127,10 +47093,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // No reactions — resolve normally (no chain visualization)
         this._inReactionCheck = false;
         let resolveResult = null;
-        delete this.gs._discardOutDeclined;
-        const _hoptVorher = resolve ? this._hoptAbzug() : null;
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolving', { linkIndex: 0, cardName, owner }); await this._delay(400); }
-        if (resolve) resolveResult = this._applyDiscardOutDecline(cardName, await resolve(), _hoptVorher);
+        if (resolve) resolveResult = await resolve();
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolved', { linkIndex: 0, cardName, owner }); await this._delay(300); this._broadcastEvent('reaction_chain_done', {}); }
         result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
       } else {
@@ -48608,7 +48572,6 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (link.resolve) {
           try {
-            delete this.gs._discardOutDeclined;
             // Wer gerade aufloest, ist der Negierer, falls das Glied
             // ein anderes negiert (`negateChainLink` liest das).
             const _vorherAufloeser = this._rxResolvingOwner;
@@ -48618,7 +48581,6 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._rxResolvingCard = link.cardName;
             this._rxResolvingLink = link;
             let result;
-            const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
             // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
             const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
@@ -48631,7 +48593,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               this._rxResolvingLink = _vorherGlied;
               if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
-            if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
+            if (link.isInitialCard) link.resolveResult = result;
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
           }
@@ -56784,6 +56746,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Einzel-Immunitaet wie `poison_immune`, CC-`immune`) - keine Quellen-/Aufloesungs-Schutze (Effekt-Immunitaet, Anti Magic).
    * Fuer Kosten-Karten, die einen Status auf den eigenen Helden legen MUESSEN (Sickly Cheese): ein solcher Held ist kein
    * waehlbares Ziel. `opts.appliedBy` = Seite der Quelle (Charme-Schutz), `opts.bypassImmune` wie dort.
+   * `opts.kontrolleAls` (18.11.2026, Mind Control im Status-Anhaengsel-Abgleich): Johanna und Light Ball schuetzen „Heroes you control" — der Held wird so beurteilt, als stuende er unter der Kontrolle
+   * dieses Spielers (bei Mind Control: sein Kontrolleur VOR der Uebernahme), damit die Uebernahme nicht durch den Schutz des Uebernehmers selbst wieder erlischt.
    */
   heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
@@ -56795,8 +56759,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.ohneCharme && statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
     if (hero.statuses?.shielded && statusName !== 'shielded') return true;
     if (statusDef?.negative) {
-      if (this._johannaSchuetzt(hero)) return true;
-      if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
+      if (this._johannaSchuetzt(hero, opts.kontrolleAls)) return true;
+      if (this._lightBallProtects(playerIdx, 'hero', heroIdx, opts.kontrolleAls)) return true;
       if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName)) return true;
     }
     if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
@@ -60916,6 +60880,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const isSummonable = script.summonableFromCoolnessStack === true;
     if (!isPlayable && !isSummonable) return { aborted: true, reason: 'not_playable_from_stack' };
     if (typeof script.resolveFromCoolnessStack !== 'function') return { aborted: true, reason: 'no_resolver' };
+    // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action", wie Cooldin): das Beschwoeren vom Coolness Stack (Hipdall, Swagdri, Wildur: "summon it as an additional
+    // Action from there") und das Spielen von String of Fine/Bifab (`stackPlayIstZusatzaktion`: "play it from there as an additional Action" / "This counts as an additional Action") sind
+    // Zusatzaktionen — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) passiert nichts, die Karte bleibt oben auf dem Stapel.
+    // Modnir/Swellpnir (Ausruestung anlegen) sind keine Aktion und bleiben spielbar.
+    if ((isSummonable || script.stackPlayIstZusatzaktion === true) && this.areActionsBlocked(playerIdx)) return { aborted: true, reason: 'actions_blocked' };
     const inst = this.getCoolnessStackTopInst(playerIdx);
     if (!inst) return { aborted: true, reason: 'no_inst' };
     const ctx = this._createContext(inst, { event: 'playFromCoolnessStack' });

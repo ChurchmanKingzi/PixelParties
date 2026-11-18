@@ -24,6 +24,11 @@
 //  • Zauber, die sich selbst in einen Stapel schreiben („Delete this card": Forbidden Zone, Liberation, Meditation …): `kopieStapelBereinigen` nimmt
 //    nach dem Wirken genau die Einträge wieder heraus, die der Stapelstand des Spiegel-Besitzers durch die Kopie zusätzlich bekam.
 //  Das ORIGINAL des negierten Zaubers geht wie immer in den Stapel seines Besitzers.
+//
+//  ── AKTIONSSPERRE (Spielgestalter-Entscheidung 18.11.2026) ──
+//  „the user immediately performs a copy of it as an additional Action" ist eine Aktion: ist der Besitzer des Spiegels aktionsgesperrt (`engine.areActionsBlocked(ownerIdx)`:
+//  Overflowing Chalice, Kents Negativ-Gold-Sperre, `_playerActionLockedTurn`, `ps.actionLocked`), wird die KOPIE nicht gewirkt (keine Kosten, kein Einmal-Stempel, kein Kettenfenster).
+//  Der Zauber wird trotzdem negiert und die Pollution Tokens werden trotzdem gelegt — nur die Kopie entfällt.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -176,6 +181,11 @@ module.exports = {
     // mehr (`spellPlayCondition` der Kostenzahler) oder bricht der Spieler die Kostenwahl ab (`false`), gibt es keine Kopie —
     // das Original bleibt negiert.
     let kopieMoeglich = !!script?.hooks?.onPlay;
+    // Spielgestalter-Entscheidung 18.11.2026: unter einer Aktionssperre des Besitzers entfällt NUR die Kopie (Negation und Pollution Tokens bleiben) — siehe Kopf.
+    if (kopieMoeglich && engine.areActionsBlocked(ownerIdx)) {
+      kopieMoeglich = false;
+      engine.log('magic_mirror_copy_blocked', { player: gs.players[ownerIdx]?.username, spell: sourceCard, reason: 'actions_blocked' });
+    }
     let synthInstVorab = null;
     if (kopieMoeglich && eigenesLimitVerbraucht(gs, ownerIdx, script, sourceCard)) kopieMoeglich = false;
     if (kopieMoeglich && typeof script.payActivationCost === 'function' && script.payActivationCost.length <= 1) {
@@ -228,8 +238,12 @@ module.exports = {
       engine._spiegelKopieName = sourceCard;   // `_trackCard` stempelt die beim Wirken entstehende Brettinstanz (Anhängsel) als Kopie
 
       try {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): „the user performs a copy of it" ist ein Spielen der Kopie
+        // (`engine.performKettenfenster`): Silence, Anti-Magic-Reaktionen usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Kosten/Limit sind oben schon bezahlt/verbraucht,
+        // Tokens liegen schon. Wird die Kopie in der Kette negiert, löst ihr Rumpf nie auf (die Instanz verschwindet unten wie sonst; das Original bleibt negiert).
+        const _pk = await engine.performKettenfenster({ cardName: sourceCard, pi: ownerIdx, heroIdx: hostHeroIdx, heroOwner: ctx.cardHeroOwner ?? ownerIdx, ausHand: false });
         // Fire the Spell's onPlay hook scoped to this instance.
-        await engine.runHooks('onPlay', {
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: synthInst, playedCard: synthInst,
           cardName: sourceCard, zone: 'hand',
           heroIdx: hostHeroIdx,

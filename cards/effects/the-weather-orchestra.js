@@ -38,6 +38,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { isEquipArtifact, equipDestinations, equipArtifactToHero } = require('./_orchestra-shared');
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'The Weather Orchestra';
 const EXACT_COST = 12;
@@ -174,8 +175,10 @@ module.exports = {
         cards.push({ name, source, cost: cd.cost || 0 });
       };
       for (const n of engine.handUndVorratListe(pi)) add(n, 'hand');   // 12.11.: Hand + Crestinas Vorrat
-      for (const n of (ps.discardPile || [])) add(n, 'discard');
-      for (const n of (ps.mainDeck || [])) add(n, 'deck');
+      // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand, deck or discard pile" — Ablage unter der Stab-Sperre (Staff of the
+      // Teleporter) / Knight of Kings [B] und Deck unter Knight of Kings [B] sind als Quelle zu (früher angeboten, das Ausrüsten scheiterte danach).
+      if (!ablageAusgangGesperrt(engine, pi)) for (const n of (ps.discardPile || [])) add(n, 'discard');
+      if (!deckAusgangGesperrt(engine, pi)) for (const n of (ps.mainDeck || [])) add(n, 'deck');
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
       if (cards.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
