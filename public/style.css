@@ -24218,6 +24218,13 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 }
 .fcp-begrenzt .fcp-text { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .fcp-begrenzt .fcp-text::-webkit-scrollbar { width: 10px; }
+/* Ursache der meisten Überläufe auf dem Telefon: ein `position: fixed`-Element bei `left: 50%` bekommt nur den Rest bis zum rechten Rand als Breite (hier ~330 px auf dem S9+), der
+   Textspalte bleiben neben dem 100-px-Kartenbild ~160 px — der Text bricht in acht Zeilen, die Knöpfe in zwei. Auf niedrigen Fenstern (gleiche Grenze wie die Zielwahl-Boxen, 560 px)
+   nimmt der Dialog deshalb wie am Desktop seine natürliche Breite bis zur Höchstbreite von `.first-choice-panel` (620 px / 92 %): breiter, aber deutlich niedriger, der Eye-of-Ren-Text
+   passt dann auf dem S9+ ohne Scrollen. */
+@media (max-height: 560px) {
+  .first-choice-panel.fcp-begrenzt { width: max-content; }
+}
 
 /* ════════════════════════════════════════════════════════════════════
    EIGENE KARTENANIMATIONEN (Als Auswahl 26.9.)
