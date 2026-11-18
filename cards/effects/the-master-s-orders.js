@@ -20,6 +20,10 @@
 //     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts. Spielgestalter-Entscheidung 17.11.2026 (ATT-15): unter Status-Immunität des Wirts
 //     liegt die Karte wirkungslos da, ABER sobald die Immunität endet, greift der Status (die Übernahme beginnt dann mit dem nächsten Zugbeginn des Anhängers); kommt sie später dazu, ruht er wieder
 //     und eine laufende Übernahme endet (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`).
+//     HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026): „Under Orders" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie
+//     dann als eigenen `attach:<instId>`-Eintrag („Under Orders (The Master's Orders)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers
+//     (eine Übernahme gab es nie: sie hängt am Status); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `ordered` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag
+//     entfällt, solange der Wirt `ordered` trägt).
 //  3. KONTROLLE: am Beginn jedes Zuges des Anhängers (`onTurnStart`) — und sofort, wenn die Karte in seinem EIGENEN Zug angelegt wird — übernimmt er den Helden für den Rest des
 //     Zuges: dieselbe Übernahme wie Charme/Love Shot/Control Device (`temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed`), OHNE Schutzklausel
 //     (`ohneSchutz`: der Text verspricht keinen), Rechte „beschwören + ausrüsten" (keine Abilities hinlegen). Die Rückgabe am nächsten Zugbeginn ist generisch (Engine). Während der
@@ -144,6 +148,10 @@ module.exports = {
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,           // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: "Under Orders (The Master's Orders)",
+  negativeStatusIcon: '📜',
   spellVisual: { impact: { type: 'dark_swarm' }, impactMs: 260 },
 
   spellPlayCondition(gs, pi, engine) {
