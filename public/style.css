@@ -24229,6 +24229,15 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .fcp-begrenzt .fcp-liste:has(> :nth-child(3)) { min-height: 90px; }
 .fcp-begrenzt .fcp-liste > * { flex-shrink: 0; }
 .fcp-begrenzt .fcp-liste::-webkit-scrollbar { width: 10px; }
+/* ★ X2: ALLE übrigen Duell-Fenster (Pickups, Wartefenster, Hinweise, Aktivierung …; `DraggablePanel` in app-board.jsx legt um ihren Inhalt die Innenschicht `.fcp-inhalt`): nie höher als der
+   Bildschirm — wie oben höchstens 95 % der Höhe abzüglich 8 px; darüber scrollt die Innenschicht (der Rahmen mit den Eck-Ornamenten steht am Außenelement fest). Gleicher Innenrand-Trick wie bei
+   der Liste, damit nichts angeschnitten wird. Die Zielwahl-Fenster (`panel-zielwahl`) sind ausgenommen (Lage und Kartenvorschau hängen an ihrer Form; gemessen passen sie auch auf 320 px). */
+.first-choice-panel.fcp-hat-inhalt { display: flex; flex-direction: column; max-height: calc(95vh - 8px); max-height: calc(95dvh - 8px); }
+.fcp-hat-inhalt > .fcp-inhalt { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 8px 10px; margin: -8px -8px -10px; }
+.fcp-hat-inhalt > .fcp-inhalt::-webkit-scrollbar { width: 10px; }
+/* Die Karte im Zielwahl-Fenster „Attach Ability" (Alex' Suche, Sacrifice to Divinity): auf niedrigen Fenstern (Handy quer, wie bei der Kartenvorschau der übrigen Zielwahl-Fenster) entfällt
+   sie — mit ihr war das Fenster 327 px hoch auf einem 320-px-Bildschirm; die Beschreibung nennt die Fähigkeit. */
+@media (max-height: 560px) { .attach-pick-kartenzeile { display: none !important; } }
 /* Ursache der meisten Überläufe auf dem Telefon: ein `position: fixed`-Element bei `left: 50%` bekommt nur den Rest bis zum rechten Rand als Breite (hier ~330 px auf dem S9+), der
    Textspalte bleiben neben dem 100-px-Kartenbild ~160 px — der Text bricht in acht Zeilen, die Knöpfe in zwei. Auf niedrigen Fenstern (gleiche Grenze wie die Zielwahl-Boxen, 560 px)
    nimmt der Dialog deshalb wie am Desktop seine natürliche Breite bis zur Höchstbreite von `.first-choice-panel` (620 px / 92 %): breiter, aber deutlich niedriger, der Eye-of-Ren-Text

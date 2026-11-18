@@ -2871,11 +2871,24 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
     : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
+  // ★ Handy-Befund X2 (Duell-Dialoge höher als der Bildschirm): Jedes Duell-Fenster der Familie `.first-choice-panel` bekommt eine INNENSCHICHT (`.fcp-inhalt`), die höchstens bis
+  // zur Bildschirmhöhe wächst und darüber innen scrollt (CSS bei `.fcp-hat-inhalt`). Der Rahmen mit Eck-Ornamenten (`::after`) bleibt am Außenelement und scrollt nicht mit.
+  // Ausgenommen: die Zielwahl-Fenster (`zielwahl`; ihre Lage, die randbündige Kartenvorschau und die Griffe hängen an der Außenform) und die Fenster mit eigener Aufteilung
+  // (`fcp-begrenzt`: Auswahl/Ja-Nein/Spieler-/Statuswahl scrollen Text und Antwortliste getrennt, Titel und Knöpfe bleiben stehen). Die Zeilen-Aufteilung, die ein Aufrufer am
+  // Fenster setzt (`display: flex; gap; alignItems` …), gehört an die Innenschicht, alles andere bleibt am Außenelement.
+  const fcpInnen = !zielwahl && /(^|\s)first-choice-panel(\s|$)/.test(className || '') && !/(^|\s)fcp-begrenzt(\s|$)/.test(className || '');
+  let aussenStil = style, innenStil;
+  if (fcpInnen && style) {
+    aussenStil = { ...style }; innenStil = {};
+    for (const k of ['display', 'flexDirection', 'flexWrap', 'gap', 'rowGap', 'columnGap', 'alignItems', 'alignContent', 'justifyContent']) {
+      if (k in aussenStil) { innenStil[k] = aussenStil[k]; delete aussenStil[k]; }
+    }
+  }
   return (
-    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '') + (fcpInnen ? ' fcp-hat-inhalt' : '')} style={{ ...aussenStil, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
       data-zieht={dragging ? '1' : undefined}
       onMouseDown={onDown} onTouchStart={phoneP ? undefined : onDown} onClick={e => e.stopPropagation()}>
-      {children}
+      {fcpInnen ? <div className="fcp-inhalt" style={innenStil}>{children}</div> : children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
     </div>
@@ -63737,8 +63750,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#66ffa2' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4, textShadow: '0 0 8px rgba(102,255,162,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          {/* ★ X2: `.attach-pick-kartenzeile` (style.css): auf niedrigen Fenstern (Handy quer) entfällt die Karte — das Fenster war mit ihr 327 px hoch (Bildschirm 320 px); die Beschreibung nennt die Fähigkeit ("Attach Fighting to …"), wie bei den übrigen Zielwahl-Fenstern, bei denen die Vorschau dort entfällt. */}
           {ep.cardName && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+            <div className="attach-pick-kartenzeile" style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
               <BoardCard cardName={ep.cardName} rarity={ppRarityLookup(ep.cardName, myIdx)} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
             </div>
           )}
