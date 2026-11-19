@@ -1539,6 +1539,8 @@ def main():
             wind.draw_logo(canvas, f)
             if windshow_on:
                 wind.draw_badge(canvas, f)
+            if windshow_on and hasattr(wind, 'draw_mid'):
+                wind.draw_mid(canvas, f)                                    # z. B. Gegner HINTER der Heldin
         # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         theme_fx.draw(layer, f)

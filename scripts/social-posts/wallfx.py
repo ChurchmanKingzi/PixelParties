@@ -34,19 +34,20 @@ class WallShow(CaptionMixin):
     TH_X, TH_FOOT = 540, 540                                                          # Tharx: Standlinie
     # Beschwörung: (Zeit, Slot) – jede Creature bekommt +100 HP
     SUMMON = [(1.0, 0), (1.6, 1), (2.2, 2)]
-    T_TH = 6.9                                                                        # Tharx erscheint
-    T_CUT = [8.3, 9.0, 9.7]                                                           # seine Hiebe auf die drei Verteidiger
-    T_HAM = 11.6                                                                      # der Relikt-Hammer fliegt zu ihr
-    T_ASC = 13.4                                                                      # Aufstieg
-    RALLY = [14.6, 15.1, 15.6]                                                        # drei gleichnamige Creatures kehren zurück
-    T_THROW = 17.4                                                                    # Hammerwurf auf Tharx
+    T_TH = 8.2                                                                        # Tharx erscheint
+    T_CUT = [9.4, 10.1, 10.8]                                                           # seine Hiebe auf die drei Verteidiger
+    T_HAM = 12.8                                                                      # der Relikt-Hammer fliegt zu ihr
+    T_ASC = 15.4                                                                      # Aufstieg
+    RALLY = [18.2, 18.7, 19.2]                                                        # drei gleichnamige Creatures kehren zurück
+    T_THROW = 20.6                                                                    # Hammerwurf auf Tharx
+    CPS = 40.0                                                                        # langsamer tippen: der Text soll mitlesbar bleiben
     CAPTIONS = [
-        (0.2, 2.9, '*Layn, Defender of Deri* holds the walls - alone.'),
-        (3.0, 6.8, 'Every *Creature* she summons gets *+100 HP* - a wall of defenders.'),
-        (7.0, 11.4, '*Tharx*, the Never-Losing General, marches in. No wall has ever stood against him.'),
-        (11.6, 14.4, 'Her last hope - the *Relic Hammer* of her ancestors, a *spirit* sealed inside.'),
-        (14.6, 17.4, 'Ascended, she calls her *fallen* back - up to *3 Creatures* of the same name.'),
-        (17.6, 21.4, '*Layn* guards *Deri* - to the very last stone.'),
+        (0.2, 3.4, '*Layn, Defender of Deri* holds the walls - alone.'),
+        (3.6, 7.8, 'Every *Creature* she summons gets *+100 HP* - a wall of defenders.'),
+        (8.0, 12.4, '*Tharx*, the Never-Losing General, storms the walls.'),
+        (12.6, 17.8, 'Her last hope - the *Relic Hammer* of her ancestors, a *spirit* sealed inside.'),
+        (18.0, 22.2, 'Ascended, she calls her *fallen* back - up to *3 Creatures*.'),
+        (22.4, 25.7, '*Layn* guards *Deri* - to the very last stone.'),
     ]
     SND = {
         'whoosh': [('booster_card_whoosh', -8)],
@@ -381,13 +382,16 @@ class WallShow(CaptionMixin):
     def draw_front(self, canvas, f):
         t = f / float(self.fps)
         d = ImageDraw.Draw(canvas)
-        self._draw_tharx(canvas, d, t)
         self._draw_defenders(canvas, d, t)
         d = ImageDraw.Draw(canvas)
         self._draw_hammer(canvas, d, t)
         self._draw_attacks(canvas, d, t)
         self._draw_hud(canvas, d, t)
         self._draw_caption(canvas, ImageDraw.Draw(canvas), t)
+
+    def draw_mid(self, canvas, f):
+        """Zwischen Karte/Logo und Heldin: Tharx steht HINTER Layn."""
+        self._draw_tharx(canvas, ImageDraw.Draw(canvas), f / float(self.fps))
 
     # ───────── Interface ─────────
     def draw_logo(self, canvas, f):
