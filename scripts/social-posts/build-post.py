@@ -573,6 +573,7 @@ def main():
     args_opener = opener
     opener_on = opener in ('heart', 'storm', 'shift', 'wind')
     aliceshow_on = bool(hero_cfg.get('aliceshow'))                            # Alice-Show (alicefx.AliceShow): nutzt dieselbe Schnittstelle wie die Wind-Show
+    wallshow_on = bool(hero_cfg.get('wallshow'))                              # Mauer-Show (wallfx.WallShow, Layn)
     flowshow_on = bool(hero_cfg.get('flowshow'))                              # Wasser-Show (flowfx.FlowShow, Mizune)
     journeyshow_on = bool(hero_cfg.get('journeyshow'))                        # Reise-Show (journeyfx.JourneyShow, Tarleinn)
     timeshow_on = bool(hero_cfg.get('timeshow'))                              # Zeit-Show (timefx.TimeShow, Zi)
@@ -589,7 +590,7 @@ def main():
     rockshow_on = bool(hero_cfg.get('rockshow'))                              # Konzert-Show (rockfx.ConcertShow, Elana)
     rootshow_on = bool(hero_cfg.get('rootshow'))                              # Wurzel-Show (rootfx.RootShow, Kyli)
     iceshow_on = bool(hero_cfg.get('iceshow'))                                # Eis-Show (icefx.IceShow, Broghan)
-    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on or armsshow_on or coolshow_on or ghostshow_on or voidshow_on or stormshow_on or bootshow_on or thiefshow_on or timeshow_on or journeyshow_on or flowshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
+    windshow_on = bool(hero_cfg.get('windshow')) or aliceshow_on or iceshow_on or rootshow_on or rockshow_on or hopshow_on or cosmosshow_on or webshow_on or armsshow_on or coolshow_on or ghostshow_on or voidshow_on or stormshow_on or bootshow_on or thiefshow_on or timeshow_on or journeyshow_on or flowshow_on or wallshow_on              # Show mit Zeitleiste (windfx.WindShow / alicefx.AliceShow) statt Schleife
     wind_on = args.wind or bool(hero_cfg.get('wind')) or windshow_on
     horror_on = args.horror or bool(hero_cfg.get('horror'))
     show_on = (args.show or hero_cfg.get('show') or 'none') == 'mini'
@@ -690,6 +691,10 @@ def main():
     if head_top is not None:
         sy = head_top - spr.vtop * spr.px
         feet_y = sy + spr.foot * spr.px
+    alt_spr = None                                                            # Zweit-Sprite (Aufstieg mitten im Video: wind.swap_sprite)
+    if hero_cfg.get('altSlug'):
+        alt_spr = Sprite(hero_cfg['altSlug'])
+        alt_spr.px = int(hero_cfg.get('altPx', spr.px))
     shadow = pixel_ellipse(max(10, min(44, round((spr.right - spr.left) * spr.px * 0.75 / U))), 4, INK, 170)
 
     parts_bg = Particles(args.slug, accent, 40 if not reel else 56, (U * 3, 0, W - U * 3, H), loop)
@@ -735,6 +740,23 @@ def main():
             ag = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
                       grid=(sx, sy, spr.px), draw_text=draw_text, home=(sx + spr.center_x * spr.px, sy + spr.foot * spr.px), actor_fn=actor_fn, assets_dir=str(AD))
             wind = armsfx.ArmsShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
+        elif wallshow_on:
+            import wallfx
+            tharx_spr = Sprite('tharx-the-never-losing-general')
+            tharx_spr.px = int(hero_cfg.get('tharxPx', spr.px))
+            _tc = {}
+            def tharx_fn(art, idx):
+                if idx % tharx_spr.n not in _tc:
+                    od_, ol_, sp_, pad_ = tharx_spr.layers(idx % tharx_spr.n, stick_col, INK)
+                    im_ = Image.new('RGBA', od_.size, (0, 0, 0, 0))
+                    for l_ in (od_, ol_, sp_):
+                        im_.alpha_composite(l_)
+                    _tc[idx % tharx_spr.n] = (im_, pad_)
+                im_, pad_ = _tc[idx % tharx_spr.n]
+                return im_, pad_, tharx_spr.center_x, tharx_spr.foot
+            lg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
+                      grid=(sx, sy, spr.px), draw_text=draw_text, assets_dir=str(HERE / 'assets' / 'layn'), per=per, actor_fn=tharx_fn, tharx_px=tharx_spr.px, layn_px=spr.px)
+            wind = wallfx.WallShow(W, H, U, float(fps), loop, lg, loop * WIND_LOOPS / float(fps))
         elif flowshow_on:
             import flowfx
             fg = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
@@ -1539,6 +1561,8 @@ def main():
                     canvas.alpha_composite(l2)
             return canvas.convert('RGB')
         gl_spr, gl_on = glitch_state(f) if GLITCH_EVENTS else (None, False)
+        if gl_spr is None and alt_spr is not None and windshow_on and hasattr(wind, 'swap_sprite') and wind.swap_sprite(f):
+            gl_spr = alt_spr
         if gl_spr is not None:                                                # Shapeshift: kurz ist er ein anderer Held (gleiche Standlinie und Mitte)
             o_dark, o_light, sp, pad_px = gl_spr.layers(f // per, stick_col, INK)
             sx_d, sy_d = round(card_x + CARD_W / 2 - gl_spr.center_x * gl_spr.px), feet_y - gl_spr.foot * gl_spr.px
@@ -1610,7 +1634,7 @@ def main():
     if first_on:
         for f in range(loop * first_loops):
             render(f, intro_on, punch_on, opener_on).save(fdir / f'i{f:03d}.png')
-    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 2.3 if bootshow_on else 2.3 if thiefshow_on else 2.3 if timeshow_on else 1.25 if journeyshow_on else 2.3 if flowshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover = Image.open(fdir / ('i%03d.png' % int((17.4 if show_on else 17.3 if iceshow_on else 14.6 if rootshow_on else 15.0 if rockshow_on else 11.0 if hopshow_on else 14.6 if webshow_on else 16.2 if armsshow_on else 16.6 if coolshow_on else 18.5 if ghostshow_on else 17.0 if voidshow_on else 8.6 if stormshow_on else 2.3 if bootshow_on else 2.3 if thiefshow_on else 2.3 if timeshow_on else 1.25 if journeyshow_on else 2.3 if flowshow_on else 2.3 if wallshow_on else 17.6 if cosmosshow_on else 16.8) * float(fps)))) if (show_on or windshow_on) else Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
     print('Standbild', cover_path)

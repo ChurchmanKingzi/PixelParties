@@ -505,7 +505,14 @@
      "move": "float"
     }
    ]
-  ]
+  ],
+  "px": 12,
+  "wallshow": true,
+  "opener": "wind",
+  "showLoops": 5,
+  "altSlug": "layn-master-of-deri-s-relic",
+  "name": "Layn",
+  "title": "Defender of Deri"
  },
  "Layn, Master of Deri's Relic": {
   "particles": [
