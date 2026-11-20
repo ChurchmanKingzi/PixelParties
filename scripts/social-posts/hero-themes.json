@@ -1449,5 +1449,39 @@
   "thiefshow": true,
   "opener": "wind",
   "showLoops": 5
+ },
+ "Natas, the Master of Hell": {
+  "px": 16,
+  "planshow": true,
+  "opener": "wind",
+  "showLoops": 6,
+  "music": "scripts/social-posts/music/bgm_natas.ogg",
+  "particles": [
+   [
+    "glyph",
+    "voidpurple",
+    8,
+    {
+     "g": "skull",
+     "move": "float"
+    }
+   ],
+   [
+    "gas",
+    "poison_bubble",
+    16
+   ],
+   [
+    "spark",
+    "crimson",
+    10
+   ],
+   [
+    "bubble",
+    "poison_bubble",
+    10
+   ]
+  ],
+  "musicHit": 77.75
  }
 }
