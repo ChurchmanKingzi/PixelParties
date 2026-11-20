@@ -76,6 +76,7 @@ HERO_TITLES = {
     'broghan': ('Broghan, the Frozen Guardian of the North', 'Older Than the Ice'),
     'kyli': ('Kyli, the Deceptive Sapling', 'Field Trip to the Old Tree'),
     'kazena': ('Kazena, the Storming Rebel', 'Where the Wind Goes'),
+    'natas': ('Natas, the Master of Hell', 'Hospitality of the Pit'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
