@@ -40,7 +40,7 @@ class WallShow(CaptionMixin):
     T_ASC = 15.4                                                                      # Aufstieg
     RALLY = [18.2, 18.7, 19.2]                                                        # drei gleichnamige Creatures kehren zurück
     T_THROW = 20.6                                                                    # Hammerwurf auf Tharx
-    CPS = 40.0                                                                        # langsamer tippen: der Text soll mitlesbar bleiben
+    CPS = 25.0                                                                        # langsam tippen: Wort für Wort, mitlesbar
     CAPTIONS = [
         (0.2, 3.4, '*Layn, Defender of Deri* holds the walls - alone.'),
         (3.6, 7.8, 'Every *Creature* she summons gets *+100 HP* - a wall of defenders.'),
