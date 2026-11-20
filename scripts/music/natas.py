@@ -2,24 +2,23 @@
 """Held-Thema „Natas, the Master of Hell“ → public/music/bgm_natas.ogg                      Titel: „Hospitality of the Pit“
 
 Natas ist *der* bösartigste Charakter des Spiels, die Graue Eminenz hinter den allermeisten Problemen der Lore (Card Art: Herr im Anzug mit Augenklappe vor einem leuchtenden Turm,
-rechts und links lavaglühende Dämonenstatuen). Das Theme drückt **unterschwellige Bösartigkeit** aus und soll **Angst einflößen** — durch Zurückhaltung, nicht durch Lärm.
+rechts und links lavaglühende Dämonenstatuen). Das Theme drückt **unterschwellige Bösartigkeit** aus und soll **Angst einflößen**.
 
-  • F-Moll, 100 BPM (Halbzeit-Schwere) über einem **Uhrwerk**: Cembalo-16tel (kalt, präzise — „er führt Buch“) mit ♭II (Ges) und Tritonus (H) im Grundton-Muster, dazu ein
-    Orgel-/Tuba-/Kontrabass-**Pedalton F**, der sich nie bewegt. Das Schlagzeug ist langsam und schwer (Kick 1, Snare 3, kaum hörbare Hi-Hat) — der Schrecken kommt vom Gewicht, nicht vom Tempo.
-  • **Verborgenes Zitat**: das Motiv ist an die Totensequenz *Dies irae* angelehnt (F–E–F–C–D♭–C–B♭–C), erst unhörbar tief im Chor (je Note ein ganzer Takt), später offen in Orgel, Posaune und Chor —
-    wie eine Drohung, die man erst erkennt, wenn man sie kennt.
-  • **Der Gastgeber**: im „Audienz“-Teil spielt eine gedämpfte Trompete eine glatte, höfliche, chromatische Melodie — charmant, einladend und völlig falsch. Die Höflichkeit eines Mannes, der nie
-    laut werden muss.
-  • **Der Pakt**: das Pedal F bleibt, doch alles darüber steigt halbtonweise (F-Moll, Ges-Moll, G-Moll, As-Moll) — der Boden bewegt sich nicht, die Welt darüber gleitet in seinen Besitz.
-  • Dazu: Glockenschlag im Tritonus, Glas-Streicher, flüsternde Chor-Cluster, Goblin-Seufzer, Geigenglissandi, Herzschlag-Pauke.
-Form (48 Takte ≈ 1:55): Intro 4 · Das Hauptbuch A 8 · Audienz B 8 · Hofstaat C 8 · Signatur (Break) 8 · Der Pakt E 8 · Coda 4
+Version 2 (v1 war dem Nutzer zu wenig Battle und zu unmelodisch): ein richtiges, treibendes Schurken-Battle-Theme mit **einprägsamer Hauptmelodie** — der Schrecken bleibt, aber er marschiert jetzt.
+
+  • F-Moll, 132 BPM, 4/4. **Riff**: das Dies-irae-angelehnte Motiv (F–E–F–C–D♭–C–B♭–C) als durchgehende **Achtel-Kette** in Kontrabass, Tuba und Posaune, jeden Takt auf den Akkordgrundton
+    versetzt (F, G♭, D♭, E♭, C) — ein unerbittlicher, schleichender Antrieb, den man als Melodie kaum erkennt, aber im Bauch spürt. Darüber das kalte Cembalo-**Uhrwerk** in 16teln.
+  • **Hauptmelodie** (Moll-Dreiklangs-Aufstieg F–As–C, Fall zurück; ♭II-Wendung): erst von der gedämpften Trompete (sly, höflich), dann groß in Orgel, Posaune, Chor, Horn und Geigen.
+  • **Schlagzeug**: echter Battle-Beat (Kick 1, 1&-Sechzehntel, 3, 3&; Snare auf 2 und 4; Hi-Hat-16tel), Tom-Fills, Crashes; im Break Halbzeit.
+  • **Der Pakt**: das Pedal F bleibt, alles darüber steigt halbtonweise (F-, Ges-, G-, As-Moll). Danach Schluss-Refrain mit allem.
+Form (64 Takte ≈ 1:56): Intro 4 · Riff A 8 · Thema B 8 · Audienz C 8 · Thema D 8 · Signatur 8 · Der Pakt E 8 · Finale 8 · Coda 4
 Ausklang auf C (Dominante) → F-Moll-Intro.
 """
 import os, sys, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
-BPM, BARS = 100, 48
+BPM, BARS = 132, 64
 song = Song(BPM, BARS)
 rng = random.Random(666)
 
@@ -46,7 +45,7 @@ def pn(s):
         a, i = (1 if s[1] == '#' else -1), 2
     return 12 * (int(s[i:]) + 1) + NAMES[s[0]] + a
 
-CH = {'Fm': (5, 'm'), 'Gb': (6, 'M'), 'Bbm': (10, 'm'), 'C': (0, 'M'), 'Db': (1, 'M'), 'C7': (0, '7')}
+CH = {'Fm': (5, 'm'), 'Eb': (3, 'M'), 'Gb': (6, 'M'), 'Bbm': (10, 'm'), 'C': (0, 'M'), 'Db': (1, 'M'), 'C7': (0, '7')}
 QUAL = {'M': (0, 4, 7), 'm': (0, 3, 7), '7': (0, 4, 7, 10)}
 
 def tones(ch, oct_, shift=0):
@@ -197,131 +196,211 @@ def sighs(bar0, nbars, vel=44):
         glide('goblins', t, 3.0, pn('C5') + rng.choice((0, 1, 6)), vel, 3.0, -4.0, steps=12)
         if k % 4 == 2: glide('violin', song.bar(bar0 + k) + 1.0, 3.0, pn('F5'), vel + 6, 0.0, -1.5, steps=12)
 
+
+# ═══ Version 2: Hauptmelodie, Riff, Battle-Beat ══════════════════════════════════════════════════
+THEME_CH = ['Fm', 'Fm', 'Db', 'Eb', 'Fm', 'Fm', 'Gb', 'C']
+THEME = [
+    [('F5', 1), ('F5', .5), ('Ab5', .5), ('C6', 2)],
+    [('Bb5', 1), ('Ab5', .5), ('G5', .5), ('F5', 2)],
+    [('Db6', 1), ('C6', .5), ('Bb5', .5), ('Ab5', 2)],
+    [('G5', 1), ('Bb5', 1), ('Eb6', 2)],
+    [('F5', 1), ('F5', .5), ('Ab5', .5), ('C6', 2)],
+    [('Eb6', 1), ('Db6', .5), ('C6', .5), ('Bb5', 2)],
+    [('Bb5', 1), ('Db6', 1), ('Gb6', 2)],
+    [('C6', 1), ('B5', 1), ('C6', 2)],
+]
+THEME_CLOSED = THEME[:7] + [[('C6', 1), ('A5', 1), ('F5', 2)]]
+CH_OFF = {'Fm': 0, 'Gb': 1, 'Db': -4, 'Eb': -2, 'C': -5, 'Bbm': -7, 'C7': -5}
+DIES_OFF = [0, -1, 0, -5, -4, -5, -7, -5]
+
+def riff(bar0, chords, shift=0, vel=96, voices=('bass', 'tuba', 'trombone')):
+    """Dies-irae-Riff in durchgehenden Achteln, pro Takt auf den Akkordgrundton versetzt."""
+    for k, ch in enumerate(chords):
+        t = song.bar(bar0 + k)
+        base = 41 + CH_OFF[ch] + shift                       # F2 + Versatz
+        for i, off in enumerate(DIES_OFF):
+            for v in voices:
+                p = base + off + (12 if v == 'trombone' else 0)
+                song.add(v, t + i * 0.5, 0.45, p, hv(vel + (12 if i in (0, 4) else 0) - (10 if v == 'trombone' else 0)))
+
+def chops(bar0, chords, shift=0, vel=62):
+    """Streicher-Chops: kurze Sechzehntel auf Grundton/Quinte (Violine) — Antrieb."""
+    for k, ch in enumerate(chords):
+        T = tones(ch, 4, shift)
+        t = song.bar(bar0 + k)
+        for i in range(16):
+            song.add('violin', t + i * 0.25, 0.12, (T[0], T[2], T[0] + 12, T[2])[i % 4], hv(vel + (12 if i % 4 == 0 else 0)))
+
+def battle_drums(bar0, nbars, level=1.0, crash=True):
+    """Kick auf 1, 1&-Sechzehntel, 3, 3&; Snare 2/4; Hi-Hat-Sechzehntel; Tom-Fill im 4. Takt; Crash zu Beginn."""
+    for k in range(nbars):
+        t = song.bar(bar0 + k)
+        L = level
+        for pos, v in ((0, 110), (3, 90), (8, 106), (10, 92)): song.dr(t + pos * 0.25, KICK, int(v * L), 0.15)
+        for beat in (1, 3): song.dr(t + beat, SNARE, int(110 * L), 0.15)
+        for i in range(16): song.dr(t + i * 0.25, HAT, int((98 if i % 4 == 0 else (80 if i % 2 == 0 else 60)) * L), 0.05)
+        if k == 0 and crash: song.dr(t, CRASH, int(108 * L), 2.0)
+        if k % 4 == 3:
+            for j in range(6): song.dr(t + 2.5 + j * 0.25, (TOM_H, TOM_H, TOM_M, TOM_M, TOM_L, TOM_L)[j], int((86 + 5 * j) * L), 0.12)
+
+def half_drums(bar0, nbars, level=1.0):
+    for k in range(nbars):
+        t = song.bar(bar0 + k)
+        song.dr(t, KICK, int(106 * level), 0.2); song.dr(t + 2, SNARE, int(112 * level), 0.2); song.dr(t + 3.5, KICK, int(90 * level), 0.15)
+        for i in range(8): song.dr(t + i * 0.5, HAT, int((84 if i % 2 == 0 else 62) * level), 0.06)
+        if k % 2 == 0: song.dr(t, CRASH, int(96 * level), 1.6)
+
+def timp8(bar0, chords, shift=0, vel=100):
+    """Pauken-Achtel auf dem Grundton (Betonung 1 und 3)."""
+    for k, ch in enumerate(chords):
+        r = 41 + CH_OFF[ch] + shift + 12
+        if r > 55: r -= 12
+        t = song.bar(bar0 + k)
+        for i in range(8): song.add('timp', t + i * 0.5, 0.4, r, hv(vel - (0 if i in (0, 4) else 24)))
+
+def big_theme(bar0, chords, melody, shift=0, vel=100, trumpet=False, strings=True):
+    for inst, o, v in (('organ', 0, vel - 18), ('trombone', 0, vel - 6), ('choir', 0, vel - 10), ('horn', 0, vel - 20)):
+        mel(inst, bar0, melody, shift=shift, vel=v, octave=o)
+    if strings: mel('violin', bar0, melody, shift=shift, vel=vel - 24, octave=0)
+    if trumpet: mel('muted', bar0, melody, shift=shift, vel=vel - 14, octave=0)
+    for k, ch in enumerate(chords):
+        T = tones(ch, 3, shift)
+        for m in T: song.add('organ', song.bar(bar0 + k), 3.95, m, 56)
+
 # ═══ Arrangement ══════════════════════════════════════════════════════════════════════════════════
 b = 0
-# ── Intro (4): Pedal, Herzschlag, ein einzelner Glockenschlag (Tritonus), erste Uhrwerk-Ticks ───────────────
-pedal(b, 4, vel=50)
-heartbeat(b, 4, vel=48)
-glass(b, 4, vel=24)
+# ── Intro (4): Pedal, Herzschlag, Uhrwerk-Ticks, Pauken-Wirbel; im letzten Takt der erste Schlag und das Riff beginnt ───
+pedal(b, 4, vel=56)
+heartbeat(b, 4, vel=52)
+glass(b, 4, vel=26)
 whispers(b, 4, vel=26)
-tolls(b, 1, vel=62)
-clockwork(b + 2, ['Fm', 'Fm'], vel=40)
-timp_roll(song.bar(b + 3) + 2, 2.0, pn('F2') + 12, 36, 92)
+tolls(b, 1, vel=64)
+clockwork(b + 1, ['Fm'] * 3, vel=50)
+timp_roll(song.bar(b + 2), 8.0, pn('F2') + 12, 36, 112)
+roll(b + 3, 0, 4, 40, 118)
+song.dr(song.bar(b + 3) + 3.5, CRASH, 84, 0.6)
 b += 4
 
-# ── Das Hauptbuch A (8): Uhrwerk, schweres Halbzeit-Schlagwerk, das verborgene Dies-irae-Zitat tief im Chor ─────
-pedal(b, 8, vel=68)
-clockwork(b, A_CH, vel=68)
-dies_hidden(b, vel=34)
-tremolo_pad(b, A_CH, vel=34)
-glass(b, 8, vel=26)
-heartbeat(b, 8, vel=46)
-drums(b, 8, level=1.08)
-tolls(b, 8, every=4, vel=66)
-whispers(b, 8, vel=30)
-sighs(b, 8, vel=34)
+# ── Riff A (8): Dies-irae-Achtel-Riff, Uhrwerk, harter Beat; die Melodie kündigt sich sly in der gedämpften Trompete an ─
+riff(b, THEME_CH)
+clockwork(b, THEME_CH, vel=62)
+mel('muted', b, THEME, vel=80, legato=.9)
+pedal(b, 8, vel=62, fixed=False, chords=THEME_CH)
+tremolo_pad(b, THEME_CH, vel=34)
+glass(b, 8, vel=28)
+timp8(b, THEME_CH, vel=86)
+battle_drums(b, 8, level=1.0)
+tolls(b, 8, every=4, vel=62)
+whispers(b, 8, vel=28)
 b += 8
 
-# ── Audienz B (8): der Gastgeber — gedämpfte Trompete, höflich und falsch; Orgelakkorde, Uhrwerk weiter ────────
-mel('muted', b, HOST, vel=82, legato=.9)
-pedal(b, 8, vel=60)
-clockwork(b, B_CH, vel=54)
+# ── Thema B (8): die Hauptmelodie groß — Orgel, Posaune, Chor, Horn, Geigen; Riff und Beat darunter ───────────────────
+big_theme(b, THEME_CH, THEME, vel=100)
+riff(b, THEME_CH, vel=98)
+clockwork(b, THEME_CH, vel=60)
+chops(b, THEME_CH, vel=56)
+pedal(b, 8, vel=70, fixed=False, chords=THEME_CH)
+timp8(b, THEME_CH, vel=100)
+battle_drums(b, 8, level=1.1)
+glass(b, 8, vel=34)
+tolls(b, 8, every=2, vel=70)
+b += 8
+
+# ── Audienz C (8): der Gastgeber — gedämpfte Trompete (neue, höfliche Linie) über Riff und Uhrwerk, Beat bleibt ─────
+mel('muted', b, HOST, vel=84, legato=.9)
 for k, ch in enumerate(B_CH):
-    for m in tones(ch, 3): song.add('organ', song.bar(b + k), 3.95, m, 44)
-    song.add('oohs', song.bar(b + k), 3.95, tones(ch, 4)[2], 40)
+    for m in tones(ch, 3): song.add('organ', song.bar(b + k), 3.95, m, 46)
+    song.add('oohs', song.bar(b + k), 3.95, tones(ch, 4)[2], 44)
+riff(b, [c if c != 'C7' else 'C' for c in B_CH], vel=88)
+clockwork(b, B_CH, vel=58)
+pedal(b, 8, vel=60)
+chops(b, [c if c != 'C7' else 'C' for c in B_CH], vel=46)
 tremolo_pad(b, B_CH, vel=38)
 glass(b, 8, vel=30)
-heartbeat(b, 8, vel=50)
-drums(b, 8, level=1.0)
-whispers(b, 8, vel=32)
-tolls(b, 8, every=4, vel=64)
+timp8(b, [c if c != 'C7' else 'C' for c in B_CH], vel=84)
+battle_drums(b, 8, level=0.95)
+whispers(b, 8, vel=30)
 for k in (3, 7):
     glide('goblins', song.bar(b + k) + 2.0, 2.0, pn('C5'), 46, 2.0, -3.0)
-roll(b + 7, 2, 4, 40, 96)
+roll(b + 7, 2, 4, 44, 108)
 b += 8
 
-# ── Hofstaat C (8): das Zitat tritt hervor — Orgel, Posaune, Chor, Horn, Tuba; schwere Trommeln, Glocken ──────
-dies_open(b, vel=98)
-pedal(b, 8, vel=70, fixed=False, chords=C_CH)
-clockwork(b, C_CH, vel=60)
-tremolo_pad(b, C_CH, vel=48)
-glass(b, 8, vel=34)
-for k in range(8):
-    r = root_midi(C_CH[k], oct_=1)
-    if r > 55: r -= 12
-    song.add('timp', song.bar(b + k), 1.2, r, 100)
-    song.add('timp', song.bar(b + k) + 2, 1.2, r, 92)
-drums(b, 8, level=1.1, style='heavy', fills=True)
-tolls(b, 8, every=2, vel=72)
-whispers(b, 8, vel=34)
-for k in (1, 3, 5, 7):
-    glide('violin', song.bar(b + k), 3.8, pn('F5') + 6 * (k % 2), 62, -1.0, 2.0)
-sighs(b, 8, vel=40)
+# ── Thema D (8): Hauptmelodie noch größer — Trompete obendrauf; das Dies-irae-Zitat offen in Horn und Orgel (Gegenstimme) ─
+big_theme(b, THEME_CH, THEME, vel=104, trumpet=True)
+riff(b, THEME_CH, vel=102)
+clockwork(b, THEME_CH, vel=62)
+chops(b, THEME_CH, vel=60)
+pedal(b, 8, vel=72, fixed=False, chords=THEME_CH)
+timp8(b, THEME_CH, vel=104)
+battle_drums(b, 8, level=1.15)
+tolls(b, 8, every=2, vel=74)
+glass(b, 8, vel=36)
+for k in (1, 5): glide('goblins', song.bar(b + k), 3.0, pn('C5'), 46, 3.0, -4.0)
 b += 8
 
-# ── Signatur (8): kein Schlagzeug — nur Uhrwerk, Pedal, geflüsterter Chor; der Meister „spricht“ (tiefe Chor-Silben), Cluster wächst ────
-pedal(b, 8, vel=62)
-clockwork(b, BREAK_CH, vel=52)
+# ── Signatur (8): Halbzeit — Uhrwerk, Pedal, gesprochene Chor-Silben (der Meister spricht), Cluster wächst; am Ende Wirbel ──
+pedal(b, 8, vel=64)
+clockwork(b, BREAK_CH, vel=56)
 for k, ch in enumerate(BREAK_CH):
     t = song.bar(b + k)
     r = root_midi(ch, oct_=1)
-    for pos in (0.0, 1.5, 2.0, 3.25):                         # gesprochene Silben: gehackter Rhythmus, tiefer Männerchor
-        song.add('choir', t + pos, 0.25, r + 12, hv(60 + 3 * k))
+    for pos in (0.0, 1.5, 2.0, 3.25): song.add('choir', t + pos, 0.25, r + 12, hv(62 + 3 * k))
     for iv in (0, 1, 6): song.add('tremolo', t, 3.95, r + 24 + iv, 36 + 5 * k)
-glass(b, 8, vel=36)
-heartbeat(b, 8, vel=56)
-tolls(b, 8, every=2, vel=66)
-whispers(b, 8, vel=38)
-glide('goblins', song.bar(b + 4), 15.0, pn('C5'), 52, -6.0, 6.0, steps=32)
-timp_roll(song.bar(b + 6), 8.0, pn('F2') + 12, 36, 116)
-roll(b + 7, 0, 4, 36, 124)
+    song.add('timp', t, 1.2, r + 12 if r + 12 <= 55 else r, 90)
+half_drums(b, 8, level=1.0)
+glass(b, 8, vel=38)
+tolls(b, 8, every=2, vel=68)
+whispers(b, 8, vel=36)
+glide('goblins', song.bar(b + 4), 7.5, pn('C5'), 52, -6.0, 6.0, steps=32)
+timp_roll(song.bar(b + 6), 8.0, pn('F2') + 12, 36, 118)
+roll(b + 7, 0, 4, 40, 126)
 b += 8
 
-# ── Der Pakt E (8): das Pedal F bleibt, alles darüber steigt halbtonweise (F-, Ges-, G-, As-Moll) — der Boden bewegt sich nicht ─────
-pedal(b, 8, vel=76)
-drums(b, 8, level=1.15, style='heavy', fills=True)
+# ── Der Pakt E (8): Pedal F bleibt, die Melodie und alles darüber steigt halbtonweise (F-, Ges-, G-, As-Moll) ───────────
+pedal(b, 8, vel=78)
+battle_drums(b, 8, level=1.15)
 for blk in range(4):
     sh = blk
     bb = b + 2 * blk
-    seg = [A_CH[2 * blk], A_CH[2 * blk + 1]]
-    clockwork(bb, ['Fm', 'Fm'], vel=62)                         # das Uhrwerk bleibt auf F (der Boden)
-    for k, ch in enumerate(seg):
-        T = tones(ch, 3, sh)
-        t = song.bar(bb + k)
-        for m in T: song.add('organ', t, 3.95, m, 62); song.add('trombone', t, 3.95, m, 88); song.add('horn', t, 3.95, m + 12, 70)
-        for m in tones(ch, 4, sh): song.add('choir', t, 3.95, m, 80)
-        for iv in (0, 1, 6): song.add('tremolo', t, 3.95, root_midi(ch, sh, 2) + iv, 50)
-    mel('muted', bb, HOST[2 * blk:2 * blk + 2], shift=sh, vel=86, legato=.9)
-    mel('violin', bb, HOST[2 * blk:2 * blk + 2], shift=sh, vel=60, octave=1)
-dies_hidden(b, vel=60, per_note=4.0, octave=0, inst='oohs')
-glass(b, 8, vel=40)
-tolls(b, 8, every=2, vel=76)
+    seg_ch = THEME_CH[2 * blk:2 * blk + 2]
+    seg_mel = THEME[2 * blk:2 * blk + 2]
+    big_theme(bb, seg_ch, seg_mel, shift=sh, vel=106, trumpet=True)
+    riff(bb, ['Fm', 'Fm'], vel=104)                              # das Riff bleibt auf F (der Boden)
+    clockwork(bb, ['Fm', 'Fm'], vel=62)
+    chops(bb, ['Fm', 'Fm'], vel=60)
+    timp8(bb, ['Fm', 'Fm'], vel=106)
+glass(b, 8, vel=42)
+tolls(b, 8, every=2, vel=78)
 whispers(b, 8, vel=38)
-sighs(b, 8, vel=46)
-for k in (1, 3, 5, 7):
-    song.add('timp', song.bar(b + k), 1.2, pn('F2') + 12, 100)
-    if k in (3, 7): song.dr(song.bar(b + k), CRASH, 88, 1.6)
+for k in (3, 7): song.dr(song.bar(b + k), CRASH, 90, 1.6)
 roll(b + 7, 2, 4, 56, 126)
 b += 8
 
-# ── Coda (4): C (Dominante zur F-Moll-Intro) — das Zitat noch einmal offen, dann nur Pedal und ein letzter Tritonus-Schlag ─────────────
+# ── Finale (8): alles, zurück in F-Moll — die Melodie geschlossen (endet auf F), Beat voll ───────────────────────────
+big_theme(b, THEME_CH, THEME_CLOSED, vel=108, trumpet=True)
+riff(b, THEME_CH, vel=106)
+clockwork(b, THEME_CH, vel=64)
+chops(b, THEME_CH, vel=62)
+pedal(b, 8, vel=76, fixed=False, chords=THEME_CH)
+timp8(b, THEME_CH, vel=108)
+battle_drums(b, 8, level=1.18)
+tolls(b, 8, every=2, vel=76)
+glass(b, 8, vel=40)
+b += 8
+
+# ── Coda (4): C (Dominante zur F-Moll-Intro) — das Riff ein letztes Mal auf C, dann nur Pedal und ein Tritonus-Schlag ────
+riff(b, ['C', 'C'], vel=100)
 for k in range(3):
-    for m in (pn('C2'), pn('C3'), pn('G3')): song.add('organ', song.bar(b + k), 3.95, m, 70 - 6 * k)
-    song.add('tuba', song.bar(b + k), 3.95, pn('C2'), 74)
-    song.add('bass', song.bar(b + k), 3.95, pn('C2'), 74)
-for i, (n, o) in enumerate(zip(DIES[:6], DIES_OCT[:6])):
-    t = song.bar(b) + i * 2.0
-    for inst, off, v in (('choir', 0, 74), ('oohs', 12, 56), ('trombone', -12, 70)):
-        song.add(inst, t, 1.9, pn(n + str(o)) + off, hv(v))
-clockwork(b, ['C', 'C'], vel=44)
-heartbeat(b, 3, vel=64)
-song.dr(song.bar(b), KICK, 92, 0.2); song.dr(song.bar(b) + 2, SNARE, 96, 0.2)
-tolls(b + 2, 1, vel=76)
-timp_roll(song.bar(b + 3), 4.0, pn('C2') + 12, 40, 100)
-glass(b, 3, vel=30)
+    for m in (pn('C2'), pn('C3'), pn('G3')): song.add('organ', song.bar(b + k), 3.95, m, 72 - 6 * k)
+battle_drums(b, 2, level=1.0, crash=True)
+clockwork(b, ['C', 'C'], vel=50)
+heartbeat(b + 2, 1, vel=70)
+tolls(b + 2, 1, vel=78)
+timp_roll(song.bar(b + 3), 4.0, pn('C2') + 12, 40, 104)
+glass(b, 3, vel=32)
 b += 4
 assert b == BARS, (b, BARS)
 
 if os.environ.get('NATAS_NORENDER') != '1':
     sf2, out = cli_paths('bgm_natas.ogg')
-    song.render(sf2, out, target_rms=0.26, saturate=False, compress=True, air_cut=0.1)
+    song.render(sf2, out, target_rms=0.27, saturate=False, compress=True, air_cut=0.1)
