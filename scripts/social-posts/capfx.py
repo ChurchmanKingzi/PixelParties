@@ -7,7 +7,7 @@ GOLD_HL = (255, 244, 170)
 
 
 class CaptionMixin:
-    CPS = 55.0
+    CPS = 25.0                                                                        # Standard: langsam tippen (Wort für Wort, mitlesbar) – Fenster müssen dazu passen: Länge / 25 s
     CAP_Y = 1150
 
     def _tw(self, text, scale):
