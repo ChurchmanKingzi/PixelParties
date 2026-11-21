@@ -214,7 +214,10 @@ function WhBigCard({ name, rarity }) {
 }
 function WhTip({ tip }) {
   if (!tip) return null;
-  const Wd = 300, x = Math.min(window.innerWidth - Wd - 16, tip.x + 22), y = Math.max(8, Math.min(window.innerHeight - 470, tip.y - 40));
+  // Höhe grob schätzen (große Karte 5:7 + Text) und so setzen, dass der Tooltip neben dem Zeiger sitzt und im Fenster bleibt
+  const Wd = 300, Ht = tip.card ? Wd * 1.4 + 120 : 290;
+  let x = tip.x + 24; if (x + Wd > window.innerWidth - 8) x = tip.x - Wd - 24;
+  const y = Math.max(8, Math.min(window.innerHeight - Ht - 8, tip.y - Ht * 0.35));
   const f = tip.info;
   return (
     <div className="wh-tip" style={{ left: Math.max(8, x), top: y, '--whc': f.rarColor || '#fad54a' }}>
@@ -648,6 +651,14 @@ function WhGallery({ rarity, mode, onBack, onGo, notify }) {
     const b = e.target.closest && e.target.closest('.wh-tile'); if (!b || b.dataset.locked) return;
     toggle(b.dataset.k);
   }, [toggle]);
+  // Alle Duplikate: je Karte so viele freie Kopien, dass genau eine übrig bleibt (Kopien in Decks zählen als übrig)
+  const selectDupes = () => {
+    const keys = [];
+    for (const c of cards || []) { const from = c.total - c.free >= 1 ? 0 : 1; for (let k = from; k < c.free; k++) keys.push(c.name + '#' + k); }
+    if (!keys.length) { notify(whT('No duplicates to select.'), 'error'); return; }
+    if (keys.length > max) notify(window.ppT('You can stake at most {0} cards at once.').replace('{0}', max), 'error');
+    setSel(new Set(keys.slice(0, max)));
+  };
   const selectShown = () => setSel(prev => { const n = new Set(prev); for (const t of shown) { if (n.size >= max) break; if (!t.locked) n.add(t.key); } return n; });
   const go = () => {
     const m = {}; for (const k of sel) { const name = k.slice(0, k.lastIndexOf('#')); m[name] = (m[name] || 0) + 1; }
@@ -674,6 +685,7 @@ function WhGallery({ rarity, mode, onBack, onGo, notify }) {
           </select>
           <input type="text" value={q} placeholder={whT('Search name…')} onChange={e => setQ(e.target.value)} />
           {!single && <button className="btn" onClick={selectShown}>Select shown</button>}
+          {!single && <button className="btn" onClick={selectDupes} title={whT('Selects every duplicate so that exactly one copy of each card stays.')}>Select all duplicates</button>}
           {sel.size > 0 && <button className="btn" onClick={() => setSel(new Set())}>Clear</button>}
         </div>
       </div>
