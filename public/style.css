@@ -26951,3 +26951,20 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-rc img { width: 100%; display: block; image-rendering: pixelated; }
 
 .wh-pick-prev { min-height: 0; }
+
+/* Debug-Auswahl (nur mit PP_DEBUG_TOOLS=1) und Ticket-Upgrade */
+.wh-debug { background: #12101f; padding: 10px 14px; box-shadow: 0 0 0 2px #e73b41; }
+.wh-debug h4 { margin: 0 0 8px; font-family: var(--font-display), sans-serif; color: #e73b41; }
+.wh-debug-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.wh-chip { font-size: 12px; padding: 4px 8px; }
+.wh-chip-on { background: #fad54a; color: #12101f; }
+.wh-up { position: fixed; inset: 0; z-index: 100001; background: #12101f; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; cursor: pointer; }
+.wh-up-title { font-family: var(--font-display), sans-serif; font-size: 44px; color: #fad54a; animation: whBlink .6s steps(1) infinite; }
+.wh-up-cards { display: flex; align-items: center; gap: 32px; }
+.wh-up-card { display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: var(--font-display), sans-serif; font-size: 20px; }
+.wh-up-from { width: 200px; }
+.wh-up-from .bp-sc-face { width: 100%; }
+.wh-up-from .bp-sc-face img { image-rendering: pixelated; }
+.wh-up-to { width: 300px; }
+.wh-up-to .wh-bigface { width: 100%; }
+.wh-up-name { font-family: var(--font-display), sans-serif; font-size: 22px; color: #ffffff; }

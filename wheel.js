@@ -245,10 +245,11 @@
   /**
    * Würfelt einen ganzen Wurf: `stake` bezahlte Pfeile, dazu Bonus-Pfeile aus spin3 (je 3, unbegrenzt rekursiv bis MAX_ARROWS).
    * Die Pfeile werden der Reihe nach aufgelöst; ein Boost-Treffer wirkt auf alle FOLGENDEN Pfeile.
+   * @param {string[]} [force] Debug: Preisarten der ersten Pfeile (nur Arten, die auf diesem Board vorkommen)
    * @returns {{ arrows: Array<{ i:number, kind:string, bonus:boolean, boosted:boolean }>, capped:boolean }}
    *   `capped`: die Notbremse MAX_ARROWS hat weitere Bonus-Pfeile verhindert (praktisch unmöglich bei den echten Quoten).
    */
-  function rollThrow(rarity, boardId, stake, rand) {
+  function rollThrow(rarity, boardId, stake, rand, force) {
     if (!Number.isInteger(stake) || stake < 1 || stake > MAX_STAKE) throw new Error('Ungültige Einsatzmenge');
     const tbl = table(rarity, boardId);
     const arrows = [];
@@ -258,7 +259,9 @@
       const bonus = queue <= 0;
       if (bonus) bonusLeft--; else queue--;
       const eff = applyBoosts(tbl, boosts);
-      const kind = rollOne(eff, rand);
+      // Debug: die ersten Pfeile sind garantiert (nur der Server reicht `force` weiter, und nur mit PP_DEBUG_TOOLS=1)
+      const forced = Array.isArray(force) && arrows.length < force.length && tbl[force[arrows.length]] > 0 ? force[arrows.length] : null;
+      const kind = forced || rollOne(eff, rand);
       arrows.push({ i: arrows.length, kind, bonus, boosted: boosts.length > 0 });
       if (kind === 'spin3') {
         if (arrows.length + queue + bonusLeft + SPIN_ARROWS <= MAX_ARROWS) bonusLeft += SPIN_ARROWS; else capped = true;

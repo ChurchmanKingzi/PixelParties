@@ -7700,5 +7700,8 @@
 "Three extra darts, thrown right after your paid ones.": "Drei zusätzliche Pfeile, direkt nach deinen bezahlten geworfen.",
 "No duplicates to select.": "Keine Duplikate zum Auswählen.",
 "Select all duplicates": "Alle Duplikate wählen",
-"Selects every duplicate so that exactly one copy of each card stays.": "Wählt alle Duplikate, sodass von jeder Karte genau eine Kopie übrig bleibt."
+"Selects every duplicate so that exactly one copy of each card stays.": "Wählt alle Duplikate, sodass von jeder Karte genau eine Kopie übrig bleibt.",
+"Debug: guarantee the first darts": "Debug: erste Pfeile garantieren",
+"UPGRADE!": "AUFWERTUNG!",
+"Nice!": "Stark!"
 }

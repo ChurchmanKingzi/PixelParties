@@ -176,3 +176,10 @@ test('Notbremse: MAX_ARROWS wird nie überschritten', () => {
   assert.strictEqual(r.capped, true);
   void always; void stuck;
 });
+
+test('Debug-Erzwingung: die ersten Pfeile sind die gewünschten Arten (nur solche, die auf dem Board vorkommen)', () => {
+  const r = W.rollThrow('uncommon', 'A', 6, seeded(5), ['golden', 'jackpot', 'ticket:uncommon', 'nicht-vorhanden']);
+  assert.deepStrictEqual(r.arrows.slice(0, 3).map(a => a.kind), ['golden', 'jackpot', 'ticket:uncommon']);
+  assert.notStrictEqual(r.arrows[3].kind, 'nicht-vorhanden');
+  assert.ok(r.arrows.filter(a => !a.bonus).length === 6);
+});

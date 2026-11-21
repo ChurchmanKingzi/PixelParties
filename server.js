@@ -4521,7 +4521,7 @@ app.get('/api/boosters', authMiddleware, (req, res) => {
       packs: man.packs.map(p => ({
         id: p.id, name: p.name, tagline: p.tagline || man.tagline,
         variants: p.variants.map(v => ({
-          id: v.id, theme: v.theme, base: v.base, shimmer: v.shimmer,
+          id: v.id, theme: v.theme, base: v.base, shimmer: v.shimmer, special: v.special || '',
           baseUrl: BOOSTER_URL_DIR + v.base, shimmerUrl: BOOSTER_URL_DIR + v.shimmer,
         })),
       })),
@@ -4559,7 +4559,8 @@ async function buyBoosterPacks(userId, packIds) {
   for (const pack of packs) {
     const pool = packPool(pack.id);
     if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
-    const variant = pack.variants[Math.floor(Math.random() * pack.variants.length)];
+    const regular = pack.variants.filter(v => !v.special);   // Gold-/Umbra-Varianten vergibt nur das Glücksrad
+    const variant = regular[Math.floor(Math.random() * regular.length)];
     rolled.push({ id: uuidv4(), packId: pack.id, variantId: variant.id, cards: RARITIES.rollPack(pool, { hasMask: cardHasMask }) });
   }
   const price = RARITIES.PACK_PRICE, total = price * n;
@@ -4945,7 +4946,7 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 // ───── Glücksrad (wheel-api.js) ─────
 require('./wheel-api')({
   app, db, authMiddleware, uuidv4, path, RARITIES, ownedRarities, addRarityCopies, packPool, cardHasMask, boosterManifest,
-  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName,
+  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName, debugEnabled: DEBUG_TOOLS_ENABLED,
   get cpuSleeves() { return cpuSleeves; }, get cpuAvatars() { return cpuAvatars; },
 });
 

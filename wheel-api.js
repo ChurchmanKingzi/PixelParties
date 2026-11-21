@@ -69,10 +69,11 @@ module.exports = function registerWheel(d) {
   }
 
   // ── Packs als Preis ──
-  function randomVariant(packId) {
+  /** Pack-Variante: `special` = 'golden' | 'umbra' (Spezial-Cover, scripts/booster/build_special_packs.py), sonst ein zufälliges normales Cover. */
+  function randomVariant(packId, special) {
     const pack = (boosterManifest().packs || []).find(p => p.id === packId);
-    const v = pack && pack.variants && pack.variants.length ? pack.variants[Math.floor(Math.random() * pack.variants.length)] : null;
-    return v ? v.id : null;
+    const list = pack && pack.variants ? pack.variants.filter(v => special ? v.special === special : !v.special) : [];
+    return list.length ? list[Math.floor(Math.random() * list.length)].id : null;
   }
   function randomPackId(rand) {
     const ids = RARITIES.PACK_IDS.filter(id => (packPool(id) || []).length && randomVariant(id));
@@ -140,7 +141,7 @@ module.exports = function registerWheel(d) {
       // Beispielkarte je Rarity (für die große Vorschau und die Zettel): zufällig, bei Umbra/Stained/Storm nur mit Motiv
       const samples = {};
       for (const r of W.INPUT_RARITIES) samples[r] = randomCard(r, Math.random);
-      res.json({ rarities, samples, tickets: await tickets(db, userId), boards, maxStake: W.MAX_STAKE, spinArrows: W.SPIN_ARROWS, ticketRarities: TICKET_RARITIES });
+      res.json({ rarities, samples, tickets: await tickets(db, userId), boards, maxStake: W.MAX_STAKE, spinArrows: W.SPIN_ARROWS, ticketRarities: TICKET_RARITIES, debug: !!d.debugEnabled });
     } catch (err) { console.error('[wheel/state]', err.message); res.status(500).json({ error: 'Failed to load wheel' }); }
   });
 
@@ -205,15 +206,15 @@ module.exports = function registerWheel(d) {
         await tx.run('DELETE FROM user_card_rarities WHERE user_id = ? AND count <= 0', [userId]);
 
         const rand = Math.random;
-        const throwRes = W.rollThrow(rarity, board, stakeN, rand);
+        const throwRes = W.rollThrow(rarity, board, stakeN, rand, d.debugEnabled && Array.isArray(req.body.force) ? req.body.force.map(String).slice(0, 50) : null);
         const gainCards = [], packRows = [];
         let sc = 0;
         const tix = {};
         const existing = await tx.all('SELECT COUNT(*) AS n FROM pending_booster WHERE user_id = ?', [userId]);
         let seq = Number(existing[0] && existing[0].n) || 0;
-        const addPack = async (packId, cards) => {
+        const addPack = async (packId, cards, special) => {
           const id = uuidv4();
-          await tx.run("INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq, source) VALUES (?, ?, ?, ?, ?, ?, 'wheel')", [id, userId, packId, randomVariant(packId), JSON.stringify(cards), seq++]);
+          await tx.run("INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq, source) VALUES (?, ?, ?, ?, ?, ?, 'wheel')", [id, userId, packId, randomVariant(packId, special), JSON.stringify(cards), seq++]);
           packRows.push(id);
         };
         for (const a of throwRes.arrows) {
@@ -230,10 +231,10 @@ module.exports = function registerWheel(d) {
             await addPack(packId, RARITIES.rollPack(packPool(packId), { rand, hasMask: cardHasMask })); a.prize = { packId };
           } else if (k === 'golden') {
             const packId = randomPackId(rand);
-            await addPack(packId, rollGolden(rand)); a.prize = { packId };
+            await addPack(packId, rollGolden(rand), 'golden'); a.prize = { packId };
           } else if (k === 'jackpot') {
             const packId = randomPackId(rand);
-            await addPack(packId, rollJackpot(rand)); a.prize = { packId };
+            await addPack(packId, rollJackpot(rand), 'umbra'); a.prize = { packId };
           } else if (k === 'avatar' || k === 'sleeve' || k === 'skin') {
             const got = await pullCosmetic(tx, userId, k);
             if (got) a.prize = got;
