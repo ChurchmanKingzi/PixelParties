@@ -586,7 +586,11 @@
     "gold",
     6
    ]
-  ]
+  ],
+  "px": 14,
+  "fireshow": true,
+  "opener": "wind",
+  "showLoops": 6
  },
  "Mao, the Vengeful Guardian": {
   "particles": [
