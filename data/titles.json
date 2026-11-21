@@ -1,0 +1,268 @@
+{
+ "titles": [
+  {
+   "id": "archmage",
+   "en": {
+    "t": "Archmage",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Erzmagier",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "captain",
+   "en": {
+    "t": "Captain",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Kapitän",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "professor",
+   "en": {
+    "t": "Professor",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Professor",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "baron",
+   "en": {
+    "t": "Baron",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Baron",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "lord",
+   "en": {
+    "t": "Lord",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Lord",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "sir",
+   "en": {
+    "t": "Sir",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Sir",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "doctor",
+   "en": {
+    "t": "Dr.",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Dr.",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "grandmaster",
+   "en": {
+    "t": "Grandmaster",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Großmeister",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "smug-master",
+   "en": {
+    "t": "Smug Master",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Smug-Meister",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "dart-master",
+   "en": {
+    "t": "Dart Master",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Dartmeister",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "card-shark",
+   "en": {
+    "t": "Card Shark",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Kartenhai",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "bulk-baron",
+   "en": {
+    "t": "Bulk Baron",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Ramschbaron",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "umbra-touched",
+   "en": {
+    "t": "Umbra-Touched",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Umbra-Erwählter",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-smug",
+   "en": {
+    "t": "the Smug",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Smugge",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-lucky",
+   "en": {
+    "t": "the Lucky",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Glückliche",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bold",
+   "en": {
+    "t": "the Bold",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Kühne",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-unbeaten",
+   "en": {
+    "t": "the Unbeaten",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Ungeschlagene",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-collector",
+   "en": {
+    "t": "the Collector",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Sammler",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-gilded",
+   "en": {
+    "t": "the Gilded",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Vergoldete",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-wise",
+   "en": {
+    "t": "the Wise",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Weise",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-unyielding",
+   "en": {
+    "t": "the Unyielding",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Unbeugsame",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-swift",
+   "en": {
+    "t": "the Swift",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Flinke",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-terrible",
+   "en": {
+    "t": "the Terrible",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Schreckliche",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "of-the-cork-board",
+   "en": {
+    "t": "of the Cork Board",
+    "pos": "after"
+   },
+   "de": {
+    "t": "von der Korkwand",
+    "pos": "after"
+   }
+  }
+ ]
+}

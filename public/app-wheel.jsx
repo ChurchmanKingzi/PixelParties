@@ -65,6 +65,8 @@ const WH_ICONS = {
   back: ['KKKKKKK.', 'KPPPPPK.', 'KPWPWPK.', 'KPPWPPK.', 'KPWPWPK.', 'KPPPPPK.', 'KKKKKKK.', '........'],
   sword: ['......KK', '.....KSK', '....KSK.', 'K..KSK..', 'KKKSK...', '.KKK....', 'KNK.....', 'KK......'],
   card: ['KKKKKK..', 'KWWWWK..', 'KWBBWK..', 'KWBYWK..', 'KWBBWK..', 'KWWWWK..', 'KKKKKK..', '........'],
+  smile: ['..KKKK..', '.KYYYYK.', 'KYKYYKYK', 'KYYYYYYK', 'KYKYYKYK', 'KYYKKYYK', '.KYYYYK.', '..KKKK..'],
+  scroll: ['KKKKKKK.', 'KLLLLLLK', '.KLKKLLK', '.KLLLLLK', '.KLKKKLK', '.KLLLLLK', 'KKLLLLKK', '..KKKKK.'],
   x: ['........', '.R....R.', '..R..R..', '...RR...', '...RR...', '..R..R..', '.R....R.', '........'],
 };
 function WhIcon({ name, px }) {
@@ -93,6 +95,8 @@ function whFieldInfo(kind) {
     case 'avatar': return base({ cls: 'cos', label: whT('Avatar'), icon: 'head', shape: 'tag', desc: 'A random avatar. A duplicate upgrades its frame.' });
     case 'sleeve': return base({ cls: 'cos', label: whT('Sleeve'), icon: 'back', shape: 'tag', desc: 'A random card sleeve. A duplicate upgrades its frame.' });
     case 'skin': return base({ cls: 'cos', label: whT('Skin'), icon: 'sword', shape: 'tag', desc: 'A random hero skin. A duplicate upgrades its frame.' });
+    case 'emote': return base({ cls: 'cos', label: whT('Emote'), icon: 'smile', shape: 'tag', desc: 'A random emote for use in duels.' });
+    case 'title': return base({ cls: 'cos', label: whT('Title'), icon: 'scroll', shape: 'tag', desc: 'A random title shown next to your name.' });
     case 'spin3': return base({ cls: 'spin', label: whT('+3 Darts'), icon: 'dart', shape: 'arrow', desc: 'Three extra darts, thrown right after your paid ones.' });
     default: return base({ cls: 'none', label: kind, shape: 'none', desc: '' });
   }
@@ -221,8 +225,10 @@ function WhTip({ tip }) {
   const f = tip.info;
   return (
     <div className="wh-tip" style={{ left: Math.max(8, x), top: y, '--whc': f.rarColor || '#fad54a' }}>
-      {tip.card ? <WhBigCard name={tip.card.name} rarity={tip.card.rarity} /> : (
-        <div className="wh-tip-art">{tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
+      {tip.card ? <WhBigCard name={tip.card.name} rarity={tip.card.rarity} /> : tip.titleId ? (
+        <div className="wh-tip-art wh-tip-title">{window.PpTitled && <window.PpTitled name={whT('Your name')} title={tip.titleId} />}</div>
+      ) : (
+        <div className="wh-tip-art">{tip.art && tip.art.startsWith('emote:') ? <PpEmote id={tip.art.slice(6)} box={240} title="" /> : tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
       )}
       <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>
       <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (tip.sub || f.sub || '')}</div>
@@ -240,13 +246,16 @@ function whRollCos(pools) {
   const pick = (a) => (a && a.length ? a[Math.floor(Math.random() * a.length)] : null);
   if (!pools) return {};
   const sk = pick(pools.skins);
-  return { avatar: pick(pools.avatars), sleeve: pick(pools.sleeves), skin: sk ? { id: sk.id, hero: sk.hero, src: '/cards/skins/' + encodeURIComponent(sk.id) + '.png', name: sk.id } : null };
+  const D = window.ppEmData || {}, em = pick(D.emotes), ti = pick(D.titles);
+  return { avatar: pick(pools.avatars), sleeve: pick(pools.sleeves), skin: sk ? { id: sk.id, hero: sk.hero, src: '/cards/skins/' + encodeURIComponent(sk.id) + '.png', name: sk.id } : null,
+    emote: em ? { id: em.id, name: window.ppEmName ? window.ppEmName(em) : em.en } : null, title: ti ? { id: ti.id } : null };
 }
 function whFrameName(d) { const i = window.ppRankFrames ? window.ppRankFrames.rankOf(d) : null; return i == null ? 'Frame ' + d : window.ppRankFrames.RANKS[i].name + ' Frame'; }
 function whArtFor(kind, art, seed) {
   // Bildmaterial je Feld: Booster-Kunst, Kartenrücken, Beispielkarte, zufälliger Avatar/Sleeve/Skin
   if (!art) return null;
   if (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') { const c = art.cos && art.cos[kind]; return c ? c.src : (kind === 'sleeve' ? '/cardback.png' : null); }
+  if (kind === 'emote') { const c = art.cos && art.cos.emote; return c ? 'emote:' + c.id : null; }   // wird als PpEmote gezeichnet
   if (kind === 'golden') return art.golden && art.golden.length ? art.golden[seed % art.golden.length] : null;
   if (kind === 'jackpot') return art.umbra && art.umbra.length ? art.umbra[seed % art.umbra.length] : null;
   if (kind === 'booster') return art.packs && art.packs.length ? art.packs[seed % art.packs.length] : null;
@@ -388,7 +397,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
     const sfx = (name, o) => { if (sfxBudget > 5) return; sfxBudget++; whPlay(name, o); };
     let lastPop = -99;
     const addPop = (x, y, text, col, big) => { if (!big && frame - lastPop < 7) return; lastPop = frame; const id = ++popId; setPops(p => p.slice(-4).concat({ id, x, y, text, col })); setTimeout(() => setPops(p => p.filter(q => q.id !== id)), 1000); };
-    const slotKey = (s) => { const p = s.a.prize; if (s.kind.startsWith('card:') && p) return 'c:' + p.name + '|' + p.rarity; if ((s.kind === 'avatar' || s.kind === 'sleeve' || s.kind === 'skin') && p && p.id) return s.kind + ':' + p.id; return s.kind; };
+    const slotKey = (s) => { const p = s.a.prize; if (s.kind.startsWith('card:') && p) return 'c:' + p.name + '|' + p.rarity; if ((s.kind === 'avatar' || s.kind === 'sleeve' || s.kind === 'skin' || s.kind === 'emote' || s.kind === 'title') && p && p.id) return s.kind + ':' + p.id; return s.kind; };
 
     const burst = (s, n, speed) => {
       for (let k = 0; k < n && parts.length < 420; k++) {
@@ -526,9 +535,10 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
   const showTip = (e, kind, extra) => {
     if (!onTip) return;
     const f = whFieldInfo(kind), sample = kind.startsWith('card:') && art && art.samples ? art.samples[kind.slice(5)] : null;
-    const cs = (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') && art && art.cos ? art.cos[kind] : null;
+    const cs = (kind === 'avatar' || kind === 'sleeve' || kind === 'skin' || kind === 'emote') && art && art.cos ? art.cos[kind] : null;
+    const tsamp = kind === 'title' && art && art.cos && art.cos.title ? art.cos.title.id : null;
     onTip({ x: e.clientX, y: e.clientY, info: { ...f, rarColor: f.rar ? WH_RCOL[f.rar] : null }, pct: table[kind], card: sample ? { name: sample, rarity: kind.slice(5) } : null, sample: !!sample,
-      art: whArtFor(kind, art, seed), ...(cs ? { name: cs.name, sub: whT('example') } : {}), ...(extra || {}) });
+      art: whArtFor(kind, art, seed), ...(cs ? { name: cs.name, sub: whT('example') } : {}), ...(tsamp ? { titleId: tsamp, sub: whT('example') } : {}), ...(extra || {}) });
   };
   const stageStyle = { width: sz(WH_BW), '--whs': S + 'px', transform: shake[0] || shake[1] ? 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' : undefined, height: play ? sz(WH_BH + WH_GAP + WH_BARH) : sz(WH_BH) };
   return (
@@ -545,11 +555,12 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
             <div key={k} ref={el => { fieldRefs.current[k] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), ...(rar ? { '--whc': rar } : {}) }}
                  onMouseEnter={(e) => showTip(e, k)} onMouseMove={(e) => showTip(e, k)} onMouseLeave={() => onTip && onTip(null)}>
               <div className="wh-body" style={clip ? { clipPath: clip } : undefined}>
-                {artUrl && <img className={'wh-art wh-art-' + f.cls} src={artUrl} alt="" draggable={false} data-pp-px="aus" />}
+                {artUrl && artUrl.startsWith('emote:') ? <div className="wh-art wh-art-emote"><PpEmote id={artUrl.slice(6)} box={Math.max(8, Math.min(r.w - 4, r.h - 8)) * S} title="" /></div> : artUrl && <img className={'wh-art wh-art-' + f.cls} src={artUrl} alt="" draggable={false} data-pp-px="aus" />}
                 {(f.cls === 'golden' || f.cls === 'jackpot') && !artUrl && <span className="wh-dither" />}
                 {showIcon && <WhIcon name={f.icon} px={px} />}
                 {showLbl && <span className="wh-lbl" style={{ fontSize: 'calc(var(--whs) * ' + lblFs.toFixed(2) + ')' }}>{f.label}</span>}
                 {showLbl && f.sub && r.h >= 12 && r.w >= 16 && <span className="wh-sub">{f.sub}</span>}
+                {k === 'title' && art && art.cos && art.cos.title && r.h >= 12 && r.w >= 16 && window.ppTitleInfo && <span className="wh-sub wh-titlesample">{(window.ppTitleInfo(art.cos.title.id) || {}).text}</span>}
               </div>
               {k !== 'none' && <span className="wh-pin" />}
               {counts[k] > 0 && <span className="wh-cnt">{'×' + counts[k]}</span>}
@@ -573,10 +584,11 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
             const img = isCard ? bpCardUrl(p.name, p.rarity) : (p && p.src) || (p && sl.kind === 'skin' && p.id ? '/cards/skins/' + encodeURIComponent(p.id) + '.png' : null) || whArtFor(sl.kind, art, seed);
             const text = isCard ? whCardName(p.name) : (sl.kind === 'skin' && p && p.id ? p.id : (p && p.label) || f.label);
             const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null, art: img, name: text, sub: p && p.id !== undefined && p.isNew !== undefined ? (p.isNew ? whT('New!') : whFrameName(p.dupes)) : undefined };
+            if (sl.kind === 'emote' && p) extra.art = 'emote:' + p.id; if (sl.kind === 'title' && p) { extra.titleId = p.id; extra.sub = whT('New!'); }
             return (
               <div key={sl.key} className={'wh-slot wh-slot-' + f.cls} data-slot={sl.key} style={{ '--whc': f.rar ? WH_RCOL[f.rar] : (isCard ? WH_RCOL[p.rarity] : WH_FCOL[f.cls]) }}
                    onMouseEnter={(e) => showTip(e, sl.kind, extra)} onMouseMove={(e) => showTip(e, sl.kind, extra)} onMouseLeave={() => onTip && onTip(null)}>
-                {img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
+                {sl.kind === 'emote' && p && p.id ? <PpEmote id={p.id} box={9 * S} title="" /> : img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
                 <span className="wh-slot-lbl">{text}</span>
                 <b key={sl.n} className="wh-slot-n">{'×' + sl.n}</b>
               </div>
@@ -808,7 +820,7 @@ function WhResult({ result, claimed, onAgain, onMore, onPacks, onTip }) {
     else if (k.startsWith('ticket:')) tix[k.slice(7)] = (tix[k.slice(7)] || 0) + 1;
     else if (whSc(k)) sc += whSc(k);
     else if (k === 'booster' || k === 'golden' || k === 'jackpot') packs.push(k);
-    else if (p && (k === 'avatar' || k === 'sleeve' || k === 'skin')) { if (p.maxed) sc += p.amount; else cos.push(p); }
+    else if (p && (k === 'avatar' || k === 'sleeve' || k === 'skin' || k === 'emote' || k === 'title')) { if (p.maxed) sc += p.amount; else cos.push({ ...p, kind: p.kind || k }); }
   }
   const frameName = whFrameName;
   if (claimed) { cardsN += claimed.length; packs.length = 0; }   // geöffnete Packs sind durch ihre Karten ersetzt
@@ -836,12 +848,13 @@ function WhResult({ result, claimed, onAgain, onMore, onPacks, onTip }) {
       {cos.length > 0 && (
         <div className="wh-res-cos">
           {cos.map((c, i) => {
+            const isEmote = c.kind === 'emote', isTitle = c.kind === 'title';
             const img = c.kind === 'skin' ? '/cards/skins/' + encodeURIComponent(c.id) + '.png' : c.src, name = c.kind === 'skin' ? c.id : (c.label || c.id), sub = c.isNew ? whT('New!') : frameName(c.dupes);
-            const tip = (e) => onTip && onTip({ x: e.clientX, y: e.clientY, info: whFieldInfo(c.kind), art: img, name, sub, pct: null });
+            const tip = (e) => onTip && onTip({ x: e.clientX, y: e.clientY, info: whFieldInfo(c.kind), art: isEmote ? 'emote:' + c.id : img, ...(isTitle ? { titleId: c.id } : {}), name, sub, pct: null });
             return (
               <div key={i} className="wh-cos" onMouseEnter={tip} onMouseMove={tip} onMouseLeave={() => onTip && onTip(null)}>
-                <img src={img} alt="" draggable={false} data-pp-px="aus" />
-                <span>{name}</span>
+                {isEmote ? <PpEmote id={c.id} box={96} title="" /> : isTitle ? <div className="wh-cos-title">{window.PpTitle && <window.PpTitle id={c.id} />}</div> : <img src={img} alt="" draggable={false} data-pp-px="aus" />}
+                {!isTitle && <span>{name}</span>}
                 <span className="wh-gold">{c.isNew ? 'New!' : frameName(c.dupes)}</span>
               </div>
             );
@@ -933,6 +946,12 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
       const r = await window.ppWheelApi.throw({ rarity, board: boardId, cards: stake.cards, ...(force && force.length ? { force } : {}) });
       if (!r.ok) { notify((r.data && r.data.error) || whT('Throw failed'), 'error'); setBusy(false); return; }
       if (r.data.sc != null) onSc(r.data.sc);
+      // Emote-/Titel-Preise: Anzeigename, Bild und Text auflösen
+      (r.data.arrows || []).forEach(a => {
+        if (!a.prize || !a.prize.id) return;
+        if (a.kind === 'emote') { a.prize.src = window.ppEmUrl(a.prize.id); a.prize.label = window.ppEmName((window.ppEmData.eById || {})[a.prize.id]); }
+        else if (a.kind === 'title') { const ti = window.ppTitleInfo(a.prize.id); a.prize.label = ti ? ti.text : a.prize.id; }
+      });
       whPlay('shop_purchase', { volume: 0.5 });
       setPlayed({ id: Date.now(), board: state.boards[rarity].find(b => b.id === boardId), result: r.data });
       setView('play');

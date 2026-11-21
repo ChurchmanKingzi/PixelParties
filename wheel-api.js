@@ -235,6 +235,10 @@ module.exports = function registerWheel(d) {
           } else if (k === 'jackpot') {
             const packId = randomPackId(rand);
             await addPack(packId, rollJackpot(rand), 'umbra'); a.prize = { packId };
+          } else if (k === 'emote' || k === 'title') {
+            const id = k === 'emote' ? await d.emotesTitles.grantRandomEmote(tx, userId, rand) : await d.emotesTitles.grantRandomTitle(tx, userId, rand);
+            if (id) a.prize = { kind: k, id, isNew: true };
+            else { sc += 25; a.prize = { maxed: true, amount: 25 }; }   // alles besessen: 25 SC statt nichts
           } else if (k === 'avatar' || k === 'sleeve' || k === 'skin') {
             const got = await pullCosmetic(tx, userId, k);
             if (got) a.prize = got;

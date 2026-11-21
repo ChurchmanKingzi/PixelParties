@@ -7703,5 +7703,22 @@
 "Selects every duplicate so that exactly one copy of each card stays.": "Wählt alle Duplikate, sodass von jeder Karte genau eine Kopie übrig bleibt.",
 "Debug: guarantee the first darts": "Debug: erste Pfeile garantieren",
 "UPGRADE!": "AUFWERTUNG!",
-"Nice!": "Stark!"
+"Nice!": "Stark!",
+"EMOTES": "EMOTES",
+"TITLE": "TITEL",
+"CHANGE TITLE": "TITEL ÄNDERN",
+"Press 1–3 in a duel, or hold the middle mouse button.": "Drücke 1–3 im Duell oder halte die mittlere Maustaste.",
+"Change emote": "Emote ändern",
+"Owned: {0}/{1}": "Besitz: {0}/{1}",
+"Hide opponent emotes": "Emotes des Gegners ausblenden",
+"Choose an emote for key {0}": "Wähle ein Emote für Taste {0}",
+"Win it on the Wheel": "Gewinne es am Glücksrad",
+"EMPTY SLOT": "PLATZ LEEREN",
+"Choose a title": "Titel wählen",
+"You own no titles yet. Win them on the Wheel in the Shop.": "Du besitzt noch keine Titel. Gewinne sie am Glücksrad im Shop.",
+"No emotes selected. Set them in your profile.": "Keine Emotes gewählt. Stelle sie in deinem Profil ein.",
+"Emote": "Emote",
+"A random emote for use in duels.": "Ein zufälliges Emote für Duelle.",
+"A random title shown next to your name.": "Ein zufälliger Titel, der neben deinem Namen steht.",
+"Your name": "Dein Name"
 }

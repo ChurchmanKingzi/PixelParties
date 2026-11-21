@@ -26968,3 +26968,57 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-up-to { width: 300px; }
 .wh-up-to .wh-bigface { width: 100%; }
 .wh-up-name { font-family: var(--font-display), sans-serif; font-size: 22px; color: #ffffff; }
+
+/* ═══════════════ Emotes und Titel (public/app-emotes.jsx) ═══════════════ */
+.pp-title { display: inline-block; font-family: var(--font-display), serif; font-style: italic; letter-spacing: 1px; color: #fad54a; white-space: nowrap; vertical-align: middle; font-size: .82em;
+  text-shadow: 1px 1px 0 #6e4421, -1px 1px 0 #6e4421, 1px -1px 0 #6e4421, -1px -1px 0 #6e4421; }
+.pp-orn { display: inline-block; width: 18px; height: 10px; margin: 0 4px; vertical-align: middle; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 5' shape-rendering='crispEdges'><rect x='4' y='0' width='1' height='1' fill='%238b5b04'/><rect x='3' y='1' width='1' height='1' fill='%238b5b04'/><rect x='4' y='1' width='1' height='1' fill='%23fad54a'/><rect x='5' y='1' width='1' height='1' fill='%238b5b04'/><rect x='0' y='2' width='1' height='1' fill='%238b5b04'/><rect x='1' y='2' width='1' height='1' fill='%23fad54a'/><rect x='2' y='2' width='1' height='1' fill='%23fad54a'/><rect x='3' y='2' width='1' height='1' fill='%23fad54a'/><rect x='4' y='2' width='1' height='1' fill='%23f8f8bd'/><rect x='5' y='2' width='1' height='1' fill='%23fad54a'/><rect x='6' y='2' width='1' height='1' fill='%23fad54a'/><rect x='7' y='2' width='1' height='1' fill='%23fad54a'/><rect x='8' y='2' width='1' height='1' fill='%238b5b04'/><rect x='3' y='3' width='1' height='1' fill='%238b5b04'/><rect x='4' y='3' width='1' height='1' fill='%23fad54a'/><rect x='5' y='3' width='1' height='1' fill='%238b5b04'/><rect x='4' y='4' width='1' height='1' fill='%238b5b04'/></svg>") center / 100% 100% no-repeat; image-rendering: pixelated; }
+.pp-emote { display: block; image-rendering: pixelated; flex: none; }
+.pp-emote-missing { display: inline-block; }
+.pp-emlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90000; }
+.pp-emote-pop { position: fixed; padding: 8px; background: #12101f; box-shadow: 0 0 0 3px var(--player-color, #66b6ff), 5px 5px 0 3px #12101f; animation: ppEmPop 2.7s steps(1) forwards; }
+.pp-emote-opp { box-shadow: 0 0 0 3px #e73b41, 5px 5px 0 3px #12101f; }
+@keyframes ppEmPop {
+  0% { transform: translate(-50%, -50%) scale(.5); } 5% { transform: translate(-50%, -50%) scale(1.25); } 10% { transform: translate(-50%, -50%) scale(1); }
+  25% { transform: translate(-50%, calc(-50% - 4px)); } 40% { transform: translate(-50%, -50%); } 55% { transform: translate(-50%, calc(-50% - 4px)); } 70% { transform: translate(-50%, -50%); }
+  86% { visibility: hidden; } 89% { visibility: visible; } 92% { visibility: hidden; } 95% { visibility: visible; } 98%, 100% { visibility: hidden; }
+}
+.pp-empicker { position: fixed; display: flex; gap: 8px; padding: 10px; background: #12101f; box-shadow: 0 0 0 3px #fad54a, 6px 6px 0 3px #12101f; pointer-events: auto; z-index: 90001; }
+.pp-empick { position: relative; width: 84px; height: 84px; display: grid; place-items: center; padding: 0; background: #12101f; border: none; cursor: pointer; box-shadow: 0 0 0 2px #3e3e51; }
+.pp-empick:hover { box-shadow: 0 0 0 3px #fad54a; }
+.pp-empick-key { position: absolute; left: 4px; top: 2px; color: #fad54a; font-family: var(--font-display), sans-serif; font-size: 14px; }
+.pp-empick-none { color: #a5b0c0; font-size: 13px; max-width: 240px; }
+/* Profil */
+.pp-cosm-hint, .pp-cosm-count { font-size: 11px; color: var(--text2); margin: 2px 0 6px; }
+.pp-cosm-slots { display: flex; gap: 8px; }
+.pp-cosm-slot { position: relative; width: 76px; height: 76px; display: grid; place-items: center; padding: 0; background: #12101f; border: none; cursor: pointer; box-shadow: 0 0 0 2px #3e3e51; }
+.pp-cosm-slot:hover { box-shadow: 0 0 0 3px #fad54a; }
+.pp-cosm-key { position: absolute; left: 4px; top: 2px; color: #fad54a; font-family: var(--font-display), sans-serif; font-size: 13px; }
+.pp-cosm-plus { color: #808898; font-size: 28px; }
+.pp-cosm-mute { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; cursor: pointer; }
+.pp-cosm-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 18px; font-family: var(--font-display), sans-serif; }
+.pp-cosm-modal { position: fixed; inset: 0; z-index: 100002; background: #08060c; display: grid; place-items: center; }
+.pp-cosm-box { width: min(760px, 94vw); max-height: 88vh; overflow-y: auto; padding: 16px; background: #12101f; box-shadow: 0 0 0 3px #fad54a, 8px 8px 0 3px #12101f; }
+.pp-cosm-box h3 { margin: 0 0 12px; font-family: var(--font-display), sans-serif; color: #fad54a; }
+.pp-cosm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.pp-cosm-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; background: #12101f; border: none; color: #ffffff; cursor: pointer; font-size: 11px; box-shadow: 0 0 0 2px #3e3e51; }
+.pp-cosm-cell:hover:not(:disabled) { box-shadow: 0 0 0 3px #fad54a; }
+.pp-cosm-cell .pp-emote { min-height: 64px; }
+.pp-cosm-off { cursor: not-allowed; color: #808898; background: repeating-conic-gradient(#12101f 0 25%, #12101f 0 50%) 0 0 / 4px 4px; }
+.pp-cosm-off .pp-emote { opacity: .35; }
+.pp-cosm-here { box-shadow: 0 0 0 3px #66ffa2; }
+.pp-cosm-badge { position: absolute; right: 2px; top: 2px; background: #fad54a; color: #12101f; padding: 0 5px; font-family: var(--font-display), sans-serif; font-weight: 400; }
+.pp-cosm-titles { display: flex; flex-direction: column; gap: 6px; }
+.pp-cosm-trow { text-align: left; padding: 10px 12px; background: #12101f; border: none; color: #ffffff; cursor: pointer; font-family: var(--font-display), sans-serif; font-size: 18px; box-shadow: 0 0 0 2px #3e3e51; }
+.pp-cosm-trow:hover { box-shadow: 0 0 0 3px #fad54a; }
+.pp-cosm-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+.wh-tip-title { font-size: 22px; flex-wrap: wrap; text-align: center; }
+.wh-art-emote { display: grid; place-items: center; }
+.wh-titlesample { color: #fad54a; }
+.wh-cos-title { min-height: 40px; display: grid; place-items: center; font-size: 18px; }
+
+/* Titel am Namen im Duell: eigene Zeile, damit Name und Titel auf das schmale Namensschild passen */
+.game-hand-name { white-space: normal; line-height: 1.15; }
+.game-hand-name .pp-title { display: block; font-size: .6em; line-height: 1.25; margin: 0 0 1px; }
+.game-hand-name .pp-orn { width: 14px; height: 8px; margin: 0 3px; }

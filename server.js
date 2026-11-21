@@ -1265,6 +1265,11 @@ async function initDatabase() {
     count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, card, rarity)
   )`);
+  // Emotes und Titel (emotes-titles.js): Besitz je Nutzer (Start-Emotes gehören jedem und stehen nicht in der Tabelle), gewählte Emotes (Tasten 1–3), ausgerüsteter Titel
+  await db.execute('CREATE TABLE IF NOT EXISTS user_emotes (user_id TEXT NOT NULL, emote_id TEXT NOT NULL, PRIMARY KEY (user_id, emote_id))');
+  await db.execute('CREATE TABLE IF NOT EXISTS user_titles (user_id TEXT NOT NULL, title_id TEXT NOT NULL, PRIMARY KEY (user_id, title_id))');
+  try { await db.execute('ALTER TABLE users ADD COLUMN emote_slots TEXT'); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN title TEXT'); } catch {}
   // Glücksrad (wheel-api.js): gewonnene Rarity-Upgrade-Tickets je (Nutzer, Rarity) — ein Ticket wertet eine freie Kopie dieser Rarity auf die nächsthöhere auf.
   await db.execute(`CREATE TABLE IF NOT EXISTS user_wheel_tickets (
     user_id TEXT NOT NULL,
@@ -2095,7 +2100,7 @@ async function purgeGuest(userId) {
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
-  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster', 'user_wheel_tickets']) {
+  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster', 'user_wheel_tickets', 'user_emotes', 'user_titles']) {
     try { await db.run(`DELETE FROM ${t} WHERE user_id = ?`, [userId]); } catch {}
   }
   await db.run('DELETE FROM users WHERE id = ? AND is_guest = 1', [userId]);
@@ -2204,8 +2209,10 @@ function parseHeroSkins(raw) {
     return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
   } catch { return {}; }
 }
+/** Gewählte Emotes aus der Spalte; null = nie gesetzt (der Client nimmt dann die Start-Emotes in Standardreihenfolge). */
+function parseEmoteSlots(json) { try { const a = JSON.parse(json || 'null'); return Array.isArray(a) ? a.filter(x => typeof x === 'string').slice(0, 3) : null; } catch { return null; } }
 function sanitizeUser(u) {
-  return { id: u.id, lang: u.lang || null, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), display_creatures: (u.display_heroes === 0) ? 0 : (u.display_creatures == null ? 1 : (u.display_creatures ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, lang: u.lang || null, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), display_creatures: (u.display_heroes === 0) ? 0 : (u.display_creatures == null ? 1 : (u.display_creatures ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest, title: u.title || null, emoteSlots: parseEmoteSlots(u.emote_slots) };
 }
 
 // Sprache des Kontos speichern (Oberflaeche + E-Mails)
@@ -4867,13 +4874,13 @@ async function shopDupes(userId) {
 
 /** Rahmen-Ränge eines Spielers für den Spielzustand: Avatar, Sleeve und die im Deck benutzten Skins. */
 async function framesForPlayer(userId, usr, deckSkins) {
-  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {} };
+  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {}, title: null };
   if (!usr) return none;
   try {
     const d = await shopDupes(userId);
     const skinRanks = {};
     for (const sk of Object.values(deckSkins || {})) if (d.skin[sk]) skinRanks[sk] = d.skin[sk];
-    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks };
+    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks, title: usr.title || null };
   } catch (err) { console.error('[frames] Ränge nicht ermittelt:', err.message); return none; }
 }
 
@@ -4943,10 +4950,14 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
   res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
 });
 
+// ───── Emotes & Titel (emotes-titles.js) ─────
+const emotesTitles = require('./emotes-titles')({ db, app, authMiddleware });
+emotesTitles.register();
+
 // ───── Glücksrad (wheel-api.js) ─────
 require('./wheel-api')({
   app, db, authMiddleware, uuidv4, path, RARITIES, ownedRarities, addRarityCopies, packPool, cardHasMask, boosterManifest,
-  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName, debugEnabled: DEBUG_TOOLS_ENABLED,
+  emotesTitles, getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName, debugEnabled: DEBUG_TOOLS_ENABLED,
   get cpuSleeves() { return cpuSleeves; }, get cpuAvatars() { return cpuAvatars; },
 });
 
@@ -5615,7 +5626,7 @@ function sendGameState(room, playerIdx, extra) {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
-      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {}, title: ps.title || null,   // Rahmen-Ränge (Duplikate), Titel
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -6870,7 +6881,7 @@ function sendGameState(room, playerIdx, extra) {
       return result;
     })() : [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), title: ps.title || null })),   // v1374
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
     ...extra,
@@ -6969,7 +6980,7 @@ function sendSpectatorGameState(room) {
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
-      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {}, title: ps.title || null,   // Rahmen-Ränge (Duplikate), Titel
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -7306,7 +7317,7 @@ function sendSpectatorGameState(room) {
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), title: ps.title || null })),   // v1374
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
   };
@@ -17469,6 +17480,18 @@ io.on('connection', (socket) => {
   });
 
   // ─── CHAT SYSTEM ──────────────────────────
+  // Emote im Duell (emotes-titles.js): an alle im Raum (Spieler und Zuschauer), nur eigene Emotes, mit Abklingzeit
+  socket.on('emote', emotesTitles.onEmote({
+    rooms, getUser: () => currentUser,
+    sendTo: (room, event, payload) => {
+      const sids = new Set();
+      for (const p of room.players || []) if (p.socketId) sids.add(p.socketId);
+      for (const ps of (room.gameState && room.gameState.players) || []) if (ps && ps.socketId) sids.add(ps.socketId);
+      for (const sp of room.spectators || []) if (sp.socketId) sids.add(sp.socketId);
+      for (const sid of sids) io.to(sid).emit(event, payload);
+    },
+  }));
+
   socket.on('chat_message', ({ roomId, text }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -17487,6 +17510,7 @@ io.on('connection', (socket) => {
       color: isSpec ? '#888' : playerColor,
       avatar: bildRef(gsPlayer?.avatar || currentUser.avatar) || null,   // v1374
       isSpectator: isSpec,
+      title: isSpec ? null : (gsPlayer?.title || null),
       text: msg,
       timestamp: Date.now(),
     };

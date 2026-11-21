@@ -3167,7 +3167,7 @@ function ProfileScreen() {
             {!editingName ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 }}>
                 <div className="orbit-font" style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: 1, textShadow: `0 0 25px ${color}44`, textAlign: 'center' }}>
-                  {user.username}
+                  {window.PpTitled ? <window.PpTitled name={user.username} title={user.title} /> : user.username}
                 </div>
                 <button className="btn" title="Edit name" onClick={startNameEdit} style={{ padding: '3px 9px', fontSize: 13, lineHeight: 1 }}>✎</button>
               </div>
@@ -3260,6 +3260,7 @@ function ProfileScreen() {
               />
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{defeatMsg.length}/80</div>
             </div>
+            {window.PpProfileCosmetics && <div style={{ marginTop: 'calc(var(--pv) * 1)' }}><window.PpProfileCosmetics /></div>}
 
             {/* Save button at bottom of identity panel */}
             <div style={{ marginTop: 'auto', paddingTop: 'calc(var(--pv) * 1.2)' }}>

@@ -37741,7 +37741,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
             {participants.players.map(p => (
               <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
                 {p.avatar && <window.PlayerAvatar className="player-list-avatar" name={p.username} src={p.avatar} alt="" />}
-                <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-name" style={{ color: p.color }}>{window.PpTitled ? <window.PpTitled name={p.username} title={p.title} /> : p.username}{p.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">PLAYER</span>
               </div>
             ))}
@@ -37761,7 +37761,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
                 <span className="chat-msg-name"
                   style={{ color: msg.isSpectator ? '#7f7f7f' : (msg.color || '#fff') }}
                   onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
-                >{msg.from || msg.username}</span>
+                >{window.PpTitled ? <window.PpTitled name={msg.from || msg.username} title={msg.title} /> : (msg.from || msg.username)}</span>
                 <span className="chat-msg-text">: {msg.text}</span>
               </div>
             ))}
@@ -59975,7 +59975,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 tutorialGegner ? tutorialGegner.name
                 : (gameState.isCpuBattle && opp.username === 'CPU')
                   ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
-                  : opp.username
+                  : (window.PpTitled ? <window.PpTitled name={opp.username} title={opp.title} /> : opp.username)
               }</span>
               {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
             </div>
@@ -61013,7 +61013,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
-            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
+            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{window.PpTitled ? <window.PpTitled name={me.username} title={me.title} /> : me.username}</span>
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
           {isSpectator ? (
