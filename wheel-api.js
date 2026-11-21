@@ -213,7 +213,7 @@ module.exports = function registerWheel(d) {
         let seq = Number(existing[0] && existing[0].n) || 0;
         const addPack = async (packId, cards) => {
           const id = uuidv4();
-          await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq) VALUES (?, ?, ?, ?, ?, ?)', [id, userId, packId, randomVariant(packId), JSON.stringify(cards), seq++]);
+          await tx.run("INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq, source) VALUES (?, ?, ?, ?, ?, ?, 'wheel')", [id, userId, packId, randomVariant(packId), JSON.stringify(cards), seq++]);
           packRows.push(id);
         };
         for (const a of throwRes.arrows) {
