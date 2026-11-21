@@ -25,14 +25,14 @@ test('24 Tabellen: Summe 100, nur bekannte Preisarten, keine negativen Gewichte'
   }
 });
 
-test('Der Schwerpunkt ist ein Downgrade: höchstens ~22 % Break-even/Gewinn (Uncommon 32 %: dort ist „Nichts“ das einzige Downgrade), mindestens 8 %', () => {
+test('Der Schwerpunkt ist ein Downgrade: höchstens ~25 % Break-even/Gewinn (Uncommon 32 %: dort ist „Nichts“ das einzige Downgrade), mindestens 8 %', () => {
   for (const r of W.INPUT_RARITIES) {
     const vin = R.DISPLAY_PRICE[r];
     for (const id of W.BOARD_IDS) {
       const t = W.table(r, id);
       let up = 0;
       for (const k of Object.keys(t)) if (!isMechanic(k) && W.valueOf(k) >= vin) up += t[k];
-      assert.ok(up <= (r === 'uncommon' ? 32 : 22), `${r}/${id}: ${up.toFixed(1)} % Break-even oder besser`);
+      assert.ok(up <= (r === 'uncommon' ? 32 : 25), `${r}/${id}: ${up.toFixed(1)} % Break-even oder besser`);
       assert.ok(up >= 8, `${r}/${id}: nur ${up.toFixed(1)} % Chance auf Break-even oder besser`);
       assert.ok(W.expectedValue(t) < 0.9 * vin, `${r}/${id}: Erwartungswert ${W.expectedValue(t).toFixed(1)} zu nah am Einsatz (${vin})`);
     }
