@@ -136,7 +136,11 @@ module.exports = function registerWheel(d) {
         id: b.id, key: b.key, table: b.table, ev: b.ev,
         boosts: Object.fromEntries(W.BOOST_KINDS.map(k => [k, W.boostSpec(r, b.id, k)])),
       }));
-      res.json({ rarities, tickets: await tickets(db, userId), boards, maxStake: W.MAX_STAKE, spinArrows: W.SPIN_ARROWS, ticketRarities: TICKET_RARITIES });
+      allNames();
+      // Beispielkarte je Rarity (für die große Vorschau und die Zettel): zufällig, bei Umbra/Stained/Storm nur mit Motiv
+      const samples = {};
+      for (const r of W.INPUT_RARITIES) samples[r] = randomCard(r, Math.random);
+      res.json({ rarities, samples, tickets: await tickets(db, userId), boards, maxStake: W.MAX_STAKE, spinArrows: W.SPIN_ARROWS, ticketRarities: TICKET_RARITIES });
     } catch (err) { console.error('[wheel/state]', err.message); res.status(500).json({ error: 'Failed to load wheel' }); }
   });
 
