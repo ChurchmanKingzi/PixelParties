@@ -279,7 +279,7 @@ function whTargetRect(a, layout, overlayRects) {
   return layout[a.kind] || layout.none || { x: 0, y: 0, w: WH_BW, h: WH_BH };
 }
 
-function WhBoard({ rarity, boardData, play, small, art, onTip }) {
+function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
   const stageRef = useRef(null), fxRef = useRef(null), decoRef = useRef(null), fieldRefs = useRef({});
   const [S, setS] = useState(3);
   const table = boardData.table;
@@ -307,6 +307,20 @@ function WhBoard({ rarity, boardData, play, small, art, onTip }) {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, [small, !!play]);
+
+  // Geöffnete Gewinn-Packs: das Pack verschwindet aus der Preis-Leiste, an seine Stelle treten die enthaltenen Karten
+  useEffect(() => {
+    if (!claimed || !claimed.length) return;
+    setRail(prev => {
+      const list = prev.filter(sl => sl.kind !== 'booster' && sl.kind !== 'golden' && sl.kind !== 'jackpot').map(sl => ({ ...sl }));
+      for (const c of claimed) {
+        const key = 'c:' + c.name + '|' + c.rarity; let sl = list.find(x => x.key === key);
+        if (!sl) { sl = { key, kind: 'card:' + c.rarity, prize: { name: c.name, rarity: c.rarity }, n: 0 }; list.push(sl); }
+        sl.n++;
+      }
+      return list;
+    });
+  }, [claimed]);
 
   // Deko-Ebene (einmal gezeichnet): Kork-Sprenkel + roter Faden · Kreide-Kritzeleien · Konfetti
   useEffect(() => {
@@ -768,7 +782,7 @@ function WhBoardPick({ rarity, stakeN, state, art, onBack, onThrow, busy }) {
 //  Schritt 4: Wurf + Ergebnis
 // ═══════════════════════════════════════════════════════════════════════════
 function whSc(k) { return window.PpWheel.SC_AMOUNT[k] || 0; }
-function WhResult({ result, onAgain, onMore, onPacks }) {
+function WhResult({ result, claimed, onAgain, onMore, onPacks, onTip }) {
   const cos = [], packs = [];
   let sc = 0, nothing = 0, spins = 0, cardsN = 0; const tix = {};
   for (const a of result.arrows) {
@@ -782,6 +796,7 @@ function WhResult({ result, onAgain, onMore, onPacks }) {
     else if (p && (k === 'avatar' || k === 'sleeve' || k === 'skin')) { if (p.maxed) sc += p.amount; else cos.push(p); }
   }
   const frameName = whFrameName;
+  if (claimed) { cardsN += claimed.length; packs.length = 0; }   // geöffnete Packs sind durch ihre Karten ersetzt
   return (
     <div className="wh-result">
       <h3>Results</h3>
@@ -805,13 +820,17 @@ function WhResult({ result, onAgain, onMore, onPacks }) {
       )}
       {cos.length > 0 && (
         <div className="wh-res-cos">
-          {cos.map((c, i) => (
-            <div key={i} className="wh-cos">
-              <img src={c.kind === 'skin' ? '/cards/skins/' + encodeURIComponent(c.id) + '.png' : c.src} alt="" draggable={false} data-pp-px="aus" />
-              <span>{c.kind === 'skin' ? c.id : (c.label || c.id)}</span>
-              <span className="wh-gold">{c.isNew ? 'New!' : frameName(c.dupes)}</span>
-            </div>
-          ))}
+          {cos.map((c, i) => {
+            const img = c.kind === 'skin' ? '/cards/skins/' + encodeURIComponent(c.id) + '.png' : c.src, name = c.kind === 'skin' ? c.id : (c.label || c.id), sub = c.isNew ? whT('New!') : frameName(c.dupes);
+            const tip = (e) => onTip && onTip({ x: e.clientX, y: e.clientY, info: whFieldInfo(c.kind), art: img, name, sub, pct: null });
+            return (
+              <div key={i} className="wh-cos" onMouseEnter={tip} onMouseMove={tip} onMouseLeave={() => onTip && onTip(null)}>
+                <img src={img} alt="" draggable={false} data-pp-px="aus" />
+                <span>{name}</span>
+                <span className="wh-gold">{c.isNew ? 'New!' : frameName(c.dupes)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="wh-confirm">
@@ -822,7 +841,7 @@ function WhResult({ result, onAgain, onMore, onPacks }) {
   );
 }
 
-function WhPlay({ rarity, board, result, art, onAgain, onMore, onPacks, onTip }) {
+function WhPlay({ rarity, board, result, art, claimed, onAgain, onMore, onPacks, onTip }) {
   const [finished, setFinished] = useState(false);
   const skipRef = useRef(null);
   const play = useMemo(() => {
@@ -838,8 +857,8 @@ function WhPlay({ rarity, board, result, art, onAgain, onMore, onPacks, onTip })
         <div style={{ flex: 1 }} />
         {!finished && <button className="btn" onClick={() => skipRef.current && skipRef.current()}>Skip</button>}
       </div>
-      <div className="wh-board-wrap"><WhBoard rarity={rarity} boardData={board} play={play} art={art} onTip={onTip} /></div>
-      {finished && <WhResult result={result} onAgain={onAgain} onMore={onMore} onPacks={onPacks} />}
+      <div className="wh-board-wrap"><WhBoard rarity={rarity} boardData={board} play={play} art={art} onTip={onTip} claimed={claimed} /></div>
+      {finished && <WhResult result={result} claimed={claimed} onAgain={onAgain} onMore={onMore} onPacks={onPacks} onTip={onTip} />}
     </div>
   );
 }
@@ -885,7 +904,7 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
   const openPacks = async () => {
     const r = await window.ppBoosterApi.pending();
     const list = r.ok && r.data && (r.data.packs && r.data.packs.length ? r.data.packs : (r.data.pending ? [r.data.pending] : null));
-    if (list && onPacks) onPacks(list); else notify(whT('No packs to open.'), 'error');
+    if (list && onPacks) onPacks(list, (data) => setPlayed(p => (p ? { ...p, claimed: (data && data.added) || [] } : p))); else notify(whT('No packs to open.'), 'error');
   };
   const useTicket = async (cards) => {
     const name = Object.keys(cards)[0];
@@ -901,7 +920,7 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
       {view === 'gallery' && <WhGallery key={rarity + mode} rarity={rarity} mode={mode} notify={notify} onBack={toRarities}
         onGo={(cards, n) => { if (mode === 'ticket') useTicket(cards); else { setStake({ cards, n }); setCos(whRollCos(pools)); setView('board'); } }} />}
       {view === 'board' && stake && <WhBoardPick rarity={rarity} stakeN={stake.n} state={state} art={art} busy={busy} onBack={() => setView('gallery')} onThrow={throwIt} />}
-      {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
+      {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} claimed={played.claimed} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
       <WhTip tip={tip} />
     </div>
   );

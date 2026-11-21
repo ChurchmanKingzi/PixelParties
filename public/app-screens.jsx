@@ -4554,6 +4554,7 @@ function ShopScreen() {
   const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
   // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
   const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
+  const wheelClaimRef = useRef(null);
   const [pendingPacks, setPendingPacks] = useState(null); // [{ id, packId, variantId, cards: [{ name, rarity }], sold }] (alle offenen Packs, Kaufreihenfolge) | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -5333,6 +5334,8 @@ function ShopScreen() {
             // „Add and rip one more!“ ohne genug SC: das Pack ist trotzdem eingelöst (Server), der Kontostand steht in der Antwort
             if (data && data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
             setPendingPacks(null);
+            // Am Glücksrad gewonnene Packs: das Rad ersetzt das Pack in den Gewinnen durch die Karten
+            if (wheelClaimRef.current) { try { wheelClaimRef.current(data); } catch (e) { /* ohne */ } wheelClaimRef.current = null; }
             if (info && info.ripFailed) notify('Cards added to your collection! ' + info.ripFailed + '.', 'error');
             else notify('Cards added to your collection!', 'success');
           }}
@@ -5365,7 +5368,7 @@ function ShopScreen() {
         {tab === 'sleeves' && renderGachaPage('sleeve')}
         {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
           onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
-        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list) => setPendingPacks(list)} />}
+        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list, cb) => { wheelClaimRef.current = cb || null; setPendingPacks(list); }} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>

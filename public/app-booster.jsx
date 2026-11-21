@@ -1514,6 +1514,8 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
   const packPrice = boosters && boosters.price != null ? boosters.price : 20;
   const sellTable = (boosters && boosters.sellback) || (window.PpRarities && window.PpRarities.SELLBACK) || {};
   const ripCost = packPrice * n;
+  // Am Glücksrad gewonnene Packs: kein „Add and rip one more“ (der Nachkauf kostet SC und gehört zum Shop-Kauf)
+  const noRip = (packsProp || (pending ? [pending] : [])).some(p => p && p.source === 'wheel');
   const canRip = (sc || 0) >= ripCost;       // Gutschriften aus Sell Back stehen schon im Kontostand
   const ids = packs.map(p => p.id);
 
@@ -1593,15 +1595,15 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
           <button className="btn bp-btn bp-btn-go" disabled={claiming} onClick={claim}>
             {claiming ? 'ADDING…' : addLabel}
           </button>
-          <button className="btn bp-btn bp-btn-more" disabled={claiming || !canRip} onClick={ripMore}
+          {!noRip && <button className="btn bp-btn bp-btn-more" disabled={claiming || !canRip} onClick={ripMore}
             title={canRip ? 'Add these cards to your collection and open ' + (multi ? n + ' more packs' : 'another pack') + ' of the same kind' : 'Not enough Smug Coins for ' + (multi ? n + ' more packs' : 'another pack') + ' (' + ripCost + ' needed)'}>
             {ripLabel} <img src="/data/sc.png" className="bp-coin" alt="" /> {ripCost}
-          </button>
+          </button>}
         </div>
       )}
     </React.Fragment>
   );
-  const warnRip = allDone && !canRip && (multi || tight || hudRoom >= 84)
+  const warnRip = allDone && !noRip && !canRip && (multi || tight || hudRoom >= 84)
     ? <div className="bp-hint bp-hint-warn">{multi ? 'Not enough SC for ' + n + ' more packs (' + ripCost + ' SC needed)' : 'Not enough SC for another pack (' + packPrice + ' SC needed)'}</div> : null;
 
   // Die Shop-Seite läuft unter CSS-`zoom` (--ui-scale): die Vollbild-Ansicht hängt deshalb direkt an <body>, damit Fenster- und Bildpunkte übereinstimmen

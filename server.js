@@ -1283,6 +1283,8 @@ async function initDatabase() {
   )`);
   // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
   try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
+  // Herkunft des Packs: '' = gekauft, 'wheel' = am Glücksrad gewonnen (kein „Add and rip one more“: das kostet 20 SC und gehört zum Kauf)
+  try { await db.execute("ALTER TABLE pending_booster ADD COLUMN source TEXT NOT NULL DEFAULT ''"); } catch {}
   // Rarity-Umbenennung Diamond → Storm Rare in Sammlung, Decks und offenen Packs (idempotent, siehe rarity-migrate.js)
   try {
     const rm = await require('./rarity-migrate').migrateRarityRenames(db);
@@ -4500,7 +4502,7 @@ function pendingBoosterView(row) {
   let cards = [];
   try { cards = JSON.parse(row.cards_json); } catch { /* leer */ }
   const sold = Number.isInteger(Number(row.sold_idx)) ? Number(row.sold_idx) : -1;
-  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards, sold: sold >= 0 && sold < cards.length ? sold : -1 };
+  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards, sold: sold >= 0 && sold < cards.length ? sold : -1, source: row.source || '' };
 }
 
 // GET /api/collection — gesammelte Rarities { rarities: { "<Karte>": { uncommon: n, … } } } (Common implizit unbegrenzt)
@@ -4658,10 +4660,10 @@ app.post('/api/boosters/rip-more', authMiddleware, async (req, res) => {
   let claimed = null;
   try {
     const ids = boosterIdsFromBody(req.body);
-    if (ids) {
-      const offen = await pendingBoosterRows(db, userId, ids);
-      if (!offen.length) return res.status(404).json({ error: 'No such open pack' });
-    }
+    const alle = await pendingBoosterRows(db, userId);
+    if (ids && !alle.some(r => ids.includes(r.id))) return res.status(404).json({ error: 'No such open pack' });
+    // „Rip one more“ löst ALLE offenen Packs ein und kauft nach: am Glücksrad gewonnene Packs sind davon ausgenommen
+    if (alle.some(r => r.source === 'wheel')) return res.status(400).json({ error: 'Packs won on the wheel cannot be re-bought.' });
     const c = await claimBoosterPacks(userId, undefined);
     if (c.status !== 200) return res.status(c.status).json(c.body);
     claimed = c.body;
