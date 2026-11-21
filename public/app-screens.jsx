@@ -5299,6 +5299,7 @@ function ShopScreen() {
     { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
     { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
     { id: 'boosters', label: '📦 Boosterpacks', count: ((boosters && boosters.packs) || []).length },
+    { id: 'wheel', label: 'Wheel', count: '' },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -5364,6 +5365,7 @@ function ShopScreen() {
         {tab === 'sleeves' && renderGachaPage('sleeve')}
         {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
           onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
+        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list) => setPendingPacks(list)} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>
