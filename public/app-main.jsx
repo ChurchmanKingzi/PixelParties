@@ -3791,6 +3791,7 @@ function App() {
       <PlayerProfilePopupHost />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       <UiScaler />
+      {window.PpEmoteLayer && <window.PpEmoteLayer />}   {/* Emotes im Duell (Tasten 1–3, mittlere Maustaste); wacht selbst über game_state */}
       {/* Pixel-Partikel hinter dem gesamten Menue (v808). Liegt fest im
           Fenster, hinter allen Bildschirminhalten; die Bildschirme sind
           dafuer durchsichtig und der Verlauf ist auf `body` gewandert.

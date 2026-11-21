@@ -64,6 +64,7 @@ const ENTRIES = [
   'app-areas',            // v1410: Area-Hintergruende (Registry + Szenen)
   'app-screens',
   'app-booster',          // Boosterpacks: Shop-Reiter, Öffnung, Aufdecken
+  'app-emotes',           // Emotes (Duell, Profil) und Titel am Namen
   'app-wheel',            // Glücksrad: Shop-Reiter „Wheel“ (Karten einsetzen, Dartpfeile, Gewinne)
   'app-player-profile',   // v1289: Spielerprofil-Popup
   'app-social',           // Who's Online, private Chats, Herausforderungen

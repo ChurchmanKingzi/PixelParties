@@ -19,7 +19,7 @@ test('24 Tabellen: Summe 100, nur bekannte Preisarten, keine negativen Gewichte'
     for (const k of Object.keys(t)) {
       assert.ok(t[k] >= 0, `${r}/${id}: ${k} negativ`);
       assert.ok(k === 'none' || k.startsWith('boost:') || k.startsWith('card:') || k.startsWith('ticket:') ||
-        ['booster', 'golden', 'jackpot', 'avatar', 'sleeve', 'skin', 'spin3', 'sc10', 'sc20', 'sc50'].includes(k), `${r}/${id}: unbekannt ${k}`);
+        ['booster', 'golden', 'jackpot', 'avatar', 'sleeve', 'skin', 'emote', 'title', 'spin3', 'sc10', 'sc20', 'sc50'].includes(k), `${r}/${id}: unbekannt ${k}`);
       if (k.startsWith('card:') || k.startsWith('ticket:')) assert.ok(R.isRarity(k.split(':')[1]));
     }
   }

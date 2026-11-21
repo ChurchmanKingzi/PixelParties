@@ -1,0 +1,233 @@
+{
+ "defaults": [
+  "smuggest",
+  "sad",
+  "cool"
+ ],
+ "emotes": [
+  {
+   "id": "rocketfist",
+   "en": "Rocket Fist",
+   "de": "Raketenfaust",
+   "w": 14,
+   "h": 7
+  },
+  {
+   "id": "big-play",
+   "en": "Big Play",
+   "de": "Großer Zug",
+   "w": 18,
+   "h": 25
+  },
+  {
+   "id": "birb",
+   "en": "Birb",
+   "de": "Birb",
+   "w": 32,
+   "h": 32
+  },
+  {
+   "id": "bomb",
+   "en": "Bomb",
+   "de": "Bombe",
+   "w": 20,
+   "h": 24
+  },
+  {
+   "id": "cool",
+   "en": "Cool",
+   "de": "Cool",
+   "w": 56,
+   "h": 56
+  },
+  {
+   "id": "corgi",
+   "en": "Corgi",
+   "de": "Corgi",
+   "w": 12,
+   "h": 11
+  },
+  {
+   "id": "creep",
+   "en": "Creep",
+   "de": "Creep",
+   "w": 37,
+   "h": 44
+  },
+  {
+   "id": "facepalm",
+   "en": "Facepalm",
+   "de": "Facepalm",
+   "w": 18,
+   "h": 15
+  },
+  {
+   "id": "frozen",
+   "en": "Frozen",
+   "de": "Eingefroren",
+   "w": 18,
+   "h": 18
+  },
+  {
+   "id": "ghost",
+   "en": "Ghost",
+   "de": "Geist",
+   "w": 14,
+   "h": 17
+  },
+  {
+   "id": "hiiii",
+   "en": "Hiiii!",
+   "de": "Hiiii!",
+   "w": 16,
+   "h": 13
+  },
+  {
+   "id": "lol",
+   "en": "LOL",
+   "de": "LOL",
+   "w": 17,
+   "h": 31
+  },
+  {
+   "id": "mimic",
+   "en": "Mimic",
+   "de": "Mimic",
+   "w": 16,
+   "h": 24
+  },
+  {
+   "id": "moniaeyes",
+   "en": "Monia Eyes",
+   "de": "Monia-Augen",
+   "w": 6,
+   "h": 5
+  },
+  {
+   "id": "moniapog",
+   "en": "Monia POG",
+   "de": "Monia POG",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "pissed",
+   "en": "Pissed",
+   "de": "Sauer",
+   "w": 14,
+   "h": 13
+  },
+  {
+   "id": "sad",
+   "en": "Sad",
+   "de": "Traurig",
+   "w": 18,
+   "h": 14
+  },
+  {
+   "id": "sc",
+   "en": "Smug Coin",
+   "de": "Smug Coin",
+   "w": 40,
+   "h": 40
+  },
+  {
+   "id": "shocked",
+   "en": "Shocked",
+   "de": "Schockiert",
+   "w": 14,
+   "h": 12
+  },
+  {
+   "id": "shrug",
+   "en": "Shrug",
+   "de": "Schulterzucken",
+   "w": 18,
+   "h": 18
+  },
+  {
+   "id": "smug",
+   "en": "Smug",
+   "de": "Smug",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "smugevil",
+   "en": "Evil Smug",
+   "de": "Fieser Smug",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "smugger",
+   "en": "Smugger",
+   "de": "Smugger",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "smuggest",
+   "en": "Smuggest",
+   "de": "Smuggest",
+   "w": 56,
+   "h": 56
+  },
+  {
+   "id": "smugkin",
+   "en": "Smugkin",
+   "de": "Smugkin",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "smuuuuug",
+   "en": "Smuuuuug",
+   "de": "Smuuuuug",
+   "w": 14,
+   "h": 14
+  },
+  {
+   "id": "tadah",
+   "en": "Ta-dah!",
+   "de": "Tadaa!",
+   "w": 21,
+   "h": 33
+  },
+  {
+   "id": "think",
+   "en": "Thinking",
+   "de": "Nachdenklich",
+   "w": 18,
+   "h": 14
+  },
+  {
+   "id": "unimpressed",
+   "en": "Unimpressed",
+   "de": "Unbeeindruckt",
+   "w": 16,
+   "h": 13
+  },
+  {
+   "id": "wat",
+   "en": "Wat?",
+   "de": "Hä?",
+   "w": 15,
+   "h": 14
+  },
+  {
+   "id": "wink",
+   "en": "Wink",
+   "de": "Zwinkern",
+   "w": 52,
+   "h": 52
+  },
+  {
+   "id": "yummy",
+   "en": "Yummy",
+   "de": "Lecker",
+   "w": 18,
+   "h": 14
+  }
+ ]
+}

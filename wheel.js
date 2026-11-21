@@ -46,7 +46,7 @@
       case 'booster': return 20;
       case 'golden': return 45;
       case 'jackpot': return 400;
-      case 'avatar': case 'sleeve': case 'skin': return 25;
+      case 'avatar': case 'sleeve': case 'skin': case 'emote': case 'title': return 25;
       case 'spin3': return 30;
       default: return 0;   // boost:* trägt seinen Wert über den Überdeckungs-Effekt
     }
@@ -113,6 +113,9 @@
     },
   };
 
+  // Emotes und Titel (emotes-titles.js): so häufig wie ein Avatar bzw. 60 % davon, je Rarity
+  for (const rar of Object.keys(BASE)) { const b = BASE[rar]; if (b.avatar > 0) { b.emote = b.avatar; b.title = Math.round(b.avatar * 0.6 * 1000) / 1000; } }
+
   /**
    * „Nichts“ ist überall um 10 % (relativ) seltener: die frei werdende Wahrscheinlichkeit geht anteilig an die billigen Preise
    * (Wert bis zum Doppelten des Einsatzwerts; Spin, Boosts und Jackpot bleiben unberührt). Umbra hat kein „Nichts“ und bleibt gleich.
@@ -138,7 +141,7 @@
   function familyOf(kind) {
     if (kind.startsWith('card:')) return 'cards';
     if (kind === 'booster' || kind === 'golden' || SC_AMOUNT[kind]) return 'cur';
-    if (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') return 'cos';
+    if (kind === 'avatar' || kind === 'sleeve' || kind === 'skin' || kind === 'emote' || kind === 'title') return 'cos';
     return 'fix';
   }
   /** Erwartungswert je Pfeil in SC-Nominalwert einer Gewichtstabelle (Prozent; spin3 zählt rekursiv: jeder Bonus-Pfeil ist wieder ein Pfeil). */
