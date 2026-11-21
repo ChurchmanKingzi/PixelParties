@@ -17,6 +17,7 @@
 //  Innerhalb EINES Commits mit Note und Skip für dasselbe Ziel gewinnt der Skip (die Note dieses Commits entfällt).
 // ═══════════════════════════════════════════════════════════════════
 const path = require('path');
+const crypto = require('crypto');
 
 const EFFECTS_DIR = 'cards/effects';
 const nameToFile = n => String(n).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');   // wie cards/effects/_loader.js
@@ -30,6 +31,9 @@ function fingerprint(text) {
     .replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
     .replace(/\s+/g, '');
 }
+
+/** Kurzer Hash des Fingerabdrucks: Der Fingerabdruck selbst ist bei großen Dateien (_engine.js ~3,5 MB) mehrere MB groß — in Mengen vorgehalten sprengt das den Heap. */
+const printHash = text => crypto.createHash('sha1').update(fingerprint(text)).digest('hex');
 
 /** `git diff --name-status`-Ausgabe → [{status, file}] (ohne Umbenennungs-Erkennung, nur .js in cards/effects). */
 function parseNameStatus(out) {
@@ -143,9 +147,9 @@ async function readCommitChanges({ git, last, head, files, maxPairs = 6000, budg
   const blobs = [...new Set(commits.flatMap(c => c.entries.filter(e => e.checked).flatMap(e => [e.before, e.after])))];
   const fetchPrint = async blob => {
     if (Date.now() > deadline) return;
-    try { prints.set(blob, fingerprint(await git('cat-file', 'blob', blob))); } catch { /* unbekannt → gilt als Änderung */ }
+    try { prints.set(blob, printHash(await git('cat-file', 'blob', blob))); } catch { /* unbekannt → gilt als Änderung */ }
   };
-  for (let i = 0; i < blobs.length; i += 16) await Promise.all(blobs.slice(i, i + 16).map(fetchPrint));
+  for (let i = 0; i < blobs.length; i += 4) await Promise.all(blobs.slice(i, i + 4).map(fetchPrint));
   for (const c of commits) for (const e of c.entries) {
     const a = prints.get(e.before), b = prints.get(e.after);
     if (a !== undefined && b !== undefined && a === b) continue;       // nur Kommentare/Leerraum
@@ -201,7 +205,7 @@ async function findBugfixes({ git, last, head, cards, maxShared = 12, balanced =
   for (const e of changed) {
     let before = '', after = '';
     try { before = await git('show', `${last}:${e.file}`); after = await git('show', `${head}:${e.file}`); } catch { continue; }
-    if (fingerprint(before) !== fingerprint(after)) real.push(e.file);
+    if (printHash(before) !== printHash(after)) real.push(e.file);
   }
   if (!real.length) return { direct: [], shared: [] };
 

@@ -21,8 +21,10 @@ MemoryMax=1200M
 
 ExecStart=/usr/bin/node index.js
 
+# 120 s statt weniger: Jeder Start, der sich bei Discord anmeldet und danach abstürzt, kostet eine der 1000 Sessions pro 24 h.
+# 86400 / 120 = 720 Starts pro Tag bleiben darunter, eine Absturzschleife kann das Kontingent also nicht mehr leeren.
 Restart=always
-RestartSec=15
+RestartSec=120
 
 # ── Härtung (wie der Spielserver) ──────────────────────────────
 NoNewPrivileges=true
