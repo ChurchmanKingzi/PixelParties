@@ -3,6 +3,9 @@ Description=MoniaBot — Discord-Bot für den Pixel-Parties-Server
 Documentation=https://github.com/ChurchmanKingzi/PixelParties/blob/main/docs/MONIABOT.md
 After=network-online.target pixelparties.service
 Wants=network-online.target
+# Nie dauerhaft aufgeben: Bei kurzem Discord-/DNS-Ausfall scheitert der Login ein paar Mal hintereinander; mit dem Standard-Limit
+# (5 Starts in 120 s) bliebe der Dienst danach bis zum manuellen Eingriff im Zustand "failed" stehen.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -19,9 +22,7 @@ MemoryMax=1200M
 ExecStart=/usr/bin/node index.js
 
 Restart=always
-RestartSec=10
-StartLimitBurst=5
-StartLimitIntervalSec=120
+RestartSec=15
 
 # ── Härtung (wie der Spielserver) ──────────────────────────────
 NoNewPrivileges=true
