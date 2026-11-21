@@ -4943,7 +4943,7 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 // ───── Glücksrad (wheel-api.js) ─────
 require('./wheel-api')({
   app, db, authMiddleware, uuidv4, path, RARITIES, ownedRarities, addRarityCopies, packPool, cardHasMask, boosterManifest,
-  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir,
+  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName,
   get cpuSleeves() { return cpuSleeves; }, get cpuAvatars() { return cpuAvatars; },
 });
 

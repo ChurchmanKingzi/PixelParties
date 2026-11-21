@@ -144,6 +144,19 @@ module.exports = function registerWheel(d) {
     } catch (err) { console.error('[wheel/state]', err.message); res.status(500).json({ error: 'Failed to load wheel' }); }
   });
 
+  // ── GET /api/wheel/pools — Bilder für die Beispiel-Zettel (Avatar/Sleeve/Skin); der Client würfelt beim Betreten des Boards daraus ──
+  app.get('/api/wheel/pools', authMiddleware, (req, res) => {
+    try {
+      const enc = encodeURIComponent;
+      const avatars = d.scanShopDir('avatars').map(f => d.path.basename(f, d.path.extname(f))).filter(id => !d.cpuAvatars.isCpuAvatar(id))
+        .map(id => ({ src: '/data/shop/avatars/' + enc(id) + '.png', name: d.avatarDisplayName(id) }));
+      const sleeves = d.scanShopDir('sleeves').map(f => d.path.basename(f, d.path.extname(f))).filter(id => !d.cpuSleeves.isCpuSleeve(id))
+        .map(id => ({ src: '/data/shop/sleeves/' + enc(id) + '.png', name: d.sleeveDisplayName(id) }));
+      const skins = d.getAvailableSkins().map(s => ({ id: s.skinName, hero: s.heroName }));
+      res.json({ avatars, sleeves, skins });
+    } catch (err) { console.error('[wheel/pools]', err.message); res.status(500).json({ error: 'Failed to load pools' }); }
+  });
+
   // ── GET /api/wheel/cards ──
   app.get('/api/wheel/cards', authMiddleware, async (req, res) => {
     try {

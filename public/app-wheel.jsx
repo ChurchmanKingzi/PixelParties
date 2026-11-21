@@ -85,7 +85,7 @@ function whFieldInfo(kind) {
   if (kind.startsWith('ticket:')) { const r = kind.slice(7), n = window.PpRarities.ORDER[window.PpRarities.rank(r) + 1]; return base({ cls: 'ticket', rar: n, label: whT('Ticket'), sub: whT(whRarityLabel(r)) + ' → ' + whT(whRarityLabel(n)), icon: 'ticket', shape: 'ticket', desc: 'Upgrades one free card to the next rarity.' }); }
   if (kind.startsWith('boost:')) return base({ cls: 'boost', label: whT('Luck Boost'), sub: kind.slice(6) === '1' ? 'S' : kind.slice(6) === '2' ? 'M' : 'L', icon: 'clover', shape: 'burst', desc: 'Covers lower prizes on the board with a better one for all remaining darts.' });
   const sc = { sc10: '10 SC', sc20: '20 SC', sc50: '50 SC' };
-  if (sc[kind]) return base({ cls: 'coin', label: sc[kind], icon: 'coin', shape: 'coin', desc: 'Shop Coins.' });
+  if (sc[kind]) return base({ cls: 'coin', label: sc[kind], icon: 'coin', shape: 'coin', desc: 'Smug Coins.' });
   switch (kind) {
     case 'booster': return base({ cls: 'pack', label: whT('Booster Pack'), shape: 'pack', desc: 'A random Booster Pack.' });
     case 'golden': return base({ cls: 'golden', label: whT('Golden Pack'), icon: 'star', shape: 'pack', desc: 'A Booster Pack from the whole card pool, every card 1 to 2 rarities higher.' });
@@ -224,8 +224,8 @@ function WhTip({ tip }) {
       {tip.card ? <WhBigCard name={tip.card.name} rarity={tip.card.rarity} /> : (
         <div className="wh-tip-art">{tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
       )}
-      <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : f.label}</div>
-      <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (f.sub || '')}</div>
+      <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>
+      <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (tip.sub || f.sub || '')}</div>
       {f.desc && <div className="wh-tip-desc">{whT(f.desc)}</div>}
       {tip.pct != null && <div className="wh-tip-pct">{whT('Chance per dart') + ': ' + whPct(tip.pct)}</div>}
     </div>
@@ -235,11 +235,19 @@ function WhTip({ tip }) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  Board (Felder, Deko, Leinwand, Preis-Leiste); `play` startet den Wurf
 // ═══════════════════════════════════════════════════════════════════════════
+// Zufällige Beispiele für die Felder „Avatar/Sleeve/Skin“ (beim Betreten des Boards gewürfelt, siehe WheelShop)
+function whRollCos(pools) {
+  const pick = (a) => (a && a.length ? a[Math.floor(Math.random() * a.length)] : null);
+  if (!pools) return {};
+  const sk = pick(pools.skins);
+  return { avatar: pick(pools.avatars), sleeve: pick(pools.sleeves), skin: sk ? { id: sk.id, hero: sk.hero, src: '/cards/skins/' + encodeURIComponent(sk.id) + '.png', name: sk.id } : null };
+}
+function whFrameName(d) { const i = window.ppRankFrames ? window.ppRankFrames.rankOf(d) : null; return i == null ? 'Frame ' + d : window.ppRankFrames.RANKS[i].name + ' Frame'; }
 function whArtFor(kind, art, seed) {
-  // Bildmaterial je Feld: Booster-Kunst, Kartenrücken, Beispielkarte
+  // Bildmaterial je Feld: Booster-Kunst, Kartenrücken, Beispielkarte, zufälliger Avatar/Sleeve/Skin
   if (!art) return null;
+  if (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') { const c = art.cos && art.cos[kind]; return c ? c.src : (kind === 'sleeve' ? '/cardback.png' : null); }
   if (kind === 'booster' || kind === 'golden' || kind === 'jackpot') return art.packs && art.packs.length ? art.packs[(seed + (kind === 'booster' ? 0 : kind === 'golden' ? 1 : 2)) % art.packs.length] : null;
-  if (kind === 'sleeve') return '/cardback.png';
   if (kind.startsWith('card:') && art.samples && art.samples[kind.slice(5)]) return bpCardUrl(art.samples[kind.slice(5)], kind.slice(5));
   return null;
 }
@@ -502,7 +510,9 @@ function WhBoard({ rarity, boardData, play, small, art, onTip }) {
   const showTip = (e, kind, extra) => {
     if (!onTip) return;
     const f = whFieldInfo(kind), sample = kind.startsWith('card:') && art && art.samples ? art.samples[kind.slice(5)] : null;
-    onTip({ x: e.clientX, y: e.clientY, info: { ...f, rarColor: f.rar ? WH_RCOL[f.rar] : null }, pct: table[kind], card: sample ? { name: sample, rarity: kind.slice(5) } : null, sample: !!sample, art: whArtFor(kind, art, seed), ...(extra || {}) });
+    const cs = (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') && art && art.cos ? art.cos[kind] : null;
+    onTip({ x: e.clientX, y: e.clientY, info: { ...f, rarColor: f.rar ? WH_RCOL[f.rar] : null }, pct: table[kind], card: sample ? { name: sample, rarity: kind.slice(5) } : null, sample: !!sample,
+      art: whArtFor(kind, art, seed), ...(cs ? { name: cs.name, sub: whT('example') } : {}), ...(extra || {}) });
   };
   const stageStyle = { width: sz(WH_BW), '--whs': S + 'px', transform: shake[0] || shake[1] ? 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' : undefined, height: play ? sz(WH_BH + WH_GAP + WH_BARH) : sz(WH_BH) };
   return (
@@ -545,8 +555,8 @@ function WhBoard({ rarity, boardData, play, small, art, onTip }) {
             const f = whFieldInfo(sl.kind), p = sl.prize;
             const isCard = sl.kind.startsWith('card:') && p;
             const img = isCard ? bpCardUrl(p.name, p.rarity) : (p && p.src) || (p && sl.kind === 'skin' && p.id ? '/cards/skins/' + encodeURIComponent(p.id) + '.png' : null) || whArtFor(sl.kind, art, seed);
-            const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null };
             const text = isCard ? whCardName(p.name) : (sl.kind === 'skin' && p && p.id ? p.id : (p && p.label) || f.label);
+            const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null, art: img, name: text, sub: p && p.id !== undefined && p.isNew !== undefined ? (p.isNew ? whT('New!') : whFrameName(p.dupes)) : undefined };
             return (
               <div key={sl.key} className={'wh-slot wh-slot-' + f.cls} data-slot={sl.key} style={{ '--whc': f.rar ? WH_RCOL[f.rar] : (isCard ? WH_RCOL[p.rarity] : WH_FCOL[f.cls]) }}
                    onMouseEnter={(e) => showTip(e, sl.kind, extra)} onMouseMove={(e) => showTip(e, sl.kind, extra)} onMouseLeave={() => onTip && onTip(null)}>
@@ -771,7 +781,7 @@ function WhResult({ result, onAgain, onMore, onPacks }) {
     else if (k === 'booster' || k === 'golden' || k === 'jackpot') packs.push(k);
     else if (p && (k === 'avatar' || k === 'sleeve' || k === 'skin')) { if (p.maxed) sc += p.amount; else cos.push(p); }
   }
-  const frameName = (d) => { const i = window.ppRankFrames ? window.ppRankFrames.rankOf(d) : null; return i == null ? 'Frame ' + d : window.ppRankFrames.RANKS[i].name + ' Frame'; };
+  const frameName = whFrameName;
   return (
     <div className="wh-result">
       <h3>Results</h3>
@@ -846,14 +856,17 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
   const [busy, setBusy] = useState(false);
   const [played, setPlayed] = useState(null);          // { id, board, result }
   const [packArt, setPackArt] = useState([]);
+  const [pools, setPools] = useState(null);
+  const [cos, setCos] = useState({});                // zufällige Beispiele (Avatar/Sleeve/Skin), neu gewürfelt beim Betreten des Boards
   const [tip, setTip] = useState(null);
   const load = () => window.ppWheelApi.state().then(r => { if (r.ok) setState(r.data); else notify(r.data.error || whT('Failed to load wheel'), 'error'); });
   useEffect(() => {
     load(); whWarm();
+    fetch('/api/wheel/pools', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} }).then(r => r.ok ? r.json() : null).then(setPools).catch(() => {});
     window.ppBoosterApi.list().then(r => { if (r.ok && r.data && r.data.packs) setPackArt(r.data.packs.map(p => (p.variants && p.variants[0] ? bpAsset(p.variants[0].base) : null)).filter(Boolean)); });
   }, []);   // eslint-disable-line
   if (!state) return <div className="wh-hint" style={{ padding: 40 }}>Loading…</div>;
-  const art = { samples: state.samples || {}, packs: packArt };
+  const art = { samples: state.samples || {}, packs: packArt, cos };
 
   const toRarities = () => { setView('rarity'); setStake(null); setPlayed(null); setMode('throw'); setTip(null); load(); };
   const toMore = () => { setStake(null); setPlayed(null); setMode('throw'); setTip(null); load(); setView('gallery'); };
@@ -886,7 +899,7 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
     <div className="wh-root">
       {view === 'rarity' && <WhRarityPick state={state} onPick={(r) => { setRarity(r); setMode('throw'); setView('gallery'); }} onTicket={(r) => { setRarity(r); setMode('ticket'); setView('gallery'); }} />}
       {view === 'gallery' && <WhGallery key={rarity + mode} rarity={rarity} mode={mode} notify={notify} onBack={toRarities}
-        onGo={(cards, n) => { if (mode === 'ticket') useTicket(cards); else { setStake({ cards, n }); setView('board'); } }} />}
+        onGo={(cards, n) => { if (mode === 'ticket') useTicket(cards); else { setStake({ cards, n }); setCos(whRollCos(pools)); setView('board'); } }} />}
       {view === 'board' && stake && <WhBoardPick rarity={rarity} stakeN={stake.n} state={state} art={art} busy={busy} onBack={() => setView('gallery')} onThrow={throwIt} />}
       {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
       <WhTip tip={tip} />

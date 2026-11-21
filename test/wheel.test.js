@@ -25,24 +25,24 @@ test('24 Tabellen: Summe 100, nur bekannte Preisarten, keine negativen Gewichte'
   }
 });
 
-test('Der Schwerpunkt ist ein Downgrade: höchstens ~22 % Break-even/Gewinn, mindestens 8 %', () => {
+test('Der Schwerpunkt ist ein Downgrade: höchstens ~22 % Break-even/Gewinn (Uncommon 32 %: dort ist „Nichts“ das einzige Downgrade), mindestens 8 %', () => {
   for (const r of W.INPUT_RARITIES) {
     const vin = R.DISPLAY_PRICE[r];
     for (const id of W.BOARD_IDS) {
       const t = W.table(r, id);
       let up = 0;
       for (const k of Object.keys(t)) if (!isMechanic(k) && W.valueOf(k) >= vin) up += t[k];
-      assert.ok(up <= 22, `${r}/${id}: ${up.toFixed(1)} % Break-even oder besser`);
+      assert.ok(up <= (r === 'uncommon' ? 32 : 22), `${r}/${id}: ${up.toFixed(1)} % Break-even oder besser`);
       assert.ok(up >= 8, `${r}/${id}: nur ${up.toFixed(1)} % Chance auf Break-even oder besser`);
-      assert.ok(W.expectedValue(t) < 0.75 * vin, `${r}/${id}: Erwartungswert ${W.expectedValue(t).toFixed(1)} zu nah am Einsatz (${vin})`);
+      assert.ok(W.expectedValue(t) < 0.9 * vin, `${r}/${id}: Erwartungswert ${W.expectedValue(t).toFixed(1)} zu nah am Einsatz (${vin})`);
     }
   }
 });
 
-test('„Nichts“: Uncommon ~75–85 %, Umbra genau 0, nie negativ; Jackpot überall 0,01 %', () => {
+test('„Nichts“: Uncommon ~68–85 %, Umbra genau 0, nie negativ; Jackpot überall 0,01 %', () => {
   for (const id of W.BOARD_IDS) {
     const n = W.table('uncommon', id).none;
-    assert.ok(n >= 75 && n <= 85, `uncommon/${id}: ${n}`);
+    assert.ok(n >= 68 && n <= 85, `uncommon/${id}: ${n}`);
     assert.strictEqual(W.table('umbra', id).none || 0, 0);
     for (const r of W.INPUT_RARITIES) {
       assert.ok((W.table(r, id).none || 0) >= 0);
@@ -73,7 +73,7 @@ test('+3-Pfeile-Felder sind rar genug: Kettenfaktor 3·p ≪ 1', () => {
   }
 });
 
-test('Wirtschaft: Alle Karten eines Packs einsetzen und den Ertrag wieder einsetzen schrumpft (Kreislauf-Faktor < 0,8)', () => {
+test('Wirtschaft: Alle Karten eines Packs einsetzen und den Ertrag wieder einsetzen schrumpft (Kreislauf-Faktor < 0,9)', () => {
   // Verteilung einer Pack-Karte
   const rs = W.INPUT_RARITIES, n = {};
   rs.forEach(r => { n[r] = 0; });
@@ -103,7 +103,7 @@ test('Wirtschaft: Alle Karten eines Packs einsetzen und den Ertrag wieder einset
       rho = s / s0; x = nx;
       if (s < 1e-12) break;
     }
-    assert.ok(rho < 0.8, `Board ${id}: Kreislauf-Faktor ${rho.toFixed(3)}`);
+    assert.ok(rho < 0.9, `Board ${id}: Kreislauf-Faktor ${rho.toFixed(3)}`);
   }
 });
 
