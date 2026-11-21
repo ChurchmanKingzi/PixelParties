@@ -113,6 +113,21 @@
     },
   };
 
+  /**
+   * „Nichts“ ist überall um 10 % (relativ) seltener: die frei werdende Wahrscheinlichkeit geht anteilig an die billigen Preise
+   * (Wert bis zum Doppelten des Einsatzwerts; Spin, Boosts und Jackpot bleiben unberührt). Umbra hat kein „Nichts“ und bleibt gleich.
+   */
+  const NONE_CUT = 0.10;
+  for (const rar of Object.keys(BASE)) {
+    const b = BASE[rar], none0 = 100 - sumOf(b);
+    if (none0 <= 0.5) continue;
+    const vin = PRICE[rar], cheap = Object.keys(b).filter(k => k !== 'spin3' && k !== 'jackpot' && !k.startsWith('boost:') && valueOf(k) > 0 && valueOf(k) <= 2 * vin);
+    const wsum = cheap.reduce((a, k) => a + b[k], 0);
+    if (!cheap.length || wsum <= 0) continue;
+    const delta = none0 * NONE_CUT;
+    for (const k of cheap) b[k] += delta * b[k] / wsum;
+  }
+
   // ── Boards: drei Gewichtungen, gleicher Erwartungswert ────────────────────────
   //  Familien: cards (card:*), cur (Booster, Golden Pack, SC), cos (Avatar/Sleeve/Skin). Spin, Tickets, Boosts, Jackpot bleiben gleich.
   const PROFILES = {
