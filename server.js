@@ -939,6 +939,12 @@ app.get('/rarities.js', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
   res.sendFile(path.join(__dirname, 'rarities.js'), { etag: true, lastModified: true });
 });
+// Glücksrad-Modul (UMD, Repo-Wurzel): Gewinntabellen und Würfeln — Server (require) und Browser-Vorschau (window.PpWheel).
+app.get('/wheel.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.sendFile(path.join(__dirname, 'wheel.js'), { etag: true, lastModified: true });
+});
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
 // Creature-Sheets: die URL trägt den Zeitstempel der Datei (`?v=`, `/api/creature-animations`) — lange zwischenspeichern, damit das Vorladen aller Sheets zu Spielbeginn
 // nach dem ersten Mal ohne Netzanfragen auskommt.
@@ -1258,6 +1264,13 @@ async function initDatabase() {
     rarity TEXT NOT NULL,
     count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, card, rarity)
+  )`);
+  // Glücksrad (wheel-api.js): gewonnene Rarity-Upgrade-Tickets je (Nutzer, Rarity) — ein Ticket wertet eine freie Kopie dieser Rarity auf die nächsthöhere auf.
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_wheel_tickets (
+    user_id TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, rarity)
   )`);
   // Offene (gekaufte, noch nicht eingelöste) Booster-Packs: mehrere je Nutzer möglich (Mengenkauf, bis BOOSTER_MAX_BUY je Kauf).
   await db.execute(`CREATE TABLE IF NOT EXISTS pending_booster (
@@ -2080,7 +2093,7 @@ async function purgeGuest(userId) {
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
-  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster']) {
+  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster', 'user_wheel_tickets']) {
     try { await db.run(`DELETE FROM ${t} WHERE user_id = ?`, [userId]); } catch {}
   }
   await db.run('DELETE FROM users WHERE id = ? AND is_guest = 1', [userId]);
@@ -4865,8 +4878,8 @@ async function framesForPlayer(userId, usr, deckSkins) {
  * Zieht ein zufälliges Item aus `pool` (Ids): der ganze Pool, außer was schon das Maximum erreicht hat. Besitzt der Spieler es schon,
  * steigt `dupes` um 1 (Upgrade), sonst wird es neu eingetragen. Liefert { id, isNew, dupes } oder null, wenn alles auf dem Maximum ist.
  */
-async function pullFromPool(userId, itemType, pool, preowned = []) {
-  const rows = await db.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
+async function pullFromPool(userId, itemType, pool, preowned = [], dbh = db) {
+  const rows = await dbh.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
   const have = new Map(rows.map(r => [r.item_id, r.dupes || 0]));
   // `preowned`: schon besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare und -Sleeves, exklusive Skins) –
   // sie sind NUR als Duplikat ziehbar; ohne eigene Zeile zählt der erste Treffer als erste Kopie (Rang 1).
@@ -4875,15 +4888,15 @@ async function pullFromPool(userId, itemType, pool, preowned = []) {
   if (!eligible.length) return null;
   const id = eligible[Math.floor(Math.random() * eligible.length)];
   if (!have.has(id) && extra.includes(id)) {
-    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
+    await dbh.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
     return { id, isNew: false, dupes: 1 };
   }
   if (have.has(id)) {
     const dupes = have.get(id) + 1;
-    await db.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
+    await dbh.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
     return { id, isNew: false, dupes };
   }
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
+  await dbh.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
   return { id, isNew: true, dupes: 0 };
 }
 
@@ -4925,6 +4938,13 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
+});
+
+// ───── Glücksrad (wheel-api.js) ─────
+require('./wheel-api')({
+  app, db, authMiddleware, uuidv4, path, RARITIES, ownedRarities, addRarityCopies, packPool, cardHasMask, boosterManifest,
+  getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir,
+  get cpuSleeves() { return cpuSleeves; }, get cpuAvatars() { return cpuAvatars; },
 });
 
 // ───── Structure decks (shop-gated sample decks) ─────
