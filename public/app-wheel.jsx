@@ -247,7 +247,9 @@ function whArtFor(kind, art, seed) {
   // Bildmaterial je Feld: Booster-Kunst, Kartenrücken, Beispielkarte, zufälliger Avatar/Sleeve/Skin
   if (!art) return null;
   if (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') { const c = art.cos && art.cos[kind]; return c ? c.src : (kind === 'sleeve' ? '/cardback.png' : null); }
-  if (kind === 'booster' || kind === 'golden' || kind === 'jackpot') return art.packs && art.packs.length ? art.packs[(seed + (kind === 'booster' ? 0 : kind === 'golden' ? 1 : 2)) % art.packs.length] : null;
+  if (kind === 'golden') return art.golden && art.golden.length ? art.golden[seed % art.golden.length] : null;
+  if (kind === 'jackpot') return art.umbra && art.umbra.length ? art.umbra[seed % art.umbra.length] : null;
+  if (kind === 'booster') return art.packs && art.packs.length ? art.packs[seed % art.packs.length] : null;
   if (kind.startsWith('card:') && art.samples && art.samples[kind.slice(5)]) return bpCardUrl(art.samples[kind.slice(5)], kind.slice(5));
   return null;
 }
@@ -544,7 +546,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
                  onMouseEnter={(e) => showTip(e, k)} onMouseMove={(e) => showTip(e, k)} onMouseLeave={() => onTip && onTip(null)}>
               <div className="wh-body" style={clip ? { clipPath: clip } : undefined}>
                 {artUrl && <img className={'wh-art wh-art-' + f.cls} src={artUrl} alt="" draggable={false} data-pp-px="aus" />}
-                {(f.cls === 'golden' || f.cls === 'jackpot') && <span className="wh-dither" />}
+                {(f.cls === 'golden' || f.cls === 'jackpot') && !artUrl && <span className="wh-dither" />}
                 {showIcon && <WhIcon name={f.icon} px={px} />}
                 {showLbl && <span className="wh-lbl" style={{ fontSize: 'calc(var(--whs) * ' + lblFs.toFixed(2) + ')' }}>{f.label}</span>}
                 {showLbl && f.sub && r.h >= 12 && r.w >= 16 && <span className="wh-sub">{f.sub}</span>}
@@ -733,6 +735,7 @@ const WH_BOARD_TEXT = {
 };
 function WhBoardPick({ rarity, stakeN, state, art, onBack, onThrow, busy }) {
   const [pick, setPick] = useState(null);
+  const [force, setForce] = useState([]);              // Debug (nur mit PP_DEBUG_TOOLS=1): Preisarten der ersten Pfeile
   const boards = state.boards[rarity];
   const chosen = boards.find(b => b.id === pick);
   return (
@@ -767,8 +770,20 @@ function WhBoardPick({ rarity, stakeN, state, art, onBack, onThrow, busy }) {
           </div>
         </div>
       )}
+      {state.debug && chosen && (
+        <div className="wh-debug">
+          <h4>Debug: guarantee the first darts</h4>
+          <div className="wh-debug-row">
+            {Object.keys(chosen.table).filter(k => k !== 'none').sort((a, b) => whFieldInfo(b).tier - whFieldInfo(a).tier || a.localeCompare(b)).map(k => {
+              const f = whFieldInfo(k), at = force.indexOf(k);
+              return <button key={k} className={'btn wh-chip' + (at >= 0 ? ' wh-chip-on' : '')} onClick={() => setForce(fo => (fo.includes(k) ? fo.filter(x => x !== k) : fo.concat(k)))}>
+                {(at >= 0 ? (at + 1) + '. ' : '') + f.label + (f.sub && f.cls !== 'boost' ? ' (' + f.sub + ')' : '')}</button>;
+            })}
+          </div>
+        </div>
+      )}
       <div className="wh-confirm">
-        <button className="btn btn-primary wh-go" disabled={!pick || busy} onClick={() => onThrow(pick)}>
+        <button className="btn btn-primary wh-go" disabled={!pick || busy} onClick={() => onThrow(pick, force)}>
           {busy ? 'Throwing…' : window.ppT(stakeN === 1 ? 'Throw {0} dart!' : 'Throw {0} darts!').replace('{0}', stakeN)}
         </button>
         {!pick && <span className="wh-hint">Pick a board first.</span>}
@@ -864,6 +879,24 @@ function WhPlay({ rarity, board, result, art, claimed, onAgain, onMore, onPacks,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  Ticket eingelöst: Karte vorher → nachher (groß, mit den Effekten der neuen Rarity)
+// ═══════════════════════════════════════════════════════════════════════════
+function WhUpgrade({ up, onClose }) {
+  return (
+    <div className="wh-up" onClick={onClose}>
+      <div className="wh-up-title">UPGRADE!</div>
+      <div className="wh-up-cards">
+        <div className="wh-up-card wh-up-from"><div className="bp-sc-face"><img src={bpCardUrl(up.name, up.from)} alt="" draggable={false} /></div><span style={{ color: WH_RCOL[up.from] }}>{whT(whRarityLabel(up.from))}</span></div>
+        <WhIcon name="ticket" px={8} />
+        <div className="wh-up-card wh-up-to"><WhBigCard name={up.name} rarity={up.to} /><span style={{ color: WH_RCOL[up.to] }}>{whT(whRarityLabel(up.to))}</span></div>
+      </div>
+      <div className="wh-up-name">{whCardName(up.name)}</div>
+      <button className="btn btn-primary wh-go" onClick={onClose}>Nice!</button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  Reiter
 // ═══════════════════════════════════════════════════════════════════════════
 function WheelShop({ sc, onSc, notify, onPacks }) {
@@ -874,7 +907,8 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
   const [stake, setStake] = useState(null);            // { cards: {name: n}, n }
   const [busy, setBusy] = useState(false);
   const [played, setPlayed] = useState(null);          // { id, board, result }
-  const [packArt, setPackArt] = useState([]);
+  const [packArt, setPackArt] = useState({ packs: [], golden: [], umbra: [] });
+  const [upgrade, setUpgrade] = useState(null);       // { name, from, to } nach einem Ticket
   const [pools, setPools] = useState(null);
   const [cos, setCos] = useState({});                // zufällige Beispiele (Avatar/Sleeve/Skin), neu gewürfelt beim Betreten des Boards
   const [tip, setTip] = useState(null);
@@ -882,17 +916,21 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
   useEffect(() => {
     load(); whWarm();
     fetch('/api/wheel/pools', { headers: window.AUTH_TOKEN ? { 'x-auth-token': window.AUTH_TOKEN } : {} }).then(r => r.ok ? r.json() : null).then(setPools).catch(() => {});
-    window.ppBoosterApi.list().then(r => { if (r.ok && r.data && r.data.packs) setPackArt(r.data.packs.map(p => (p.variants && p.variants[0] ? bpAsset(p.variants[0].base) : null)).filter(Boolean)); });
+    window.ppBoosterApi.list().then(r => { if (r.ok && r.data && r.data.packs) {
+      const o = { packs: [], golden: [], umbra: [] };
+      r.data.packs.forEach(pk => (pk.variants || []).forEach((v, i) => { const u = bpAsset(v.base); if (v.special === 'golden') o.golden.push(u); else if (v.special === 'umbra') o.umbra.push(u); else if (i === 0) o.packs.push(u); }));
+      setPackArt(o);
+    } });
   }, []);   // eslint-disable-line
   if (!state) return <div className="wh-hint" style={{ padding: 40 }}>Loading…</div>;
-  const art = { samples: state.samples || {}, packs: packArt, cos };
+  const art = { samples: state.samples || {}, packs: packArt.packs, golden: packArt.golden, umbra: packArt.umbra, cos };
 
   const toRarities = () => { setView('rarity'); setStake(null); setPlayed(null); setMode('throw'); setTip(null); load(); };
   const toMore = () => { setStake(null); setPlayed(null); setMode('throw'); setTip(null); load(); setView('gallery'); };
-  const throwIt = async (boardId) => {
+  const throwIt = async (boardId, force) => {
     if (busy) return; setBusy(true);
     try {
-      const r = await window.ppWheelApi.throw({ rarity, board: boardId, cards: stake.cards });
+      const r = await window.ppWheelApi.throw({ rarity, board: boardId, cards: stake.cards, ...(force && force.length ? { force } : {}) });
       if (!r.ok) { notify((r.data && r.data.error) || whT('Throw failed'), 'error'); setBusy(false); return; }
       if (r.data.sc != null) onSc(r.data.sc);
       whPlay('shop_purchase', { volume: 0.5 });
@@ -910,8 +948,8 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
     const name = Object.keys(cards)[0];
     const r = await window.ppWheelApi.ticket(rarity, name);
     if (!r.ok) { notify((r.data && r.data.error) || whT('Ticket failed'), 'error'); return; }
-    notify(whCardName(name) + ' → ' + whRarityLabel(r.data.to) + '!', 'success');
-    toRarities();
+    whPlay('ascension', { volume: 0.7 }); whPlay('pull_sparkle', { volume: 0.7 });
+    setUpgrade({ name, from: rarity, to: r.data.to });
   };
 
   return (
@@ -921,6 +959,7 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
         onGo={(cards, n) => { if (mode === 'ticket') useTicket(cards); else { setStake({ cards, n }); setCos(whRollCos(pools)); setView('board'); } }} />}
       {view === 'board' && stake && <WhBoardPick rarity={rarity} stakeN={stake.n} state={state} art={art} busy={busy} onBack={() => setView('gallery')} onThrow={throwIt} />}
       {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} claimed={played.claimed} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
+      {upgrade && <WhUpgrade up={upgrade} onClose={() => { setUpgrade(null); toRarities(); }} />}
       <WhTip tip={tip} />
     </div>
   );

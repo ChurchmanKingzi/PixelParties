@@ -11,7 +11,9 @@ test('neun Packs mit je höchstens acht Varianten', () => {
   assert.deepStrictEqual(man.packs.map(p => p.id),
     ['ability', 'hero', 'clash', 'monia', 'future', 'world1', 'world2', 'community', 'trials']);
   for (const p of man.packs) {
-    assert.ok(p.variants.length >= 1 && p.variants.length <= 8, p.id + ': Variantenzahl');
+    const reg = p.variants.filter(v => !v.special);
+    assert.ok(reg.length >= 1 && reg.length <= 8, p.id + ': Variantenzahl');
+    assert.deepStrictEqual(p.variants.filter(v => v.special).map(v => v.special).sort(), ['golden', 'umbra'], p.id + ': Spezialvarianten fürs Glücksrad');
     assert.strictEqual(p.tagline, '9 Rarity Skins for your Collection!');
   }
 });

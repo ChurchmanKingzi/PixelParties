@@ -105,7 +105,7 @@ function bpStageScale(vw, vh) { return Math.max(1, Math.floor(Math.min(vw / 320,
 function BpPackCanvas({ pack, zoom }) {
   const cvRef = useRef(null);
   const [vi, setVi] = useState(0);
-  const variants = pack.variants || [];
+  const variants = (pack.variants || []).filter(x => !x.special);   // Gold-/Umbra-Varianten (Glücksrad) werden im Shop nicht gezeigt
   const v = variants[vi % Math.max(1, variants.length)] || null;
   useEffect(() => {
     const cv = cvRef.current;
