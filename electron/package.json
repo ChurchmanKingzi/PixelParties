@@ -29,10 +29,8 @@
       "main.js",
       "preload.js",
       "splash.html",
-      "launcher.html",
-      "launcher-config.json",
       "desktop-secrets.json",
-      "assets/**/*"
+      "assets/title.png"
     ],
     "win": {
       "target": [

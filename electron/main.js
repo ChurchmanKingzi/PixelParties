@@ -34,9 +34,9 @@ const TARGET_URL =
 
 const IS_DEV = !app.isPackaged;
 
-// Startseite (launcher.html) zuerst; überspringen mit --skip-launcher oder PP_SKIP_LAUNCHER=1
-// (Entwicklung, Steam-Start ohne Umweg).
-const SKIP_LAUNCHER = process.argv.includes('--skip-launcher') || process.env.PP_SKIP_LAUNCHER === '1';
+// Standard: direkt ins Spiel (der Splash-Bildschirm überbrückt die Ladezeit). Die eigene Startseite (launcher.html) ist nur noch optional:
+// `npm start -- --launcher` oder PP_LAUNCHER=1 (im gepackten Client nicht enthalten, siehe electron/package.json → files).
+const SKIP_LAUNCHER = !(process.argv.includes('--launcher') || process.env.PP_LAUNCHER === '1');
 const LAUNCHER_FILE = path.join(__dirname, 'launcher.html');
 
 // ===========================================================================
