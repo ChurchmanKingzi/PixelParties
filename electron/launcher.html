@@ -37,27 +37,47 @@
   .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
   .center { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * .8); }
 
-  /* PLAY: goldene Taste mit abgestuften Ecken, heller Oberkante, dunkler Unterkante, blauem Rahmen; ein heller Streifen läuft in Pixelstufen darüber */
-  .playwrap { filter: drop-shadow(var(--px) 0 0 #08060c) drop-shadow(calc(var(--px) * -1) 0 0 #08060c) drop-shadow(0 var(--px) 0 #08060c) drop-shadow(0 calc(var(--px) * -1) 0 #08060c) drop-shadow(0 calc(var(--px) * 2) 0 #08060c);
-    margin-bottom: calc(var(--u) * .2); }
-  #play { --n: calc(var(--px) * 3); appearance: none; border: 0; cursor: pointer; font-family: inherit; position: relative; overflow: hidden; display: block;
-    color: #12101f; background: #fad54a; font-size: calc(var(--u) * 2.5); letter-spacing: .2em; text-indent: .2em; padding: calc(var(--u) * .85) calc(var(--u) * 5.2);
-    border: calc(var(--px) * 2) solid #66b6ff;
-    box-shadow: inset 0 calc(var(--px) * 2) 0 #f7f7ad, inset 0 calc(var(--px) * -3) 0 #c68206, inset calc(var(--px) * 2) 0 0 #f7f7ad, inset calc(var(--px) * -2) 0 0 #c68206;
+  /* PLAY: goldene Taste mit abgestuften Ecken, blauem blinkendem Rahmen, Dither-Bändern (Schachbrett) oben/unten, geprägter Schrift, Rubinen an den Seiten,
+     marschierenden Pfeilen, Glitzersternen und einem hellen Streifen, der in Pixelstufen darüberläuft. Alles Sprites/harte Kanten, keine Verläufe. */
+  .playwrap { animation: bobp 1.2s steps(1) infinite; position: relative; margin: calc(var(--u) * .5) 0 calc(var(--u) * .2);
+    filter: drop-shadow(var(--px) 0 0 #08060c) drop-shadow(calc(var(--px) * -1) 0 0 #08060c) drop-shadow(0 var(--px) 0 #08060c) drop-shadow(0 calc(var(--px) * -1) 0 #08060c) drop-shadow(0 calc(var(--px) * 2) 0 #08060c); }
+  #play { --n: calc(var(--px) * 3); appearance: none; cursor: pointer; font-family: inherit; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 7);
+    color: #ffffff; background-color: #fad54a; font-size: calc(var(--u) * 3.1); letter-spacing: .26em; padding: calc(var(--u) * 1) calc(var(--u) * 2.6);
+    border: calc(var(--px) * 2) solid #66b6ff; animation: ring .7s steps(1) infinite;
+    text-shadow: calc(var(--px) * -1) calc(var(--px) * -1) 0 #08060c, 0 calc(var(--px) * -1) 0 #08060c, var(--px) calc(var(--px) * -1) 0 #08060c, calc(var(--px) * -1) 0 0 #08060c, var(--px) 0 0 #08060c,
+      calc(var(--px) * -1) var(--px) 0 #08060c, 0 var(--px) 0 #08060c, var(--px) var(--px) 0 #08060c, 0 calc(var(--px) * 2) 0 #08060c, var(--px) calc(var(--px) * 2) 0 #08060c, calc(var(--px) * -1) calc(var(--px) * 2) 0 #08060c, 0 calc(var(--px) * 3) 0 #08060c;
+    background-image: conic-gradient(#c68206 25%, transparent 0 50%, #c68206 0 75%, transparent 0); background-size: calc(var(--px) * 2) calc(var(--px) * 4); background-repeat: repeat-x; background-position: 0 calc(100% - var(--px) * 5);
+    box-shadow: inset 0 calc(var(--px) * 2) 0 #f7f7ad, inset 0 calc(var(--px) * -3) 0 #c68206, inset calc(var(--px) * 2) 0 0 #f7f7ad, inset calc(var(--px) * -2) 0 0 #c68206,
+      inset 0 0 0 calc(var(--px) * 4) #fad54a, inset 0 0 0 calc(var(--px) * 5) #c68206;
     clip-path: polygon(0 var(--n), var(--px) var(--n), var(--px) var(--px), var(--n) var(--px), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--px), calc(100% - var(--px)) var(--px), calc(100% - var(--px)) var(--n), 100% var(--n),
       100% calc(100% - var(--n)), calc(100% - var(--px)) calc(100% - var(--n)), calc(100% - var(--px)) calc(100% - var(--px)), calc(100% - var(--n)) calc(100% - var(--px)), calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--px)), var(--px) calc(100% - var(--px)), var(--px) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
-  #play::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--px) * 4); background: #ffffff; transform: translateX(-200%); animation: shine 3.2s steps(24) infinite; }
-  @keyframes shine { 0%, 55% { transform: translateX(-300%); } 100% { transform: translateX(var(--shine-end, 1200%)); } }
-  #play:hover { background: #f7f7ad; border-color: #b3d8f9; }
+  @keyframes bobp { 0% { transform: translateY(0); } 50% { transform: translateY(calc(var(--px) * -1)); } }
+  @keyframes ring { 0%, 49% { border-color: #66b6ff; } 50%, 100% { border-color: #b3d8f9; } }
+  #play::before { content: ''; position: absolute; left: calc(var(--px) * 5); right: calc(var(--px) * 5); top: calc(var(--px) * 5); height: calc(var(--px) * 4);
+    background: conic-gradient(#ffffff 25%, transparent 0 50%, #ffffff 0 75%, transparent 0) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2); }
+  #play::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--px) * 5); background: #ffffff; transform: translateX(-300%); animation: shine 3.4s steps(26) infinite; }
+  @keyframes shine { 0%, 50% { transform: translateX(-300%); } 100% { transform: translateX(var(--shine-end, 1500%)); } }
+  #play:hover { background-color: #f7f7ad; animation-duration: .35s; }
   #play:active { transform: translateY(var(--px)); }
+  .pl { position: relative; padding-top: calc(var(--px) * 1); }
+  .chev { display: flex; gap: var(--px); } .chev svg { display: block; } .chev.r { transform: scaleX(-1); }
+  .chev svg:nth-child(1) { animation: mk 0.9s steps(1) infinite; } .chev svg:nth-child(2) { animation: mk 0.9s steps(1) infinite; animation-delay: -.45s; }
+  @keyframes mk { 0% { visibility: visible; } 50% { visibility: hidden; } }
+  #play:hover .chev svg { animation-duration: .45s; }
+  .gem { position: absolute; top: 50%; margin-top: calc(var(--px) * -6); } .gem svg { display: block; }
+  .gem.l { left: calc(var(--px) * -9); } .gem.r { right: calc(var(--px) * -9); }
+  .spk { position: absolute; animation: tw 2.1s steps(1) infinite; } .spk svg { display: block; }
+  @keyframes tw { 0% { visibility: visible; } 45% { visibility: hidden; } 55% { visibility: visible; } 70% { visibility: hidden; } }
+  .spk.a { left: calc(var(--px) * -14); top: calc(var(--px) * -13); } .spk.b { right: calc(var(--px) * -12); top: calc(var(--px) * -16); animation-delay: -.7s; }
+  .spk.c { right: calc(var(--px) * -13); bottom: calc(var(--px) * 2); animation-delay: -1.3s; } .spk.d { left: calc(var(--px) * -13); bottom: calc(var(--px) * -2); animation-delay: -.3s; }
 
-  .pitch { appearance: none; border: 0; cursor: pointer; font-family: inherit; color: #e5edfa; background: #12101f; font-size: calc(var(--u) * .85); letter-spacing: .06em; line-height: 1.45; text-align: center;
-    padding: calc(var(--u) * .5) calc(var(--u) * 1.1); max-width: calc(var(--u) * 34); box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
-  .pitch b { color: #66b6ff; font-weight: 400; }
-  .pitch:hover { background: #243a8a; }
-  .pitch[hidden] { display: none; }
+  /* Discord-Knopf oben rechts (wie im Hauptmenü: Discord-Blau, Pixel-Logo) */
+  #discord { z-index: 5; position: fixed; right: calc(var(--u) * 1.4); top: calc(var(--u) * 1.3); appearance: none; border: 0; cursor: pointer; background: #3866f0; padding: calc(var(--px) * 4) calc(var(--px) * 6);
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #6d9bf8, inset 0 calc(var(--px) * 2) 0 #6d9bf8, inset 0 calc(var(--px) * -2) 0 #0351c9, calc(var(--px) * 3) calc(var(--px) * 3) 0 calc(var(--px) * 2) #08060c; }
+  #discord svg { display: block; } #discord:hover { background: #6d9bf8; transform: translateY(calc(var(--px) * -1)); } #discord:active { transform: translateY(var(--px)); }
+  #discord[hidden] { display: none; }
 
-  .row { display: flex; gap: calc(var(--u) * .7); justify-content: center; }
+  .row { display: flex; gap: calc(var(--u) * .7); justify-content: center; flex-wrap: wrap; }
   .btn { appearance: none; border: 0; cursor: pointer; font-family: inherit; color: #ffffff; background: #12101f; font-size: calc(var(--u) * .85); letter-spacing: .1em; padding: calc(var(--u) * .5) 0; width: calc(var(--u) * 8.6); text-align: center;
     box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
   .btn:hover { color: #12101f; background: #66b6ff; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #b3d8f9; }
@@ -82,6 +102,7 @@
 </style>
 </head>
 <body>
+<button id="discord" title="Join our Discord" hidden data-sprite="discord"></button>
 <div id="art">
   <img class="bg" src="assets/scene/background.png" alt="">
   <!-- Laserkette: Rabbit, Explosion und Golem tragen vorgeschnittene Laserstücke (senkrechte Schnittkanten), die nur in EINER Lage nahtlos aufeinandertreffen:
@@ -113,14 +134,14 @@
       <div class="status" id="status"><span class="dot"></span><span id="stxt">Checking server…</span></div>
     </div></div>
     <div class="center">
-      <div class="playwrap"><button id="play">PLAY</button></div>
-      <button class="pitch" id="pitch" hidden>Join our <b>Discord</b> to find opponents, share your decks, and see more news!</button>
-      <div class="row">
-        <button class="btn" id="b-discord" hidden>DISCORD</button>
-        <button class="btn" id="b-web" hidden>IN BROWSER</button>
-        <button class="btn" id="b-itch" hidden>ITCH.IO</button>
+      <div class="playwrap">
+        <button id="play"><span class="chev l" data-sprite="chev"></span><span class="pl">PLAY</span><span class="chev r" data-sprite="chev"></span></button>
+        <span class="gem l" data-sprite="gem"></span><span class="gem r" data-sprite="gem"></span>
+        <span class="spk a" data-sprite="star"></span><span class="spk b" data-sprite="star"></span><span class="spk c" data-sprite="star"></span><span class="spk d" data-sprite="star"></span>
       </div>
       <div class="row">
+        <button class="btn" id="b-web" hidden>IN BROWSER</button>
+        <button class="btn" id="b-itch" hidden>ITCH.IO</button>
         <button class="btn" id="b-music">MUSIC: ON</button>
         <button class="btn" id="b-full">FULLSCREEN</button>
         <button class="btn" id="b-quit">QUIT</button>
@@ -171,6 +192,21 @@
     }
   }, 33);
 
+  // ── Sprites (wie PIXEL_ICONS des Spiels): Zeilen aus Zeichen → SVG mit scharfen Kanten, Zelle = --px ──
+  const SPR = {
+    discord: { c: { '#': '#ffffff' }, z: 1, r: ['...##..........##...', '..#####......#####..', '..################..', '.##################.', '.##################.', '.######.####.######.', '######...##...######', '######...##...######', '######...##...######', '#######.####.#######', '####################', '.##################.', '.#######....#######.', '..####........####..', '...##..........##...'] },
+    chev: { c: { '#': '#12101f' }, z: 2, n: 2, r: ['##.....', '###....', '.###...', '..###..', '...###.', '..###..', '.###...', '###....', '##.....'] },
+    gem: { c: { o: '#08060c', r: '#fe5154', '+': '#ffffff' }, z: 2, r: ['..ooo..', '.orrro.', 'orr+rro', 'orrrrro', '.orrro.', '..ooo..'] },
+    star: { c: { '#': '#ffffff', o: '#fad54a' }, z: 2, r: ['...#...', '...#...', '..#o#..', '###o###', '..#o#..', '...#...', '...#...'] },
+  };
+  const sprite = (k, cell) => {
+    const d = SPR[k], w = d.r[0].length, h = d.r.length, paths = {};
+    d.r.forEach((row, y) => { for (let x = 0; x < w;) { const ch = row[x]; if (ch === '.') { x++; continue; } let e = x; while (e < w && row[e] === ch) e++; paths[ch] = (paths[ch] || '') + 'M' + x + ' ' + y + 'h' + (e - x) + 'v1h' + (x - e) + 'z'; x = e; } });
+    const one = '<svg viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges" style="width:calc(' + w + ' * var(--px) * ' + (d.z || 1) + ');height:calc(' + h + ' * var(--px) * ' + (d.z || 1) + ')">' + Object.keys(paths).map(c => '<path d="' + paths[c] + '" fill="' + d.c[c] + '"/>').join('') + '</svg>';
+    return one.repeat(d.n || 1);
+  };
+  for (const el of document.querySelectorAll('[data-sprite]')) el.innerHTML = sprite(el.getAttribute('data-sprite'));
+
   // ── Inhalt ──
   let cfg = { links: {} };
   const open = (u) => u && L.openExternal(u);
@@ -178,8 +214,8 @@
     cfg = c || cfg;
     $('ver').textContent = 'v' + (cfg.version || '?') + (cfg.serverUrl ? '  ·  ' + cfg.serverUrl.replace(/^https?:\/\//, '') : '');
     const lk = cfg.links || {};
-    for (const [id, key] of [['b-discord', 'discord'], ['b-itch', 'itch'], ['b-web', 'website']]) if (lk[key]) { $(id).hidden = false; $(id).onclick = () => open(lk[key]); }
-    if (lk.discord) { $('pitch').hidden = false; $('pitch').onclick = () => open(lk.discord); }
+    for (const [id, key] of [['b-itch', 'itch'], ['b-web', 'website']]) if (lk[key]) { $(id).hidden = false; $(id).onclick = () => open(lk[key]); }
+    if (lk.discord) { $('discord').hidden = false; $('discord').onclick = () => open(lk.discord); }
   });
 
   // ── Serverstatus (Hauptprozess; wach halten, falls der Server schläft) ──
