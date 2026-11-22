@@ -38,3 +38,19 @@ test('Titel: Ids eindeutig, je Sprache Text und Stellung (davor/dahinter)', () =
   }
   assert.ok(titles.some(t => t.en.pos === 'before') && titles.some(t => t.en.pos === 'after'));
 });
+
+test('Titel: Heldentitel (Namensregel rückwärts) und thematische Titel sind enthalten, nichts davon ist ein Heldenname', () => {
+  const byId = Object.fromEntries(titles.map(t => [t.id, t]));
+  assert.deepStrictEqual(byId['bomb-berserker'].en, { t: 'Bomb Berserker', pos: 'before' });          // „Bomb Berserker Bartas“
+  assert.deepStrictEqual(byId['the-nature-fairy'].en, { t: 'the Nature Fairy', pos: 'after' });        // „Maya, the Nature Fairy“
+  assert.deepStrictEqual(byId['the-traveler'].en, { t: 'the Traveler', pos: 'after' });                // „Tarleinn the Traveler“
+  assert.ok(byId['the-creation-fairy'] && byId['the-primordial-goddess']);                              // Crestina-Karten
+  assert.ok(!byId['mary-crestmas'] && !byId['santa-klaus'], 'Wortspiel-Eigennamen haben keinen Titel');
+  for (const id of ['antonia-s-apprentice', 'control-menace', 'final-boss-of-aggro', 'creature-spammer-extraordinaire']) assert.ok(byId[id], id);
+  assert.ok(titles.length >= 150);
+});
+
+test('cards.json: „Bad“ ist kein Archetype', () => {
+  const cards = JSON.parse(fs.readFileSync(path.join(root, 'data', 'cards.json'), 'utf8'));
+  assert.ok(!cards.some(c => c.archetype === 'Bad'));
+});

@@ -185,8 +185,13 @@ function whLayout(table, seed, BW) {
     let x = Math.round(r.x), y = Math.round(r.y), x2 = Math.round(r.x + r.w), y2 = Math.round(r.y + r.h);
     if (flipX) { const nx = BW - x2, nx2 = BW - x; x = nx; x2 = nx2; }
     if (flipY) { const ny = RH - y2, ny2 = RH - y; y = ny; y2 = ny2; }
-    // zusätzlicher Abstand zu den Nachbarn (1 Zelle je Seite): zwischen den Feldern bleibt freier Board-Hintergrund
-    out[it.id] = { x: x + 1, y: y + 1 + WH_HEAD, w: Math.max(4, x2 - x - 2), h: Math.max(4, y2 - y - 2) };
+    // Chaos: jedes Feld füllt seine Zelle nur zu 78–100 %, sitzt versetzt darin, ragt manchmal über den Nachbarn und hängt leicht schief (Neigung nur bei Zetteln, nicht bei „Nichts“)
+    const isNone = it.k === 'none', cw = Math.max(4, x2 - x - 2), ch = Math.max(4, y2 - y - 2);
+    let w2 = Math.max(4, Math.floor(cw * (isNone ? 1 : 0.78 + 0.22 * rnd()))), h2 = Math.max(4, Math.floor(ch * (isNone ? 1 : 0.78 + 0.22 * rnd())));
+    let ox = Math.floor((cw - w2) * rnd()), oy = Math.floor((ch - h2) * rnd());
+    if (!isNone && rnd() < 0.2) { const g = 2 + Math.floor(rnd() * 3); w2 += g; h2 += Math.floor(g / 2); ox -= Math.floor(g / 2); }
+    const small = w2 * h2 < 320;
+    out[it.id] = { x: x + 1 + ox, y: y + 1 + oy + WH_HEAD, w: w2, h: h2, rot: isNone ? 0 : Math.round((rnd() - 0.5) * (small ? 16 : 7) * 10) / 10, z: 1 + Math.floor(rnd() * 3) };
   }
   return out;
 }
@@ -424,17 +429,24 @@ function whDrawBoardBg(ctx, S, id, layout, seed, BW) {
   }
   if (id === 'A') {
     for (let i = 0; i < 40; i++) P.cell(2 + Math.floor(rnd() * (BW - 4)), HD + 1 + Math.floor(rnd() * (BH - HD - 3)), '#5a341a');
-    const keys = Object.keys(layout).filter(k => !whIsNone(k)), pinOf = (k) => { const r = layout[k]; return [r.x + Math.floor(r.w / 2), r.y]; };
-    for (let i = 0; i < 4 && keys.length > 1; i++) {   // roter Faden: durchhängend, mit Knoten
-      const a = pinOf(keys[Math.floor(rnd() * keys.length)]), b = pinOf(keys[Math.floor(rnd() * keys.length)]), m = Math.max(8, Math.hypot(b[0] - a[0], b[1] - a[1]));
-      for (let t = 0; t <= m; t++) { const u = t / m; P.cell(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + Math.sin(u * Math.PI) * 5, '#b5171c'); }
-      P.rect(a[0] - 1, a[1], 2, 2, '#780014'); P.rect(b[0] - 1, b[1], 2, 2, '#780014');
-    }
   } else if (id === 'B') {
     for (let k = 0; k < 8; k++) { const cx = Math.floor(rnd() * BW), cy = HD + Math.floor(rnd() * (BH - HD)), rx = 10 + rnd() * 18, ry = 5 + rnd() * 9; for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) if ((x * x) / (rx * rx) + (y * y) / (ry * ry) < 1 && WH_BAY[(cy + y) & 3][(cx + x) & 3] / 16 < 0.35 && ((x + y) & 1) === 0) P.cell(cx + x, cy + y, '#1a4128'); }
     for (let i = 0; i < 110; i++) P.cell(Math.floor(rnd() * BW), BH - 1 - Math.floor(rnd() * 7), '#66a1a1');
   } else {
     for (let i = 0; i < 70; i++) { const x = 2 + Math.floor(rnd() * (BW - 5)), y = HD + 2 + Math.floor(rnd() * (BH - HD - 5)), c = i % 3 ? '#f8b4df' : '#f7f7ad'; P.cell(x, y, c); if (i % 4 === 0) { P.cell(x - 1, y, c); P.cell(x + 1, y, c); P.cell(x, y - 1, c); P.cell(x, y + 1, c); } }
+  }
+  // Roter Faden: jeder Zettel hängt an seinem nächsten (und manchmal übernächsten) Nachbarn, mit Durchhang und Knoten an den Nadeln
+  const ids = Object.keys(layout).filter(k => !whIsNone(k)), pin = (k) => { const r = layout[k]; return [r.x + Math.floor(r.w / 2), r.y + 1]; };
+  const edges = new Set(), ekey = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+  for (const a of ids) {
+    const pa = pin(a), near = ids.filter(b => b !== a).map(b => ({ b, d: Math.hypot(pin(b)[0] - pa[0], pin(b)[1] - pa[1]) })).sort((x, y) => x.d - y.d);
+    if (near[0] && rnd() < 0.9) edges.add(ekey(a, near[0].b));
+    if (near[1] && rnd() < 0.45) edges.add(ekey(a, near[1].b));
+  }
+  for (const e of edges) {
+    const [ka, kb] = e.split('|'), a = pin(ka), b = pin(kb), m = Math.max(6, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let t = 0; t <= m; t++) { const u = t / m; P.cell(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + Math.sin(u * Math.PI) * Math.min(5, m / 6), '#b5171c'); }
+    P.rect(a[0] - 1, a[1], 2, 2, '#780014'); P.rect(b[0] - 1, b[1], 2, 2, '#780014');
   }
 }
 
@@ -527,6 +539,16 @@ function WhNothing({ w, h, S, id, seed, variant }) {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) { const ctx = ref.current.getContext('2d'); ctx.imageSmoothingEnabled = false; whDrawNothing(ctx, S, w, h, id, seed, variant); } }, [w, h, S, id, seed, variant]);
   return <canvas ref={ref} className="wh-nothing-cv" width={w * S} height={h * S} />;
+}
+
+// Reihenfolge der Preis-Leiste: Packs → Kosmetik (Skin, Avatar, Sleeve, Emote, Titel) → Tickets → Karten (Rarity absteigend, dann Name) → SC → Sonstiges
+const WH_RAIL_ORDER = ['jackpot', 'golden', 'booster', 'skin', 'avatar', 'sleeve', 'emote', 'title', 'ticket', 'card', 'sc50', 'sc20', 'sc10', 'spin3', 'boost'];
+function whRailCmp(a, b) {
+  const g = (sl) => { const i = WH_RAIL_ORDER.indexOf(sl.kind.split(':')[0]); return i < 0 ? 99 : i; };
+  if (g(a) !== g(b)) return g(a) - g(b);
+  const rk = (sl) => (sl.kind.startsWith('card:') ? window.PpRarities.rank(sl.kind.slice(5)) : sl.kind.startsWith('ticket:') ? window.PpRarities.rank(sl.kind.slice(7)) : 0);
+  if (rk(a) !== rk(b)) return rk(b) - rk(a);
+  return String((a.prize && (a.prize.name || a.prize.id)) || a.key).localeCompare(String((b.prize && (b.prize.name || b.prize.id)) || b.key));
 }
 
 function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
@@ -789,7 +811,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
           const isTk = k.startsWith('ticket:');
           const showIcon = !artUrl && f.icon && (isTk ? (r.w >= 22 && r.h >= 15) : (r.w >= 9 && r.h >= (showLbl ? 13 : 9))), px = Math.max(1, Math.min(4, Math.floor(Math.min(r.w - 4, r.h - (showLbl ? 8 : 4)) / 9)));
           return (
-            <div key={fid} ref={el => { fieldRefs.current[fid] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), ...(rar ? { '--whc': rar } : {}) }}
+            <div key={fid} ref={el => { fieldRefs.current[fid] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), zIndex: r.z || 1, ...(r.rot ? { transform: 'rotate(' + r.rot + 'deg)' } : {}), ...(rar ? { '--whc': rar } : {}) }}
                  onMouseEnter={(e) => showTip(e, k)} onMouseMove={(e) => showTip(e, k)} onMouseLeave={() => onTip && onTip(null)}>
               <div className="wh-body" style={clip ? { clipPath: clip } : undefined}>
                 {k === 'none' && <WhNothing w={r.w - 2} h={r.h - 2} S={S} id={boardData.id} seed={seed} variant={fid === 'none' ? 0 : parseInt(fid.slice(5), 10) || 1} />}
@@ -817,7 +839,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       {play && (
         <div className="wh-rail" style={{ top: sz(WH_BH + WH_GAP), height: sz(WH_BARH), width: sz(BW) }}>
           {rail.length === 0 && <span className="wh-rail-empty">{whT('Your prizes land here')}</span>}
-          {rail.map(sl => {
+          {[...rail].sort(whRailCmp).map(sl => {
             const f = whFieldInfo(sl.kind), p = sl.prize;
             const isCard = sl.kind.startsWith('card:') && p;
             const img = isCard ? bpCardUrl(p.name, p.rarity) : (p && p.src) || (p && sl.kind === 'skin' && p.id ? '/cards/skins/' + encodeURIComponent(p.id) + '.png' : null) || whArtFor(sl.kind, art, seed);

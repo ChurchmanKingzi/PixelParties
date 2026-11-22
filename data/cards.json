@@ -3003,7 +3003,7 @@
     "atk": 80,
     "cost": null,
     "effect": "When you play this Hero, you may play up to 5 copies of any Attacks, Spells and Artifacts in your deck. \nYou may once per turn spend all your Gold (at least 1) to delete an Artifact from your discard pile and add a copy of it from your deck to your hand.",
-    "archetype": "Bad",
+    "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
     "skilltestLegal": true,
