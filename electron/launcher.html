@@ -119,6 +119,7 @@
         <button class="btn" id="b-discord" hidden>DISCORD</button>
         <button class="btn" id="b-itch" hidden>ITCH.IO</button>
         <button class="btn" id="b-web" hidden>WEBSITE</button>
+        <button class="btn" id="b-music">MUSIC: ON</button>
         <button class="btn" id="b-full">FULLSCREEN</button>
         <button class="btn" id="b-quit">QUIT</button>
       </div>
@@ -129,6 +130,7 @@
   </div>
 </div>
 
+<audio id="bgm" src="assets/music/title.ogg" loop preload="auto"></audio>
 <div id="go"><div class="t">CONNECTING</div><div class="bar"><i></i></div><div class="s" id="gos">Entering the Pixel Parties…</div></div>
 
 <script>
@@ -190,6 +192,19 @@
     setTimeout(poll, r.state === 'ok' ? 20000 : 4000);
   };
   poll();
+
+  // ── Musik (Titelmusik des Spiels); Wahl „aus“ bleibt gespeichert ──
+  const bgm = $('bgm'); bgm.volume = 0.55;
+  let muted = false; try { muted = localStorage.getItem('ppLauncherMuted') === '1'; } catch {}
+  const showMusic = () => { $('b-music').textContent = muted ? 'MUSIC: OFF' : 'MUSIC: ON'; };
+  const startMusic = () => { if (!muted) bgm.play().catch(() => {}); };
+  showMusic(); startMusic();
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (bgm.paused) startMusic(); }, { once: false });
+  $('b-music').onclick = () => {
+    muted = !muted; try { localStorage.setItem('ppLauncherMuted', muted ? '1' : '0'); } catch {}
+    if (muted) bgm.pause(); else startMusic();
+    showMusic();
+  };
 
   // ── Knöpfe ──
   let going = false;
