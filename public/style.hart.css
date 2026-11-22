@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 45249e117b4d0663 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 1705eb674b5a171c — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26556,7 +26556,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 /* ═══════════════ Glücksrad (Shop-Reiter „Wheel“, public/app-wheel.jsx) ═══════════════
    Pixelart: harte Rahmen aus Schatten-Ringen ohne Unschärfe, Schachbrett-Dither statt Alpha, Blinken per steps(1). */
-.wh-root { padding: 12px 16px 40px; max-width: 1280px; margin: 0 auto; }
+.wh-root { padding: 12px 16px 40px; max-width: none; margin: 0 auto; }
 @media (min-width: 1100px) { .wh-root { padding-left: 250px; } }   /* Platz für den Shopkeeper links */
 .wh-step { display: flex; flex-direction: column; gap: 12px; }
 .wh-intro, .wh-hint { color: var(--text2); font-size: 15px; margin: 0; }
@@ -26814,12 +26814,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .pp-emote-box { display: grid; place-items: center; flex: none; }
 
 /* Board-Rahmen (Holz mit Maserung und Schrauben), Klebeband, bunte Pins, „Nichts“-Szene */
-.wh-frame { position: absolute; box-shadow: 0 0 0 var(--whs) #12101f, calc(var(--whs) * 1.5) calc(var(--whs) * 1.5) 0 var(--whs) #12101f; }
-.wh-frame-A { background: repeating-linear-gradient(0deg, #9d612f 0 calc(var(--whs) * 2), #6e4421 calc(var(--whs) * 2) calc(var(--whs) * 3), #6e4421 calc(var(--whs) * 3) calc(var(--whs) * 4)); }
-.wh-frame-B { background: repeating-linear-gradient(0deg, #b29466 0 calc(var(--whs) * 2), #886c44 calc(var(--whs) * 2) calc(var(--whs) * 3), #9d612f calc(var(--whs) * 3) calc(var(--whs) * 4)); }
-.wh-frame-C { background: repeating-linear-gradient(90deg, #b21a29 0 calc(var(--whs) * 4), #f7e0b5 calc(var(--whs) * 4) calc(var(--whs) * 6)); }
-.wh-screw { position: absolute; width: calc(var(--whs) * 2); height: calc(var(--whs) * 2); background: #d2d2db; box-shadow: 0 0 0 calc(var(--whs) * .5) #12101f, inset calc(var(--whs) * .5) calc(var(--whs) * .5) 0 #ffffff; z-index: 1; }
-.wh-chalkpc { position: absolute; width: calc(var(--whs) * 5); height: calc(var(--whs) * 1.5); z-index: 1; box-shadow: 0 0 0 calc(var(--whs) * .5) #12101f; }
 .wh-pin { background: var(--pin, #e73b41) !important; box-shadow: 0 0 0 1px #12101f, calc(var(--whs) * .5) calc(var(--whs) * .5) 0 #12101f; }
 .wh-tape { position: absolute; top: calc(var(--whs) * -1.5); width: calc(var(--whs) * 5); height: calc(var(--whs) * 2.5); background: #f7e0b5; box-shadow: 0 0 0 1px #886c44; z-index: 4; }
 .wh-tape-l { left: calc(var(--whs) * -1); }
@@ -26830,3 +26824,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-n-none .wh-lbl { position: relative; z-index: 2; color: #ebdcc1; text-shadow: calc(var(--whs) * .5) calc(var(--whs) * .5) 0 #12101f, calc(var(--whs) * -.5) calc(var(--whs) * .5) 0 #12101f; }
 .wh-none-sub { position: relative; z-index: 2; color: #ebdcc1; text-shadow: calc(var(--whs) * .5) calc(var(--whs) * .5) 0 #12101f; }
 .wh-pick-prev { padding: 8px; box-sizing: border-box; }
+
+/* Rahmen als Leinwand hinter dem Board; breite Boards nutzen die Bildschirmbreite */
+.wh-framecv { position: absolute; image-rendering: pixelated; pointer-events: none; }
+.wh-pick-prev { padding: 22px; overflow: visible; }
+.wh-pick-grid { grid-template-columns: repeat(auto-fit, minmax(390px, 1fr)); }
+.wh-board-wrap { padding: 16px 0 18px; }

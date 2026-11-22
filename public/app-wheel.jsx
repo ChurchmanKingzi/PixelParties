@@ -129,8 +129,10 @@ const WH_FCOL = { none: '#3e3e51', card: '#1ca9fd', ticket: '#f7e0b5', coin: '#f
 const whColorOf = (kind) => { const f = whFieldInfo(kind); return f.rar ? WH_RCOL[f.rar] : (WH_FCOL[f.cls] || '#ffffff'); };
 
 // ── Layout: Treemap (quadratische Streifen) auf das Raster, mit Zufall ─────
-const WH_HEAD = 9;   // Kopfleiste des Boards (Wimpelkette · Kreide-Titel · Zeltdach), die Preisfelder liegen darunter
-const WH_BW = 160, WH_BH = 100, WH_BARH = 34, WH_GAP = 5, WH_M = 6;   // Board, Preis-Leiste, Abstand, Leinwand-Rand (Rasterzellen)
+const WH_HEAD = 12;   // Kopfleiste des Boards (Wimpelkette · Kreide-Titel · Zeltdach), die Preisfelder liegen darunter
+const WH_FR = 5;      // Rahmenstärke in Rasterzellen
+const WH_BW0 = 160, WH_BW_MAX = 300;   // Boardbreite in Zellen: mindestens 160, bei viel Platz bis 300 (Breite = Bildschirm)
+const WH_BH = 100, WH_BARH = 30, WH_GAP = 7, WH_M = 8;   // Board, Preis-Leiste, Abstand, Leinwand-Rand (Rasterzellen)
 function whSquarify(items, x, y, w, h, out, rnd) {
   items = items.slice();
   const total = items.reduce((s, i) => s + i.a, 0);
@@ -160,28 +162,35 @@ function whSquarify(items, x, y, w, h, out, rnd) {
     }
   }
 }
-function whLayout(table, seed) {
+function whLayout(table, seed, BW) {
   const rnd = whRng(seed);
   const keys = Object.keys(table).filter(k => table[k] > 0);
   // Fläche ∝ Wahrscheinlichkeit^0,8 (milde Stauchung, damit auch seltene Zettel lesbar bleiben); die genauen Chancen stehen in der Liste
-  const items = keys.map(k => { const a = Math.pow(Math.max(table[k], 0.16), 0.8); return { k, a, o: a * (0.55 + 0.9 * rnd()) }; }).sort((a, b) => b.o - a.o);
-  // „Nichts“ darf höchstens ~35 % der Fläche belegen (sonst wirkt das Board leer; die echte Chance steht in der Liste und im Tooltip)
+  let items = keys.map(k => { const a = Math.pow(Math.max(table[k], 0.16), 0.8); return { k, id: k, a, o: a * (0.55 + 0.9 * rnd()) }; });
+  // „Nichts“ darf höchstens ~35 % der Fläche belegen und ist auf mehrere TASCHEN zwischen den Zetteln verteilt (die größte heißt 'none', die übrigen 'none#1' …)
   const none = items.find(i => i.k === 'none');
-  if (none) { const others = items.reduce((a, i) => a + (i === none ? 0 : i.a), 0); none.a = Math.min(none.a, others * 0.55); none.o = Math.min(none.o, none.a * 1.45); items.sort((a, b) => b.o - a.o); }
+  if (none) {
+    const others = items.reduce((a, i) => a + (i === none ? 0 : i.a), 0), total = Math.min(none.a, others * 0.55);
+    const n = BW >= 230 ? 7 : BW >= 190 ? 6 : 5, w = Array.from({ length: n }, (_, i) => (i === 0 ? 2.2 : 0.6 + rnd() * 0.9)), ws = w.reduce((a, b) => a + b, 0);
+    items = items.filter(i => i !== none).concat(w.map((x, i) => { const a = Math.max(0.5, total * x / ws); return { k: 'none', id: i === 0 ? 'none' : 'none#' + i, a, o: a * (0.7 + 0.8 * rnd()) }; }));
+  }
+  items.sort((a, b) => b.o - a.o);
   const raw = {};
   const RH = WH_BH - WH_HEAD;
-  whSquarify(items, 0, 0, WH_BW, RH, raw, rnd);
+  whSquarify(items.map(i => ({ ...i, k: i.id })), 0, 0, BW, RH, raw, rnd);
   const flipX = rnd() < 0.5, flipY = rnd() < 0.5;
   const out = {};
-  for (const k of keys) {
-    const r = raw[k]; if (!r) continue;
+  for (const it of items) {
+    const r = raw[it.id]; if (!r) continue;
     let x = Math.round(r.x), y = Math.round(r.y), x2 = Math.round(r.x + r.w), y2 = Math.round(r.y + r.h);
-    if (flipX) { const nx = WH_BW - x2, nx2 = WH_BW - x; x = nx; x2 = nx2; }
+    if (flipX) { const nx = BW - x2, nx2 = BW - x; x = nx; x2 = nx2; }
     if (flipY) { const ny = RH - y2, ny2 = RH - y; y = ny; y2 = ny2; }
-    out[k] = { x, y: y + WH_HEAD, w: Math.max(4, x2 - x), h: Math.max(4, y2 - y) };
+    // zusätzlicher Abstand zu den Nachbarn (1 Zelle je Seite): zwischen den Feldern bleibt freier Board-Hintergrund
+    out[it.id] = { x: x + 1, y: y + 1 + WH_HEAD, w: Math.max(4, x2 - x - 2), h: Math.max(4, y2 - y - 2) };
   }
   return out;
 }
+const whIsNone = (id) => id === 'none' || id.startsWith('none#');
 
 // Umrisse in ganzen Rasterzellen (S = Zellgröße in px, w/h in Zellen); liefert eine clip-path-Polygonliste
 function whClip(shape, w, h, S) {
@@ -298,26 +307,27 @@ function whSpecsUpTo(arrows, uptoI) {
   for (const a of arrows) { if (a.i > uptoI) break; if (a.kind.startsWith('boost:') && a.spec) specs.push(a.spec); }
   return specs;
 }
-function whOverlayRects(specs, table, layout, W) {
+function whOverlayRects(specs, table, layout, W, BW) {
   const out = []; if (!specs.length) return out;
   let t = table;
-  const hostKey = layout.none ? 'none' : Object.keys(layout).sort((a, b) => layout[b].w * layout[b].h - layout[a].w * layout[a].h)[0];
+  const hostKey = layout.none ? 'none' : Object.keys(layout).sort((a, b) => layout[b].w * layout[b].h - layout[a].w * layout[a].h)[0];   // die größte Nichts-Tasche
   const host = layout[hostKey]; let slot = 0;
   for (const spec of specs) {
     const eff = W.applyBoosts(t, [spec]);
     const moved = Math.max(0.05, (eff[spec.make] || 0) - (t[spec.make] || 0));
-    const area = Math.max(20, Math.round(moved / 100 * WH_BW * WH_BH));
+    const area = Math.max(20, Math.round(moved / 100 * BW * WH_BH));
     const w = Math.max(10, Math.min(host.w - 4, Math.round(Math.sqrt(area * 1.8)))), h = Math.max(7, Math.min(host.h - 4, Math.round(area / w)));
     const x = host.x + 2 + ((slot * 11) % Math.max(1, host.w - w - 3)), y = host.y + 2 + ((slot * 7) % Math.max(1, host.h - h - 3));
     out.push({ make: spec.make, x, y, w, h }); slot++; t = eff;
   }
   return out;
 }
-function whTargetRect(a, layout, overlayRects) {
+function whTargetRect(a, layout, overlayRects, BW) {
   if (a.boosted && overlayRects && overlayRects.length) {
     for (let i = overlayRects.length - 1; i >= 0; i--) if (overlayRects[i].make === a.kind) return overlayRects[i];
   }
-  return layout[a.kind] || layout.none || { x: 0, y: 0, w: WH_BW, h: WH_BH };
+  if (a.kind === 'none') { const ids = Object.keys(layout).filter(whIsNone); if (ids.length) return layout[ids[Math.floor(whRng(a.i * 31 + 5)() * ids.length)]]; }
+  return layout[a.kind] || layout.none || { x: 0, y: 0, w: BW, h: WH_BH };
 }
 
 // ── Board-Optik: Materialtextur, Kopfleiste, Deko; eigene Szene im „Nichts“-Bereich (alles Rasterzellen, feste Palette, Bayer-Dither statt Alpha) ───────────
@@ -343,15 +353,15 @@ function whNoise(x, y, sc, s) {
 }
 const WH_BAY = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-function whDrawBoardBg(ctx, S, id, layout, seed) {
-  const P = whPainter(ctx, S, WH_BW, WH_BH), rnd = whRng(seed ^ 0x5bd1e995), BW = WH_BW, BH = WH_BH, HD = WH_HEAD;
+function whDrawBoardBg(ctx, S, id, layout, seed, BW) {
+  const BH = WH_BH, HD = WH_HEAD, P = whPainter(ctx, S, BW, BH), rnd = whRng(seed ^ 0x5bd1e995);
   ctx.clearRect(0, 0, BW * S, BH * S);
-  if (id === 'C') {   // Zeltwand: breite Streifen, nach unten dunkler, Funkelsterne
+  // ── Material ──
+  if (id === 'C') {   // Zeltwand: breite Streifen, nach unten dunkler
     for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
-      const st = Math.floor(x / 10) % 2, shade = y > BH * 0.6 && ((x + y) & 1) === 0 && WH_BAY[y & 3][x & 3] / 16 < (y / BH - 0.6) * 1.4;
+      const st = Math.floor(x / 10) % 2, shade = y > BH * 0.55 && ((x + y) & 1) === 0 && WH_BAY[y & 3][x & 3] / 16 < (y / BH - 0.55) * 1.5;
       P.cell(x, y, shade ? '#1a0a3a' : (st ? '#401a66' : '#2b0b47'));
     }
-    for (let i = 0; i < 46; i++) { const x = 2 + Math.floor(rnd() * (BW - 5)), y = HD + 2 + Math.floor(rnd() * (BH - HD - 5)), c = i % 3 ? '#f8b4df' : '#f7f7ad'; P.cell(x, y, c); if (i % 4 === 0) { P.cell(x - 1, y, c); P.cell(x + 1, y, c); P.cell(x, y - 1, c); P.cell(x, y + 1, c); } }
   } else {            // Kork bzw. Kreidetafel: geglättetes Rauschen in drei Tönen, dazwischen Bayer-Dither
     const T = id === 'A' ? { dark: '#9d612f', base: '#9d612f', light: '#ca874e', speck: '#6e4421' } : { dark: '#0f2412', base: '#1a4128', light: '#1a4128', speck: '#686868' };
     for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
@@ -361,46 +371,131 @@ function whDrawBoardBg(ctx, S, id, layout, seed) {
       P.cell(x, y, c);
     }
   }
-  const keys = Object.keys(layout);
-  const pinOf = (k) => { const r = layout[k]; return [r.x + Math.floor(r.w / 2), r.y]; };
+  // ── Kopfleiste ──
   if (id === 'A') {
-    // alte Nadellöcher und Klebebandreste
-    for (let i = 0; i < 38; i++) P.cell(2 + Math.floor(rnd() * (BW - 4)), HD + 1 + Math.floor(rnd() * (BH - HD - 3)), '#5a341a');
-    for (let i = 0; i < 6; i++) P.rect(4 + Math.floor(rnd() * (BW - 14)), HD + 2 + Math.floor(rnd() * (BH - HD - 8)), 5, 2, '#e0c085');
-    // Holzbalken oben + Wimpelkette
-    for (let x = 0; x < BW; x++) { P.cell(x, 0, '#9d612f'); P.cell(x, 1, '#6e4421'); P.cell(x, 2, '#4a2a10'); if (x % 7 === 3) P.cell(x, 1, '#4a2a10'); }
-    const fc = ['#e73b41', '#fad54a', '#6d9bf8', '#4bcd7c', '#fc69c6', '#f29a3e'];
-    for (let x = 1; x < BW - 1; x++) P.cell(x, 3 + Math.round(Math.sin((x / (BW - 2)) * Math.PI * 4) * 1.2 + 1.2), '#ebdcc1');
-    for (let i = 0, x0 = 5; x0 < BW - 10; i++, x0 += 13) { const ys = 4 + Math.round(Math.sin((x0 / (BW - 2)) * Math.PI * 4) * 1.2 + 1.2); for (let r = 0; r < 5; r++) for (let x = x0 + r; x <= x0 + 8 - r; x++) P.cell(x, ys + r, r === 4 ? '#12101f' : fc[i % fc.length]); }
-    // roter Faden mit durchhängenden Strecken und Knoten
-    for (let i = 0; i < 4; i++) {
-      const a = pinOf(keys[Math.floor(rnd() * keys.length)]), b = pinOf(keys[Math.floor(rnd() * keys.length)]), n = Math.max(8, Math.hypot(b[0] - a[0], b[1] - a[1]));
-      for (let t = 0; t <= n; t++) { const u = t / n; P.cell(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + Math.sin(u * Math.PI) * 5, '#b5171c'); }
+    for (let x = 0; x < BW; x++) { P.cell(x, 0, '#9d612f'); P.cell(x, 1, '#9d612f'); P.cell(x, 2, '#6e4421'); P.cell(x, 3, '#4a2a10'); if (x % 9 === 4) { P.cell(x, 1, '#6e4421'); P.cell(x + 1, 2, '#4a2a10'); } }
+    for (let x = 10; x < BW; x += 30) { P.rect(x, 1, 3, 2, '#fad54a'); P.cell(x + 1, 1, '#f7f7ad'); }   // Messingnägel am Balken
+    const sag = (x) => 4 + Math.round(Math.sin((x / BW) * Math.PI * 6) * 1.4 + 1.4), fc = ['#e73b41', '#fad54a', '#6d9bf8', '#4bcd7c', '#fc69c6', '#f29a3e'];
+    for (let x = 1; x < BW - 1; x++) P.cell(x, sag(x), '#ebdcc1');
+    for (let i = 0, x0 = 5; x0 < BW - 10; i++, x0 += 13) {
+      const ys = sag(x0 + 4) + 1;
+      for (let r = 0; r < 6; r++) for (let x = x0 + r; x <= x0 + 8 - r; x++) P.cell(x, ys + r, r === 5 ? '#12101f' : (r === 0 ? '#ffffff' : fc[i % fc.length]));
+      if (i % 2) { const sx = x0 + 11; P.cell(sx, ys, '#fad54a'); P.cell(sx - 1, ys + 1, '#fad54a'); P.cell(sx, ys + 1, '#f7f7ad'); P.cell(sx + 1, ys + 1, '#fad54a'); P.cell(sx, ys + 2, '#fad54a'); }   // Sternchen zwischen den Wimpeln
+    }
+  } else if (id === 'B') {
+    P.rect(0, 0, BW, HD, '#0f2412');
+    for (let x = 0; x < BW; x += 2) { P.cell(x, HD - 1, '#1a4128'); P.cell(x + 1, 0, '#1a4128'); }
+    const word = 'LUCKY DRAW', k = 2, ww = word.length * 4 * k - k, wx = Math.floor((BW - ww) / 2);
+    P.text(word, wx + 1, 2, '#66a1a1', k); P.text(word, wx, 1, '#e6e6e6', k);    // Kreideschrift mit leichtem Schatten
+    P.line(wx - 12, 6, wx - 3, 6, '#e6e6e6'); P.line(wx + ww + 3, 6, wx + ww + 12, 6, '#e6e6e6');
+    for (const sx of [wx - 18, wx + ww + 18]) { for (let d = -2; d <= 2; d++) { P.cell(sx + d, 6, '#fad54a'); P.cell(sx, 6 + d, '#fad54a'); } P.cell(sx, 6, '#f7f7ad'); }
+    for (let x = 6; x < BW - 6; x += 5) if (whIh(x, 9, seed) < 0.5) P.cell(x, HD - 3, '#e6e6e6');
+  } else {
+    for (let y = 0; y < HD; y++) for (let x = 0; x < BW; x++) { const st = Math.floor(x / 8) % 2, sc = y >= HD - 3 ? Math.abs((x % 8) - 3.5) > (HD - y) * 1.3 + 0.4 : false; if (!sc) P.cell(x, y, st ? '#b21a29' : '#f7e0b5'); }
+    for (let x = 0; x < BW; x += 8) { P.cell(x, HD - 4, '#fad54a'); P.cell(x, HD - 5, '#f7f7ad'); P.cell(x, HD - 3, '#9d612f'); }
+    for (let x = 4; x < BW; x += 16) { P.cell(x, 1, '#fad54a'); P.cell(x - 1, 2, '#fad54a'); P.cell(x + 1, 2, '#fad54a'); P.cell(x, 3, '#fad54a'); }   // Sternchen im Dach
+  }
+  // ── Details auf freien Stellen (Abstand zu allen Feldern) ──
+  const rects = Object.keys(layout).map(k => layout[k]);
+  const free = (x, y, w, h) => x >= 1 && y >= HD + 1 && x + w < BW - 1 && y + h < BH - 1 && !rects.some(r => x < r.x + r.w + 2 && x + w > r.x - 2 && y < r.y + r.h + 2 && y + h > r.y - 2);
+  const spot = (w, h) => { for (let t = 0; t < 40; t++) { const x = 2 + Math.floor(rnd() * (BW - w - 4)), y = HD + 2 + Math.floor(rnd() * (BH - HD - h - 4)); if (free(x, y, w, h)) { rects.push({ x, y, w, h }); return [x, y]; } } return null; };
+  const bal = ['#e73b41', '#fad54a', '#6d9bf8', '#4bcd7c', '#fc69c6', '#f29a3e'];
+  const n = Math.round(BW / 20);
+  for (let i = 0; i < n; i++) {
+    if (id === 'A') {
+      const t = i % 3;
+      if (t === 0) { const p = spot(9, 11); if (p) { const [x, y] = p; P.rect(x, y, 9, 11, '#fff8e8'); P.rect(x + 1, y + 1, 7, 7, '#6d9bf8'); P.rect(x + 1, y + 5, 7, 3, '#4bcd7c'); P.cell(x + 6, y + 2, '#fad54a'); P.cell(x + 5, y + 2, '#fad54a'); P.rect(x, y + 10, 9, 1, '#ebdcc1'); P.cell(x + 4, y - 1, WH_PIN_COL[i % 5]); } }     // Polaroid
+      else if (t === 1) { const p = spot(11, 9); if (p) { const [x, y] = p; P.rect(x, y, 11, 9, '#ebdcc1'); P.rect(x + 1, y + 1, 9, 2, '#323232'); for (let r = 4; r < 8; r += 2) P.rect(x + 1, y + r, 9, 1, '#a89370'); P.rect(x + 1, y + 4, 3, 3, '#a89370'); P.cell(x + 5, y - 1, WH_PIN_COL[(i + 2) % 5]); } }   // Zeitungsausschnitt
+      else { const p = spot(7, 7); if (p) { const [x, y] = p; P.line(x, y + 6, x + 6, y, '#6e4421'); P.line(x + 4, y, x + 6, y, '#e73b41'); P.line(x + 6, y, x + 6, y + 2, '#e73b41'); P.cell(x, y + 6, '#12101f'); P.cell(x + 1, y + 6, '#12101f'); } }   // Dartskizze
+    } else if (id === 'B') {
+      const t = i % 5, c = i % 2 ? '#e6e6e6' : '#e6e6e6';
+      if (t === 0) { const p = spot(9, 8); if (p) { const [x, y] = p; P.cell(x + 2, y, c); P.cell(x + 3, y, c); P.cell(x + 5, y, c); P.cell(x + 6, y, c); P.rect(x + 1, y + 1, 7, 2, c); P.rect(x + 2, y + 3, 5, 1, c); P.rect(x + 3, y + 4, 3, 1, c); P.cell(x + 4, y + 5, c); } }       // Herz
+      else if (t === 1) { const p = spot(7, 7); if (p) { const [x, y] = p; P.ring(x + 3, y + 3, 3, c); P.cell(x + 2, y + 2, c); P.cell(x + 4, y + 2, c); P.cell(x + 2, y + 4, c); P.cell(x + 3, y + 5, c); P.cell(x + 4, y + 4, c); } }                               // Smiley
+      else if (t === 2) { const p = spot(8, 5); if (p) { const [x, y] = p; for (let k = 0; k < 4; k++) P.line(x + k * 2, y, x + k * 2, y + 4, c); P.line(x - 1, y + 4, x + 7, y, c); } }                                                                              // Strichliste
+      else if (t === 3) { const p = spot(8, 8); if (p) { const [x, y] = p; P.line(x + 4, y, x + 1, y + 4, '#fad54a'); P.line(x + 1, y + 4, x + 5, y + 4, '#fad54a'); P.line(x + 5, y + 4, x + 2, y + 7, '#fad54a'); } }                                                  // Blitz
+      else { const p = spot(10, 6); if (p) { const [x, y] = p; P.line(x, y + 5, x + 8, y + 1, c); P.line(x + 8, y + 1, x + 5, y + 1, c); P.line(x + 8, y + 1, x + 8, y + 4, c); } }                                                                                   // Pfeil
+    } else {
+      const t = i % 4;
+      if (t === 0) { const p = spot(7, 12); if (p) { const [x, y] = p, c = bal[i % bal.length]; P.rect(x + 1, y, 5, 6, c); P.rect(x, y + 1, 7, 4, c); P.cell(x + 1, y + 1, '#ffffff'); P.cell(x + 3, y + 6, c); P.line(x + 3, y + 7, x + 3, y + 11, '#e6e6e6'); } }          // Luftballon
+      else if (t === 1) { const p = spot(8, 7); if (p) { const [x, y] = p, c = bal[(i + 1) % bal.length]; for (let r = 0; r < 6; r++) for (let q = 0; q <= 7 - r; q++) P.cell(x + q, y + r, c); P.line(x, y - 1, x + 7, y - 1, '#e6e6e6'); } }                       // Wimpel
+      else if (t === 2) { const p = spot(10, 5); if (p) { const [x, y] = p; P.rect(x, y, 10, 5, '#f7e0b5'); P.rect(x + 1, y + 1, 3, 3, '#b21a29'); for (let r = 0; r < 5; r += 2) P.cell(x + 6, y + r, '#9d612f'); P.cell(x + 7, y + 2, '#9d612f'); P.cell(x + 8, y + 2, '#9d612f'); } }  // Eintrittskarte
+      else { const p = spot(7, 7); if (p) { const [x, y] = p; for (let d = -3; d <= 3; d++) { P.cell(x + 3 + d, y + 3, '#fad54a'); P.cell(x + 3, y + 3 + d, '#fad54a'); } P.cell(x + 1, y + 1, '#f7f7ad'); P.cell(x + 5, y + 5, '#f7f7ad'); P.cell(x + 3, y + 3, '#ffffff'); } }                 // Stern
+    }
+  }
+  if (id === 'A') {
+    for (let i = 0; i < 40; i++) P.cell(2 + Math.floor(rnd() * (BW - 4)), HD + 1 + Math.floor(rnd() * (BH - HD - 3)), '#5a341a');
+    const keys = Object.keys(layout).filter(k => !whIsNone(k)), pinOf = (k) => { const r = layout[k]; return [r.x + Math.floor(r.w / 2), r.y]; };
+    for (let i = 0; i < 4 && keys.length > 1; i++) {   // roter Faden: durchhängend, mit Knoten
+      const a = pinOf(keys[Math.floor(rnd() * keys.length)]), b = pinOf(keys[Math.floor(rnd() * keys.length)]), m = Math.max(8, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      for (let t = 0; t <= m; t++) { const u = t / m; P.cell(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + Math.sin(u * Math.PI) * 5, '#b5171c'); }
       P.rect(a[0] - 1, a[1], 2, 2, '#780014'); P.rect(b[0] - 1, b[1], 2, 2, '#780014');
     }
   } else if (id === 'B') {
-    // verwischte Stellen (Schwamm) und Kreidestaub
-    for (let k = 0; k < 7; k++) { const cx = Math.floor(rnd() * BW), cy = HD + Math.floor(rnd() * (BH - HD)), rx = 10 + rnd() * 18, ry = 5 + rnd() * 9; for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) if ((x * x) / (rx * rx) + (y * y) / (ry * ry) < 1 && WH_BAY[(cy + y) & 3 & 3][(cx + x) & 3 & 3] / 16 < 0.35 && ((x + y) & 1) === 0) P.cell(cx + x, cy + y, '#1a4128'); }
-    for (let i = 0; i < 90; i++) P.cell(Math.floor(rnd() * BW), BH - 1 - Math.floor(rnd() * 7), '#66a1a1');
-    // Kreide-Kritzeleien
-    const c = '#e6e6e6';
-    for (let i = 0; i < 16; i++) { const x = 3 + Math.floor(rnd() * (BW - 10)), y = HD + 3 + Math.floor(rnd() * (BH - HD - 10)), t = i % 4; if (t === 0) { P.cell(x, y, c); P.cell(x - 1, y, c); P.cell(x + 1, y, c); P.cell(x, y - 1, c); P.cell(x, y + 1, c); } else if (t === 1) { P.line(x, y, x + 5, y, c); P.line(x + 5, y, x + 3, y - 2, c); P.line(x + 5, y, x + 3, y + 2, c); } else if (t === 2) { P.line(x, y, x + 3, y + 3, c); P.line(x + 3, y, x, y + 3, c); } else { P.cell(x, y, c); P.cell(x + 2, y, c); P.rect(x - 1, y + 1, 5, 1, c); P.rect(x, y + 2, 3, 1, c); P.cell(x + 1, y + 3, c); } }
-    // Kopfleiste: Kreide-Titel zwischen Sternen
-    const word = 'LUCKY DRAW', wx = Math.floor((BW - word.length * 4) / 2);
-    P.rect(0, 0, BW, HD, '#0f2412'); for (let x = 0; x < BW; x += 2) P.cell(x, HD - 1, '#1a4128');
-    P.text(word, wx, 2, '#e6e6e6');
-    for (const sx of [wx - 10, wx + word.length * 4 + 6]) { P.cell(sx, 4, '#fad54a'); P.cell(sx - 1, 4, '#fad54a'); P.cell(sx + 1, 4, '#fad54a'); P.cell(sx, 3, '#fad54a'); P.cell(sx, 5, '#fad54a'); }
-    P.line(wx, 8, wx + word.length * 4 - 2, 8, '#e6e6e6');
+    for (let k = 0; k < 8; k++) { const cx = Math.floor(rnd() * BW), cy = HD + Math.floor(rnd() * (BH - HD)), rx = 10 + rnd() * 18, ry = 5 + rnd() * 9; for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) if ((x * x) / (rx * rx) + (y * y) / (ry * ry) < 1 && WH_BAY[(cy + y) & 3][(cx + x) & 3] / 16 < 0.35 && ((x + y) & 1) === 0) P.cell(cx + x, cy + y, '#1a4128'); }
+    for (let i = 0; i < 110; i++) P.cell(Math.floor(rnd() * BW), BH - 1 - Math.floor(rnd() * 7), '#66a1a1');
   } else {
-    // Zeltdach: rot-creme Streifen mit Girlanden-Bogen unten und Lampen an den Nähten
-    for (let y = 0; y < HD; y++) for (let x = 0; x < BW; x++) { const st = Math.floor(x / 8) % 2, sc = y >= HD - 2 ? Math.abs((x % 8) - 3.5) > (HD - y) * 1.6 + 0.5 : false; if (!sc) P.cell(x, y, st ? '#b21a29' : '#f7e0b5'); }
-    for (let x = 0; x < BW; x += 8) { P.cell(x, HD - 3, '#fad54a'); P.cell(x, HD - 4, '#f7f7ad'); }
+    for (let i = 0; i < 70; i++) { const x = 2 + Math.floor(rnd() * (BW - 5)), y = HD + 2 + Math.floor(rnd() * (BH - HD - 5)), c = i % 3 ? '#f8b4df' : '#f7f7ad'; P.cell(x, y, c); if (i % 4 === 0) { P.cell(x - 1, y, c); P.cell(x + 1, y, c); P.cell(x, y - 1, c); P.cell(x, y + 1, c); } }
   }
 }
 
-function whDrawNothing(ctx, S, w, h, id, seed) {
+// Rahmen (Leinwand hinter dem Board, Stärke WH_FR): Holzmaserung, Fase, Zierecken, Nieten; Kreidestücke bzw. Streifen je Board
+function whDrawFrame(ctx, S, id, BW, BH, seed) {
+  const F = WH_FR, W = BW + 2 * F, H = BH + 2 * F, P = whPainter(ctx, S, W, H);
+  ctx.clearRect(0, 0, W * S, H * S);
+  const tone = id === 'A' ? ['#6e4421', '#9d612f', '#9d612f'] : id === 'B' ? ['#9d612f', '#886c44', '#b29466'] : ['#780014', '#b21a29', '#e94e53'];
+  const band = (x, y) => x < F || y < F || x >= W - F || y >= H - F;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!band(x, y)) continue;
+    if (id === 'C') { const horiz = y < F || y >= H - F, st = Math.floor((horiz ? x : y) / 4) % 2; P.cell(x, y, st ? '#b21a29' : '#f7e0b5'); continue; }
+    const g = whNoise(x * 0.18, y * 4, 5, seed + 11) + (WH_BAY[y & 3][x & 3] / 16 - 0.5) * 0.18;
+    P.cell(x, y, g < 0.4 ? tone[0] : g > 0.62 ? tone[2] : tone[1]);
+  }
+  // Fase: außen dunkel, oben/links hell, innen Schattenkante
+  for (let x = 0; x < W; x++) { P.cell(x, 0, '#12101f'); P.cell(x, H - 1, '#12101f'); if (x > 0 && x < W - 1) { P.cell(x, 1, id === 'C' ? '#ffffff' : '#e0c085'); P.cell(x, H - 2, '#27180c'); } }
+  for (let y = 0; y < H; y++) { P.cell(0, y, '#12101f'); P.cell(W - 1, y, '#12101f'); if (y > 0 && y < H - 1) { P.cell(1, y, id === 'C' ? '#ffffff' : '#e0c085'); P.cell(W - 2, y, '#27180c'); } }
+  for (let x = F - 1; x < W - F + 1; x++) { P.cell(x, F - 1, '#12101f'); P.cell(x, H - F, '#12101f'); }
+  for (let y = F - 1; y < H - F + 1; y++) { P.cell(F - 1, y, '#12101f'); P.cell(W - F, y, '#12101f'); }
+  // Nieten entlang des Rahmens (Messing)
+  const stud = (x, y) => { P.rect(x, y, 2, 2, '#fad54a'); P.cell(x, y, '#f7f7ad'); P.cell(x + 1, y + 1, '#8b5b04'); };
+  if (id !== 'C') { for (let x = 16; x < W - 14; x += 14) { stud(x, 2); stud(x, H - 4); } for (let y = 16; y < H - 14; y += 14) { stud(2, y); stud(W - 4, y); } }
+  // Zierecken: Messingplatte mit Raute und vier Nieten
+  const corner = (cx, cy) => {
+    P.rect(cx, cy, 9, 9, '#c68206'); P.rect(cx + 1, cy + 1, 7, 7, '#fad54a');
+    for (let i = 0; i < 4; i++) { P.cell(cx + 4 - i, cy + 4 - 0, '#8b5b04'); }
+    P.cell(cx + 4, cy + 2, '#8b5b04'); P.cell(cx + 3, cy + 3, '#8b5b04'); P.cell(cx + 5, cy + 3, '#8b5b04'); P.cell(cx + 2, cy + 4, '#8b5b04'); P.cell(cx + 6, cy + 4, '#8b5b04'); P.cell(cx + 3, cy + 5, '#8b5b04'); P.cell(cx + 5, cy + 5, '#8b5b04'); P.cell(cx + 4, cy + 6, '#8b5b04'); P.cell(cx + 4, cy + 4, '#f7f7ad');
+    for (const [dx, dy] of [[1, 1], [7, 1], [1, 7], [7, 7]]) P.cell(cx + dx, cy + dy, '#f8f8bd');
+    P.rect(cx, cy, 9, 1, '#f7f7ad'); P.rect(cx, cy + 8, 9, 1, '#8b5b04'); P.rect(cx, cy, 1, 9, '#f7f7ad'); P.rect(cx + 8, cy, 1, 9, '#8b5b04');
+  };
+  corner(0, 0); corner(W - 9, 0); corner(0, H - 9); corner(W - 9, H - 9);
+  // Typenschild oben in der Mitte
+  const pw = 34, px = Math.floor((W - pw) / 2);
+  P.rect(px, 1, pw, F - 2, '#c68206'); P.rect(px + 1, 2, pw - 2, F - 4, '#fad54a'); P.rect(px, 1, pw, 1, '#f7f7ad');
+  for (let i = 0; i < 5; i++) { const x = px + 5 + i * 6; P.cell(x, 2 + Math.floor((F - 4) / 2) - 0, '#8b5b04'); P.cell(x - 1, 2 + 1, '#8b5b04'); P.cell(x + 1, 2 + 1, '#8b5b04'); }
+  if (id === 'B') for (const [c, x] of [['#e6e6e6', 14], ['#fad54a', 22], ['#fc69c6', 29]]) { P.rect(x + 12, H - F + 1, 6, 2, c); P.rect(x + 12, H - F + 1, 6, 1, '#ffffff'); }   // Kreidestücke auf der unteren Leiste
+}
+
+// ── Szenen im „Nichts“ (je Tasche): große Tasche mit voller Szene, kleine mit einem Detail ──
+function whDrawNothing(ctx, S, w, h, id, seed, variant) {
   ctx.clearRect(0, 0, w * S, h * S);
-  const P = whPainter(ctx, S, w, h), rnd = whRng(seed ^ 0xA5A5A5), cx = Math.floor(w / 2);
+  const P = whPainter(ctx, S, w, h), rnd = whRng(seed ^ (0xA5A5A5 + variant * 977)), cx = Math.floor(w / 2);
+  const big = variant === 0 && w >= 24 && h >= 20;
+  if (!big) {
+    const v = variant % 3, cy = Math.floor(h * 0.45);
+    if (id === 'A') {
+      if (v === 0) { const L = Math.min(w, h) * 0.7; for (let a = 0; a <= 3; a++) { const ang = (a / 3) * Math.PI / 2; P.line(0, 0, Math.cos(ang) * L, Math.sin(ang) * L, '#e6e6e6'); } for (const r of [0.4, 0.75]) for (let a = 0; a < 3; a++) { const a0 = (a / 3) * Math.PI / 2, a1 = ((a + 1) / 3) * Math.PI / 2; P.line(Math.cos(a0) * L * r, Math.sin(a0) * L * r, Math.cos(a1) * L * r, Math.sin(a1) * L * r, '#d2d2db'); } for (let i = 0; i < 4; i++) P.cell(rnd() * w, rnd() * h, '#5a341a'); }
+      else if (v === 1) { for (let i = 0; i < 2; i++) { const x = rnd() * (w - 5), y = h - 4 - rnd() * 2; P.rect(x, y, 3, 2, '#b9b9b9'); P.cell(x - 1, y + 1, '#929292'); P.cell(x + 3, y, '#929292'); } P.rect(2, 2, 5, 2, '#f7e0b5'); }
+      else { P.line(cx - 2, cy - 2, cx + 2, cy + 2, '#6e4421'); P.line(cx + 2, cy - 2, cx - 2, cy + 2, '#6e4421'); for (const [dx, dy] of [[-5, -4], [5, -4], [-5, 4], [5, 4]]) P.cell(cx + dx, cy + dy, '#5a341a'); }
+    } else if (id === 'B') {
+      if (v === 0) { P.line(cx - 4, cy - 1, cx + 4, cy - 1, '#e6e6e6'); P.line(cx - 4, cy + 2, cx + 4, cy + 2, '#e6e6e6'); P.line(cx - 1, cy - 4, cx - 1, cy + 5, '#e6e6e6'); P.line(cx + 2, cy - 4, cx + 2, cy + 5, '#e6e6e6'); P.ring(cx + 4, cy - 3, 1, '#b4cff8'); }
+      else if (v === 1) { const r = Math.max(2, Math.floor(Math.min(w, h) * 0.3)); P.ring(cx, cy, r, '#e6e6e6'); P.cell(cx - 1, cy - 1, '#e6e6e6'); P.cell(cx + 1, cy - 1, '#e6e6e6'); for (let t = -1; t <= 1.001; t += 0.25) P.cell(cx + t * r * 0.5, cy + r * 0.5 - (1 - t * t) * 1.2, '#e6e6e6'); }
+      else { for (let k = 0; k < 4; k++) P.line(cx - 4 + k * 2, cy - 2, cx - 4 + k * 2, cy + 2, '#e6e6e6'); P.line(cx - 5, cy + 2, cx + 3, cy - 2, '#e6e6e6'); for (let i = 0; i < 14; i++) P.cell(rnd() * w, h * 0.6 + rnd() * h * 0.4, '#b9b9b9'); }
+    } else {
+      if (v === 0) { for (let y = 0; y < h; y++) { const wd = 2 + (y / h) * w * 0.8; for (let x = Math.floor(cx - wd / 2); x <= cx + wd / 2; x++) if (((x + y) & 1) === 0) P.cell(x, y, '#f7f7ad'); } P.cell(cx, 1, '#12101f'); }
+      else if (v === 1) { const cols = ['#f8b4df', '#fad54a', '#68fdc1', '#6d9bf8']; for (let i = 0; i < Math.round(w * h / 18); i++) { const x = rnd() * w, y = h * 0.5 + rnd() * h * 0.5; P.cell(x, y, cols[i % 4]); P.cell(x + 1, y, cols[i % 4]); } }
+      else { P.rect(cx - 5, cy - 2, 10, 5, '#f7e0b5'); P.rect(cx - 4, cy - 1, 3, 3, '#780014'); P.cell(cx + 1, cy - 2, '#1a0a3a'); P.cell(cx + 1, cy, '#1a0a3a'); P.cell(cx + 1, cy + 2, '#1a0a3a'); P.cell(cx + 2, cy - 1, '#1a0a3a'); }
+    }
+    return;
+  }
   if (id === 'A') {            // Kork: Geist eines abgenommenen Plakats (Klebebandreste, helle Fläche), Spinnennetz, Staubmäuse
     const pw = Math.max(10, Math.floor(w * 0.6)), ph = Math.max(10, Math.floor(h * 0.5)), px = Math.floor((w - pw) / 2), py = Math.floor(h * 0.1);
     for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) { const edge = x === 0 || y === 0 || x === pw - 1 || y === ph - 1; if (edge ? (x + y) % 2 === 0 : (x + y) % 2 === 1) P.cell(px + x, py + y, edge ? '#6e4421' : '#b29466'); }
@@ -420,7 +515,7 @@ function whDrawNothing(ctx, S, w, h, id, seed) {
     for (let i = 0; i < 50; i++) P.cell(rnd() * w, h * 0.55 + rnd() * h * 0.45, '#b9b9b9');
   } else {                      // Zelt: leerer Sockel im Scheinwerfer, Vorhänge, Netz
     const bandW = Math.max(3, Math.floor(w * 0.1));
-    for (let y = 0; y < h; y++) { const wd = 3 + (y / h) * w * 0.7; for (let x = Math.floor(cx - wd / 2); x <= cx + wd / 2; x++) if (((x + y) & 1) === 0) P.cell(x, y, '#f7f7ad'); }
+    for (let y = 0; y < h; y++) { const wd = 3 + (y / h) * w * 0.7; for (let x = Math.floor(cx - wd / 2); x <= cx + wd / 2; x++) if (((x + y) & 1) === 0 && ((x >> 1) + y) % 3 !== 0) P.cell(x, y, '#f7f7ad'); }
     for (let y = 0; y < h; y++) for (let i = 0; i < bandW; i++) { const col = Math.floor(i / 3) % 2 ? '#f7e0b5' : '#b21a29'; P.cell(i, y, col); P.cell(w - 1 - i, y, col); }
     const pw = Math.max(10, Math.floor(w * 0.42)), px = Math.floor((w - pw) / 2), py = h - 9;
     P.rect(px, py, pw, 2, '#ca874e'); P.rect(px, py + 2, pw, 2, '#9d612f'); P.rect(px + 2, py + 4, pw - 4, 5, '#6e4421'); P.rect(px + 2, py + 4, 1, 5, '#9d612f');
@@ -428,18 +523,19 @@ function whDrawNothing(ctx, S, w, h, id, seed) {
     const L = Math.min(w, h) * 0.3; for (let a = 0; a <= 4; a++) { const ang = Math.PI / 2 + (a / 4) * Math.PI / 2; P.line(w - 1, 0, w - 1 + Math.cos(ang) * L, Math.sin(ang) * L, '#e6e6e6'); }
   }
 }
-function WhNothing({ w, h, S, id, seed }) {
+function WhNothing({ w, h, S, id, seed, variant }) {
   const ref = useRef(null);
-  useEffect(() => { if (ref.current) { const ctx = ref.current.getContext('2d'); ctx.imageSmoothingEnabled = false; whDrawNothing(ctx, S, w, h, id, seed); } }, [w, h, S, id, seed]);
+  useEffect(() => { if (ref.current) { const ctx = ref.current.getContext('2d'); ctx.imageSmoothingEnabled = false; whDrawNothing(ctx, S, w, h, id, seed, variant); } }, [w, h, S, id, seed, variant]);
   return <canvas ref={ref} className="wh-nothing-cv" width={w * S} height={h * S} />;
 }
 
 function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
-  const stageRef = useRef(null), fxRef = useRef(null), decoRef = useRef(null), fieldRefs = useRef({});
+  const stageRef = useRef(null), fxRef = useRef(null), decoRef = useRef(null), frameRef = useRef(null), fieldRefs = useRef({});
   const [S, setS] = useState(3);
+  const [BW, setBW] = useState(WH_BW0);   // Boardbreite in Zellen: bei viel Platz (große Anzeige) bis WH_BW_MAX
   const table = boardData.table;
   const seed = useMemo(() => whHash(rarity + ':' + boardData.id), [rarity, boardData.id]);
-  const layout = useMemo(() => whLayout(table, seed), [table, seed]);
+  const layout = useMemo(() => whLayout(table, seed, BW), [table, seed, BW]);
   const [counts, setCounts] = useState({});
   const [overlays, setOverlays] = useState([]);
   const [rail, setRail] = useState([]);
@@ -455,8 +551,11 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       const w = el.clientWidth || 640;
       const cap = small ? 3 : 8;
       // beim Wurf soll das ganze Bild (Board + Preis-Leiste) auf den Bildschirm passen: Höhe begrenzt die Rasterzelle ebenfalls
-      const byH = play ? Math.floor((window.innerHeight - 250) / (WH_BH + WH_GAP + WH_BARH)) : 99;
-      setS(Math.max(2, Math.min(cap, Math.floor((w - 24) / WH_BW), byH)));
+      const byH = play ? Math.floor((window.innerHeight - 250) / (WH_BH + 2 * WH_FR + WH_GAP + WH_BARH)) : 99;
+      const sNew = Math.max(2, Math.min(cap, Math.floor((w - 12) / (WH_BW0 + 2 * WH_FR)), byH));
+      setS(sNew);
+      // Breite: soviel Platz wie da ist (Rahmen eingerechnet), mindestens 160, höchstens 300 Zellen
+      setBW(small ? WH_BW0 : Math.max(WH_BW0, Math.min(WH_BW_MAX, Math.floor((w - 12) / sNew) - 2 * WH_FR)));
     };
     fit();
     window.addEventListener('resize', fit);
@@ -481,8 +580,13 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
   useEffect(() => {
     const cv = decoRef.current; if (!cv) return;
     const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
-    whDrawBoardBg(ctx, S, boardData.id, layout, seed);
-  }, [S, layout, seed, boardData.id]);
+    whDrawBoardBg(ctx, S, boardData.id, layout, seed, BW);
+  }, [S, layout, seed, boardData.id, BW]);
+  useEffect(() => {
+    const cv = frameRef.current; if (!cv) return;
+    const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    whDrawFrame(ctx, S, boardData.id, BW, WH_BH, seed);
+  }, [S, seed, boardData.id, BW]);
 
   // ── Wurf-Animation ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -490,7 +594,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
     whWarm();
     const cv = fxRef.current, ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    const M = WH_M, CWc = WH_BW + 2 * M, CHc = M + WH_BH + WH_GAP + WH_BARH + M;
+    const M = WH_M, CWc = BW + 2 * M, CHc = M + WH_BH + WH_GAP + WH_BARH + M;
     const arrows = play.arrows, Wz = window.PpWheel;
     const paid = arrows.filter(a => !a.bonus), bonus = arrows.filter(a => a.bonus);
     const rnd = whRng(Date.now() & 0xffffff);
@@ -508,11 +612,11 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
     t = bonusAt;
     bonus.forEach((a, i) => { starts[a.i] = Math.round(t); t += gapOf(i, 5); });
     const sched = arrows.map((a, i) => {
-      const rect = whTargetRect(a, layout, ovNow);
-      if (a.kind.startsWith('boost:') && a.spec) { specsSoFar.push(a.spec); ovNow = whOverlayRects(specsSoFar, table, layout, Wz); }
+      const rect = whTargetRect(a, layout, ovNow, BW);
+      if (a.kind.startsWith('boost:') && a.spec) { specsSoFar.push(a.spec); ovNow = whOverlayRects(specsSoFar, table, layout, Wz, BW); }
       const h1 = whRng(i * 7919 + 13)(), h2 = whRng(i * 104729 + 7)();
       const tx = rect.x + 1 + Math.floor(h1 * Math.max(1, rect.w - 3)), ty = rect.y + 2 + Math.floor(h2 * Math.max(1, rect.h - 5));
-      const side = i % 3, sx = side === 0 ? -6 : side === 1 ? WH_BW + 6 : Math.floor(WH_BW / 2 + (h2 - 0.5) * 40), sy = WH_BH + 2 + Math.floor(h1 * 3);
+      const side = i % 3, sx = side === 0 ? -6 : side === 1 ? BW + 6 : Math.floor(BW / 2 + (h2 - 0.5) * 40), sy = WH_BH + 2 + Math.floor(h1 * 3);
       const info = whFieldInfo(a.kind);
       return { a, i, start: starts[i], land: starts[i] + FLY, tx, ty, sx, sy, kind: a.kind, info, tier: info.tier, col: whColorOf(a.kind) };
     });
@@ -564,14 +668,14 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       if (s.tier >= 3) { shakeT = Math.max(shakeT, 5 + s.tier * 2); shakeA = Math.max(shakeA, s.tier === 4 ? 3 : 2); }
       else if (s.tier === 2) { shakeT = Math.max(shakeT, 3); shakeA = Math.max(shakeA, 1); }
       if (s.tier === 4) flashT = 4;
-      if (s.kind.startsWith('boost:') && s.a.spec) setOverlays(whOverlayRects(whSpecsUpTo(arrows, s.a.i), table, layout, Wz));
+      if (s.kind.startsWith('boost:') && s.a.spec) setOverlays(whOverlayRects(whSpecsUpTo(arrows, s.a.i), table, layout, Wz, BW));
       // Chip fliegt in die Preis-Leiste (begrenzt, sonst kommt er sofort an)
       if (chips.length < 70) chips.push({ s, t0: frame + 3, dur: 13 + Math.floor(rnd() * 4), x0: s.tx, y0: s.ty, key: slotKey(s) });
       else arrive({ s, key: slotKey(s) });
     };
     const slotTarget = (key) => {
       const host = stageRef.current;
-      const n = railOrder.length, per = Math.max(1, Math.floor((WH_BW - 4) / 11));
+      const n = railOrder.length, per = Math.max(1, Math.floor((BW - 4) / 11));
       const fallback = [4 + (n % per) * 11 + 5, WH_BH + WH_GAP + 4 + Math.floor(n / per) * 15 + 6];
       if (!host) return fallback;
       let el = null;
@@ -592,7 +696,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       for (const ch of chips) arrive({ s: ch.s, key: ch.key });   // unterwegs befindliche Chips zählen sofort
       chips.length = 0;
       setCounts({ ...cnt }); setRail(railOrder.map(k => railMap[k]));
-      setOverlays(whOverlayRects(whSpecsUpTo(arrows, Infinity), table, layout, Wz));
+      setOverlays(whOverlayRects(whSpecsUpTo(arrows, Infinity), table, layout, Wz, BW));
       draw(true); setShake([0, 0]);
       setBanner(bestTier >= 4 ? 'JACKPOT!!!' : bestTier === 3 ? 'BIG WIN!' : bestTier === 2 ? 'NICE!' : null);
       if (bestTier >= 3) whPlay('victory', { volume: 0.6 }); else if (bestTier === 2) whPlay('booster_ready', { volume: 0.6 });
@@ -606,8 +710,8 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       // Rahmen-Lampen (nur Jahrmarkt-Board): abwechselnd im Takt
       if (boardData.id === 'C') {
         const ph = (frame >> 3) & 1;
-        for (let x = -3; x <= WH_BW + 2; x += 4) for (const y of [-3, WH_BH + 2]) { ctx.fillStyle = ((x >> 2) & 1) === ph ? '#f7f7ad' : '#8b5b04'; ctx.fillRect((x + M) * S, (y + M) * S, S * 2, S * 2); }
-        for (let y = 1; y <= WH_BH - 2; y += 4) for (const x of [-3, WH_BW + 2]) { ctx.fillStyle = ((y >> 2) & 1) === ph ? '#f7f7ad' : '#8b5b04'; ctx.fillRect((x + M) * S, (y + M) * S, S * 2, S * 2); }
+        for (let x = -3; x <= BW + 2; x += 4) for (const y of [-3, WH_BH + 1]) { ctx.fillStyle = ((x >> 2) & 1) === ph ? '#f7f7ad' : '#8b5b04'; ctx.fillRect((x + M) * S, (y + M) * S, S * 2, S * 2); }
+        for (let y = 1; y <= WH_BH - 2; y += 4) for (const x of [-3, BW + 1]) { ctx.fillStyle = ((y >> 2) & 1) === ph ? '#f7f7ad' : '#8b5b04'; ctx.fillRect((x + M) * S, (y + M) * S, S * 2, S * 2); }
       }
       ctx.drawImage(stuck, 0, 0);
       if (final) return;
@@ -636,7 +740,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
         for (const [a, b] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) cell(ctx, x + a, y + b, '#12101f');
       }
       // Vollbild-Blitz (Jackpot/Boost): Schachbrett aus Weiß
-      if (flashT > 0) { ctx.fillStyle = '#ffffff'; for (let y = 0; y < WH_BH; y++) for (let x = (y + frame) & 1; x < WH_BW; x += 2) ctx.fillRect((x + M) * S, (y + M) * S, S, S); }
+      if (flashT > 0) { ctx.fillStyle = '#ffffff'; for (let y = 0; y < WH_BH; y++) for (let x = (y + frame) & 1; x < BW; x += 2) ctx.fillRect((x + M) * S, (y + M) * S, S, S); }
     };
 
     const tick = () => {
@@ -658,7 +762,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
     };
     raf = whRaf(tick);
     return () => { done = true; try { window.cancelAnimationFrame(raf); } catch (e) { /* ohne */ } };
-  }, [play, S, layout]);   // eslint-disable-line
+  }, [play, S, layout, BW]);   // eslint-disable-line
 
   const fields = Object.keys(layout);
   const sz = (n) => n * S;
@@ -671,37 +775,34 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
       ...(kind.startsWith('ticket:') ? { ticketFrom: kind.slice(7) } : {}),
       art: whArtFor(kind, art, seed), ...(cs ? { name: cs.name, sub: whT('example') } : {}), ...(tsamp ? { titleId: tsamp, sub: whT('example') } : {}), ...(extra || {}) });
   };
-  const stageStyle = { width: sz(WH_BW), '--whs': S + 'px', transform: shake[0] || shake[1] ? 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' : undefined, height: play ? sz(WH_BH + WH_GAP + WH_BARH) : sz(WH_BH) };
+  const stageStyle = { width: sz(BW), '--whs': S + 'px', transform: shake[0] || shake[1] ? 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' : undefined, height: play ? sz(WH_BH + WH_GAP + WH_BARH) : sz(WH_BH) };
   return (
     <div className={'wh-stage' + (small ? ' wh-stage-small' : '')} ref={stageRef} style={stageStyle}>
-      <div className={'wh-frame wh-frame-' + boardData.id} style={{ left: -sz(3), top: -sz(3), width: sz(WH_BW + 6), height: sz(WH_BH + 6) }}>
-        {[[1, 1], [WH_BW + 3, 1], [1, WH_BH + 3], [WH_BW + 3, WH_BH + 3]].map(([x, y], i) => <i key={i} className="wh-screw" style={{ left: sz(x), top: sz(y) }} />)}
-        {boardData.id === 'B' && [['#e6e6e6', 10], ['#fad54a', 17], ['#fc69c6', 23]].map(([c, x]) => <i key={c} className="wh-chalkpc" style={{ left: sz(x), top: sz(WH_BH + 3), background: c }} />)}
-      </div>
-      <div className={'wh-board wh-theme-' + boardData.id} style={{ width: sz(WH_BW), height: sz(WH_BH) }}>
-        <canvas ref={decoRef} className="wh-deco" width={sz(WH_BW)} height={sz(WH_BH)} />
-        {fields.map(k => {
-          const r = layout[k], f = whFieldInfo(k), artUrl = whArtFor(k, art, seed), rar = f.rar ? WH_RCOL[f.rar] : null;
+      <canvas ref={frameRef} className="wh-framecv" width={sz(BW + 2 * WH_FR)} height={sz(WH_BH + 2 * WH_FR)} style={{ left: -sz(WH_FR), top: -sz(WH_FR) }} />
+      <div className={'wh-board wh-theme-' + boardData.id} style={{ width: sz(BW), height: sz(WH_BH) }}>
+        <canvas ref={decoRef} className="wh-deco" width={sz(BW)} height={sz(WH_BH)} />
+        {fields.map(fid => {
+          const k = fid.split('#')[0], r = layout[fid], f = whFieldInfo(k), artUrl = whArtFor(k, art, seed), rar = f.rar ? WH_RCOL[f.rar] : null;
           const clip = whClip(f.shape, r.w - 2, r.h - 2, S);
           const lblFs = Math.min(2.8, (r.w - 4) / (Math.max(...f.label.split(' ').map(w => w.length)) * 1.0));
           const showLbl = lblFs >= 1.5 && r.h >= 7;
           const isTk = k.startsWith('ticket:');
           const showIcon = !artUrl && f.icon && (isTk ? (r.w >= 22 && r.h >= 15) : (r.w >= 9 && r.h >= (showLbl ? 13 : 9))), px = Math.max(1, Math.min(4, Math.floor(Math.min(r.w - 4, r.h - (showLbl ? 8 : 4)) / 9)));
           return (
-            <div key={k} ref={el => { fieldRefs.current[k] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), ...(rar ? { '--whc': rar } : {}) }}
+            <div key={fid} ref={el => { fieldRefs.current[fid] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), ...(rar ? { '--whc': rar } : {}) }}
                  onMouseEnter={(e) => showTip(e, k)} onMouseMove={(e) => showTip(e, k)} onMouseLeave={() => onTip && onTip(null)}>
               <div className="wh-body" style={clip ? { clipPath: clip } : undefined}>
-                {k === 'none' && <WhNothing w={r.w - 2} h={r.h - 2} S={S} id={boardData.id} seed={seed} />}
+                {k === 'none' && <WhNothing w={r.w - 2} h={r.h - 2} S={S} id={boardData.id} seed={seed} variant={fid === 'none' ? 0 : parseInt(fid.slice(5), 10) || 1} />}
                 {artUrl && artUrl.startsWith('emote:') ? <div className="wh-art wh-art-emote"><PpEmote id={artUrl.slice(6)} box={Math.max(8, Math.min(r.w - 4, r.h - 8)) * S} title="" /></div> : artUrl && <img className={'wh-art wh-art-' + f.cls} src={artUrl} alt="" draggable={false} data-pp-px="aus" />}
                 {(f.cls === 'golden' || f.cls === 'jackpot') && !artUrl && <span className="wh-dither" />}
                 {showIcon && (k.startsWith('ticket:') ? <WhTicket from={k.slice(7)} px={Math.max(1, Math.min(4, Math.floor((r.w - 4) / 20), Math.floor((r.h - (showLbl ? 9 : 4)) / 11)))} /> : <WhIcon name={f.icon} px={px} />)}
-                {showLbl && <span className="wh-lbl" style={{ fontSize: 'calc(var(--whs) * ' + lblFs.toFixed(2) + ')' }}>{f.label}</span>}
+                {showLbl && (k !== 'none' || fid === 'none') && <span className="wh-lbl" style={{ fontSize: 'calc(var(--whs) * ' + lblFs.toFixed(2) + ')' }}>{f.label}</span>}
                 {showLbl && f.sub && r.h >= 12 && r.w >= 16 && <span className="wh-sub">{f.sub}</span>}
-                {k === 'none' && r.h >= 14 && r.w >= 22 && <span className="wh-sub wh-none-sub">{whT('Better luck next time!')}</span>}
+                {fid === 'none' && r.h >= 14 && r.w >= 22 && <span className="wh-sub wh-none-sub">{whT('Better luck next time!')}</span>}
                 {k === 'title' && art && art.cos && art.cos.title && r.h >= 12 && r.w >= 16 && window.ppTitleInfo && <span className="wh-sub wh-titlesample">{(window.ppTitleInfo(art.cos.title.id) || {}).text}</span>}
               </div>
               {k !== 'none' && (whHash(k + 't') % 3 === 0 && r.w >= 14 ? <React.Fragment><i className="wh-tape wh-tape-l" /><i className="wh-tape wh-tape-r" /></React.Fragment> : <span className="wh-pin" style={{ '--pin': WH_PIN_COL[whHash(k) % WH_PIN_COL.length] }} />)}
-              {counts[k] > 0 && <span className="wh-cnt">{'×' + counts[k]}</span>}
+              {fid === k && counts[k] > 0 && <span className="wh-cnt">{'×' + counts[k]}</span>}
             </div>
           );
         })}
@@ -714,7 +815,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
         ))}
       </div>
       {play && (
-        <div className="wh-rail" style={{ top: sz(WH_BH + WH_GAP), height: sz(WH_BARH), width: sz(WH_BW) }}>
+        <div className="wh-rail" style={{ top: sz(WH_BH + WH_GAP), height: sz(WH_BARH), width: sz(BW) }}>
           {rail.length === 0 && <span className="wh-rail-empty">{whT('Your prizes land here')}</span>}
           {rail.map(sl => {
             const f = whFieldInfo(sl.kind), p = sl.prize;
@@ -735,7 +836,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
           })}
         </div>
       )}
-      {play && <canvas ref={fxRef} className="wh-fx" width={sz(WH_BW + 2 * WH_M)} height={sz(WH_M + WH_BH + WH_GAP + WH_BARH + WH_M)} style={{ left: -sz(WH_M), top: -sz(WH_M) }} />}
+      {play && <canvas ref={fxRef} className="wh-fx" width={sz(BW + 2 * WH_M)} height={sz(WH_M + WH_BH + WH_GAP + WH_BARH + WH_M)} style={{ left: -sz(WH_M), top: -sz(WH_M) }} />}
       {pops.map(q => <span key={q.id} className="wh-pop" style={{ left: sz(q.x), top: sz(q.y), color: q.col }}>{q.text}</span>)}
       {banner && <div className="wh-banner">{whT(banner)}</div>}
     </div>
