@@ -11,13 +11,14 @@ Friendship. Das Theme klingt nach Schöpfung *und* nach Party: festlich, kosmisc
   • **Kosmos**: groß und weit — Streicher, Hörner, Chor, Pauke, Harfenglissandi tragen die langen Töne (Db–As–Es), die Galaxie dreht sich.
   • **Tanz der Kinder** (Break): Spieluhr-Melodie in Glockenspiel und Vibraphon, nur Klatschen, Aufbau mit Snare-Wirbel und steigendem Synth-Riser; danach der große Drop.
   • Finale einen Ganzton höher (B-Dur), alles zusammen; Ausklang auf Es (Dominante) → zurück in die As-Dur-Genesis.
-Form (64 Takte ≈ 1:42): Genesis 4 · Spaß A 8 · A' 8 · Friendship B 8 · Kosmos C 8 · Tanz der Kinder 8 · Alle +2 8 · Finale +2 8 · Coda 4
+Version 2: längere, abwechslungsreichere Melodie (drei verschiedene Themen: Hook a, zweite Phrase b, Playtime-Staccato c) und eine zusätzliche Hintergrundstimme — eine weich fließende Horn-Gegenstimme in langen Terzen.
+Form (72 Takte ≈ 1:55): Genesis 4 · Spaß A (Hook a) 8 · A' (Phrase b) 8 · Friendship (Kanon a) 8 · Playtime (Thema c) 8 · Kosmos 8 · Tanz der Kinder 8 · Alle +2 (a) 8 · Finale +2 (b, geschlossen) 8 · Coda 4
 """
 import os, sys, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
-BPM, BARS = 150, 64
+BPM, BARS = 150, 72
 song = Song(BPM, BARS)
 rng = random.Random(1001)
 
@@ -189,6 +190,59 @@ def hook_layer(bar0, chords, end, shift=0, vel=94, flute=True, choir=True):
         for k, ch in enumerate(chords):
             for m in tones(ch, 4, shift): song.add('choir', song.bar(bar0 + k), 3.95, m, 50)
 
+
+# ═══ Version 2: längere Melodie ═══════════════════════════════════════════════════════════════════
+# Phrase b (zweite Hälfte des Hauptthemas): höher, fließender, über Fm – Db – As – Es | Fm – Db – B – Es
+B_CH = ['Fm', 'Db', 'Ab', 'Eb', 'Fm', 'Db', 'Bb', 'Eb']
+B_CH2 = ['Fm', 'Db', 'Ab', 'Eb', 'Fm', 'Db', 'Bb', 'Ab']
+HOOK_B = [
+    [('C6', 1), ('Ab5', .5), ('C6', .5), ('F6', 1), ('Eb6', .5), ('C6', .5)],
+    [('Db6', 1), ('Ab5', .5), ('Db6', .5), ('F6', 2)],
+    [('Eb6', 1), ('C6', .5), ('Eb6', .5), ('Ab6', 1), ('G6', .5), ('Eb6', .5)],
+    [('Bb5', 1), ('G5', 1), ('Bb5', 2)],
+    [('C6', 1), ('Ab5', .5), ('C6', .5), ('F6', 1), ('G6', .5), ('Ab6', .5)],
+    [('F6', 1), ('Ab6', .5), ('F6', .5), ('Db6', 2)],
+    [('D6', 1), ('F6', 1), ('Bb6', 1), ('A6', .5), ('F6', .5)],
+]
+HB_END_OPEN = [('G6', 2), ('Bb5', 1), ('Eb6', 1)]
+HB_END_CLOSED = [('Ab6', 3), (None, 1)]
+A8_OPEN = HOOK + [H_END_OPEN]
+B8_OPEN = HOOK_B + [HB_END_OPEN]
+B8_CLOSED = HOOK_B + [HB_END_CLOSED]
+
+# Thema c (Playtime): Staccato-Frage und Kinderchor-Antwort
+PLAY_CH = ['Ab', 'Db', 'Ab', 'Eb', 'Ab', 'Db', 'Ab', 'Eb']
+PLAY = [
+    [('Ab5', .5), (None, .5), ('Ab5', .5), ('Eb5', .5), ('Ab5', 1), (None, 1)],
+    [('Db6', .5), (None, .5), ('Db6', .5), ('Ab5', .5), ('Db6', 1), (None, 1)],
+    [('C6', .5), ('Eb6', .5), ('C6', .5), ('Ab5', .5), ('C6', 2)],
+    [('Bb5', .5), ('G5', .5), ('Bb5', .5), ('Eb6', .5), ('G6', 2)],
+    [('Eb6', .5), (None, .5), ('Eb6', .5), ('C6', .5), ('Eb6', 1), (None, 1)],
+    [('F6', .5), (None, .5), ('F6', .5), ('Db6', .5), ('F6', 1), (None, 1)],
+    [('Ab6', .5), ('G6', .5), ('Eb6', .5), ('C6', .5), ('Eb6', 1), ('Ab5', 1)],
+    [('Bb5', 1), ('G5', 1), ('Bb5', 1), ('D6', 1)],
+]
+
+# Hintergrundstimme (Horn): weich fließende lange Terzen/Quinten unter dem Hook
+COUNTER_A = [
+    [('C5', 2), ('Eb5', 2)], [('D5', 2), ('F5', 2)], [('C5', 2), ('Ab4', 2)], [('Bb4', 2), ('G4', 2)],
+    [('C5', 2), ('Eb5', 2)], [('D5', 2), ('Bb4', 2)], [('Ab4', 2), ('C5', 2)], [('Bb4', 2), ('G4', 2)],
+]
+COUNTER_B = [
+    [('Ab4', 2), ('C5', 2)], [('Ab4', 2), ('F4', 2)], [('Eb5', 2), ('C5', 2)], [('Bb4', 2), ('G4', 2)],
+    [('Ab4', 2), ('C5', 2)], [('F4', 2), ('Ab4', 2)], [('D5', 2), ('F5', 2)], [('Bb4', 2), ('G4', 2)],
+]
+
+def counter(bar0, which, shift=0, vel=66):
+    mel('horn', bar0, COUNTER_A if which == 'a' else COUNTER_B, shift=shift, vel=vel, legato=1.0)
+
+def layer(bar0, chords, m8, shift=0, vel=94, flute=True, square=True, choir=True):
+    if square: mel('square', bar0, m8, shift=shift, vel=vel - 18, legato=.9)
+    if flute: mel('flute', bar0, m8, shift=shift, vel=vel)
+    if choir:
+        for k, ch in enumerate(chords):
+            for m in tones(ch, 4, shift): song.add('choir', song.bar(bar0 + k), 3.95, m, 50)
+
 # ═══ Arrangement ══════════════════════════════════════════════════════════════════════════════════
 b = 0
 # ── Genesis (4): Stille, ein Glockenton, Funken steigen auf, Chor schwillt, Harfenlauf, Riser — dann der Drop ─────────
@@ -210,8 +264,9 @@ roll(b + 3, 1, 4, 40, 118)
 song.dr(song.bar(b + 3) + 3.5, CRASH, 90, 0.6)
 b += 4
 
-# ── Spaß A (8): der Drop — Dance-Beat, Bounce-Bass, Vibraphon-Arpeggien; der Hook in Square + Flöte ─────────────────────
-hook_layer(b, A_CH, H_END_OPEN)
+# ── Spaß A (8): der Drop — Dance-Beat, Bounce-Bass, Vibraphon-Arpeggien; Hook a in Square + Flöte; Horn-Gegenstimme ────────
+layer(b, A_CH, A8_OPEN)
+counter(b, 'a')
 bounce(b, A_CH)
 arps(b, A_CH, vel=58)
 hops(b, A_CH)
@@ -221,24 +276,27 @@ sparkle(b, 8, vel=56, density=2)
 fairy_run(song.bar(b + 7) + 1.0, vel=66)
 b += 8
 
-# ── A' (8): Hook mit Kinderchor-Verdopplung, geschlossen auf As; Glockenspiel wirbelt ─────────────────────────────
-hook_layer(b, A_CH2, H_END_CLOSED, vel=98)
-mel('oohs', b, HOOK, vel=66, octave=1); mel('oohs', b + 7, [H_END_CLOSED], vel=66, octave=1)
-mel('glock', b, HOOK, vel=60, octave=1); mel('glock', b + 7, [H_END_CLOSED], vel=60, octave=1)
-bounce(b, A_CH2, vel=98)
-arps(b, A_CH2, vel=62)
-hops(b, A_CH2, vel=64)
-pad(b, A_CH2, vel=46)
+# ── A' (8): Phrase b — die Melodie geht weiter, höher und fließender (Fm – Db – As – Es); Kinderchor und Glockenspiel doppeln ────
+layer(b, B_CH, B8_OPEN, vel=98)
+counter(b, 'b', vel=68)
+mel('oohs', b, B8_OPEN, vel=66, octave=0)
+mel('glock', b, B8_OPEN, vel=58, octave=1)
+bounce(b, B_CH, vel=98)
+arps(b, B_CH, vel=62)
+hops(b, B_CH, vel=64)
+pad(b, B_CH, vel=46)
 drums(b, 8, level=1.08)
 sparkle(b, 8, vel=60, density=3)
-timp_beat(b, A_CH2, vel=82)
+timp_beat(b, B_CH, vel=82)
+fairy_run(song.bar(b + 7) + 1.0, vel=68)
 b += 8
 
-# ── Friendship B (8): Kanon — jede Stimme kommt später dazu (2, 4, 6 Schläge Versatz): ein Freund mehr ──────────────────
-mel('flute', b, HOOK, vel=96); mel('flute', b + 7, [H_END_OPEN], vel=96)
-mel('oohs', b, HOOK, vel=74, delay=2.0); mel('oohs', b + 7, [H_END_OPEN], vel=74, delay=2.0)
-mel('glock', b, HOOK, vel=68, octave=1, delay=4.0); mel('glock', b + 7, [H_END_OPEN], vel=68, octave=1, delay=4.0)
-mel('square', b, HOOK, vel=70, octave=-1, delay=6.0, legato=.9); mel('square', b + 7, [H_END_OPEN], vel=70, octave=-1, delay=6.0, legato=.9)
+# ── Friendship (8): Kanon über Hook a — jede Stimme kommt später dazu (2, 4, 6 Schläge Versatz): ein Freund mehr ───────────
+mel('flute', b, A8_OPEN, vel=96)
+mel('oohs', b, A8_OPEN, vel=74, delay=2.0)
+mel('glock', b, A8_OPEN, vel=68, octave=1, delay=4.0)
+mel('square', b, A8_OPEN, vel=70, octave=-1, delay=6.0, legato=.9)
+counter(b, 'a', vel=64)
 bounce(b, A_CH, vel=98)
 arps(b, A_CH, vel=60)
 hops(b, A_CH, vel=64)
@@ -248,6 +306,25 @@ for k, ch in enumerate(A_CH):
 drums(b, 8, level=1.05)
 sparkle(b, 8, vel=62, density=3)
 for k in (3, 7): fairy_run(song.bar(b + k) + 2.0, vel=64)
+b += 8
+
+# ── Playtime (8): neues Thema c — Staccato-Frage (Marimba + Flöte), der Kinderchor antwortet in den Pausen ───────────────────
+mel('marimba', b, PLAY, vel=92, octave=0, legato=.6)
+mel('flute', b, PLAY, vel=80, octave=1, legato=.7)
+mel('vibes', b, PLAY, vel=62, octave=0, legato=.6)
+for k in (0, 1, 4, 5):
+    t = song.bar(b + k) + 3.0
+    song.add('oohs', t, 0.5, pn('Eb6') if k < 4 else pn('G6'), hv(78)); song.add('oohs', t + 0.5, 0.5, pn('C6') if k < 4 else pn('Eb6'), hv(78))
+    song.add('glock', t, 0.5, pn('Eb7') if k < 4 else pn('G7'), hv(62)); song.add('glock', t + 0.5, 0.5, pn('C7') if k < 4 else pn('Eb7'), hv(62))
+bounce(b, PLAY_CH, vel=98)
+arps(b, PLAY_CH, vel=54)
+pad(b, PLAY_CH, vel=42)
+for k, ch in enumerate(PLAY_CH):
+    for m in tones(ch, 4): song.add('choir', song.bar(b + k), 3.95, m, 40)
+drums(b, 8, level=1.05)
+sparkle(b, 8, vel=60, density=3)
+for k in (3, 7): fairy_run(song.bar(b + k) + 2.0, vel=64)
+roll(b + 7, 3, 4, 50, 100)
 b += 8
 
 # ── Kosmos C (8): groß und weit — Streicher, Hörner, Chor, Pauke; lange Töne, Harfenglissandi; Beat bleibt ─────────────────
@@ -282,12 +359,12 @@ roll(b + 6, 0, 8, 40, 126)
 timp_beat(b + 4, DANCE_CH[4:], vel=86)
 b += 8
 
-# ── Alle +2 (8): B-Dur — alle Stimmen gleichzeitig, der Hook in Square, Flöte, Kinderchor, Glockenspiel, Hörnern ────────────
+# ── Alle +2 (8): B-Dur — Hook a, alle Stimmen gleichzeitig (Square, Flöte, Kinderchor, Glockenspiel); Horn-Gegenstimme ─────────
 S = 2
-hook_layer(b, A_CH, H_END_OPEN, shift=S, vel=102)
-mel('oohs', b, HOOK, shift=S, vel=70, octave=1); mel('oohs', b + 7, [H_END_OPEN], shift=S, vel=70, octave=1)
-mel('glock', b, HOOK, shift=S, vel=64, octave=1); mel('glock', b + 7, [H_END_OPEN], shift=S, vel=64, octave=1)
-mel('horn', b, HOOK, shift=S, vel=66, octave=-1); mel('horn', b + 7, [H_END_OPEN], shift=S, vel=66, octave=-1)
+layer(b, A_CH, A8_OPEN, shift=S, vel=102)
+mel('oohs', b, A8_OPEN, shift=S, vel=70, octave=1)
+mel('glock', b, A8_OPEN, shift=S, vel=64, octave=1)
+counter(b, 'a', shift=S, vel=70)
 bounce(b, A_CH, shift=S, vel=100)
 arps(b, A_CH, shift=S, vel=64)
 hops(b, A_CH, shift=S, vel=66)
@@ -298,17 +375,17 @@ sparkle(b, 8, shift=S, vel=64, density=4)
 fairy_run(song.bar(b + 7) + 1.0, shift=S, vel=70)
 b += 8
 
-# ── Finale +2 (8): alles, geschlossen auf B; Kanon-Echo im Kinderchor ─────────────────────────────────────────────────────────
-hook_layer(b, A_CH2, H_END_CLOSED, shift=S, vel=106)
-mel('oohs', b, HOOK, shift=S, vel=72, octave=1, delay=2.0); mel('oohs', b + 7, [H_END_CLOSED], shift=S, vel=72, octave=1, delay=2.0)
-mel('glock', b, HOOK, shift=S, vel=66, octave=1); mel('glock', b + 7, [H_END_CLOSED], shift=S, vel=66, octave=1)
-mel('horn', b, HOOK, shift=S, vel=68, octave=-1); mel('horn', b + 7, [H_END_CLOSED], shift=S, vel=68, octave=-1)
-mel('strings', b, HOOK, shift=S, vel=60, octave=-1); mel('strings', b + 7, [H_END_CLOSED], shift=S, vel=60, octave=-1)
-bounce(b, A_CH2, shift=S, vel=102)
-arps(b, A_CH2, shift=S, vel=66)
-hops(b, A_CH2, shift=S, vel=66)
-pad(b, A_CH2, shift=S, vel=50)
-timp_beat(b, A_CH2, shift=S, vel=96)
+# ── Finale +2 (8): Phrase b zum Ganzschluss auf B; Kanon-Echo im Kinderchor, Streicher tragen mit ───────────────────────────────
+layer(b, B_CH2, B8_CLOSED, shift=S, vel=106)
+mel('oohs', b, B8_CLOSED, shift=S, vel=72, octave=0, delay=2.0)
+mel('glock', b, B8_CLOSED, shift=S, vel=66, octave=1)
+mel('strings', b, B8_CLOSED, shift=S, vel=62, octave=-1)
+counter(b, 'b', shift=S, vel=72)
+bounce(b, B_CH2, shift=S, vel=102)
+arps(b, B_CH2, shift=S, vel=66)
+hops(b, B_CH2, shift=S, vel=66)
+pad(b, B_CH2, shift=S, vel=50)
+timp_beat(b, B_CH2, shift=S, vel=96)
 drums(b, 8, level=1.18)
 sparkle(b, 8, shift=S, vel=66, density=5)
 b += 8
