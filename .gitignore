@@ -60,3 +60,4 @@ bot/data/moniabot.db-*
 !/cards/effects/CARD_API.md
 *.trail.json
 *_report.csv
+electron/dist/

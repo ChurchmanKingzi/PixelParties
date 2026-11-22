@@ -1,0 +1,4 @@
+# Von itch.io-App/butler gelesen: so startet der Knopf „Launch“.
+[[actions]]
+name = "play"
+path = "Pixel Parties.exe"

@@ -17,3 +17,17 @@ contextBridge.exposeInMainWorld('pixelPartiesDesktop', {
   // browser's GIS credential.
   googleSignIn: () => ipcRenderer.invoke('pixel-parties:google-signin'),
 });
+
+// Startseite (launcher.html, file://): eigene, schmale Brücke. Auf der Spielseite
+// (https) wird sie nicht angelegt — dort gibt es nur pixelPartiesDesktop.
+if (location.protocol === 'file:') {
+  contextBridge.exposeInMainWorld('ppLauncher', {
+    config: () => ipcRenderer.invoke('pp-launcher:config'),
+    status: () => ipcRenderer.invoke('pp-launcher:status'),
+    play: () => ipcRenderer.send('pp-launcher:play'),
+    openExternal: (url) => ipcRenderer.send('pp-launcher:open-external', String(url)),
+    toggleFullscreen: () => ipcRenderer.send('pp-launcher:fullscreen'),
+    quit: () => ipcRenderer.send('pp-launcher:quit'),
+    onPlayFailed: (cb) => { ipcRenderer.on('pp-launcher:play-failed', () => cb()); },
+  });
+}

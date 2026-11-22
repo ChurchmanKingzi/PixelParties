@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pixel Parties</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Pixel Parties — Desktop-Startseite (Launcher).
+  Wird vom Electron-Fenster zuerst geladen (electron/main.js); „PLAY“ lädt dann das Spiel vom Server. Alles Pixelart: die Kulisse ist die animierte Titelkulisse des Spiels
+  (assets/scene, scripts/electron/build_assets.py), Bewegung in ganzen Pixeln (steps), harte Rahmen aus Schatten-Ringen, keine Weichzeichner, nur Palettenfarben.
+  Inhalte (Links, Neuigkeiten) stehen in launcher-config.json. Ohne Electron (Browser-Test) arbeitet eine Attrappe `ppLauncher`.
+-->
+<style>
+  @font-face { font-family: 'PP Pixel'; src: url('assets/fonts/PixelIntv.otf'); }
+  :root { --px: 3px; --u: 16px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #08060c; color: #ffffff; font-family: 'PP Pixel', monospace; user-select: none; cursor: default; }
+  img, canvas { image-rendering: pixelated; }
+
+  /* ── Kulisse: 1920×1080-Bühne, per JS auf das Fenster gestreckt (Deckung, Mitte) ── */
+  #art { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #art img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: block; }
+  #art img.bg { left: -39px; top: -22px; width: 1998px; height: 1125px; }
+  .fl { animation: fl 3.4s steps(8) infinite alternate; }
+  .fl2 { animation: fl 4.6s steps(10) infinite alternate; animation-delay: -1.3s; }
+  .fl3 { animation: fl 5.4s steps(9) infinite alternate; animation-delay: -2.6s; }
+  @keyframes fl { from { transform: translateY(0); } to { transform: translateY(-12px); } }
+  .dr { animation: dr 7s steps(16) infinite alternate; }
+  .dr2 { animation: dr 9s steps(18) infinite alternate-reverse; animation-delay: -3s; }
+  @keyframes dr { from { transform: translate(0, 0); } to { transform: translate(36px, -14px); } }
+  .ex { transform-origin: 54.5% 38.2%; animation: ex 1.3s steps(4) infinite alternate; }
+  @keyframes ex { from { transform: scale(1); } to { transform: scale(1.035); } }
+  #embers { position: fixed; inset: 0; pointer-events: none; }
+  #vig { position: fixed; inset: 0; background: url('assets/vignette.png') center / cover; }
+
+  /* ── Oberfläche ── */
+  .ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: calc(var(--u) * 1.4) calc(var(--u) * 2) calc(var(--u) * 1.4); }
+  #logo { width: min(62vw, calc(var(--u) * 58)); margin-top: calc(var(--u) * .6); animation: bob 2.4s steps(4) infinite alternate; filter: drop-shadow(0 calc(var(--px) * 2) 0 #08060c); }
+  @keyframes bob { from { transform: translateY(0); } to { transform: translateY(calc(var(--px) * -2)); } }
+  .tag { margin-top: calc(var(--u) * .9); font-size: calc(var(--u) * .95); letter-spacing: .16em; color: #ffffff; background: #12101f; padding: calc(var(--u) * .4) calc(var(--u) * 1.1); text-align: center;
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #fad54a; }
+  .mid { flex: 1; }
+  .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
+  .col { display: flex; flex-direction: column; gap: calc(var(--u) * .7); }
+  .col.right { align-items: flex-end; }
+  .center { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * .9); }
+
+  .panel { background: #12101f; padding: calc(var(--u) * .8) calc(var(--u) * 1); box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #66b6ff, calc(var(--px) * 3) calc(var(--px) * 3) 0 calc(var(--px) * 2) #08060c; }
+  .panel h3 { margin: 0 0 calc(var(--u) * .5); font-size: calc(var(--u) * .95); letter-spacing: .14em; color: #fad54a; font-weight: 400; }
+  .news { width: calc(var(--u) * 22); max-width: 30vw; }
+  .news ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--u) * .5); }
+  .news li { font-size: calc(var(--u) * .8); line-height: 1.35; color: #e5edfa; }
+  .news li b { color: #66b6ff; font-weight: 400; margin-right: .4em; }
+
+  #play { appearance: none; border: 0; cursor: pointer; font-family: inherit; color: #12101f; background: #fad54a; font-size: calc(var(--u) * 2.4); letter-spacing: .18em; padding: calc(var(--u) * .9) calc(var(--u) * 4.6);
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #f7f7ad, 0 0 0 calc(var(--px) * 3) #08060c, calc(var(--px) * 4) calc(var(--px) * 4) 0 calc(var(--px) * 3) #08060c, inset 0 calc(var(--px) * -2) 0 #c68206; position: relative; }
+  #play:hover { background: #f7f7ad; transform: translate(0, calc(var(--px) * -1)); }
+  #play:active { transform: translate(var(--px), var(--px)); }
+  #play::before, #play::after { content: ''; position: absolute; top: 50%; width: calc(var(--px) * 3); height: calc(var(--px) * 3); margin-top: calc(var(--px) * -1.5); background: #12101f; animation: arr 0.8s steps(1) infinite; }
+  #play::before { left: calc(var(--u) * 1.4); }
+  #play::after { right: calc(var(--u) * 1.4); animation-delay: -0.4s; }
+  @keyframes arr { 0% { visibility: visible; } 50% { visibility: hidden; } }
+
+  .row { display: flex; gap: calc(var(--u) * .6); flex-wrap: wrap; justify-content: center; }
+  .btn { appearance: none; border: 0; cursor: pointer; font-family: inherit; color: #ffffff; background: #12101f; font-size: calc(var(--u) * .85); letter-spacing: .1em; padding: calc(var(--u) * .5) calc(var(--u) * 1);
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
+  .btn:hover { color: #12101f; background: #66b6ff; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #b3d8f9; }
+  .btn[hidden] { display: none; }
+
+  .status { display: flex; align-items: center; gap: calc(var(--u) * .6); font-size: calc(var(--u) * .85); letter-spacing: .08em; background: #12101f; padding: calc(var(--u) * .4) calc(var(--u) * .8); align-self: flex-start; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
+  .dot { width: calc(var(--px) * 4); height: calc(var(--px) * 4); background: #7e7d9b; box-shadow: 0 0 0 var(--px) #08060c; }
+  .ok .dot { background: #66ffa2; } .wake .dot { background: #fad54a; animation: arr .8s steps(1) infinite; } .bad .dot { background: #fe5154; }
+  .foot { font-size: calc(var(--u) * .7); color: #a5b0c0; letter-spacing: .1em; text-shadow: var(--px) var(--px) 0 #08060c; text-align: center; }
+
+  /* Verbinden-Ansicht */
+  #go { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: calc(var(--u) * 1.4); background: #08060c; z-index: 10; }
+  #go.on { display: flex; }
+  #go .t { font-size: calc(var(--u) * 2); letter-spacing: .2em; color: #fad54a; }
+  #go .bar { width: calc(var(--u) * 24); height: calc(var(--u) * 1.4); background: #12101f; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #66b6ff; position: relative; overflow: hidden; }
+  #go .bar i { position: absolute; top: 0; bottom: 0; width: 25%; background: #fad54a; animation: bar 1.4s steps(14) infinite; }
+  @keyframes bar { from { left: -25%; } to { left: 100%; } }
+  #go .s { font-size: calc(var(--u) * .85); color: #a5b0c0; letter-spacing: .08em; max-width: calc(var(--u) * 30); text-align: center; line-height: 1.5; }
+
+  @media (max-width: 1150px) { .news { display: none; } .bottom { grid-template-columns: 1fr; justify-items: center; } .col.right { display: none; } }
+</style>
+</head>
+<body>
+<div id="art">
+  <img class="bg" src="assets/scene/background.png" alt="">
+  <img class="fl3" src="assets/scene/hammer.png" alt="">
+  <img class="fl" src="assets/scene/golem.png" alt="">
+  <img class="fl2" src="assets/scene/horned.png" alt="">
+  <img class="fl3" src="assets/scene/ninja.png" alt="">
+  <img class="fl2" src="assets/scene/rabbit.png" alt="">
+  <img class="fl" src="assets/scene/blonde.png" alt="">
+  <img class="fl2" src="assets/scene/angel.png" alt="">
+  <img class="ex" src="assets/scene/explosion.png" alt="">
+  <img class="dr" src="assets/scene/cat_mid.png" alt="">
+  <img class="dr2" src="assets/scene/cat_top.png" alt="">
+  <img class="dr" src="assets/scene/cat_bottom.png" alt="">
+</div>
+<canvas id="embers"></canvas>
+<div id="vig"></div>
+
+<div class="ui">
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <img id="logo" src="assets/logo.png" alt="Pixel Parties">
+    <div class="tag">COLLECT · BUILD · DUEL</div>
+  </div>
+  <div class="mid"></div>
+  <div class="bottom">
+    <div class="col">
+      <div class="status" id="status"><span class="dot"></span><span id="stxt">Checking server…</span></div>
+      <div class="foot" style="text-align:left" id="ver"></div>
+    </div>
+    <div class="center">
+      <button id="play">PLAY</button>
+      <div class="row">
+        <button class="btn" id="b-discord" hidden>DISCORD</button>
+        <button class="btn" id="b-itch" hidden>ITCH.IO</button>
+        <button class="btn" id="b-web" hidden>WEBSITE</button>
+        <button class="btn" id="b-full">FULLSCREEN</button>
+        <button class="btn" id="b-quit">QUIT</button>
+      </div>
+    </div>
+    <div class="col right">
+      <div class="panel news" id="news" hidden><h3>WHAT'S NEW</h3><ul id="newsl"></ul></div>
+    </div>
+  </div>
+</div>
+
+<div id="go"><div class="t">CONNECTING</div><div class="bar"><i></i></div><div class="s" id="gos">Entering the Pixel Parties…</div></div>
+
+<script>
+(() => {
+  // ── Brücke zu Electron (preload.js); im Browser eine Attrappe ──
+  const L = window.ppLauncher || {
+    config: async () => ({ version: 'dev', serverUrl: '', links: {}, news: [{ tag: 'NEW', text: 'Browser preview of the launcher.' }] }),
+    status: async () => ({ state: 'ok', ms: 42 }),
+    play: () => { document.getElementById('gos').textContent = '(preview: no game server attached)'; },
+    openExternal: () => {}, toggleFullscreen: () => {}, quit: () => {}, onPlayFailed: () => {},
+  };
+  const $ = (id) => document.getElementById(id);
+
+  // ── Maßstab: Zelle (--px) und Einheit (--u) folgen der Fensterhöhe; die Bühne deckt das Fenster ab ──
+  const art = $('art'), cv = $('embers'), g = cv.getContext('2d');
+  const fit = () => {
+    const w = innerWidth, h = innerHeight, px = Math.max(2, Math.round(h / 330));
+    document.documentElement.style.setProperty('--px', px + 'px');
+    document.documentElement.style.setProperty('--u', Math.max(12, Math.round(h / 45)) + 'px');
+    const s = Math.max(w / 1920, h / 1080);
+    art.style.transform = 'translate(' + Math.round((w - 1920 * s) / 2) + 'px,' + Math.round((h - 1080 * s) / 2) + 'px) scale(' + s + ')';
+    cv.width = w; cv.height = h; g.imageSmoothingEnabled = false;
+  };
+  addEventListener('resize', fit); fit();
+
+  // ── Funken (30 Hz, ganze Pixelzellen) ──
+  const cols = ['#f29a3e', '#fad54a', '#f7f7ad', '#fe5154', '#ffffff'];
+  const P = []; const N = 70;
+  const mk = (init) => ({ x: Math.random() * innerWidth, y: init ? Math.random() * innerHeight : innerHeight + 10, v: 0.6 + Math.random() * 1.6, dx: (Math.random() - 0.5) * 0.5, c: cols[Math.floor(Math.random() * cols.length)], s: Math.random() < 0.25 ? 2 : 1, ph: Math.random() * 60 });
+  for (let i = 0; i < N; i++) P.push(mk(true));
+  setInterval(() => {
+    const c = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--px'), 10) || 3;
+    g.clearRect(0, 0, cv.width, cv.height);
+    for (const p of P) {
+      p.y -= p.v * c * 0.5; p.x += p.dx * c * 0.4 + Math.sin((p.y + p.ph) / 30) * 0.6;
+      if (p.y < -10) Object.assign(p, mk(false));
+      g.fillStyle = p.c; g.fillRect(Math.round(p.x / c) * c, Math.round(p.y / c) * c, p.s * c, p.s * c);
+    }
+  }, 33);
+
+  // ── Inhalt ──
+  let cfg = { links: {}, news: [] };
+  const open = (u) => u && L.openExternal(u);
+  L.config().then(c => {
+    cfg = c || cfg;
+    $('ver').textContent = 'v' + (cfg.version || '?') + (cfg.serverUrl ? '  ·  ' + cfg.serverUrl.replace(/^https?:\/\//, '') : '');
+    const lk = cfg.links || {};
+    for (const [id, key] of [['b-discord', 'discord'], ['b-itch', 'itch'], ['b-web', 'website']]) if (lk[key]) { $(id).hidden = false; $(id).onclick = () => open(lk[key]); }
+    if (cfg.news && cfg.news.length) { $('news').hidden = false; $('newsl').innerHTML = cfg.news.slice(0, 4).map(n => '<li><b>' + esc(n.tag || '') + '</b>' + esc(n.text) + '</li>').join(''); }
+  });
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ── Serverstatus (Hauptprozess; wach halten, falls der Server schläft) ──
+  const st = $('status');
+  const poll = async () => {
+    let r; try { r = await L.status(); } catch { r = { state: 'bad' }; }
+    st.className = 'status ' + (r.state === 'ok' ? 'ok' : r.state === 'wake' ? 'wake' : 'bad');
+    $('stxt').textContent = r.state === 'ok' ? 'Server online' + (r.ms ? ' · ' + r.ms + ' ms' : '') : r.state === 'wake' ? 'Waking up the server…' : 'Server not reachable';
+    setTimeout(poll, r.state === 'ok' ? 20000 : 4000);
+  };
+  poll();
+
+  // ── Knöpfe ──
+  let going = false;
+  const play = () => {
+    if (going) return; going = true;
+    $('go').classList.add('on');
+    setTimeout(() => { $('gos').textContent = 'Still connecting… the server may be waking up, this can take a moment.'; }, 6000);
+    L.play();
+  };
+  if (L.onPlayFailed) L.onPlayFailed(() => {
+    going = false; $('go').classList.remove('on');
+    $('stxt').textContent = 'Server not reachable — please try again';
+  });
+  $('play').onclick = play;
+  $('b-full').onclick = () => L.toggleFullscreen();
+  $('b-quit').onclick = () => L.quit();
+  addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); } else if (e.key === 'F11') { e.preventDefault(); L.toggleFullscreen(); } });
+})();
+</script>
+</body>
+</html>
