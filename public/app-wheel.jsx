@@ -1045,6 +1045,13 @@ function WheelShop({ sc, onSc, notify, onPacks, onLock }) {
   const packsOpen = !!(played && !played.claimed && (played.result.arrows || []).some(a => a.kind === 'booster' || a.kind === 'golden' || a.kind === 'jackpot'));
   useEffect(() => { if (onLock) onLock(packsOpen); }, [packsOpen]);   // eslint-disable-line
   useEffect(() => () => { if (onLock) onLock(false); }, []);   // eslint-disable-line
+  // Escape verlässt den Shop sonst über den globalen Handler (app-main): solange Packs offen sind, schlucken wir es (capture, vor dem globalen Handler)
+  useEffect(() => {
+    if (!packsOpen) return undefined;
+    const block = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } };
+    window.addEventListener('keydown', block, true);
+    return () => window.removeEventListener('keydown', block, true);
+  }, [packsOpen]);
   if (!state) return <div className="wh-hint" style={{ padding: 40 }}>Loading…</div>;
   const art = { samples: state.samples || {}, packs: packArt.packs, golden: packArt.golden, umbra: packArt.umbra, cos };
 
