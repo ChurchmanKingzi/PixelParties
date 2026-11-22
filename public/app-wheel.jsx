@@ -272,7 +272,7 @@ function WhTip({ tip }) {
       ) : isTicket ? (
         <div className="wh-tip-art"><WhTicket from={tip.ticketFrom} px={12} /></div>
       ) : (
-        <div className="wh-tip-art">{tip.art && tip.art.startsWith('emote:') ? <PpEmote id={tip.art.slice(6)} box={240} title="" /> : tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
+        <div className="wh-tip-art">{tip.art && tip.art.startsWith('emote:') ? <PpEmote id={tip.art.slice(6)} box={240} title="" /> : tip.art && tip.frame && window.FramedImg ? <window.FramedImg src={tip.art} kind={tip.frame.kind} dupes={tip.frame.dupes} alt="" draggable={false} data-pp-px="aus" /> : tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
       )}
       {!tip.titleId && !(tip.art && tip.art.indexOf('/cards/skins/') >= 0) && <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>}
       <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (tip.sub || f.sub || '')}</div>
@@ -294,6 +294,8 @@ function whRollCos(pools) {
   return { avatar: pick(pools.avatars), sleeve: pick(pools.sleeves), skin: sk ? { id: sk.id, hero: sk.hero, src: '/cards/skins/' + encodeURIComponent(sk.id) + '.png', name: sk.id } : null,
     emote: em ? { id: em.id, name: window.ppEmName ? window.ppEmName(em) : em.en } : null, title: ti ? { id: ti.id } : null };
 }
+/** Rang-Rahmen (Duplikat) eines gewonnenen Avatars/Sleeves/Skins: { kind, dupes } oder null – der Rahmen wird ums Bild gezeichnet (FramedImg), nicht als Text genannt. */
+function whFrameOf(kind, p) { return p && p.dupes > 0 && (kind === 'avatar' || kind === 'sleeve' || kind === 'skin') ? { kind, dupes: p.dupes } : null; }
 function whFrameName(d) { const i = window.ppRankFrames ? window.ppRankFrames.rankOf(d) : null; return i == null ? 'Frame ' + d : window.ppRankFrames.RANKS[i].name + ' Frame'; }
 function whArtFor(kind, art, seed) {
   // Bildmaterial je Feld: Booster-Kunst, Kartenrücken, Beispielkarte, zufälliger Avatar/Sleeve/Skin
@@ -844,13 +846,13 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
             const isCard = sl.kind.startsWith('card:') && p;
             const img = isCard ? bpCardUrl(p.name, p.rarity) : (p && p.src) || (p && sl.kind === 'skin' && p.id ? '/cards/skins/' + encodeURIComponent(p.id) + '.png' : null) || whArtFor(sl.kind, art, seed);
             const text = isCard ? whCardName(p.name) : (sl.kind === 'skin' && p && p.id ? p.id : (p && p.label) || f.label);
-            const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null, art: img, name: text, sub: p && p.id !== undefined && p.isNew !== undefined ? (p.isNew ? whT('New!') : whFrameName(p.dupes)) : undefined };
+            const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null, art: img, name: text, sub: p && p.id !== undefined && p.isNew ? whT('New!') : undefined, ...(whFrameOf(sl.kind, p) ? { frame: whFrameOf(sl.kind, p) } : {}) };
             if (sl.kind === 'emote' && p) extra.art = 'emote:' + p.id; if (sl.kind === 'title' && p) { extra.titleId = p.id; extra.sub = whT('New!'); }
             return (
               <div key={sl.key} className={'wh-slot wh-slot-' + f.cls + (sl.kind === 'emote' ? ' wh-slot-emote' : '') + (sl.kind === 'title' ? ' wh-slot-title' : '')} data-slot={sl.key} style={{ '--whc': f.rar ? WH_RCOL[f.rar] : (isCard ? WH_RCOL[p.rarity] : WH_FCOL[f.cls]) }}
                    onMouseEnter={(e) => showTip(e, sl.kind, extra)} onMouseMove={(e) => showTip(e, sl.kind, extra)} onMouseLeave={() => onTip && onTip(null)}>
                 {sl.kind === 'emote' || sl.kind === 'title' ? <span className="wh-slot-tag">{sl.kind === 'emote' ? 'EMOTE' : 'TITLE'}</span> : null}
-                {sl.kind === 'title' && p && p.id && window.PpTitle ? <div className="wh-slot-titlebody"><window.PpTitle id={p.id} /></div> : sl.kind.startsWith('ticket:') ? <WhTicket from={sl.kind.slice(7)} px={Math.max(1, Math.floor(S * 0.5))} /> : sl.kind === 'emote' && p && p.id ? <PpEmote id={p.id} box={9 * S} title="" /> : img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
+                {sl.kind === 'title' && p && p.id && window.PpTitle ? <div className="wh-slot-titlebody"><window.PpTitle id={p.id} /></div> : sl.kind.startsWith('ticket:') ? <WhTicket from={sl.kind.slice(7)} px={Math.max(1, Math.floor(S * 0.5))} /> : sl.kind === 'emote' && p && p.id ? <PpEmote id={p.id} box={9 * S} title="" /> : img && whFrameOf(sl.kind, p) && window.FramedImg ? <window.FramedImg src={img} kind={whFrameOf(sl.kind, p).kind} dupes={whFrameOf(sl.kind, p).dupes} alt="" draggable={false} data-pp-px="aus" /> : img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
                 {sl.kind !== 'title' && <span className="wh-slot-lbl">{sl.kind.startsWith('ticket:') ? f.sub : text}</span>}
                 <b key={sl.n} className="wh-slot-n">{'×' + sl.n}</b>
               </div>
@@ -1118,13 +1120,14 @@ function WhResult({ result, claimed, locked, onAgain, onMore, onPacks, onTip }) 
         <div className="wh-res-cos">
           {cos.map((c, i) => {
             const isEmote = c.kind === 'emote', isTitle = c.kind === 'title';
-            const img = c.kind === 'skin' ? '/cards/skins/' + encodeURIComponent(c.id) + '.png' : c.src, name = c.kind === 'skin' ? c.id : (c.label || c.id), sub = c.isNew ? whT('New!') : frameName(c.dupes);
-            const tip = (e) => onTip && onTip({ x: e.clientX, y: e.clientY, info: whFieldInfo(c.kind), art: isEmote ? 'emote:' + c.id : img, ...(isTitle ? { titleId: c.id } : {}), name, sub, pct: null });
+            const img = c.kind === 'skin' ? '/cards/skins/' + encodeURIComponent(c.id) + '.png' : c.src, name = c.kind === 'skin' ? c.id : (c.label || c.id);
+            const fr = whFrameOf(c.kind, c);
+            const tip = (e) => onTip && onTip({ x: e.clientX, y: e.clientY, info: whFieldInfo(c.kind), art: isEmote ? 'emote:' + c.id : img, ...(isTitle ? { titleId: c.id } : {}), name, sub: c.isNew ? whT('New!') : undefined, ...(fr ? { frame: fr } : {}), pct: null });
             return (
               <div key={i} className="wh-cos" onMouseEnter={tip} onMouseMove={tip} onMouseLeave={() => onTip && onTip(null)}>
-                {isEmote ? <PpEmote id={c.id} box={96} title="" /> : isTitle ? <div className="wh-cos-title">{window.PpTitle && <window.PpTitle id={c.id} />}</div> : <img src={img} alt="" draggable={false} data-pp-px="aus" />}
+                {isEmote ? <PpEmote id={c.id} box={96} title="" /> : isTitle ? <div className="wh-cos-title">{window.PpTitle && <window.PpTitle id={c.id} />}</div> : fr && window.FramedImg ? <window.FramedImg src={img} kind={fr.kind} dupes={fr.dupes} alt="" draggable={false} data-pp-px="aus" /> : <img src={img} alt="" draggable={false} data-pp-px="aus" />}
                 {!isTitle && <span>{name}</span>}
-                <span className="wh-gold">{c.isNew ? 'New!' : frameName(c.dupes)}</span>
+                {c.isNew && <span className="wh-gold">New!</span>}
               </div>
             );
           })}
