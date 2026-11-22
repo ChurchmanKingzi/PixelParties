@@ -3311,9 +3311,8 @@ function OpponentUnlockPopup() {
 
           {current.kind === 'rarity' ? (
           <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
-            You won a <b data-rarity-bonus-label={current.rarity}>{ppRarLabel(current.rarity)}</b> copy of{' '}
-            <span className="orbit-font" style={{ color: '#fbe181', fontWeight: 800, fontSize: 20, textShadow: '2px 2px 0 #72541d' }}>{current.card}</span>
-            {' '}— it was added to your collection!
+            You keep your <b data-rarity-bonus-label={current.rarity}>{ppRarLabel(current.rarity)}</b> copy of{' '}
+            <span className="orbit-font" style={{ color: '#fbe181', fontWeight: 800, fontSize: 20, textShadow: '2px 2px 0 #72541d' }}>{current.card}</span>!
           </div>
           ) : (
           <div className="pp-unlock-satz" style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
