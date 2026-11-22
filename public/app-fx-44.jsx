@@ -51,6 +51,38 @@ function ppFx44Stufen(breite, hoch) {
 }
 window.ppFx44Stufen = ppFx44Stufen;
 
+/**
+ * Handkarten-Highlight (Tutorial): die vergrößerte Karte steht nur in ganzzahligen Kartenpixeln (`ppKarteGanz`, app-shared.jsx): jede Stufe hat eine Breite aus ganzen Vielfachen von
+ * 75 Gerätepixeln, Ecke und Größe liegen auf ganzen Bildschirmpixeln, die Karte steht aufrecht. Vorher: `scale` 1,5 auf die Ruhegröße (z. B. 123 → 184,5 px = 2,46 Pixel je Kartenpixel) plus
+ * Fächerdrehung. `scale`/`transform` streckt die schon gezeichnete 123-px-Ebene des Browsers (Compositor, bilinear): jede Kartenpixelkante bekam Mischfarben („weich"), Drehung dazu. Jetzt
+ * vergrößert `zoom` die HÜLLE im Layout: das Kartenbild wird gleich in Zielgröße gezeichnet (nächster Nachbar, `image-rendering: pixelated`) — ganzzahlig und scharf.
+ * Nur `zoom`-Faktor und Versatz ändern sich je Stufe; Versatz in Einheiten VOR dem Zoom (`translate` wird mitgezoomt), Hülle liegt bei links/oben 0.
+ * `rect` = Layout-Box der Handkarte (links/oben/Breite/Höhe in Bildschirmpixeln), `fensterH` = Fensterhöhe (unterer Rand bleibt 8 px im Bild).
+ * Liefert Inline-Variablen: --tbs1..4 (Zoom), --tbx0..4 / --tbt0..4 (Versatz; 0 = Ruhelage, 4 = Endzustand). Nur Rechnung, kein Layout lesen.
+ */
+function ppFx44HandStufen(rect, fensterH) {
+  const w0 = rect.width, h0 = rect.height;
+  const ganz = window.ppKarteGanz || ((w) => w);
+  let wEnd = ganz(w0 * 1.5);
+  if (wEnd < w0 * 1.3) wEnd = ganz(w0 * 1.3, 'auf');           // mindestens deutlich größer als die Ruhekarte
+  const cx = rect.left + w0 / 2, cy = rect.top + h0 / 2;
+  const hEnd = wEnd * 1.4, hoch = Math.min(0, fensterH - 8 - (cy + hEnd / 2));
+  const r = { '--tbx0': rect.left + 'px', '--tbt0': rect.top + 'px' };
+  const rd = (v) => Math.round(v * 10000) / 10000;
+  let vorher = w0;
+  for (let k = 1; k <= 4; k++) {
+    let w = k === 4 ? wEnd : ganz(w0 + (wEnd - w0) * k / 4);
+    w = Math.max(vorher, Math.min(wEnd, w)); vorher = w;
+    const h = w * 1.4, z = w / w0;
+    const links = Math.round(cx - w / 2), oben = Math.round(cy - h / 2 + hoch * k / 4);
+    r['--tbs' + k] = String(rd(z));
+    r['--tbx' + k] = rd(links / z) + 'px';
+    r['--tbt' + k] = rd(oben / z) + 'px';
+  }
+  return r;
+}
+window.ppFx44HandStufen = ppFx44HandStufen;
+
 // ───────────────────────── 1. Mischen ─────────────────────────
 const PP_FX44_RUECKEN = new Map();                  // Schlüssel → { grid: Uint8Array(W·H·3) | null, W, H, laedt }
 /** Rückenbild als Zellgitter (RGB, auf die Palette eingerastet). Gibt das Gitter zurück oder null, solange das Bild lädt / nicht lesbar ist. */

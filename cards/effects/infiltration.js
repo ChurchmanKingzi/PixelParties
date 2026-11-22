@@ -18,6 +18,8 @@ const CARD_NAME = 'Infiltration';
 const { takeTopFromOpponentDeck, flugDeckZuHand } = require('./_opponent-deck-shared');
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // BORIS-SPERRE (Klausel 1): nimmt die oberste Karte des Gegnerdecks auf die eigene Hand.
   // Bei wirksamem Boris beim Gegner nicht aktivierbar.
   stealsOpponentCards: true,
@@ -44,7 +46,8 @@ module.exports = {
     // is blocked. Same rule applies in onFreeActivate as a defensive
     // re-check in case the activation reached the engine despite the
     // greyed-out UI.
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch gegen den Erste-Runden-Geschuetzten aktivierbar (onFreeActivate: Einsatz verbraucht, Wirkung verpufft).
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
     return true;
@@ -59,7 +62,7 @@ module.exports = {
     const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
     if (!hero?.name) return false;
     const oi = engine.opponentOf(pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    if (gs.firstTurnProtectedPlayer === oi) { engine.log('infiltration_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return true; }   // Spielgestalter-Entscheidung 16.11.2026: verpufft (Einsatz verbraucht)
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
 

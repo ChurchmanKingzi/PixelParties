@@ -23,6 +23,10 @@
 //
 //  Die RUECKNAHME am Zugende ist generisch (`charmedBy` wird dort
 //  gelöscht) — eine Karte muss dafür nichts tun.
+//  `fortsetzung` (nur The Master's Orders): dieselbe Übernahme setzt sich im
+//  selben Zug fort, nachdem eine Status-Immunität sie unterbrochen hat — ①–③
+//  entfallen, sie liefen beim Beginn schon (Resistance wird nicht ein zweites
+//  Mal verbraucht und nicht umgangen).
 //
 //  ── DER SCHUTZ-SCHALTER ───────────────────────────────────────────
 //  `statuses.charmed` trägt die Ausprägung, `engine._charmBlocksFrom`
@@ -52,6 +56,7 @@ async function temporaereKontrolle(engine, {
   sourceName = 'Control',
   marker = null,              // '_loveShot' | 'onlyFromController' | null
   supportZonesLocked = false, // nur, wenn der Kartentext sie nennt
+  fortsetzung = false,        // The Master's Orders: dieselbe Übernahme setzt sich im selben Zug fort (nach einer Status-Immunität) — ①–③ liefen beim Beginn schon, nicht erneut (Resistance nie ein zweites Mal)
 }) {
   const gs = engine.gs;
   const ops = gs.players[ownerPi];
@@ -60,7 +65,7 @@ async function temporaereKontrolle(engine, {
   if (hero.charmedBy != null) return { ok: false, grund: 'bereits uebernommen' };
 
   // ① Erst-Zug-Schutz
-  if (gs.firstTurnProtectedPlayer === ownerPi) {
+  if (!fortsetzung && gs.firstTurnProtectedPlayer === ownerPi) {
     engine.log('charm_fizzle', {
       by: sourceName, target: hero.name, reason: 'turn-1 protection',
     });
@@ -73,7 +78,7 @@ async function temporaereKontrolle(engine, {
     playerIdx: ownerPi, heroIdx, hero,
     effectType: 'charm', cancelled: false, _skipReactionCheck: true,
   };
-  await engine.runHooks('beforeHeroEffect', effectCtx);
+  if (!fortsetzung) await engine.runHooks('beforeHeroEffect', effectCtx);
   if (effectCtx.cancelled) {
     engine.log('charm_blocked', { by: sourceName, target: hero.name });
     engine.sync();
@@ -81,7 +86,7 @@ async function temporaereKontrolle(engine, {
   }
 
   // ③ Effekt-Immunitaet (Escape Device, Invisibility Cloak)
-  if (engine.hasEffectImmunity?.(ownerPi, heroIdx, null)) {
+  if (!fortsetzung && engine.hasEffectImmunity?.(ownerPi, heroIdx, null)) {
     engine.log('effect_immunity', { hero: hero.name, status: 'charmed' });
     engine.sync();
     return { ok: false, grund: 'immun' };
@@ -104,6 +109,9 @@ async function temporaereKontrolle(engine, {
   if (supportZonesLocked) {
     if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
     gs._charmedSupportLocked.push({ owner: ownerPi, heroIdx });
+    // „It and its Support Zones are unaffected by other cards and effects": Marke fuer `engine.heroZonenGeschuetzt` — Anhaengsel werden dort weder angelegt (`placeAttachment`)
+    // noch entfernt (Exorcism). (Die Liste `_charmedSupportLocked` oben fuehrt auch dauerhafte Uebernahmen und wird nirgends gelesen.)
+    hero.statuses.charmed.zonenGeschuetzt = true;
   }
 
   engine.log('charm_control', {

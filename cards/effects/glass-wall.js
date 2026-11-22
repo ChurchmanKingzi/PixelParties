@@ -73,8 +73,8 @@ function istAttack(engine, source, info) {
 }
 
 module.exports = {
-  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
-  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  // „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; nur Hammer Throws Item Lock liest es noch —
+  // Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
   negatesWholeCard: true,
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT, läuft ihr Effekt-Rumpf nie — die Engine spielt dann dieses Bild.
@@ -153,7 +153,8 @@ module.exports = {
 
     engine._broadcastEvent('play_zone_animation', { type: 'glass_wall_shatter', owner: t.seite, heroIdx: t.heroIdx, zoneSlot: -1 });
     await engine._delay(BRUCH_MS);                        // die Risse laufen, dann bricht die Scheibe
-    engine.grantEffectImmunity(t.seite, t.heroIdx, source);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(t.seite, t.heroIdx, source, { ueberFenster: true });
     engine.log('glass_wall_shatter', { player: gs.players[pi]?.username, hero: t.hero.name, negated: srcName });
     if (inst.zone === 'surprise') {
       // Flug Surprise Zone → Ablage, an die Zone des Trägers gebunden (gleichnamige Karten auf anderen Helden sind sonst nicht unterscheidbar; Muster: Spider Silk Bridge).

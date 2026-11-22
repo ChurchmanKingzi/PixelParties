@@ -121,7 +121,7 @@ module.exports = {
     chainSource: {
       fromHand: true,
       isArmed(engine, inst) {
-        return !!inst && inst.zone === 'hand';
+        return !!inst && (inst.zone === 'hand' || inst.zone === 'creationZone');   // Hand oder Crestinas Vorrat
       },
       triggersOn(engine, tributeInst, sourceInst) {
         if (!tributeInst || !sourceInst) return false;
@@ -148,6 +148,7 @@ module.exports = {
 
   // Muss auf der HAND zuhoeren (Reaktion) und auf dem Feld wirken.
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
@@ -206,7 +207,7 @@ module.exports = {
   hooks: {
     /** Reaktion: eine eigene "Drago"-Kreatur fällt. */
     onCreatureDeath: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;          // nur die Handkopie reagiert
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;          // nur die Handkopie reagiert (Hand oder Crestinas Vorrat)
 
       const engine = ctx._engine;
       const gs = engine.gs;
@@ -247,7 +248,7 @@ module.exports = {
       if (gs._greenDragoneerTriggered[evtKey]) return;
       if (gs[RESOLVING_KEY]?.[pi]) return;
       // Frische Handpruefung — siehe Kopfkommentar.
-      if (!ps.hand.includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       // ── EIN Platz, kein Ausweichen (Als Ruling 8.8.) ─────────────────
       // Kartentext: "into the Support Zone it occupied". Der Effekt darf
@@ -289,8 +290,8 @@ module.exports = {
       });
       if (!confirmed || confirmed.cancelled) return;
 
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      if (handIdx < 0) return;                       // zwischenzeitlich verloren
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;                       // zwischenzeitlich verloren
 
       gs._greenDragoneerTriggered[evtKey] = true;
       if (!gs[RESOLVING_KEY]) gs[RESOLVING_KEY] = {};
@@ -298,7 +299,7 @@ module.exports = {
       try {
         // Handkarte VOR dem Summon abbuchen, damit spaetere Hooks keine
         // Geisterkopie in der Hand sehen.
-        engine.takeFromPileSync(ps, 'hand', handIdx);
+        engine.rxNimm(ps, q);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(

@@ -1,0 +1,15 @@
+{
+  "creature": "Black Marketeer",
+  "sheet": "black-marketeer.png",
+  "frameWidth": 22,
+  "frameHeight": 31,
+  "frames": 60,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 11.0
+}

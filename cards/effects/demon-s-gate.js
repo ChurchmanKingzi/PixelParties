@@ -87,11 +87,13 @@ function untertypErlaubt(cd, script) {
  *  Demon's Gate would unlock Spells the player couldn't legally cast
  *  even with the schools met.
  */
-function eligibleHandIndices(engine, ps, pi) {
+function eligibleHandIndices(engine, ps, pi, vorrat = false) {
   const cardDB = engine._getCardDB();
   const out = [];
-  for (let i = 0; i < (ps.hand || []).length; i++) {
-    const name = ps.hand[i];
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): `vorrat` = dieselbe Pruefung fuer die Plaetze in Crestinas Vorrat.
+  const liste = vorrat ? (engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : []) : (ps.hand || []);
+  for (let i = 0; i < liste.length; i++) {
+    const name = liste[i];
     const cd = cardDB[name];
     if (!cd) continue;
     if (cd.cardType !== 'Spell') continue;
@@ -128,7 +130,9 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     if (!ps) return false;
-    return eligibleHandIndices(engine, ps, pi).length > 0;
+    // Spielgestalter-Entscheidung 17.11.2026 (G-01): "as an additional Action" ist eine Aktion — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar.
+    if (engine.areActionsBlocked(pi)) return false;
+    return eligibleHandIndices(engine, ps, pi).length > 0 || eligibleHandIndices(engine, ps, pi, true).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -140,6 +144,7 @@ module.exports = {
     const heroIdx = gateInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (engine.areActionsBlocked(pi)) return false;   // zweite Absicherung (Sperre nach dem Angebot gesetzt): Einmal-Stempel bleibt frei
     // Styx 28.9.: Wirtsheld = Held der Spalte auf der BRETTSEITE der
     // Kreatur (seitenfremd beschworen: liegt auf B, gehoert A). Wirkt fuer
     // `pi`; die fluechtige Spell-Instanz traegt die Brettseite als
@@ -148,7 +153,8 @@ module.exports = {
     const castingHero = gs.players[feld]?.heroes?.[heroIdx] || null;
 
     const eligibleIdx = eligibleHandIndices(engine, ps, pi);
-    if (eligibleIdx.length === 0) return false;
+    const eligibleVorrat = eligibleHandIndices(engine, ps, pi, true);
+    if (eligibleIdx.length === 0 && eligibleVorrat.length === 0) return false;
 
     // ── Step 1: in-hand pick (handPick, not gallery) ──
     // Per the project's "handPick over gallery" rule, any pick from the
@@ -158,6 +164,7 @@ module.exports = {
       title: CARD_NAME,
       description: 'Choose a Destruction or Decay Magic Spell to cast through Demon’s Gate (as if it had Destruction Magic 3 or Decay Magic 3).',
       eligibleIndices: eligibleIdx,
+      creationEligibleIndices: eligibleVorrat,
       minSelect: 1,
       maxSelect: 1,
       cancellable: true,
@@ -177,9 +184,11 @@ module.exports = {
     const pick = result.selectedCards[0];
     const handIndex = pick.handIndex;
     const spellName = pick.cardName;
+    const ausVorrat = !!pick.fromCreation;
 
     // Defensive: re-verify the pick.
-    if (typeof handIndex !== 'number' || ps.hand[handIndex] !== spellName) return false;
+    if (typeof handIndex !== 'number') return false;
+    if (ausVorrat ? (!eligibleVorrat.includes(handIndex) || (ps.creationZone || [])[handIndex] !== spellName) : ps.hand[handIndex] !== spellName) return false;
     const cardDB = engine._getCardDB();
     const cd = cardDB[spellName];
     if (!cd || cd.cardType !== 'Spell') return false;
@@ -219,7 +228,7 @@ module.exports = {
     spellInst.turnPlayed = gs.turn || 0;
     if (feld !== pi) spellInst.heroOwner = feld;
     // Gestohlene Handkarte: Area/Attachment bleibt Eigentum ihres Besitzers (Ablage dort) — wie `doPlaySpell` (W63c).
-    { const _hk = engine._handCardPileOwner(pi, spellName, handIndex); if (_hk !== pi) spellInst.originalOwner = _hk; }
+    if (!ausVorrat) { const _hk = engine._handCardPileOwner(pi, spellName, handIndex); if (_hk !== pi) spellInst.originalOwner = _hk; }
 
     // Build the cast ctx and patch self-targeting helpers so anything
     // the Spell would do to "the casting hero" (Phoenix Tackle's
@@ -276,7 +285,10 @@ module.exports = {
     let castError = null;
     try {
       const script = loadCardEffect(spellName);
-      if (typeof script?.hooks?.onPlay === 'function') {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs/casts" = „plays", `engine.performKettenfenster`): der von der KREATUR gewirkte Spell öffnet dasselbe Kettenfenster wie ein normal gespielter
+      // (Silence, The Master's Plan [aus der Hand], …); Wirker ist die Kreatur (`trotzStatus`: kein Helden-Wirker). Negiert: der Rumpf läuft nie; der Spell gilt als gespielt und geht (wie sonst) in die Ablage.
+      const _pk = await engine.performKettenfenster({ cardName: spellName, pi, heroIdx, heroOwner: feld, ausHand: true, trotzStatus: true });
+      if (!_pk.negated && typeof script?.hooks?.onPlay === 'function') {
         await script.hooks.onPlay(spellCtx);
       }
     } catch (err) {
@@ -310,11 +322,14 @@ module.exports = {
     // ── Step 3: commit. Spell moves from hand → discard. ──
     // Re-find the actual index (downstream listeners might have
     // shifted the hand — paranoid lookup mirrors Skeleton Priest).
-    const finalIdx = ps.hand.indexOf(spellName);
+    const finalIdx = ausVorrat ? (ps.creationZone || []).indexOf(spellName) : ps.hand.indexOf(spellName);
+    const gateQuelle = ausVorrat && finalIdx >= 0 ? { liste: ps.creationZone, ausVorrat: true, idx: finalIdx } : null;
     if (finalIdx >= 0 && aufsBrett) {
       // Area/Attachment hat sich selbst aufs Brett gelegt: die Karte verlässt nur die Hand (Flug/Landung zeigt das Brett), KEIN Ablagestapel.
-      engine.takeFromPileSync(ps, 'hand', finalIdx);
-      engine.handKartenBesitzerPs(ps, spellName);   // Herkunftsbuch der gestohlenen Handkarte abschließen
+      if (gateQuelle) engine.rxNimm(ps, gateQuelle); else {
+        engine.takeFromPileSync(ps, 'hand', finalIdx);
+        engine.handKartenBesitzerPs(ps, spellName);   // Herkunftsbuch der gestohlenen Handkarte abschließen
+      }
     } else if (finalIdx >= 0) {
       // Hand→discard flight (zone-anchored play_pile_transfer before
       // the splice, per the project's "Removing a chosen board card"
@@ -322,7 +337,7 @@ module.exports = {
       // otherwise pick the leftmost copy if the hand had duplicates).
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: spellName,
-        from: 'hand', to: 'discard',
+        from: ausVorrat ? 'creation' : 'hand', to: 'discard',
         fromHandIdx: finalIdx,
         // `asPlay: 'sole'` — einziges Play-Signal dieser Karte.
         // Als Verdachtsfall "Destruction-Spells mit 0% Cast-Rate": der
@@ -337,8 +352,11 @@ module.exports = {
         // gerade NICHT.
         asPlay: 'sole',
       });
-      engine.takeFromPileSync(ps, 'hand', finalIdx);
-      engine.handKartenBesitzerPs(ps, spellName).discardPile.push(spellName);   // W3/W5a: Stapel des permanenten Besitzers
+      if (gateQuelle) { engine.rxNimm(ps, gateQuelle); ps.discardPile.push(spellName); }
+      else {
+        engine.takeFromPileSync(ps, 'hand', finalIdx);
+        engine.handKartenBesitzerPs(ps, spellName).discardPile.push(spellName);   // W3/W5a: Stapel des permanenten Besitzers
+      }
     }
 
     engine.log('demons_gate_cast', {

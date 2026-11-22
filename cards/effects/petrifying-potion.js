@@ -45,11 +45,13 @@ const CARD_NAME = 'Petrifying Potion';
 const DAUER = 3;
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   isPotion: true,
 
   canActivate(gs) {
     for (let pi = 0; pi < gs.players.length; pi++) {
-      if (gs.firstTurnProtectedPlayer === pi) continue;
+      // Erste-Runden-Schutz: waehlbar, die Versteinerung verpufft (Spielgestalter-Entscheidung 16.11.2026)
       for (const hero of (gs.players[pi]?.heroes || [])) {
         if (hero?.name && hero.hp > 0) return true;
       }
@@ -60,9 +62,10 @@ module.exports = {
   getValidTargets(gs, pi, engine) {
     const targets = [];
     for (let seite = 0; seite < gs.players.length; seite++) {
-      if (gs.firstTurnProtectedPlayer === seite) continue;
       targets.push(...engine.getHeroTargets(seite));
     }
+    // Warnungsprinzip (Spielgestalter-Entscheidung 17.11.2026): betäubungs-immune Helden bleiben wählbar, die Zielwahl warnt („… is immune to stunning and will not be affected."), die CPU wählt sie nicht.
+    engine.markiereStatusWirkungslos?.(targets, 'stunned', pi, CARD_NAME);
     return targets;
   },
 

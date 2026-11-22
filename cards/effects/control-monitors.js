@@ -95,7 +95,7 @@ module.exports = {
     // Es muss noch etwas zu loeschen geben (sonst waere die Karte reine Verschwendung).
     if (nochAufDerHand(adderPs, hc.cardNames || []).length === 0) return false;
     // Preis: N weitere Handkarten (Control Monitors selbst liegt noch in der Hand und zaehlt nicht), dazu ein noetiger Weisheits-Abwurf.
-    const weitere = (myPs.hand || []).length - 1;
+    const weitere = engine.handFodderFor(pi, CARD_NAME);   // 11.11.: liegt die Karte in Crestinas Vorrat, steht die ganze Hand als Preis bereit (sonst -1 fuer die Karte selbst)
     return weitere - minWeisheit(engine, pi) >= anzahlHinzugefuegt(hc);
   },
 

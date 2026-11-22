@@ -76,6 +76,40 @@ function _countCopies(arr, cardName) {
 }
 
 /**
+ * Dajans Preis: dieselbe Rechnung wie beim Handspiel (`engine.artifactPlayCost`: Rusting Crystal, Selbstrabatt der Karte wie
+ * Future Tech Laser Cannon, Shu'Chaku, Misfire …) und davon 10 abgezogen, Boden 0. Kein Handindex (Handrabatte gelten der
+ * Handkarte) und kein Gratis-Kauf des Conquerors (`ausDeck`: der gilt nur fuer Karten aus der Hand).
+ */
+function _artifactCost(engine, pi, cardName) {
+  const pc = engine.artifactPlayCost(pi, cardName, -1, { ausDeck: true });
+  return Math.max(0, pc.cost - COST_REDUCTION);
+}
+
+/** Verbraucht die einmaligen Rabatte, die in den Preis eingingen (wie der Hand-Weg im Server): Misfires Nullpreis und Shu'Chakus Rabatt aufs naechste Artefakt. */
+function _rabatteEinloesen(engine, pi, cardName) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return;
+  if (ps._freeArtifactNames && ps._freeArtifactNames[cardName]) delete ps._freeArtifactNames[cardName];
+  if (ps._nextArtifactCostReduction) {
+    delete ps._nextArtifactCostReduction;
+    delete ps._nextArtifactCostReductionTurn;
+  }
+}
+
+/** „You can only play 1 X per game" (`oncePerGame` / `oncePerGameKey`): ist diese Karte fuer die Partie schon verbraucht? */
+function _oncePerGameVerbraucht(ps, script, cardName) {
+  if (!script?.oncePerGame && !script?.oncePerGameKey) return false;
+  return !!ps?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
+}
+
+/** Der Partie-Stempel einer gespielten (nicht negierten) Karte — wie `_markOncePerGamePotion` / der Equip-Weg im Server. */
+function _oncePerGameStempeln(ps, script, cardName) {
+  if (!ps || (!script?.oncePerGame && !script?.oncePerGameKey)) return;
+  if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+  ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+}
+
+/**
  * Build the deck gallery the player picks from. Filters out any
  * artifact whose reduced cost (max(0, raw - 10)) the player can't
  * afford right now — there's no point letting them pick a card we'd
@@ -103,7 +137,8 @@ function _buildEligibleGallery(engine, pi) {
     if (script?.blockedByPileLock && engine.isPileLockedFor(pi)) continue;
     if (script?.blockedBySummonLock && ps.summonLocked) continue;
     if (cd.subtype && cd.subtype.toLowerCase() === 'equipment' && !engine.hasLegalEquipHero(cardName, pi)) continue;
-    const reducedCost = Math.max(0, (cd.cost || 0) - COST_REDUCTION);
+    if (_oncePerGameVerbraucht(ps, script, cardName)) continue;   // „only 1 per game": ein verbrauchtes Exemplar wird nicht angeboten (wie beim Handspiel)
+    const reducedCost = _artifactCost(engine, pi, cardName);
     if (gold < reducedCost || (reducedCost > 0 && engine.goldSpendBlocked(pi))) continue;   // G1 (A09-11): Goldsperre
     seen.add(cardName);
     out.push({
@@ -201,16 +236,29 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   if (engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName) >= 0) destSlot = engine.equipPflichtPlatz(destSeite, destHeroIdx, cardName);   // Darion: Pflicht-Platz im Equip-Stapel
   else if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return false;
 
+  // Spielgestalter-Entscheidung 16.11.2026: Ausrüsten PER EFFEKT prallt an der Resistance des Trägers ab (Regel Welle 14 Q5) — Dajans Deck-Spiel genauso wie Treasure Hunter's Backpack
+  // (`heroNonDamageEffectBlocked(…, 'equip')`, VOR jeder Kartenbewegung). Wie beim Backpack bleibt die Ausrüstung im Deck (kein Mischen, kein Aufdecken), es wird nichts bezahlt, nichts
+  // abgelegt — Karte und Gold sind unberührt, der Heldeneffekt ist gewirkt und verbraucht (Rückgabe 'blocked': `onHeroEffect` überspringt das Mischen und meldet Erfolg, die Aktion bleibt weg).
+  if (await engine.heroNonDamageEffectBlocked(destSeite, destHeroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+    engine.log('dajan_equip_blocked', { player: ps.username, equip: cardName, hero: dps.heroes?.[destHeroIdx]?.name });
+    engine.sync();
+    return 'blocked';
+  }
+
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.
   const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
   let placedInst = null;
+  const equipScript = loadCardEffect(cardName);
+  // Item Lock (Hammer Throw): wie beim Handspiel erst vormerken, nach der Aufloesung einfordern (`itemLockFordern`).
+  engine.itemLockVormerken(pi);
   const chainResult = await engine.executeCardWithChain({
     fromBoard: true,   // v1323: aus dem DECK gespielt — kein Hand-Spiel (The Master's Plan)
     cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
     resolve: async () => {
+      _rabatteEinloesen(engine, pi, cardName);
       if (cost > 0) {
         await engine._payCardCost(pi, cost);
         engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
@@ -232,14 +280,18 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
       await engine.runHooks('onCardEnterZone', {
         enteringCard: placedInst, toZone: 'support', toHeroIdx: destHeroIdx,
       });
+      _oncePerGameStempeln(ps, equipScript, cardName);   // „only 1 per game": erst jetzt verbraucht (eine ganz negierte Karte stempelt nicht)
       return true;
     },
   });
 
+  await engine.itemLockFordern(pi);
   if (chainResult.negated) {
     // Chain-negated → card flows to discard, gold not paid (engine
     // restored). Mirrors doPlayArtifact's negation handling.
-    if (!ps.discardPile.includes(cardName)) ps.discardPile.push(cardName);
+    // Immer ablegen: die Kette legt sie nicht selbst ab, und eine gleichnamige Karte, die schon in der Ablage liegt, ist eine ANDERE Kopie
+    // (frueher `includes`-Pruefung: die negierte Karte ging dann verloren).
+    ps.discardPile.push(cardName);
   }
   return true;
 }
@@ -255,22 +307,41 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
   const ps = engine.gs.players[pi];
   if (!ps) return false;
 
+  // Item Lock (Hammer Throw): wie beim Handspiel erst vormerken, nach der Aufloesung einfordern; ein Abbruch kostet nichts.
+  engine.itemLockVormerken(pi);
+  // Magic Gems („discard a card to keep this card in your hand"): die Karte kommt hier nicht aus der Hand — es gibt nichts zu behalten
+  // und keine Abwurfkosten (`_magic-gem-shared.js` liest `engine._deckSpielScope`).
+  const aus = async (...args) => {
+    const vorher = engine._deckSpielScope;
+    engine._deckSpielScope = { pi, cardName };
+    try { return await resolveFn(...args); }
+    finally { engine._deckSpielScope = vorher; }
+  };
   const chainResult = await engine.executeCardWithChain({
     fromBoard: true,   // v1323: aus dem DECK gespielt — kein Hand-Spiel (The Master's Plan)
     cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
-    resolve: resolveFn,
+    resolve: aus,
   });
 
   // Aborted (re-enter targeting path) — for Dajan's inline flow we
   // treat it the same as cancelled and refund the action via false
   // return up the stack. Resolve hasn't paid gold yet.
-  if (chainResult.resolveResult?.aborted) return null;
+  if (chainResult.resolveResult?.aborted) { engine.itemLockVerwerfen(); return null; }
 
   // Cancelled mid-resolve — script signalled "the player backed out".
   // Don't pay gold, keep the card available (return to deck top so the
   // shuffle below re-mixes it with the rest).
   if (chainResult.resolveResult?.cancelled) {
+    engine.itemLockVerwerfen();
     return { cancelled: true };
+  }
+
+  await engine.itemLockFordern(pi);   // aufgeloest oder negiert: die Kosten sind faellig
+
+  const script = loadCardEffect(cardName);
+  if (!chainResult.negated) {
+    _oncePerGameStempeln(ps, script, cardName);   // „only 1 per game": eine ganz negierte Karte stempelt nicht
+    _rabatteEinloesen(engine, pi, cardName);
   }
 
   if (cost > 0 && !chainResult.negated) {
@@ -282,9 +353,14 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
     // Negated artifacts go to discard regardless (matching doConfirmPotion).
     ps.discardPile.push(cardName);
   } else {
-    const script = loadCardEffect(cardName);
     if (script?.deleteOnUse) ps.deletedPile.push(cardName);
     else ps.discardPile.push(cardName);
+    // Gespielt ist gespielt: Beobachter wie Luck, Liquid Luck und Koperniko haengen an `afterArtifactUsed` (wie beim Handspiel).
+    try {
+      await engine.runHooks('afterArtifactUsed', { artifactName: cardName, playerIdx: pi, _skipReactionCheck: true });
+    } catch (err) {
+      console.error('[Dajan] afterArtifactUsed hook error:', err.message);
+    }
   }
   return true;
 }
@@ -371,7 +447,8 @@ module.exports = {
     if (!_isPlayableArtifact(cd, script)) return false;
 
     const rawCost = cd.cost || 0;
-    const cost = Math.max(0, rawCost - COST_REDUCTION);
+    const cost = _artifactCost(engine, pi, chosenName);
+    if (_oncePerGameVerbraucht(ps, script, chosenName)) return false;   // Stempel kann sich waehrend der Auswahl geaendert haben
     if ((ps.gold || 0) < cost || (cost > 0 && engine.goldSpendBlocked(pi))) return false;   // G1 (A09-11): Goldsperre
 
     // Re-verify deck membership; a mid-prompt mill could have removed it.
@@ -391,6 +468,7 @@ module.exports = {
     if (isEquip) {
       success = await _playEquip(engine, pi, chosenName, cd, cost);
       if (!success) return false; // Cancelled before commitment.
+      if (success === 'blocked') return true;   // Resistance des Trägers fing das Ausrüsten ab (siehe `_playEquip`): Effekt verbraucht, Karte bleibt im Deck, kein Mischen/Aufdecken
     } else if (isTargeting) {
       // Build validTargets + run the script's UI prompt inline.
       const validTargets = script.getValidTargets(gs, pi, engine) || [];

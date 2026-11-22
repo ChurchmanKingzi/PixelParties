@@ -100,6 +100,9 @@ module.exports = {
     const oppPs  = gs.players[oppIdx];
     if (!ps || !oppPs) return { cancelled: true };
     if ((ps.mainDeck?.length || 0) < REVEAL_COUNT) return { cancelled: true };
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen den Erste-Runden-Geschuetzten (kein Karte-Schenken moeglich) ist die Karte spielbar und verpufft
+    // ohne Aufdecken (Karte gespielt, Kosten bezahlt; das Deck bleibt unberuehrt). Frueher: `blockedByFirstTurnProtection` = unspielbar.
+    if (engine.ersterZugGeschuetzt(oppIdx, pi)) { engine.log('birthday_present_fizzle', { player: ps.username, reason: 'first-turn protection' }); return {}; }
 
     // ── Step 1: take the top 3 cards off the deck ────────────────────────
     // W85c (Atta, Al 29.10.: „löschen STATT auf die Hand"): die 3 obersten Karten sind EIN Aufdeck-Ereignis, gemeldet BEVOR sie das Deck verlassen; eine von Atta gelöschte Karte kommt

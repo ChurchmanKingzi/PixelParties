@@ -149,6 +149,7 @@ module.exports = {
     await engine.actionDestroyCard(
       { name: CARD_NAME, owner: pi, heroIdx: ownHeroIdx },
       sacrificed,
+      { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
     );
 
     // ── Step 3: deck → hand (with reveal) ──

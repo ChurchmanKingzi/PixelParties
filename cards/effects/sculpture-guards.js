@@ -44,7 +44,8 @@
 //  windows check the flag and skip, so a multi-
 //  target source that already offered the player
 //  one prompt doesn't re-prompt per individual
-//  entry. Cleared at chain-resolve.
+//  entry. Cleared at chain-resolve, at the end of every action /
+//  Spell resolution and at turn start.
 //
 //  ── ALL CARD-SPECIFIC STATE / HOOKS LIVE HERE ──
 //
@@ -275,6 +276,24 @@ module.exports = {
       const gs = ctx._engine.gs;
       if (gs._sgShield) delete gs._sgShield;
       if (gs._sgPromptedFor) delete gs._sgPromptedFor;
+    },
+    // Der Angebots-Merker lebt NUR für eine Auflösung. `onChainResolve` feuert nur aus der alten `_resolveChain` — lief danach keine
+    // Reaktionskette, blieb er stehen, und Sculpture Guards wurde für den nächsten Schaden (andere Quelle, anderer Held, nächster Zug) nie mehr
+    // angeboten, sobald ein Angebot einmal abgelehnt war. Gleiche Aufräumer wie bei Bamboo Shield und Spectral Armor (F01-03, v1378).
+    onAnyActionResolved: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._sgPromptedFor) delete gs._sgPromptedFor;
+    },
+    afterSpellResolved: (ctx) => {
+      // Eine Reaktion, die MITTEN im Fenster aufloest (auch Sculpture Guards selbst), beendet die Quelle nicht: der Merker bleibt, sonst bekaeme dieselbe Quelle ein zweites Angebot.
+      if (ctx.isReaction || String(ctx.spellCardData?.subtype || '').toLowerCase() === 'reaction') return;
+      const gs = ctx._engine.gs;
+      if (gs._sgPromptedFor) delete gs._sgPromptedFor;
+    },
+    onTurnStart: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._sgPromptedFor) delete gs._sgPromptedFor;
+      if (gs._sgShield) delete gs._sgShield;
     },
   },
 };

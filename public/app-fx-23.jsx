@@ -202,7 +202,7 @@ function ppFx23Gift(vial) {
     for (const b of te.blasen) ppFx23GiftBlase(g, t, b, cx, cy, S);
     if (vial) for (const b of te.schaedel) ppFx23GiftBlase(g, t, b, cx, cy, S);
   }, 1000, { breite: 168, hoehe: 168, ankerY: 120 }, {
-    z: 10100,
+    z: vial ? 10110 : 10100,      // Poison Vial liegt über gleichzeitigen Goldfunkeln (`gold_sparkle`, 10100): sonst deckt dessen Scheibe die Giftblasen zu (Tutorial 5, Alchemy + Poison Vial auf Fiona)
     vorbereiten: () => ({
       blasen: Array.from({ length: ppFxN(vial ? 12 : 14) }, () => vial
         ? { xOff: ppFx23Zufall(-30, 30), size: ppFx23Zufall(6, 16), verzug: Math.random() * 200, dauer: ppFx23Zufall(500, 1000), farbe: ppFx23Wahl(PP_FX23_VIAL), wobble: ppFx23Zufall(-10, 10) }

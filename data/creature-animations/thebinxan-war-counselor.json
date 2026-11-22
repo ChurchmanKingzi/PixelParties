@@ -1,0 +1,15 @@
+{
+  "creature": "Thebinxan War Counselor",
+  "sheet": "thebinxan-war-counselor.png",
+  "frameWidth": 38,
+  "frameHeight": 33,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 19.0
+}

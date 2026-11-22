@@ -4,12 +4,36 @@
 //  unnegatable damage to any target (Hero or
 //  Creature). Breaks through all protection
 //  EXCEPT turn-1 protection.
+//  ★ Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung
+//  (Baihu/Petrifier) hält den Schaden auch bei KREATUREN nicht ab (wie beim Helden) — `engine.actionDealTrueDamage` stempelt den Treffer mit
+//  `durchschlagVersteinerung` (gilt für alle True-Damage-Quellen: Rockfall, Pressure Projectile, Surefire Shot, Piercer of Heavens, Glasowt).
+//  ★ Spielgestalter-Entscheidung 18.11.2026: True Damage schlägt auch Time Bomblebee („cannot take damage") und Succubus-gestohlene Kreaturen durch (`durchschlagSchutz`, wie
+//  Elixir of Strength/Ida); Cardinal Beasts („unaffected by all cards and effects") bleiben unberührt.
 //  Damage type: 'other'.
 //  Hard once per turn.
-//  Animation: red acid splash on target.
+//  Animation (Pixelart, public/app-fx-70.jsx): Spuckkugel wie im Trailer — die Kugel LÄDT über der Handkarte der gespielten Potion (0,7 s, Radius 2 → 7; die Karte fliegt nach einem Drittel der Animation (ca. 0,8 s) in den Gelöscht-Stapel, `_potion-hand-flight.js`),
+//  fliegt 0,7 s im Bogen zum Ziel und schlägt dort ein (Ringe, Strahlen, Tropfen); der Schaden fällt erst beim Einschlag (SCHADEN_MS).
+//  Rückfall des Clients (Retro, reduzierte Bewegung, `window.__ppFx70Aus`): der bisherige Säure-GUSS von oben (`acid_splash`, app-fx-9) — er wird
+//  dann zum Einschlagszeitpunkt gezeigt. EINE Zeile zurück zum alten Guss-Look (sofort, ohne Wartezeit): `SPUCKKUGEL = false`.
 // ═══════════════════════════════════════════
 
+// Zeiten (ms) der Zonen-Animation `acid_spit` (app-fx-70.jsx, 30 Hz): Laden 700 + Flug 700 = Einschlag bei Bild 42 der Animation; `VORLAUF_MS` = Mount-Vorlauf im Client
+// (ZONE_ANIM_MOUNT_DELAY_MS 100 + Aufbau, wie bei Tiger Kick/Venom Snake). Engine-Wartezeit = Animationszeit + Vorlauf, damit Zahl und HP-Balken beim Einschlag erscheinen.
+const { quelle: handQuelle, warteMitAbflug, abflugNachDrittel } = require('./_potion-hand-flight');
+
+const SPUCKKUGEL = true;   // false = der bisherige Säure-Guss von oben (`acid_splash`, Schaden sofort) — die einzige Stelle, die zwischen den beiden Looks umschaltet
+const SPUCK_LADE_MS = 700;
+const SPUCK_FLUG_MS = 700;
+const VORLAUF_MS = 120;
+const SCHADEN_MS = SPUCK_LADE_MS + SPUCK_FLUG_MS + VORLAUF_MS;
+// Abflug der Handkarte: frühestens nach einem Drittel der Animation (2,45 s, Nutzer 13.11.), und so spät, dass ihre Landung (560 ms) auf das Ende der Auflösung fällt (+60 ms) — dann bucht der Server die Potion
+// im selben Augenblick in den Gelöscht-Stapel, in dem die Karte dort ankommt (Nutzer 14.11.: „direkt sichtbar, wenn sie dort landet").
+const ABFLUG_MS = Math.max(abflugNachDrittel(VORLAUF_MS, 2450), SCHADEN_MS + 60 - 560);
+
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT('acid-vial', pi); },
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Wenn du andere Schadenskarten unspielbar machst, müssen das Vial und Rockfall auch sein!"): die Karte richtet NUR Schaden an Zielen an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,
@@ -22,14 +46,16 @@ module.exports = {
   // Schaden durchgehen. Rockfall trägt es NICHT: sein Text nennt nur
   // "reduced or negated", er bleibt also umleitbar.
   cannotBeRedirected: true,
+  // Kartentext: „This damage cannot be reduced or negated" (True Damage). Nur Metadatum fuer die Hand-Reaktionsfenster der Engine: Schutz-/Negationskarten werden TROTZDEM angeboten
+  // (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt) — die Frage traegt dann den Hinweis „This damage cannot be reduced or negated." (`_nutzlosHinweis`).
+  damageCannotBeReducedOrNegated: true,
 
   canActivate(gs, playerIdx) {
     // Hard once per turn
     const hoptKey = `acid-vial:${playerIdx}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
-    // At least one targetable hero must exist (not turn-1 protected)
+    // At least one hero must exist. Spielgestalter-Entscheidung 16.11.2026: auch ein Erste-Runden-geschuetzter Held ist waehlbar (der Treffer verpufft: `dealTrueDamage` blockt).
     for (let pi = 0; pi < gs.players.length; pi++) {
-      if (gs.firstTurnProtectedPlayer === pi) continue;
       for (const hero of (gs.players[pi]?.heroes || [])) {
         if (hero?.name && hero.hp > 0) return true;
       }
@@ -49,9 +75,7 @@ module.exports = {
     // which keeps Artifact-Creature hybrids (Powder Keg, Pollution
     // Spewer, …) included.
     for (let pi = 0; pi < gs.players.length; pi++) {
-      if (gs.firstTurnProtectedPlayer !== pi) {
-        targets.push(...engine.getHeroTargets(pi));
-      }
+      targets.push(...engine.getHeroTargets(pi));   // Erste-Runden-Schutz: waehlbar, der Treffer verpufft (Spielgestalter-Entscheidung 16.11.2026)
       targets.push(...engine.getCreatureTargets(pi));
     }
     return targets;
@@ -77,7 +101,8 @@ module.exports = {
     return selectedIds && selectedIds.length === 1;
   },
 
-  animationType: 'acid_splash',
+  // ★ `'none'`: der Server schickt KEIN `potion_resolved` mit dem Guss mehr — die Spuckkugel (`acid_spit`) sendet `resolve` selbst (Quelle `von` = Handkarte der Potion, Ziel = gewähltes Ziel).
+  animationType: SPUCKKUGEL ? 'none' : 'acid_splash',
 
   async resolve(engine, pi, selectedIds, validTargets) {
     if (!selectedIds || selectedIds.length === 0) return;
@@ -93,9 +118,22 @@ module.exports = {
 
     const source = { name: 'Acid Vial', owner: pi, heroIdx: -1 };
 
+    // Spuckkugel: lädt über der Handkarte, fliegt zum Ziel (app-fx-70). Das Ziel wird VOR dem Senden geprüft (kein Flug ins Leere), der Schaden folgt beim Einschlag.
+    const spuck = async (zoneSlot) => {
+      if (!SPUCKKUGEL) return;
+      engine.sync();   // Zielwahl-Fenster schließen, bevor die Kugel fliegt (sonst steht „Splash!" über der Flugbahn)
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'acid_spit', owner: target.owner, heroIdx: target.heroIdx, zoneSlot,
+        von: handQuelle(engine, pi, 'Acid Vial'),   // Handplatz der Karte (Rückfall: Gelöscht-Stapel)
+      });
+      await warteMitAbflug(engine, pi, 'Acid Vial', SCHADEN_MS, ABFLUG_MS);
+    };
+
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero || hero.hp <= 0) return;
+
+      await spuck(-1);
 
       const { dealt } = await engine.actionDealTrueDamage(source, hero, DAMAGE, {
         type: 'potion',
@@ -113,6 +151,8 @@ module.exports = {
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (!inst) return;
+
+      await spuck(target.slotIdx);
 
       await engine.actionDealTrueDamage(source, inst, DAMAGE, { type: 'potion' });
     }

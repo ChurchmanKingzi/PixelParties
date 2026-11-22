@@ -205,7 +205,7 @@ async function runStellinEffect(ctx) {
 
   const cardDB = engine._getCardDB();
 
-  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand);
+  const handEligible = levelZeroCreatureNames(engine, pi, engine.handUndVorratListe(pi));   // 12.11.: Hand + Crestinas Vorrat
   const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck);
   if (handEligible.length === 0 && deckEligible.length === 0) return false;
 
@@ -250,7 +250,7 @@ async function runStellinEffect(ctx) {
       if (userCancelled) break;
       // Re-verify hand presence — previous placements' onPlay hooks
       // could have moved cards around.
-      if ((ps.hand || []).indexOf(cardName) < 0) continue;
+      if (!engine._rxQuelleFuer(ps, cardName)) continue;   // Hand oder Crestinas Vorrat
       const cd = cardDB[cardName];
       if (!cd) continue;
       // Pre-check eligibility so we can tell "no host available for THIS
@@ -266,7 +266,7 @@ async function runStellinEffect(ctx) {
       // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
       if (!(await engine._runBeforeSummon(cardName, pi, heroIdx,
         seite !== pi ? { heldSeite: seite } : {}, slot))) continue;
-      if ((ps.hand || []).indexOf(cardName) < 0) continue;
+      if (!engine._rxQuelleFuer(ps, cardName)) continue;   // Hand oder Crestinas Vorrat
       if (!platzOk(engine, pi, seite, heroIdx, slot, cardName)) continue;   // Kosten koennen den Platz belegt haben (W63a: frei oder geteilt)
       const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slot, {
         heldSeite: seite,   // Kontrolle statt Seite (Styx 28.9.)
@@ -348,7 +348,7 @@ module.exports = {
     if (ctx.card.counters?.attachedHero) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    const hasStellan = (ps.hand || []).includes(ATTACHABLE)
+    const hasStellan = ctx._engine.handUndVorratListe(ctx.cardOwner).includes(ATTACHABLE)   // 12.11.: Hand + Crestinas Vorrat
       || (ps.mainDeck || []).includes(ATTACHABLE);
     return hasStellan;
   },

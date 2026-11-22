@@ -192,6 +192,9 @@ const HOOKS = {
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
   BEFORE_CREATURE_AFFECTED: 'beforeCreatureAffected',
+  // Quellen-Immunitaet VOR der Pool-Umbuchung (Molinda: "Creatures take no damage from this Hero's Attacks and Spells").
+  // ctx: { entry } — Kopie des Schadenseintrags (Quelle in Klon-Sicht); ein Zuhoerer, dessen Effekt der Kreatur diesen Schaden nimmt, setzt `entry._quelleNegiert = true`.
+  BEFORE_POOLED_CREATURE_DAMAGE: 'beforePooledCreatureDamage',
   AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
   AFTER_ALL_STATUS_DAMAGE:      'afterAllStatusDamage',
 
@@ -356,12 +359,10 @@ const STATUS_EFFECTS = {
   // all keep firing. Distinct from Stunned which silences everything.
   // Cleansable like Stunned.
   bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
-  // `blinded` (Smoke Vial, future Blinded sources) prevents the bearer
-  // from using Attacks, Spells, or activated effects that need to pick
-  // one or more targets. AoE / area-wide effects keep working — the
-  // engine reads `blocksTargeting: true` plus the card script's
-  // `requiresTarget: true` flag to decide. Cleansable like Stunned.
-  // Status icon is rendered as 👁 with a CSS strikethrough line.
+  // `blinded` (Smoke Vial, future Blinded sources): „Cannot choose a target the opponent controls with Attacks, Spells or effects." (Spielgestalter-Entscheidung 16.11.2026.)
+  // Gilt fuer ALLE Effekte des Traegers (Attacks, Spells, Reaktionen, Surprises, Helden-, Ability-, Kreatur-, Ausruestungs-Effekte): Picker-Filter `engine.markiereBlindGesperrte`
+  // (gegnerische Ziele ausgegraut), Spielbarkeit/Aktivierbarkeit `engine.blindedEffektGesperrt` (gesperrt nur, wenn der Effekt keinen legalen EIGENEN Kandidaten hat).
+  // Effekte ohne Zielwahl und Platzierungen ignorieren Blinded. Cleansable like Stunned.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   // ★ v1059 (Als Befund 14.9.): ZWEITE Blendungs-Art mit anderer
   // Endbedingung — „until the next time it takes damage" („Trunk Sand")
@@ -540,7 +541,7 @@ const BUFF_EFFECTS = {
   // next single-target Attack. Persists across turns until consumed.
   empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." },
   // Unreasonable Anger (24.10.): jeder Schaden, den der Held an EINEM einzelnen Ziel verursacht, +100 — bis zum Ende des nächsten Zuges des Wirkers (Engine `_applyAngerBonusIfApplicable`).
-  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'Any damage this Hero deals to single targets is increased by 100.' },
+  unreasonable_anger: { label: 'Unreasonable Anger', icon: '💢', tooltip: 'The next damage this Hero deals to a single target during its controller\'s next turn is increased by 100.' },
   // String of Fine — target takes 0 damage from any source for the
   // duration of the buff. `damageMultiplier: 0` is read by the
   // engine's standard buff-multiplier pass on hero & creature damage,
@@ -1183,7 +1184,7 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
   // selbst 0 liefert, und die Handkarte bekaeme gar nichts.
   const kopien = (engine.cardInstances || []).filter(c =>
     c.name === cardName
-    && (!opts.zone || c.zone === opts.zone)
+    && (!opts.zone || c.zone === opts.zone || (opts.zone === 'hand' && c.zone === 'creationZone'))   // 11.11.: eine Karte in Crestinas Vorrat (Extra-Hand) zaehlt als Handkopie
     && (c.controller ?? c.owner) === ownerIdx
     && !c.faceDown
     && (typeof c.isActiveIn !== 'function' || c.isActiveIn()));

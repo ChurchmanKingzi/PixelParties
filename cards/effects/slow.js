@@ -55,6 +55,9 @@ module.exports = {
 
       // ★ W74c: EIN Abwurf-Stapel statt einer Einzelabfrage je Karte — Ambush the Scout und Boris werden einmal gefragt (vorher je Karte: Boris fragte
       // zweimal, ein Ambush-Fenster je Karte). Das violette Dunkelmagie-Aufblitzen läuft einmal zu Beginn.
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „Wird eine der anderen Karten negiert, wird auch die Sperre mitnegiert." Negiert Ambush the Scout den Abwurf des Gegners, gilt die mitgelieferte
+      // Selbstsperre („cannot interact with your opponent's hand …") nicht (Boris' Verzicht negiert nichts: die Sperre bleibt).
+      const _negiertVorher = engine.handInteraktionenNegiert();
       if ((oppPs.hand || []).length > 0) {
         // Purple dark-magic burst over the opponent's hand
         engine._broadcastEvent('slow_dark_magic', { ownerIdx: oppIdx });
@@ -67,6 +70,12 @@ module.exports = {
         });
 
         await engine._delay(200);
+      }
+
+      if (engine.handInteraktionenNegiert() > _negiertVorher) {
+        engine.log('slow_negated', { player: ps.username, reason: 'Ambush the Scout — keine Sperre' });
+        engine.sync();
+        return;
       }
 
       // Lock: no more hand interaction with the opponent this turn

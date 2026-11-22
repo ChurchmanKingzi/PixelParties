@@ -49,7 +49,8 @@ const MANIFEST_HALB_MS = 1250;   // wie in dark-deepsea-god.js
 
 /** Liegt ein „Dark Deepsea God" auf der Hand dieses Spielers? */
 function gottAufDerHand(engine, pi) {
-  return (engine.gs.players[pi]?.hand || []).indexOf(GOTT);
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  return engine.handUndVorratListe(pi).indexOf(GOTT);
 }
 
 module.exports = {
@@ -96,9 +97,9 @@ module.exports = {
     if (!zurueck?.returned) return false;
 
     // ── ② Der Gott steigt aus SEINER Zone auf ───────────────────
-    const idxJetzt = (ps.hand || []).indexOf(GOTT);
-    if (idxJetzt < 0) return false;
-    engine.takeFromPileSync(ps, 'hand', idxJetzt);
+    const gottQuelle = engine._rxQuelleFuer(ps, GOTT);   // Hand oder Crestinas Vorrat
+    if (!gottQuelle) return false;
+    engine.rxNimm(ps, gottQuelle);
     engine.notePlayedFromHand(pi);
 
     engine._broadcastEvent('dark_deepsea_god_manifest', { owner: pi });

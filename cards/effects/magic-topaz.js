@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════
 
 const { arrowTriggerCondition, armAttackerWithArrow } = require('./_arrows-shared');
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 
 const CARD_NAME = 'Magic Topaz';
 const FLAT_DAMAGE_BONUS = 60;
@@ -38,6 +38,9 @@ module.exports = {
 
   // Strictly reactive — never proactively playable.
   canActivate: () => false,
+
+  // Spielgestalter-Entscheidung 16.11.2026: „1 per turn" gilt ab dem Ausspielen (vor dem Kettenfenster) — auch ein danach negierter Topaz ist verbraucht (Engine: `_promptReactionsForChain`).
+  stempelBeiAktivierung(engine, pi) { stempelGem(engine, pi, CARD_NAME); },
 
   reactionCondition: (gs, pi, engine, chainCtx) => {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;

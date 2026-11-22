@@ -1,0 +1,257 @@
+# -*- coding: utf-8 -*-
+"""Idle-Animation für „Deepsea Reaper“ (Creature).
+
+Quelle: src/deepsea-reaper.png — Ebene „Reaper“ (32×30 px, 556 Pixel, alle deckend, 18 Farben) aus MotiveDeepsea.xcf (Ebene 298). Gegen die Kartenkunst abgeglichen (data/card-art/native/Deepsea_Reaper.png, 76×51,
+Ebene liegt bei (22, 12)): gleiche Form, Position und Größe; die Karte ist sehr dunkel getönt, die Augen sind dort grün überlagert (Korrelation deshalb nur 0,68). Die Ebene „Ebene #15“ (299, blaue Flügelfläche) ist ein
+Tönungs-/Overlay-Stück über den Flügeln und nicht Teil der Figur.
+PICK: [["MotiveDeepsea", 298, 1]]
+
+Aufruf:   python3 deepsea_reaper.py [--preview <ordner>]
+Ausgabe:  ../../data/creature-animations/deepsea-reaper.png + .json
+
+Was ist was (x/y im Sprite):
+* Ein schwebender Sensenmann mit Fledermausflügeln in Teal-Karo (51,93,119)/(77,137,154) mit dunkelblauem Umriss (13,16,49): Kopf mit grauem Schädel (189,189,189)/(106,106,106)/(213,213,213) unter einer schwarzen Kapuze (x 8–23, y 3–13),
+  zwei orangefarbene Hörner (123,41,16)/(230,131,82)/(189,90,57) links (x 9–12) und rechts (x 19–22), an den Kopfseiten (y 3–8); weiße Augen (246,255,255) in Winkelform bei (13–14, 12–13) und (17–18, 12–13)
+  (in der Kartenkunst grün überlagert), dazu ein diagonaler heller Streifen auf dem Schädel (Knochenglanz, kein Metall);
+  zwei Fledermausflügel links (x 0–8) und rechts (x 23–31) (y 0–11); Rumpf/Robe (y 12–23) mit einem Saum aus drei Fetzen (y 17–21);
+  eine Sense waagerecht davor (Schaft y 22–23, x 1–29, schwarz/dunkelgrau; Klinge unten links x 2–12, y 24–29 in Stahlgrau (189,189,189)/(213,213,213)/(246,246,246)).
+Fest bleiben: Kopf-/Schädelform, Hörner, Augenform im Ruhebild, Schaft der Sense, Karomuster.
+
+Ablauf (48 Frames à 70 ms = 3,36 s; Frame 0 = Original, Partikel ausgenommen):
+* Flügelschlag (RUNDE 2, Nutzer: „sollte mehr mit den Flügeln schlagen“): beide Flügel schlagen jetzt kräftig und gleichzeitig: Periode 16 Frames (1,12 s, dreimal pro Schleife; vorher ±2 px, Periode 24). Jeder Flügel (links x 0–7, rechts x 24–31, y 0–11:
+  das waagerechte Flügelblatt y 6–11 und der obere Flügelfinger y 0–5) BIEGT sich entlang seiner Mittellinie (anim_flieger_r2.biege, Rückwärtsabbildung: jedes Zielpixel holt sich das Quellpixel an derselben Bogenlänge/Querstelle, keine Löcher, keine
+  Mischfarben, die Wurzel am Kopf bleibt stehen): das Blatt schlägt von der Ruhelage (Flügel hängen leicht) bis ca. 58° nach oben und ca. 25° nach unten (Spitze ca. −7 … +4 px), die Spitze hinkt der Wurzel um 0,4 rad nach (Flügel biegt sich durch); der Flügelfinger schwenkt bis ca. 27° (Spitze ±2 px). Frame 0 = Original.
+* Schweben: der ganze Körper (Kopf, Rumpf, Sense) hebt sich 1 px beim Abschlag der Flügel und sinkt beim Aufschlag zurück (gegenläufig).
+* Saumfetzen: die drei Fetzen (y 17–21) pendeln unabhängig ±1 px zur Seite (Periode 16, versetzte Phasen).
+* Sense: die Klinge (y ≥ 24) pendelt ±1 px, ihre untere Hälfte (y ≥ 27) mit Verzögerung (Periode 24). Stahlglanz (Regel 14: Metall): ein heller Lichtpunkt läuft an der Schneide (Weiß (246,255,255)) entlang; zweimal pro Schleife.
+* Blinzeln (Lid = schwarz (0,0,0), die Farbe der Augenhöhle): beide Augen, zweimal (Frame 14–16 und 38–40).
+* Partikel (hinter der Figur): zwei graue Seelen-Wölkchen 2×2 → 3×3 → 2×2 (`U.wolke_ebene`, Kern (189,189,189), Rand (106,106,106)), nie ein Einzelpixel; sie steigen je 8 px links und rechts neben dem Rumpf auf
+  (Lebensdauer 24 Frames, zweimal pro Schleife, links/rechts um 12 versetzt). Flügel, Saum und Sense füllen das Feld, deshalb ist nur diese Bahn frei: in jeder Pose ≥ 2 px Abstand zur Figur und nie teilweise verdeckt
+  (per Skript über alle 48 Frames geprüft).
+Kein Glanz außer der Klinge (Schädel/Hörner = Knochen, kein Metall), kein Feuer (Regel 15). Randpixel-Test (Regel 16): `U.kontur_schliessen` (Randfarben der Quelle) in jeder Pose; im Ruhebild nichts.
+Keine gemalten Pixel außer Farben der Quelle.
+Zuschnitt: Frame auf die Figur zugeschnitten (symmetrisch um die Ruhefigur; Partikel vergrößern ihn höchstens 2 px darüber hinaus, dazu 1 px leerer Rand). Alle Bewegungen laufen auf der vollen Leinwand
+(anim_lib wirft ClipError). Nur ganze Pixel.
+"""
+import math
+import sys
+
+import cv2
+import numpy as np
+
+import anim_lib as L
+import anim_untote as U
+import anim_flieger_r2 as R2
+import anim_amorph as A
+
+N, MS = 48, 70
+GPL, GPR, GPT, GPB = 7, 7, 7, 5
+
+spr = L.lade('deepsea-reaper')
+sh, sw = spr.shape[:2]
+H, W = sh + GPT + GPB, sw + GPL + GPR
+yy, xx = np.mgrid[0:sh, 0:sw]
+vorhanden = L.deckend(spr)
+col = lambda x, y: tuple(int(v) for v in spr[y, x, :3])
+UMRISS = U.umrissfarben(spr)
+KONTUR = (13, 16, 49)
+SCHWARZ, WEISS = (0, 0, 0), (246, 255, 255)
+GREY = [(0, 0, 0), (24, 24, 24), (41, 41, 41), (82, 82, 82), (106, 106, 106), (123, 123, 123), (189, 189, 189), (213, 213, 213), (246, 246, 246)]
+assert KONTUR in UMRISS
+
+AUGEN = [(13, 12), (14, 12), (14, 13), (17, 12), (18, 12), (17, 13)]
+assert all(col(x, y) == WEISS for (x, y) in AUGEN)
+SCHNEIDE = [(5, 25), (5, 26), (6, 26), (6, 27), (7, 27), (8, 28), (9, 28), (10, 29), (11, 29), (12, 29)]      # helle Pixel der Klinge, von oben links nach unten rechts
+assert all(col(x, y) in ((189, 189, 189), (213, 213, 213), (246, 246, 246)) for (x, y) in SCHNEIDE)
+
+# Zeitplan (alles 0 bei Frame 0)
+BLINZ = {14: 1, 15: 2, 16: 1, 38: 1, 39: 2, 40: 1}                 # 1 = obere Zeile (y 12) zu, 2 = alles zu
+GLANZ = {s0 + k: k for s0 in (8, 32) for k in range(len(SCHNEIDE))}  # Lichtpunkt läuft die Schneide entlang: Frame s0 + k → Pixel k
+
+# Teile (Masken im Sprite)
+FL_L = vorhanden & (xx <= 7) & (yy <= 11)
+FL_R = vorhanden & (xx >= 24) & (yy <= 11)
+greymask = np.zeros((sh, sw), bool)
+for c in GREY:
+    greymask |= (spr[..., 0] == c[0]) & (spr[..., 1] == c[1]) & (spr[..., 2] == c[2])
+KLINGE1 = vorhanden & greymask & (xx <= 13) & (yy >= 24) & (yy <= 26)
+KLINGE2 = vorhanden & greymask & (xx <= 13) & (yy >= 27)
+sub = vorhanden.copy()
+sub[:17] = False
+sub[22:] = False
+_n, _lab = cv2.connectedComponents(sub.astype(np.uint8), connectivity=4)
+_teile = sorted(range(1, _n), key=lambda k: int(np.nonzero(_lab == k)[1].mean()))
+assert len(_teile) == 3
+SAUM = [vorhanden & (_lab == k) for k in _teile]                   # links, Mitte, rechts
+rest = vorhanden & ~FL_L & ~FL_R & ~KLINGE1 & ~KLINGE2 & ~SAUM[0] & ~SAUM[1] & ~SAUM[2]
+
+BLASE = {'c': (189, 189, 189), 'r': (106, 106, 106)}
+P = lambda x, y: (GPL + x, GPT + y)
+# Flügel, Saum und Sense füllen das Feld fast ganz: freie Bahnen (Abstand ≥ 2 px in jeder Pose, Partikel höchstens +2 px über den Körper-Rand hinaus) gibt es nur links und rechts neben dem Rumpf
+# (y 11–19) und rechts unten.
+BLASEN_N = 24                                                   # Lebensdauer 24 Frames, zweimal pro Schleife (je Bahn nur ein Wölkchen auf einmal)
+PUFFS = [
+    dict(x=P(-1, 19)[0], y=P(-1, 19)[1], vx=0, vy=-8, off=0, wackeln=0.4),
+    dict(x=P(32, 19)[0], y=P(32, 19)[1], vx=0, vy=-8, off=12, wackeln=0.4),
+]
+
+
+def teil(maske):
+    t, _ = L.trenne(spr, maske)
+    return L.platz(t, H, W, GPL, GPT)                           # sofort auf die volle Leinwand
+
+
+FLL_FAN, FLL_FING, FLR_FAN, FLR_FING = teil(FL_L & (yy >= 6)), teil(FL_L & (yy <= 5)), teil(FL_R & (yy >= 6)), teil(FL_R & (yy <= 5))
+REST_A, K1_A, K2_A = teil(rest), teil(KLINGE1), teil(KLINGE2)
+SAUM_A = [teil(m) for m in SAUM]
+
+
+def fluegel(a, pivot_x, amp, ph, breite=2):
+    """Flügelschlag wie `L.spalten_welle`, aber je `breite` Spalten (vom Gelenk aus gezählt) mit gleichem Versatz. Verliert ein Spaltenpaar, das im Ruhebild waagerecht aneinander lag, durch die
+    verschiedenen Versätze den 4er-Zusammenhang (dünne Flügelspitzen), wird die äußere Spalte um ein Pixel bis zur inneren verlängert (Farbe = ihr nächstes Pixel) — die Spitze reißt nicht ab."""
+    out = L.leer(*a.shape[:2])
+    cols = [x for x in range(a.shape[1]) if a[:, x, 3].any()]
+    maxd = max(abs(x - pivot_x) for x in cols)
+    dys = {}
+    for x in cols:
+        d = abs(x - pivot_x)
+        frac = min(1.0, ((d // breite) * breite + breite / 2.0) / maxd) if d >= breite else 0.0
+        dys[x] = int(round(amp * math.sin(ph) * frac))
+        for y in np.nonzero(a[:, x, 3])[0]:
+            out[y + dys[x], x] = a[y, x]
+    # Reparatur: von innen nach außen; jede zusammenhängende Pixelfolge (Lauf) einer Spalte, die im Ruhebild waagerecht an der inneren Nachbarspalte lag, es nach dem Versatz aber nicht mehr tut, wird um die Lücke
+    # (Pixel in der Farbe ihres nächsten Pixels) bis zur inneren Spalte verlängert — die Spitze reißt nicht ab.
+    step = -1 if min(cols) < pivot_x else 1
+    for x in sorted(cols, key=lambda c: abs(c - pivot_x)):
+        xi = x - step
+        if xi not in dys or dys[xi] == dys[x]:
+            continue
+        r_in = set(np.nonzero(a[:, xi, 3])[0].tolist())
+        ys = np.nonzero(a[:, x, 3])[0].tolist()
+        runs, cur = [], [ys[0]]
+        for y in ys[1:]:
+            if y == cur[-1] + 1:
+                cur.append(y)
+            else:
+                runs.append(cur)
+                cur = [y]
+        runs.append(cur)
+        s_in = {y + dys[xi] for y in r_in}
+        for run in runs:
+            if not (set(run) & r_in):
+                continue                                           # lag im Ruhebild nicht waagerecht an der inneren Spalte
+            sr = [y + dys[x] for y in run]
+            if set(sr) & s_in:
+                continue
+            yo, yi = min(((o, i_) for o in sr for i_ in s_in), key=lambda t: abs(t[0] - t[1]))
+            lo, hi = sorted((yo, yi))
+            for y in range(lo, hi + 1):
+                if not out[y, x, 3]:
+                    out[y, x] = a[yo - dys[x], x]
+    return out
+
+
+# ── Flügelschlag: Biegung entlang der Mittellinie ─────────────────────────────────────────────────────────────────────────────
+FL_PERIODE = 16
+A_BLATT = math.radians(40.0)                                 # Ausschlag des Blatts (Spitze: bis ca. +50° nach oben, −17° nach unten gegenüber der Ruhelage)
+FING_A = math.radians(18.0)
+LAUF = 0.4
+#            Wurzelpunkt (Sprite)  Richtung zur Spitze (rad)           Länge   Drehsinn (+1 = oben ist im Uhrzeigersinn)
+BLATT_L = dict(p0=(8.0, 9.0), ang0=math.atan2(-0.5, -6.0), laenge=9.0, seite=+1)
+BLATT_R = dict(p0=(23.0, 9.0), ang0=math.atan2(-0.5, 6.0), laenge=9.0, seite=-1)
+FING_L = dict(p0=(8.0, 5.0), ang0=math.atan2(-5.0, -2.0), laenge=5.5, seite=+1)
+FING_R = dict(p0=(23.0, 5.0), ang0=math.atan2(-5.0, 2.0), laenge=5.5, seite=-1)
+
+
+def _v(ph, f):
+    """Schlagwert: 0 bei Frame 0 (Ruhe = Original), Spitze (f = 1) hinkt der Wurzel um LAUF rad nach."""
+    return math.sin(ph - LAUF * f) - math.sin(-LAUF * f)
+
+
+def blatt(a, fl, ph):
+    def delta(s):
+        f = min(1.0, max(0.0, (s - 1.5) / (fl['laenge'] - 1.5)))
+        return fl['seite'] * _v(ph, f) * A_BLATT * f ** 0.45        # Biegung früh (nah an der Wurzel), damit sich die Spitze fast wie bei einer Drehung bewegt
+    return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta)
+
+
+def finger(a, fl, ph):
+    def delta(s):
+        f = min(1.0, max(0.0, s / fl['laenge']))
+        return fl['seite'] * _v(ph, f) * FING_A * f
+    return R2.biege(a, (GPL + fl['p0'][0], GPT + fl['p0'][1]), fl['ang0'], fl['laenge'], delta, inseln=0)
+
+
+def set_px(a, x, y, farbe):
+    a[GPT + y, GPL + x, :3] = farbe
+    a[GPT + y, GPL + x, 3] = 255
+
+
+def sinz(i, per, ph=0.0):
+    return math.sin(2 * math.pi * i / per + ph)
+
+
+def versatz(i, per, ph, amp=1.2):
+    """Ganzzahliger Versatz ±1, bei Frame 0 genau 0 (Phasenkorrektur)."""
+    return max(-1, min(1, int(round(amp * (sinz(i, per, ph) - sinz(0, per, ph))))))
+
+
+def frame_gross(i, nur=None):
+    ph = 2 * math.pi * i / FL_PERIODE
+    kb = REST_A.copy()
+    bl = BLINZ.get(i, 0)
+    if bl:
+        for (x, y) in AUGEN:
+            if bl == 2 or y == 12:
+                set_px(kb, x, y, SCHWARZ)
+    fl = L.zusammen(H, W, [(blatt(FLL_FAN, BLATT_L, ph), 0, 0), (finger(FLL_FING, FING_L, ph), 0, 0)])
+    fr = L.zusammen(H, W, [(blatt(FLR_FAN, BLATT_R, ph), 0, 0), (finger(FLR_FING, FING_R, ph), 0, 0)])
+    # Sense: Klinge pendelt, Schneide glänzt
+    k1, k2 = K1_A.copy(), K2_A.copy()
+    g = GLANZ.get(i)
+    if g is not None:
+        x, y = SCHNEIDE[g]
+        for kk in (k1, k2):
+            if kk[GPT + y, GPL + x, 3]:
+                kk[GPT + y, GPL + x, :3] = WEISS
+    s1 = int(round(sinz(i, 24)))
+    s2 = int(round(1.4 * (sinz(i, 24, -0.8) - sinz(0, 24, -0.8))))
+    s2 = max(s1 - 1, min(s1 + 1, s2))
+    saum = [(SAUM_A[0], versatz(i, 16, 0.0), 0), (SAUM_A[1], versatz(i, 16, 2.1), 0), (SAUM_A[2], versatz(i, 16, 4.2), 0)]
+    bob = -int(round(1.0 * math.sin(ph)))
+    koerper = L.zusammen(H, W, [(fl, 0, 0), (fr, 0, 0), (kb, 0, 0)] + [(a, dx, dy) for (a, dx, dy) in saum] + [(k1, s1, 0), (k2, s2, 0)])
+    koerper = L.versetze(koerper, 0, bob) if bob else koerper
+    koerper, _ = A.verbinde4(koerper)                           # Flügelfinger-Spitze, die nur über eine Pixelecke hängt: Brückenpixel (Farbe des Spitzenpixels)
+    koerper = U.kontur_schliessen(koerper, UMRISS, KONTUR)
+    if nur == 'koerper':
+        return koerper
+    blasen = _glut(H, W, i, BLASEN_N, PUFFS, BLASE)
+    return L.zusammen(H, W, [(blasen, 0, 0), (koerper, 0, 0)])
+
+
+_OHNE_PARTIKEL = [False]
+
+
+def _glut(*a, **k):
+    """Partikelebene (leer, wenn nur die Figur gerendert wird — für den Zuschnitt)."""
+    if _OHNE_PARTIKEL[0]:
+        return L.leer(a[0], a[1])
+    return U.wolke_ebene(*a, **k)
+
+
+# Zuschnitt auf die Figur: symmetrisch um die Ruhefigur; Partikel dürfen den Frame höchstens 2 px über den Figurenrand hinaus vergrößern
+BOX = U.zuschnitt([frame_gross(i) for i in range(N)], [frame_gross(i, 'koerper') for i in range(N)], (GPL, GPT, GPL + sw, GPT + sh))
+PAD_L, PAD_T = GPL - BOX[0], GPT - BOX[1]
+
+
+def frame(i, nur=None):
+    return U.beschneiden(frame_gross(i, nur), BOX)
+
+
+if __name__ == '__main__':
+    frames = [frame(i) for i in range(N)]
+    prev = sys.argv[sys.argv.index('--preview') + 1] if '--preview' in sys.argv else None
+    L.pruefe(frames, quelle=spr, min_rand=1)
+    L.speichern('deepsea-reaper', 'Deepsea Reaper', frames, MS, prev)
+    if prev:
+        L.streifen(prev + '/deepsea-reaper-strip.png', [frames[k] for k in (0, 6, 12, 18, 24, 30, 36, 42)], spalten=4, scale=8)

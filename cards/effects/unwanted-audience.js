@@ -125,6 +125,7 @@ module.exports = {
   // Fire hooks from hand (the onTurnStart trigger) AND discard (the
   // catch-later-summons listener, after the card resolves there).
   activeIn: ['hand', 'discard'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Never proactively playable — only via the onTurnStart trigger.
   // (Deliberately NOT `isReaction`; see header.)
@@ -135,7 +136,7 @@ module.exports = {
      * Beginning of the OPPONENT's turn: offer to play the card.
      */
     onTurnStart: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;   // only a hand copy triggers
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat (11.11.)   // only a hand copy triggers
       if (ctx.isMyTurn) return;              // only on the opponent's turn
 
       const engine = ctx._engine;
@@ -147,7 +148,7 @@ module.exports = {
       gs._unwantedAudiencePromptDone = gs.turn;
 
       const ps = gs.players[pi];
-      if (!ps?.hand?.includes(CARD_NAME)) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
       // ★ W21a (Al, 20.10.2026: „ja"): Wirker-Held mit Decay Magic 1 (Magic Arts zaehlt als zweite Schule laut Kartendaten) noetig —
       // eigener oder uebernommener; sonst kein Angebot.
       if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
@@ -164,12 +165,14 @@ module.exports = {
 
       // Remove one copy from hand, keep its instance (it becomes the
       // discard-resident listener for later summons).
-      const removeIdx = ps.hand.indexOf(CARD_NAME);
-      if (removeIdx < 0) return;
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;
+      const removeIdx = q.idx;
       // ★ W21a: Wirker waehlen (vor jeder Entnahme; Abbruch = nichts passiert).
       const wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
       if (!wirkerPlan) return;
-      if (ps.hand.indexOf(CARD_NAME) !== removeIdx) return;
+      const q2 = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q2 || q2.ausVorrat !== q.ausVorrat || q2.idx !== removeIdx) return;
 
       // Zone-anchored hand→discard flight. This card is removed from
       // hand here and pushed to discard only AFTER executeCardWithChain
@@ -183,7 +186,7 @@ module.exports = {
       // the engine's canonical hand→pile pattern.
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: CARD_NAME,
-        from: 'hand', to: 'discard',
+        from: q.ausVorrat ? 'creation' : 'hand', to: 'discard',
         fromHandIdx: removeIdx,
         // Einsatz-Beleg: derselbe Fall wie Jump in the River — die
         // Karte spielt sich im eigenen Reaktions-Hook aus der Hand,
@@ -193,14 +196,17 @@ module.exports = {
         asPlay: 'sole',
       });
 
-      engine.takeFromPileSync(ps, 'hand', removeIdx);
+      // Die Instanz BLEIBT getrackt (sie wird zum Ablage-Lauscher): aus dem Vorrat nur splicen, nicht abraeumen.
+      const _vorratInst = q.ausVorrat ? engine._findHandInstanceAt(pi, removeIdx, true) : null;
+      if (q.ausVorrat) q.liste.splice(q.idx, 1);
+      else engine.takeFromPileSync(ps, 'hand', removeIdx);
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
       // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
       engine.sync();
       await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
-      const inst = engine.cardInstances.find(c =>
+      const inst = q.ausVorrat ? _vorratInst : engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
 
       // Reveal to opponent + spectators (same etiquette as Jump in the River).
@@ -251,7 +257,7 @@ module.exports = {
         inst.heroIdx = -1;
         inst.zoneSlot = -1;
       }
-      engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W63c: Ablage des permanenten Besitzers
+      engine._rxAblagePs(ps, CARD_NAME, q).discardPile.push(CARD_NAME);   // W63c: Ablage des permanenten Besitzers
 
       if (chainResult.negated) {
         engine.log('unwanted_audience_negated', { player: ps.username });

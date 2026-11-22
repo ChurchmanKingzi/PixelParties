@@ -76,8 +76,10 @@ module.exports = {
   // Als Ruling (Al 28.10.): diese Attack richtet nie Schaden an — Schadens-Pfeile und Magic Topaz sind an ihr nicht ankettbar (`_arrows-shared`: `arrowTriggerCondition`).
   dealsNoAttackDamage: true,
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Send a Surprise from your opponent's side of the board …") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
 
   // „This counts as an additional Action" — immer.
   inherentAction: true,

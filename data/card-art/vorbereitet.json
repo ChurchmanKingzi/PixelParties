@@ -1,0 +1,47 @@
+{
+ "_hinweis": "Fullart-Kunst (nativ, pixelgenau) fuer Karten, die noch NICHT implementiert sind. Bewusst NICHT in data/card-art/index.json und nicht im Atlas (public/cardgen/art.png): Die Karten haben dadurch kein Bild und erscheinen nicht im Deck-Editor, Puzzle-Creator usw. Beim Umsetzen einer Karte: PNG nach data/card-art/native/<id>.png verschieben, in index.json eintragen ({\"<Kartenname>\": {\"id\": \"<id>\", \"kind\": \"a\"}}) und python3 scripts/build-card-art.py ausfuehren.",
+ "karten": {
+  "Bad Birthday Girl Cecilia": {
+   "native": "vorbereitet/Bad_Birthday_Girl_Cecilia.png",
+   "size": [
+    96,
+    135
+   ]
+  },
+  "Champion, the Eye of the Storm": {
+   "native": "vorbereitet/Champion_the_Eye_of_the_Storm.png",
+   "size": [
+    90,
+    126
+   ]
+  },
+  "Cool Birthday Girl Monia": {
+   "native": "vorbereitet/Cool_Birthday_Girl_Monia.png",
+   "size": [
+    88,
+    123
+   ]
+  },
+  "Definitely not Andras, the Human Weapon": {
+   "native": "vorbereitet/Definitely_not_Andras_the_Human_Weapon.png",
+   "size": [
+    96,
+    135
+   ]
+  },
+  "Fern, the Liberated Fairy": {
+   "native": "vorbereitet/Fern_the_Liberated_Fairy.png",
+   "size": [
+    96,
+    135
+   ]
+  },
+  "Sparrow, the Buffoon of the Treasure Cave": {
+   "native": "vorbereitet/Sparrow_the_Buffoon_of_the_Treasure_Cave.png",
+   "size": [
+    96,
+    134
+   ]
+  }
+ }
+}

@@ -26,6 +26,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Wise Village Elder';
 const LEHR_MS = 1500;        // Länge von `elder_teaching` im Client
@@ -45,7 +46,8 @@ function entsprechenderHeld(engine, inst) {
 function handAbilities(engine, pi, feld, heroIdx) {
   const db = engine._getCardDB();
   const seen = new Set(), out = [];
-  for (const n of (engine.gs.players[pi]?.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     if (seen.has(n)) continue;
     const cd = db[n];
     if (!cd || !hasCardType(cd, 'Ability')) continue;
@@ -91,7 +93,8 @@ function cpuBeste(engine, pi, heroIdx, namen) {
 /** Die Galerie: erst die Hand, dann das Deck (je alphabetisch), jeder Eintrag mit seinem Herkunfts-Label (`source`). Deck nur mit Summoning Magic 1. */
 function galerieFuer(engine, pi, feld, heroIdx) {
   const hand = handAbilities(engine, pi, feld, heroIdx).sort((a, b) => a.localeCompare(b)).map(name => ({ name, source: 'hand' }));
-  const deck = deckErlaubt(engine, feld, heroIdx) ? deckAbilities(engine, pi, feld, heroIdx) : [];
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu.
+  const deck = (deckErlaubt(engine, feld, heroIdx) && !deckAusgangGesperrt(engine, pi)) ? deckAbilities(engine, pi, feld, heroIdx) : [];
   return [...hand, ...deck];
 }
 

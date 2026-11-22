@@ -74,7 +74,8 @@ async function offerAttach(ctx) {
     seen.add(key);
     gallery.push({ name, source });
   };
-  for (const name of (ps.hand || [])) considerCard(name, 'hand');
+  // ★ 12.11. (Al: „Effekte, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  for (const name of engine.handUndVorratListe(pi)) considerCard(name, 'hand');
   for (const name of (ps.mainDeck || [])) considerCard(name, 'deck');
   if (gallery.length === 0) return;
 
@@ -100,7 +101,7 @@ async function offerAttach(ctx) {
   // Re-verify legality (state may have shifted while the prompt was open).
   if (!engine.canAttachAbilityToHero(pi, chosenAbility, heroIdx, seitenOpt)) return;
   if (chosenSource === 'hand') {
-    if ((ps.hand || []).indexOf(chosenAbility) < 0) return;
+    if (!engine._rxQuelleFuer(ps, chosenAbility)) return;
   } else {
     if ((ps.mainDeck || []).indexOf(chosenAbility) < 0) return;
   }

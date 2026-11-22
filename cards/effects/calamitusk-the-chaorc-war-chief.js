@@ -56,7 +56,8 @@ function canSummonReduced(engine, feld, calaHi, name) {
 function replacements(engine, pi, calaHi, excludeName, feld = pi) {
   const ps = engine.gs.players[pi];
   const byName = new Map();
-  for (const cn of (ps?.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const cn of engine.handUndVorratListe(pi)) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
   }
@@ -138,9 +139,9 @@ module.exports = {
 
         const slot = firstFreeSupportSlot(engine, feld, calaHi, chosen.name, pi);   // W63a: geteilte Zone (Alice) zuerst, dann die erste leere
         if (slot < 0) { engine.sync(); return; }
-        const pile = chosen.source === 'deck' ? ps.mainDeck : ps.hand;
-        const idx = pile.indexOf(chosen.name);
-        if (idx < 0) { engine.sync(); return; }
+        const pile = chosen.source === 'deck' ? ps.mainDeck : null;
+        const calaQuelle = chosen.source === 'deck' ? null : engine._rxQuelleFuer(ps, chosen.name);   // Hand oder Crestinas Vorrat
+        if (chosen.source === 'deck' ? pile.indexOf(chosen.name) < 0 : !calaQuelle) { engine.sync(); return; }
         // Z6 (A06-09): Stapel-Schicht statt Splice - Deck ueber die Deck-Bausteine (`deckEntnahme`: Stapel-Sperre, `deckHookExtras`),
         // Hand wie bisher.
         let _deckAb = null;
@@ -149,7 +150,7 @@ module.exports = {
           if (!_deckAb) { engine.sync(); return; }
           engine.shuffleDeck(pi);
         } else {
-          pile.splice(idx, 1);
+          engine.rxNimm(ps, calaQuelle);
         }
 
         // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling

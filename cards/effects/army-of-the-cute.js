@@ -32,6 +32,7 @@
 
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { heroHasCuteWings, isCuteCreatureCard, schoolLevelMitSupport } = require('./_cute-shared');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Army of the Cute';
 
@@ -90,18 +91,23 @@ function cuteGallery(engine, pi, heroIdx, hs = pi) {
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const out = [];
-  for (const name of (ps.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  for (const name of engine.handUndVorratListe(pi)) {
     const cd = cardDB[name];
     if (isArmyPick(engine, cd, pi, heroIdx, hs)) {
       const level = engine.effectiveCardLevel(cd, pi);
       out.push({ name, level, source: 'hand' });
     }
   }
-  for (const name of (ps.discardPile || [])) {
-    const cd = cardDB[name];
-    if (isArmyPick(engine, cd, pi, heroIdx, hs)) {
-      const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
-      out.push({ name, level, source: 'discard' });
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand OR discard pile" — unter der Stab-Sperre (Staff of the Teleporter) und
+  // Knight of Kings [B] ist die Ablage als Quelle zu (früher angeboten, die Entnahme scheiterte danach). Die Hand bleibt.
+  if (!ablageAusgangGesperrt(engine, pi)) {
+    for (const name of (ps.discardPile || [])) {
+      const cd = cardDB[name];
+      if (isArmyPick(engine, cd, pi, heroIdx, hs)) {
+        const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
+        out.push({ name, level, source: 'discard' });
+      }
     }
   }
   return out;
@@ -249,16 +255,18 @@ module.exports = {
         if (engine.nurEinerSchonKontrolliert?.(pi, name)) continue;
 
         const wunsch = gewollteQuellen[ci];
+        let qHand = null;   // Hand oder Crestinas Vorrat (`_rxQuelleFuer`)
+        const handIdxFuer = () => { qHand = engine._rxQuelleFuer(ps, name); return qHand ? qHand.idx : -1; };
         let src = wunsch === 'discard' ? 'discard' : 'hand';
-        let idx = src === 'hand' ? ps.hand.indexOf(name) : (ps.discardPile || []).indexOf(name);
+        let idx = src === 'hand' ? handIdxFuer() : (ps.discardPile || []).indexOf(name);
         if (idx < 0 && !wunsch) {   // ohne Indizes: alte Reihenfolge Hand → Ablage
           src = src === 'hand' ? 'discard' : 'hand';
-          idx = src === 'hand' ? ps.hand.indexOf(name) : (ps.discardPile || []).indexOf(name);
+          idx = src === 'hand' ? handIdxFuer() : (ps.discardPile || []).indexOf(name);
         }
         if (idx < 0) continue; // copy gone (race) — skip
         // v1389: Ablage über die EINE Stelle (Sperre, Lethe, Signal).
         let ab = null;
-        if (src === 'hand') engine.takeFromPileSync(ps, 'hand', idx);
+        if (src === 'hand') engine.rxNimm(ps, qHand);
         else if (!(ab = await engine.ablageEntnahme(pi, pi, idx, { source: CARD_NAME }))) continue;
 
         if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];

@@ -18,6 +18,13 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.BEFORE_DRAW_BATCH, HOOKS.ON_CARD_ADDED_TO_HAND,
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
+// Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Haltepunkte, an denen zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger aufgelöst werden
+// (dieselben wie beim Elixir of Immortality; siehe `_loeseOpferWiederbelebungen`).
+const OPFER_REVIVE_HALTEPUNKTE = new Set(['afterAllStatusDamage', 'afterSpellResolved', 'afterCreatureEffect', 'onAnyActionResolved', 'onActiveEffectUsed', 'onPhaseEnd']);
+// Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): Meldungen, bei denen sich die Status-Immunität eines Helden ändern kann (Johanna fällt, Light Ball kommt/geht, Zugbeginn nach dem Ende von Schutz/Buff) —
+// vor ihnen gleicht `statusAnhaengselAbgleichen` die Status der Anhängsel (Stowaway, Curse …) sofort ab, statt erst im nächsten `sync()`. Bewusst NICHT bei `onStatusRemoved`/`onStatusApplied`:
+// Johannas Heilung der Verbündeten (Auftauen) läuft über diese Meldung und soll VOR dem Ruhen laufen (geheilte Anhängsel gehen in die Ablage); den Rest holt das nächste `sync()`.
+const STATUS_ABGLEICH_HOOKS = new Set(['onHeroKO', 'onCardEnterZone', 'onCardLeaveZone', 'onTurnStart']);
 const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
 const { loadCardEffect, nameToFile } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
@@ -27,6 +34,9 @@ const ScTracking = require('./_sc-tracking');   // v1381
 const SpyShared = require('./_spy-shared');   // Spy in the Enemy's Camp: Spionage-Marke an der Kreatur
 const ZugFristen = require('./_zug-fristen');   // W68a: „nur echte Züge zählen"
 // ★ W63d: Ereignisse, die den Beginn einer Aktion ANKÜNDIGEN, aber noch keine sichtbare Wirkung sind: sie lösen den Commit des Auftritts nicht aus (nur Protokoll + Flug/Aktivierungsschein).
+// Aufladen vor dem Dash (public/app-fx-68.jsx): 8 Bilder (30 Hz) Vorlauf, den der Client im Ramm-Ereignis (`lade`) bekommt; Folgedashes derselben Figur binnen RAMM_FOLGE_MS laden nicht neu.
+const RAMM_LADEN_MS = process.env.PP_RAMM_LADEN_MS != null && process.env.PP_RAMM_LADEN_MS !== '' ? Math.max(0, Math.min(600, Number(process.env.PP_RAMM_LADEN_MS) || 0)) : 267;   // `PP_RAMM_LADEN_MS=0` schaltet das Aufladen server-seitig ab (Messung vorher/nachher, Notbremse)
+const RAMM_FOLGE_MS = 1800;
 const AUFTRITT_HALTE_MAX_MS = 4000;   // Fail-safe: so lange hält eine Vormerkung den Zustand höchstens zurück, wenn der Besitzer keine Frage offen hat (siehe `_auftrittWaechterStellen`)
 const AUFTRITT_HALTE_EREIGNISSE = new Set(['action_log', 'hand_to_board_fly', 'ability_activated', 'potion_resolved']);   // `potion_resolved`: der Server sendet es beim START der Auflösung — also VOR den abbrechbaren Fragen der Karte
 
@@ -205,7 +215,7 @@ const DAMAGE_HEAP_CHECK_EVERY = 25;
 // `CARDINAL_NAMES_SET`). Imported lazily inside the few hot paths
 // that need them (see usages of `require('./_cardinal-shared')`).
 
-const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { isCardinalBeastByName, cardinalNameImmun } = require('./_cardinal-shared');
 // Recursion depth cap for actionHealHero / actionDealDamage. Hook
 // handlers can call these engine methods DIRECTLY (not via
 // pendingTriggers), which bypasses MAX_PENDING_TRIGGERS. Known example:
@@ -296,6 +306,11 @@ const MILL_CENTER_REVEAL_MS = 1100;
 // 16.8.).
 const DECK_TO_DELETED_PACE_MS = 150;
 const DECK_TO_DELETED_FLIGHT_MS = 500;
+
+// ★ EINÄSCHERUNG (Client: public/app-fx-66.jsx): eine Karte, die sich selbst zerstört, brennt auf ihrem Platz und ihre Essenz fliegt zum Stapel. Das Ereignis `play_pile_transfer` trägt dann
+// `flightStyle: 'einaescherung'`; der Client braucht bis zur Landung der Essenz `EINAESCHERUNG_MS` (= `PP_FX66_LANDUNG_MS`, Bild 61 bei 30 Hz). Die Engine wartet nach der Zerstörung genau so lange
+// (abzüglich der seit dem Ereignis vergangenen Zeit), damit Folgeeffekte (Cute Cat: die drei gemillten Karten) erst NACH der Landung laufen. Spiellogik und Reihenfolge bleiben unverändert.
+const EINAESCHERUNG_MS = 2033;
 
 // ═══════════════════════════════════════════
 //  GENERIC TARGETING FILTER:
@@ -487,6 +502,9 @@ class CardInstance {
     const override = this.counters?._effectOverride;
     const script = override ? loadCardEffect(override) : this.loadScript();
     if (!script) return false;
+    // ★ TELEPORTAL: die offen WARTENDE Karte („place it openly in front of you", Stempel `counters._teleportalUntil`) ist inert — keine Permanent-Hooks (Divine Gift of The Light …), bis sie auf die Hand kommt.
+    // Ausnahme: Skripte mit `listensWhileWaiting` (Teleportal selbst, wenn sie sich suchte: die wartende Kopie holt die wartenden Karten ab).
+    if ((zone || this.zone) === ZONES.PERMANENT && this.counters?._teleportalUntil != null && !script.listensWhileWaiting) return false;
     if (!script.activeIn) return true; // No restriction = always active
     // ★ HELD ALS KREATUR (Hulijing, 24.10.): die Überlagerung eines Helden (`heroOverlay`) feuert die Hooks ihrer Kreatur wie in einer Support Zone.
     const z = ((zone || this.zone) === ZONES.HERO_OVERLAY) ? ZONES.SUPPORT : (zone || this.zone);
@@ -507,6 +525,11 @@ class CardInstance {
         && this.counters?.treatAsEquip
         && !this.counters?._suppressEquipHooks
         && script.activeIn.includes('hero')) return true;
+    // ★ 11.11. (Vorgabe: „alle Reaktionen auch aus der Crestina-Hand"): Hook-Reaktionen aus der Hand (Doomed Town Guard, Front Soldier …) hoeren auch als Karte in Crestinas
+    // Vorrat (`ZONES.CREATION`) mit — NUR mit dem Opt-in `reactFromCreation: true` am Skript. Reine Hand-PASSIVE (Magic Gems, Play Money …) bleiben aussen vor: eine Vorratskarte
+    // gilt nicht als Handkarte (Ruling 28.8.). Ob der Vorrat gerade benutzbar ist (Crestina da, nicht eingefroren …), prueft das Skript ueber `engine._rxQuelleFuer`.
+    // Dasselbe gilt fuer Stufensenker der Hand (`reduceCardLevel`): eine Karte im Vorrat senkt ihre Stufe wie eine Handkopie (sonst waere sie dort teurer als in der Hand).
+    if (z === ZONES.CREATION && script.activeIn.includes('hand') && (script.reactFromCreation || typeof script.reduceCardLevel === 'function')) return true;
     return script.activeIn.includes(z);
   }
 
@@ -1933,6 +1956,9 @@ class GameEngine {
     // forever because the hand size never shrinks.
     const promptPi = promptedPlayerIdx != null ? promptedPlayerIdx : this._cpuPlayerIdx;
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt (Mensch) — die CPU (auch in Rollouts/Puzzles) waehlt sie nicht (`_nutzlos`, s. `_cpu.js`).
+    if (promptData.type === 'confirm' && promptData._nutzlos === true && promptData.cancellable) return null;
+
     // Umsortier-Dialog (`promptDeckReorder`): die CPU belaesst die Reihenfolge (bei Trennmarke: alles oben).
     if (promptData.type === 'cardReorder') {
       return { order: (promptData.cards || []).map((_, k) => k).concat(promptData.splitMarker ? [-1] : []) };
@@ -2160,7 +2186,19 @@ class GameEngine {
 
       // Generic: take the first `pickN` eligible indices.
       const pickN = Math.min(maxSelect, eligible.length);
-      const selectedIndices = eligible.slice(0, pickN);
+      let selectedIndices = eligible.slice(0, pickN);
+      // Typ-Obergrenzen (`cardTypes`/`typeLimits`, Shard of Chaos): nie mehr Karten eines Typs, als der Prompt zulaesst (der Server prueft sie, 17.11.2026).
+      if (promptData.typeLimits && promptData.cardTypes) {
+        const benutzt = {};
+        selectedIndices = [];
+        for (const idx of eligible) {
+          if (selectedIndices.length >= pickN) break;
+          const t = promptData.cardTypes[idx];
+          if (t != null && promptData.typeLimits[t] != null && (benutzt[t] || 0) >= promptData.typeLimits[t]) continue;
+          benutzt[t] = (benutzt[t] || 0) + 1;
+          selectedIndices.push(idx);
+        }
+      }
       return {
         selectedCards: selectedIndices.map(idx => ({
           handIndex: idx, cardName: ps.hand?.[idx] ?? null,
@@ -2448,6 +2486,32 @@ class GameEngine {
   }
 
   /**
+   * Rarity-Identitaet (cards/effects/_rarity-track.js): HINWEIS, dass gleich `count` Karten ab `start` aus Zone `key` ('hand', 'dp', 'xp' …) von
+   * `pi` entfernt werden — VOR dem Entfernen aufrufen. Ohne Rarity-Ledger (alles Common) und in Simulationen ein No-op.
+   */
+  /** Wie `_rarityTake`, aus den Argumenten eines `splice(start, deleteCount, …)` auf einer Liste der Laenge `len`. */
+  _rarityTakeSplice(pi, key, len, args) {
+    if (!args.length) return;
+    let start = Math.trunc(Number(args[0])) || 0;
+    if (start < 0) start = Math.max(0, len + start); else start = Math.min(start, len);
+    const del = args.length < 2 ? len - start : Math.min(Math.max(0, Math.trunc(Number(args[1])) || 0), len - start);
+    if (del > 0) this._rarityTake(pi, key, start, del);
+  }
+
+  /** Ereignisdaten mit `rarity`/`rarities` der betroffenen Karten ergaenzen (nur wenn ein Spieler Nicht-Common-Karten im Deck hat). */
+  _rarityMitEreignis(event, data) {
+    if (!data || !this.gs?.players?.some(ps => ps && ps.rarityLedger)) return data;
+    try { return require('./_rarity-track').eventRarity(this.gs, event, data); } catch (e) { console.error('[rarity] event:', e.message); return data; }
+  }
+
+  _rarityTake(pi, key, start, count) {
+    if (this._fastMode || this._inMctsSim) return;
+    const ps = this.gs?.players?.[pi];
+    if (!ps || !ps.rarityLedger) return;
+    try { require('./_rarity-track').take(this.gs, pi, key, start, count); } catch (e) { console.error('[rarity] take:', e.message); }
+  }
+
+  /**
    * Monkey-patch `ps.hand.splice` so that every registered per-hand-index
    * field on `ps` stays consistent across hand mutations. Covers every
    * caller that already does `ps.hand.splice(i, 1)` — no refactor needed.
@@ -2542,6 +2606,7 @@ class GameEngine {
             }
           }
         }
+        if ((delCount ?? 0) > 0) engine._rarityTake(pi, 'hand', start, delCount);   // Rarity-Identitaet: die entfernte Kopie nimmt ihre Rarity mit
         const result = origSplice.call(this, start, delCount, ...items);
         // Rebase every registered field's map on `ps`.
         for (const [fieldName] of engine._handIndexedFields) {
@@ -2568,6 +2633,9 @@ class GameEngine {
     this.cardInstances.push(inst);
     // W63c: eine fremde Handkarte (Charme Lv 2, Diebstahl, Geschenk …) betritt das Brett — die Instanz gehoert weiter ihrem BESITZER.
     if (zone === ZONES.SUPPORT || zone === ZONES.ABILITY || zone === ZONES.SURPRISE || zone === ZONES.AREA || zone === ZONES.HERO) this._stempelFremdHerkunft(inst);
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): waehrend die Kopie wirkt (`_spiegelKopieName`), ist jede Brettinstanz desselben Namens, die dabei entsteht
+    // (Anhaengsel am Helden …), selbst eine Kopie — Marke `_spiegelKopie` (siehe `isTokenCard`).
+    if (this._spiegelKopieName && name === this._spiegelKopieName && zone !== ZONES.HAND) inst.counters._spiegelKopie = true;
     return inst;
   }
 
@@ -2894,16 +2962,17 @@ class GameEngine {
    *
    * „You cannot move cards out of your discard pile for the rest of the
    * turn" (Staff of the Teleporter, Staff of Uncontrollable Destruction,
-   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn`.
+   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn` und
+   * HART: kein Freikauf, keine Ausnahme (die Stäbe setzen zusätzlich
+   * `_discardLockHard` — nur Meditation unterscheidet die Stab-Sperre).
    *
-   * The Eye of Ren haengt einen FREIKAUF daran (`ps._discardLockBuyout`):
-   * „unless you pay an additional 6 Gold" — nach Als Ruling (29.8.)
-   * EINMALIG je Zug: erste Bewegung aus dem Discard kostet 6, danach ist
-   * der Rest des Zuges frei. Ist der Effekt PFLICHT (`opts.mandatory`,
-   * z.B. The First Circle of Hell), zahlt der Spieler, was er hat (auch
-   * 0), und die Bewegung findet statt. Ist er optional, wird bei
-   * ausreichend Gold gefragt; ohne Gold oder bei Ablehnung bleibt die
-   * Sperre. Ohne Freikauf (Staebe) ist die Sperre hart.
+   * Spielgestalter-Entscheidung 18.11.2026 (The Eye of Ren): die 6 Gold
+   * sind Zusatzkosten der Aktivierung („Pay 6 extra Gold or lock your
+   * discard pile?", siehe `the-eye-of-ren.js`) — gezahlt, gibt es keine
+   * Sperre; sonst setzt das Auge die Sperre wie die Stäbe. Der frühere
+   * Freikauf je Zugriff (`_discardLockBuyout`, Abfrage „Pay 6 Gold to move
+   * cards out of it?", Pflicht-Variante `mandatory`, Ablehnung = Abbruch der
+   * Karte) ist entfallen.
    *
    * Alle Wege aus dem Discard fragen HIER: addCardFromDiscardToHand,
    * actionRecycleCards, actionPlaceCreature (source 'discard'),
@@ -2919,88 +2988,7 @@ class GameEngine {
       this.log('pile_out_blocked', { player: ps.username, pile: 'discard' });
       return false;
     }
-    if (ps._discardLockedTurn !== this.gs.turn) return true;
-    // Z6 (F03-10): die HARTE Stab-Sperre (`_discardLockHard`, Staebe) hebt auch der 6-Gold-Freikauf des Eye of Ren
-    // nicht auf - gelten beide im selben Zug, gilt die strengere (der Stab hat keine Ausnahme), in beiden Reihenfolgen.
-    if (ps._discardLockHard === this.gs.turn) return false;
-    const buy = ps._discardLockBuyout;
-    if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
-    if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
-    const gold = ps.gold || 0;
-    const spend = async (amount) => {
-      if (amount <= 0) return true;
-      const ok = await this.actionSpendGold(pi, amount, { cardName: buy.source, reason: 'discard_lock_buyout' });
-      return ok !== false;
-    };
-    if (opts.mandatory) {
-      const pay = Math.min(buy.cost, gold);
-      let paid = 0;   // G1: TATSAECHLICH gezahlt (goldLocked → 0), nicht der Wunschbetrag
-      if (pay > 0 && await spend(pay)) paid = pay; // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
-      buy.paidTurn = this.gs.turn;
-      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid, mandatory: true });
-      this.sync();
-      return true;
-    }
-    if (!this.canAffordGold(pi, buy.cost, buy.source)) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', needGold: buy.cost });
-      return false;
-    }
-    const yes = opts.silent ? true : await this.promptGeneric(pi, {
-      type: 'confirm',
-      title: buy.source,
-      message: `Your discard pile is locked by ${buy.source}. Pay ${buy.cost} Gold to move cards out of it for the rest of this turn?`,
-      showCard: buy.source,
-      confirmLabel: `💰 Pay ${buy.cost} Gold`,
-      cancelLabel: 'No',
-      cancellable: true,
-    });
-    if (!yes) {
-      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', declined: true });
-      this.gs._discardOutDeclined = this.gs.turn; // → `_applyDiscardOutDecline`
-      return false;
-    }
-    if (!(await spend(buy.cost))) return false;
-    buy.paidTurn = this.gs.turn;
-    this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: buy.cost, mandatory: false });
-    this.sync();
-    return true;
-  }
-
-  /**
-   * v627 (Als Regel 29.8.): Lehnt der Spieler den Eye-of-Ren-Freikauf ab,
-   * gilt das Ausspielen der Karte als ABGEBROCHEN wie jede andere
-   * Cancellation — die Karte bleibt in der Hand, die Kosten kommen
-   * zurueck. Das Gate stempelt `gs._discardOutDeclined = gs.turn`; der
-   * Chain-Auflöser ruft dies nach `resolve()` und macht aus dem Ergebnis
-   * `{ cancelled: true }`, sofern das Skript nicht `discardOutDeclineConsumes`
-   * setzt (fuer Karten, die VOR der Discard-Bewegung schon etwas Bleibendes
-   * getan haben — dann ist die Karte verbraucht).
-   */
-  _applyDiscardOutDecline(cardName, result, hoptVorher) {
-    if (this.gs._discardOutDeclined !== this.gs.turn) return result;
-    delete this.gs._discardOutDeclined;
-    if (result && (result.aborted || result.cancelled)) return result;
-    const script = cardName ? loadCardEffect(cardName) : null;
-    if (script?.discardOutDeclineConsumes) return result;
-    // ★ Z7 (F02-20): „Abbruch heißt: nichts ist passiert" — auch die Rundensperren (`claimHOPT`), die
-    // das Skript vor dem abgelehnten Ablage-Zugriff gestempelt hat (Relic in the Sky, Magic Gems),
-    // gehen zurück. `hoptVorher` = Abzug von `gs.hoptUsed` vor dem `resolve()`.
-    if (hoptVorher) this._hoptWiederherstellen(hoptVorher);
-    this.log('play_cancelled', { card: cardName, reason: 'discard_lock_declined' });
-    return { cancelled: true };
-  }
-
-  /** ★ Z7: flacher Abzug der Rundensperren (für `_hoptWiederherstellen`). */
-  _hoptAbzug() { return { ...(this.gs.hoptUsed || {}) }; }
-
-  /** ★ Z7: Rundensperren auf den Stand `abzug` zurücksetzen (nur Schlüssel, die sich seither geändert haben). */
-  _hoptWiederherstellen(abzug) {
-    const h = this.gs.hoptUsed;
-    if (!h) return;
-    for (const k of Object.keys(h)) {
-      if (!(k in abzug)) delete h[k];
-      else if (h[k] !== abzug[k]) h[k] = abzug[k];
-    }
+    return ps._discardLockedTurn !== this.gs.turn;
   }
 
   async addCardFromDiscardToHand(toPlayerIdx, cardName, fromOwnerIdx, opts = {}) {
@@ -3191,6 +3179,21 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): zurückgestellte Wiederbelebungen geopferter Extra-Life-Träger kehren an den Haltepunkten
+    // zurück, nachdem der Effekt der Karte gelaufen ist, die das Opfer verlangte (`_loeseOpferWiederbelebungen`) — vor den Zuhörern, damit z. B. ein Elixir of Immortality sie nicht
+    // zusätzlich belebt. Ein freier Ability-Effekt meldet sich nur auf oberster Ebene (nicht mitten in einem Zauber / Flächentreffer), wie beim Elixir.
+    if (this.gs?._opferRevives?.length && !this._opferReviveLaeuft && OPFER_REVIVE_HALTEPUNKTE.has(hookName)
+        && !(hookName === HOOKS.ON_ACTIVE_EFFECT_USED && ((this.gs._spellResolutionDepth || 0) > 0 || this._multiHitScope))) {
+      try { await this._loeseOpferWiederbelebungen(); } catch (err) { console.error('[Engine] Opfer-Wiederbelebung:', err.message); }
+    }
+    // ★ 12.11. (Al: „Reaktionen, z. B. Quetzahuitl, sollen unbedingt auch aus der Crestina-Zone feuern“): Fällt Crestina SELBST (typisch: als letzter Held — genau dann zieht
+    // Quetzahuitl ein), laufen die Todes-Reaktionen ihrer Vorratskarten noch im Augenblick ihres Falls. Ohne diese Marke gälte der Vorrat schon als nicht nutzbar (Crestina tot,
+    // `isCreationZoneUsable`) und die Karte feuerte nie. Die Marke gilt nur für die Dauer dieser Meldung (`_heldImKO`).
+    if (hookName === HOOKS.ON_HERO_KO && hookCtx?.hero && this._heldImKO !== hookCtx.hero) {
+      const _vorherKO = this._heldImKO;
+      this._heldImKO = hookCtx.hero;
+      try { return await this.runHooks(hookName, hookCtx); } finally { this._heldImKO = _vorherKO; }
+    }
     // ★ W71b (Al, 25.10.2026 — Cool Rescuer Monia reagiert auf JEDEN Effekt auf Kreaturen): das Schutzfenster `beforeCreatureAffected` fragt je Kreatur, Effektart und Karte/Effekt in EINER Auflösung
     // nur EINMAL — auch wenn der Effekt es vorab für alle seine Kreaturen geöffnet hat (`kreaturenVorab`: Iceage und Medusa's Curse treffen erst die Helden, Monia könnte sonst nicht mehr reagieren).
     // Das Ergebnis (erlaubt / negiert) wird gemerkt und von allen späteren Fenstern derselben Kreatur/Art/Quelle übernommen; die Buchführung endet mit der Auflösung (`endeEffektImmunitaeten`).
@@ -3236,6 +3239,7 @@ class GameEngine {
         }
       } finally { this._playSignaleLaeuft = false; }
     }
+    if (STATUS_ABGLEICH_HOOKS.has(hookName)) require('./_attachment-shared').statusAnhaengselAbgleichen(this);   // 17.11.2026: Status-Anhängsel folgen der Status-Immunität des Wirts (auch vor `sync`)
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
     // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)
@@ -3779,6 +3783,10 @@ class GameEngine {
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
                  && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
+            // Gegenstück zum Anlegen: Skript-Flag `bypassStatusFilterOnPlay` - die Vergabe eines Stempel-Bonus (Fighting-ATK) beim Anlegen der EIGENEN Karte
+            // läuft in jedem Heldenzustand (sonst blieb der Bonus an einem gefrorenen/betäubten/negierten Träger dauerhaft aus, auch nach dem Auftauen).
+            && !(hookName === 'onPlay' && (hookCtx.playedCard || hookCtx._onlyCard)?.id === c.id
+                 && loadCardEffect(c.name)?.bypassStatusFilterOnPlay)
             && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
@@ -4512,7 +4520,15 @@ class GameEngine {
         if (!(opt && opt.schild)) hookCtx._kFlat = (hookCtx._kFlat || 0) + delta;
         // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
         // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
-        if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
+        // Spielgestalter-Entscheidung 18.11.2026 (Wealth Lv3 × Royal Treasury): der Zuschlag EINES Ability-Stapels ist EIN Effekt — Wealth Lv3 gibt „12 additional Gold" als einen Gewinn, nicht drei zu je 4
+        // (die Kopien des Stapels hören je einen Hook): die Beträge desselben Stapels (Held, Zone, Slot; Performance-Kopien liegen im selben Stapel) werden zu EINEM Eintrag und damit einem Ereignis.
+        if (hookCtx._isResourceGain && delta > 0) {
+          const boni = hookCtx._einkommensBoni || (hookCtx._einkommensBoni = []);
+          const stapel = engine.istWirksameAbility(cardInstance) ? `${cardInstance.zone}:${cardInstance.owner}:${cardInstance.heroIdx}:${cardInstance.zoneSlot}` : null;
+          const gleicher = stapel && boni.find(b => b.stapel === stapel);
+          if (gleicher) gleicher.delta += delta;
+          else boni.push({ card: cardInstance, delta, stapel, name: stapel ? (engine.abilityStapelVon(cardInstance).find(n => n !== 'Performance') || cardInstance.name) : cardInstance.name });
+        }
       },
       multiplyAmount(factor) {
         if (hookCtx.amount === undefined) return;
@@ -4642,8 +4658,8 @@ class GameEngine {
       increaseMaxHp(target, amount, opts) {
         return engine.increaseMaxHp(target, amount, opts);
       },
-      decreaseMaxHp(target, amount) {
-        return engine.decreaseMaxHp(target, amount);
+      decreaseMaxHp(target, amount, opts) {
+        return engine.decreaseMaxHp(target, amount, opts);
       },
       async drawCards(playerIdx, count, opts) {
         // Der Kontext kennt seine eigene Karte — Ziehungen tragen damit
@@ -6023,6 +6039,7 @@ class GameEngine {
                 if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
               }
               gs._zielNegiertDurchSchutz = true;   // W36a: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
+              engine._merkeNegation(selected);   // (auch der Schutz-Drop bei EINEM Ziel: das einzige Ziel ist weg) — siehe `negationsStand`
               return null;
             }
             if (redirected) {
@@ -6126,7 +6143,8 @@ class GameEngine {
                 if (deadIdx >= 0) gs._spellDamageLog.splice(deadIdx, 1);
               }
               // Recursive retarget — rebuild targets, dead hero excluded naturally
-              return ctx.promptDamageTarget({ ...config, _skipPostTargetReactions: false });
+              // ★ 17.11.2026 (ARW-01): hat das Pfeil-Fenster nach der Zielwahl schon geoeffnet, ist die Attack verbindlich — die neue Wahl ist nicht abbrechbar (kein Abbruch nach der Zielwahl).
+              return ctx.promptDamageTarget({ ...config, _skipPostTargetReactions: false, ...(gs._pfeilFenster?.geoeffnet && gs._pfeilFenster.cardName === cardInstance.name ? { cancellable: false } : {}) });
             }
           }
         }
@@ -7041,6 +7059,14 @@ class GameEngine {
   async _fireAttackDeclare(source, target, baseDamage) {
     if (source && source._attackDeclareFired) return Math.max(0, baseDamage || 0);
     if (this.istKlonQuelle(source)) return Math.max(0, baseDamage || 0);   // der Klon greift an, nicht der Held: keine „when this Hero attacks"-Fenster
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): Rueckfall fuer das Pfeil-Fenster NACH der Zielwahl (`_pfeilFensterNachZielwahl`) — eine Attack, deren Ziel nicht ueber `_zielwahlAbschliessen` lief
+    // (Zwangsziel, feste Ziele), bietet die Pfeile spaetestens hier an, bevor der Schaden feststeht. Nur fuer die gespielte Attack-Karte selbst (Name + Besitzer + Held).
+    {
+      const _pf = this.gs._pfeilFenster;
+      if (_pf && !_pf.geoeffnet && source && source.name === _pf.cardName && (source.owner ?? source.controller) === _pf.owner && source.heroIdx === _pf.heroIdx) {
+        await this._pfeilFensterNachZielwahl();
+      }
+    }
     const hookCtx = { source, target, amount: Math.max(0, baseDamage || 0) };
     await this.runHooks('onAttackDeclare', hookCtx);
     if (source) source._attackDeclareFired = true;
@@ -7302,6 +7328,264 @@ class GameEngine {
     const c = inst?.counters;
     if (!c) return false;
     return BLIND_STATUSES.some(n => !!c[n]);
+  }
+
+  /**
+   * ★ BLINDED (Spielgestalter-Entscheidung 16.11.2026): „Cannot choose a target the opponent controls with Attacks, Spells or effects."
+   * Blinded sperrt NUR die Wahl gegnerischer Ziele — fuer ALLE Effekte des geblendeten Helden bzw. der geblendeten Kreatur: Attacks, Spells, Reaktionen, Surprises, Helden-, Ability-,
+   * Kreatur- und Ausruestungs-Effekte, auch Effekte, die nur als Attack/Spell ZAEHLEN (Alice, Javelin Throw …). Ziel = vom Gegner des Wirkers KONTROLLIERT (Kontrolle, nicht Besitz).
+   * Effekte ohne Zielwahl (feste Mengen, Zufall, Selbsteffekte), Platzieren/Beschwoeren (Zonenwahl) und Kosten-Auswahl eigener Karten ignorieren Blinded von selbst.
+   * „Can always choose any target" (Piercer of Heavens, Surefire Shot, Knife Throw) und das Truth-Seeing Eye ignorieren Blinded (`_blindAusgenommen`).
+   * Drei Stellen, EINE Auslegung:
+   *   • `markiereBlindGesperrte` — der Picker-Filter am Flaschenhals `promptEffectTarget` (deckt `promptDamageTarget`, `promptMultiTarget`, `ctx.promptTarget` und jede Karte, die selbst
+   *     eine Liste baut); wirkt auch fuer die CPU (`_cpu.js`-Wrapper) und den Trockenlauf (`_sondeListe`/`_waehlbarProbe`);
+   *   • `blindedEffektGesperrt` / `blindedAttackSpellGesperrt` / `blindedKreaturGesperrt` — die SPIELBARKEIT/AKTIVIERBARKEIT: ein Zielwahl-Effekt (`requiresTarget: true`), der keinen legalen
+   *     EIGENEN Kandidaten haben kann, ist unter Blinded nicht spielbar/aktivierbar (Handkarten, Reaktionen/Surprises, Heldeneffekte, Abilities, Kreatur-/Ausruestungs-Effekte; Server-Tore
+   *     in `server.js`). Kein Trockenlauf der Karte selbst (Karten zahlen Kosten vor der Wahl): Kartenvertrag `blindedEigeneZiele` (Boolean/Funktion) bzw. der gedruckte Text
+   *     („Choose … your opponent controls", `_textVerlangtGegnerziel`) bzw. eine Naeherung (`_blindEigenerKandidat`). Grenzfaelle dokumentiert CARD_API („Blinded");
+   *   • `_attachment-shared.js` (Wirtswahl eines Anhaengsels) fragt `blindWirtGesperrt`.
+   */
+  _irgendeinGeblendet() {
+    for (const ps of this.gs?.players || []) {
+      for (const h of ps?.heroes || []) {
+        const st = h?.statuses;
+        if (st && BLIND_STATUSES.some(n => !!st[n])) return true;
+      }
+    }
+    for (const inst of this.cardInstances || []) {
+      const c = inst?.counters;
+      if (c && BLIND_STATUSES.some(n => !!c[n])) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Gilt Blinded fuer diesen Effekt ueberhaupt NICHT (Ausnahmen)? `true` = ignoriert Blinded.
+   * • Effekte „can be used in spite of any negative status effects" (Outbreak, `canPlayDespiteStatuses`);
+   * • Karten/Helden mit „can always choose any target" / Truth-Seeing Eye (`_sourceIgnoresTargetingRestrictions`: sie heben jede Wahl-Sperre auf, auch die der Blendung).
+   */
+  _blindAusgenommen(pi, seite, heroIdx, cardData) {
+    if (!cardData) return false;
+    if (this._mitWirker(pi, heroIdx, seite, () => this._spielTrotzStatus(pi, heroIdx, cardData))) return true;   // `pi` = Kontrolleur, `seite` = Brettseite des Helden (geliehener Held)
+    return this._sourceIgnoresTargetingRestrictions({ name: cardData.name, owner: seite, controller: seite, heroIdx });
+  }
+
+  /**
+   * Ist dieser Effekt fuer den geblendeten Akteur (Kontrolleur `pi`, Brettseite `seite`, Heldenindex `heroIdx`; `opts.kreatur` = die wirkende Kreatur, geblendet ist sie selbst oder ihr
+   * Wirtsheld) GESPERRT, weil er keinen legalen eigenen Kandidaten hat? `name` = Karten-/Helden-/Ability-Name (Text und Skript).
+   *   1. nicht geblendet / keine Zielwahl (`requiresTarget !== true`, ausser `opts.zielwahl`: Effekte, die nie ohne Zielwahl laufen) / `playsWithoutHero` → frei;
+   *   2. Ausnahmen (`_blindAusgenommen`) → frei;
+   *   3. Kartenvertrag `blindedEigeneZiele`: `true` frei, `false` gesperrt, oder Funktion `({ gs, engine, pi, seite, heroIdx, cardData, kreatur, level }) => boolean` (true = legaler eigener Kandidat; `level` = Stapelhoehe einer Ability);
+   *   4. sonst der gedruckte Text: verlangt eine „choose …"-Klausel ein Ziel, das „your opponent controls" (`_textVerlangtGegnerziel`) → gesperrt;
+   *   5. sonst die Naeherung `_blindEigenerKandidat`.
+   */
+  blindedEffektGesperrt(pi, seite, heroIdx, name, opts = {}) {
+    const blind = this._isHeroBlinded(seite, heroIdx) || (!!opts.kreatur && this._isCreatureBlinded(opts.kreatur));
+    if (!blind || !name) return false;
+    const script = opts.script || loadCardEffect(name);
+    if (!opts.zielwahl && script?.requiresTarget !== true) return false;
+    if (script?.playsWithoutHero) return false;
+    const cardData = this._getCardDB()[name] || { name };
+    if (this._blindAusgenommen(pi, seite, heroIdx, cardData)) return false;
+    const vertrag = script?.blindedEigeneZiele;
+    if (vertrag === true) return false;
+    if (vertrag === false) return true;
+    if (typeof vertrag === 'function') {
+      try {
+        return !vertrag({ gs: this.gs, engine: this, pi, seite, heroIdx, cardData, kreatur: opts.kreatur || null, level: opts.level ?? null });
+      } catch (err) {
+        console.error(`[Engine] blindedEigeneZiele "${name}" warf:`, err.message);
+        return false;
+      }
+    }
+    if (this._textVerlangtGegnerziel(name)) return true;
+    return !this._blindEigenerKandidat(pi, seite, heroIdx, cardData, opts);
+  }
+
+  /**
+   * Verlangt der gedruckte Text eine Wahl, die NUR ein gegnerisches Ziel sein kann? Jede „choose …"-Klausel (bis Komma, Strichpunkt, Punkt, „then"; „A and B" Glied fuer Glied) wird einzeln
+   * gelesen; nennt eine „your opponent controls"/„an opponent's Hero …", ist der Effekt ohne gegnerisches Ziel wirkungslos (Alice: „choose a target your opponent controls and deal …", auch
+   * wenn der Rest des Satzes „Creatures you control" nennt; Embodiment of Biseria: „choose a target and … Creatures your opponent controls" bleibt frei, die Klausel endet am „and"). „Choose a target. If … a Creature
+   * your opponent controls …" bleibt frei (die Klausel endet am Punkt).
+   */
+  _textVerlangtGegnerziel(cardName) {
+    const text = this._getCardDB()[cardName]?.effect || '';
+    if (!/\bchoose\b/i.test(text)) return false;
+    for (const satz of text.split(/(?<=[.!])\s+|\n+/)) {
+      const re = /\bchoose\b([^,;.]*?)(?=,|;|\.| then |$)/gi;
+      let m;
+      while ((m = re.exec(satz))) {
+        // „choose A and B": jedes Glied einzeln (Sword in a Bottle: „a Hero you control and a target your opponent controls"); Glieder, die mit einem Verb beginnen („and deal 300 damage … OR Freeze
+        // all Creatures your opponent controls"), sind keine Wahl.
+        for (const teil of m[1].split(/ and /i)) {
+          if (/^\s*(?:deal|inflict|freeze|burn|stun|heal|take|send|place|add|put|draw|discard|negate|destroy|defeat|summon|equip|attach|remove|reduce|increase|swap|shuffle|play|use|spend|pay|delete|return|move|activate|perform|gain)\b/i.test(teil)) continue;
+          if (/your opponent controls|an opponent controls|opponent'?s (?:Hero|Creature|target|Artifact|Ability)/i.test(teil)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Attack-/Spell-KARTE: `blindedEffektGesperrt` fuer Handspiel, Reaktion und Surprise. `opts.aktivierung`: beim AKTIVIEREN (dort zaehlt auch der Surprise-Subtyp; Setzen ist kein Wirken). */
+  blindedAttackSpellGesperrt(pi, seite, heroIdx, cardData, opts = {}) {
+    if (!cardData || (cardData.cardType !== 'Spell' && cardData.cardType !== 'Attack')) return false;
+    if (!opts.aktivierung && String(cardData.subtype || '').toLowerCase() === 'surprise') return false;
+    return this.blindedEffektGesperrt(pi, seite, heroIdx, cardData.name, opts);
+  }
+
+  /** Kreatureneffekt: `pi` = Kontrolleur, Wirtsheld = Held der Zone der Kreatur (Brettseite). */
+  blindedKreaturGesperrt(inst, pi, effectName, script) {
+    if (!inst || !this._irgendeinGeblendet()) return false;
+    return this.blindedEffektGesperrt(pi, this.physicalSide(inst), inst.heroIdx, effectName || inst.name, { script, kreatur: inst });
+  }
+
+  /**
+   * Gibt es fuer den geblendeten Akteur ueberhaupt einen eigenen Helden-/Kreaturen-Kandidaten? Grobe, ehrliche Naeherung fuer die Spielbarkeit (kein Trockenlauf der Karte):
+   * eigene lebende Helden (Kontrolle, nicht Besitz) und eigene offene Kreaturen. Der Wirker selbst zaehlt NICHT bei Attacks (`executeAttack` schliesst den Angreifer aus) und bei Texten
+   * „except the user" / „another Hero" (Petrifier, Calm Diatribe, Trial of Coolness …); die wirkende Kreatur zaehlt nicht bei „different/another/other" (Skeleton Healer); sonst waehlt ein
+   * Effekt auch sich selbst (Heal, Icebolt). Was daran vorbeigeht (Ziele erst waehrend der Aufloesung, Artefakt-/Ability-Ziele, Zustandsbedingungen wie bei Cure), loest die Zielwahl selbst:
+   * kein legales Ziel → Abbruch. Genauer: Vertrag `blindedEigeneZiele`.
+   */
+  _blindEigenerKandidat(pi, seite, heroIdx, cardData, opts = {}) {
+    const text = cardData.effect || '';
+    const ohneNutzer = cardData.cardType === 'Attack' || /except the user|another (?:target|Hero|Creature)\b/i.test(text);
+    for (const e of this.heroesControlledBy(pi)) {
+      if (!(e.hero.hp > 0)) continue;
+      if (ohneNutzer && e.physOwner === seite && e.heroIdx === heroIdx) continue;
+      return true;
+    }
+    if (opts.kreatur && /\b(?:different|another|other)\b/i.test(text)) {
+      return this.cardInstances.some(c => c !== opts.kreatur && c.zone === ZONES.SUPPORT && !c.faceDown && this.kontrolleurVon(c) === pi
+        && this._istKreaturenInstanz(c) && !c.counters?.treatAsEquip);
+    }
+    return this.hasRequiredTargetKind(pi, 'ownCreature');
+  }
+
+  /**
+   * Wer WIRKT? Quelle `q` (Karteninstanz oder Ersatzobjekt) → `{ seite, heroIdx, controller, kreatur }` oder `null` (kein Held-/Kreatur-Wirker: Area, liegender Anhaengszauber [Dauerwirkung,
+   * Gathering Storm], Hand-Artefakt/Trank ohne Held, Ausruestung auf der Gegenseite). `playerIdx` = der Waehlende.
+   *   • Effekt, der nur als Attack/Spell ZAEHLT (Alice, Broghan, Javelin Throw, Bamboo Staff …): der Held hinter dem Effekt (`_effektHeld`);
+   *   • Attack-/Spell-KARTE: Reaktionsglied (Cure, Golden Wings …: Wirker im Glied), auflösende Surprise (Wirt-Held), Handspiel/verzoegerter Guss (die Instanz);
+   *   • Heldeneffekt/-passiv (Zone `hero`), Ability (Zone `ability` bzw. Support Zone), Kreatur (Wirtsheld der Zone; Kontrolle `kontrolleurVon`), Ausruestung (Traeger).
+   */
+  _blindAkteurVon(q, name, cd, playerIdx, config) {
+    const hatHeld = (s, h) => Number.isInteger(s) && Number.isInteger(h) && h >= 0 && !!this.gs.players[s]?.heroes?.[h]?.name;
+    if (this._zaehltAlsArt(q)) {
+      const h = this._effektHeld(q, name);
+      if (!h) return null;
+      return { seite: h.seite, heroIdx: h.heroIdx, controller: this.kontrolleurVonHeld(h.seite, h.heroIdx), kreatur: null };
+    }
+    const istAS = !hasCardType(cd, 'Creature') && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'));
+    if (istAS) {
+      if (q.zone === ZONES.SUPPORT || q.zone === 'area' || q.zone === 'permanent' || q.zone === ZONES.ABILITY || q.zone === 'hero') return null;
+      // Reaktionsglied kennt seinen Helden; sonst die Quelle selbst (Handkarte, Surprise, verzoegerter Guss). Nennt die Zielwahl die Karte nur beim Namen (`source: 'Voodoo Curse'` →
+      // Ersatzquelle ohne Held), gilt die wirkende Karte der Umgebung (`_umgebungsQuelle`), zuletzt `chooserHeroIdx`.
+      let seite, heroIdx, controller;
+      const link = this._rxResolvingLink;
+      if (link && !link.isInitialCard && !link.fromHero && !link.fromCreature && link.cardName === name && link.casterHeroIdx >= 0) {
+        heroIdx = link.casterHeroIdx; controller = link.owner; seite = link.casterOwner ?? link.owner;
+      } else {
+        let src = q;
+        if (!(Number.isInteger(src.heroIdx) && src.heroIdx >= 0)) {
+          const amb = this._umgebungsQuelle(playerIdx, config);
+          if (amb && amb.name === name) src = amb;
+        }
+        heroIdx = src.heroIdx; controller = src.controller ?? src.owner; seite = src.heroOwner ?? src.owner;
+        if (!(Number.isInteger(heroIdx) && heroIdx >= 0) && config.chooserHeroIdx >= 0) {
+          const ws = this.gs._wirkerSeite;
+          heroIdx = config.chooserHeroIdx; controller = playerIdx;
+          seite = (ws && ws.pi === playerIdx && ws.heroIdx === heroIdx && Number.isInteger(ws.heroOwner)) ? ws.heroOwner : playerIdx;
+        }
+      }
+      if (!hatHeld(seite, heroIdx) || !Number.isInteger(controller)) return null;
+      return { seite, heroIdx, controller, kreatur: null };
+    }
+    if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ability')) {
+      // Heldeneffekt/-passiv und Ability-Effekt: der Held, an dem die Karte liegt (Zone `hero`/`ability`; Ability im Support Zone: Wirtsheld der Zone).
+      const seite = q.heroOwner ?? q.owner, heroIdx = q.heroIdx;
+      if (!hatHeld(seite, heroIdx)) return null;
+      if (!(q.zone === 'hero' || q.zone === ZONES.ABILITY || q.zone === ZONES.SUPPORT)) return null;
+      return { seite, heroIdx, controller: this.kontrolleurVonHeld(seite, heroIdx), kreatur: null };
+    }
+    if (q.zone === ZONES.SUPPORT && !q.faceDown) {
+      const seite = this.physicalSide(q), heroIdx = q.heroIdx;
+      const script = loadCardEffect(q.counters?._effectOverride || q.name);
+      if (script?.placesOnOpponentBoard) return null;   // Ausruestung auf der Gegenseite (Future Tech Control Device): kein Wirkerheld des Besitzers
+      if (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token')) {
+        if (!Number.isInteger(heroIdx) || heroIdx < 0) return null;
+        return { seite, heroIdx, controller: this.kontrolleurVon(q), kreatur: q };
+      }
+      if (hasCardType(cd, 'Artifact')) {
+        if (!hatHeld(seite, heroIdx)) return null;
+        return { seite, heroIdx, controller: this.kontrolleurVon(q), kreatur: null };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * ★ Wer WIRKT gerade, hinter dem diese Zielwahl steht — und ist er geblendet? `{ seite, heroIdx, controller }` oder `null` (kein Blinded-Filter).
+   * `playerIdx` = der Waehlende: nur der KONTROLLEUR des Wirkers waehlt „fuer" ihn (Chain Lightning, Big Oopsie, Ricochet-Gegenzug: der Gegner waehlt SEINE Ziele → frei).
+   * Quelle der Zielwahl: `config._quellObjekt` (Engine-Picker) → ausdrueckliche Quelle → aufloesende Surprise → Titelkarte → wirkende Karte (`_tauntQuelleFuer`); Akteur: `_blindAkteurVon`.
+   */
+  _blindWirkerFuer(playerIdx, config = {}) {
+    if (!this._irgendeinGeblendet()) return null;
+    let q = config._quellObjekt || (config.sourceCard && typeof config.sourceCard === 'object' ? config.sourceCard : null);
+    if (!q) q = this._tauntQuelleFuer(playerIdx, config);
+    if (!q || typeof q !== 'object') return null;
+    const name = q.name || q.cardName || q.cardInstance?.name;
+    const cd = name ? this._getCardDB()[name] : null;
+    if (!cd) return null;
+    let a = this._blindAkteurVon(q, name, cd, playerIdx, config);
+    if (!a) {
+      // Nennt die Zielwahl ihre Quelle nur beim Namen (`source: 'Doctor Fester'`), liefert der Aufrufer keinen Held: dann zaehlt die wirkende Karte der Umgebung, der laufende Kreatureneffekt
+      // oder die Aktivierung (`armEffectAnnounce`, Wirker-Feld).
+      const amb = this._umgebungsQuelle(playerIdx, config);
+      if (amb && amb !== q && amb.name === name) a = this._blindAkteurVon(amb, name, cd, playerIdx, config);
+      if (!a) {
+        const ak = this._activeCreatureEffect;
+        const inst = (ak && ak.cardName === name) ? this.cardInstances.find(c => c.id === ak.instId) : null;
+        if (inst) a = this._blindAkteurVon(inst, name, cd, playerIdx, config);
+      }
+      if (!a) {
+        const act = this._activationSource, w = act?.wirker;
+        if (w && act.cardName === name && Number.isInteger(w.seite) && Number.isInteger(w.heroIdx) && this.gs.players[w.seite]?.heroes?.[w.heroIdx]?.name) {
+          a = { seite: w.seite, heroIdx: w.heroIdx, controller: this.kontrolleurVonHeld(w.seite, w.heroIdx), kreatur: null };
+        }
+      }
+    }
+    if (!a || a.controller !== playerIdx) return null;
+    if (!(this._isHeroBlinded(a.seite, a.heroIdx) || (a.kreatur && this._isCreatureBlinded(a.kreatur)))) return null;
+    if (this._blindAusgenommen(a.controller, a.seite, a.heroIdx, cd)) return null;
+    return { seite: a.seite, heroIdx: a.heroIdx, controller: a.controller };
+  }
+
+  /** Ziele, die ein Wirker NICHT waehlen darf, weil sein Kontrolleur sie nicht kontrolliert (nur Brett-Ziele; Hand-/Optionslisten tragen keinen Besitzer). */
+  _blindZielGegnerisch(t, controller) {
+    if (!t || !t.type || !['hero', 'equip', 'creature', 'ability', 'surprise', 'area', 'perm'].includes(t.type)) return false;
+    const seite = this.zielSeite(t, null);
+    return Number.isInteger(seite) && seite !== controller;
+  }
+
+  /**
+   * Picker-Filter: markiert (`ineligible`, wie Taunt/Erstrunden-Schutz) jedes gegnerisch kontrollierte Ziel, wenn die Quelle eine Attack/ein Spell eines GEBLENDETEN Helden ist.
+   * `config.ignoreBlinded: true` = Opt-out (z. B. eine Zonenwahl zum Platzieren, die ueber diesen Picker laeuft — Platzieren ist kein Auswaehlen).
+   */
+  markiereBlindGesperrte(targets, playerIdx, config = {}) {
+    if (!Array.isArray(targets) || targets.length === 0 || config.ignoreBlinded) return targets;
+    const w = this._blindWirkerFuer(playerIdx, config);
+    if (!w) return targets;
+    for (const t of targets) {
+      if (t && !t.ineligible && this._blindZielGegnerisch(t, w.controller)) t.ineligible = true;
+    }
+    return targets;
+  }
+
+  /** Wirtswahl eines Anhaengsels (`_attachment-shared`): ist dieser Held fuer den geblendeten Wirker der Karte `quelle` (Handinstanz) gesperrt? */
+  blindWirtGesperrt(quelle, hostSeite, hostHeroIdx) {
+    const w = this._blindWirkerFuer(quelle?.controller ?? quelle?.owner, { _quellObjekt: quelle });
+    if (!w) return false;
+    return this.kontrolleurVonHeld(hostSeite, hostHeroIdx) !== w.controller;
   }
 
   /**
@@ -7735,6 +8019,9 @@ class GameEngine {
       // heilen schickt die Karte in die Ablage, uebertragen nimmt sie mit
       // (Als allgemeine Regel 17.9.).
       if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      // Spielgestalter-Entscheidung 18.11.2026: eine ruhende Karte, die als Status zaehlt, steht unter derselben Sperre wie ein Status
+      // („its other status effects cannot be removed", Forbidden Curse of Aging) — sie steht dann nicht in der Liste.
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
       out.push({
         key: `attach:${inst.id}`,
         label: script.negativeStatusLabel || inst.name,
@@ -7746,6 +8033,25 @@ class GameEngine {
       });
     }
     return out;
+  }
+
+  /**
+   * Spielgestalter-Entscheidung 18.11.2026: traegt der Held ein RUHENDES Status-Anhaengsel (Stowaway, Decisive Defeat, Forbidden Curse of Aging, Mind Control unter Status-Immunitaet),
+   * das die Heil-Listen als `attach:`-Eintrag fuehren? Ein solcher Held ist auch ohne echten Status ein Ziel der Heilkarten (Cure fragt `cleansableHeroEntries` ohnehin selbst).
+   */
+  heroHatRuhendesAnhaengsel(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.statuses) return false;
+    // Dieselben Bedingungen wie die `attach:`-Eintraege in `cleansableHeroEntries`, aber ohne die Liste zu bauen (laeuft in Zielfiltern und CPU-Planung oft).
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== pi || inst.faceDown) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.countsAsNegativeStatus) continue;
+      if (script.attachmentStatus && hero.statuses[script.attachmentStatus]) continue;
+      if (this._heroStatusRemovalBlocked(pi, heroIdx, script.attachmentStatus)) continue;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -7798,7 +8104,7 @@ class GameEngine {
    * Zieht das Anhaengsel eines uebertragenen Status zum neuen Traeger um.
    * @returns {boolean} ob der Umzug geklappt hat
    */
-  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx) {
+  async anhaengselUmziehen(inst, neuOwner, neuHeroIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     const zonen = this.gs.players[neuOwner]?.supportZones?.[neuHeroIdx];
     if (!zonen) return false;
@@ -7807,27 +8113,10 @@ class GameEngine {
       if ((zonen[z] || []).length === 0) { platz = z; break; }
     }
     if (platz < 0) return false;
-
-    const altZonen = this.gs.players[inst.owner]?.supportZones?.[inst.heroIdx];
-    const altSlot = altZonen?.[inst.zoneSlot];
-    if (Array.isArray(altSlot)) {
-      const i = altSlot.indexOf(inst.name);
-      if (i >= 0) altSlot.splice(i, 1);
-    }
-    this._broadcastEvent('play_pile_transfer', {
-      owner: inst.owner, cardName: inst.name,
-      from: 'support', to: 'support',
-      fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
-      toHeroIdx: neuHeroIdx, toSlotIdx: platz,
-      ...(neuOwner !== inst.owner ? { fromOwner: inst.owner, toOwner: neuOwner } : {}),
-    });
-    zonen[platz] = [inst.name];
-    inst.owner = neuOwner;
-    inst.heroIdx = neuHeroIdx;
-    inst.zoneSlot = platz;
-    this.log('attachment_moved', { card: inst.name, toHeroIdx: neuHeroIdx });
-    this.sync();
-    return true;
+    // ★ ATT-01/02: EIN Umhaengeweg (`actionTransferAttachment`) statt eines rohen Platztauschs — mit Austritts-/Eintritts-Haken und
+    // `attachmentMovedToHost`, damit die Wirkung der Karte (Polymorph-ATK-Bonus, Fluch-ATK-Sperre, Mind-Control-Kontrolle …) mit umzieht.
+    const r = await this.actionTransferAttachment(inst, neuOwner, neuHeroIdx, platz, { sourceName: 'Tea', quiet: true, ...opts });
+    return !!r?.success;
   }
 
   /**
@@ -7858,11 +8147,12 @@ class GameEngine {
     return this.sendBoardCardToDiscard(inst, { source: typeof source === 'string' ? { name: source } : source });
   }
 
-  async cleanseAttachmentByKey(key, source) {
+  async cleanseAttachmentByKey(key, source, gesperrt) {
     const id = String(key || '').startsWith('attach:') ? String(key).slice(7) : null;
     if (!id) return false;
     const inst = this.cardInstances.find(c => String(c.id) === id && c.zone === ZONES.SUPPORT);
     if (!inst) return false;
+    if (gesperrt?.has(inst.id)) return false;   // 18.11.2026: Sperre des Wirts (s. `cleanseHeroStatuses`)
     this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
     // ★★ v1143b: ueber den EINEN Brett→Ablage-Weg — vorher fehlte der
     // Flug, und `{ source }` landete im Parameter `toHeroIdx`.
@@ -7870,10 +8160,10 @@ class GameEngine {
     return true;
   }
 
-  async cleanseNegativeAttachments(pi, heroIdx, source) {
+  async cleanseNegativeAttachments(pi, heroIdx, source, gesperrt) {
     const treffer = this.cardInstances.filter(inst =>
       inst.zone === ZONES.SUPPORT && inst.heroIdx === heroIdx && inst.owner === pi
-      && !inst.faceDown
+      && !inst.faceDown && !gesperrt?.has(inst.id)
       && loadCardEffect(inst.name)?.countsAsNegativeStatus);
     for (const inst of treffer) {
       this.log('status_remove', { target: inst.name, status: 'attachment', by: source });
@@ -7933,7 +8223,7 @@ class GameEngine {
         message: `${chainCtx.eventDesc}. Activate ${hero.name}?`,
         showCard: cardName, confirmLabel: 'Activate!', cancelLabel: 'No', cancellable: true,
       });
-      if (!ja) continue;
+      if (!this._confirmSaidYes(ja)) continue;
       if (typeof script.payActivationCost === 'function') {
         const paid = await script.payActivationCost(this, gegner, chainCtx, hi);
         if (paid === false) continue;
@@ -8189,6 +8479,129 @@ class GameEngine {
       catch { return false; }
     }
     return flag === true;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 (Ida: „Da soll sie überall durchschlagen!"): schlägt der Schaden dieser Quelle die „takes no damage"-FORMEN am HELDEN durch —
+   * Kontrolle durch Deepsea Succubus/Little Lyta (`charmed.nurSchadenSchutz`: „cannot take any damage"), `damage_proof`-Status (Storm Piano, Cheat Chair) und Versteinerung
+   * (`stunned._petrified`: Baihu, Petrifier)? Heldenskript-Vertrag `piercesDamageProtection(engine, { source, target, type, sourceOwner, sourceHeroIdx })` (Ida), nur solange der
+   * Quellheld lebt und nicht stummgeschaltet ist (wie jeder laufende Heldeneffekt). NICHT dabei bleiben „unaffected by ALL cards and effects" (Charme Lv 3 …), der Erstrunden-Schutz,
+   * Effekt-Immunitäten und Quellen-Immunitäten (Damus); Gegenstück bei Kreaturen: `e.ignoreUnaffected` (`_markCreatureDamageImmunity`).
+   */
+  _quelleDurchschlaegtHeldenSchutz(source, target, type) {
+    if (!source || !target || target.hp === undefined) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „cannot be reduced or negated" — „Der Schaden soll durchgehen! Gilt allgemein für jede Immunität"): der vom Elixir verstärkte
+    // Attack-Treffer schlägt dieselben „takes no damage"-Formen durch wie Ida (Storm Piano/Cheat Chair, Versteinerung, Succubus-/Lyta-Kontrolle); „unaffected by …"-Effekt-Immunitäten bleiben.
+    if (this._empoweredStrikeHeld(source, type)) return true;
+    const qs = this._klonSicht(source);
+    const sOwner = qs?.heroOwner ?? qs?.owner ?? qs?.controller;
+    const sHeroIdx = qs?.heroIdx;
+    if (!Number.isInteger(sOwner) || sOwner < 0 || !Number.isInteger(sHeroIdx) || sHeroIdx < 0) return false;
+    const sHero = this.gs.players[sOwner]?.heroes?.[sHeroIdx];
+    if (!sHero?.name || !(sHero.hp > 0)) return false;
+    const f = this.heroScript(sHero)?.piercesDamageProtection;
+    if (typeof f !== 'function') return false;
+    if (this._isHeroEffectSilenced(sOwner, sHeroIdx)) return false;
+    try { return !!f(this, { source: qs, target, type, sourceOwner: sOwner, sourceHeroIdx: sHeroIdx }); }
+    catch (err) { console.error(`[piercesDamageProtection] ${sHero.name}:`, err.message); return false; }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 (Chuck, the Crazy Veteran: „unless all other Heroes you control are immune to that source of damage" — JEDE Form von Schadensimmunität
+   * des Mitstreiters zählt): GEMEINSAMES Prädikat „nimmt der Held (Brettseite `physOwner`, Platz `heroIdx`) von DIESER Quelle gerade keinen Schaden?" — gespiegelt aus dem Helden-
+   * Schadenspfad (`_actionDealDamageImpl`), nur statische/lesende Prüfungen (nichts wird verbraucht, kein Prompt). Ein neuer Schutz im Schadenspfad gehört hier mit hinein; Skripte
+   * mit einem „takes no damage"-Hook, den die Engine nicht von außen lesen kann, melden ihn per Heldenskript-Vertrag `heroTakesNoDamage(engine, { hero, physOwner, heroIdx, controller,
+   * source, type })` (Inya: lebender Fantasy Buddy).
+   *
+   * Gezählt wird: tot (außer Todesaufschub im Flächenschlag), Erstrunden-Schutz, Effekt-Immunität/Zielschutz „or HIT" gegen diese Quelle, Schadens-Status (`blocksDamage`: Storm Piano,
+   * Cheat Chair), Kontrolle durch Succubus/Lyta/Charme, Versteinerung, Anti Magic/Spell-Immunität, Carris, Damus (Quellen-Immunität), Submerged, Interference (Flächenschlag),
+   * Buff-Multiplikator 0 (Damage Immune, Medusa's Curse), Heldenskript-Vertrag, Status-Immunitäten bei Brenn-/Gift-Ticks.
+   * Unreduzierbarer/unnegierbarer Schaden („cannot be reduced or negated": `opts.cannotBeNegated`/`cannotBeReduced`) schlägt Anti Magic, Carris, Multiplikator-Buffs und Hook-Schilde
+   * durch (Spielgestalter-Entscheidung 16.11.2026: „Unreduzierbarer Schaden toppt Schilde"); ein durchschlagender Quellheld (`_quelleDurchschlaegtHeldenSchutz`, Ida) zusätzlich Storm Piano,
+   * Succubus-/Lyta-Kontrolle und Versteinerung — gegen diese Quelle gilt der Held dann als NICHT immun. Nicht erfasst (kein Zustand, den man von außen lesen kann): einmalige Karten-Schilde
+   * (Energy Aura …) und Hook-Reduktionen ohne Vertrag.
+   * @param {object} [opts] `{ festesZiel, cannotBeNegated, cannotBeReduced }` — wie im Schadenspfad (`istEinzelzielTreffer`, Flaggen des Treffers)
+   */
+  heroTakesNoDamageFromSource(physOwner, heroIdx, source, type, opts = {}) {
+    const hero = this.gs.players[physOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp === undefined) return false;
+    // Tot zählt als immun — AUSSER der Tod ist im laufenden Flächenschlag nur vorgemerkt (Todes-Aufschub 28.9.): dann steht der Held für die Schadensberechnung noch im Spiel.
+    if (hero.hp <= 0) return !this.heldTodAufgeschoben(hero);
+    const festesZiel = !!opts.festesZiel;
+    const idaDurch = this._quelleDurchschlaegtHeldenSchutz(source, hero, type);
+    // Idas Hook stempelt `cannotBeReduced` + `cannotBeNegated` auf die Helden des Gegners — `_quelleDurchschlaegtHeldenSchutz` gilt unter genau diesen Bedingungen.
+    const nichtNegierbar = !!opts.cannotBeNegated || idaDurch;
+    const nichtReduzierbar = !!opts.cannotBeReduced || idaDurch;
+    const stumm = this._isHeroEffectSilenced(physOwner, heroIdx);
+    const qName = (typeof source === 'string') ? source : source?.name;
+
+    // Erstrunden-Schutz: absolut, gegen jeden Schaden.
+    const fts = this.gs.firstTurnProtectedPlayer;
+    if (fts != null && (this.gs.players[fts]?.heroes || []).includes(hero)) return true;
+    if (hero.statuses?.shielded || hero.buffs?.gou_protected) return true;
+    // Effekt-Immunität (Escape Device …) und Zielschutz „cannot be chosen or HIT" (Dive Down, Jetpack …): gelten nicht für Status-Ticks (wie der Schadenspfad).
+    if (type !== 'status' && type !== 'burn' && type !== 'poison') {
+      if (this.hasEffectImmunity(physOwner, heroIdx, source)) return true;
+      try {
+        if (this.heroBlocksTargeting(physOwner, heroIdx, {
+          sourceData: qName ? this._getCardDB()[qName] : null, damageType: type, cardName: qName || null, source,
+          chooserIdx: source?.controller ?? source?.owner ?? null, hit: true, festesZiel,
+        })) return true;
+      } catch { /* eine defekte Karte darf die Prüfung nicht sprengen */ }
+    }
+    // Generische Immunität (nach CC) und Status-Immunität je Schadenstyp (burn → burn_immune …).
+    if (hero.statuses?.immune) return true;
+    const statusByType = STATUS_EFFECTS?.[type] || STATUS_EFFECTS?.[type + 'ed'];
+    if (statusByType?.immuneKey && hero.statuses?.[statusByType.immuneKey]) return true;
+    // Burn-/Gift-Tick (Quelle „Burn"/„Poison"): ist der Held gegen den STATUS immun (Light Ball, Johanna, `negative_status_immune` …), gilt er als immun gegen diese Quelle.
+    const tick = Object.keys(STATUS_EFFECTS || {}).find(k => STATUS_EFFECTS[k].dealsTickDamage && qName && STATUS_EFFECTS[k].damageSourceName === qName) || null;
+    if (tick && this.heroBlocksStatusNow(physOwner, heroIdx, tick, { festesZiel })) return true;
+    // „Prevent any damage the Hero would take" (Storm Piano, Cheat Chair): `blocksDamage`-Status; Idas Zauberschaden schlägt ihn durch.
+    if (!idaDurch && this._schadensSchutzStatus(hero)) return true;
+    // Anti Magic (Stufenschranke) und „unaffected by all Spells" (Black-Thorn Dragon): unnegierbarer Schaden schlägt durch.
+    if (!nichtNegierbar && qName) {
+      if (this._wouldHeroDamageBeVoided(hero, source, type)) return true;
+      if (this._spellLevelAlsQuelle(qName, type, source) != null && this.heroHasSpellImmunity(physOwner, heroIdx)) return true;
+    }
+    // Carris: „any damage this Hero would take becomes 0" — unreduzierbarer/unnegierbarer Schaden trifft ihn (v1444).
+    if (!nichtNegierbar && !nichtReduzierbar && this._isHeroSelfDamageImmune(hero)) return true;
+    // Kontrolle (Deepsea Succubus/Little Lyta: „cannot take any damage") und Charme Lv 3; Ida durchschlägt nur die reine Schadens-Kontrolle.
+    if (this._charmBlocksFrom(hero, source?.controller ?? source?.owner, { loveShotOhneSchutz: true })
+        && !(hero.statuses?.charmed?.nurSchadenSchutz && idaDurch)) return true;
+    // Quellen-Immunität (Damus: „unaffected by Armageddon", solange …).
+    {
+      const sc = this.heroScript(hero);
+      const liste = sc?.immuneToSourceNames;
+      if (Array.isArray(liste) && typeof qName === 'string' && !stumm && liste.some(n => qName.includes(n))) {
+        let gilt = true;
+        if (typeof sc.immuneToSourceCondition === 'function') {
+          try { gilt = !!sc.immuneToSourceCondition(this, physOwner, heroIdx); } catch { gilt = false; }
+        }
+        if (gilt) return true;
+      }
+    }
+    // Versteinerung („takes no damage from any sources": Baihu, Petrifier); Ida durchschlägt sie.
+    if ((hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) && !idaDurch) return true;
+    // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
+    if (hero.buffs?.submerged && this.isSubmergedProtected(physOwner, hero, { festesZiel })) return true;
+    // Interference: voller Schutz (Stufe 2/3) gegen Flächenquellen, die mehrere Ziele treffen.
+    if ((this._multiHitScope?.total || 0) >= 2 && this.interferenceShare(physOwner, hero) >= 1) return true;
+    // Buff-Multiplikator 0 („Damage Immune" von String of Fine, Medusa's Curse): Senkungen wirken nicht gegen unreduzierbaren/unnegierbaren Schaden.
+    if (!nichtNegierbar && !nichtReduzierbar) {
+      for (const bd of Object.values(hero.buffs || {})) {
+        if (bd && bd.damageMultiplier === 0) return true;
+      }
+    }
+    // Heldenskript-Vertrag `heroTakesNoDamage` (Inya: lebender Fantasy Buddy). Ein Hook-Schild ruht bei Frost/Betäubung/Negierung und gegen unreduzierbaren Schaden.
+    if (!stumm && !nichtReduzierbar) {
+      const f = this.heroScript(hero)?.heroTakesNoDamage;
+      if (typeof f === 'function') {
+        try {
+          if (f(this, { hero, physOwner, heroIdx, controller: this.heroSideOf(physOwner, hero), source, type })) return true;
+        } catch (err) { console.error(`[heroTakesNoDamage] ${hero.name}:`, err.message); }
+      }
+    }
+    return false;
   }
 
   _isHeroSelfDamageImmune(target) {
@@ -8571,14 +8984,15 @@ class GameEngine {
    * doesn't break the protection — only physically removing Light
    * Ball from the board does.
    */
-  _lightBallProtects(playerIdx, targetType, targetHeroIdx) {
+  _lightBallProtects(playerIdx, targetType, targetHeroIdx, kontrolleAls = null) {
     // ★ Styx 28.9.: nach KONTROLLE — „other targets you control". Bei
     // 'hero' ist `playerIdx` die Brettseite des Zielhelden (Kontrolleur
     // ueber `heroSideOf`), bei 'creature' bereits der Kontrolleur.
+    // `kontrolleAls` (18.11.2026, nur Status-Anhaengsel-Abgleich): beurteilt den Helden, als stuende er unter der Kontrolle dieses Spielers (s. `heroBlocksStatusNow`).
     let ctrl = playerIdx, zielHeld = null;
     if (targetType === 'hero') {
       zielHeld = this.gs.players[playerIdx]?.heroes?.[targetHeroIdx] || null;
-      if (zielHeld) ctrl = this.heroSideOf(playerIdx, zielHeld);
+      if (zielHeld) ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(playerIdx, zielHeld);
     }
     for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(ctrl)) {
       if (hero.hp <= 0) continue;
@@ -8616,10 +9030,10 @@ class GameEngine {
    * Negated). ★ Styx 28.9.: nach Kontrolle — eine geliehene Johanna
    * schuetzt die Helden ihres Kontrolleurs, nicht mehr die ihrer Spalte.
    */
-  _johannaSchuetzt(zielHeld) {
+  _johannaSchuetzt(zielHeld, kontrolleAls = null) {
     const phys = this._findHeroOwner(zielHeld);
     if (phys < 0) return false;
-    const ctrl = this.heroSideOf(phys, zielHeld);
+    const ctrl = kontrolleAls != null ? kontrolleAls : this.heroSideOf(phys, zielHeld);   // `kontrolleAls`: s. `heroBlocksStatusNow`
     for (const { hero: johanna } of this.heroesControlledBy(ctrl)) {
       if (johanna.name !== 'Johanna, Crusader of Light') continue;
       if (johanna === zielHeld) continue;   // schuetzt sich nicht selbst
@@ -9608,7 +10022,9 @@ class GameEngine {
     // Ausnahme davon ausdruecklich in dessen Kartentext, hier nicht.
     // ★ v1341: generisch ueber `STATUS_EFFECTS[key].blocksDamage` (Storm
     // Piano, Cheat Chair) statt ueber den Namen eines einzelnen Status.
-    const _schutzStatus = (target && target.hp !== undefined && amount > 0) ? this._schadensSchutzStatus(target) : null;
+    // Spielgestalter-Entscheidung 16.11.2026: Idas Zauberschaden schlägt „damage_proof" durch (`_quelleDurchschlaegtHeldenSchutz`; Charme Lv 3 usw. bleiben).
+    const _idaDurch = (target && target.hp !== undefined && amount > 0) ? this._quelleDurchschlaegtHeldenSchutz(source, target, type) : false;
+    const _schutzStatus = (target && target.hp !== undefined && amount > 0 && !_idaDurch) ? this._schadensSchutzStatus(target) : null;
     if (_schutzStatus) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: _schutzStatus, amount, source: source?.name });
       this._flashHeroDamageZero(target);
@@ -9915,6 +10331,13 @@ class GameEngine {
         this.log('true_damage', { target: this._heroLabel(target), source: source?.name });
       }
     }
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength): „that Attack's damage is increased by 150 and cannot be reduced or negated" — der GANZE Schaden dieses Treffers ist unreduzier-/unnegierbar,
+    // schon fuer die Hook-Runde unten (Schilde, Senkungen, negierende Hooks sehen die Flaggen wie bei Ida); +150 und Verbrauch des Buffs folgen im Rider (`_applyEmpoweredStrikeIfApplicable`).
+    if (target?.hp !== undefined && amount > 0 && this._empoweredStrikeHeld(source, type)) {
+      hookCtx.cannotBeNegated = true;
+      hookCtx.cannotBeReduced = true;
+      hookCtx._unreduzierbar = true;
+    }
     // v687: zielseitige Unangreifbarkeit (Tempeste, the Weather Fairy).
     // VOR BEFORE_DAMAGE gesetzt, damit jeder Listener `ctx.cannotBe…`
     // schon liest und setAmount/modifyAmount die Reduktion abweisen
@@ -10122,16 +10545,17 @@ class GameEngine {
     // Karten, die den Treffer VOR Schilden/Deckeln/HP-Boeden senken (Cloud in a Bottle: „Halve any damage … including that damage"), melden sich mit
     // `preDamageEarly: true` und werden HIER gefragt — nach Immunitaeten/Negationen und Pfeil-Boni, aber VOR dem Buff-Multiplikatoren-Durchgang unten.
     // Die Karte legt ihren Multiplikator-Buff (Cloudy) sofort auf; der Durchgang darunter halbiert den Treffer dann wie jede andere Senkung (Kettenbetrag
-    // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Nicht anbieten, wenn der Treffer
-    // nicht senkbar ist (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang ohnehin aus).
+    // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Ein nicht senkbarer Treffer
+    // (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang aus) bekommt das Angebot trotzdem (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind
+    // erlaubt, Hinweis in der Frage) — die Karte wird bezahlt, ein zurueckgelieferter `multiplier` wird aber verworfen.
     // R5 (Als Ruling Al 26.10.): wird Hydra Blood Arrow diesen Treffer gleich auf 0 setzen, sehen Reaktionen am Ziel schon die 0 — kein Angebot.
     if (target && target.hp !== undefined && target.hp > 0 && !hookCtx.cancelled
-        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated
         && (this.istKlonQuelle(source) || !require('./_arrows-shared').hydraWirdNullen(this, source, hookCtx))) {
       const _fruehBetrag = this._projectedAmount(hookCtx);
       if (_fruehBetrag > 0) {
-        const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type, { early: true });
-        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+        const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type,
+          { early: true, cannotBeNegated: !!hookCtx.cannotBeNegated, cannotBeReduced: !!hookCtx.cannotBeReduced });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1 && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated) {
           hookCtx._mul = (hookCtx._mul ?? 1) * _fr.multiplier;
           hookCtx._kMul = (hookCtx._kMul ?? 1) * _fr.multiplier;
         }
@@ -10257,9 +10681,12 @@ class GameEngine {
     // („The controlled Hero cannot take any damage…" faellt weg).
     // Der Marker `_loveShot` liegt seit jeher auf dem Status; er
     // unterscheidet die geliehene Kontrolle vom echten Charme Lv3.
+    // Spielgestalter-Entscheidung 16.11.2026: Idas Zauberschaden schlägt NUR die reine Schadens-Kontrolle durch (Deepsea Succubus/Little Lyta: „cannot take any damage",
+    // `charmed.nurSchadenSchutz`); Charme Lv 3 / Golden Apple („unaffected by … cards and effects") bleiben.
     if (target?.hp !== undefined
         && this._charmBlocksFrom(target, source?.controller ?? source?.owner,
-          { loveShotOhneSchutz: true })) {
+          { loveShotOhneSchutz: true })
+        && !(target.statuses?.charmed?.nurSchadenSchutz && _idaDurch)) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -10300,8 +10727,9 @@ class GameEngine {
     // haette jede weitere Versteinerungs-Karte hier einen eigenen
     // Zweig gebraucht — und `_baihuPetrify` bleibt daneben stehen,
     // damit laufende Spielstaende nicht brechen.
+    // Spielgestalter-Entscheidung 16.11.2026: „takes no damage"/„would take becomes 0" (Versteinerung) hält Idas Zauberschaden NICHT ab.
     if ((target?.statuses?.stunned?._petrified || target?.statuses?.stunned?._baihuPetrify)
-        && target.hp !== undefined) {
+        && target.hp !== undefined && !_idaDurch) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'petrified' });
       this._flashHeroDamageZero(target);   // v1146
       return { dealt: 0, cancelled: true };
@@ -10677,8 +11105,16 @@ class GameEngine {
    *
    * What it still respects:
    *   • firstTurnProtectedPlayer (game-start grace shield — absolute)
-   *   • Cardinal Beast immunity + Baihu Petrify on creatures (absolute
-   *     "immune to all damage" flags, not reductions)
+   *   • Cardinal Beast immunity (absolute "unaffected by all cards and effects").
+   *     Spielgestalter-Entscheidung 17.11.2026 („Auch Acid Vial soll versteinerte Kreaturen treffen und schädigen können!"): die Versteinerung von
+   *     Baihu/Petrifier („takes no damage from any sources" / „Damage … becomes 0") hält True Damage bei KREATUREN nicht mehr ab (`durchschlagVersteinerung`,
+   *     wie beim Helden, wo sie nie griff).
+   *     Spielgestalter-Entscheidung 18.11.2026 („Ja" — wenn Elixir of Strength und Ida das schon tun): True Damage schlägt bei KREATUREN auch die übrigen „takes no damage"-Schutz-Immunitäten
+   *     durch (`durchschlagSchutz`, derselbe Stempel wie das Elixir): Time Bomblebee mit Bomb Counters („cannot take damage or be defeated") und die Succubus-gestohlene Kreatur. Cardinal Beasts
+   *     („unaffected by ALL cards and effects"), Erstrunden-Schutz und die „unaffected by …"-Effekt-Immunitäten bleiben (anders als bei Ida wird `ignoreUnaffected` NICHT gesetzt).
+   *     `opts.durchschlagen === false` schaltet nur das Durchschlagen der Schutz-Immunitäten ab (kein Aufrufer setzt es: alle Kreaturen-Aufrufer — Acid Vial, Rockfall, Pressure Projectile, Surefire
+   *     Shot, Piercer of Heavens, Glasowt — tragen im Text „cannot be reduced or negated"; Johanna, Bubbles, Prophecy of Tempeste, Deepsea Siren, Rioting Village treffen nur Helden). Eine künftige
+   *     Karte, die technisch True Damage nutzt, ohne dass ihr Text unreduzierbaren Schaden nennt, setzt es.
    *
    * Behavior preserved vs. actionDealDamage:
    *   • Sets `_damagedOnTurn` on the target (used by Medusa's Curse etc.)
@@ -10761,6 +11197,15 @@ class GameEngine {
           require('./_arrows-shared').applyArrowsBeforeDamage(this, source, target, pk);
           if (pk.amount > amount) amount = pk.amount;
         }
+      }
+
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Die Hand-Reaktionen des Vor-Schaden-Fensters (Homerun!, Escape, Strong Shield, Sculpture Guards,
+      // Spectral Armor, Bamboo Shield, Cloud in a Bottle …) kamen gegen True Damage nie zum Zug; sie werden jetzt angeboten (Hinweis „cannot be reduced or negated" in der Frage, die CPU
+      // waehlt das nicht). Bezahlt/verbraucht wird wie immer — Negation und Senkung werden verworfen, der Treffer geht durch („cannot be reduced or negated").
+      if (amount > 0 && target.hp > 0) {
+        const _tdFlags = { cannotBeNegated: true, cannotBeReduced: true };
+        await this._checkPreDamageHandReactions(target, source, amount, type, { early: true, ..._tdFlags });
+        if (target.hp > 0) await this._checkPreDamageHandReactions(target, source, amount, type, _tdFlags);
       }
 
       if (_atkBoni && target.hp > 0 && !this._inMctsSim && !this._fastMode) {
@@ -10849,8 +11294,10 @@ class GameEngine {
     // Route through the batch so all the centralized plumbing runs
     // (animation, death hooks, _damagedOnTurn tracker, hand-limit rechecks,
     // discard-pile routing). canBeNegated:false pierces Gate Shield,
-    // Guardian, and buff multipliers. Cardinal Beast / Baihu absolutes
-    // still block — those are "immune to all damage" flags, not reductions.
+    // Guardian, and buff multipliers. Cardinal Beast absolutes
+    // still block — "unaffected by all cards and effects", not a reduction.
+    // Spielgestalter-Entscheidung 17.11.2026: die Versteinerung (Baihu/Petrifier) gilt hier nicht mehr als Schutz (`durchschlagVersteinerung`).
+    // Spielgestalter-Entscheidung 18.11.2026: ebenso Time Bomblebee („cannot take damage") und die Succubus-gestohlene Kreatur (`durchschlagSchutz`, wie Elixir of Strength/Ida); Cardinal Beasts bleiben.
     if (target.counters) {
       await this.processCreatureDamageBatch([{
         inst: target,
@@ -10859,6 +11306,8 @@ class GameEngine {
         source,
         sourceOwner,
         canBeNegated: false,
+        durchschlagVersteinerung: true,
+        ...(opts.durchschlagen === false ? {} : { durchschlagSchutz: true }),
         trueDamage: true,   // Johanna (Ruling Al, Welle 2): „cannot be reduced or negated" — Umleitung ZUSÄTZLICH statt Senkung
         isStatusDamage: false,
         animType: opts.animType || null,
@@ -10901,7 +11350,7 @@ class GameEngine {
   _todesAufschubBeginnen() {
     const a = this._todesAufschub;
     if (a) { a.tiefe += 1; return; }
-    this._todesAufschub = { tiefe: 1, liste: [], nachher: [] };
+    this._todesAufschub = { tiefe: 1, liste: [], nachher: [], nachTode: [] };
   }
 
   /**
@@ -10917,18 +11366,32 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * Spielgestalter-Entscheidung 17.11.2026 (Explosivo's Sword × Whirlwind Strike): Wirkung, die erst laufen darf, wenn der Flaechenschlag
+   * KOMPLETT aufgeloest ist — aller Schaden, alle Tode samt ihrer Trigger (Wanted Poster …) und die Klammer selbst sind durch.
+   * Laeuft gerade ein Schlag (Klammer offen), wird `fn` vorgemerkt und beim Schliessen der AEUSSERSTEN Klammer NACH den Toden
+   * abgearbeitet (`endMultiHit`); sonst `false` zurueck, und der Aufrufer wirkt sofort (Einzeltreffer unveraendert).
+   */
+  nachFlaechenschlagTode(fn) {
+    const a = this._todesAufschub;
+    if (!a || typeof fn !== 'function') return false;
+    (a.nachTode || (a.nachTode = [])).push(fn);
+    return true;
+  }
+
   /** Aufschub schliessen; der aeusserste wickelt alle vorgemerkten Tode
-   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen. */
+   *  ab — Helden und Kreaturen in der Reihenfolge, in der sie fielen.
+   *  Rueckgabe: die erst NACH den Toden vorgemerkten Wirkungen (`nachFlaechenschlagTode`) — `endMultiHit` fuehrt sie nach dem Schliessen der Klammer aus. */
   async _todesAufschubAbschliessen() {
     const a = this._todesAufschub;
-    if (!a) return;
-    if (a.tiefe > 1) { a.tiefe -= 1; return; }
+    if (!a) return [];
+    if (a.tiefe > 1) { a.tiefe -= 1; return []; }
     this._todesAufschub = null;
     // Aller Schaden ist durch: vorgemerkte Nachwirkungen (Rool …) jetzt, vor der Todesauswertung.
     for (const fn of (a.nachher || [])) {
       try { await fn(); } catch (err) { console.error('[nachFlaechenschlag]', err.message); }
     }
-    if (a.liste.length === 0) return;
+    if (a.liste.length === 0) return a.nachTode || [];
     // Ein Sammler um ALLE Kreaturentode des Schlags: „one or more of your
     // Creatures are defeated" sieht die ganze Liste auf einmal.
     await this._mitNiederlagenSammler(async () => {
@@ -10949,6 +11412,7 @@ class GameEngine {
         await this._checkReactiveHandLimits(owner);
       }
     });
+    return a.nachTode || [];
   }
 
   /**
@@ -11493,11 +11957,17 @@ class GameEngine {
     // dieser Karten pruefen auf „toedlich", und toedlicher als das geht
     // es nicht. `instaKill` filtert das Angebot auf die Reaktionen,
     // die einen Tod wirklich ersetzen koennen (s. dort).
-    // Ein Selbstopfer (`isSacrifice`) oeffnet kein Fenster: der
-    // Kontrolleur gibt den Helden absichtlich her.
-    if (!opts.isSacrifice && !opts.skipDefeatReactions && !_u) {
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat", Heldenopfer): auch ein Helden-OPFER (`isSacrifice`: Divine Gift of Sacrifice, Pharaoh,
+    // Teocuilatl, Pythia) öffnet dieses Fenster — das Opfer ist als Kosten/Effekt gezahlt, die Hand darf auf die bevorstehende Niederlage reagieren. Das Fenster ist für
+    // künftige Karten da: im Fenster steht `opts.isSacrifice`/`cause: 'sacrifice'`, und NUR Karten mit `firesOnSacrifice: true` werden überhaupt angeboten (Homerun!, Escape,
+    // Emergency Spell Armor, Paraseed Zombie, Point-Blank Annihilation tragen es nicht: ihr Text meint „defeated by an effect/Spell/opponent's card", nicht die eigene Opfergabe —
+    // Escape/Emergency Spell Armor würden den Spell-Typ der Opferkarte sonst fälschlich als Auslöser lesen). Ersetzt/negiert eine Reaktion die Niederlage, ist das Opfer NICHT
+    // bezahlt (`opferErsetzt`): Karten, deren Wirkung das Opfer voraussetzt (Divine Gift of Sacrifice, Teocuilatl), fizzeln wie bei einem gerade noch geretteten Kreaturen-Opfer.
+    // Ausgenommen bleibt der HP-Kosten-Tod (`hpKosten`, Foresta): kein Opfer, kein Fenster.
+    if (!(opts.isSacrifice && opts.hpKosten) && !opts.skipDefeatReactions && !_u) {
+      const _opferFenster = !!opts.isSacrifice;
       const rx = await this._checkPreDamageHandReactions(
-        target, source, target.hp, 'defeat', { instaKill: true });
+        target, source, target.hp, 'defeat', { instaKill: true, ...(_opferFenster ? { isSacrifice: true, cause: 'sacrifice' } : {}) });
       // `negated` deckt beide Faelle ab: die reine Negation (Escape)
       // und die Ersetzung, bei der die Reaktion die HP selbst setzt
       // (Paraseed Zombie: „that Hero's HP drop to 1 instead").
@@ -11505,7 +11975,7 @@ class GameEngine {
         this.log('defeat_negated', {
           hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat',
         });
-        return { defeated: false };
+        return { defeated: false, ...(_opferFenster ? { opferErsetzt: true } : {}) };
       }
       // Hat eine Reaktion den Helden zwischenzeitlich geheilt oder
       // entfernt, gilt derselbe Abbruch.
@@ -11550,8 +12020,9 @@ class GameEngine {
     // SC (v1381): Insta-Kill und Opfer zaehlen wie Schaden in Hoehe der
     // restlichen HP — ein eigenes Opfer ist „50%+ damage" (Als Ruling 24.9.).
     this._scNoteHeroHpLoss(target, _scHpVorher);
-    // W24a (N1-05): Besiegen OHNE Schaden durch Attack/Spell → Corpse Explosion (ueber das Hand-Fenster "Held besiegt"); nicht bei Opfer/Eigenabgang/HP-Kosten/unaufhaltsam.
-    await this._runHeroDefeatSequence(target, source, targetOwner, { ohneSchaden: !_u && !opts.isSacrifice && !opts.eigenerAbgang && !opts.hpKosten });
+    // W24a (N1-05): Besiegen OHNE Schaden durch Attack/Spell → Corpse Explosion (ueber das Hand-Fenster "Held besiegt"); nicht bei Eigenabgang/HP-Kosten/unaufhaltsam.
+    // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): auch ein Helden-Opfer (`isSacrifice`) zählt — die Karte prüft selbst, ob die Quelle eine Attack/ein Spell ist.
+    await this._runHeroDefeatSequence(target, source, targetOwner, { ohneSchaden: !_u && !opts.eigenerAbgang && !opts.hpKosten });
     // Welle 11 (Al, Q61: „Auch Heroes"): ein Helden-OPFER ist ein „sacrifice a target" — Hook NACH dem Todesablauf (Bonded Companion Thuly:
     // „when you sacrifice a target"). Opferer = `source.owner`; nicht mehr nach Spielende.
     // Welle 12 (Al, Rueckfrage 4, Foresta): „Der Hero stirbt ja nicht, weil er durch einen Effekt 'sacrificed' wird, sondern durch HP-Verlust!" —
@@ -11718,6 +12189,18 @@ class GameEngine {
     if (this._isAmeShieldedHeroObj(target)) {
       this.log('ame_heal_blocked', { target: this._heroLabel(target), amount });
       return;
+    }
+
+    // Spielgestalter-Entscheidung 16.11.2026: eine Effekt-Immunität dieser Auflösung (Future Tech Escape Device …: „Negate all effects … on that Hero") negiert auch eine Heilung
+    // (auch durch einen eigenen hilfreichen Zauber, der die Reaktion ausgelöst hat) — wie im Schadens- und Statuspfad.
+    {
+      const iOwner = this._findHeroOwner(target);
+      const iHi = iOwner >= 0 ? (this.gs.players[iOwner].heroes || []).indexOf(target) : -1;
+      if (iOwner >= 0 && iHi >= 0 && amount > 0) await this.heroAffectWindow(iOwner, iHi);   // „Affected"-Fenster (17.11.2026): auch Heilungen ohne Zielwahl (Healing Melody …)
+      if (iOwner >= 0 && iHi >= 0 && this.hasEffectImmunity(iOwner, iHi, source)) {
+        this.log('effect_immunity', { hero: this._heroLabel(target), source: source?.name || null, effect: 'heal' });
+        return;
+      }
     }
 
     // ★ v1096 („Forbidden Curse of Aging"): Heilsperre durch ein
@@ -12036,6 +12519,12 @@ class GameEngine {
     // v1466: 0 max HP → keine Wiederbelebung, auch kein Fenster davor.
     // v1467: `opts.heilt` (voll/halb heilen) → auch nicht bei Heilsperre.
     if (!this.canReviveHero(hero, opts)) return false;
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — auch der gewählte besiegte Held
+    // (das Zielfenster bietet die Reaktion für ihn an) wird dann nicht wiederbelebt.
+    if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: this._heroLabel(hero), source: typeof opts.source === 'string' ? opts.source : (opts.source?.name || null), effect: 'revive' });
+      return false;
+    }
     // ★ v1288 — Fenster UNMITTELBAR vor jeder Wiederbelebung. Alles, was
     // an den Tod dieses Helden anknuepft und noch aussteht (Pseudonias
     // vorgemerkte Aufnahme), wird hier entschieden — solange der Held noch
@@ -12082,6 +12571,13 @@ class GameEngine {
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
       hero.maxHpCapped = opts.maxHpCap;
+      // ★ Die max HP sind jetzt ein FESTER Wert der Karte (Divine Gift of Death/Equality, Paraseed Control, Resuscitation Potion): was Toughness vorher
+      // aufgeschlagen hatte (`counters.hpGranted`), steckt nicht mehr darin. Der gemerkte Bonus wuerde beim Abgang einer Kopie sonst von den NEUEN max HP
+      // abgezogen — der Held fiel auf 1/1 statt auf seinen festen Wert zu bleiben. Neu angelegte Kopien bringen unter der Obergrenze ohnehin nichts mehr.
+      for (const c of this.cardInstances) {
+        if ((c.counters?.hpGranted || 0) > 0 && c.owner === playerIdx && c.heroIdx === heroIdx
+            && (c.zone === ZONES.ABILITY || this.istAbilityImSupport(c))) c.counters.hpGranted = 0;
+      }
     }
     if (opts.forceKillAtTurnEnd) {
       hero._forceKillAtTurnEnd = this.gs.turn;
@@ -12184,9 +12680,11 @@ class GameEngine {
     const accepted = script?.attachableHeroes;
     if (!Array.isArray(accepted) || !accepted.includes(heroName)) return false;
 
-    const handIdx = (ps.hand || []).indexOf(heroName);
+    // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): „from your hand“ = Hand zuerst, dann benutzbarer Vorrat.
+    const heroQuelle = this._rxQuelleFuer(ps, heroName);
+    const handIdx = heroQuelle ? heroQuelle.idx : -1;
     const deckIdx = (ps.mainDeck || []).indexOf(heroName);
-    const inHand = handIdx >= 0;
+    const inHand = !!heroQuelle;
     const inDeck = deckIdx >= 0;
     if (!inHand && !inDeck) return false;
 
@@ -12217,18 +12715,21 @@ class GameEngine {
     } else {
       sourceLabel = inHand ? 'hand' : 'deck';
     }
+    if (sourceLabel === 'hand' && heroQuelle?.ausVorrat) sourceLabel = 'creation';   // Flug und Abgang vom Vorratsplatz
 
     // Snapshot the source location BEFORE we mutate hand / deck — the
     // client's attach-fly animation needs the original handIndex so it
     // can find the right hand-card DOM source. After the splice, the
     // card is gone and indices shift.
-    const sourceHandIndex = sourceLabel === 'hand' ? handIdx : -1;
+    const sourceHandIndex = (sourceLabel === 'hand' || sourceLabel === 'creation') ? handIdx : -1;
     // W64c (Al 23.10.2026: Karten gehen IMMER in die Stapel ihres permanenten Besitzers): der angelegte Held ist die Karte des Spielers, der ihn anlegt
     // (bei einer gestohlenen Handkarte: ihres Besitzers) - NICHT zwingend die des Kreatur-Besitzers (uebernommene Kreatur, eigene Karte darunter).
     // Beim Abgang der Traeger-Kreatur folgt der Held in den Stapel DIESES Besitzers (`counters.attachedHeroOwner`).
     const _heldBesitzer = (sourceLabel === 'hand' ? this._handOriginAt(ps, handIdx) : null) ?? playerIdx;
 
-    if (sourceLabel === 'hand') {
+    if (sourceLabel === 'creation') {
+      this._rxAbgang(ps, heroQuelle);
+    } else if (sourceLabel === 'hand') {
       ps.hand.splice(handIdx, 1);
     } else {
       // Re-resolve the deck index in case it shifted (defensive — the
@@ -12349,6 +12850,14 @@ class GameEngine {
       this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'spell_immunity' });
       return true;
     }
+    // Spielgestalter-Entscheidung 16.11.2026: eine Effekt-Immunität dieser Auflösung (Future Tech Escape Device, Castling, Man-Eater Birds …: „Negate all effects … on that Hero")
+    // gilt für ALLE Effekte auf den Helden, auch die ohne Schaden und Status (Max-HP-Gewinn, Fähigkeiten abwerfen/tauschen, Kontrolle, Ausrüstung …) — auch ein hilfreicher eigener Zauber
+    // (Divine Gift of Sacrifice) kann die Reaktion auslösen. `defeat` prüft `actionDefeatHero` selbst (Rückgabe `effectImmune`); `piercing` (Exorcism Decay 2) geht durch.
+    if (!opts.piercing && effectType !== 'defeat') await this.heroAffectWindow(heroOwner, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Effekte ohne Zielwahl (Divine Gift of Sacrifice mit nur einem Empfänger, Anhänge …)
+    if (!opts.piercing && effectType !== 'defeat' && this.hasEffectImmunity(heroOwner, heroIdx, opts.source ?? null)) {
+      this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'effect_immunity' });
+      return true;
+    }
     const ctx = {
       playerIdx: heroOwner, heroIdx, hero, effectType, cancelled: false, _skipReactionCheck: true,
       ...(opts.sourceOwner != null ? { sourceOwner: opts.sourceOwner } : {}),
@@ -12428,9 +12937,11 @@ class GameEngine {
    * Max HP can never drop below 1. Current HP is clamped to new max.
    * @param {object} hero - The hero object
    * @param {number} amount - Desired decrease
+   * @param {object} [opts] - { alsoReduceCurrent: true } — Gegenstueck zu `increaseMaxHp(…, { alsoHealCurrent })`: die aktuellen HP sinken um denselben Betrag (nie unter 1),
+   *   statt nur auf das neue Maximum geklemmt zu werden (Toughness, s. u.)
    * @returns {number} The actual amount max HP was decreased by
    */
-  decreaseMaxHp(hero, amount) {
+  decreaseMaxHp(hero, amount, opts = {}) {
     if (!hero || hero.hp === undefined) return 0;
     const currentMax = hero.maxHp || hero.hp;
     const effective = Math.min(amount, currentMax - 1); // Never below 1
@@ -12439,7 +12950,9 @@ class GameEngine {
     hero.maxHp = currentMax - effective;
     // Ein LEBENDER Held faellt nie unter 1 HP; ein gefallener (0 HP) bleibt gefallen —
     // sonst belebte der Abgang einer Toughness ihn mit 1 HP wieder.
-    if (hero.hp > 0) hero.hp = Math.max(1, Math.min(hero.hp, hero.maxHp));
+    // Spielgestalter-Entscheidung 17.11.2026 (Toughness): „… soll die HP, die diese eine Kopie von Toughness beschert, abziehen, gecappt bei 1 HP" — mit `alsoReduceCurrent` sinken die
+    // aktuellen HP um den abgezogenen Betrag (Max −200, aktuell −200, mindestens 1; ein Ueberschuss ueber dem Maximum (Overheal) bleibt dabei erhalten). Ohne die Option: wie bisher auf das neue Maximum geklemmt.
+    if (hero.hp > 0) hero.hp = opts.alsoReduceCurrent ? Math.max(1, hero.hp - effective) : Math.max(1, Math.min(hero.hp, hero.maxHp));
 
     this.log('max_hp_decrease', { hero: this._heroLabel(hero), amount: effective, newMax: hero.maxHp });
     return effective;
@@ -12783,10 +13296,49 @@ class GameEngine {
     return prot != null && seite === prot && wirker !== prot;
   }
 
-  /** `blockedByFirstTurnProtection`: unspielbar, solange der Gegner des Spielers `pi` durch die Erste-Runden-Immunität geschützt ist. */
+  /**
+   * `blockedByFirstTurnProtection`: ehemals „unspielbar, solange der Gegner des Spielers `pi` durch die Erste-Runden-Immunität geschützt ist".
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Nutzlose Aktivierungen müssen möglich sein"): ÜBERHOLT — die Karte ist spielbar, das geschützte Ziel wählbar, der Effekt verpufft (Karte gespielt, Kosten und
+   * Aktion bezahlt, Einmal-Marker verbraucht; Schaden/Status/Zerstörung/Gold-/Hand-/Deck-Eingriffe blockt die Engine selbst, Zielwahlen ziehen das geschützte Ziel ab). Das Flag in den Skripten bleibt als
+   * Dokumentation („trifft nur die Gegnerseite") stehen, sperrt aber nichts mehr; die CPU spielt solche Karten weiter nicht gegen den Geschützten (`_cpu.js`: `isFirstTurnSafe`).
+   */
   _cardBlockedByFirstTurn(script, playerIdx) {
-    if (!script?.blockedByFirstTurnProtection || !Number.isInteger(playerIdx) || playerIdx < 0) return false;
-    return this.ersterZugGeschuetzt(this.opponentOf(playerIdx), playerIdx);
+    return false;
+  }
+
+  /** Erste-Runden-Immunität: steht diese Kreatur unter der Kontrolle des geschützten Spielers? (Schutz vor Status/Eingriffen von aussen; bei Selbstwirkung des Geschützten gibt es keinen Schutz zu prüfen.) */
+  _ersterZugKreatur(inst) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    return prot != null && !!inst && (inst.controller ?? inst.owner) === prot;
+  }
+
+  /** ★ Spielgestalter-Entscheidung 16.11.2026: ist dieses Ziel (Ziel-Objekt einer Zielliste) durch die Erste-Runden-Immunität gegenüber dem WÄHLENDEN geschützt? Gilt nur gegenüber dem Zugspieler. */
+  _ersterZugZiel(t, waehler) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    if (prot == null || !t || waehler === prot) return false;
+    const inst = t.cardInstance || t._cardInstance;
+    const seite = inst ? (inst.controller ?? inst.owner) : t.owner;
+    return seite === prot;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: nach der Zielwahl die Erste-Runden-geschützten Ziele abziehen (sie sind wählbar, der Effekt verpufft). Bleibt nichts übrig, gilt die Wahl als NEGIERT (nicht
+   * als Abbruch): der Zauber ist gespielt (`_spellNegatedByEffect`), Aktivierungen verbrauchen ihr Einmal-Limit (`_merkeNegation`/`negiertSeit`). Rückgabe { ids, abgezogen }.
+   */
+  _ersterZugZielAbziehen(waehler, validTargets, ids, config = {}) {
+    if (!Array.isArray(ids) || ids.length === 0 || config?.ignoreFirstTurnProtection) return { ids, abgezogen: false };
+    if (this.gs.firstTurnProtectedPlayer == null || waehler === this.gs.firstTurnProtectedPlayer) return { ids, abgezogen: false };
+    const byId = (id) => (validTargets || []).find(t => t && t.id === id);
+    let behalten = ids.filter(id => !this._ersterZugZiel(byId(id), waehler));
+    if (behalten.length === ids.length) return { ids, abgezogen: false };
+    // Paarwahlen (Sword in a Bottle: Angreifer + Opfer, `minRequired: 2`): fehlt nach dem Abziehen die Mindestzahl, verpufft die ganze Wahl.
+    if (behalten.length < (config?.minRequired ?? config?.minSelect ?? 0)) behalten = [];
+    this.log('target_fizzled', { reason: 'first-turn protection', chosen: ids.length, kept: behalten.length, by: config?.title || null });
+    if (behalten.length === 0) {
+      this._merkeNegation(ids.map(byId).filter(Boolean));
+      if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
+    }
+    return { ids: behalten, abgezogen: true };
   }
 
   _cardBlockedBySearchLock(script, cardData, ps, playerIdx) {
@@ -12884,6 +13436,7 @@ class GameEngine {
    */
   async actionApplyCreaturePoison(source, inst, stacks = 1, opts = {}) {   // W25a (N5-09-Klasse): `opts.unhealable` (Venom Infusion Lv3) - Marke VOR dem Reaktionsfenster
     if (!inst || inst.zone !== 'support') return;
+    if (this._ersterZugKreatur(inst)) { this.log('status_blocked', { card: inst.name, status: 'poisoned', reason: 'shielded' }); return; }   // Erste-Runden-Immunitaet (Spielgestalter-Entscheidung 16.11.2026: wählbar, verpufft)
     if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
 
     const hookCtx = {
@@ -13253,7 +13806,7 @@ class GameEngine {
    * weiter direkt genutzt (Terrors Zug-Ende, Warrior of Teocuilatl) —
    * nur die AKTIVIERUNGEN laufen nicht mehr darueber.
    */
-  armEffectAnnounce(cardName, ownerIdx, origin) {
+  armEffectAnnounce(cardName, ownerIdx, origin, wirker) {   // `wirker` ({ seite, heroIdx }): der Held hinter der Aktivierung (Blinded: `_blindWirkerFuer`)
     this._pendingEffectAnnounce = cardName
       ? { cardName, owner: ownerIdx ?? null, origin: origin === 'hand' ? 'hand' : 'board' }
       : null;
@@ -13272,7 +13825,7 @@ class GameEngine {
     // Merker spaetestens mit dem naechsten Halbzug wieder wertlos —
     // und bis dahin ueberschreibt ihn die naechste Aktivierung.
     this._activationSource = cardName
-      ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn, origin: origin === 'hand' ? 'hand' : 'board' }
+      ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn, origin: origin === 'hand' ? 'hand' : 'board', ...(wirker ? { wirker } : {}) }
       : null;
     this._gewaehlteZiele = null;   // W78a: eine neue Aktivierung beginnt — keine gemerkten Zielwahlen einer abgebrochenen früheren
   }
@@ -13890,7 +14443,13 @@ class GameEngine {
   //  • `revealedHandIndices(pi)` / `anyHandCardRevealed()`  welche Handkarten gelten als aufgedeckt (alle Wege: Luna Kiai, Bamboo Shield, Crystals, Madaga, Arcane Eyes).
   arcaneEyesFor(ctrlIdx) {
     if (ctrlIdx == null || ctrlIdx < 0) return null;
-    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && c.zone === ZONES.SUPPORT && !c.faceDown
+    // Held als Kreatur (Hulijing, „This Hero becomes that Creature"): die Überlagerung (`heroOverlay`) ist die Kreatur — sie zählt wie eine Karte in einer Support Zone, solange ihr Wirt lebt (fällt er, gilt sie als besiegt).
+    const ueberlagerungLebt = (c) => {
+      if (c.zone !== ZONES.HERO_OVERLAY || !c.counters?._heldKreatur) return false;
+      const w = require('./_hero-creature-shared').wirtVon(this, c);
+      return !!w?.hero && w.hero.hp > 0 && !w.hero.heldKreatur?._tot;
+    };
+    return (this.cardInstances || []).find(c => c.name === 'Arcane Eyes' && (c.zone === ZONES.SUPPORT || ueberlagerungLebt(c)) && !c.faceDown
       && this.kontrolleurVon(c) === ctrlIdx && !this.isCardPassiveDormant(c)) || null;
   }
 
@@ -14543,8 +15102,7 @@ class GameEngine {
     // counter never got stamped (puzzle preset / revive without hooks).
     // Mirrors the same belt-and-suspenders check in canApplyCreatureStatus.
     {
-      const { CARDINAL_NAMES } = require('./_cardinal-shared');
-      if (!_u && CARDINAL_NAMES.includes(targetCard.name)) {
+      if (!_u && cardinalNameImmun(this, targetCard)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Kreatur (Omikrons Cardinal-Illusion) hat die Immunität nicht
         this.log('destroy_blocked', { card: targetCard.name, reason: 'cardinal-beast' });
         return;
       }
@@ -14644,9 +15202,14 @@ class GameEngine {
       }
     }
     // W16d (A08-07): Extra Life (Trial of Coolness) greift bei JEDEM „defeat" einer Kreatur, nicht nur beim Schadenstod:
-    // gleiche Stempelung wie im Schadens-Batch, die Wiederbelebung löst `actionMoveCard` ein. Ein Opfer ist kein „defeat"
-    // (sonst wären Opferkosten umsonst) und bleibt außen vor.
-    if (isCreatureTarget && !opts.isSacrifice && targetCard.counters?._extraLife && !targetCard._reviveAfterDeath) {
+    // gleiche Stempelung wie im Schadens-Batch, die Wiederbelebung löst `actionMoveCard` ein.
+    // ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): auch ein OPFER (Kosten oder Effekt, mit oder ohne `opts.isSacrifice` —
+    // die handgebauten Opferwege Garius, Trex, Rottweiler … stempeln `_sacrificedTurn` über `onCreatureSacrificed`) löst Extra Life aus. Das Opfer
+    // ist bezahlt, der Effekt der Karte läuft weiter: die Wiederbelebung wird bei einem Opfer erst NACH dem Effekt aufgelöst (`nachEffekt`,
+    // `_loeseOpferWiederbelebungen` an den Haltepunkten) — „place it into the same Support Zone" (Garius, Rottweiler …) braucht den Platz noch — und
+    // weicht dann bei besetztem Platz auf eine andere freie Zone aus (`ausweichen`).
+    if (isCreatureTarget && targetCard.counters?._extraLife && !targetCard._reviveAfterDeath) {
+      const _opferTod = !!opts.isSacrifice || targetCard.counters?._sacrificedTurn === this.gs.turn;
       const lifeMark = this._popExtraLife(targetCard.counters);
       targetCard._reviveAfterDeath = {
         name: targetCard.name,
@@ -14657,6 +15220,7 @@ class GameEngine {
         by: lifeMark?.by || 'Extra Life',
         fireHooks: true,
         bypassSummoningSickness: true,
+        ...(_opferTod ? { nachEffekt: true, ausweichen: true, instId: targetCard.id } : {}),
       };
       this.log('extra_life_creature_revive', { creature: targetCard.name, by: lifeMark?.by || 'Extra Life' });
     }
@@ -14763,7 +15327,19 @@ class GameEngine {
         } else if (fromZone !== ZONES.SURPRISE) {
           payload.fromSlotIdx = targetCard.zoneSlot;
         }
-        this._broadcastEvent('play_pile_transfer', payload);
+        // ★ EINÄSCHERUNG: die Karte zerstört SICH SELBST (Quelle == Ziel, z. B. `ctx.destroyCard(inst)`) oder das Kartenskript verlangt es (`opts.einaescherung`: Doomed Town Guard, Tamed Hell Fox, …).
+        // Nur Kreaturen im Support-Slot, keine Wiederbelebung (Extra Life) und keine Token (eigener Zerfall). Karten mit eigener Zerstörungs-Animation setzen `skipPileTransfer` oder senden ihr eigenes Ereignis.
+        const _selbst = !!opts.einaescherung || !!opts.isSacrifice || (!!source && (source === targetCard || (source.id != null && source.id === targetCard.id)));
+        if (_selbst && isCreatureTarget && fromZone === ZONES.SUPPORT && !_istToken && !targetCard._reviveAfterDeath) {
+          // Das Ereignis wird erst in `_actionMoveCardKern` gesendet, wenn das ZIEL feststeht (Löschumleitungen wie Greatmaw Remora / Vacarn / Ankhota setzen es erst in `onCardLeaveZone`):
+          // sonst flöge die Essenz zur Ablage, obwohl die Karte im Gelöscht-Stapel landet. Wird die Bewegung vorher abgebrochen, gibt es weder Animation noch Wartezeit.
+          payload.flightStyle = 'einaescherung';
+          // gestohlene/übernommene Kreatur: der Platz liegt auf der Brettseite des Kontrolleurs, die Karte geht in den Stapel ihres Besitzers (Client: `fromOwner`/`toOwner`)
+          { const _seite = this.physicalSide(targetCard), _besitzer = this.kartenBesitzerVon(targetCard); if (_seite !== payload.owner) payload.fromOwner = _seite; if (_besitzer !== payload.owner) payload.toOwner = _besitzer; }
+          targetCard._eaPending = payload; targetCard._eaPendingT = Date.now();
+        } else {
+          this._broadcastEvent('play_pile_transfer', payload);
+        }
       }
     }
 
@@ -14788,6 +15364,10 @@ class GameEngine {
       // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
       _cdChecked: true,
     });
+    // ★ EINÄSCHERUNG: warten, bis die Essenz den Stapel erreicht hat (Animationszeit des Clients, abzüglich der schon vergangenen Zeit)
+    // (`opts.einaescherungOhneWarten`: Mehrfach-Tribut — nur das LETZTE Opfer wartet, die Einäscherungen laufen gestaffelt überlappend; s. `resolveSacrificeCost`)
+    const _eaT0 = targetCard._eaT0 || 0; delete targetCard._eaT0; delete targetCard._eaPending; delete targetCard._eaPendingT;   // Sendezeit des Einäscherungs-Ereignisses (0 = keines gesendet)
+    if (_eaT0 && !opts.einaescherungOhneWarten) { const rest = EINAESCHERUNG_MS - (Date.now() - _eaT0); if (rest > 0) await this._delay(rest); }
   }
 
   /**
@@ -14823,9 +15403,10 @@ class GameEngine {
     def('_stempelVerfolgt', true);
     def('push', function (...items) { stamps().push(...items.map(jetzt)); const r = Array.prototype.push.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
     def('unshift', function (...items) { stamps().unshift(...items.map(jetzt)); const r = Array.prototype.unshift.apply(this, items); engine._geloeschtMeldung(pi, items); return r; });
-    def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-    def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+    def('pop', function () { engine._rarityTake(pi, 'xp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+    def('shift', function () { engine._rarityTake(pi, 'xp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
     def('splice', function (...args) {
+      engine._rarityTakeSplice(pi, 'xp', this.length, args);
       const sargs = args.length > 2 ? [args[0], args[1], ...args.slice(2).map(jetzt)] : args;
       Array.prototype.splice.apply(stamps(), sargs);
       return Array.prototype.splice.apply(this, args);
@@ -15019,9 +15600,10 @@ class GameEngine {
     umhuellen('unshift', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().unshift(...Array(d).fill(jetzt())); } });
     if (!arr._ablage_pop) {
       def('_ablage_pop', true);
-      def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
-      def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+      def('pop', function () { engine._rarityTake(pi, 'dp', this.length - 1, 1); stamps().pop(); return Array.prototype.pop.call(this); });
+      def('shift', function () { engine._rarityTake(pi, 'dp', 0, 1); stamps().shift(); return Array.prototype.shift.call(this); });
       def('splice', function (...args) {
+        engine._rarityTakeSplice(pi, 'dp', this.length, args);
         Array.prototype.splice.apply(stamps(), args.length > 2 ? [args[0], args[1], ...Array(args.length - 2).fill(jetzt())] : args);
         return Array.prototype.splice.apply(this, args);
       });
@@ -15425,7 +16007,7 @@ class GameEngine {
         for (let runde = 0; runde < 8; runde++) {
           if (this.gs.result) return;
           let gespielt = false;
-          for (const cardName of [...new Set(ps.hand || [])]) {
+          for (const cardName of this._rxNamen(ps)) {
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
@@ -15507,7 +16089,7 @@ class GameEngine {
       for (let runde = 0; runde < 8; runde++) {
         if (this.gs.result || !(hero.hp > 0)) return;
         let gespielt = false;
-        for (const cardName of [...new Set(ps.hand || [])]) {
+        for (const cardName of this._rxNamen(ps)) {
           if (abgelehnt.has(cardName)) continue;
           if (this._handPlayLockedFor(ps, cardName)) continue;
           const script = loadCardEffect(cardName);
@@ -15581,7 +16163,7 @@ class GameEngine {
     if (!ps || !target || target.hp > 0) return false;
     const heroIdx = ((this.gs.players[phys]?.heroes) || []).indexOf(target);
     if (heroIdx < 0) return false;
-    const kandidaten = (ps.hand || []).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
+    const kandidaten = this._rxNamen(ps).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
     if (kandidaten.length === 0) return false;
 
     const roh = source?.controller ?? source?.owner;
@@ -15592,7 +16174,7 @@ class GameEngine {
     const allCards = this._getCardDB();
 
     const seen = new Set();
-    for (const cardName of [...ps.hand]) {
+    for (const cardName of this._rxNamen(ps)) {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
       if (this._handPlayLockedFor(ps, cardName)) continue;
@@ -15654,8 +16236,7 @@ class GameEngine {
     const info = { ...roh, sourceOwner: verursacher, cardData: allCards[roh.cardName] || null };
 
     const seen = new Set();
-    for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -15868,8 +16449,7 @@ class GameEngine {
     }
     // v626: Discard-out-Sperre (Staebe, The Eye of Ren) — auch fuer
     // generische Bewegungen aus dem eigenen Discard (nach Deleted, Deck,
-    // Brett …). `opts.mandatory` fuer Pflichteffekte (Freikauf mit allem
-    // vorhandenen Gold), `opts._bypassDiscardLock` fuer Engine-Wege.
+    // Brett …). `opts._bypassDiscardLock` fuer Engine-Wege.
     if (fromZone === ZONES.DISCARD && cardInstance
         && !(await this._discardOutAllowed(cardInstance.owner, opts))) {
       this.log('discard_out_blocked', { card: cardInstance.name, to: toZone, reason: 'discard_locked' });
@@ -16041,13 +16621,22 @@ class GameEngine {
         toSlot    = -1;
       }
     }
+    // ★ EINÄSCHERUNG: das aus `_actionDestroyCardKern` zurückgehaltene Ereignis jetzt senden — Ziel (Ablage/Gelöscht) steht fest, der Zustand hat die Karte noch nicht verlassen.
+    if (cardInstance._eaPending) {
+      const _eaPl = cardInstance._eaPending; delete cardInstance._eaPending;
+      if (Date.now() - (cardInstance._eaPendingT || 0) < 15000 && fromZone === ZONES.SUPPORT && (toZone === ZONES.DISCARD || toZone === ZONES.DELETED)) {
+        _eaPl.to = toZone === ZONES.DELETED ? 'deleted' : 'discard';
+        cardInstance._eaT0 = Date.now();
+        this._broadcastEvent('play_pile_transfer', _eaPl);
+      }
+    }
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
     // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
     // (`processCreatureDamageBatch`) und in `_addCardToState`, nie abgelegt.
     // Z5: gleiche Konvention fuer „zurueck auf die Hand" (Chasing the Legend, Surprising Opportunity …): ein Token ist keine Karte.
     if ((toZone === ZONES.DISCARD || toZone === ZONES.HAND) && fromZone === 'support') {
       const _tokenCd = this.getEffectiveCardData(cardInstance);
-      if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
+      if ((_tokenCd && hasCardType(_tokenCd, 'Token')) || cardInstance.counters?._spiegelKopie) {   // Magic-Mirror-Kopie: wie ein Token ohne Karte darunter (verschwindet, `tokenAbgang`)
         // W64a (Al, 23.10.2026): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (auch bei „zurück auf die Hand").
         toZone    = this.tokenStapelZiel(cardInstance) === 'discard' ? ZONES.DISCARD : ZONES.DELETED;
         toHeroIdx = -1;
@@ -16488,8 +17077,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (fromZone === ZONES.SUPPORT && cardInstance._reviveAfterDeath && toZone === ZONES.DISCARD) {
       const _rev = cardInstance._reviveAfterDeath;
       delete cardInstance._reviveAfterDeath;
+      if (_rev.nachEffekt) {
+        // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): ein geopferter Träger von Extra Life kehrt erst NACH dem Effekt zurück, der das Opfer
+        // verlangte (Haltepunkte: `_loeseOpferWiederbelebungen`). Bis dahin liegt die Karte in der Ablage (Ablage-Instanz bleibt getrackt).
+        (this.gs._opferRevives || (this.gs._opferRevives = [])).push(_rev);
+      }
       // Wiederbelebt → die Ablage-Instanz dieser Karte ist verbraucht.
-      if (await this._wiederbelebungNachTod(_rev)) this._untrackCard(cardInstance.id);
+      else if (await this._wiederbelebungNachTod(_rev)) this._untrackCard(cardInstance.id);
     }
     if (_sofortWiederbelebt) this._untrackCard(cardInstance.id);   // Welle 10 (Q38): die Ablage-Instanz ist verbraucht
 
@@ -17574,7 +18168,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _rcd = this._getCardDB()[cardName];
       if (_rcd && (_rcd.subtype || '') === 'Reaction' && hasCardType(_rcd, 'Creature')) {
         const _rBesitzer = rest.controller ?? playerIdx;
-        if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature')) {
+        // 16.11.2026: `ohneKette` — das Gegenreaktions-Fenster dieser Beschwörung öffnet NACH dem Landen (`_landungsFenster` unten: The Master's Plan, Off Duty …), kein zweites davor.
+        if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature', { ohneKette: true })) {
           if (await this._nimmOffenenRaub(cardName, _rBesitzer)) return { negated: true, inst: null };   // 24.10. Reverse Trap: gestohlen, kein Ablage-Flug
           this._broadcastEvent('play_pile_transfer', {
             owner: _rBesitzer, cardName, from: 'hand', to: 'discard', asPlay: true, fromHandIdx: rest.fromHandIdx,
@@ -17733,6 +18328,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         return false;
       }
+    }
+
+    // ── HELDEN-VORAUSSETZUNG DER BESCHWÖRUNG (Spielgestalter-Entscheidung 17.11.2026, NECRO-02) ─────
+    // „Restriktionen wie die der Spirits … gelten IMMER, egal, von wo eine Creature beschworen wird": „This Creature can only be summoned by a Hero equipped with …" ist ein
+    // Skript-`canPlayWithHero`; der Handweg prüft es in `validateActionPlay`, JEDE Effekt-Beschwörung hier. Beschwörer = `controller`, sonst die Feldseite; der Held ist der Held der
+    // Landezone. Ausgenommen: Platzieren (`isPlacement`, keine Beschwörung — Q9) und Wiederbelebung/Eigenplatzierung (`skipBeforeSummon`/`skipHooks`, wie bei der Beschwörungssperre oben);
+    // die Wege, die als Beschwörung zählen und `isPlacement` nur für die Reaktionsfenster setzen (Soul Shard Ka/Khet), melden sich mit `alsBeschwoerung: true`.
+    if ((!opts.isPlacement || opts.alsBeschwoerung) && !opts.skipBeforeSummon && !opts.skipHooks && !this.beschwoerHeldBedingungOk(cardName, playerIdx, heroIdx, opts.controller ?? playerIdx)) {
+      this.log('summon_blocked', { card: cardName, reason: 'hero_condition', heroIdx });
+      return false;
     }
 
     // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
@@ -18333,12 +18938,73 @@ this._deathWatch = (this._deathWatchStack || []).length
     return inst.owner === spec.mustIncludeFromHeroOwner;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (NECRO-02): „Restriktionen wie die der Spirits, aber z. B. auch Opfer-Anforderungen, gelten IMMER, egal, von wo eine Creature
+   * beschworen wird." Die HELDEN-seitige Voraussetzung einer Kreatur („This Creature can only be summoned by a Hero equipped with …": die sieben Spirits der WAW-Reihe) steht im
+   * Skript als `canPlayWithHero` — der Handweg fragt sie über `validateActionPlay`. Diese Methode ist dieselbe Frage für JEDEN Beschwörungsweg (Necromancy, Monster in a Bottle,
+   * Psychic Scout, Pinaxolotl, Stellin, Skullmael's Greatsword, Soul Shards …): sie wird von `isCreatureSummonable` (Zielangebote), `canHeroSummon`/`eligibleSummonZones`
+   * (Zonenlisten) und `_summonSperrenOk` (der Hub, Sicherheitsnetz) gerufen. Gilt nur für Beschwörungen — Platzieren („place") ist keine Beschwörung und umgeht sie (Q9).
+   * @param {number} feldSeite  Brettseite des beschwörenden Helden (dort landet die Kreatur)
+   * @param {number} [beschwoerer] der Spieler, der beschwört (Kontrolleur); Standard: der Kontrolleur des Helden
+   */
+  beschwoerHeldBedingungOk(cardName, feldSeite, heroIdx, beschwoerer = null) {
+    const script = loadCardEffect(cardName);
+    if (typeof script?.canPlayWithHero !== 'function') return true;
+    const cd = this._getCardDB()[cardName];
+    if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) return true;   // Artifact Creatures (Debt-O-Tron) werden gespielt, nie beschworen — ihr Tor gilt dem Handweg
+    const hero = this.gs.players[feldSeite]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const ktrl = beschwoerer ?? this.heroSideOf(feldSeite, hero);
+    try {
+      return !!this._mitWirker(ktrl, heroIdx, feldSeite !== ktrl ? feldSeite : null,
+        () => script.canPlayWithHero(this.gs, ktrl, heroIdx, cd, this));
+    } catch (err) {
+      console.error(`[canPlayWithHero/summon] ${cardName} threw:`, err.message);
+      return false;
+    }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (NECRO-02): die Beschwörungs-VORAUSSETZUNGEN gelten für Direktwege genauso wie für den Hub. Necromancy und Monster in a Bottle legen die
+   * Kreatur selbst aufs Brett (kein `summonCreatureWithHooks`) und ließen bisher die Pflicht-Kosten der Karte aus („Sacrifice … to summon this Creature": Blue-Ice Dragon, Foresta,
+   * The Egg of God, Steam Dwarf Dragon Pilot, Pollution Piranha, Gigantisaur Chimera/King Trex …). Hier werden sie bezahlt, mit denselben Bausteinen wie die Pile-Wege
+   * (`_beschwoerungKostenVorAuftritt`: Platz reservieren, Opfer-/Tribut-Wahl, Rettungsfenster-Sperre). Gefragt wird nur bei Karten mit PFLICHT-Bedingung
+   * (`nurUnterBedingungBeschwoerbar`); „may"-Alternativwege („You may sacrifice … to summon this Creature as an additional Action") bleiben unberührt, denn der Effekt ist selbst
+   * die Zusatzaktion. Die Helden-Voraussetzung (Spirits) prüft der Aufrufer über `isCreatureSummonable`; hier wird sie noch einmal abgesichert.
+   * @param {object} o  { source, controller (Beschwörer), hookExtras }
+   * @returns {Promise<{ ok: boolean, extras: object, selbstGelegt: (object|null) }>} `ok: false` = nichts bezahlt (abgebrochen/unzulässig), die Karte bleibt, wo sie liegt.
+   *   `selbstGelegt`: die Karte hat sich in `beforeSummon` selbst auf das Brett gelegt (500 Piranhas) — der Aufrufer legt NICHT noch einmal. `extras`: Hook-Extras des Kostenstempels (`_tributePaid`).
+   */
+  async zahleEffektBeschwoerKosten(cardName, feldSeite, heroIdx, slotIdx, o = {}) {
+    const beschwoerer = o.controller ?? feldSeite;
+    if (!this.beschwoerHeldBedingungOk(cardName, feldSeite, heroIdx, beschwoerer)) return { ok: false, extras: {}, selbstGelegt: null };
+    const script = loadCardEffect(cardName);
+    const cd = this._getCardDB()[cardName];
+    const { nurUnterBedingungBeschwoerbar } = require('./_summon-eligibility');
+    if (typeof script?.beforeSummon !== 'function' || !cd || !nurUnterBedingungBeschwoerbar(cd, cardName)) return { ok: true, extras: {}, selbstGelegt: null };
+    const kernOpts = {
+      source: o.source || null, _nurKosten: true,
+      ...(beschwoerer !== feldSeite ? { controller: beschwoerer } : {}),
+      hookExtras: { _alsZusatzaktion: true, _isNormalSummon: false, ...(o.hookExtras || {}) },
+    };
+    const ok = await this._beschwoerungKostenVorAuftritt(cardName, feldSeite, heroIdx, slotIdx, kernOpts);
+    if (!ok) return { ok: false, extras: {}, selbstGelegt: kernOpts._selbstGelegt || null };
+    return { ok: true, extras: this.takeTributeSummonExtras(cardName, beschwoerer, kernOpts.hookExtras), selbstGelegt: null };
+  }
+
   isCreatureSummonable(cardName, playerIdx, heroIdx = -1, ctxExtras = {}) {
     const script = loadCardEffect(cardName);
     {
       const _h = heroIdx >= 0 ? this.gs.players[playerIdx]?.heroes?.[heroIdx] : null;
       const _b = ctxExtras.beschwoerer ?? (_h?.name ? this.heroSideOf(playerIdx, _h) : playerIdx);
       if (this.zusatzNameSperrt(_b, cardName)) return false;   // W73c: ein Zusatzname (Shroomasaur) belegt das „only 1"
+      // Spielgestalter-Entscheidung 17.11.2026: die Helden-Voraussetzung der Beschwörung („can only be summoned by a Hero equipped with …", Spirits) gilt auf JEDEM Weg,
+      // nicht nur beim Spielen aus der Hand — mit Held: dieser Held; ohne Held (`heroIdx < 0`, Kartenfrage): mindestens ein kontrollierter Held erfüllt sie.
+      if (script?.canPlayWithHero && !ctxExtras._ohneHeldenBedingung) {
+        if (heroIdx >= 0) {
+          if (!this.beschwoerHeldBedingungOk(cardName, playerIdx, heroIdx, _b)) return false;
+        } else if (!this.heroesControlledBy(_b).some(h => h.hero.hp > 0 && this.beschwoerHeldBedingungOk(cardName, h.physOwner, h.heroIdx, _b))) return false;
+      }
     }
     if (!script?.canSummon) return true;
     try {
@@ -18388,6 +19054,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const fromSeite = this.physicalSide(inst);
     const fromZonenPs = gs.players[fromSeite] || fromPs;
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — das Ziel ist wählbar, der Kontrollwechsel gegen den Geschützten verpufft (früher filterte `isCreatureImmune` die Kreatur aus der
+    // Zielwahl). Nur ein Wechsel ZU einem anderen Spieler als dem geschützten, den der Zugspieler auslöst (eigene Effekte des Geschützten bleiben möglich).
+    if (!opts.selfInflicted && fromPlayerIdx !== neuerKtrl && this.ersterZugGeschuetzt(fromPlayerIdx, opts.sourceOwner ?? neuerKtrl)) {
+      this.log('transfer_fizzle', { creature: inst.name, reason: 'first-turn protection', from: fromPs.username, to: toPs.username });
+      return { success: false, firstTurnProtected: true };
+    }
     // Omni-immune Creatures (Cardinal Beasts, `_cardinalImmune` /
     // `_omniImmune` flag, cardinal-name fallback) silently fizzle
     // any transfer/control attempt — the caller already played its
@@ -18597,7 +19269,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let runde = 0; runde < 4; runde++) {
         if (this.gs.result) return;
         let gespielt = false;
-        for (const cardName of [...new Set(ps.hand || [])]) {
+        for (const cardName of this._rxNamen(ps)) {
           if (abgelehnt.has(cardName)) continue;
           if (this._handPlayLockedFor(ps, cardName)) continue;
           const script = loadCardEffect(cardName);
@@ -18656,6 +19328,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _checkSpellPerformedHandReactions(raw) {
     if (!raw || !Number.isInteger(raw.performerOwner)) return;
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `opponentCannotReact`) — auch das Fenster NACH der Auflösung bleibt zu (Nasty Prank).
+    try { if (raw.spellName && loadCardEffect(baseCardName(raw.spellName))?.opponentCannotReact) return; } catch { /* unbekannte Karte: normal */ }
     return this._rxEreignisFenster({
       flag: 'isSpellPerformedReaction', cond: 'spellPerformedCondition', res: 'spellPerformedResolve', tiefe: '_spellPerformedWindowDepth',
       log: 'spell_performed_window_reaction', ausloeser: raw.performerOwner, info: raw,
@@ -18708,7 +19382,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         for (let runde = 0; runde < 4; runde++) {
           if (this.gs.result) return;
           let gespielt = false;
-          for (const cardName of [...new Set(ps.hand || [])]) {
+          for (const cardName of this._rxNamen(ps)) {
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
@@ -20373,14 +21047,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @param quellenSeite Spielerindex der Quelle (oder null/-1)
    * @param opts.loveShotOhneSchutz  true am SCHADENSpfad — dort hebt
-   *        `_loveShot` den Schutz auf; beim Status bleibt er.
+   *        `_loveShot` den Schutz auf (`nurSchadenSchutz` bleibt davon getrennt).
    */
   _charmBlocksFrom(target, quellenSeite, opts = {}) {
     const ch = target?.statuses?.charmed;
     if (!ch) return false;
     // Styx, the Opened Gate: reine Kontrolle, der Text verspricht keinen Schutz.
     if (ch.ohneSchutz) return false;
-    if (ch._loveShot && opts.loveShotOhneSchutz) return false;
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (LOVE-01): der von Love Shot GELIEHENE Held ist weder schadens- noch status-immun — nur die Kontrolle ist geliehen. Frozen/Poisoned/Stunned …
+    // (Frost Rune, Toxic Trap & Co. am Angreifer) wirken wie bei jedem anderen Helden; die Immunität echter Charme-Helden (Charme Lv3, Marke ohne `_loveShot`) bleibt unverändert.
+    if (ch._loveShot) return false;
     // Deepsea Succubus (QA-Welle 1 Nr. 18, Al): „cannot take any damage and cannot be defeated" — NUR Schadens-/Besiegen-Schutz, KEIN Schutz vor
     // negativen Status (`nurSchadenSchutz`; der Schadens-/Kill-Pfad fragt mit `loveShotOhneSchutz: true`, der Statuspfad ohne).
     if (ch.nurSchadenSchutz && !opts.loveShotOhneSchutz) return false;
@@ -20557,13 +21233,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {string} source - Card name for logging (e.g. 'Beer', 'Cure')
    * @returns {string[]} Array of actually removed status keys
    */
-  cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
+  cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source, opts = {}) {
     // ★ v1473 (Als Vorgabe 28.9.: „Effekte, die Status entfernen (Beer,
     // Tea …) dürfen den Gift-of-Skill-Debuff nie entfernen können!").
     // Die Sperre von Divine Gift of Skill ist KEIN Status: sie liegt in
     // `hero._skillLockTurn` (Anzeige `hero.buffs.blessed_skill`) und wird
     // hier nie angefasst — nur `hero.statuses`. So muss es bleiben.
     if (!hero?.statuses) return [];
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device: „Negate all effects … on that Hero") — auch eine heilende Wirkung
+    // (Cure, Divine Zeal …) entfernt dann nichts. `opts.piercing` (Exorcism mit Decay Magic 2: „cannot be prevented or negated") geht durch.
+    if (!opts.piercing && this.hasEffectImmunity(playerIdx, heroIdx, source)) {
+      this.log('effect_immunity', { hero: this._heroLabel(hero), source: typeof source === 'string' ? source : (source?.name || null), effect: 'cleanse' });
+      return [];
+    }
     const removed = [];
     const poisonLocked = this._isPoisonHealLocked()
       && !this._isDiverHelmetProtectedTarget(hero);
@@ -20574,6 +21256,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Bewegung auch die Status ab, die der Fluch gerade noch schuetzt.
     const sperrtZuBeginn = new Map(statusKeys.map(k =>
       [k, this._heroStatusRemovalBlocked(playerIdx, heroIdx, k)]));
+    // Spielgestalter-Entscheidung 18.11.2026: Karten, die „als negativer Status zaehlen" (Stowaway, Decisive Defeat, Aged, Mind Control), stehen unter derselben Sperre wie ihr Status —
+    // auch die Vollheilung (Cure) raeumt sie nicht ab, solange „its other status effects cannot be removed" gilt (Stand zu Beginn, wie oben; der eigene Status von Aged bleibt entfernbar).
+    const anhGesperrt = new Set();
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.heroIdx !== heroIdx || inst.owner !== playerIdx || inst.faceDown) continue;
+      const sc = loadCardEffect(inst.name);
+      if (sc?.countsAsNegativeStatus && this._heroStatusRemovalBlocked(playerIdx, heroIdx, sc.attachmentStatus)) anhGesperrt.add(inst.id);
+    }
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (this._statusUnentfernbar(key, hero.statuses[key])) continue;
@@ -20654,7 +21344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const gewaehlt = (statusKeys || []).filter(k => String(k).startsWith('attach:'));
       if (gewaehlt.length > 0) {
         queueMicrotask(() => {
-          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source); })()
+          (async () => { for (const k of gewaehlt) await this.cleanseAttachmentByKey(k, source, anhGesperrt); })()
             .catch(err => console.error('[cleanseAttachmentByKey]', err.message));
         });
       }
@@ -20664,7 +21354,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const alleDabei = voll.length > 0 && voll.every(k => statusKeys.includes(k));
       if (alleDabei) {
         queueMicrotask(() => {
-          this.cleanseNegativeAttachments(playerIdx, heroIdx, source)
+          this.cleanseNegativeAttachments(playerIdx, heroIdx, source, anhGesperrt)
             .catch(err => console.error('[cleanseNegativeAttachments]', err.message));
         });
       }
@@ -20934,6 +21624,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     const already = inst.counters?.[statusName];
     if (already && !opts.addStacks) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet auch fuer Kreaturen — „blocks ALL negative statuses" wie bei Helden (`addHeroStatus`). Die Zielwahlen blenden die Kreatur nicht mehr
+    // aus (wählbar, der Effekt verpufft), also blockt der Status-Weg selbst; gilt fuer jeden negativen Status von aussen (nicht fuer eigene Kosten: `opts.selfInflicted`).
+    if (STATUS_EFFECTS[statusName]?.negative && !opts.selfInflicted && this._ersterZugKreatur(inst)) {
+      this.log('status_blocked', { card: inst.name, status: statusName, reason: 'shielded' });
+      return false;
+    }
 
     const sourceObj = typeof opts.source === 'string'
       ? { name: opts.source }
@@ -21255,6 +21951,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         return false;
       }
     }
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch Buffs/Debuffs auf dem Helden.
+    await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Buffs ohne Zielwahl
+    if (this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: hero.name, buff: buffName });
+      return false;
+    }
     // Allow Resistance (and similar) to cancel the buff
     const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_add', buffName, cancelled: false, _skipReactionCheck: true };
     await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
@@ -21329,6 +22031,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async actionRemoveBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
     if (!hero?.buffs?.[buffName]) return;
+    // Spielgestalter-Entscheidung 16.11.2026: Effekt-Immunität dieser Auflösung (Future Tech Escape Device …) negiert auch das Entfernen von Buffs. Das Auslaufen am Ende der Dauer (`opts.ablauf`)
+    // ist kein Effekt einer Karte und bleibt unberührt.
+    if (!opts.ablauf) await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026)
+    if (!opts.ablauf && this.hasEffectImmunity(playerIdx, heroIdx, opts.source ?? null)) {
+      this.log('effect_immunity', { hero: hero.name, buffRemove: buffName });
+      return;
+    }
     // Allow Resistance to cancel debuff removal too (e.g. an enemy stripping a hero's buff)
     const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_remove', buffName, cancelled: false, _skipReactionCheck: true };
     await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
@@ -21429,7 +22138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
-          await this.actionRemoveBuff(hero, pi, hi, buffName);
+          await this.actionRemoveBuff(hero, pi, hi, buffName, { ablauf: true });
           expired = true;
         }
       }
@@ -21623,14 +22332,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     // are immune to ALL negation paths — Forbidden Zone, Dark Gear,
     // Necromancy, Diplomacy, Null Zone, etc. The name-list fallback
     // covers pre-placed beasts whose onPlay never fired.
-    if (inst.counters?._cardinalImmune) return;
+    // ★ `opts.alsPlatzierung` (Omikron: „place a copy …, but its effects are negated"): die Negation gehoert zur Platzierung des Abbilds selbst — kein Zugriff auf eine
+    // bestehende Kreatur. Die „unaffected"-Immunitaet eines Cardinal Beast ist ein Effekt der Kreatur und damit selbst Teil dessen, was negiert wird; sie sperrt die eigene
+    // Platzierungs-Negation deshalb nicht (sonst stand die Illusion eines Cardinal Beast wirksam auf dem Brett).
+    if (inst.counters?._cardinalImmune && !opts.alsPlatzierung) return;
     if (this.kreaturGegnerEffektImmun(inst, source, opts)) return;   // W17b: Golden Wings – nur gegnerische Negation
     // Sparkfly Attendant gift: opp-applied negations only — own-side
     // self-negations (test scaffolding, future "negate your own
     // creature" cards) still work.
     if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return;
+    if (CARDINAL_NAMES.includes(inst.name) && !opts.alsPlatzierung) return;
+    // ATT-04: Negationen mit „This counts as a negative status effect" (`opts.cleansable`: Anti Magic Zone, Pink Sky, Forbidden Zone, Locke, Null …) sind negative Status —
+    // Light Ball („all other targets you control are immune to all negative status effects") schuetzt die Kreaturen seiner Seite davor, wie `canApplyCreatureStatus` es fuer
+    // Frozen & Co. tut (diese Funktion ruft jene nicht auf). Unverhinderbare Negationen (Dark Gear, Diplomacy) sind kein Statuseffekt, Eigenkosten ohne `cleansable` auch nicht.
+    if (opts.cleansable && !hart && inst.zone === 'support' && this._lightBallProtects(inst.controller ?? inst.owner, 'creature')) {
+      this.log('negation_blocked', { creature: inst.name, source: (typeof source === 'string' ? source : source?.name) || 'effect', reason: 'light_ball' });
+      return;
+    }
     // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
     // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
     // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
@@ -22417,8 +23136,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.counters?._cardinalImmune) return true;
     if (this.kreaturGegnerEffektImmun(inst, quelle, opts)) return true;   // W17b: Golden Wings quellenbewusst
     if (inst.counters?._omniImmune) return true;
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return true;
+    if (cardinalNameImmun(this, inst)) return true;   // Namens-Rückfall; Spielgestalter-Entscheidung 16.11.2026: nicht, solange die Kreatur negiert ist (Omikrons Illusion)
     return false;
   }
 
@@ -22529,6 +23247,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   kreaturGegnerEffektImmun(inst, quelle, opts = {}) {
     if (this.cdMalfunctionSchutz(inst, quelle, opts)) return true;   // B2/E9: Cosmic Malfunction — alle Effekte der negierten Karte auf Cosmic-Depths-Kreaturen, bis Zugende
     if (this.kreaturSpellImmun(inst, quelle, opts)) return true;   // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — dieselben Sperrstellen
+    // Spielgestalter-Entscheidung 16.11.2026 (Ida): „ignore any effects that make a target unaffected by them" gilt für alle „unaffected by (your opponent's) cards and effects"
+    // (Golden Wings, Sparkfly Attendant, Rook/Board of Kings) — nicht aber für „unaffected by ALL cards and effects" (Cardinal Beasts, Stowaway … `_cardinalImmune`, Namens-Rückfall).
+    // `opts.ignoreUnaffected` stempelt NUR Idas Schadenseintrag (`e.ignoreUnaffected`); anderer „nicht negierbarer" Schaden (`canBeNegated: false`) durchschlägt Golden Wings weiter nicht.
+    if (opts?.ignoreUnaffected) return false;
     if (!inst?.counters?._gwImmune) return false;
     let q;
     if (typeof opts?.gwSourceOwner === 'number') q = opts.gwSourceOwner;   // ausdrücklicher Hinweis des Aufrufers (String-Quellen ohne Besitzer)
@@ -22573,8 +23295,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * this so opp damage on protected Queens fizzles too; the inherited
    * gift does NOT, matching its "except damage" clause.
    */
-  isOppDamageImmuneFrom(inst, sourceOwner, source = null) {
+  isOppDamageImmuneFrom(inst, sourceOwner, source = null, opts = {}) {
     if (!inst) return false;
+    // Spielgestalter-Entscheidung 16.11.2026 (Ida): alle „unaffected by your opponent's cards and effects"-Schutzformen dieser Prüfung (Sparkfly-Aura, Fenster-Immunität von Rook of Kings/Castling,
+    // Board-of-Kings-Wächter) fallen für Idas Zauberschaden weg (`opts.ignoreUnaffected`, siehe `kreaturGegnerEffektImmun`).
+    if (opts?.ignoreUnaffected) return false;
     const targetController = inst.controller ?? inst.owner;
     if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(this, targetController);   // W5b-Z3
     if (inst.counters?._oppDamageImmune && sourceOwner != null && sourceOwner !== targetController) return true;
@@ -22596,10 +23321,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Liste `gs._effectImmunities` (wird zu Beginn jedes Zielfensters
    * geleert), quellenblind wie beim Helden (Als Befund 21.8.).
    */
-  grantCreatureEffectImmunity(inst, sourceObj) {
+  grantCreatureEffectImmunity(inst, sourceObj, opts = {}) {
     if (!inst || !sourceObj || typeof sourceObj !== 'object') return false;
     if (!this.gs._effectImmunities) this.gs._effectImmunities = [];
-    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj });
+    // Spielgestalter-Entscheidung 17.11.2026: `opts.ueberFenster` wie beim Helden — übersteht die Leerung beim nächsten Zielfenster und endet mit der Auflösung (`endeEffektImmunitaeten`).
+    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj, ...(opts.ueberFenster ? { ueberFenster: true } : {}) });
     return true;
   }
 
@@ -23098,8 +23824,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Synchrone Form fuer Stellen ohne `await` (CPU-Bewertungsproben,
-   * Hilfsfunktionen). Deck: identisch. Ablage: die Stab-Sperre gilt als
-   * hart (kein Freikauf-Prompt moeglich) — vorher umgingen diese Stellen
+   * Hilfsfunktionen). Deck: identisch. Ablage: die Discard-out-Sperre
+   * (Staebe, The Eye of Ren) gilt hart — vorher umgingen diese Stellen
    * sie ganz.
    */
   takeFromPileSync(pi, pile, what, opts = {}) {
@@ -23127,11 +23853,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
     if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
-      const buy = ps._discardLockBuyout;
-      if (ps._discardLockHard === this.gs.turn || !(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
-        this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
-        return null;
-      }
+      this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
+      return null;
     }
     return this._takeFromPileCore(pi, ps, arr, pile, idx, name, opts);
   }
@@ -23227,6 +23950,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return res?.inst || null;
     }
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: beschwoeren —, greifen auch auf die Extra-Hand zu“): liegt die Karte nicht in der Hand, wohl aber in Crestinas
+    // (benutzbarem) Vorrat, wird sie von dort beschworen (`summonFromCreation`).
+    if (pile === 'hand' && (opts.ausVorrat || (opts.handIdx == null && !(this.gs.players[pi]?.hand || []).includes(cardName)))
+        && this.isCreationZoneUsable(pi) && (this.gs.players[pi]?.creationZone || []).includes(cardName)) {
+      return this.summonFromCreation(pi, cardName, heroIdx, slotIdx, opts);
+    }
     // Als Ruling (Al 26.10.): `opts.handIdx` (nur Pile `hand`) benennt die KOPIE, die beschworen wird — das Heldenstufen-Tor gilt je Handkopie (Rocky Slime reduziert nur eine einzelne Kopie);
     // ohne Index die erste Kopie wie bisher.
     const _kopie = (pile === 'hand' && Number.isInteger(opts.handIdx) && this.gs.players[pi]?.hand?.[opts.handIdx] === cardName) ? opts.handIdx : cardName;
@@ -23262,6 +23991,46 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand und Potion Deck sind geordnete Stapel ohne Mischen: scheitert die Beschwoerung, liegt die
     // Karte wieder an IHREM Platz (das Potion Deck behaelt seine Reihenfolge, die oberste Karte bleibt oben).
     if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, (pile === 'hand' || pile === 'potionDeck') ? taken.idx : null); this.sync(); return null; }
+    return summon.inst;
+  }
+
+  /**
+   * ★ 11.11. (Vorgabe: „alle Reaktionen auch aus der Crestina-Hand"): Kreatur aus CRESTINAS VORRAT (Extra-Hand) BESCHWOEREN — Schwester von `summonFromPile(…, 'hand', …)`
+   * fuer Hand-Reaktionen, die sich selbst beschwoeren (Wendy, Front Soldier, Albrecht …). Gleiche Reihenfolge: Karte raus, Kosten VOR dem sichtbaren Flug (Abbruch → zurueck an
+   * ihren Platz), Flug vom Vorratsplatz, echte Beschwoerung; scheitert sie, liegt die Karte wieder im Vorrat. Der Vorrat muss benutzbar sein (`isCreationZoneUsable`).
+   * @returns {CardInstance|null}
+   */
+  async summonFromCreation(pi, cardName, heroIdx, slotIdx, opts = {}) {
+    pi = this._resolvePi(pi);
+    if (loadCardEffect(cardName)?.summonOnlyViaOwnEffect) return null;   // wie summonFromPile
+    const ps = this.gs.players[pi];
+    if (!ps || !this.isCreationZoneUsable(pi)) return null;
+    const liste = ps.creationZone || [];
+    const idx = liste.indexOf(cardName);
+    if (idx < 0) return null;
+    const feld = opts.heldSeite ?? pi;
+    const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, fromHandIdx: idx, ...(feld !== pi ? { toOwner: feld } : {}) };
+    this._rxAbgang(ps, { liste, ausVorrat: true, idx });
+    const zurueck = () => {   // an den alten Platz zurueck (der Vorrat behaelt seine Reihenfolge)
+      liste.splice(Math.min(idx, liste.length), 0, cardName);
+      this._trackCard(cardName, pi, ZONES.CREATION);
+      this.sync();
+      return null;
+    };
+    const kernOpts = {
+      source: opts.source || 'summonFromCreation', hookExtras: { _summonedFromPile: 'hand', ...(opts.hookExtras || {}) },   // eine Vorratskarte spielt „als waere sie auf der Hand"
+      alsZusatzaktion: !!opts.alsZusatzaktion,
+      ...(opts.summonOpts || {}),
+      ...(feld !== pi ? { controller: pi } : {}),
+    };
+    if (!(await this._beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts))) return zurueck();
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    this._auftrittSchrittNachKosten('summonFromPile');
+    // W66b (wie `summonFromPile`): Limit/Auftritt HINTER der letzten Abbruchstelle; `false` = abgebrochen, die Karte geht an ihren Vorratsplatz zurueck.
+    if (typeof opts.nachKostenAnim === 'function' && (await opts.nachKostenAnim({ name: cardName })) === false) return zurueck();
+    if (opts.flug !== false) this._pileFlight(pi, cardName, 'creation', 'support', flight);
+    const summon = await this.summonCreatureWithHooks(cardName, feld, heroIdx, slotIdx, kernOpts);
+    if (!summon?.inst) return zurueck();
     return summon.inst;
   }
 
@@ -23591,16 +24360,13 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre ohne Freikauf
-   * (Staff of the Teleporter/Uncontrollable Destruction) bzw. Stab + Eye of Ren? Synchrones Gegenstueck zu
-   * `_discardOutAllowed` fuer Spielbarkeits-Gates (die Eye-Sperre allein ist freikaufbar und zaehlt NICHT).
+   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre (Staff of the Teleporter/
+   * Uncontrollable Destruction) oder die Sperre des Eye of Ren (nicht bezahlt)? Synchrones Gegenstueck zu `_discardOutAllowed`
+   * fuer Spielbarkeits-Gates. Spielgestalter-Entscheidung 18.11.2026: auch die Eye-Sperre ist hart (kein Freikauf mehr).
    */
   isDiscardOutHardLocked(pi) {
     const ps = this.gs?.players?.[pi];
-    if (!ps || ps._discardLockedTurn !== this.gs.turn) return false;
-    if (ps._discardLockHard === this.gs.turn) return true;
-    const buy = ps._discardLockBuyout;
-    return !buy || buy.turn !== this.gs.turn;
+    return !!ps && ps._discardLockedTurn === this.gs.turn;
   }
 
   /**
@@ -23646,6 +24412,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const order = [...targetOwners, ...this.gs.players.map((_, i) => i).filter(i => !targetOwners.includes(i))];
     for (const pi of order) {
       if (this._reaktionGesperrt(pi)) continue;   // v1293 Reaktionssperre
+      if (opts.affect && this.isCpuPlayer(pi)) continue;   // „Affected"-Fenster: kein neuer Prompt für die CPU
       for (const inst of [...this.cardInstances]) {
         // 12.10. (Glass Wall): auch eine OFFEN liegende Karte in einer Surprise Zone reagiert hier (sie gehoert dem Kontrolleur des Helden, dessen Zone sie belegt).
         if (inst.zone !== 'support' && inst.zone !== 'area' && inst.zone !== 'surprise') continue;
@@ -23655,6 +24422,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (inst.faceDown) continue;
         const script = loadCardEffect(inst.name);
         if (!script?.isPostTargetBoardReaction) continue;
+        if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
         if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn()) continue;
         if (inst.zone === 'support' && this.isCreatureEffectSuppressed(inst)) continue;
         let ok = false;
@@ -23905,9 +24673,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Check creature's own immunity counter
     if (inst.counters[immuneType]) return true;
     // First-turn protection grants targeting + control immunity
-    if (this.gs.firstTurnProtectedPlayer != null) {
-      if (inst.controller === this.gs.firstTurnProtectedPlayer) return true;
-    }
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — die Erste-Runden-Immunitaet macht Kreaturen NICHT mehr „unwaehlbar" (`targeting_immune`/`control_immune`
+    // meldeten sie bisher als Ziel-/Kontrollschutz und die Zielwahlen der Karten blendeten sie aus): sie sind wählbar, der Effekt verpufft (Übernahme: `_stealMoeglich`/`actionTransferCreature`
+    // lehnen den Kontrollwechsel gegen den Geschützten ab, Schaden/Status/Zerstören blocken die Engine-Primitive wie bisher).
     // NOTE: omni-immune Creatures (Cardinal Beasts, `_cardinalImmune`
     // / `_omniImmune` flag, cardinal-name fallback) are intentionally
     // NOT included here. They remain VALID TARGETS for picker UIs —
@@ -24249,7 +25017,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (hero?.name !== CRESTINA_ASCENDED) continue;
       // tot — ausser `opts.schadensberechnung` und der Tod ist im laufenden
       // Flaechenschlag nur vorgemerkt (Todes-Aufschub 28.9.)
-      if (hero.hp <= 0 && !(opts.schadensberechnung && this.heldTodAufgeschoben(hero))) continue;
+      // … und ausser dieser Crestina fällt gerade (`_heldImKO`, Todes-Reaktionen ihrer Vorratskarten — Quetzahuitl).
+      if (hero.hp <= 0 && hero !== this._heldImKO && !(opts.schadensberechnung && this.heldTodAufgeschoben(hero))) continue;
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) continue;
       return true;
@@ -24270,6 +25039,138 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!fromCreation) return ps.hand;
     if (!this.isCreationZoneUsable(playerIdx)) return null;
     return ps.creationZone;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  HAND-REAKTIONEN AUS CRESTINAS VORRAT (Extra-Hand) — Vorgabe 11.11.
+  // ═══════════════════════════════════════════════════════════════
+  // „Auch alle Reaktionen, inklusive des Bone-Dog-Beispiels, sollen von der Crestina-Hand funktionieren." Alle Hand-Reaktionsfenster (und die Reaktionskette)
+  // lesen ihre Kandidaten ueber `_rxKandidaten` / `_rxNamen` (Hand ZUERST, dann der benutzbare Vorrat) und nehmen die Karte ueber `_rxQuelleFuer` + `q.liste`
+  // heraus. Der Index zaehlt je Quelle (`q.ausVorrat`); Fluege nutzen `from: 'creation'`. Eine Vorratskarte gilt nicht als Handkarte (Ruling 28.8.): keine
+  // Herkunfts-Stempel gestohlener Handkarten, keine Hand-Abwurf-Haken.
+
+  /** Kandidaten fuer Hand-Reaktionen: `[{ cardName, ausVorrat, idx }]` — erst die Hand, dann (nur wenn benutzbar) Crestinas Vorrat. `idx` zaehlt in der jeweiligen Liste. */
+  _rxKandidaten(ps) {
+    const pi = this.gs.players.indexOf(ps);
+    const out = (ps?.hand || []).map((cardName, idx) => ({ cardName, ausVorrat: false, idx }));
+    if (pi >= 0 && this.isCreationZoneUsable(pi)) {
+      (ps.creationZone || []).forEach((cardName, idx) => out.push({ cardName, ausVorrat: true, idx }));
+    }
+    return out;
+  }
+
+  /**
+   * ★ 12.11. (Al: „Effekte/Ascension-Boni, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Karten, die ein Anlege-Effekt „aus deiner Hand“ nehmen darf —
+   * die Hand und Crestinas Vorrat (nur benutzbar), MIT Duplikaten, Hand zuerst. Zum Lesen der Kandidaten; entnommen wird per `handkarteNehmen` (Hand zuerst, dann Vorrat).
+   */
+  handUndVorratListe(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    return [...(ps?.hand || []), ...(this.isCreationZoneUsable(playerIdx) ? (ps?.creationZone || []) : [])];
+  }
+
+  /** Entnimmt die erste Kopie von `cardName` aus Hand, sonst benutzbarem Vorrat. @returns {{liste,ausVorrat,idx}|null} die Quelle (fuer `handkarteZurueck`) oder `null`. */
+  handkarteNehmen(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    const q = this._rxQuelleFuer(ps, cardName);
+    if (!q) return null;
+    this.rxNimm(ps, q);
+    return q;
+  }
+
+  /**
+   * ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): legt eine Karte aus Crestinas Vorrat fuer die Dauer
+   * eines Gusses STILL ans Ende der Hand (keine Hand-Zugangs-Hooks, kein Log) — die Aufloesung (Kette, onPlay, Ablage, Wisdom) laeuft danach wie fuer eine
+   * Handkarte. Rueckgabe `{ zurueck() }` oder `null` (Karte nicht im benutzbaren Vorrat). `zurueck()` bringt sie in den Vorrat zurueck, falls sie noch „auf der
+   * Hand“ liegt (Guss abgebrochen); hat sie die Hand schon verlassen (Ablage/Brett), tut es nichts.
+   */
+  vorratStillInDieHand(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !this.isCreationZoneUsable(playerIdx)) return null;
+    const vi = (ps.creationZone || []).indexOf(cardName);
+    if (vi < 0) return null;
+    const inst = this._findHandInstanceAt(playerIdx, vi, true) || null;
+    ps.creationZone.splice(vi, 1);
+    ps.hand.push(cardName);
+    if (inst) inst.zone = ZONES.HAND;
+    let offen = true;
+    return {
+      zurueck: () => {
+        if (!offen) return;
+        offen = false;
+        const hi = ps.hand.lastIndexOf(cardName);
+        if (hi < 0) return;                       // die Karte hat die Hand schon verlassen (Ablage / Brett)
+        this.takeFromPileSync(ps, 'hand', hi);    // Stapel-Schicht: verschiebt Handindex-Daten korrekt mit
+        ps.creationZone.push(cardName);
+        const i2 = inst || this.cardInstances.find(c => c.owner === playerIdx && c.zone === ZONES.HAND && c.name === cardName);
+        if (i2) i2.zone = ZONES.CREATION;
+      },
+    };
+  }
+
+  /** Gegenstueck zu `handkarteNehmen` (Rennen: die Karte ging doch nicht in den Einsatz): zurueck an ihre Quelle — Vorrat statt Hand, wenn sie von dort kam. */
+  handkarteZurueck(playerIdx, cardName, q, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    if (q?.ausVorrat) { ps.creationZone.push(cardName); this._trackCard(cardName, playerIdx, ZONES.CREATION); return; }
+    this.handZugangSync(ps, cardName, { von: 'rueckgabe', ohneInstanz: true, ...opts });
+  }
+
+  /** Namen aller Reaktions-Kandidaten (Hand + Vorrat), ohne Duplikate. */
+  _rxNamen(ps) {
+    return [...new Set(this._rxKandidaten(ps).map(k => k.cardName))];
+  }
+
+  /** Erste Kopie von `cardName` in Hand, sonst im benutzbaren Vorrat: `{ liste, ausVorrat, idx }` oder `null`. */
+  _rxQuelleFuer(ps, cardName) {
+    const hi = (ps?.hand || []).indexOf(cardName);
+    if (hi >= 0) return { liste: ps.hand, ausVorrat: false, idx: hi };
+    const pi = this.gs.players.indexOf(ps);
+    if (pi >= 0 && this.isCreationZoneUsable(pi)) {
+      const vi = (ps.creationZone || []).indexOf(cardName);
+      if (vi >= 0) return { liste: ps.creationZone, ausVorrat: true, idx: vi };
+    }
+    return null;
+  }
+
+  /** Die Karte verlaesst ihre Quelle. Hand: reiner Splice (wie bisher); Vorrat: Splice + die Vorrats-Instanz wird abgeraeumt. */
+  _rxAbgang(ps, q, mitInstanz = q.ausVorrat) {
+    let inst = null;
+    if (mitInstanz) inst = this._findHandInstanceAt(this.gs.players.indexOf(ps), q.idx, q.ausVorrat);
+    q.liste.splice(q.idx, 1);
+    if (inst) this._untrackCard(inst.id);
+  }
+
+  /**
+   * ★ 12.11.: Instanzgebundene Stufensenkung fuer Karten in Crestinas Vorrat (Extra-Hand) — Gegenstueck zu den Handindex-Feldern (`_handLevelOffsets*`), die nur die Hand kennt.
+   * Eine Vorratskarte traegt ihre Senkung als `inst.counters._vorratStufe` (negativ; Great Vanguard Demon: „reduce this card's level in your hand by 1"). Namensweit gilt wie in der Hand
+   * die am staerksten gesenkte Kopie; nur bei benutzbarem Vorrat. Der Eintrag faellt mit der Instanz weg, sobald die Karte den Vorrat verlaesst (Ausspielen, Abwurf …).
+   */
+  _vorratStufenAbzug(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName || !(ps.creationZone || []).includes(cardName) || !this.isCreationZoneUsable(playerIdx)) return 0;
+    let best = 0;
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx || inst.zone !== ZONES.CREATION || inst.name !== cardName) continue;
+      const v = Number(inst.counters?._vorratStufe) || 0;
+      if (v < best) best = v;
+    }
+    return best;
+  }
+
+  /** Die Reaktionskarte verlaesst ihre Quelle: Hand ueber die Stapel-Schicht (wie bisher), Vorrat per Splice + Instanz weg. Fuer Karten, die sich per Hook selbst einsetzen. */
+  rxNimm(ps, q) {
+    if (q.ausVorrat) return this._rxAbgang(ps, q);
+    return this.takeFromPileSync(ps, 'hand', q.idx);
+  }
+
+  /** Stapel-Besitzer fuer die Ablage der Reaktionskarte: Hand = Herkunft des Platzes (gestohlene Karten), Vorrat = der Spieler selbst. */
+  _rxAblagePs(ps, cardName, q) {
+    return q?.ausVorrat ? ps : this.handKartenBesitzerPs(ps, cardName);
+  }
+
+  /** `fromOwner/toOwner` fuer den Ablage-Flug einer Reaktionskarte (nur Handkarten koennen gestohlen sein). */
+  _rxPileOwnerFlug(holder, cardName, q) {
+    return q?.ausVorrat ? {} : this._pileOwnerFlug(holder, cardName, q?.idx);
   }
 
   /**
@@ -24493,14 +25394,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Alleiniger Angriff (v726) — Spiegel des Gates in
         // `validateActionPlay`, damit der Client die Karte ausgraut.
         if (cd.cardType === 'Attack' && ps._soleAttackTurn === gs.turn) continue;
-        // Blinded heroes can't play targeting Spells / Attacks. Mirrors
-        // the play-time gate in validateActionPlay; when set, the client
-        // grays this card out under the affected hero so its hand
-        // preview matches what the server will accept.
-        if (this._isHeroBlinded(playerIdx, hi) && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
-          const s = loadCardEffect(cd.name);
-          if (s?.requiresTarget === true && !this._spielTrotzStatus(playerIdx, hi, cd)) continue;   // W14 (Q174): Outbreak trotz Blendung
-        }
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): ein geblendeter Held darf bei Attacks/Spells nur EIGENE Ziele waehlen. Die Karte ist grau, wenn sie keinen legalen eigenen
+        // Kandidaten haben kann (Fireball: „targets your opponent controls"); Cure & Co. bleiben mit eigenen Zielen spielbar. Spiegel des Tors in `validateActionPlay`.
+        if (this.blindedAttackSpellGesperrt(playerIdx, playerIdx, hi, cd)) continue;   // W14 (Q174): Outbreak trotz Blendung (`_blindAusgenommen`)
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set
         // cleared in the turn-start reset path alongside other per-turn flags.
@@ -24699,6 +25595,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
           if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.polymorphed)) continue;   // v879; 24.10. Polymorph
           if ((cd.cardType === 'Spell' || cd.cardType === 'Attack') && this.heroPranked(hero, cd.name)) continue;   // 24.10. Nasty Prank
+          if (this.blindedAttackSpellGesperrt(playerIdx, oppIdx, hi, cd)) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): wie im eigenen Zweig (Love Shot spielt mit dem geliehenen Helden)
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -25386,16 +26283,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
 
-    // Blinded heroes can't play Attacks or Spells whose script declares
-    // `requiresTarget: true`. AoE-only cards (no requiresTarget flag)
-    // are still legal — that's the whole point of the status. Mirror in
-    // `getHeroPlayableCards` keeps the client gray-out aligned with this
-    // server-side gate.
-    if (this._isHeroBlinded(heroOwner, heroIdx) && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
-      const cardScript = loadCardEffect(cardData.name);
-      if (cardScript?.requiresTarget === true
-          && !this._mitWirker(pi, heroIdx, opts.charmedOwner, () => this._spielTrotzStatus(pi, heroIdx, cardData))) return null;   // W14 (Q174): Outbreak trotz Blendung
-    }
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): „Blinded verhindert nur, GEGNERISCHE Ziele zu waehlen." Der Picker-Filter (`markiereBlindGesperrte`) erzwingt das bei jeder
+    // Zielwahl; hier faellt nur die Karte weg, die keinen legalen eigenen Kandidaten haben kann (Fireball, Alliance …). Karten ohne Zielwahl ignorieren Blinded. Mirror in
+    // `getHeroPlayableCards` haelt die Ausgrauung im Client synchron mit diesem Tor.
+    if (this.blindedAttackSpellGesperrt(pi, heroOwner, heroIdx, cardData)) return null;   // W14 (Q174): Outbreak trotz Blendung (`_blindAusgenommen`)
 
     // Divine Gift of Skill lock — the chosen hero can't perform Actions
     // this turn unless they have Magic Arts >= 1. Spell/Attack/Creature
@@ -26050,13 +26941,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // ★ W82 (Sinister Idol, Al): auch die Aktivierung als Sofort-Zusatzaktion öffnet das Kettenfenster (Idol, Ragnarock & Co.) und das Surprise-Fenster; Stufe danach neu lesen,
-      // Kosten = Stufe beim Aktivieren, gesenkte Stufe = Pflicht-Auflösung. Negiert = nie aufgelöst: Einmal-Stempel frei (Z7b), die Zusatzaktion ist verbraucht.
+      // Kosten = Stufe beim Aktivieren, gesenkte Stufe = Pflicht-Auflösung. Negiert: der Einmal-Stempel bleibt verbraucht (Spielgestalter-Entscheidung 16.11.2026), die Zusatzaktion ist verbraucht.
       const fenster = await this.abilityAktivierungsFenster({ pi: playerIdx, heroIdx, heroOwner: abSeite, slotHeroIdx: heroIdx, zoneIdx, zoneKind, abilityName, level, inst });
       if (fenster.negated) {
         // Al (28.10.): die Zusatzaktion bleibt UNVERBRAUCHT — zurück zur Auswahl (`retry`). Die Listen werden neu erhoben: bleibt nichts, wofür man sie ausgeben kann (Pflicht-Sofortaktion ohne
-        // weitere Option), verwirft die Schleife oben die Aktion (`return { played: false }`). Die negierte Ability: Aktivierung gewirkt, Einmal-Stempel nach Z7b frei (Ragnarock sperrt sie zusätzlich
-        // für den Zug über `_abilityHeroLocks` — dann wird sie nicht mehr angeboten).
-        delete this.gs.hoptUsed[hoptKey];
+        // weitere Option), verwirft die Schleife oben die Aktion (`return { played: false }`). Die negierte Ability: Aktivierung gewirkt, Einmal-Stempel bleibt gesetzt (Ragnarock sperrt sie zusätzlich
+        // für den Zug über `_abilityHeroLocks`).
         this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, zoneKind, abilityName });
         this.sync();
         return { retry: true };
@@ -26067,6 +26957,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _abOrig = _leihSeite != null ? { controller: _fInst.controller, owner: _fInst.owner } : null;
       if (_abOrig) { _fInst.controller = playerIdx; _fInst.owner = playerIdx; _fInst.heroOwner = _leihSeite; }
       let abErgebnis;
+      const negStand = this.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
       try {
         const ctx = this._createContext(_fInst, {});
         ctx.kostenStufe = level;   // W82: Kosten bleiben die der Stufe beim Aktivieren
@@ -26091,6 +26982,12 @@ this._deathWatch = (this._deathWatchStack || []).length
           this.log('gerrymander_veto', { player: ps.username, ability: abilityName });
           this.sync();
           return { played: false };
+        }
+        if (this.negiertSeit(negStand)) {
+          // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch — der Einmal-Stempel bleibt verbraucht, die Zusatzaktion bleibt wie bei der Negation in der Kette (oben)
+          // unverbraucht (zurück zur Auswahl).
+          this.sync();
+          return { retry: true };
         }
         delete this.gs.hoptUsed[hoptKey];
         this.sync();
@@ -26338,6 +27235,38 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „'performs' ist nur eine Abart von 'plays', die impliziert, dass der Zauber beim Nutzen vom Hero selbst 'bereitgestellt' wurde, statt aus der Hand zu kommen.
+   * Sollte von den Fenstern her identisch zu einem normalen Ausspielen sein." Ein Spell/eine Attack, die ein Held PERFORMT (Timeless King Zi, Love Shot, Time Distortion, Chaos Magic, Zusatzaktions-Güsse
+   * über `_castSpellImmediately`, Ghostly Warning/Atta-Rückkehr, Archibald, Taio, Nieht, Chaorc Friendly Fireballer …), öffnet dasselbe Kettenfenster wie ein normal gespielter: Silence, Ghostly Warning,
+   * Anti-Magic-Reaktionen der Kette, Master's Plan/Lunar Eclipse (nur bei Herkunft HAND: Kartentext „from their hand"), Cute Camera, Hand-Reaktionen auf Attacks (Pfeile, Magic Topaz) usw.
+   * Nichts wird erneut bezahlt (`goldCost: 0`, keine Aktion): die Quelle ist der Held, der sie „bereitgestellt" hat. Einmal-Limits stempelt die Kette wie sonst ab Aktivierungsbeginn.
+   * Wie `alsSpellKette`: mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und im MCTS-Rollout (`_inMctsSim`) öffnet kein neues Fenster.
+   * Der Aufrufer löst NICHT auf, wenn `negated` (Zauberrumpf überspringen, Karte in die Ablage — bzw. in den Löschstapel bei `negatedToDeleted`: Ghostly Warning, Lunar Eclipse; keine Wisdom-Kosten).
+   * Der Wirker ist ein HELD (`casterCheck`, wie beim normalen Spielen: Ghostly Warning/Celia/Shamanic Curse lesen ihn): wird er WÄHREND der Kette handlungsunfähig, fizzelt der Guss wie beim normalen Spielen.
+   * Ausnahme `trotzStatus` („in spite of any negative status effects": verzögerter Guss von Ghostly Warning/Atta): keine Wirkerprüfung.
+   * @param {object} o  { cardName, pi (Spieler), heroIdx, heroOwner (Brettseite des Wirkers, Standard pi), ausHand (Herkunft Hand/Vorrat: kein `fromBoard`), trotzStatus }
+   * @returns {Promise<{ negated: boolean, negatedToDeleted: boolean, fizzled: boolean, kette: object|null }>}
+   */
+  async performKettenfenster({ cardName, pi, heroIdx, heroOwner, ausHand = false, trotzStatus = false }) {
+    const keine = { negated: false, negatedToDeleted: false, fizzled: false, kette: null };
+    if (this._inReactionCheck || this._inMctsSim) return keine;
+    const cd = this._getCardDB()[cardName];
+    if (!cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) return keine;
+    // ★ Spielgestalter-Entscheidung 18.11.2026 (Zweitziel von Bartas/Grisgar/Andras, Saya, Kunagi …): der performte Wurf ist wie ein eigenständiges Ausspielen eine NEUE Schadensquelle —
+    // Reaktionen, die einzelne Ziele schützen (Bamboo Shield, Sculpture Guards …), werden für ihn erneut angeboten. Ihre „schon gefragt"-Merker gelten nur für EINE Auflösung und werden sonst erst
+    // NACH dem Ende des Hauptzaubers (`afterSpellResolved`, hinter dem Held-Haken) geräumt: der Zweitwurf sah sie noch stehen und bekam kein Angebot. Geräumt wird über den Aufräum-Haken, den die Karten
+    // ohnehin registrieren (`onChainResolve`, wie am Ende einer Kette); Einmal-Regeln („1 pro Zug", `gs.hoptUsed`) bleiben unberührt.
+    await this.runHooks(HOOKS.ON_CHAIN_RESOLVE, {});
+    const kette = await this.executeCardWithChain({
+      cardName, owner: pi, cardType: cd.cardType, goldCost: 0, heroIdx,
+      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi, casterCheck: !trotzStatus,
+      fromBoard: !ausHand, resolve: null,
+    });
+    // Ein Wirker, der während der Kette handlungsunfähig wurde (`fizzled`), wirkt wie beim normalen Spielen NICHT: der Aufrufer behandelt es wie eine Negation (Rumpf läuft nie, die Karte ist gespielt).
+    return { negated: !!kette.negated || !!kette.fizzled, negatedToDeleted: !!kette.negatedToDeleted && !!kette.negated, fizzled: !!kette.fizzled && !kette.negated, kette };
+  }
+
   async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
     const ps = this.gs.players[playerIdx];
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite eines GELIEHENEN
@@ -26357,7 +27286,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { cancelled: true };
     }
     // Atta: Spells, die dieser Held wirkt und die in die Ablage gingen, werden stattdessen geloescht — beim Wirken festgestellt.
-    const _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
+    let _attaLoescht = cardData.cardType === 'Spell' && this.spellGoesToDeletedInstead(wirkerSeite, heroIdx);
     // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
     const _silenceBonusVorher = ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell === this.gs.turn;
     // ★ Z7 (S01-11, H04-05/-17): EINMAL PRO SPIEL gilt für JEDEN Sofort-Guss (Zi, Saya, Call for
@@ -26414,7 +27343,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Hand (damit man sie nicht selbst abwirft) und tauchte danach wieder
     // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
-    const _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
+    let _wisdomKosten = (cardData.cardType === 'Spell' && !opts.ohneWisdom)   // `ohneWisdom`: regardless of its level (Ghostly Warning, Atta) - keine Wisdom-Abwuerfe
       ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData,
           (fromZone === 'hand' && pool === ps.hand) ? poolIndex : undefined,
           wirkerSeite !== playerIdx ? playerIdx : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie; W16a (Frage 6): auch beim geliehenen Helden (Hand des Kontrolleurs)
@@ -26452,7 +27381,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // hat nichts zu verbergen, und der Auftritt soll der Wirkung vorangehen).
     let _placedVorher = false, _aufsBrett = false;   // v1364
     let _buddyTicket = null;   // W67a: Inyas Fantasy Buddy (gesetzt vor `afterSpellResolved`)
-    let _ganzNegiert = false;   // Z7b
     const _auftritt = this.gussAuftrittBeginnen(cardName, playerIdx);   // v1339: gemeinsamer Helfer
     // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
     const _wirkerVorher = this.gs._wirkerSeite;
@@ -26476,7 +27404,21 @@ this._deathWatch = (this._deathWatchStack || []).length
           catch (err) { console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message); }
         }
       }
-      const _stempelVorher = this._stempelAbzug(playerIdx);   // Z7b
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `performKettenfenster`): der Sofort-Guss öffnet dasselbe Kettenfenster wie ein normal gespielter Spell/eine Attack (Silence, Ghostly
+      // Warning, Master's Plan [nur aus der Hand] …). Wird er in der Kette negiert, löst sein Rumpf nie auf: der Guss gilt als gespielt (zählt, Zusatzaktion verbraucht, Einmal-Stempel), die Karte geht in die
+      // Ablage (Ghostly Warning/Lunar Eclipse: in den Löschstapel), es fallen keine Wisdom-Kosten an (wie in `doPlaySpell`). `opts.ohneKette`: der Aufrufer hat die Kette schon geöffnet.
+      let _kettenNegiert = false;
+      let _pfeileVorher = 0;
+      if (!opts.ohneKette && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+        _pfeileVorher = (hero._armedArrows || []).length;
+        const _pk = await this.performKettenfenster({ cardName, pi: playerIdx, heroIdx, heroOwner: wirkerSeite, ausHand: fromZone === 'hand' && pool === ps.hand, trotzStatus: this.gs._verzoegertWirkt != null || !!this.gs._spellCasterCreature });   // Kreatur als Wirker (Skeleton Wizard …): kein Held-Wirker, wie `doPlaySpell` (`casterCheck`)
+        if (_pk.negated) {
+          _kettenNegiert = true;
+          this.gs._spellNegatedByEffect = true;
+          _wisdomKosten = 0;
+          if (_pk.negatedToDeleted) _attaLoescht = true;
+        }
+      }
       const _onPlay = () => this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       // ★★ v1364 (Als Befund Sticky Wand + Call of the Deepsea): legt sich
       // der Sofort-Guss selbst aufs Brett (Attachment → `placeAttachment`
@@ -26488,11 +27430,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // gehen. Jetzt: Stempel des aeusseren Wegs retten, eigenen auswerten.
       _placedVorher = this.gs._spellPlacedOnBoard;
       delete this.gs._spellPlacedOnBoard;
-      if (fromZone === 'hand' && pool === ps.hand) {
+      if (_kettenNegiert) {
+        // in der Kette negiert: der Rumpf läuft nie
+      } else if (fromZone === 'hand' && pool === ps.hand) {
         await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
       } else {
         await _onPlay();
       }
+      // Pfeile, die in DIESEM Kettenfenster einer Attack scharf wurden (Magic Topaz, Angelfeather Arrow …), gelten nur für sie (wie am Ende von `doPlaySpell`).
+      if (cardData.cardType === 'Attack' && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(this, playerIdx);
       if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
       if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
@@ -26529,12 +27475,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
         }
       }
-      // Z7b: ganz negiert (MOE Shield, Frost Rune …) = nie aufgeloest → kein „1 pro Spiel"-Stempel unten;
-      // nur das Ergebnis verhindert (Teil-Negierung) = verbraucht, Zaehler-Lauscher hoeren `afterSpellPrevented`.
-      _ganzNegiert = !!(this.gs._spellNegatedByEffect && this.gs._negationWhole);
-      if (_ganzNegiert) this._stempelZurueck(_stempelVorher);
-      else if (this.gs._spellNegatedByEffect && cardData.cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
-        await this._meldeZauberVerhindert(playerIdx, cardName, heroIdx, opts.heroOwner ?? playerIdx);
+      // Spielgestalter-Entscheidung 16.11.2026: ganz negiert (MOE Shield, Frost Rune …) oder nur das Ergebnis verhindert (Teil-Negierung) = Aktivierung begonnen = verbraucht
+      // (Stempel aus dem `onPlay` und „1 pro Spiel" unten bleiben); Zaehler-Lauscher hoeren `afterSpellPrevented`.
+      if (this.gs._spellNegatedByEffect) {
+        await this._noteFizzledPlay(playerIdx, cardName, heroIdx, cardData.cardType, opts.heroOwner ?? playerIdx);   // `onFizzledPlay`: Marken, die `onPlay` nach der Zielwahl setzen würde (idempotent)
       }
       delete this.gs._spellNegatedByEffect;
       delete this.gs._negationWhole;
@@ -26573,7 +27517,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.gs._spellCancelled = _cancelVorher;
     // „Only 1 per game" (Hymn of Rebirth, Divine Gift …): auch der Sofort-Guss
     // verbraucht das Einmal-Limit — der regulaere Weg stempelt in server.js.
-    if (!abgebrochen && !_ganzNegiert && cardData.cardType === 'Spell') {
+    if (!abgebrochen && cardData.cardType === 'Spell') {
       this.thaliaNotiereSupportZauber(playerIdx, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
@@ -27580,6 +28524,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Burn/poison damage BEFORE regular buff expiry — so buffs like Cloudy still
     // halve status damage on the turn they expire
+    // Spielgestalter-Entscheidung 17.11.2026 (ATT-12): Status-Ticks ZUERST — Regeneration, Spell Shackle & Co. (ON_TURN_START) laufen erst danach; ein Held, der am Tick stirbt, bekommt sie nicht mehr.
     await this.processBurnDamage();
     await this.processPoisonDamage();
 
@@ -27855,6 +28800,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   _delay(ms) {
     if (this._aborted) return Promise.resolve();
     if (this._fastMode) return Promise.resolve();
+    // Aufladen vor dem Dash (app-fx-68): das Ramm-Ereignis desselben Atemzugs hat dem Client `lade` ms Vorlauf gegeben, der Kontakt liegt also `lade` ms spaeter — die
+    // naechste Wartezeit des Skripts (`_delay`, `rammeBisKontakt`) verlaengert sich um genau diese Zeit, damit Zonen-Animationen und Schaden weiter im Kontakt-Moment landen.
+    if (this._rammLadeSchuld) { ms += this._rammLadeSchuld; this._rammLadeSchuld = 0; }
     // „Die Engine arbeitet noch": der Server zaehlt eine Aktion nur als stillschweigend
     // verworfen (`action_rejected`), wenn nach 2 s kein neuer Zustand kam UND die
     // Engine bis dahin nichts mehr getan hat (server.js, `AKTION_VERWORFEN_NACH_MS`).
@@ -28353,6 +29301,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           reason: String(err.message || '').slice(0, 240),
         });
       }
+      // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): ein Opfer im Zugende-Trigger (Pharaoh) lässt seinen Extra-Life-Träger gleich zurückkehren.
+      try { await this._loeseOpferWiederbelebungen(); } catch (err) { console.error('[Engine] Opfer-Wiederbelebung am Zugende:', err.message); }
       // ★ W66a: SPIELERgebundene Zugende-Aufträge (Hand of Death: „at the end of your opponent's next turn … defeat it") laufen in einem EIGENEN Fangnetz —
       // ein abgebrochener ON_TURN_END (Hook-Obergrenze, Kartenfehler eines anderen Zugende-Lauschers) darf sie nicht verschlucken; sie hängen an
       // `ps._handOfDeathArmed`, nicht an einer Karteninstanz (Ablage, Hand, Fantasy Buddy Token …). Welle 14 (Q171) hatte den Nachhol-Weg, W66a macht ihn zum einzigen.
@@ -28796,6 +29746,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Check if a player's abilities are protected from removal (first-turn rule).
    * Use this in any card's getValidTargets() to skip opponent abilities during turn 1.
    * Example: if (engine.isAbilityRemovalProtected(gs, targetOwnerIdx)) { skip; }
+   * ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT für Zielwahlen — Ziele des Erste-Runden-Geschützten werden NICHT mehr aus `getValidTargets` ausgeschlossen (wählbar, die Wahl verpufft;
+   * `_ersterZugZielAbziehen`). Die Methode bleibt als Prädikat für Effekt-Teile.
    */
   static isAbilityRemovalProtected(gs, targetOwnerIdx) {
     return gs.firstTurnProtectedPlayer === targetOwnerIdx;
@@ -29041,15 +29993,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Welle 11 (Al, Q76: „das normale Einkommen sollte unberührt sein. Aber andere Einkommensquellen in der Resource Phase, etwa Wealth oder
     // Semi, dürfen ihn triggern!"): die Zuschläge zum Rundeneinkommen sind Effekt-Gold — je Quelle bietet der Hook `onIncomeBonusGain`
     // (Golden Vermin) an, sie durch eine Karte zu ersetzen. Das Grund-Einkommen (4) bleibt immer.
+    // Spielgestalter-Entscheidung 17.11.2026 (SEM-01): derselbe Zuschlag ist Effekt-Gold auch fuer „when you gain Gold through an effect" NACH der Buchung (Monkees, Royal Treasury, Humby): die nicht
+    // ersetzten Zuschlaege (`wirksameBoni`) feuern unten je Quelle einen eigenen `afterResourceGain` OHNE `_isResourceGain` (Marker `_einkommensBonus`); nur das Grund-Einkommen (4) bleibt ausgenommen.
+    const wirksameBoni = [];
     if (hookCtx._isResourceGain && hookCtx._einkommensBoni?.length) {
       for (const bonus of hookCtx._einkommensBoni) {
-        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
+        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.name, cancelled: false, _skipReactionCheck: true };
         await this.runHooks('onIncomeBonusGain', bonusCtx);
         if (bonusCtx.cancelled) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
         else if (bonus.delta > 0) {
           // W24b N2-09: derselbe Zuschlag ist auch fuer Gold Trap „Gold through an effect" — Fenster nur fuer den Zuschlag, das Grund-Einkommen bleibt.
           const trap = await this._checkSurpriseOnResourceGain(playerIdx, bonus.delta);
           if (trap?.redirected) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
+          else wirksameBoni.push(bonus);
         }
       }
     }
@@ -29092,6 +30048,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         playerIdx, amount: gained, _isResourceGain: !!opts._isResourceGain,
         _goldSource: { playerIdx, amount: gained, consumed: false },
       });
+      // Spielgestalter-Entscheidung 17.11.2026 (SEM-01: „Semis Gold-Gain zählt als Effekt-Gold und soll entsprechende Trigger aktivieren können"; Q76: Wealth, Semi & Co.): jeder Einkommens-Zuschlag
+      // ist ein eigenes Effekt-Gold-Ereignis — wie ein Gewinn durch eine Karte (`_isResourceGain: false`, eigene Goldquelle), damit Cheeky/Nimble/Resilient Monkee („4 or more Gold through an effect"),
+      // Royal Treasury („through another effect") und Humby darauf reagieren. Das Grund-Einkommen bleibt ausgenommen (kein eigenes Ereignis); schon ersetzte (Golden Vermin) oder umgeleitete (Gold Trap)
+      // Zuschlaege kommen hier nicht mehr vor. Der Betrag ist bereits gebucht (Teil von `gained`).
+      if (wirksameBoni.length > 0) {
+        let rest = gained;
+        for (const bonus of wirksameBoni) {
+          const betrag = Math.min(bonus.delta, rest);
+          rest -= betrag;
+          if (!(betrag > 0)) continue;
+          await this.runHooks(HOOKS.AFTER_RESOURCE_GAIN, {
+            playerIdx, amount: betrag, _isResourceGain: false, _einkommensBonus: true, sourceName: bonus.name,
+            _goldSource: { playerIdx, amount: betrag, consumed: false },
+          });
+        }
+      }
     }
     // Zustandsregeln (Logan) — siehe _checkGoldStateRules.
     this._checkGoldStateRules(playerIdx);
@@ -29360,8 +30332,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       + (ps._handCostReductionsPermanent?.[handIdx] || 0)
       // Misfire: namensweiter Nullpreis fuer das naechste dieses Namens.
       + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
-      // Dajan, Conqueror: scharfgestellter Gratis-Kauf.
-      + (this.freeArtifactArmed(playerIdx) ? rawCost : 0)
+      // Dajan, Conqueror: scharfgestellter Gratis-Kauf (nur Karten aus der Hand; `opts.ausDeck`: Legendary Explorer Dajan spielt aus dem Deck).
+      + (!opts.ausDeck && this.freeArtifactArmed(playerIdx) ? rawCost : 0)
       // Selbstrabatt der Karte (Future Tech Laser Cannon).
       + (typeof sk?.selfCostReduction === 'function'
         ? (sk.selfCostReduction(gs, playerIdx, cardData, this) || 0) : 0);
@@ -29398,7 +30370,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * G1: darf `playerIdx` gerade KEIN Gold ausgeben? Golden Arrow: "You cannot gain or spend Gold for the rest of the turn
    * afterwards." (`ps.goldLocked`, faellt zum Zugwechsel). Als Regel: unter dieser Sperre ist auch alles mit Gold-KOSTEN > 0
-   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold", Freikauf) nicht spielbar/aktivierbar; Kosten 0
+   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold") nicht spielbar/aktivierbar; Kosten 0
    * bleiben moeglich. Gegenstueck zu `goldGainWouldBeBlocked` (_gold-block-shared.js, Gewinn-Seite) - hier die Ausgabe-Seite.
    * `actionSpendGold`, `canAffordGold` und `goldBudget` fragen HIER.
    * @param {number} playerIdx
@@ -29759,6 +30731,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Steal up to `requested` Gold from the activator's opponent.
    * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
    * Broadcasts the coin-burst animation on both gold counters.
+   *
+   * `opts.verlustBleibtBeiSperre` (Thieving, Deepsea Pirate, Dirty Smuggler, Mimic, Spielgestalter-Entscheidung 16.11.2026): Ist der GEWINN des Diebes
+   * gesperrt (Golden Arrow `goldLocked`, Tuscan Aristocrat), verliert der Gegner das Gold trotzdem — der Dieb bekommt nichts, das Gold „ist dann weg".
+   * Ohne die Option bleibt es beim alten Verhalten (Z6/A09-12: der Diebstahl fizzelt, das Opfer behaelt sein Gold). Rueckgabe dann
+   * `{ stolen: 0, lost: <Menge>, fizzled: false }`. Der Erstzug-Schutz des Opfers fizzelt IMMER (auch mit der Option): der Gegner verliert nichts.
    */
   async actionStealGold(pi, requested, opts = {}) {
     const gs = this.gs;
@@ -29774,7 +30751,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Z6 (A09-12): wer kein Gold gewinnen darf (Golden Arrow), kann auch nichts stehlen.
-    if (ps.goldLocked) {
+    if (ps.goldLocked && !opts.verlustBleibtBeiSperre) {
       this.log('gold_steal_fizzle', { by: source, reason: 'goldLocked' });
       return { stolen: 0, fizzled: true };
     }
@@ -29789,11 +30766,24 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
     this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
+    // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): der Dieb darf kein Gold gewinnen (Golden Arrow) — der Gegner hat es verloren, der Dieb bekommt nichts.
+    if (ps.goldLocked) {
+      this.log('gold_gain_blocked', { player: ps.username, amount: clamped, reason: 'goldLocked' });
+      this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'goldLocked' });
+      this.sync();
+      return { stolen: 0, lost: clamped, fizzled: false };
+    }
     const _gainState = {};
     await this.actionGainGold(pi, clamped, { _gainState });
     // Z6 (A09-12): ein gesperrter Gewinn (Tuscan Aristocrat: ausserhalb der eigenen Resource Phase) macht den
     // Diebstahl wirkungslos - das Opfer bekommt sein Gold zurueck, statt dass es aus dem Spiel faellt.
     if (_gainState.blocked) {
+      // Spielgestalter-Entscheidung 16.11.2026 (Thieving, `verlustBleibtBeiSperre`): das Gold bleibt verloren, der Dieb bekommt es nicht.
+      if (opts.verlustBleibtBeiSperre) {
+        this.log('gold_steal_lost', { by: source, player: ps.username, from: ops.username, amount: clamped, fromRemaining: ops.gold, reason: 'gain blocked' });
+        this.sync();
+        return { stolen: 0, lost: clamped, fizzled: false };
+      }
       ops.gold = (ops.gold || 0) + clamped;
       this._checkGoldStateRules(oi);
       this.log('gold_steal_fizzle', { by: source, reason: 'gain blocked' });
@@ -29897,6 +30887,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     const oppPs = gs.players[this.opponentOf(pi)];
     if (!oppPs) return { cancelled: true };
+    if (this.handZugangGesperrt(pi)) return { cancelled: true };   // Hand-Sperre: nichts zu wählen (siehe `actionStealFromHand`)
     // Die aufgeloeste Karte des Gegners bleibt bis zum Ende seiner Aufloesung in `oppPs.hand`, ist aber nicht stehlbar: die Indizes bleiben die
     // physischen Handplaetze (die Anzeige zeigt sie ausgegraut mit), `blockedIndices` nennt dem Client den gesperrten Platz.
     const oppStehlbar = this._handIndizesOhneAufloesende(oppPs);
@@ -29943,6 +30934,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         by: opts.sourceName || 'Hand Steal',
         reason: 'first-turn protection',
       });
+      return { stolen: [], cancelled: false, fizzled: true };
+    }
+
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ANG-13): Klauen ist „add cards to your hand" — unter der Hand-Sperre („You cannot draw or add cards to your hand", Rain of Spores &
+    // Co.: `handLocked`) entfällt der Klau; der Rest des Effekts (z. B. der Schaden von Thieving Strike) wirkt weiter. Die reine Zieh-Sperre (`drawLocked`: Sacred Jewel, MOE Shield …)
+    // verbietet das Klauen NICHT — dort gilt nur „draw". Vor dem Ambush-Fenster: ein Klau, der nicht stattfinden kann, öffnet auch keine Reaktion.
+    if (this.handZugangGesperrt(pi)) {
+      this.log('hand_steal_blocked', { by: opts.sourceName || 'Hand Steal', reason: 'hand lock' });
       return { stolen: [], cancelled: false, fizzled: true };
     }
 
@@ -30478,6 +31477,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!toPs) return false;
     if (handIdx < 0 || handIdx >= (fromPs.hand?.length || 0)) return false;
     if (this._isSearchBlocked(toPi, opts, 'deck')) return false;   // v1068
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — dem Geschuetzten kann keine Karte auf die Hand gelegt werden (Welle 11); die Karte verpufft (Cool Presents: gespielt, Preis bezahlt).
+    if (this.ersterZugGeschuetzt(toPi, fromPi)) { this.log('hand_gift_blocked', { player: fromPs.username, reason: 'first-turn protection', by: opts.source || opts.sourceName || null }); return false; }
 
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert':
     // jemandem eine Karte IN die Hand zu legen zählt laut Als Ruling
@@ -31096,6 +32097,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const originalOwner = inst.controller ?? inst.owner;
     if (originalOwner === stealerPi) return false;
     if (inst.stolenBy != null) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — das Ziel ist wählbar, die Übernahme verpufft (früher filterte `isCreatureImmune` die Kreatur aus der Zielwahl).
+    if (!opts.selfInflicted && this.ersterZugGeschuetzt(originalOwner, opts.sourceOwner ?? stealerPi)) {
+      this.log('steal_fizzle', { creature: inst.name, reason: 'first-turn protection', by: opts.sourceName || 'Steal' });
+      return false;
+    }
     // Omni-immune Creatures silently fizzle the steal attempt — the
     // caller's pre-steal animation already played, but the Creature
     // stays put on its original side. Matches `actionTransferCreature`
@@ -31370,6 +32376,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const source = opts.source || 'hand';
     const sourceName = opts.sourceName || 'Placement';
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: platzieren —, greifen auch auf die Extra-Hand zu“): liegt die Karte nicht in der Hand, wohl aber in Crestinas
+    // (benutzbarem) Vorrat, kommt sie von dort. Gilt nur ohne ausdrueckliche Hand-Position (`opts.sourceIdx`).
+    // `opts.ausVorrat: true` erzwingt den Vorrat (der Aufrufer weiss, dass genau DIESE Kopie zaehlt, auch wenn die Hand eine gleichnamige hat).
+    const _ausVorrat = source === 'hand' && (opts.ausVorrat || (opts.sourceIdx == null && !(ps.hand || []).includes(cardName)))
+      && this.isCreationZoneUsable(playerIdx) && (ps.creationZone || []).includes(cardName);
+    if (_ausVorrat) opts = { ...opts, _ausVorrat: true };
 
     // ── PLATZIERUNG NEGIEREN (Off Duty, Ruling 3.10.: „summons" gilt auch
     // fuer das PLATZIEREN per Effekt) ────────────────────────────────────
@@ -31405,7 +32417,23 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     let _handFlug = false;
     let _ablage = null;   // v1389: Entnahme-Beleg bei source 'discard'
-    if (source === 'hand') {
+    if (source === 'hand' && _ausVorrat) {
+      // Crestinas Vorrat (Extra-Hand): Flug vom Vorratsplatz, Abgang samt Instanz.
+      const vi = (ps.creationZone || []).indexOf(cardName);   // direkt im Vorrat suchen (die Hand kann eine gleichnamige Karte haben)
+      if (vi < 0) return null;
+      const q = { liste: ps.creationZone, ausVorrat: true, idx: vi };
+      if (!opts.skipPileTransfer && !this._fastMode && !this._inMctsSim) {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName,
+          from: 'creation', to: 'support', fromHandIdx: q.idx,
+          toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+          ...(feld !== playerIdx ? { toOwner: feld } : {}),
+        });
+        _handFlug = true;
+      }
+      this._rxAbgang(ps, q);
+      this.sync();
+    } else if (source === 'hand') {
       const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (idx < 0) return null;
       // ── SICHTBARER FLUG Hand → Support Zone (v700, Als Befund:
@@ -31497,7 +32525,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters = inst.counters || {};
     if (feld !== playerIdx) this.markiereSeitenfremd(inst, playerIdx);
     inst.counters.isPlacement = 1;
-    if (source === 'hand') this._drainHandIndexedPending(ps, cardName, inst);   // Elephant-Counter bleiben erhalten
+    if (source === 'hand' && !_ausVorrat) this._drainHandIndexedPending(ps, cardName, inst);   // Elephant-Counter bleiben erhalten
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
     // v1389: aus der Ablage → Lethe, Heimkehr, SC, Signal (EINE Stelle).
@@ -31759,6 +32787,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ Held als Kreatur (Hulijing): die aufgelegte Kreatur teilt ihre HP mit dem Wirt — ihr Schaden IST Heldenschaden (ruht NICHT mit dem Wirt: sie hat keine eigenen HP).
       const _ueber = !!inst?.counters?._heldKreatur;
       if (!_ueber && (!script?.sharesHpWithHero || this.isCardPassiveDormant(inst))) { keep.push(e); continue; }   // W8: der Pool ruht bei Frost/Betäubung/Negation
+      // ★ Spielgestalter-Entscheidung 16.11.2026 (Cute Angel Molinda × Bonded Companion): „Es kommt nur auf das primäre Ziel an." Ist die Kreatur das Ziel, gilt, was für Kreaturen gilt —
+      // sagt die Quelle „Creatures take no damage from this Hero's Attacks and Spells", entsteht KEIN Schaden, auch nicht über den geteilten Pool am Helden (die Umbuchung findet gar nicht erst statt).
+      // Ist der Held das Ziel, läuft der Heldenpfad ganz normal (er kommt hier nicht vorbei). Der Eintrag bleibt als abgewehrter im Stapel (Bild, „0"), wie bei jeder anderen immunen Kreatur;
+      // die Kreatur hat keine eigenen HP und ihr Stempel `_immuneCreature` hält den Heldenschaden und (Molinda: `_immuneCreature` wird übersprungen) die Übernahme der Companion-Kreatur fern.
+      if (!_ueber && e.source && typeof e.source === 'object' && !e.isStatusDamage) {
+        const probe = { ...e, source: this._klonSicht(e.source), _quelleNegiert: false };
+        await this.runHooks(HOOKS.BEFORE_POOLED_CREATURE_DAMAGE, { entry: probe });
+        if (probe._quelleNegiert) {
+          e.amount = 0;
+          e._immuneCreature = true;
+          this.log('pooled_damage_negated_by_source', { token: inst.name, source: e.source?.name || null, type: e.type });
+          keep.push(e);
+          continue;
+        }
+      }
       const owner = _ueber ? (inst.counters?._heldKreatur?.seite ?? inst.heroOwner) : (inst.controller ?? inst.owner);
       const hero = this.gs.players[owner]?.heroes?.[inst.heroIdx];
       e._pooledToHero = true;
@@ -31949,7 +32992,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   getSacrificableCreatures(playerIdx, opts = {}) {
     const gs = this.gs;
     const cardDB = this._getCardDB();
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
     const results = [];
     for (const inst of this.cardInstances) {
       // Kontrolle statt Seite (Styx 28.9.): „a Creature you control" —
@@ -31976,7 +33018,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // their onPlay hook, so the counter never gets stamped — but a
       // Baihu is a Baihu regardless of how it landed on the board.
       if (inst.counters?._cardinalImmune) continue;
-      if (CARDINAL_NAMES.includes(inst.name)) continue;
+      if (cardinalNameImmun(this, inst)) continue;   // (negierte Omikron-Illusion: ohne Immunität)
       // ★ „This Creature cannot be sacrificed" (v958, Boulder in a
       // Bottle). Eigener, enger Vertrag statt `_cardinalImmune`: der
       // sperrt JEDEN Effekt, hier geht es nur um das Opfern. Das
@@ -32167,6 +33209,57 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   liegen — dann FIZZELT der zugehoerige Effekt (Als Ruling 23.9.).
    */
   /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life für handgebaute Opferwege, die den Geopferten selbst in die Ablage schieben und nicht über
+   * `actionDestroyCard` laufen (Tausch-Kreaturen: Suspicious Monster, Guardian of Teocuilatl & Co.). Aufruf NACH dem Ablegen, VOR `_untrackCard`; `platz` = Heldenindex und Zone,
+   * in der der Geopferte stand (die Instanz trägt sie dann nicht mehr). Die Rückkehr läuft wie bei jedem Opfer (`_loeseOpferWiederbelebungen`): erst nach dem Tausch, bei besetztem Platz in einer
+   * anderen freien Zone, ohne freie Zone gar nicht. @returns {boolean} true, wenn ein Extra Life vorgemerkt wurde.
+   */
+  opferExtraLebenVormerken(inst, platz = {}) {
+    if (!inst?.counters?._extraLife || inst._reviveAfterDeath) return false;
+    const lifeMark = this._popExtraLife(inst.counters);
+    (this.gs._opferRevives || (this.gs._opferRevives = [])).push({
+      name: inst.name, owner: inst.owner, originalOwner: inst.originalOwner,
+      heroIdx: platz.heroIdx ?? inst.heroIdx, zoneSlot: platz.zoneSlot ?? inst.zoneSlot,
+      by: lifeMark?.by || 'Extra Life', fireHooks: true, bypassSummoningSickness: true,
+      nachEffekt: true, ausweichen: true, instId: inst.id,
+    });
+    this.log('extra_life_creature_revive', { creature: inst.name, by: lifeMark?.by || 'Extra Life' });
+    return true;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): löst die zurückgestellten Wiederbelebungen GEOPFERTER Extra-Life-Träger auf
+   * (`gs._opferRevives`, gefüllt in `actionMoveCard` aus `_reviveAfterDeath.nachEffekt`). Läuft an denselben Haltepunkten wie das Elixir of Immortality
+   * (`OPFER_REVIVE_HALTEPUNKTE` in `runHooks`, VOR den Zuhörern des Hooks): erst nach dem Effekt der Karte, die das Opfer verlangte. Liegt die Karte nicht mehr
+   * in ihrem Stapel (anders zurückgeholt) oder ist eine an ihren Helden gebundene Kreatur (`sharesHpWithHero`) bei totem Wirtsheld nicht lebensfähig, kehrt nichts zurück.
+   */
+  async _loeseOpferWiederbelebungen() {
+    const gs = this.gs;
+    const liste = gs._opferRevives;
+    if (!Array.isArray(liste) || liste.length === 0 || this._opferReviveLaeuft) return;
+    gs._opferRevives = [];
+    this._opferReviveLaeuft = true;
+    try {
+      for (const rev of liste) {
+        if (gs.result) break;
+        const bps = gs.players[rev.originalOwner ?? rev.owner];
+        const alt = this.cardInstances.find(c => c.id === rev.instId);
+        // Tokens liegen im Gelöscht-Stapel (`_wiederbelebungNachTod` holt sie wie bisher ohne Stapel-Eintrag zurück); jede andere Karte muss noch in der Ablage liegen.
+        if (!bps || !((bps.discardPile || []).includes(rev.name) || (alt && this.isTokenCard(alt) && (bps.deletedPile || []).includes(rev.name)))) continue;
+        if (loadCardEffect(rev.name)?.sharesHpWithHero) {
+          const wirt = gs.players[rev.owner]?.heroes?.[rev.heroIdx];
+          if (!(wirt?.name && wirt.hp > 0)) continue;
+        }
+        if (await this._wiederbelebungNachTod(rev)) {
+          if (alt && alt.zone === ZONES.DISCARD) this._untrackCard(alt.id);   // wiederbelebt → die Ablage-Instanz ist verbraucht
+        }
+      }
+    } finally {
+      this._opferReviveLaeuft = false;
+    }
+  }
+
+  /**
    * ★★ v1360 — WIEDERBELEBUNG NACH DEM TOD („_reviveAfterDeath"), an EINER
    * Stelle fuer beide Todeswege. Bisher lebte sie nur im Schadens-Batch:
    * eine ZERSTOERTE Creature (Defeat-Effekte ohne Schaden), die Cute Phoenix
@@ -32175,6 +33268,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _wiederbelebungNachTod(reviveAfterDeath) {
     if (!reviveAfterDeath) return;
+    // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): die zurückgestellte Wiederbelebung eines Opfers (Extra Life, `ausweichen`) findet ihren Platz oft
+    // belegt (der Effekt des Opfers hat ihn genommen: Garius, Rottweiler, Tausch-Kreaturen …) — dann kehrt sie in eine andere freie Zone zurück (zuerst desselben
+    // Helden), erst ohne freie Zone fizzelt sie. Plätze, die die Kreatur teilen darf (Alice), bleiben wie bisher.
+    if (reviveAfterDeath.ausweichen && this.supportSlotBelegt(reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot)
+        && !require('./_alice-shared').canShareInto(this, reviveAfterDeath.owner, reviveAfterDeath.heroIdx, reviveAfterDeath.zoneSlot, reviveAfterDeath.name)) {
+      const _frei = this.beschwoerZonenFuer(reviveAfterDeath.owner, reviveAfterDeath.name, { livingHeroesOnly: true })
+        .filter(z => this.isCreatureSummonable(reviveAfterDeath.name, reviveAfterDeath.owner, z.heroIdx, { _bypassBeforeSummon: true }));
+      const _z = _frei.find(z => z.heroIdx === reviveAfterDeath.heroIdx) || _frei[0];
+      if (_z) reviveAfterDeath = { ...reviveAfterDeath, heroIdx: _z.heroIdx, zoneSlot: _z.slotIdx };
+    }
     // ★ v1360 (Audit „same Support Zone"): die Wiederbelebung geht in
     // DENSELBEN Platz. Hat ein Todes-Listener ihn inzwischen gefuellt
     // (Call of the Deepsea, Grave Worm, Loyal Shepherd …), fizzelt sie
@@ -32196,13 +33299,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this.zeigeFizzle(reviveAfterDeath.by || reviveAfterDeath.name, { playerIdx: reviveAfterDeath.owner, grund: 'cannot_be_revived' });
       return false;
     } else {
+      // Eigene Wiederbelebungs-Animation (Cute Phoenix: Flammensammeln, Feuer-Ei, Explosion, `phoenix_rebirth`): der Stempel nennt Typ, Wartezeit (= Bild der Explosion + Mount-Vorlauf)
+      // und Lebensdauer der Leinwand; ohne Angabe das goldene `holy_revival` (Bone Dog, Extra Life ...).
       this._broadcastEvent('play_zone_animation', {
-        type: 'holy_revival',
+        type: reviveAfterDeath.animation || 'holy_revival',
         owner: reviveAfterDeath.owner,
         heroIdx: reviveAfterDeath.heroIdx,
         zoneSlot: reviveAfterDeath.zoneSlot,
+        ...(reviveAfterDeath.animationDauer ? { duration: reviveAfterDeath.animationDauer } : {}),
       });
-      await this._delay(620);
+      await this._delay(reviveAfterDeath.animationMs || 620);
       // Pop the just-discarded card from its original owner's
       // discard pile so the revived instance isn't a duplicate.
       // ★ v1389: ueber die EINE Ablage-Stelle (Lethe, Heimkehr-Besitzer).
@@ -32680,7 +33786,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       : 550;
     const sacAnimExtra = spec.sacrificeAnimationExtras || {};
 
+    // Mehrfach-Tribut: die Einäscherungen (je ~2 s bis zur Landung) laufen überlappend — nur das letzte Brett-Opfer wartet auf die Landung der Essenz (sonst 2 s je Tribut nacheinander).
+    let _letztesBrettOpfer = -1;
+    picked.forEach((t, i) => { if (t.cardInstance && t.type !== 'hand' && t.cardInstance.zone !== 'hand') _letztesBrettOpfer = i; });
+    let _opferNr = -1;
     for (const t of picked) {
+      _opferNr++;
       try {
         // Played BEFORE the hook + destroy so the visual lands while
         // the creature is still rendered in its zone. Brief delay
@@ -32771,7 +33882,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // ★ 26.9.: `spec.skipPileTransfer` — die Karte zeigt den Weg
             // des Opfers zur Ablage selbst (Chaorc Interception wirft es
             // aufs Ziel und laesst es von DORT abfliegen).
-            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}) },
+            { isSacrifice: true, ...(spec.skipPileTransfer ? { skipPileTransfer: true } : {}), ...(_opferNr < _letztesBrettOpfer ? { einaescherungOhneWarten: true } : {}) },
           );
         }
       } catch (err) {
@@ -33320,7 +34431,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   • Gibt es MEHR Kopien als Plaetze UND liefern mindestens zwei Quellen welche, waehlt der Spieler JE KOPIE die Quelle (Galerie `pickAusQuellen`,
    *     ein Eintrag je Quelle mit Herkunfts-Abzeichen DECK / HAND / DISCARD; CPU: `cpuSourceOrder` Ablage, Deck, Hand - die Ablage kostet nichts).
    *   • Die Ablage ist ein Stapel-Ausgang wie jeder andere: `takeFromPile(pi, 'discard', …)` (Knight-of-Kings-Sperre `pileOutAllowed`, Lethe-Stempel, verwaiste Instanz
-   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle (keine Freikauf-Frage mitten im Aufstieg).
+   *     wird abgetragen); ist die Ablage fuer diesen Zug gesperrt (Stab-/Eye-of-Ren-Sperre), zaehlt sie nicht als Quelle.
    *
    * ★ W71a (Al, 25.10.2026: "Der Ascension-Bonus bei Abilities ist OR, nicht AND"):
    * `abilityChoices` ist eine Liste von ALTERNATIVEN (ODER) - der Spieler
@@ -33660,6 +34771,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Nachlauf als `nachBilder` im Rueckgabewert.
    */
   async negationsBilder(quelle, ziele, ergebnis, opts = {}) {
+    this._merkeNegation(ziele);   // Spielgestalter-Entscheidung 16.11.2026: der Aufrufer (Aktivierung) erkennt eine echte Negation im Zielfenster (`negationsStand`/`negiertSeit`)
     // ★★ v1181 (Al 17.9.): Die Abwehr soll KURZ NACH dem Beginn der
     // Zauberbilder sichtbar werden — dafuer startet ihr `waehrendBilder`
     // parallel (nicht abgewartet), die Karte legt ihre eigene Pause fest.
@@ -33847,19 +34959,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // besteht nur gegenüber dem Zugspieler. Deckt alle Ziel-Typen ab
     // (hero, equip, ability, perm, area, surprise, hand …), nicht nur
     // Creatures. Opt-out für Sonderfälle: `ignoreFirstTurnProtection`.
-    const _ftProtected = this.gs.firstTurnProtectedPlayer;
-    if (_ftProtected != null && playerIdx !== _ftProtected
-        && !config.ignoreFirstTurnProtection) {
-      // ★ v1294: MARKIEREN statt entfernen — geschuetzte Ziele werden
-      // ausgegraut gezeigt (Als Regel 21.8., fuer Midnight Assault
-      // nachgezogen am 23.9.). Waehlbar sind sie trotzdem nicht: jede
-      // Entscheidung laeuft unten ueber `_waehlbar`.
-      for (const t of validTargets) {
-        const inst = t?.cardInstance || t?._cardInstance;
-        const side = inst ? (inst.controller ?? inst.owner) : t?.owner;
-        if (side === _ftProtected) t.ineligible = true;
-      }
-    }
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — Ziele des durch die Erste-Runden-Immunitaet geschuetzten Spielers sind HIER WAEHLBAR (nicht mehr
+    // ausgegraut, v1294 ueberholt): die Wahl eines geschuetzten Ziels verpufft (Karte gespielt/bezahlt, Einmal-Marker verbraucht, keine Wirkung) — `_zielwahlAbschliessen` zieht es nach der
+    // Wahl ab (`_ersterZugZielAbziehen`). Das gilt wie bisher nur gegenueber dem Zugspieler (der Geschuetzte waehlt seine eigenen Karten normal) und nicht bei `ignoreFirstTurnProtection`.
+    // ★ BLINDED (Spielgestalter-Entscheidung 16.11.2026): wirkt ein GEBLENDETER Held die Attack/den Spell hinter dieser Zielwahl, ist alles gegnerisch Kontrollierte nicht waehlbar —
+    // markiert (ausgegraut), nicht entfernt, wie die Schutzmarkierungen darunter. Eigene Ziele bleiben waehlbar. Siehe `_blindWirkerFuer`; Opt-out `config.ignoreBlinded`.
+    this.markiereBlindGesperrte(validTargets, playerIdx, config);
     // Erzwungene Aufloesung (v741) — s. `promptGeneric`.
     if (this._forceNonCancellable > 0 && config?.cancellable) {
       config = { ...config, cancellable: false };
@@ -34057,6 +35162,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       return await this._zielwahlAbschliessen(playerIdx, validTargets, config, cpuPicked);
     }
     this.beginHumanWait();   // v848: Uhren der CPU anhalten
+    this.ersterZugHinweisSetzen(validTargets, playerIdx, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel (Erste-Runden-Schutz), vom Client nur beim angewaehlten Ziel gezeigt
     const picked = await new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
@@ -34303,6 +35409,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     let _pickedIds = Array.isArray(_pickedRoh)
       ? _pickedRoh.filter(id => !_gesperrt.has(id))
       : _pickedRoh;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Ziele des Erste-Runden-Geschuetzten sind waehlbar und verpuffen — nach der Wahl abziehen (Negation, nicht Abbruch: Karte gespielt, Kosten gezahlt).
+    {
+      const _ft = this._ersterZugZielAbziehen(playerIdx, validTargets, _pickedIds, config);
+      if (_ft.abgezogen) {
+        if (_ft.ids.length === 0) return [];
+        _pickedIds = _ft.ids;
+      }
+    }
+
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): die Zielwahl einer gespielten Attack steht fest → JETZT bieten sich Pfeile und Magic Topaz an (`_pfeilFensterNachZielwahl`). Nur die Wahl des Attack-Besitzers
+    // waehrend der Aufloesung dieser Karte, nur echte Ziele (Held/Kreatur), nicht in den inneren Fenstern (Umleitung, Post-Target) und nicht im Trockenlauf.
+    {
+      const _pf = this.gs._pfeilFenster;
+      if (_pf && !_pf.geoeffnet && playerIdx === _pf.owner && !config._sondeListe && !config._waehlbarProbe
+          && !this._inPostTargetWindow && !this._inRedirectWindow && this._currentResolvingPlayName() === _pf.cardName) {
+        const _ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : (_pickedIds ? [_pickedIds] : []));
+        if ((validTargets || []).some(t => _ids.has(t.id) && (t.type === 'hero' || t.type === 'equip' || t.type === 'creature'))) {
+          await this._pfeilFensterNachZielwahl();
+        }
+      }
+    }
 
     // ★ POST-TARGET-FENSTER AUCH HIER (Als Vorgabe 21.8.: „stelle
     //   sicher, dass ALLE Effekte Escape Device und Invisibility Cloak
@@ -34335,7 +35462,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _umgebung = _ersatzErlaubt ? (_spQ || this._umgebungsQuelle(playerIdx, config)) : null;
     const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
-      const quelle = _ausdruecklich || _ersatzQuelle || null;
+      let quelle = _ausdruecklich || _ersatzQuelle || null;
+      // Viele Skripte nennen die Quelle nur als NAMEN (`source: CARD_NAME` — Voodoo Curse, Exorcism, Midnight Assault, Ricochet, Tail Slap …). Die Hand-Reaktionen lesen aber `sourceCard.owner/.name`
+      // (Anti Magic Shield: `postTargetCondition`): mit einem blossen String war die Quelle fuer sie „kein Besitzer, keine Karte" und das Fenster nie offen. Wie das Umleitungsfenster darunter
+      // (`_redirectSourceFor`) bekommt der Hub eine Quelle MIT Besitzer: die gerade wirkende Karte, wenn sie so heisst (Instanz mit Wirker-Held), sonst ein Namensobjekt des Waehlenden.
+      const _quelleWarName = typeof quelle === 'string';
+      if (_quelleWarName) {
+        const _wirkend = this._umgebungsQuelle(playerIdx, config);
+        quelle = (_wirkend && _wirkend.name === quelle)
+          ? _wirkend
+          : { ...this._redirectSourceFor(playerIdx, { source: quelle }), ...(config.chooserHeroIdx != null ? { heroIdx: config.chooserHeroIdx } : {}) };
+      }
       const ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id));
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
@@ -34348,7 +35485,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
-        if (_ersatzQuelle) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
+        if (_ersatzQuelle || _quelleWarName) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
         this._inPostTargetWindow = true;
         try {
           const pt = await this._checkPostTargetHandReactions(helden.concat(kreaturen), quelle, {
@@ -34356,8 +35493,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             dealsDamage: config.dealsDamage === true,
             heroChoiceIsCost: config.heroChoiceIsCost === true,
             ausZielwahl: true,
+            cannotBeNegated: config.cannotBeNegated === true,   // Exorcism mit Decay Magic 2: Reaktionen, die die ganze Karte negieren, werden gar nicht erst angeboten
           });
           if (pt?.effectNegated) {
+            // Negation ≠ Abbruch (wie in `promptDamageTarget`/`promptMultiTarget`): der Zauber ist gespielt und geht in die Ablage — ohne die Marke wertete `doPlaySpell` die
+            // leere Rueckgabe als Abbruch (Karte zurueck auf die Hand, Aktion erstattet, die Abwehrkarte trotzdem verbraucht). Nur waehrend einer Zauberaufloesung (Tiefe > 0,
+            // sonst bliebe die Marke stehen).
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;
             // ★★ v1179/v1180: Bilder des abgewehrten Zaubers, dann der
             // Nachlauf der Abwehrkarte.
             await this.negationsBilder(quelle, helden.length ? helden : kreaturen, pt);
@@ -34406,15 +35548,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _kreatSr = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && t.heroIdx >= 0 && _ids.has(t.id)
         && t.cardInstance.zone === ZONES.SUPPORT && this._istKreaturenInstanz?.(t.cardInstance));
       if (_qName && (_helden.length > 0 || _kreatSr.length > 0)) {
-        const _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
+        // Ohne `sourceCard`/`chooserHeroIdx` (Love Shot, Cure, Divine Zeal, Dangerous Knowledge, Compulsory Body Swap …) kannte die Quelle den wirkenden Helden nicht (`heroIdx` -1): Surprises,
+        // die einen Angreifer brauchen (Frost Rune, Booby Trap, Toxic Trap: `sourceInfo.heroIdx < 0 → false`), bekamen nie ein Fenster, Flooding (braucht keinen) schon. Traegt die gerade
+        // wirkende Karte denselben Namen (`_umgebungsQuelle`, Instanz mit Wirker-Held und Besitzer des Wirkers — dieselbe Quelle, die `promptDamageTarget` den Fenstern gibt), ist SIE die Quelle.
+        let _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
           ? config.sourceCard
           : { name: _qName, owner: playerIdx, controller: playerIdx,
               heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
+        if (!_spFenster && config.chooserHeroIdx == null && !(typeof config.sourceCard === 'object' && config.sourceCard)) {
+          const _wirkend = _umgebung || this._umgebungsQuelle(playerIdx, config);
+          if (_wirkend && _wirkend.name === _qName && _wirkend.heroIdx >= 0) _quelle = _wirkend;
+        }
         if (_helden.length > 0) {
           const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
             damageType: config.damageType,
           });
           if (_sr?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelle, _helden, _sr);   // v1179/v1180
             return [];
           }
@@ -34430,6 +35580,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType: config.damageType,
           });
           if (_srK?.effectNegated) {
+            if ((this.gs._spellResolutionDepth || 0) > 0) this.gs._spellNegatedByEffect = true;   // Negation ≠ Abbruch (siehe Post-Target-Fenster oben)
             await this.negationsBilder(_quelleK, _kreatSr, _srK);
             return [];
           }
@@ -34647,6 +35798,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    // Der wirkende Held (Spell/Attack/Fähigkeit aus der Hand bzw. Zone) — Client: Hüpfer + Silhouetten-Flackern (app-fx-68). Nur Optik, an beide Seiten und die Zuschauer.
+    if (pending.wirker && !this._inMctsSim && !this._fastMode) this._broadcastEvent('hero_cast', { owner: pending.wirker.owner, heroIdx: pending.wirker.heroIdx, art: pending.wirker.art });
     // Fire any pending play log at the same time as the card reveal
     this._firePendingPlayLog();
     // ★ W66b (Al, 23.10.2026): Kosten und Limits/Zähler erst NACH dem Commit — was die Karte per `engine.beiCommit(fn)` vorgemerkt hat, läuft jetzt (nach dem Auftritt, vor dem ersten Effekt).
@@ -35391,11 +36544,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Rolling Boulder) — v701. Nur eine Kopie, das Original bleibt
     // unangetastet.
     config = { ...config, _redirectPickCount: liste.length };
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Ein Umleiter (Martyry, Challenge, Anti-Magnet, Anti-Magnetic Armor, Empty Armor, Laki, Shield of
+    // Wisdom, Alleria, Monia Bot …) bietet KEIN Ziel an, das derselbe Spell/Effekt schon gewählt oder (durch eine frühere Umleitung) schon getroffen hat — ein „up to 2 targets" meint verschiedene
+    // Ziele. Die Fenster bekommen dafür eine Kopie der Zielliste, in der diese Ziele `ineligible` UND `_bereitsGewaehlt` sind (ausgegraut: „zählt nicht als Ausweichziel"; Skripte, die `ineligible`
+    // nicht lesen, prüfen `_bereitsGewaehlt`). AUSNAHME: Redirecting Aura („even if that target was already hit by the same Spell/effect") liest das Flag und bietet sie weiter an (der Effekt trifft
+    // dann zweimal). `config._bereitsGewaehlt`: weitere schon gewählte/getroffene Ziele des Effekts, die nicht in `pickedIds` stehen (Chain Lightning: die übrigen Glieder der Kette).
+    const _vorBelegt = Array.isArray(config._bereitsGewaehlt) ? config._bereitsGewaehlt : [];
     this._inRedirectWindow = true;
     try {
       for (let i = 0; i < liste.length; i++) {
         const sel = (validTargets || []).find(t => t && t.id === liste[i]);
         if (!sel) continue;
+        const _belegt = new Set(_vorBelegt);
+        for (let j = 0; j < liste.length; j++) if (j !== i) _belegt.add(liste[j]);
+        _belegt.delete(sel.id);
+        const _vtUml = (_belegt.size > 0 && Array.isArray(validTargets))
+          ? validTargets.map(t => (t && _belegt.has(t.id) && !t.ineligible) ? { ...t, ineligible: true, _bereitsGewaehlt: true } : t)
+          : validTargets;
         // v704 (Puppets, Vinny): Brett-Waechter sehen die GANZE aktuelle
         // Auswahl, um alle geschuetzten Ziele in einem Zug fallen zu lassen.
         config._redirectPickedIds = liste.slice();
@@ -35404,7 +36569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (sel.type !== 'hero' && sel.type !== 'equip') continue;
         if (typeof sel.owner !== 'number' || sel.owner < 0) continue;
         const redirected = await this._checkTargetRedirect(
-          sel.owner, sel, validTargets, config, sourceCard
+          sel.owner, sel, _vtUml, config, sourceCard
         );
         if (!redirected) continue;
         // Negation (v701): der GANZE Effekt ist negiert — leere Auswahl
@@ -35418,7 +36583,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           for (let j = liste.length - 1; j >= 0; j--) {
             if (drop.has(liste[j])) { liste.splice(j, 1); if (j <= i) i--; }
           }
-          if (liste.length === 0) return [];
+          if (liste.length === 0) { this._merkeNegation(sel); return []; }   // alle Ziele geschützt = der Effekt ist negiert (siehe `negationsStand`)
           continue;
         }
         // Eine ID, die nicht in der Zielliste des Aufrufers steht, ginge
@@ -35543,6 +36708,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {object|null} Redirected target, or null
    */
   /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: ein AUSGELÖSTES PASSIV, das umleitet bzw. negiert (Brett-Wächter `isBoardRedirect` — Laki, Vinny, Tri Fecta, Tri Ad, Anti-Magnetic Armor, Empty Armor,
+   * Winged Haressassin, Redirecting Aura — und Helden-Passive `heroRedirect` — Alleria, Monia Bot), öffnet das Kettenfenster: NACH der Bestätigung des Besitzers (bzw. sofort bei einer Pflicht-
+   * Umleitung), VOR der Wirkung des Skripts. Das Glied ist die Auslösung selbst (`cardType: 'TriggeredEffect'`, `fromBoard: true`, Name = Wächter/Held): Der Gegner darf mit seinen passenden Reaktionen antworten;
+   * wird sie negiert, findet die Umleitung/Negation nicht statt. Der Typ ist bewusst weder 'CreatureEffect' noch 'Hero': die Reaktionen auf AKTIVE Effekte (Spearman, Dark Deal, Gigantisaur Skull, Divine Punishment …)
+   * meinen laut Kartentext nur aktivierte Effekte und lesen genau diese Typen; Handkarten-Reaktionen („from their hand": The Master's Plan, Lunar Eclipse) schließt `fromBoard` aus. Wer künftig auf ausgelöste
+   * Passive reagieren soll, liest `link.cardType === 'TriggeredEffect'`. KOSTEN (Abwurf, Counter) UND das Einmal-Limit („once per turn") zahlt/stempelt der Aufrufer VOR diesem Fenster (`payBoardRedirectCost` & Co. der Skripte) — beides bleibt auch bei Negation verbraucht.
+   * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) und in KI-Simulationen öffnet kein neues Fenster (Konvention von `alsAttackKette`).
+   * @returns {Promise<boolean>} true = die Auslösung wurde negiert
+   */
+  async _passivAusloesungNegiert(quellName, ownerIdx, heroIdx) {
+    if (this._inMctsSim || this._inReactionCheck || !quellName) return false;
+    const k = await this.executeCardWithChain({
+      cardName: quellName, owner: ownerIdx, heroIdx: Number.isInteger(heroIdx) ? heroIdx : -1,
+      cardType: 'TriggeredEffect', goldCost: 0, resolve: null, fromBoard: true, casterCheck: false,
+    });
+    return !!k?.negated;
+  }
+
+  /**
    * ★ EINE Auslegung fuer „hat der Spieler JA gesagt?" (v672).
    *
    * Die Rueckgabeform-Falle, dritter Fund. `promptGeneric` liefert bei
@@ -35564,6 +36748,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     return antwort.confirmed !== false;
   }
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Negations-/Schutzkarten (Hand-Reaktionen, Surprises, Brett-Wächter, Umleiter) werden AUCH gegen
+   * Schaden/Effekte angeboten, die laut Kartentext nicht verringert/umgeleitet/negiert werden können (Rockfall, Pressure Projectile, Acid Vial, Ida, Exorcism mit Decay Magic 2 …): Der Spieler
+   * will vielleicht Karten loswerden oder die Ablage füllen. Gespielt/bezahlt/verbraucht wird wie immer — nur die Wirkung bleibt aus (der Treffer geht durch, die Umleitung findet nicht statt).
+   * Die Bestätigungsfrage trägt dafür einen Hinweis. `flags` = { cannotBeNegated, cannotBeReduced, cannotBeRedirected }, `was` = 'damage' | 'effect' | …; ohne eines der Flags: '' (Frage unverändert).
+   */
+  _nutzlosHinweis(flags, was = 'damage') {
+    if (!flags) return '';
+    const teile = [];
+    if (flags.cannotBeReduced) teile.push('reduced');
+    if (flags.cannotBeRedirected) teile.push('redirected');
+    if (flags.cannotBeNegated) teile.push('negated');
+    if (teile.length === 0) return '';
+    const liste = teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} or ${teile[teile.length - 1]}`;
+    return `This ${was} cannot be ${liste}.`;
+  }
+
+  /** Bestätigungsfrage "… Activate X?" bzw. mit Hinweis "… <Hinweis> Activate X anyway?" (siehe `_nutzlosHinweis`). */
+  _nutzlosFrage(vorne, hinweis, aktion) {
+    return hinweis ? `${vorne} ${hinweis} ${aktion} anyway?` : `${vorne} ${aktion}?`;
+  }
+
   async _checkTargetRedirectOnce(targetOwnerIdx, selected, validTargets, config, sourceCard) {
     const ps = this.gs.players[targetOwnerIdx];
     if (!ps) return null;
@@ -35583,12 +36789,22 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // v701: Umleitungs-Ausgaenge gesperrt (cannotBeRedirected / Eye) —
     // Hand- und Helden-Scans entfallen, nur negierende Surprises bleiben.
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Umleiter (Hand, Held, Brett, Surprise) werden AUCH gegen Quellen angeboten, die laut Kartentext nicht
+    // umgeleitet werden duerfen (Acid Vial, Glasowt, Truth-Seeing Eye), und Negierer AUCH gegen „cannot be negated" (Exorcism mit Decay Magic 2): Hinweis in der Frage, Kosten/Aktivierung
+    // wie immer — die Umleitung bzw. Negation selbst findet nicht statt (`_nurNegation` = Umleitungs-Ausgang gesperrt, `_negGesperrt` = Negation gesperrt). Die CPU waehlt das nicht
+    // (`_nutzlos`). Eine Quelle, auf die der Gegner gar nicht reagieren darf (Surefire Shot, Midnight Assault: `opponentCannotReact`), oeffnet weiter keine Negations-Waechter.
     const _nurNegation = !!config._noRedirectOutcome;
+    const _srcSkriptR = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
+    const _negGesperrt = !!(config.cannotBeNegated || _srcSkriptR?.cannotBeNegated);
+    const _reaktionZu = this._reaktionGesperrt(targetOwnerIdx) || !!_srcSkriptR?.opponentCannotReact;
+    const _umlHinweis = _nurNegation ? this._nutzlosHinweis({ cannotBeRedirected: true }, 'effect') : '';
 
     // Scan hand for redirect cards
+    // Dark Ocean („neither player can react to … the effects of their opponent's Creatures"): die Umleiter aus der Hand (Martyry, Challenge, Anti-Magnet) sind Reaktionen — wie in allen anderen
+    // Hand-Fenstern (W34a) gesperrt, wenn der Effekt von einer GEGNERISCHEN Creature kommt; auf Effekte der eigenen Creatures darf man reagieren.
+    const _ozeanSperre = this.darkOceanBlocksReaction(targetOwnerIdx, null);
     const seen = new Set();
-    for (let hi = 0; hi < (_nurNegation ? 0 : ps.hand.length); hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName } of (_ozeanSperre ? [] : this._rxKandidaten(ps))) {   // Hand + Crestinas Vorrat
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -35620,7 +36836,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // vorbei in den Decline-Default: Martyry/Challenge/Anti-Magnet
         // feuerten für die CPU NIE (10 Declines in einem Testspiel).
         showCard: cardName,
-        message: `Your ${selected.cardName} was targeted by ${attackerName}! Activate ${cardName}?`,
+        ...(_nurNegation ? { _nutzlos: true } : {}),
+        message: this._nutzlosFrage(`Your ${selected.cardName} was targeted by ${attackerName}!`, _umlHinweis, `Activate ${cardName}`),
         confirmLabel: `↪️ ${cardName}!`,   // v673: Pfeil zur Seite statt Waffen-/Netz-Symbolik (Al 31.8.)
         cancelLabel: 'No',
         cancellable: true,
@@ -35629,22 +36846,42 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!this._confirmSaidYes(confirmed)) continue; // Declined — check next redirect card
 
-      // Run the card's redirect logic (hero selection, chain UI, etc.)
-      const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
-      if (!result?.redirectTo) continue; // Redirect was cancelled
+      // ★ Spielgestalter-Entscheidung 16.11.2026: Umleitungs-Reaktionen sind KETTBAR. Der Gegner darf auf die Aktivierung von Martyry/Challenge/Anti-Magnet antworten wie auf jede andere Hand-Reaktion
+      // (Cute Camera, Front Soldier, Reverse Trap — `_reaktionGespielt`, derselbe Baustein wie bei Spiky Armor, Strong Shield und Anti Magic Shield); wird die Umleitung negiert, findet sie nicht statt,
+      // die Karte ist verbraucht, Gold und Wisdom bleiben bezahlt. Der Umleiter läuft dafür in drei Schritten:
+      //   ① `script.redirectWaehlen(...)` (optional): Wahlen, die VOR dem Ausspielen feststehen müssen (welcher Held wirkt → Wisdom). Keine Nebenwirkung, kein Gold, kein Bild; `null` = abgebrochen (Karte bleibt auf der Hand).
+      //   ② Die Engine spielt die Karte: Hand → Ablage, Gold (`cost` der Karte — das Skript bucht es nicht mehr selbst), Wisdom, Aufdecken, Gegenreaktions-Fenster.
+      //   ③ `script.onRedirect(..., plan)`: Wahl des Gegners (Anti-Magnet), Bilder, Log; liefert `{ redirectTo }`.
+      // Während ① und ③ läuft, öffnet die Ersatzzielwahl des Umleiters (Anti-Magnet: der Gegner wählt per `promptEffectTarget`) kein weiteres Umleitungsfenster: das Ersatzziel hat der Umleiter gewählt, nicht der
+      // ursprüngliche Effekt; der Weiterleitungs-Fall (neuer Besitzer darf wieder umleiten) läuft über die Kette in `_checkTargetRedirect`, nicht über diese Wahl.
+      const _fensterVorher = this._inRedirectWindow;
+      this._inRedirectWindow = true;
+      let plan;
+      try {
+        plan = typeof script.redirectWaehlen === 'function'
+          ? await script.redirectWaehlen(this, targetOwnerIdx, selected, validTargets, config, sourceCard)
+          : {};
+      } finally {
+        this._inRedirectWindow = _fensterVorher;
+      }
+      if (!plan) continue; // Redirect was cancelled — die Karte bleibt auf der Hand
 
-      // Consume the card from hand
-      const removeIdx = ps.hand.indexOf(cardName);
-      if (removeIdx >= 0) {
-        ps.hand.splice(removeIdx, 1);
-        this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
-        // Untrack hand instance
+      // Consume the card from hand (oder aus Crestinas Vorrat — 11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue; // nicht mehr auf der Hand
+      const _cardData = this._getCardDB()[cardName];
+      this._rxAbgang(ps, _q);
+      this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
+      this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
+      // Untrack hand instance (die Vorrats-Instanz raeumt `_rxAbgang` selbst ab)
+      if (!_q.ausVorrat) {
         const inst = this.cardInstances.find(c =>
           c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
         );
         if (inst) this._untrackCard(inst.id);
       }
+      await this._rxPay(ps, _cardData?.cost || 0, { cardName });   // Anti-Magnet: 2 Gold (Kreditrahmen Kent/Debt-O-Tron, Item Lock wie bei jedem Hand-Artefakt)
+      this.sync();
 
       // Reveal to other player + spectators
       const otherIdx = this.opponentOf(targetOwnerIdx);
@@ -35655,23 +36892,28 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
         }
       }
+      await this._delay(300);
 
-      this.log('target_redirect', {
-        redirectCard: cardName,
-        originalTarget: selected.cardName,
-        newTarget: result.redirectTo.cardName,
-        player: ps.username,
-      });
+      // Wisdom (Luecke zur Stufe des Wirkers) wie in jedem anderen Hand-Reaktionsweg (`_rxWisdomKosten`, z. B. Post-Target-Hub): nennt der Umleiter seinen Wirker (`casterIdx`/`casterSeite`,
+      // Martyry: der Held, der sich vorwirft), zahlt der Reagierende den Abwurf — die Karte ist schon aus der Hand, die Rechnung entspricht dem Hub. Ohne Wirker (Challenge, Anti-Magnet) entfaellt er.
+      if (Number.isInteger(plan.casterIdx) && plan.casterIdx >= 0) {
+        const _wisdomKosten = this._rxWisdomKosten(targetOwnerIdx, plan.casterSeite ?? targetOwnerIdx, plan.casterIdx, _cardData);
+        if (_wisdomKosten > 0) {
+          await this.actionPromptForceDiscard(targetOwnerIdx, _wisdomKosten, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
+        }
+      }
 
       // Observer hook — hand-based redirect cards (Martyry, Challenge)
-      // are functionally Reactions, but this flow never touches the
-      // chain system. DEDICATED hook name on purpose: firing
+      // are functionally Reactions, but this flow never goes through the
+      // reaction chain window. DEDICATED hook name on purpose: firing
       // onReactionActivated here would feed every existing consumer of
       // that hook (card passives like Archer, brain-side observers,
       // anything keying on _isReaction) an event from a codepath they
       // were never written against. afterTargetRedirect is
       // observation-only by construction — today's sole listener is the
-      // training recorder.
+      // training recorder (zeichnet die Aktivierung auf, auch wenn der Gegner sie gleich negiert).
       try {
         await this.runHooks('afterTargetRedirect', {
           redirectCardName: cardName, redirectOwner: targetOwnerIdx,
@@ -35680,6 +36922,28 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error('[Engine] afterTargetRedirect hook error:', err.message);
       }
+
+      // Gegenreaktions-Fenster („when your opponent plays a Reaction": Cute Camera, Front Soldier, Reverse Trap). Negiert: keine Umleitung, die Karte liegt in der Ablage, Kosten bleiben bezahlt.
+      // Ein anderer Umleiter auf der Hand darf danach noch angeboten werden (wie im Post-Target-Hub).
+      if (await this._reaktionGespielt(targetOwnerIdx, cardName, _cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard) })) { this.sync(); continue; }
+      if (_nurNegation) { this.log('redirect_blocked', { source: sourceCard?.name, reason: 'cannotBeRedirected', card: cardName }); this.sync(); continue; }   // nutzlose Aktivierung: bezahlt, keine Umleitung
+
+      // ③ Die Umleitung wirkt (Wahl des Gegners, Bilder, Log).
+      this._inRedirectWindow = true;
+      let result;
+      try {
+        result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard, plan);
+      } finally {
+        this._inRedirectWindow = _fensterVorher;
+      }
+      if (!result?.redirectTo) { this.sync(); continue; } // die Umleitung ist verpufft (kein Ziel mehr) — Karte und Kosten sind verbraucht
+
+      this.log('target_redirect', {
+        redirectCard: cardName,
+        originalTarget: selected.cardName,
+        newTarget: result.redirectTo.cardName,
+        player: ps.username,
+      });
 
       return result.redirectTo;
     }
@@ -35690,7 +36954,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // uebernommene der Gegenspalte; ein abgegebener eigener beschuetzt
     // nicht. `physOwner` (Brettseite) geht als letztes Argument an
     // `canHeroRedirect`/`onHeroRedirect`.
-    for (const { physOwner, heroIdx: hi, hero } of (_nurNegation ? [] : this.heroesControlledBy(targetOwnerIdx))) {
+    // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (`_reaktionZu`: Surefire Shot, Midnight Assault) — Helden-Umleiter (Alleria, Monia Bot) sind Reaktionen und bieten
+    // NICHTS an (anders als bei „cannot be redirected/negated": dort Warnungsprinzip).
+    for (const { physOwner, heroIdx: hi, hero } of (_reaktionZu ? [] : this.heroesControlledBy(targetOwnerIdx))) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
 
@@ -35717,8 +36983,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         type: 'confirm',
         title: hero.name,
         protMeta: { d: Number(config?.baseDamage) || 0, hp: _redirHpH, pi: targetOwnerIdx },
-        message: `Redirect ${attackerName}?`,
+        message: _umlHinweis ? `${_umlHinweis} Redirect ${attackerName} anyway?` : `Redirect ${attackerName}?`,
         showCard: sourceCard?.name || null,
+        ...(_nurNegation ? { _nutzlos: true } : {}),
         confirmLabel: '↪️ Redirect!',
         cancelLabel: 'No',
         cancellable: true,
@@ -35726,8 +36993,22 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!this._confirmSaidYes(confirmed)) continue;
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: KOSTEN sind VOR dem Kettenfenster und unabhängig von dessen Ausgang zu bezahlen — wie bei einer gespielten Hand-Reaktion,
+      // deren Kosten auch bei Negation bezahlt bleiben. Ein Helden-Passiv mit Kosten bietet dafür das optionale Gegenstück `payHeroRedirectCost(...)` (gleiche Argumente wie
+      // `onHeroRedirect`); `false` = nicht zahlbar/abgebrochen → keine Aktivierung, nichts ausgelöst (wie ein Nein). Das Ergebnis geht als letztes Argument an `onHeroRedirect`.
+      // Dasselbe Gegenstück stempelt auch das Verbrauchslimit („once per turn", Alleria) — es zählt mit der Aktivierung, nicht erst mit der Wirkung (Spielgestalter-Entscheidung 16.11.2026).
+      let bezahltH;
+      if (typeof heroScript.payHeroRedirectCost === 'function') {
+        bezahltH = await heroScript.payHeroRedirectCost(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
+        if (!bezahltH) continue;
+      }
+
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Helden-Passivs ist kettbar (`_passivAusloesungNegiert`); negiert → keine Umleitung.
+      if (await this._passivAusloesungNegiert(hero.name, targetOwnerIdx, hi)) continue;
+      if (_nurNegation) { this.log('redirect_blocked', { source: sourceCard?.name, reason: 'cannotBeRedirected', card: hero.name }); continue; }   // nutzlose Aktivierung: bezahlt, keine Umleitung
+
       // Run the hero's redirect logic (hero selection, animation, etc.)
-      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner);
+      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard, physOwner, bezahltH);
       if (!result?.redirectTo) continue;
 
       // Reveal hero card
@@ -35786,11 +37067,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((bInst.counters?.negated || bInst.counters?.nulled || bInst.counters?.stunned) && !this._creatureNegationProof(bInst)) continue;
       for (const g of guardsB) {
       if (!g?.isBoardRedirect || typeof g.onBoardRedirect !== 'function') continue;
-      if (_nurNegation && !g.isBoardNegation) continue;
-      if (g.isBoardNegation) {
-        const _srcScriptB = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (config.cannotBeNegated || _srcScriptB?.cannotBeNegated) continue;
-      }
+      // „cannot react" (Surefire Shot, Midnight Assault): KEIN Brett-Waechter — weder Negierer noch Umleiter (Anti-Magnetic Armor, Empty Armor [auch die Pflicht-Umleitung], Winged Haressassin,
+      // Laki, Redirecting Aura; Spielgestalter-Entscheidung 17.11.2026); „cannot be negated/redirected" laesst sie dagegen zu (nutzlose Aktivierung, s. oben).
+      if (_reaktionZu) continue;
       if (typeof g.canBoardRedirect === 'function'
           && !g.canBoardRedirect(this.gs, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, this)) continue;
 
@@ -35805,9 +37084,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       const confirmedB = _pflichtB ? true : await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: guardNameB,
-        message: g.boardRedirectPrompt
-          ? g.boardRedirectPrompt(attackerNameB, selected, this)
-          : `${g.isBoardNegation ? 'Negate' : 'Redirect'} ${attackerNameB}?`,
+        message: (() => {
+          const _hB = g.isBoardNegation ? (_negGesperrt ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect') : '') : _umlHinweis;
+          const _basisB = g.boardRedirectPrompt
+            ? g.boardRedirectPrompt(attackerNameB, selected, this)
+            : `${g.isBoardNegation ? 'Negate' : 'Redirect'} ${attackerNameB}?`;
+          return _hB ? `${_basisB} ${_hB} Activate it anyway?` : _basisB;
+        })(),
+        ...(((g.isBoardNegation && _negGesperrt) || (!g.isBoardNegation && _nurNegation)) ? { _nutzlos: true } : {}),
         showCard: sourceCard?.name || null,
         showCardLeft: guardNameB,
         confirmLabel: g.isBoardNegation ? '🛡️ Negate!' : '↪️ Redirect!',
@@ -35820,7 +37104,34 @@ this._deathWatch = (this._deathWatchStack || []).length
         continue;
       }
 
-      const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard);
+      // ★ Spielgestalter-Entscheidung 16.11.2026: KOSTEN sind VOR dem Kettenfenster und unabhängig von dessen Ausgang zu bezahlen (Abwurf der Winged Haressassin, Luck-/Preserve-Counter
+      // von Tri Fecta/Tri Ad/Laki/Vinny) — wie bei einer gespielten Hand-Reaktion, deren Kosten auch bei Negation bezahlt bleiben. Der Wächter bietet dafür das optionale Gegenstück
+      // `payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config, sourceCard)`: `false` = nicht zahlbar/abgebrochen → keine Aktivierung (wie ein Nein, nichts ausgelöst);
+      // sonst wird der Rückgabewert als letztes Argument an `onBoardRedirect` gereicht (dort steht, was gezahlt wurde). Ohne `payBoardRedirectCost` zahlt `onBoardRedirect` wie bisher selbst.
+      // Spielgestalter-Entscheidung 16.11.2026: auch die Verbrauchslimits („once per turn" von Anti-Magnetic Armor, Empty Armor, Haressassin) werden HIER gestempelt — mit der Aktivierung, vor dem
+      // Fenster; wird die Auslösung danach negiert, bleibt die Nutzung verbraucht. Wer „No" sagt (oder `false` zurückgibt), verbraucht nichts. Ohne Kosten dient `payBoardRedirectCost` nur dem Stempel.
+      let bezahltB;
+      if (typeof g.payBoardRedirectCost === 'function') {
+        bezahltB = await g.payBoardRedirectCost(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard);
+        if (!bezahltB) {
+          if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+          continue;
+        }
+      }
+
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Auslösung des Brett-Wächters ist kettbar (`_passivAusloesungNegiert`; auch die Pflicht-Umleitung — Empty Armor); negiert → keine Umleitung/Negation.
+      if (await this._passivAusloesungNegiert(guardNameB, targetOwnerIdx, bInst.heroIdx)) {
+        if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);   // wie ein Nein: derselbe Effekt fragt nicht noch einmal
+        continue;
+      }
+
+      // Nutzlose Aktivierung (Spielgestalter-Entscheidung 16.11.2026): Kosten, Limit und Kettenfenster sind durch — Umleitung/Negation findet nicht statt.
+      if ((g.isBoardNegation && _negGesperrt) || (!g.isBoardNegation && _nurNegation)) {
+        this.log('board_guard_useless', { card: guardNameB, source: sourceCard?.name, reason: g.isBoardNegation ? 'cannotBeNegated' : 'cannotBeRedirected' });
+        if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+        continue;
+      }
+      const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, bezahltB);
       if (Array.isArray(resultB?.dropTargetIds) && resultB.dropTargetIds.length > 0) {
         this.log('target_negated_by_board', {
           card: guardNameB, targets: resultB.dropTargetIds, player: ps.username,
@@ -35863,11 +37174,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Negierer (`isSurpriseNegation`) schweigen nur, wenn der Effekt
       // selbst „cannot be negated" ist (Quell-Skript oder Targeting-
       // Konfiguration).
-      if (_nurNegation && !sScript.isSurpriseNegation) continue;
-      if (sScript.isSurpriseNegation) {
-        const _srcScript = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (config.cannotBeNegated || _srcScript?.cannotBeNegated) continue;
-      }
+      if (sScript.isSurpriseNegation && _reaktionZu) continue;   // „cannot react": kein Negierer; „cannot be negated" laesst ihn zu (nutzlose Aktivierung, Ausgang unten verworfen)
 
       // Surprise instance must still be face-down in the zone.
       const sInst = this.cardInstances.find(c =>
@@ -35883,7 +37190,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       const confirmed = await this.promptGeneric(reaktor, {
         type: 'confirm',
         title: sName,
-        message: `Your ${selected.cardName} was chosen by ${attackerName}! Activate ${sName}?`,
+        message: this._nutzlosFrage(`Your ${selected.cardName} was chosen by ${attackerName}!`,
+          sScript.isSurpriseNegation ? (_negGesperrt ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect') : '') : _umlHinweis, `Activate ${sName}`),
+        ...(((sScript.isSurpriseNegation && _negGesperrt) || (!sScript.isSurpriseNegation && _nurNegation)) ? { _nutzlos: true } : {}),
         showCard: sourceCard?.name || null,
         // v700-Konvention auch hier: links die angebotene Surprise.
         showCardLeft: sName,
@@ -35912,11 +37221,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // neues Ziel), und die drei Eingaenge uebersetzen es einheitlich
       // in „keine Ziele" (Karten-Skripte brechen auf leerer Auswahl ab)
       // bzw. Abbruch des Targeting-Pfads.
+      // Nutzlose Aktivierung (Spielgestalter-Entscheidung 16.11.2026): Die Surprise ist aktiviert und verbraucht, ihr Ausgang aber gesperrt („cannot be negated" / „cannot be redirected").
+      if ((sResult?.negateEffect && _negGesperrt) || (sResult?.redirectTo && !sScript.isSurpriseNegation && _nurNegation)) {
+        this.log('surprise_useless', { surprise: sName, source: sourceCard?.name, reason: sResult?.negateEffect ? 'cannotBeNegated' : 'cannotBeRedirected' });
+        continue;
+      }
       if (sResult?.negateEffect) {
         this.log('target_negated_by_surprise', {
           surprise: sName, source: sourceCard?.name,
           target: selected.cardName, player: this.gs.players[reaktor]?.username,
         });
+        this._merkeNegation(selected);   // Negation (nicht Abbruch) im Zielfenster — siehe `negationsStand`
         return { _redirectNegated: true, _bySurprise: sName };
       }
       if (!sResult?.redirectTo) continue; // Declined / cancelled inside
@@ -36869,6 +38184,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Usage in card scripts:
    *   if (!engine.claimHOPT('icy-slime', ctx.cardOwner)) return;
    */
+  /** Anzahl der bisher durch eine Reaktion (Ambush the Scout) negierten Hand-Interaktionen dieser Partie — vorher/nachher vergleichen, ob der Hand-Teil einer Karte negiert wurde (siehe `checkHandInteractionReaction`). */
+  handInteraktionenNegiert() { return this._handInteraktionNegiert || 0; }
+
   /**
    * ZENTRALES REAKTIONSFENSTER FÜR HAND-INTERAKTIONEN
    *
@@ -36935,6 +38253,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._pendingHandInteraction = prevWindow;
     }
     if (hookCtx.cancelled) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout × Slow / Rain of Spores / Champion / Draw): ein negierter Hand-Teil nimmt seine FOLGEWIRKUNGEN mit — die mitgelieferte Selbstsperre
+      // („cannot interact with your opponent's hand" / „cannot draw or add cards") und das Ziehen des Spielers, der nichts abgeworfen hat. Der Teileffekt ist nur ein `true` am Aufrufer (Primitive
+      // `actionPromptForceDiscard` gibt dann nichts zurueck) — Karten mit solcher Folgewirkung vergleichen deshalb diesen Zaehler vor/nach dem Hand-Teil (`handInteraktionenNegiert()`).
+      this._handInteraktionNegiert = (this._handInteraktionNegiert || 0) + 1;
       this.log('hand_interaction_negated', {
         player: gs.players[targetPi]?.username,
         kind,
@@ -37247,52 +38569,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ Z7b — GANZE Karte negiert ODER nur ein Teil des Ergebnisses? (Als Entscheidung, Welle 3.)
+   * GANZE Karte negiert ODER nur ein Teil des Ergebnisses? (Welle 3, Z7b.)
    * Reaktionen, deren Text „Negate that card/Spell/Attack/effect" sagt, tragen `negatesWholeCard: true`;
-   * liefern sie `effectNegated`, merkt sich der Zauber-Weg (`doPlaySpell`, `_castSpellImmediately`)
-   * `gs._negationWhole` und gibt die Einmal-Stempel der gewirkten Karte zurück — sie hat nie aufgelöst.
-   * „Negate any effects … on that Hero" / „Negate that damage" (Rain, Test Flight, Bamboo Shield …)
-   * lassen die Karte auflösen (Ergebnis verhindert) und tragen das Flag nicht → Stempel bleibt.
+   * liefern sie `effectNegated`, merkt sich der Zauber-Weg `gs._negationWhole`. Seit der Spielgestalter-Entscheidung
+   * 16.11.2026 hat das KEINEN Einfluss mehr auf Einmal-Limits (sie sind mit dem Beginn der Aktivierung verbraucht,
+   * ganz oder teilweise negiert); nur Hammer Throws Item Lock liest es noch (Q139: bei ganz negierter Karte kein Lock).
    */
   _merkeGanzeNegation(script, result) {
     if (result?.effectNegated && script?.negatesWholeCard) this.gs._negationWhole = true;
   }
 
   /**
-   * ★ Z7b — Abzug der Einmal-Stempel des WIRKENDEN Spielers (`gs.hoptUsed`-Schlüssel `…:<pi>` und
-   * `ps._oncePerGameUsed`), vor dem `onPlay`. Annahme: ganz negierende Reaktionen gehören dem
-   * GEGNER (andere Sitzhälfte `…:<pi>` / anderes `ps`), ihre eigenen Stempel bleiben also unberührt.
-   */
-  _stempelAbzug(pi) {
-    const h = this.gs.hoptUsed || {};
-    const suffix = `:${pi}`;
-    const hopt = {};
-    for (const k of Object.keys(h)) if (k.endsWith(suffix)) hopt[k] = h[k];
-    return { pi, hopt, opg: new Set(this.gs.players?.[pi]?._oncePerGameUsed || []) };
-  }
-
-  /** ★ Z7b — Gegenstück: setzt die Stempel des Wirkers auf den Abzug zurück (ganze Karte negiert). */
-  _stempelZurueck(abzug) {
-    if (!abzug) return;
-    const h = this.gs.hoptUsed;
-    const suffix = `:${abzug.pi}`;
-    if (h) {
-      for (const k of Object.keys(h)) {
-        if (!k.endsWith(suffix)) continue;
-        if (this._surpriseHoptStempel?.get(`${abzug.pi}|${k.slice(0, -suffix.length)}`) === this.gs.turn) continue;   // W75a: Stempel einer aufgeloesten Surprise-Aktivierung (Aquatic Spear) bleibt
-        if (!(k in abzug.hopt)) delete h[k];
-        else if (h[k] !== abzug.hopt[k]) h[k] = abzug.hopt[k];
-      }
-    }
-    const ps = this.gs.players?.[abzug.pi];
-    if (ps?._oncePerGameUsed) for (const k of [...ps._oncePerGameUsed]) if (!abzug.opg.has(k) && !this._surpriseStempel?.has(`${abzug.pi}|${k}`)) ps._oncePerGameUsed.delete(k);
-  }
-
-  /**
    * ★ W49a (Thalia, the Fun Fairy; Al 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
    * Gesperrt ist ein Support-Magic-SPELL (Name), von dem `pi` diesen Zug schon eine Kopie gewirkt hat, solange ein aktiver
-   * (nicht ruhender) Thalia-Held auf `pi`s Seite steht. Stempel in `gs.hoptUsed` (`thalia-support:<Basisname>:<pi>`), damit die
-   * Z7b-Rueckgabe (`_stempelAbzug`/`_stempelZurueck`, ganz negierter Zauber) ihn mitnimmt. Logik im Heldenskript.
+   * (nicht ruhender) Thalia-Held auf `pi`s Seite steht. Stempel in `gs.hoptUsed` (`thalia-support:<Basisname>:<pi>`) wie die anderen
+   * Einmal-Marken (auch eine negierte Kopie zählt, siehe `thaliaNotiereSupportZauber`). Logik im Heldenskript.
    */
   thaliaSupportSperre(pi, cardData) {
     const th = loadCardEffect('Thalia, the Fun Fairy');
@@ -37518,7 +38809,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancellable: true,
       });
       
-      if (!confirmed) {
+      if (!this._confirmSaidYes(confirmed)) {
         // Remember the decline for the rest of THIS effect resolution
         // so the remaining targets of a multi-target effect don't
         // re-prompt (mirrors `_gateShieldActive`'s per-resolution scope).
@@ -37903,7 +39194,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ...(promptConfig.extra || {}),
       });
 
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : {};
       const result = await this._activateSurprise(seite, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
@@ -38667,19 +39958,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    // v687: Ist der Treffer UNAUFHALTBAR (weder verringerbar noch
-    // negierbar — Tempeste, the Weather Fairy; Monia-Bot-True-Damage),
-    // wird das Angebot uebersprungen statt vetoiert. Jede Reaktion in
-    // diesem Fenster (Strong Shield, Bamboo Shield, Escape, Homerun,
-    // Sculpture Guards, Spectral Armor) kann NUR negieren oder
-    // verringern; sie anzubieten hiesse, die Karte fuer nichts zu
-    // verbrauchen — „Kosten bleiben bezahlt" waere hier eine Falle.
-    // Nur-`cannotBeNegated` (Ida) bleibt beim alten Verhalten.
+    // v687: Ist der Treffer UNAUFHALTBAR (weder verringerbar noch negierbar — Tempeste, the Weather Fairy; Monia-Bot-True-Damage), wurde das Angebot bisher uebersprungen.
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — die Reaktionen dieses Fensters (Strong Shield, Bamboo Shield, Escape, Homerun,
+    // Sculpture Guards, Spectral Armor) werden AUCH gegen unaufhaltsamen Schaden angeboten (Hinweis in der Frage, `_nutzlosHinweis`); bezahlt/verbraucht wird wie immer, der
+    // Treffer geht durch (der Aufrufer verwirft Negation/Senkung bei `cannotBeNegated`/`cannotBeReduced`). Die CPU waehlt solche Aktivierungen weiter nicht (`_nutzlos`).
+    const _hinweisSchaden = this._nutzlosHinweis(opts, 'damage');
     if (opts.cannotBeNegated && opts.cannotBeReduced) {
-      this.log('pre_damage_reactions_skipped', {
+      this.log('pre_damage_reactions_unstoppable', {
         target: this._heroLabel(target), source: source?.name, reason: 'unstoppable_damage',
       });
-      return NULL_RESULT;
     }
     if (this._inPreDamageReaction) return NULL_RESULT;
 
@@ -38712,8 +39999,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this.gs.firstTurnProtectedPlayer === targetOwner) return NULL_RESULT;
 
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -38731,6 +40017,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Cloud in a Bottle), haetten hier nichts zu halbieren — sie
       // anzubieten hiesse, sie fuer nichts zu verbrauchen.
       if (opts.instaKill && !script.firesOnDefeat) continue;
+      // ★ Spielgestalter-Entscheidung 16.11.2026: Helden-OPFER (`opts.isSacrifice`, `cause: 'sacrifice'`) öffnen dieses Fenster, aber NUR Karten, die ausdrücklich auf ein Opfer
+      // hören (`firesOnSacrifice: true`), werden gefragt — alle bisherigen Karten meinen „defeated by an effect/Attack/Spell/opponent's card", nicht die eigene Opfergabe.
+      // Ihre `preDamageCondition` bekommt `opts.isSacrifice` und `opts.cause` (9. Argument) und prüft ihr Auslöse-Ereignis selbst.
+      if (opts.isSacrifice && !script.firesOnSacrifice) continue;
 
       const cardData = allCards[cardName];
       // Boomerang's "no Artifacts for the rest of this turn" lockout —
@@ -38768,18 +40058,25 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Karte, die nur AUFHEBT (Homerun!), bietet sich dann gar nicht
           // erst an, statt bezahlt und hinterher verworfen zu werden.
           !script.preDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type,
-            { cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })) continue;
+            { cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced, ...(opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : {}) })) continue;
 
       // Prompt
       const srcName = source?.name || 'An effect';
       const heroName = target.name || 'Hero';
+      // Nutzlos (nur fuer die CPU-Sperre): Standard = der Treffer ist weder verringer- noch negierbar; eine Karte, die nur negiert (Homerun!) bzw. nur senkt, nennt es selbst (`preDamageUseless`).
+      const _nutzlos = !!_hinweisSchaden && (typeof script.preDamageUseless === 'function'
+        ? !!script.preDamageUseless({ cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })
+        : !!(opts.cannotBeNegated && opts.cannotBeReduced));
       const confirmed = await this.promptGeneric(targetOwner, {
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
-        message: opts.instaKill
+        ...(_nutzlos ? { _nutzlos: true } : {}),
+        message: opts.isSacrifice
+          ? `${heroName} is about to be sacrificed by ${srcName}! Activate ${cardName}?`
+          : opts.instaKill
           ? `${heroName} is about to be defeated by ${srcName}! Activate ${cardName}?`
-          : `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
+          : this._nutzlosFrage(`${heroName} is about to take ${amount} damage from ${srcName}!`, _hinweisSchaden, `Activate ${cardName}`),
         showCard: cardName,
         confirmLabel: '✨ Activate!',
         cancelLabel: 'No',
@@ -38795,9 +40092,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           targetSeite: zielPhys,   // W20c: Brettseite des Zielhelden (uebernommener Held der Gegenspalte)
           sourceName: srcName,
           sourceOwner: source?.owner ?? -1,
+          ...(opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : {}),
         },
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx, targetSeite: zielPhys }))) continue;
 
@@ -38820,8 +40118,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (ps.hand[k] === cardName) { actualIdx = k; break; }
         }
       }
-      if (actualIdx < 0) actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      let _q = actualIdx >= 0 ? { liste: ps.hand, ausVorrat: false, idx: actualIdx } : this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat
+      if (!_q) continue;
+      actualIdx = _q.idx;
       // Reveal VOR dem Konterfenster (v693, Als Wunsch): der Gegner
       // soll die Reaktion angezeigt bekommen, als wuerde sie aufloesen,
       // BEVOR er gefragt wird, ob Key sie stiehlt. Frueher kam das
@@ -38838,9 +40137,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cardName, cardType: cardData?.cardType, goldCost: cost,
         });
         if (konter?.negated) {
-          const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
-          ps.hand.splice(actualIdx, 1);
-          if (consumedInst) this._untrackCard(consumedInst.id);
+          this._rxAbgang(ps, _q, true);
           if (Number.isInteger(konter.stolenBy) && this.gs.players[konter.stolenBy]) {
             const diebPs = this.gs.players[konter.stolenBy];
             const zielIdx = diebPs.hand.length;
@@ -38849,14 +40146,14 @@ this._deathWatch = (this._deathWatchStack || []).length
             // URSPRUENGLICHEN Besitzers zurueck.
             this._tagHandCardOrigin(konter.stolenBy, cardName, targetOwner);
             this._broadcastEvent('play_pile_transfer', {
-              cardName, from: 'hand', to: 'hand',
+              cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: 'hand',
               fromOwner: targetOwner, toOwner: konter.stolenBy,
               fromHandIdx: actualIdx, toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
             });
             this.log('negated_card_stolen', { card: cardName, from: ps.username, to: diebPs.username });
           } else {
-            this._broadcastEvent('play_pile_transfer', { owner: targetOwner, cardName, from: 'hand', to: 'discard', fromHandIdx: actualIdx });
-            this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+            this._broadcastEvent('play_pile_transfer', { owner: targetOwner, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: 'discard', fromHandIdx: actualIdx });
+            this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
           }
           this.sync();
           await this._delay(650);
@@ -38879,16 +40176,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(targetOwner, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(targetOwner, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
       // Untrack the matching inst at this hand index (computed BEFORE
       // splice, since splice would shift the rank-by-name mapping).
-      const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
-      ps.hand.splice(actualIdx, 1);
-      if (consumedInst) this._untrackCard(consumedInst.id);
+      this._rxAbgang(ps, _q, true);
       // Route to destination pile IMMEDIATELY (alongside the splice,
       // BEFORE resolve runs). The next sync covers BOTH the hand
       // removal and the pile addition, so the client's
@@ -38897,9 +40192,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the board when long resolves push the pile delta outside
       // the 700ms pending-entry window.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -38926,7 +40221,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._inPreDamageReaction = true;
       try {
         if (script.preDamageResolve) {
-          const result = await script.preDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type);
+          const result = await script.preDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type, opts.isSacrifice ? { isSacrifice: true, cause: 'sacrifice' } : undefined);
           negated = !!result?.negated;
           if (result && typeof result.amountOverride === 'number') {
             amountOverride = Math.max(0, result.amountOverride);
@@ -39002,8 +40297,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39051,12 +40345,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           sourceOwner: source?.owner ?? -1,
         },
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39070,21 +40365,19 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      const consumedInst = this._findHandInstanceAt(pi, actualIdx);
-      ps.hand.splice(actualIdx, 1);
-      if (consumedInst) this._untrackCard(consumedInst.id);
+      this._rxAbgang(ps, _q, true);
       // Route to destination pile alongside the splice (see post-target
       // handler for the rationale — keeps the flight + pile-grow
       // deltas in the same diff cycle).
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39171,8 +40464,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39207,23 +40499,30 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const srcName = source?.name || 'An effect';
       const tgtName = creatureInst.name || 'Creature';
+      // Spielgestalter-Entscheidung 16.11.2026 (nutzlose Aktivierungen sind erlaubt): Hinweis bei unnegier-/unsenkbarem Schaden; die CPU waehlt solche Aktivierungen nicht (`_nutzlos`).
+      const _hinweisK = this._nutzlosHinweis(opts, 'damage');
+      const _nutzlosK = !!_hinweisK && (typeof script.preDamageUseless === 'function'
+        ? !!script.preDamageUseless({ cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })
+        : !!(opts.cannotBeNegated && opts.cannotBeReduced));
       const confirmed = await this.promptGeneric(ownerIdx, {
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
-        message: `${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
+        ...(_nutzlosK ? { _nutzlos: true } : {}),
+        message: this._nutzlosFrage(`${tgtName} is about to take ${amount} damage from ${srcName}!`, _hinweisK, `Activate ${cardName}`),
         showCard: cardName,
         showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '🛡️ Activate!',
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39237,18 +40536,18 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice (see post-target
       // handler for the rationale).
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39330,8 +40629,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39375,12 +40673,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -39394,17 +40693,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -39533,8 +40832,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -39578,13 +40876,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
@@ -39597,6 +40896,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
       await this._delay(300);
       this.log('creature_pre_defeat_reaction', { card: cardName, player: ps.username, target: creatureInst.name });
+
+      // ★ 16.11.2026: auch dieses Hand-Fenster meldet die Reaction als gespielt (Gegenreaktions-Fenster: Cute Camera, Front Soldier, Reverse Trap, zentrales Kettenfenster). Negiert: die Kreatur ist nicht gerettet,
+      // die Karte liegt in der Ablage (die Engine routet sie: `ort: 'limbo'`), Kosten bezahlt.
+      if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), ort: 'limbo', _q, goldCost: cost })) { this.sync(); return false; }
 
       let saved = false;
       this._inCreaturePreDefeatReaction = true;
@@ -39616,9 +40919,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Same routing as the other hand-reaction windows.
       if (_buddyErsetzt) { /* W67a: Inyas Fantasy Buddy ersetzt die Ablage */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return saved;
@@ -40221,8 +41524,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
       if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
       const seen = new Set();
-      for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;
         if (seen.has(cardName)) continue;
         seen.add(cardName);
@@ -40253,7 +41555,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
         // W26a: Quelle für Cute Camera nur, wenn alle Niederlagen dieser Seite von derselben bekannten Quelle stammen.
         const _quellen = new Set(defeated.map(d => this._rxQuellBesitzer(d.source)));
@@ -40293,10 +41595,38 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Hand-Reaktionsfenstern) und von `summonCreatureWithHooks` (Reaction-CREATURES aus der Hand: Doomed Town Guard, Explosive Drone, Enhanced Guard Dog,
    * Chaorc Rider Warg, Elven Rider). Kettenreaktionen laufen über ihr eigenes Kettenfenster. Loggt `reaction_negated` und meldet die Negation
    * (`ON_NEGATION_DEALT`).
+   *
+   * ★ Spielgestalter-Entscheidung 16.11.2026 — ZENTRALES KETTENFENSTER: Jede Hand-Reaction (Spell, Attack, Artifact, Creature), die ein Hand-Reaktionsfenster einsetzt, öffnet dem Gegner das REGULÄRE
+   * Gegenreaktions-Fenster (`_zentralesKettenfenster`): reine Kettenkarten (Silence, The Master's Plan, Misfire, Lunar Eclipse, Key …) kommen darin zum Zug. Reihenfolge: erst die Handfallen mit eigenem
+   * Hook (Cute Camera, Front Soldier: `onReactionPlayed`), dann die Surprise-Fallen (Reverse Trap), zuletzt das Kettenfenster — diese drei Karten werden in der Kette NICHT noch einmal an dasselbe Glied
+   * angeboten (kein Doppelangebot; tiefer in der Kette sind sie normale Kettenkarten). Cute Camera mit +3 Gold (`extra.ohneReaktion`) öffnet GAR KEIN Fenster („your opponent cannot react to this card's
+   * activation"). `extra.ohneKette` überspringt nur das Kettenfenster (Reaction-Creatures mit `summonWindow`: ihr Fenster öffnet nach dem Landen).
+   * `extra.ort` sagt, wo die Karte beim Aufruf liegt: 'ablage' (Standard: schon im Ablage-/Löschstapel — alle Fenster mit sofortigem Routing), 'hand' (noch in der Hand: Front Soldier) oder 'limbo'
+   * (schon aus der Hand, aber erst NACH der Auflösung abgelegt: die Fenster mit `spaetAblegen`; `extra._q` = Quelle für `_rxAblagePs`). Bei 'hand'/'limbo' legt die Engine eine NEGIERTE Karte selbst ab
+   * (Ablage, bzw. Hand des Diebes/Löschstapel) — der Aufrufer überspringt dann Auflösung UND eigenes Routing.
    * @returns {Promise<boolean>} true = negiert (die Wirkung der Reaction fällt aus)
    */
   async _reaktionGespielt(ownerIdx, cardName, cardType, extra = {}) {
     if (this._inMctsSim) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: Einmal-Limits sind mit dem BEGINN der Aktivierung verbraucht — die Reaction ist hier ausgespielt (Kosten bezahlt), ihr Gegenreaktions-Fenster noch
+    // nicht offen. Ein Skript mit Rundengrenze, die es sonst erst in seiner Wirkung stempelt (Core Explosion, Pawn Chain, Future Tech Escape Device, Bamboo Shield …), meldet sie ueber
+    // `stempelBeiAktivierung(engine, pi, extra)`; eine danach negierte Reaction gibt nichts zurueck („1 pro Spiel" stempelt schon beim Verlassen der Hand).
+    {
+      const _stSc = loadCardEffect(cardName);
+      // „1 pro Spiel" (Divine Gift of Rain …): nicht jedes Fenster stempelt beim Verlassen der Hand (das Post-Target-Fenster überließ es der Wirkung) — hier für alle, idempotent.
+      if (_stSc && (_stSc.oncePerGame || _stSc.oncePerGameKey)) {
+        const _stPs = this.gs.players[ownerIdx];
+        if (_stPs) {
+          if (!_stPs._oncePerGameUsed) _stPs._oncePerGameUsed = new Set();
+          _stPs._oncePerGameUsed.add(_stSc.oncePerGameKey || cardName);
+        }
+      }
+      if (typeof _stSc?.stempelBeiAktivierung === 'function') {
+        try { await _stSc.stempelBeiAktivierung(this, ownerIdx, { cardName, ...extra }); }
+        catch (err) { console.error(`[Engine] stempelBeiAktivierung for ${cardName} failed:`, err.message); }
+      }
+    }
+    if (extra.ohneReaktion) return false;   // Cute Camera +3: „your opponent cannot react to this card's activation" — weder Hand-Hooks noch Surprises noch Kettenfenster
     this._offenerRaub = null;   // 24.10. (Reverse Trap): ein Rest aus einem früheren Fenster gilt nicht für diese Reaction
     // N5-04: `extra.sourceOwner` = Besitzer der Karte/des Effekts, auf den die Reaction antwortet (Cute Camera: „in reaction to YOUR card or
     // effect"); fehlt er (ältere Fenster), kennt der Zuhörer die Quelle nicht und darf nicht danach filtern.
@@ -40314,17 +41644,133 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (Number.isInteger(res.stolenTo)) { rxHook._reactionStolenTo = res.stolenTo; rxHook._stufeNull = !!res.stufeNull; }
       }
     }
-    if (!rxHook._reactionNegated) return false;
-    // Z7b: eine GANZ negierte Reaction verbraucht ihren Einmal-pro-Spiel-Stempel nicht (die Fenster stempeln beim Verlassen der Hand).
-    {
-      const _sc = loadCardEffect(cardName);
-      const _k = _sc?.oncePerGameKey || (_sc?.oncePerGame ? cardName : null);
-      if (_k) this.gs.players[ownerIdx]?._oncePerGameUsed?.delete(_k);
+    // ★ 16.11.2026: das zentrale Kettenfenster (Silence, The Master's Plan & Co.) — nach den Hand-/Surprise-Fallen, nur wenn die Reaction noch steht.
+    let viaKette = null;
+    if (!rxHook._reactionNegated && !extra.ohneKette) {
+      viaKette = await this._zentralesKettenfenster(ownerIdx, cardName, cardType, extra);
+      if (viaKette?.negated) {
+        rxHook._reactionNegated = true;
+        rxHook._reactionNegatedBy = viaKette.negatedBy || 'a reaction';
+        if (Number.isInteger(viaKette.stolenTo)) { rxHook._reactionStolenTo = viaKette.stolenTo; rxHook._stufeNull = !!viaKette.stufeNull; }
+      }
     }
+    if (!rxHook._reactionNegated) return false;
     this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
-    await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
-    if (Number.isInteger(rxHook._reactionStolenTo)) await this._stiehlGespielteReaktion(ownerIdx, cardName, rxHook._reactionStolenTo, !!rxHook._stufeNull);
+    if (!viaKette?.negated) await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });   // die Kette meldet ihre Negation beim Auflösen selbst
+    await this._reaktionNegiertUnterbringen(ownerIdx, cardName, cardType, extra, {
+      stolenTo: rxHook._reactionStolenTo, stufeNull: !!rxHook._stufeNull, geloescht: !!viaKette?.geloescht,
+      preisZurueck: viaKette?.negated ? viaKette.preis : 0,   // nur ein Diebstahl DURCH DIE KETTE (Key) erstattet den Preis; Reverse Trap im Hand-Fenster bleibt wie bisher
+    });
     return true;
+  }
+
+  /**
+   * ★ 16.11.2026 — ZENTRALES KETTENFENSTER für eine aus der Hand gespielte Reaction (siehe `_reaktionGespielt`). Die Reaction steht als Kettenglied (`_zentral`, kein Initialglied: sie ist selbst eine
+   * Reaction) vor dem regulären Reaktionsfenster; wer antwortet, bildet mit ihr eine echte Kette (LIFO, Kette auf Kette, Once-per-Spiel/Turn-Marken, Rückgabe bei Negation der Kettenkarte).
+   * Wird das Glied negiert, fällt die Wirkung der Reaction aus (Karte in der Ablage, Kosten bezahlt). Das Glied löst selbst nichts auf (`resolve: null`) — die Wirkung der Reaction läuft beim Aufrufer.
+   * Öffnet sich nirgends eine Antwort (der Normalfall), bleibt das Fenster lautlos (`_runReactionWindow` → `null`).
+   * @returns {Promise<{negated:boolean, negatedBy?:string, stolenTo?:number, stufeNull?:boolean, geloescht?:boolean}|null>}
+   */
+  async _zentralesKettenfenster(ownerIdx, cardName, cardType, extra = {}) {
+    if (this._inMctsSim) return null;
+    const cd = this._getCardDB()[cardName];
+    const link = {
+      id: uuidv4().substring(0, 12),
+      cardName, owner: ownerIdx, heroIdx: -1, casterHeroIdx: -1, casterOwner: ownerIdx, casterCheck: false,
+      cardType: cardType || cd?.cardType || 'Unknown',
+      fromBoard: false, isPlacement: false, isInherentAction: false, zaehltAlsArt: null,
+      goldCost: Number.isFinite(extra.goldCost) ? extra.goldCost : (cd?.cost || 0), wisdomCost: 0,
+      isInitialCard: false, negated: false, chainClosed: false, resolve: null,
+      _zentral: true,   // Platzhalter der schon eingesetzten Reaction: die Kettenauflösung fasst Stapel/Flug/Hooks dieses Glieds nicht an (`_resolveReactionChain`)
+    };
+    // Liegt die Karte noch in der Hand (Front Soldier, `ort: 'hand'`), ist genau diese Kopie im Spiel und kein Kettenkandidat gegen ihre eigene Gegenreaktion.
+    if (extra.ort === 'hand') {
+      const q = this._rxQuelleFuer(this.gs.players[ownerIdx], cardName);
+      if (q) link._imFlug = { ausVorrat: !!q.ausVorrat, idx: q.idx };
+    }
+    const vorherQuelle = this._currentEffectSource;
+    const vorherPruefung = this._inReactionCheck;
+    this._currentEffectSource = { cardName, owner: ownerIdx, cardType: link.cardType, heroIdx: -1, fromBoard: false, isPlacement: false, abilityZone: null };
+    this._inReactionCheck = true;
+    let kette = null;
+    try {
+      kette = await this._runReactionWindow(link, `${cardName} was played as a Reaction`);
+    } finally {
+      this._inReactionCheck = vorherPruefung;
+      this._currentEffectSource = vorherQuelle;
+    }
+    if (!kette) return null;
+    if (!link.negated) return { negated: false };
+    return {
+      negated: true,
+      negatedBy: link.negatedByCard || 'a reaction',
+      stolenTo: Number.isInteger(link._negatedToHandOf) ? link._negatedToHandOf : undefined,
+      stufeNull: !!link._negatedStufeNull,
+      geloescht: !!link._negatedToDeleted,
+      preis: link.goldCost || 0,
+    };
+  }
+
+  /**
+   * ★ 16.11.2026 — Wohin eine NEGIERTE Hand-Reaction geht (gemeinsamer Schluss von `_reaktionGespielt`). 'ablage': die Karte liegt schon im Ablage-/Löschstapel — nur Diebstahl (Reverse Trap, Key) oder
+   * Löschung (Lunar Eclipse) bewegen sie noch. 'hand'/'limbo': die Karte steht noch in keinem Stapel — die Engine legt sie hier ab (Ablage, Löschstapel bei Potion/`deleteOnUse`/Löschung) bzw. übergibt sie dem Dieb.
+   * Key: „your opponent doesn't have to pay" — wer eine Reaction stiehlt, bekommt sie samt Preis zurückerstattet (wie bei jedem gestohlenen Reaktions-Glied der Kette).
+   */
+  async _reaktionNegiertUnterbringen(ownerIdx, cardName, cardType, extra, k) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return;
+    const ort = extra.ort || 'ablage';
+    if (ort === 'ablage') {
+      if (Number.isInteger(k.stolenTo)) {
+        await this._stiehlGespielteReaktion(ownerIdx, cardName, k.stolenTo, !!k.stufeNull);
+        await this._reaktionPreisZurueck(ownerIdx, k.preisZurueck);
+      } else if (k.geloescht) {
+        const pilePs = this.handKartenBesitzerPs(ps, cardName) || ps;
+        const idx = Array.isArray(pilePs.discardPile) ? pilePs.discardPile.lastIndexOf(cardName) : -1;
+        if (idx >= 0) {
+          pilePs.discardPile.splice(idx, 1);
+          if (!pilePs.deletedPile) pilePs.deletedPile = [];
+          pilePs.deletedPile.push(cardName);
+          this.sync();
+        }
+      }
+      return;
+    }
+    let q = extra._q || null;
+    if (ort === 'hand') {
+      q = this._rxQuelleFuer(ps, cardName);
+      if (!q) return;
+      this._broadcastEvent('play_pile_transfer', {
+        owner: ownerIdx, cardName, from: q.ausVorrat ? 'creation' : 'hand', to: 'discard', asPlay: true, fromHandIdx: q.idx,
+        ...this._rxPileOwnerFlug(ownerIdx, cardName, q),
+      });
+      this._rxAbgang(ps, q);
+    }
+    if (Number.isInteger(k.stolenTo)) {
+      const besitzer = Math.max(0, this.gs.players.indexOf(this._rxAblagePs(ps, cardName, q)));
+      await this._reaktionInHandLegen(ownerIdx, cardName, k.stolenTo, besitzer, !!k.stufeNull, 'hand');
+      await this._reaktionPreisZurueck(ownerIdx, k.preisZurueck);
+      return;
+    }
+    const script = loadCardEffect(cardName);
+    const ablagePs = this._rxAblagePs(ps, cardName, q);
+    if (k.geloescht || cardType === 'Potion' || script?.deleteOnUse) {
+      if (!ablagePs.deletedPile) ablagePs.deletedPile = [];
+      ablagePs.deletedPile.push(cardName);
+    } else {
+      ablagePs.discardPile.push(cardName);
+    }
+    this.sync();
+  }
+
+  /** Key (`stealToHandOf`): die gestohlene Reaction kostet ihren Besitzer nichts — der bezahlte Preis geht zurück (wie `_resolveReactionChain` bei gestohlenen Reaktions-Gliedern). */
+  async _reaktionPreisZurueck(ownerIdx, preis) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps || !(preis > 0)) return;
+    ps.gold = (ps.gold || 0) + preis;
+    this.log('gold_refund', { player: ps.username, amount: preis, reason: 'stolen reaction' });
+    this._broadcastEvent('gold_change', { owner: ownerIdx, amount: preis });
+    this.sync();
   }
 
   /**
@@ -40389,17 +41835,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     const cardData = this._getCardDB()[cardName];
     const cost = cardData?.cost || 0;
-    const actualIdx = ps?.hand?.indexOf(cardName) ?? -1;
-    if (actualIdx < 0) return false;
+    const _q = this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat (11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+    if (!_q) return false;
+    const actualIdx = _q.idx;
     const inDieLoeschung = cardData?.cardType === 'Potion' || !!script?.deleteOnUse;
     this._broadcastEvent('play_pile_transfer', {
-      owner: ownerIdx, cardName, from: 'hand', to: inDieLoeschung ? 'deleted' : 'discard', asPlay: true,
+      owner: ownerIdx, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: inDieLoeschung ? 'deleted' : 'discard', asPlay: true,
       fromHandIdx: actualIdx,
-      ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+      ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
     });
-    ps.hand.splice(actualIdx, 1);
-    if (inDieLoeschung) this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-    else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+    this._rxAbgang(ps, _q);
+    if (inDieLoeschung) this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+    else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
     await this._rxPay(ps, cost + (extra.zusatzKosten || 0), { cardName });   // N5-04: Cute Camera „increase this Artifact's Cost by 3"
     await this._rxPayWisdom(ps, rxCast);
     this.notePlayedFromHand(ownerIdx);
@@ -40414,7 +41861,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `_reaktionGespielt` fragt die Hand-Zuhörer des Gegners. Negiert: der Aufrufer sieht `false` und überspringt die Wirkung, die Karte
     // liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte).
     // N5-04: `extra.ohneReaktion` = „your opponent cannot react to this card's activation" (Cute Camera mit +3 Gold).
-    if (!extra.ohneReaktion && await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: extra.sourceOwner })) { this.sync(); return false; }
+    if (!extra.ohneReaktion && await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: extra.sourceOwner, goldCost: cost + (extra.zusatzKosten || 0) })) { this.sync(); return false; }
     return true;
   }
 
@@ -40628,7 +42075,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `kernOpts` = die Optionen des spaeteren `summonCreatureWithHooks`-Aufrufs; der Aufrufer reicht sie danach mit `_sperrenGeprueft` / `_kostenGezahlt` weiter.
    */
   async _beschwoerungKostenVorAuftritt(cardName, feld, heroIdx, slotIdx, kernOpts = {}) {
-    if (!this._summonSperrenOk(cardName, feld, heroIdx, kernOpts)) return false;
+    if (!kernOpts._nurKosten && !this._summonSperrenOk(cardName, feld, heroIdx, kernOpts)) return false;   // `_nurKosten`: Direktwege (`zahleEffektBeschwoerKosten`) fragen die Sperren selbst
     if (kernOpts.skipBeforeSummon) return true;
     const _fremd = kernOpts.controller != null && kernOpts.controller !== feld;
     const _beschwoerer = _fremd ? kernOpts.controller : feld;
@@ -40781,8 +42228,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < (ps.hand || []).length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -40821,7 +42267,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
@@ -40903,8 +42349,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.gs.firstTurnProtectedPlayer === reactorIdx) continue;
 
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -40956,30 +42401,31 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancellable: true,
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adZielIdx, targetSeite: zielPhys }))) continue;
 
         // Activate: remove from hand, deduct gold
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
         // Hand → discard/deleted flight animation (broadcast before splice).
         {
           const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
             ? 'deleted' : 'discard';
           this._broadcastEvent('play_pile_transfer', {
             owner: reactorIdx, cardName,
-            from: 'hand', to: destPile, asPlay: true,
+            from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
             fromHandIdx: actualIdx,
-            ...this._pileOwnerFlug(reactorIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+            ...this._rxPileOwnerFlug(reactorIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
           });
         }
-        ps.hand.splice(actualIdx, 1);
+        this._rxAbgang(ps, _q);
         // Route to destination pile alongside the splice.
         if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-          this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
         } else {
-          this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         }
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);   // v1155: wie in den uebrigen Hand-Reaktionen
@@ -41123,8 +42569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -41167,12 +42612,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
 
         // Hand → discard/deleted flight (broadcast before the splice so
         // the source slot is still rendered; index-anchored).
@@ -41180,13 +42626,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: ownerIdx, cardName,
-          from: 'hand', to: destPile, asPlay: true,
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(ownerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(ownerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
-        ps.hand.splice(actualIdx, 1);
-        if (destPile === 'deleted') this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-        else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAbgang(ps, _q);
+        if (destPile === 'deleted') this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+        else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(ownerIdx);
@@ -41310,8 +42756,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41342,13 +42787,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
 
       // Activate: remove from hand, deduct gold
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
       // Hand → discard/deleted flight animation (broadcast before splice).
       {
         const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
@@ -41362,17 +42808,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 // glaubt — Escape (Attack) und Spectral Armor (Spell) waren
 // dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
 // "einziges Play-Signal dieser Karte" und zählt typunabhängig.
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(playerIdx, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(playerIdx, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
-      ps.hand.splice(actualIdx, 1);
+      this._rxAbgang(ps, _q);
       // Route to destination pile alongside the splice.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
@@ -41386,6 +42832,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(300);
 
       this.log('resource_phase_reaction', { card: cardName, player: ps.username });
+
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: keine Wirkung, die Karte liegt in der Ablage. Eine Reaction pro Phase gilt auch für die negierte.
+      if (await this._reaktionGespielt(playerIdx, cardName, cardData?.cardType, { goldCost: cost })) { this.sync(); return; }
 
       this._inResourcePhaseReaction = true;
       try {
@@ -41431,8 +42880,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     while (rest > 0 && gespielt) {
       gespielt = false;
       const seen = new Set();
-      for (let hi = 0; hi < ps.hand.length && !gespielt; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
+        if (gespielt) break;
         if (seen.has(cardName)) continue;
         seen.add(cardName);
         if (this._handPlayLockedFor(ps, cardName)) continue;
@@ -41455,16 +42904,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         if (!ja || ja.cancelled || ja.confirmed === false) continue;
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
-        const idx = ps.hand.indexOf(cardName);
-        if (idx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);   // Hand, sonst Crestinas Vorrat
+        if (!_q) continue;
+        const idx = _q.idx;
 
         const zumLoeschen = cardData?.cardType === 'Potion' || script?.deleteOnUse;
         this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName, from: 'hand', to: zumLoeschen ? 'deleted' : 'discard',
+          owner: playerIdx, cardName, from: _q.ausVorrat ? 'creation' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
           asPlay: true, fromHandIdx: idx,
         });
-        ps.hand.splice(idx, 1);
-        (zumLoeschen ? this.handKartenBesitzerPs(ps, cardName).deletedPile : this.handKartenBesitzerPs(ps, cardName).discardPile).push(cardName);   // W63c: Stapel des permanenten Besitzers
+        this._rxAbgang(ps, _q);
+        (zumLoeschen ? this._rxAblagePs(ps, cardName, _q).deletedPile : this._rxAblagePs(ps, cardName, _q).discardPile).push(cardName);   // W63c: Stapel des permanenten Besitzers
         await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(playerIdx);
@@ -41472,6 +42922,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._broadcastEvent('card_reveal', { cardName, playerIdx });
         await this._delay(300);
         this.log('potion_draw_reaction', { card: cardName, player: ps.username });
+
+        // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: der Zug wird NICHT ersetzt (er läuft regulär), eine weitere Kopie darf noch gefragt werden.
+        if (await this._reaktionGespielt(playerIdx, cardName, cardData?.cardType, { goldCost: cost })) { this.sync(); gespielt = true; continue; }
 
         this._inPotionDrawReaction = true;
         try {
@@ -41519,8 +42972,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41557,7 +43009,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -41566,9 +43018,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? summoningPi;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(summoningPi);
 
@@ -41588,6 +43041,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
       }
 
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`: die Engine legt eine negierte Karte selbst ab). Der Wisdom-Abwurf ist bezahlt (Kosten bleiben bei Negation bezahlt); negiert: keine Wirkung.
+      if (await this._reaktionGespielt(summoningPi, cardName, cardData?.cardType, { ort: 'limbo', _q, goldCost: cost })) { this.sync(); return; }
+
       this._inPostSummonReaction = true;
       try {
         if (script.postSummonReactionResolve) {
@@ -41603,9 +43059,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return; // Only one post-summon reaction per window
@@ -41721,8 +43177,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Bedingung / Lock / Prompt abgelehnt.)
       const _bwOut = !this._inMctsSim ? this._batchWindowStats?.outcomes : null; // Sim-Guard: Rollouts kontaminierten die Zähler (fired=8320 bei 0 echten Plays)
       let _bwHadCard = false;
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
@@ -41755,7 +43210,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) { if (_bwOut) _bwOut.declined++; continue; }
+        if (!this._confirmSaidYes(confirmed)) { if (_bwOut) _bwOut.declined++; continue; }
         if (_bwOut) _bwOut.fired++;
         // Zählbarer Einsatz-Beleg: Der Reaction-Play bucht die Karte
         // namensbasiert in den Discard (kein ZoneEnter) — ohne dieses
@@ -41763,8 +43218,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // CC-Lauf in JEDEM Report unsichtbar ("nie eingesetzt").
         this.log('batch_reaction_fired', { player: ps.username, card: cardName });
 
-        const actualIdx = ps.hand.indexOf(cardName);
-        if (actualIdx < 0) continue;
+        const _q = this._rxQuelleFuer(ps, cardName);
+        if (!_q) continue;
+        const actualIdx = _q.idx;
         // ★★ v1185 (Als Befund 18.9.: „Deepsea Idol fehlt der visuelle
         // Weg Hand → Discard Pile"). Dieses Fenster war das letzte der
         // Hand-Reaktionsfenster ohne `play_pile_transfer`: es spliced
@@ -41782,18 +43238,18 @@ this._deathWatch = (this._deathWatchStack || []).length
           const destPile = script?.deleteOnUse ? 'deleted' : 'discard';
           this._broadcastEvent('play_pile_transfer', {
             owner: pi, cardName,
-            from: 'hand', to: destPile,
+            from: _q.ausVorrat ? 'creation' : 'hand', to: destPile,
             fromHandIdx: actualIdx,
-            ...this._pileOwnerFlug(pi, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+            ...this._rxPileOwnerFlug(pi, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
           });
         }
-        ps.hand.splice(actualIdx, 1);
+        this._rxAbgang(ps, _q);
         // Ablage-Routing SOFORT neben dem Splice (Muster der uebrigen
         // Hand-Reaktionsfenster): sonst steht die Karte waehrend des
         // ganzen Resolve nirgends, und der Flug oben landet auf einem
         // Stapel, der sie noch nicht enthaelt.
-        if (script?.deleteOnUse) this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
-        else this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        if (script?.deleteOnUse) this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
+        else this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         // ★★ v1222: Abgleich nach dem Hand-Abgang UND dem Ablage-Routing.
         // Beides in EINEM Abgleich, sonst sieht der Client zwei Schritte
         // und startet einen zweiten Flug (Vertrag der Zeilen darunter).
@@ -41811,6 +43267,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           card: cardName, player: ps.username, source: sourceName,
           affected: ownDmgEntries.length,
         });
+
+        // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`); negiert: der Schaden wird nicht abgewehrt, die Karte liegt in der Ablage.
+        if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), goldCost: cost })) { this.sync(); break; }
 
         this._inCreatureDamageBatchReaction = true;
         try {
@@ -41887,8 +43346,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -41923,7 +43381,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -41932,9 +43390,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? victimOwner;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(victimOwner);
 
@@ -41955,9 +43414,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: victimOwner, cardName,
-          from: 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,   // v1157: Spell/Attack zaehlt afterSpellResolved (_rxAufgeloest)
           fromHandIdx: actualIdx,
-          ...this._pileOwnerFlug(victimOwner, cardName, actualIdx),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
+          ...this._rxPileOwnerFlug(victimOwner, cardName, _q),   // W63c: gestohlene Handkarte fliegt in den Stapel des Besitzers
         });
       }
       this._broadcastEvent('card_reveal', { cardName, playerIdx: victimOwner });
@@ -41977,6 +43436,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
       }
 
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`). Wisdom ist bezahlt; negiert: der Effekt entfernt die Kreatur wie vorgesehen (kein Abbruch), die Karte liegt in der Ablage/Löschstapel.
+      if (await this._reaktionGespielt(victimOwner, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source), ort: 'limbo', _q, goldCost: cost })) { this.sync(); return false; }
+
       this._inCdMovementReaction = true;
       let cancelOp = false;
       try {
@@ -41995,9 +43457,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // so it goes to deletedPile. Scripts opt in via deleteOnUse.
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return cancelOp;
@@ -42035,8 +43497,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const allCards = this._getCardDB();
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -42074,7 +43535,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -42083,9 +43544,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         castingSeite = _plan.casterSeite ?? reactorIdx;
       }
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      ps.hand.splice(actualIdx, 1);
+      const _q = this._rxQuelleFuer(ps, cardName);
+      if (!_q) continue;
+      const actualIdx = _q.idx;
+      this._rxAbgang(ps, _q);
       await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(reactorIdx);
 
@@ -42105,6 +43567,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
       }
 
+      // ★ 16.11.2026: Gegenreaktions-Fenster (siehe `_reaktionGespielt`, `ort: 'limbo'`); Wisdom ist bezahlt; negiert: keine Wirkung, die Karte liegt in der Ablage. Eine Reaction pro Fenster gilt auch für die negierte.
+      if (await this._reaktionGespielt(reactorIdx, cardName, cardData?.cardType, { ort: 'limbo', _q, goldCost: cost })) { this.sync(); return; }
+
       this._inOppActionPhaseReaction = true;
       try {
         if (script.oppActionPhaseReactionResolve) {
@@ -42121,9 +43586,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Routing matches the resource-phase reaction handler.
       if (_buddyErsetzt) { /* W67a */ }
       else if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
       } else {
-        this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+        this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
       }
       this.sync();
       return; // Only one reaction per window
@@ -42405,7 +43870,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           _hostSeite: tOwner,   // Als Vorgabe 29.9.: Brettseite der Zone
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
 
         // Activate the surprise. `opts.hostHeroIdx` is the physical
         // zone (defaults to the activator unless Brain Spider's cross-
@@ -42539,7 +44004,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         _hostSeite: seite,   // 29.9.
         _damageAmount: dmgInfo.amount,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       const result = await this._activateSurprise(seite, hi, surpriseCardName, sourceInfo, script);
       if (result?.damageReduced) totalReduced += result.damageReduced;
@@ -42723,7 +44188,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         confirmClass: 'btn-success',
         cancellable: true,
       });
-      if (!confirmed || confirmed.cancelled) {
+      if (!this._confirmSaidYes(confirmed)) {
         if (!this.gs._ameDeclinedHeroes) this.gs._ameDeclinedHeroes = new Set();
         this.gs._ameDeclinedHeroes.add(key);
         return false;
@@ -42770,7 +44235,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcOwner = source.owner ?? source.controller;
     const srcHi = source.heroIdx;
     if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
-    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    // „that Hero": bei einem geliehenen Helden (Love Shot, Charme) ist `owner` der Kontrolleur, `heroOwner` die Brettseite des Helden — ohne sie träfe der Buff
+    // des eigenen Helden mit gleichem Index (quelleIstHeld).
+    const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
     if (!srcHero?.buffs?.cold_strike) return;
     // Recognise Attack and Spell damage. The damage-type tag isn't
     // standardised across cards (Spells use `<school>_spell` strings,
@@ -42820,9 +44287,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Unreasonable Anger rider (24.10.): trägt die Quelle (ein Held) den Buff `unreasonable_anger`, steigt JEDER Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100.
+   * Unreasonable Anger rider (24.10.; neuer Text 10.11.): „The next damage the user deals to a single target during your next turn is increased by 100." Trägt die Quelle (ein Held) den
+   * Buff `unreasonable_anger`, steigt der NÄCHSTE Schaden, den dieser Held an EINEM einzelnen Ziel verursacht, um 100 — NUR im Zeitfenster (`buff.fenster = [{ runde, bonus }]`: die
+   * Zugnummer des nächsten eigenen Zuges; Schaden davor, etwa als Reaktion im Gegnerzug, zählt nicht) und nur EINMAL: der Treffer verbraucht seine Einträge (mehrere Kopien für denselben
+   * Zug summieren sich, der Bonus liegt dann auf demselben nächsten Schaden). Buffs OHNE `fenster` (Puzzle-Editor, alter Stand) wirken einmalig +100 ohne Zeitfenster.
    * Gleiche Auslegung wie bei Frog Race Boat: direkter Schaden des Helden (Attack, Spell, Effekt) — nicht Statusticks (kein Heldenindex) und nicht der Schaden einer Kreatur in seinen
-   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus. Der Buff bleibt (Frist-Ablauf).
+   * Zonen (`type === 'creature'` / Quelle in einer Support Zone). Kein Einzelziel (Mehrziel-Klammer mit 2+ Zielen, Batch mit 2+ Einträgen) → kein Bonus UND kein Verbrauch („to a single target").
    * @param {object} hookCtx  { source, target, type, amount, … }
    * @param {number} [eintraege]  Anzahl der Ziele im Batch (Kreaturenpfad); Heldenpfad: 1
    */
@@ -42840,9 +44310,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _mh = this._multiHitScope;
     if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
     if (eintraege > 1) return;
-    hookCtx.amount += ANGER_BONUS;
-    if (hookCtx._kBase !== undefined) hookCtx._kBase += ANGER_BONUS;
-    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus: ANGER_BONUS });
+    // Zeitfenster + Verbrauch: nur Einträge der AKTUELLEN Zugnummer zählen und werden aufgebraucht (Buff ohne `fenster`: einmalig +100, jederzeit).
+    const buff = srcHero.buffs.unreasonable_anger;
+    let bonus = ANGER_BONUS;
+    if (Array.isArray(buff.fenster)) {
+      const jetzt = this.gs.turn;
+      const treffer = buff.fenster.filter(f => f && f.runde === jetzt);
+      if (treffer.length === 0) return;                                 // nicht im nächsten eigenen Zug (noch nicht dran): kein Bonus, nichts verbraucht
+      bonus = treffer.reduce((a, f) => a + (Number(f.bonus) || ANGER_BONUS), 0);
+      buff.fenster = buff.fenster.filter(f => f && f.runde !== jetzt);
+      if (!buff.fenster.some(f => f.runde > jetzt)) delete srcHero.buffs.unreasonable_anger;   // nichts Späteres mehr vorgemerkt: der Buff ist verbraucht
+    } else {
+      delete srcHero.buffs.unreasonable_anger;
+    }
+    hookCtx.amount += bonus;
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += bonus;
+    this.log('unreasonable_anger_bonus', { hero: srcHero.name, target: hookCtx.target?.name, bonus });
   }
 
   /**
@@ -42860,15 +44343,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Mutates the passed hookCtx-shape object directly (works for both
    * the hero-damage hookCtx and the creature-damage proxy).
    */
-  _applyEmpoweredStrikeIfApplicable(hookCtx) {
-    if (!hookCtx) return;
-    if (hookCtx.type !== 'attack') return;
-    const source = hookCtx.source;
+  /**
+   * Der Held, dessen bereitstehender Elixir of Strength (`empowered_strike`) diesen Treffer verstaerkt — oder `null`. EINE Stelle fuer die Bedingungen (Attack-Schaden eines Helden mit dem Buff,
+   * nicht in einer Mehrziel-Klammer mit 2+ Zielen): der Rider (`_applyEmpoweredStrikeIfApplicable`) und die Durchschlags-Abfrage (`_quelleDurchschlaegtHeldenSchutz`) lesen sie beide.
+   */
+  _empoweredStrikeHeld(source, type) {
+    if (type !== 'attack') return null;
     const srcOwner = source?.owner ?? source?.controller;
     const srcHi = source?.heroIdx;
-    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
-    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
-    if (!srcHero?.buffs?.empowered_strike) return;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return null;
+    // „that Hero": geliehener Held (Love Shot, Charme) → `heroOwner` ist seine Brettseite, `owner` der Kontrolleur (quelleIstHeld).
+    const srcHero = this.gs.players[source.heroOwner ?? srcOwner]?.heroes?.[srcHi];
+    if (!srcHero?.buffs?.empowered_strike) return null;
 
     // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
     // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
@@ -42877,7 +44363,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
     // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
     const _mh = this._multiHitScope;
-    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return null;
+    return srcHero;
+  }
+
+  _applyEmpoweredStrikeIfApplicable(hookCtx) {
+    if (!hookCtx) return;
+    const srcHero = this._empoweredStrikeHeld(hookCtx.source, hookCtx.type);
+    if (!srcHero) return;
 
     hookCtx.amount = (hookCtx.amount || 0) + EMPOWERED_STRIKE_BONUS;   // W49a (Al, 22.10.2026): 150 statt 100
     if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
@@ -42911,18 +44404,20 @@ this._deathWatch = (this._deathWatchStack || []).length
    *     konvertiert. Der Pfeil macht den Schaden zu 0, *bevor* er trifft, das umgeht Effekte am Ziel."
    */
   _attackSchadenUnreduzierbar(ctx = {}) {
+    // `ctx.nurElixir` (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt): nur der bereitstehende Elixir of Strength („müssen sich ausschließen", s. unten) —
+    // die Quellen-seitig unreduzierbaren Attacks (Surefire Shot, Club of Gobbo) sperren Hydra Blood Arrow nicht mehr, sie wird angeboten und wirkt dann nicht.
     const h = ctx?.hookCtx;
     if (h && h._unreduzierbar) return true;
     const link = ctx?.link;
     if (!link) return false;
     const script = loadCardEffect(link.cardName);
-    if (script?.attackDamageCannotBeReduced) return true;
+    if (!ctx.nurElixir && script?.attackDamageCannotBeReduced) return true;
     const seite = link.casterOwner ?? link.owner;
     const hi = link.heroIdx;
     if (!Number.isInteger(hi) || hi < 0) return false;
     const hero = this.gs.players[seite]?.heroes?.[hi];
     if (!hero?.name) return false;
-    for (const inst of this.cardInstances) {
+    for (const inst of (ctx.nurElixir ? [] : this.cardInstances)) {
       if (inst.zone !== ZONES.SUPPORT || inst.faceDown || inst.heroIdx !== hi || this.physicalSide(inst) !== seite) continue;
       if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.attackerDamageCannotBeReduced) continue;
       if (this.isCardPassiveDormant(inst)) continue;
@@ -43029,7 +44524,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W15a (Al, R01-10): Zauber OHNE Schaden (`opts.dealsDamage === false`, Status-Flächenzauber) melden das den Reaktionen
     // (Schadens-Reaktionen springen ab) und geben den Schulen-Tag mit (Anti Magic Shield: „hit by an opponent's Spell").
     const ptResult = await this._checkPostTargetHandReactions(normalized, source,
-      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : {});
+      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : (opts.nurTreffer ? { damageType: opts.damageType, nurTreffer: true } : {}));
     // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
     // actionAoeHit (which set `_spellNegatedByEffect` and return an
     // empty target list so the caster's onPlay deals nothing), the
@@ -43220,6 +44715,86 @@ this._deathWatch = (this._deathWatchStack || []).length
     return key != null && set.has(key);
   }
 
+  /** „Affected"-Fenster: Geltungsbereich = die laufende Auflösung (nur gespielte Spells/Attacks und aktive Kreatureneffekte), sonst `null`. */
+  _affectScope() {
+    const cur = this._currentEffectSource;
+    if (!cur?.cardName || !isSeat(this, cur.owner)) return null;
+    if (cur.cardType !== 'Spell' && cur.cardType !== 'Attack' && cur.cardType !== 'CreatureEffect') return null;
+    return cur;
+  }
+
+  /** Vormerkung „für diesen Helden lief das Fenster dieser Auflösung schon" (am Auflösungs-Objekt). `merken` = eintragen, sonst nur lesen. */
+  _affectGesehen(heroSeite, heroIdx, merken) {
+    const scope = this._affectScope();
+    if (!scope) return false;
+    if (!this._affectOffen) this._affectOffen = new WeakMap();
+    let set = this._affectOffen.get(scope);
+    if (!set) { set = new Set(); this._affectOffen.set(scope, set); }
+    const key = `${heroSeite}-${heroIdx}`;
+    const war = set.has(key);
+    if (merken) set.add(key);
+    return war;
+  }
+
+  /**
+   * ★ „AFFECTED"-FENSTER (Spielgestalter-Entscheidung 17.11.2026): Reaktionen, deren Kartentext auf „would be AFFECTED" lautet (Future Tech Escape Device, Barrier of Faith, Divine Gift of
+   * Rain, Castling, Future Tech Weathercock — Skript-Flag `affectFenster: true`), werden auch angeboten, wenn die Attack/der Spell KEINE Zielwahl hat: nur ein legales Ziel (Auto-Wahl),
+   * Zauber ohne Zielfenster (Healing Melody), Anhängsel-Spells auf eigene Helden, Divine Gift of Coolness … „Wählt/target"-Reaktionen (Surprises, Invisibility Cloak, Cool Tech Jetpack …) und
+   * „hit"-Reaktionen bleiben unverändert.
+   *
+   * ZENTRAL, an den Wegen, auf denen ein Effekt einen Helden verändert (Heilung, Buff setzen/entfernen, Status, Nicht-Schadens-Effekt über `heroNonDamageEffectBlocked` — z. B. Anhänge, Max-HP; die synchrone Status-Reinigung `cleanseHeroStatuses` bleibt ohne Fenster): JE betroffenem
+   * lebendem Helden EIN Fenster, VOR dem Effekt (der Aufrufer prüft danach `hasEffectImmunity` wie bisher — eine Zusage gibt dem Helden die Effekt-Immunität dieser Auflösung). Wie bei den
+   * Zielwahl-Fenstern entscheidet der Spieler je Held (Mehrfach-Betroffene: je Held ein eigenes Fenster, wie dort eine Reaktion je Held).
+   *
+   * KEIN Doppelfenster: ein Held, für den das Zielwahl-/Flächen-Fenster dieser Auflösung (`_checkPostTargetHandReactions`) schon lief, bekommt keines mehr — die Vormerkung hängt am
+   * Auflösungs-Objekt (`_currentEffectSource`) und endet damit von selbst. Gefallene Helden bekommen nie eines (Entscheidung Punkt 2). Nur Spells, Attacks und aktive Kreatureneffekte
+   * (`_affectScope`); CPU-Reagierende und MCTS-Läufe bekommen das Fenster nicht (kein neuer Prompt für die CPU).
+   * @param {number} heroSeite  Brettseite des Helden
+   * @returns {Promise<void>}
+   */
+  async heroAffectWindow(heroSeite, heroIdx) {
+    if (this._inMctsSim || this._fastMode) return;
+    if (this._inPostTargetWindow || this._inPostTargetReaction) return;
+    const scope = this._affectScope();
+    if (!scope) return;
+    const hero = this.gs.players[heroSeite]?.heroes?.[heroIdx];
+    if (!hero?.name || !(hero.hp > 0)) return;   // Entscheidung Punkt 2: ein gefallener Held ist kein Ziel
+    if (this._affectGesehen(heroSeite, heroIdx, true)) return;
+    const quelle = this._umgebungsQuelle(scope.owner);
+    if (!quelle) return;
+    this._inPostTargetWindow = true;   // Rekursionssperre wie im Zielwahl-Dispatcher (die Reaktionen zielen selbst über ihn)
+    try {
+      const res = await this._checkPostTargetHandReactions(
+        [{ type: 'hero', owner: heroSeite, heroIdx, cardName: hero.name }], quelle,
+        { affect: true, dealsDamage: false, weitereZiele: loadCardEffect(scope.cardName)?.hitsMultipleTargets === true });
+      if (res?.effectNegated) {
+        // Eine Reaktion, die die GANZE Karte negiert (Divine Gift of Rain, einseitig: „Negate any effects … on targets you control"), lässt sich mitten in der Auflösung nicht mehr zurücknehmen:
+        // sie wirkt hier als Effekt-Immunität ALLER Ziele des Reagierenden (Helden und Kreaturen) gegen diese Auflösung.
+        const kontrolleur = this.heroSideOf(heroSeite, hero);
+        for (const { physOwner, heroIdx: hi, hero: h } of this.heroesControlledBy(kontrolleur)) {
+          if (h?.name && h.hp > 0) this.grantEffectImmunity(physOwner, hi, quelle, { ueberFenster: true });
+        }
+        for (const inst of this.cardInstances) {
+          if (inst.zone === ZONES.SUPPORT && !inst.faceDown && (inst.controller ?? inst.owner) === kontrolleur && this._istKreaturenInstanz?.(inst)) {
+            this.grantCreatureEffectImmunity(inst, quelle, { ueberFenster: true });
+          }
+        }
+      }
+    } finally {
+      this._inPostTargetWindow = false;
+    }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Overheat): reagiert diese Reaktion laut Kartentext auf eine WAHL („is chosen by …", „chooses a target …": Invisibility Cloak, Chaorc Interception,
+   * Dream Dust, Dream World Switcheroo, Deepsea Encounter, Cool Tech Jetpack, Winged Skeleton, Flesh-Eating Swarm Trap)? Fenster für einen reinen TREFFER ohne Wahl (`opts.nurTreffer`,
+   * `preDamageMultiTargetWindow`) lassen solche Karten aus — „hit / would take damage / would be affected"-Karten (Anti Magic Shield, Test Flight, Unreasonable Anger, Barrier of Faith, Divine Gift
+   * of Rain, Future Tech Escape Device, MOE Shield, Spectral Armor, Bamboo Shield …) kommen dran. Gelesen wird der gedruckte Kartentext (wie beim Surprise-Filter „chosen/targeted by").
+   */
+  _waehltZielKarte(cardName) {
+    return /\b(chosen|chooses)\b/i.test(this._getCardDB()[cardName]?.effect || '');
+  }
+
   /**
    * Post-target hand-reaction hub. ONE call per damage source per
    * resolution: the loop offers every eligible `isPostTargetReaction`
@@ -43239,6 +44814,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `processCreatureDamageBatch`.
    */
   async _checkPostTargetHandReactions(targetedHeroesAlle, sourceCard, opts = {}) {
+    // ★ Spielgestalter-Entscheidung 17.11.2026: Gefallene Helden sind keine legitimen Ziele — auch nicht der gewählte tote Held einer Wiederbelebung (Divine Gift of Death/Equality):
+    // keine Reaktion dieses Fensters (Escape Device, Barrier of Faith, Test Flight …) wird für ihn angeboten.
+    if (Array.isArray(targetedHeroesAlle) && targetedHeroesAlle.some(t => t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0))) {
+      targetedHeroesAlle = targetedHeroesAlle.filter(t => !(t?.type === 'hero' && !(this.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0)));
+    }
+    // „Affected"-Fenster (`heroAffectWindow`): ein Held, für den dieses Fenster in der laufenden Auflösung schon lief (Zielwahl, Fläche), bekommt kein zweites.
+    if (!opts.affect) for (const t of (targetedHeroesAlle || [])) if (t?.type === 'hero') this._affectGesehen(t.owner, t.heroIdx, true);
     // ★ v1368: `opts.ausZielwahl` — die Liste kann Kreaturen enthalten;
     // nur Reaktionen mit `postTargetKreaturWahl` sehen sie (siehe unten).
     let targetedHeroes = targetedHeroesAlle;
@@ -43246,7 +44828,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _gesammelt = [];   // v1368: Umlenkungen (`newTargets`) aller Reaktionen
     // Effekt-Immunitaeten gelten fuer GENAU EINE Aufloesung. Ein neues
     // Zielfenster heisst: die vorige ist vorbei.
-    if (this.gs._effectImmunities?.length) this.gs._effectImmunities = this.gs._effectImmunities.filter(e => e.ueberFenster);   // Welle 6b: Surprise-Immunitäten (`ueberFenster`) bleiben
+    if (this.gs._effectImmunities?.length && !opts.affect) this.gs._effectImmunities = this.gs._effectImmunities.filter(e => e.ueberFenster);   // Welle 6b: Surprise-Immunitäten (`ueberFenster`) bleiben; das „Affected"-Fenster (`opts.affect`) beginnt keine neue Auflösung
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
     if (this._inPostTargetReaction) return null;
 
@@ -43254,6 +44836,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // gewaehren Immunitaeten fuer genau diese Aufloesung.
     await this._checkPostTargetBoardReactions(targetedHeroes, sourceCard, {
       damageType: opts.damageType, dealsDamage: opts.dealsDamage !== false,
+      ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}),
     });
 
     // Demon's Gate-style "Creature casts a Spell": annotate the source
@@ -43295,6 +44878,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Turn-1 lockout: the first-turn-protected player cannot activate any
       // hand cards during the opening turn (no interaction allowed).
       if (this.gs.firstTurnProtectedPlayer === pi) continue;
+      if (opts.affect && this.isCpuPlayer(pi)) continue;   // „Affected"-Fenster: kein neuer Prompt für die CPU
 
       // Dark Ocean gilt AUCH hier: dieses Fenster ist ein VIERTER Weg
       // zu einer Reaktion (`isPostTargetReaction`, feuert nach der
@@ -43302,12 +44886,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Gift of Rain den 3-Headed Giant trotz Ocean (Als Befund 5.8.).
       if (this.darkOceanBlocksReaction(pi, null)) continue;
 
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (let _k = 0; _k < this._rxKandidaten(ps).length; _k++) {   // Kandidaten je Runde frisch: der Abgang einer Karte verschiebt die folgenden Plaetze
+        const { cardName, ausVorrat: _av, idx: hi } = this._rxKandidaten(ps)[_k];
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
+        if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+        if (opts.nurTreffer && this._waehltZielKarte(cardName)) continue;   // „Treffer ohne Wahl" (Overheat-Träger): nur „hit/affect/damage"-Reaktionen, keine „is chosen"-Reaktionen
+        // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — bei „cannot be negated" (`config.cannotBeNegated` der Zielwahl: Exorcism mit Decay Magic 2) werden auch
+        // ganz negierende Reaktionen angeboten (Hinweis in der Frage, CPU waehlt sie nicht); ihre Negation wird unten verworfen (die Karte ist bezahlt, der Effekt laeuft).
         // v1368: aus der allgemeinen Zielwahl sehen nur ausdrueckliche
         // Kreatur-Reaktionen die gewaehlten Kreaturen.
         targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
@@ -43338,7 +44926,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // damage tag so reactions can detect Hero-effect damage that
         // is "treated as a Spell" (Alice the Puppeteer Girl, …).
         if (script.postTargetCondition &&
-            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true })) continue;
+            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}) })) continue;
 
         // Spell/Attack reactions: at least 1 hero must be able to cast it
         // Artifacts: skip hero check (only need gold). `spellInHand: true`
@@ -43357,11 +44945,20 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Build prompt message
         const targetNames = targetedHeroes.map(t => t.cardName).join(', ');
         const srcName = sourceCard?.name || 'An effect';
+        // Hinweis fuer nutzlose Aktivierungen (Spielgestalter-Entscheidung 16.11.2026): ganz negierende Reaktion gegen „cannot be negated" / Schutzkarte gegen Schaden, der laut Kartentext
+        // weder verringert noch negiert werden kann (Skript-Flag `damageCannotBeReducedOrNegated`: Rockfall, Pressure Projectile, Acid Vial).
+        const _ptGanzNeg = !!(opts.cannotBeNegated && script.negatesWholeCard);
+        const _ptSchadenFlag = dealsDamage && !script.negatesWholeCard && !!(sourceCard?.name && loadCardEffect(sourceCard.name)?.damageCannotBeReducedOrNegated === true);
+        const _ptHinweis = opts.cannotBeNegated ? this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')
+          : (_ptSchadenFlag ? this._nutzlosHinweis({ cannotBeNegated: true, cannotBeReduced: true }, 'damage') : '');
+        // CPU-Sperre: reine Schadens-Schutzkarten (Vor-Schaden-Reaktionen, Future Tech Escape Device: `uselessVsUnstoppableDamage`) gegen unaufhaltsamen Schaden verbrennt die CPU nicht.
+        const _ptNutzlos = _ptGanzNeg || (_ptSchadenFlag && (script.isPreDamageReaction === true || script.uselessVsUnstoppableDamage === true));
 
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: cardName,
           _handReactionWindow: true,
+          ...(_ptNutzlos ? { _nutzlos: true } : {}),
           // Structured context for per-card `cpuResponse` heuristics
           // (generic contract, mirrors `_preDamageContext` on the
           // per-hero path): the post-target stage doesn't know
@@ -43380,14 +44977,14 @@ this._deathWatch = (this._deathWatchStack || []).length
             damageType,
             dealsDamage,
           },
-          message: `${srcName} is targeting ${targetNames}! Activate ${cardName}?`,
+          message: this._nutzlosFrage(`${srcName} ${opts.affect ? 'would affect' : 'is targeting'} ${targetNames}!`, _ptHinweis, `Activate ${cardName}`),
           showCard: cardName,
           confirmLabel: '✨ Activate!',
           cancelLabel: 'No',
           cancellable: true,
         });
 
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
         // ★ 10.10. (Test Flight): `fensterInfo` reicht das Zielfenster an `reactionCasterAllowed` weiter — „a Hero you control that
         // can use this Spell would be hit" bindet den Wirker an einen GETROFFENEN Helden. Bisher bekam das Skript hier `null`;
@@ -43407,12 +45004,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         // not whichever matching name happens to sit at hand[hi].
         // Mirror of the pre-damage handler's same fix.
         let consumeIdx = hi;
+        let _qListe = _av ? ps.creationZone : ps.hand, _qVorrat = _av;   // Quelle der Kopie (Hand oder Crestinas Vorrat)
         if (cost < baseCost && ps._permanentlyRevealedHandIndices) {
           for (const kStr of Object.keys(ps._permanentlyRevealedHandIndices)) {
             const k = +kStr;
-            if (ps.hand[k] === cardName) { consumeIdx = k; break; }
+            if (ps.hand[k] === cardName) { consumeIdx = k; _qListe = ps.hand; _qVorrat = false; break; }
           }
         }
+        const _q = { liste: _qListe, ausVorrat: _qVorrat, idx: consumeIdx };
 
         // Hand → discard/deleted flight animation. Broadcast BEFORE
         // the splice so the client's pile-transfer handler can pin
@@ -43427,13 +45026,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName,
-          from: 'hand', to: destPile, asPlay: true,
+          from: _q.ausVorrat ? 'creation' : 'hand', to: destPile, asPlay: true,
           fromHandIdx: consumeIdx,
         });
 
         // Activate: remove from hand, route to destination pile,
         // deduct gold.
-        ps.hand.splice(consumeIdx, 1);
+        const _handLaengeVorher = ps.hand.length;
+        this._rxAbgang(ps, _q);
         // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
         // Startplatz der abfliegenden Karte nur, solange die Hand noch so
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -43444,7 +45044,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // previously at hi+1 or at consumeIdx+1). When the splice was at
         // an index < hi, shift the iterator back one as well so the
         // loop doesn't skip a card.
-        if (consumeIdx <= hi) hi--;
+        if ((_q.ausVorrat ? _handLaengeVorher + consumeIdx : consumeIdx) <= _k) _k--;
         // Route to destination pile IMMEDIATELY (alongside the splice
         // and BEFORE resolve runs). Two reasons:
         //   1. Visual: the next sync covers BOTH the hand removal and
@@ -43460,9 +45060,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         //      any hook reading `discardPile` / `deletedPile` during
         //      resolve sees the post-state.
         if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-          this.handKartenBesitzerPs(ps, cardName).deletedPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).deletedPile.push(cardName);
         } else {
-          this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
+          this._rxAblagePs(ps, cardName, _q).discardPile.push(cardName);
         }
         await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
@@ -43495,7 +45095,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
-        if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard) })) { this.sync(); continue; }
+        // `postTarget`: Kontext für `stempelBeiAktivierung` (Future Tech Escape Device stempelt „1 je Held pro Zug" für den geschützten Helden schon mit der Aktivierung).
+        if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard), postTarget: { targetedHeroes, sourceCard } })) { this.sync(); continue; }
 
         this._inPostTargetReaction = true;
         let resolveResult = null;
@@ -43505,7 +45106,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard,
               { damageType, dealsDamage, casterIdx: isArtifact ? null : castingHeroIdx, casterSeite: castingSeite });
           }
-          this._merkeGanzeNegation(script, resolveResult);   // Z7b
+          if (!opts.cannotBeNegated) this._merkeGanzeNegation(script, resolveResult);   // Z7b (bei 'cannot be negated' verfaellt die Negation, s. unten)
         } finally {
           this._inPostTargetReaction = false;
         }
@@ -43558,6 +45159,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // circuits the loop, because the source itself is fizzled and
         // no further damage is coming. Non-negating reactions return
         // and the loop continues to offer the next eligible card.
+        // Spielgestalter-Entscheidung 16.11.2026: „cannot be negated" — die Negation verfaellt (Karte und Kosten sind verbraucht, der Effekt laeuft; wie `piercing_override` im Schadenspfad).
+        if (resolveResult?.effectNegated && opts.cannotBeNegated) {
+          this.log('piercing_override', { source: sourceCard?.name, reason: 'post_target_negation', card: cardName });
+          resolveResult = { ...resolveResult, effectNegated: false };
+        }
         if (resolveResult?.effectNegated) return resolveResult;
         // v1368: Umlenkungen sammeln (Deepsea Encounter, Dream World
         // Switcheroo) — vorher gab der Hub sie NIE zurueck.
@@ -43599,7 +45205,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Helden, die `pi` kontrolliert (auch geliehene der Gegenspalte;
       // ein abgegebener eigener Held faellt heraus). Reagierender = `pi`,
       // die Brettseite des Traegers geht als `rxOpts.heroOwner` mit.
-      for (const { physOwner: seite, heroIdx: hi } of this.heroesControlledBy(pi)) {
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Midnight Assault: `ohneGegnerReaktion`) — auch ausgeruestete Reaktionen (Winged Skeleton, Cool Tech Jetpack,
+      // Future Tech Weathercock) bieten nichts an (die Hand-Reaktionen oben sperrt `_handPlayLockedFor`).
+      for (const { physOwner: seite, heroIdx: hi } of (this._reaktionGesperrt(pi) ? [] : this.heroesControlledBy(pi))) {
         const zonenPs = this.gs.players[seite];
         const _rxBenutzt = new Set();   // Darion: gleichnamige Ausruestung im Stapel — jede Instanz kommt einzeln dran (nicht zweimal die erste)
         for (const slot of (zonenPs?.supportZones?.[hi] || [])) {
@@ -43617,10 +45225,12 @@ this._deathWatch = (this._deathWatchStack || []).length
             // `loadCardEffect(cardName)` wurde sie nie angeboten.
             const script = rxInst ? loadCardEffect(rxInst.counters?._effectOverride || cardName) : this.supportCardScript(seite, hi, cardName);
             if (!script?.isEquippedPostTargetReaction) continue;
+            if (opts.affect && !script.affectFenster) continue;   // „Affected"-Fenster: nur Karten, deren Text auf „would be affected" lautet
+            if (opts.nurTreffer && this._waehltZielKarte(rxInst?.counters?._ftCopyOf || cardName)) continue;   // „Treffer ohne Wahl": keine „is chosen"-Reaktion (Cool Tech Jetpack, Winged Skeleton)
             // Als Ruling (Al 26.10., Winged Skeleton): aus der allgemeinen Zielwahl (`ausZielwahl`) sehen auch ausgerüstete/Brett-Reaktionen die gewählten KREATUREN nur mit
             // `postTargetKreaturWahl: true` (wie die Handreaktionen oben); alle übrigen sehen weiter nur Helden.
             targetedHeroes = (_nurHelden && !script.postTargetKreaturWahl) ? _nurHelden : targetedHeroesAlle;
-            const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite };
+            const rxOpts = { damageType, dealsDamage, heroChoiceIsCost: opts.heroChoiceIsCost === true, inst: rxInst, heroIdx: hi, heroOwner: seite, ...(opts.affect ? { affect: true, weitereZiele: opts.weitereZiele === true } : {}) };
             if (script.postTargetCondition
                 && !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, rxOpts)) continue;
 
@@ -43633,13 +45243,13 @@ this._deathWatch = (this._deathWatchStack || []).length
               title: anzeigeName,
               // Als Ruling (Al 26.10., Winged Skeleton): die Karte kann eine eigene Frage formulieren (`postTargetMessage`) — „your Hero" passt nicht, wenn eine KREATUR gewählt wurde.
               message: (typeof script.postTargetMessage === 'function' ? script.postTargetMessage(this, srcName2, rxOpts, targetedHeroes) : null)
-                || `${srcName2} is targeting your Hero! Activate ${anzeigeName}?`,
+                || `${srcName2} ${opts.affect ? 'would affect' : 'is targeting'} your Hero! Activate ${anzeigeName}?`,
               confirmLabel: '🛡️ Activate!',
               cancellable: true,
               _handReactionWindow: true,
               reactionCardName: cardName,
             });
-            if (!confirmed) {
+            if (!this._confirmSaidYes(confirmed)) {
               // ★ Al 14.10.2026: „The first time every turn …, you may …" — ein abgelehntes
               // Angebot verbraucht das „erste Mal" (nur bei Effekten, die ausdrücklich nur die
               // erste Instanz treffen; Skript meldet das über `consumeOnDecline`).
@@ -43697,8 +45307,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ascendedHero = this.gs.players[heroOwner]?.heroes?.[ascendedHeroIdx];
     const ascendedName = ascendedHero?.name || 'Your Hero';
 
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
+    for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       const script = loadCardEffect(cardName);
       if (!script?.isAscensionReaction) continue;
@@ -43735,7 +45344,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
         const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
@@ -43764,14 +45373,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       const _aszAblegen = async (mitVorlauf) => {
         if (_aszAbgelegt) return;
         _aszAbgelegt = true;
-        const idx = ps.hand[hi] === cardName ? hi : ps.hand.indexOf(cardName);
+        const _liste = _av ? (ps.creationZone || []) : ps.hand;   // Quelle: Hand oder Crestinas Vorrat
+        const idx = _liste[hi] === cardName ? hi : _liste.indexOf(cardName);
         if (idx < 0) return;   // während der Aktion schon aus der Hand verschwunden (abgeworfen, gestohlen …)
-        const besitzer = this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice
+        const besitzer = _av ? pi : this._consumeHandCardOrigin(pi, cardName, idx);   // VOR dem Splice (eine Vorratskarte kann nicht gestohlen sein)
         this._broadcastEvent('play_pile_transfer', {
-          owner: pi, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+          owner: pi, cardName, from: _av ? 'creation' : 'hand', to: 'discard', fromHandIdx: idx,
           ...(besitzer !== pi ? { fromOwner: pi, toOwner: besitzer } : {}),
         });
-        ps.hand.splice(idx, 1);
+        this._rxAbgang(ps, { liste: _liste, ausVorrat: _av, idx });
         (this.gs.players[besitzer] || ps).discardPile.push(cardName);
         this.sync();   // sofort abgleichen: die Hand rückt auf, während die Karte fliegt (Wächter `check-hand-flight-sync`)
         if (mitVorlauf) await this._delay(ASCENSION_REAKTION_ABLAGE_VORLAUF_MS);
@@ -44373,6 +45983,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): eine Reaktion/Surprise MIT Zielwahl beim Aktivieren darf der geblendete Held nur mit eigenen Zielen wirken; kann sie keinen legalen
+    // eigenen Kandidaten haben (Reflection: „Choose a target your opponent controls"), ist sie fuer ihn nicht aktivierbar. Reaktionen ohne Zielwahl (kein `requiresTarget`) bleiben frei;
+    // die Zielwahl selbst filtert `markiereBlindGesperrte`.
+    if (this.blindedAttackSpellGesperrt(reaktor, playerIdx, heroIdx, cardData, { aktivierung: true })) return false;
+
     // W19b (Al): Kontrolleffekte koennen ausdruecklich ausschliessen, mit dem Helden Attacks/Spells auszufuehren — dann darf auch der
     // Kontrolleur ihn dafuer nicht nutzen (`_kontrollRechte.zauber/attacken === false`; heute stempelt keine Karte so).
     {
@@ -44413,6 +46028,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (!bypass) return false;
     }
+    // ★ Spielgestalter-Entscheidung 16.11.2026 (Silence im zentralen Kettenfenster): „Your opponent cannot play Spells for the rest of the turn afterwards" — der Rundenstempel `_spellLockTurn` (Silence;
+    // Eraser Beam: „the only Spell you play this turn") gilt auch für Spell-REAKTIONEN aus der Hand, wie die Statussperren darüber (v880). Der Bonus-Spell-Token von Silence (`_silenceBonusSpell`) gilt nur dem
+    // Sofort-Zauber danach (`performImmediateActionAnyHero`), nicht einer Reaktion dazwischen. Surprises sind davon nicht betroffen (sie werden aktiviert, nicht gespielt).
+    if (opts.spellInHand && cardData.cardType === 'Spell' && this.gs.players[reaktor]?._spellLockTurn === this.gs.turn) return false;
 
     // Check spell school / level requirements (centralized — respects
     // Wisdom paid coverage, Performance wildcards, levelOverrideCards,
@@ -44909,6 +46528,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Z7c: „once per game" bei Surprises (Tharxian Horse) begrenzt die AKTIVIERUNG, nicht das Setzen. ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung ist hier BEGONNEN (aufgedeckt,
+    // Wisdom-Kosten bezahlt, kein Gegenfenster offen) — ab jetzt ist das Einmal-Limit verbraucht, auch wenn sie danach negiert wird (Boots of Hermes, Front Soldier, Kette …; früher Z7b: ganz
+    // negiert = unverbraucht). Beim Auslöser gestempelt (`steuerer`). Die weitere Kopie im selben Fenster/Reaktionsfenster ist damit gesperrt (`_canHeroActivateSurprise`).
+    if (script.oncePerGame || script.oncePerGameKey) {
+      const _sps = this.gs.players[steuerer];
+      if (_sps) {
+        if (!_sps._oncePerGameUsed) _sps._oncePerGameUsed = new Set();
+        _sps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+      }
+    }
+    // ★ W75a (Aquatic Spear): hartes Once-per-turn — die Aktivierung stempelt mit ihrem Beginn (s. o.; vorher: erst „sobald sie auflösen darf"), beim Auslöser (`steuerer`).
+    if (script.surpriseHartOPT) this.claimHOPT(script.surpriseHartOPT, steuerer);
+
     // Fire onSurpriseActivated hook. A hand reaction (Boots of Hermes)
     // may negate the Surprise AS it activates by setting
     // `_surpriseNegated` on the hook ctx (via ctx.setFlag). A negated
@@ -44985,29 +46617,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           surpriseHookCtx._surpriseNegatedBy = 'a chain reaction';
         }
       }
-    }
-
-    // ★ Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) verbraucht erst die
-    // AKTIVIERUNG — ab dem Moment, in dem sie auflösen darf (nicht von Boots of Hermes & Co. negiert).
-    // Eine ganz negierte Aktivierung lässt die Grenze unverbraucht (Z7b). Beim Auslöser gestempelt
-    // (`steuerer`); `_surpriseStempel` schützt den Eintrag vor dem Z7b-Rückgabe-Abzug (`_stempelZurueck`),
-    // falls der Auslöser zugleich der Wirker der negierten Karte ist.
-    if (!surpriseNegated && (script.oncePerGame || script.oncePerGameKey)) {
-      const _sps = this.gs.players[steuerer];
-      if (_sps) {
-        const _opgKey = script.oncePerGameKey || cardName;
-        if (!_sps._oncePerGameUsed) _sps._oncePerGameUsed = new Set();
-        _sps._oncePerGameUsed.add(_opgKey);
-        (this._surpriseStempel || (this._surpriseStempel = new Set())).add(`${steuerer}|${_opgKey}`);
-      }
-    }
-
-    // ★ W75a (Aquatic Spear): hartes Once-per-turn — die Aktivierung stempelt, sobald sie aufloesen darf (nicht negiert; Z7b/W66b: eine ganz negierte Karte stempelt nicht).
-    // Beim Ausloeser (`steuerer`). `_surpriseHoptStempel` schuetzt den Eintrag vor dem Z7b-Rueckgabe-Abzug (`_stempelZurueck`) des Zaubers, waehrend dessen Schaden er ausloeste.
-    // Der Stempel liegt VOR `onSurpriseActivate`: eine weitere Kopie im selben Fenster/Reaktionsfenster (auch durch den 80er-Treffer selbst ausgeloest) ist damit gesperrt.
-    if (!surpriseNegated && script.surpriseHartOPT) {
-      this.claimHOPT(script.surpriseHartOPT, steuerer);
-      (this._surpriseHoptStempel || (this._surpriseHoptStempel = new Map())).set(`${steuerer}|${script.surpriseHartOPT}`, this.gs.turn);
     }
 
     // Execute the surprise's effect (unless negated)
@@ -45449,6 +47058,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
       handFlug: cardInfo.handFlug || null,   // Handkarte des Initialglieds: { handIdx, to, toOwner } — Flug beim Aufloesen des Glieds (`_resolveReactionChain`)
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): eine Attack mit Zielwahl (`requiresTarget`) bietet Pfeile und Magic Topaz erst NACH der Zielwahl an (`_pfeilFensterNachZielwahl`);
+      // dieses Fenster (beim Ausspielen) zeigt sie nicht (`arrowTriggerCondition`, Bow of the Hunt Goddess). `nurPfeile` = das spaetere Pfeil-Fenster selbst: am Basisglied nur Pfeile.
+      _pfeileNachZielwahl: !!cardInfo.pfeileNachZielwahl,
+      _nurPfeile: !!cardInfo.nurPfeile,
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -45480,10 +47093,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // No reactions — resolve normally (no chain visualization)
         this._inReactionCheck = false;
         let resolveResult = null;
-        delete this.gs._discardOutDeclined;
-        const _hoptVorher = resolve ? this._hoptAbzug() : null;
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolving', { linkIndex: 0, cardName, owner }); await this._delay(400); }
-        if (resolve) resolveResult = this._applyDiscardOutDecline(cardName, await resolve(), _hoptVorher);
+        if (resolve) resolveResult = await resolve();
         if (cardInfo.vorlauf) { this._broadcastEvent('reaction_chain_link_resolved', { linkIndex: 0, cardName, owner }); await this._delay(300); this._broadcastEvent('reaction_chain_done', {}); }
         result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
       } else {
@@ -45532,16 +47143,46 @@ this._deathWatch = (this._deathWatchStack || []).length
     // the play lock is released. Draining from arbitrary hook/chain
     // points (esp. End-Phase turn-end chains) caused a frozen-turn
     // CPU-deadline trip.
-    // ★ Z7b (Als Entscheidung, Welle 3): eine NEGIERTE Karte (ganz negiert, bevor sie auflöst) war nicht
-    // gespielt — kein Einmal-Stempel. Nur wer FIZZELT (Wirker handlungsunfähig, v1328), durfte auflösen:
-    // das Ergebnis ist verhindert, der Slot verbraucht (siehe `_noteFizzledPlay`). Beschwörungen
-    // stempeln `oncePerGame` weiter erst bei der Landung (v1030), Fähigkeiten/Helden-/Kreatureneffekte
-    // haben eigene Stempel.
-    if (result.fizzled && !result.negated && !fromBoard && !cardInfo.isPlacement
-        && (cardType === 'Spell' || cardType === 'Attack')) {
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit („once per turn / per game") ist mit dem BEGINN der Aktivierung verbraucht. Die Karte ist hier gespielt: wird sie in der Kette
+    // NEGIERT oder FIZZELT sie (Wirker beim Auflösen handlungsunfähig, v1328), läuft ihr `onPlay`/`resolve` nie — der Slot wird deshalb hier gestempelt (siehe `_noteFizzledPlay`; früher Z7b:
+    // „ganz negiert stempelt nicht"). Fähigkeiten/Helden-/Kreatureneffekte (Board-Aktivierungen, `fromBoard`) stempeln in ihren Aktivierungs-Wegen (server.js, `resolveHeroEffectActivation`).
+    if ((result.fizzled || result.negated) && !fromBoard && !cardInfo.isPlacement
+        && (cardType === 'Spell' || cardType === 'Attack' || cardType === 'Artifact' || cardType === 'Potion' || cardType === 'Creature')) {
       await this._noteFizzledPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
     }
     return result;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten! Nach der Zielwahl kann man dann nicht mehr abbrechen."
+   * Eine gespielte Attack mit Zielwahl (`requiresTarget`) bietet die Pfeil-Klasse — alle `isArrow`-Reaktionen (Angelfeather, Flame, Poisoned, Golden, Hydra Blood, Bomb, Racket, Rainbow's Arrow, Magic Topaz)
+   * und den Bow of the Hunt Goddess (`spieltPfeile`), der einen Pfeil aus dem Deck spielt — nicht mehr im Kettenfenster beim Ausspielen an (`arrowTriggerCondition`), sondern in DIESEM Fenster an: sobald der Spieler
+   * das Ziel der Attack bestätigt hat (`_zielwahlAbschliessen`; Rückfall `_fireAttackDeclare`, falls eine Attack ihr Ziel anders bestimmt). Ein Abbruch der Zielwahl verbraucht deshalb keinen Pfeil, kein Gold und
+   * keinen Topaz-Stempel; ab hier gibt es keinen Abbruch mehr (server.js ignoriert `_spellCancelled`, solange `geoeffnet` steht, und der Wiederhol-Wähler nach einem toten Ziel ist nicht abbrechbar).
+   * Alle übrigen Reaktionen auf die Attack (Silence, Rusty Touch, Master's Plan, Cute Camera, Surprises, Hand-Reaktionen, Schilde …) behalten ihr Fenster beim Ausspielen und ihre Ziel-Fenster (Umleiter, Surprises, Post-Target).
+   * Das Fenster ist eine eigene Mini-Kette: Basisglied = die Attack (Anzeige), nur ihr Besitzer (und Hydra Blood Arrow des Gegners) bietet Pfeile an (`_nurPfeile`, `_promptReactionsForChain`); ab dem ersten Pfeil gilt die Kette
+   * normal (Arrow Slit, Gegenreaktionen auf den Pfeil, weitere Pfeile). Die Pfeile bewaffnen den Angreifer (`armAttackerWithArrow`) und wirken im Schaden der Attack; abgeräumt werden sie wie bisher am Ende der Attack (server.js).
+   * Eine Attack ohne Zielwahl (Flächen-/Ohne-Ziel-Attacks) behält die Pfeile im Fenster beim Ausspielen. Nur ein Mal je gespielter Attack (`geoeffnet`).
+   * @returns {Promise<object|null>} Kettenergebnis (`chainFormed`, …) oder null, wenn nichts zu tun war
+   */
+  async _pfeilFensterNachZielwahl() {
+    const gs = this.gs;
+    const pf = gs?._pfeilFenster;
+    if (!pf || pf.geoeffnet) return null;
+    pf.geoeffnet = true;   // Zielwahl steht fest: ab jetzt kein Abbruch mehr (server.js) und das Fenster oeffnet nur einmal
+    if (this._inReactionCheck || gs.result) return null;   // mitten in einer offenen Kette (Pfeil-Wirkung, Gegenreaktion): kein neues Fenster
+    const heroSeite = Number.isInteger(pf.casterOwner) ? pf.casterOwner : pf.owner;
+    const hero = gs.players[heroSeite]?.heroes?.[pf.heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;   // der Angreifer ist nicht mehr da: nichts zu verstaerken
+    const _aeussere = this._inReactionCheck;
+    try {
+      return await this.executeCardWithChain({
+        cardName: pf.cardName, owner: pf.owner, cardType: 'Attack', goldCost: 0, heroIdx: pf.heroIdx,
+        casterOwner: heroSeite, casterCheck: false, resolve: null, fromBoard: true, nurPfeile: true,
+      });
+    } finally {
+      this._inReactionCheck = _aeussere;
+    }
   }
 
   /**
@@ -45996,21 +47637,31 @@ this._deathWatch = (this._deathWatchStack || []).length
       // reactions can gate on the specific trigger (Sculpture Theft
       // → only fires on `onStatusApplied` for `frozen` on a Creature).
       const chainCtx = { chain, eventDesc, hookName, hookCtx };
+      // ★ 16.11.2026 (zentrales Kettenfenster, `_reaktionGespielt`): am BASISGLIED einer eingesetzten Hand-Reaction (`_zentral`) sind die Karten, die dieses Ereignis schon über ihren Hand-/Surprise-Hook
+      // bedient haben (Cute Camera, Front Soldier: `hooks.onReactionPlayed`; Reverse Trap: `surpriseReactionPlayedTrigger`), nicht noch einmal anzubieten — kein Doppelangebot. Tiefer in der Kette gelten sie normal.
+      const _zentralBasis = chain.length === 1 && chain[0]?._zentral === true;
+      if (_zentralBasis && chain[0].owner === pi) continue;   // 16.11.2026: auf die eigene eingesetzte Reaction antwortet nur der Gegner (kein Selbstangebot, z. B. Divine Gift of Edge)
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): das Pfeil-Fenster NACH der Zielwahl (`_pfeilFensterNachZielwahl`) bietet am Basisglied NUR Pfeile an (`isArrow`, Magic Topaz) und Ausruestungen,
+      // die einen Pfeil spielen (`spieltPfeile`: Bow of the Hunt Goddess) — alle uebrigen Reaktionen auf die Attack hatten ihr Fenster schon beim Ausspielen. Ab dem ersten Pfeil gilt die Kette normal
+      // (Arrow Slit, Gegenreaktionen auf den Pfeil, weitere Pfeile).
+      const _nurPfeile = chain.length === 1 && chain[0]?._nurPfeile === true;
       const eligibleByName = new Map();
       const countByName = new Map();
-      for (let hi = 0; hi < ps.hand.length; hi++) {
-        const cardName = ps.hand[hi];
+      for (const { cardName, ausVorrat: _av, idx: hi } of this._rxKandidaten(ps)) {
         if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         // Skip the card currently being played/resolved (prevents self-
         // chaining, e.g. a Reaction Spell trying to chain onto itself
         // while it's still in hand mid-play).
-        if (ps._resolvingCard) {
-          const nth = ps.hand.slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
+        if (ps._resolvingCard && !!ps._resolvingCard.fromCreation === !!_av) {   // der Rang (`nth`) zaehlt in der Liste, aus der die Karte spielt (Hand ODER Vorrat)
+          const nth = (_av ? (ps.creationZone || []) : ps.hand).slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
           if (cardName === ps._resolvingCard.name && nth === ps._resolvingCard.nth) continue;
         }
         const script = loadCardEffect(cardName);
         if (!script?.isReaction) continue;
+        if (_nurPfeile && !script.isArrow) continue;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
+        if (_zentralBasis && script.hooks && typeof script.hooks.onReactionPlayed === 'function') continue;   // 16.11.2026: schon über `onReactionPlayed` gefragt
+        if (chain[0]?._imFlug && chain[0].owner === pi && cardName === chain[0].cardName && !!_av === chain[0]._imFlug.ausVorrat && hi === chain[0]._imFlug.idx) continue;   // 16.11.2026: die gerade gespielte Kopie (noch in der Hand)
 
         const cardData = allCards[cardName];
         // Boomerang's "no Artifacts for the rest of this turn" lockout —
@@ -46118,7 +47769,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // tally the count for the ×N badge in the gallery.
         if (!eligibleByName.has(cardName)) {
           eligibleByName.set(cardName, {
-            handIdx: hi, cost, script, cardData, cardName,
+            handIdx: hi, ausVorrat: _av, cost, script, cardData, cardName,
             eligibleHeroIdxs: reactionEligibleHeroIdxs,
             wisdomCost: reactionWisdomCost,
           });
@@ -46136,6 +47787,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Als Vorgabe 29.9.: Zonen nach KONTROLLE (`_getAllSurpriseEntries`),
       // auch am geliehenen Helden; `seite` = Brettseite der Zone.
       for (const sEntry of this._getAllSurpriseEntries(pi)) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (sEntry.isBakhmSlot) continue;
         const shi = sEntry.heroIdx;
         const sSeite = sEntry.seite ?? pi;
@@ -46143,6 +47795,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (eligibleByName.has(sName)) continue; // a hand copy already offered
         const sScript = loadCardEffect(sName);
         if (!sScript?.isSurprise || !sScript?.isReaction) continue;
+        if (_zentralBasis && typeof sScript.surpriseReactionPlayedTrigger === 'function') continue;   // 16.11.2026: schon über das Surprise-Fenster von `_reaktionGespielt` gefragt
         // ★ 25.10. (Reverse Trap, Lunar Eclipse): eine Surprise, die in DIESER Kette schon aktiviert wurde, bleibt aufgedeckt in ihrer Zone liegen (`skipPostResolveDiscard`, das Kettenende räumt
         // sie ab) — sie darf in derselben Kette nicht noch einmal antworten. Erkennbar am Aufräum-Eintrag bzw. an der aufgedeckten Instanz.
         if ((this._pendingSurpriseReactionCleanup || []).some(e => e.pi === sSeite && e.heroIdx === shi && e.cardName === sName)) continue;
@@ -46170,6 +47823,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ W21a (Al, 20.10.2026: „nur der aktuelle Kontrolleur"): angeboten wird dem KONTROLLEUR des Helden (`heroesControlledBy`): ein an den Gegner
       // abgegebener eigener Held fehlt, ein vom Spieler kontrollierter Gegnerheld zaehlt (Seite `seite` = Brettspalte; Bedingung/Kosten laufen ueber `pi`).
       for (const { physOwner: hSeite, heroIdx: hhi, hero } of this.heroesControlledBy(pi)) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (!hero?.name || hero.hp <= 0) continue;
         if (eligibleByName.has(hero.name)) continue;
         const hScript = this.heroScript(hero);
@@ -46193,6 +47847,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Der Link traegt `fromCreature` und `creatureInstId`; `creatureReactionResolve(engine, pi, chain, myIndex, inst)` loest ihn auf,
       // `payActivationCost(engine, pi, chainCtx, inst)` (optional, `false` = nicht bezahlt) stempelt z. B. die Rundengrenze.
       for (const cInst of this.cardInstances) {
+        if (_nurPfeile) break;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
         if (cInst.zone !== ZONES.SUPPORT || cInst.faceDown) continue;
         if ((cInst.controller ?? cInst.owner) !== pi) continue;
         if (eligibleByName.has(cInst.name)) continue;
@@ -46226,6 +47881,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             _eBenutzt.add(eInst.id);
             const eScript = loadCardEffect(eInst.counters?._effectOverride || eName);
             if (!eScript?.isEquipReaction || typeof eScript.equipReactionCondition !== 'function') continue;
+            if (_nurPfeile && !eScript.spieltPfeile) continue;   // 17.11.2026 (ARW-01): Pfeil-Fenster nach der Zielwahl
             let okE = false;
             try { okE = !!eScript.equipReactionCondition(this.gs, pi, this, chainCtx, eInst); } catch { okE = false; }
             if (!okE) continue;
@@ -46239,6 +47895,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Eine Reaktion kann ueber `reactionUselessHint(gs, pi, engine, chainCtx)` einen Hinweis liefern, dass sie
+      // gegen dieses Ereignis nichts bewirkt (Hydra Blood Arrow gegen unreduzierbaren Attack-Schaden): sie wird trotzdem angeboten (Hinweis in der Frage), die CPU waehlt sie nicht.
+      const _nutzlosHinweise = new Map();
+      for (const [nm, inf] of [...eligibleByName]) {
+        let hint = null;
+        try { hint = typeof inf.script?.reactionUselessHint === 'function' ? inf.script.reactionUselessHint(this.gs, pi, this, chainCtx) : null; } catch { hint = null; }
+        if (!hint) continue;
+        if (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) { eligibleByName.delete(nm); continue; }
+        _nutzlosHinweise.set(nm, hint);
+      }
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -46251,7 +47917,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: onlyName,
-          message: `${eventDesc}. Activate ${onlyName}?`,
+          message: _nutzlosHinweise.has(onlyName)
+            ? `${eventDesc}. ${_nutzlosHinweise.get(onlyName)} Activate ${onlyName} anyway?`
+            : `${eventDesc}. Activate ${onlyName}?`,
           // ★ v877 (Als Vorgabe): Der Prompt fragt nach DIESER Karte —
           // sie gehoert LINKS an die Seite. Der Confirm-Dialog hat dafuer
           // zwei Plaetze: `showCardLeft` links neben dem Text,
@@ -46266,7 +47934,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!this._confirmSaidYes(confirmed)) continue;
         chosenName = onlyName;
       } else {
         const cards = [...eligibleByName.keys()]
@@ -46281,7 +47949,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           type: 'cardGallery',
           cards,
           title: 'Chain a Reaction?',
-          description: `${eventDesc}. Click a card to chain it, or decline.`,
+          description: `${eventDesc}. Click a card to chain it, or decline.${[..._nutzlosHinweise].map(([nm, h]) => ` ${nm}: ${h}`).join('')}`,
           // v693: WORAUF reagiere ich? Die juengste fremde Karte der
           // Kette (sonst die Initialkarte) neben dem Text zeigen — der
           // Einfach-Confirm hatte das schon (`showCard`), die Galerie nicht.
@@ -46407,8 +48075,6 @@ this._deathWatch = (this._deathWatchStack || []).length
           goldCost: pCost, wisdomCost: 0,
           isInitialCard: false, negated: false, chainClosed: false,
           fromDeck: pPile === 'deck', fromEquip: eInst.id,
-          // W19c (Al): wird dieses Glied negiert/fizzelt, gibt die Ausruestung ihren Einmal-Stempel zurueck (Kosten bleiben bezahlt).
-          _equipRefund: typeof script.equipReactionRefund === 'function' ? () => script.equipReactionRefund(this, pi, eInst, pick) : null,
           resolve: pScript?.resolve
             ? async (ch, idx) => pScript.resolve(engine, reactionOwner, null, null, ch, idx)
             : null,
@@ -46563,7 +48229,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Re-lookup hand index (defensive — hand may have shifted between
       // eligibility scan and consumption if a hook ran in between).
-      const actualHandIdx = ps.hand.indexOf(chosenName);
+      // ★ Quelle = die der gewaehlten Kopie (Hand ODER Crestinas Vorrat, 11.11.): in DERSELBEN Liste neu suchen.
+      const _kAusVorrat = !!info.ausVorrat;
+      const _kListe = () => (_kAusVorrat ? (ps.creationZone || []) : ps.hand);
+      const actualHandIdx = _kListe().indexOf(chosenName);
       if (actualHandIdx < 0) continue;
 
       // Recompute Wisdom cost for the actually-picked hero — the
@@ -46582,15 +48251,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       let kostenWahl = null;
       if (typeof script.reactionKostenWahl === 'function') {
         kostenWahl = await script.reactionKostenWahl(this, pi, chainCtx, {
-          handIdx: actualHandIdx, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,
+          handIdx: _kAusVorrat ? -1 : actualHandIdx, ausVorrat: _kAusVorrat, casterHeroIdx: reactionCasterHeroIdx, casterSeite: reactionCasterSeite, wisdomCost,   // `handIdx` -1: eine Vorratskarte belegt keinen Handplatz
         });
         if (!kostenWahl) continue;
         // Die Hand kann sich während der Frage geändert haben (Hook, Zeitablauf): die Karte muss noch da sein.
-        if (ps.hand[actualHandIdx] !== chosenName && ps.hand.indexOf(chosenName) < 0) continue;
+        if (_kListe()[actualHandIdx] !== chosenName && _kListe().indexOf(chosenName) < 0) continue;
       }
-      const actualHandIdxNachWahl = ps.hand[actualHandIdx] === chosenName ? actualHandIdx : ps.hand.indexOf(chosenName);
+      const actualHandIdxNachWahl = _kListe()[actualHandIdx] === chosenName ? actualHandIdx : _kListe().indexOf(chosenName);
 
-      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: _kAusVorrat ? undefined : actualHandIdxNachWahl });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -46600,21 +48269,24 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card Game Player Inya) entscheiden sich erst beim Aufloesen
       // der Kette. Flug UND Eintrag passieren deshalb jetzt gemeinsam
       // dort, wo das Ziel bekannt ist — siehe _resolveReactionChain.
-      ps.hand.splice(actualHandIdxNachWahl, 1);
+      this._rxAbgang(ps, { liste: _kListe(), ausVorrat: _kAusVorrat, idx: actualHandIdxNachWahl });
 
       // ★ v1031: … und die Partie-Grenze verbrauchen. Der Stempel sitzt
-      // hier, wo die Karte die Hand verlaesst. ★ Z7b (Als Entscheidung,
-      // Welle 3): wird die Reaktion spaeter GANZ negiert (Cute Camera …),
-      // hat sie nie aufgeloest — `_resolveReactionChain` nimmt den hier
-      // gesetzten Stempel (`link._opgNeu`) dann zurueck. Fizzle behaelt ihn.
-      let _opgNeu = null;
+      // hier, wo die Karte die Hand verlaesst. ★ Spielgestalter-Entscheidung
+      // 16.11.2026: wird die Reaktion spaeter negiert (Cute Camera …), bleibt
+      // der Stempel gesetzt (die Aktivierung hat begonnen) — kein Zurueckgeben.
+      // Rundengrenzen („You can only play 1 … per turn") stempelt das Skript
+      // ueber `stempelBeiAktivierung(engine, pi)` (The Master's Plan, Magic Topaz): sie gilt
+      // schon im Kettenfenster, nicht erst mit der Wirkung.
       {
         const _opgScript = loadCardEffect(chosenName);
         if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
           if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-          const _opgKey = _opgScript.oncePerGameKey || chosenName;
-          if (!ps._oncePerGameUsed.has(_opgKey)) _opgNeu = _opgKey;
-          ps._oncePerGameUsed.add(_opgKey);
+          ps._oncePerGameUsed.add(_opgScript.oncePerGameKey || chosenName);
+        }
+        if (typeof _opgScript?.stempelBeiAktivierung === 'function') {
+          try { await _opgScript.stempelBeiAktivierung(this, pi, { cardName: chosenName, chain }); }
+          catch (err) { console.error(`[Engine] stempelBeiAktivierung for ${chosenName} failed:`, err.message); }
         }
       }
 
@@ -46637,7 +48309,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Master's Plan": die Karte flog aus der Handmitte statt von
         // ihrem Platz.
         fromHandIdx: actualHandIdxNachWahl,
-        _opgNeu,   // Z7b: Partie-Stempel dieser Aktivierung (Rueckgabe bei ganzer Negation)
+        ...(_kAusVorrat ? { fromCreation: true } : {}),   // Flug aus Crestinas Vorrat statt aus der Hand
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
         // Als Vorgabe 29.9.: Reihe, in die `casterHeroIdx` zeigt (geliehener Wirker).
@@ -46800,14 +48472,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         if (link.negated) {
           this.log('card_negated', { card: link.cardName, owner: link.owner });
-          // Z7b: ganz negierte Reaktion = nie aufgeloest → „1 pro Spiel" (Divine Gift …) nicht verbraucht.
-          if (link._opgNeu) this.gs.players[link.owner]?._oncePerGameUsed?.delete(link._opgNeu);
-          // Z7b: Held-/Board-Creature-Reaktionen (Key, Spearman) stempeln ihre Rundengrenze beim Aktivieren
-          // (`payActivationCost`); die Kosten bleiben bezahlt, die Rundengrenze nicht (optionaler Haken).
-          if (!link.isInitialCard && typeof link.script?.refundOnNegation === 'function') {
-            try { link.script.refundOnNegation(this, link); }
-            catch (err) { console.error(`[Engine] refundOnNegation for ${link.cardName} failed:`, err.message); }
-          }
+          // Spielgestalter-Entscheidung 16.11.2026: Einmal-Limits („once per turn / per game") sind mit dem BEGINN der Aktivierung verbraucht — auch eine hier negierte Reaktion
+          // (Hand-Reaktion mit „1 pro Spiel", Key/Spearman/Celia, Bow of the Hunt Goddess) gibt ihren Stempel nicht zurueck (frueher: Z7b/W19c `_opgNeu`, `refundOnNegation`, `equipReactionRefund`).
         } else {
           const _wo = link.casterOwner ?? link.owner;
           const _whi = link.isInitialCard ? link.heroIdx : link.casterHeroIdx;
@@ -46815,12 +48481,6 @@ this._deathWatch = (this._deathWatchStack || []).length
             card: link.cardName, player: this.gs.players[link.owner]?.username,
             hero: this.gs.players[_wo]?.heroes?.[_whi]?.name || null, reason: link.fizzleReason,
           });
-        }
-        // W19c (Al, Bow of the Hunt Goddess): das vom Bow gespielte Glied wurde negiert/fizzelt -> der Einmal-Stempel der Ausruestung
-        // geht zurueck (Z7b-Leitfrage „durfte die Karte resolven?"); Kosten und Kartenbewegung bleiben, wie bei jedem negierten Glied.
-        if (link.fromEquip && typeof link._equipRefund === 'function') {
-          try { link._equipRefund(); }
-          catch (err) { console.error(`[Engine] equipReactionRefund for ${link.cardName} failed:`, err.message); }
         }
         await this._delay(TK.neg);
         let _fl = false;
@@ -46832,6 +48492,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // post-chain cleanup instead, so skip them here.
         if (link.fromHero || link.fromCreature) {
           // Helden-Effekt-Link (v691) / Board-Creature-Link: nichts abzulegen.
+        } else if (link._zentral) {
+          // 16.11.2026: Platzhalter einer schon eingesetzten Hand-Reaction (`_zentralesKettenfenster`): die Karte liegt bereits im Stapel; Diebstahl/Löschung/Ablage regelt `_reaktionGespielt` danach.
         } else if (!link.isInitialCard
             && Number.isInteger(link._negatedToHandOf)
             && this.gs.players[link._negatedToHandOf]) {
@@ -46843,7 +48505,11 @@ this._deathWatch = (this._deathWatchStack || []).length
           const oppPs = this.gs.players[link.owner];
           const zielIdx = diebPs.hand.length;
           diebPs.hand.push(link.cardName);
-          this._tagHandCardOrigin(dieb, link.cardName, link.owner);   // kehrt spaeter zum Besitzer zurueck
+          // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte: spielte `link.owner` eine gestohlene Karte, gehoert sie dem Bestohlenen (Key holt sie zurueck →
+          // keine Fremdmarke auf seiner eigenen Karte). Wie der Ablagezweig unten (`handKartenBesitzerPs`); aus Deck/Vorrat gespielt gilt `link.owner`.
+          const _kartenBesitzer = (oppPs && !link.fromDeck && !link.fromCreation)
+            ? this.gs.players.indexOf(this.handKartenBesitzerPs(oppPs, link.cardName)) : -1;
+          this._tagHandCardOrigin(dieb, link.cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : link.owner);   // kehrt spaeter zum Besitzer zurueck
           if (link._negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, link.cardName);
           if ((link.goldCost || 0) > 0 && oppPs) {
             oppPs.gold = (oppPs.gold || 0) + link.goldCost;
@@ -46851,7 +48517,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             this._broadcastEvent('gold_change', { owner: link.owner, amount: link.goldCost });
           }
           this._broadcastEvent('play_pile_transfer', {
-            cardName: link.cardName, from: 'hand', to: 'hand',
+            cardName: link.cardName, from: link.fromCreation ? 'creation' : 'hand', to: 'hand',
             fromOwner: link.owner, toOwner: dieb,
             toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
             ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
@@ -46877,13 +48543,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Handmitte.
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
-              from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
+              from: link.fromDeck ? 'deck' : (link.fromCreation ? 'creation' : 'hand'), to: toDeleted ? 'deleted' : 'discard',
               ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
               flugMs: TK.flugMs,
             });
             // 3. Landung ERST NACH der Animation.
             _fl = true; await this._delay(TK.Fl);
-            const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
+            const _kettenPs = (link.fromDeck || link.fromCreation) ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
             if (!_kettenPs[pile]) _kettenPs[pile] = [];
             _kettenPs[pile].push(link.cardName);
             this.sync();
@@ -46906,15 +48572,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (link.resolve) {
           try {
-            delete this.gs._discardOutDeclined;
             // Wer gerade aufloest, ist der Negierer, falls das Glied
             // ein anderes negiert (`negateChainLink` liest das).
             const _vorherAufloeser = this._rxResolvingOwner;
             const _vorherKarte = this._rxResolvingCard;
+            const _vorherGlied = this._rxResolvingLink;   // Blinded: der Wirker eines Reaktionsglieds (`_blindWirkerFuer`)
             this._rxResolvingOwner = link.owner;
             this._rxResolvingCard = link.cardName;
+            this._rxResolvingLink = link;
             let result;
-            const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
             // Pfeilsalve (nur Darstellung): hat der Angreifer Pfeile an der Kette, haelt das Schild die Standard-Animationen der Attack zurueck (`_arrows-shared.js`).
             const _pfeilSchild = (link.isInitialCard && link.cardType === 'Attack') ? require('./_arrows-shared').pfeilSchildOeffnen(this, chain, link) : null;
             try {
@@ -46924,9 +48590,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
+              this._rxResolvingLink = _vorherGlied;
               if (_pfeilSchild) require('./_arrows-shared').pfeilSchildSchliessen(this, _pfeilSchild);
             }
-            if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result, _hoptVorher);
+            if (link.isInitialCard) link.resolveResult = result;
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
           }
@@ -46988,7 +48655,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // — a negated Reaction Creature paid its cost but didn't
         // actually land, so the discard pile is its correct
         // destination there.
-        if (!link.isInitialCard && !link.fromHero && !link.fromCreature) {   // v691: Helden-Links (und Board-Creature-Links) haben keine Karte
+        if (!link.isInitialCard && !link.fromHero && !link.fromCreature && !link._zentral) {   // v691: Helden-Links (und Board-Creature-Links) haben keine Karte; 16.11.2026: `_zentral` liegt schon im Stapel
           const linkScript = loadCardEffect(link.cardName);
           // `gs._spellPlacedOnBoard` lets a hook fired during this
           // link's resolve (e.g. Card Game Player Inya turning the
@@ -47013,7 +48680,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               // bisherige generische Startpunkt.
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
-                from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
+                from: link.fromDeck ? 'deck' : (link.fromCreation ? 'creation' : 'hand'), to: zumLoeschen ? 'deleted' : 'discard',
                 ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx, chainLinkId: link.id } : {}),
                 flugMs: TK.flugMs,
               });
@@ -47022,7 +48689,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               // erschiene sie sonst schon beim START der Animation.
               // Gleiche Reihenfolge wie routeNegatedInitialCard.
               await this._delay(TK.Fl);
-              const _kettenPs = link.fromDeck ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
+              const _kettenPs = (link.fromDeck || link.fromCreation) ? ps : this.handKartenBesitzerPs(ps, link.cardName);   // W63c: Stapel des permanenten Besitzers
               if (zumLoeschen) { if (!_kettenPs.deletedPile) _kettenPs.deletedPile = []; _kettenPs.deletedPile.push(link.cardName); }
               else _kettenPs.discardPile.push(link.cardName);
               this.sync();
@@ -47164,7 +48831,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const traegt = (n) => !!loadCardEffect(n)?.reactsToSurpriseActivation;
     for (let i = 0; i < this.playerCount(); i++) {
       if (i === steuerer) continue;
-      if ((this.gs.players[i]?.hand || []).some(traegt)) return true;
+      if (this._rxNamen(this.gs.players[i]).some(traegt)) return true;   // Hand + Crestinas Vorrat
       // 24.10. (Reverse Trap): auch eine VERDECKTE Surprise des Gegners kann auf die Aktivierung antworten (`isSurprise` + `isReaction`, wie Lunar Eclipse im Kettenfenster).
       try { if (this._getAllSurpriseEntries(i).some(e => traegt(e.cardName))) return true; } catch { /* ignore */ }
     }
@@ -47175,7 +48842,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const opp = this.gs.players[this.opponentOf(playerIdx)];
     if (!opp) return false;
     const traegt = (n) => !!loadCardEffect(n)?.reactsToPlacement;
-    if ((opp.hand || []).some(traegt)) return true;
+    if (this._rxNamen(opp).some(traegt)) return true;   // Hand + Crestinas Vorrat
     return (opp.surpriseZones || []).some(z => (z || []).some(traegt));
   }
 
@@ -47214,6 +48881,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.sync();
     } else if (source === 'none') {
       von = null;
+    } else if (source === 'hand' && opts._ausVorrat) {
+      // 12.11.: Karte aus Crestinas Vorrat — Abflug vom Vorratsplatz
+      const vi = (ps.creationZone || []).indexOf(cardName);
+      von = 'creation';
+      if (vi >= 0) { handIdx = vi; this._rxAbgang(ps, { liste: ps.creationZone, ausVorrat: true, idx: vi }); }
     } else if (source === 'hand') {
       handIdx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (handIdx >= 0 && ps.hand[handIdx] === cardName) ps.hand.splice(handIdx, 1);
@@ -47229,7 +48901,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('play_pile_transfer', {
         owner: playerIdx, cardName, from: von,
         to: nachDeck ? 'deck' : (nachGeloescht ? 'deleted' : 'discard'),
-        ...(von === 'hand' && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
+        ...((von === 'hand' || von === 'creation') && Number.isInteger(handIdx) && handIdx >= 0 ? { fromHandIdx: handIdx } : {}),
         ...(von === 'surprise' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld } : {}),
         ...(von === 'support' && Number.isInteger(vonHeld) ? { fromHeroIdx: vonHeld, fromSlotIdx: opts.slotIdx } : {}),
       });
@@ -47253,22 +48925,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ Z7b — Einmal-Stempel („1 pro Zug / 1 pro Spiel") bei FIZZLE (eine Regel, eine Stelle).
+   * ★ Einmal-Stempel („1 pro Zug / 1 pro Spiel") einer GESPIELTEN Initialkarte, die nicht auflöst — Fizzle ODER Negation (eine Regel, eine Stelle).
    *
-   * Leitfrage (Als Entscheidung, Welle 3): „Durfte die Karte resolven?"
-   *   • Ganz negiert („Negate that card/Spell/Artifact/effect": Silence, Master's Plan, Rusty Touch,
-   *     MOE Shield …) → nie aufgelöst → KEIN Stempel (auch nicht bei Divine Gifts); bezahlte Kosten
-   *     bleiben bezahlt. Läuft nie hierher.
-   *   • Aufgelöst, aber das Ergebnis verhindert (Schadens-/Teil-Negierung, Immunität, Zielschutz,
-   *     kein legales Ziel, Fizzle) → die Karte WAR gespielt → Slot verbraucht.
-   * Hierher kommt nur das Fizzle einer Initialkarte, deren Skript-`onPlay` deshalb gar nicht läuft
-   * (Wirker beim Auflösen eingefroren/besiegt/betäubt/negiert, v1328): `oncePerGame`/`oncePerGameKey`
-   * stempelt die Engine, Rundensperren meldet die Karte über den optionalen Haken
-   * `onFizzledPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (dieselbe Marke, die sie sonst
-   * im `onPlay` setzt), und Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
-   * Abbruch durch den SPIELER ist wieder etwas anderes (nichts gespielt) und läuft nie hierher.
+   * ★ Spielgestalter-Entscheidung 16.11.2026 (kehrt Z7b um: „ganz negiert stempelt nicht"): Effekte, die NACH BEGINN ihrer Aktivierung negiert werden („Negate that card/Spell/Artifact/effect":
+   * Silence, The Master's Plan, Rusty Touch, MOE Shield …), gelten als VERBRAUCHT — wie ein Fizzle (Wirker beim Auflösen handlungsunfähig, v1328) oder ein verhindertes Ergebnis
+   * (Schadens-/Teil-Negierung, Immunität, Zielschutz, kein legales Ziel). Bezahlte Kosten bleiben bezahlt. NICHT verbraucht: Abbruch durch den SPIELER (Zielwahl, Wahlfenster, „Nein") und
+   * Karten, die gar nicht aktivierbar waren — beides läuft nie hierher.
+   * Hierher kommt die Initialkarte (aus der Hand gespielt: Spell, Attack, Artifact, Potion, Creature), deren Skript-`onPlay`/`resolve` deshalb nie läuft: `oncePerGame`/`oncePerGameKey`
+   * stempelt die Engine, Rundensperren meldet die Karte über den optionalen Haken `onFizzledPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (dieselbe Marke, die sie sonst im
+   * `onPlay`/`resolve` setzt), und Zähler-Lauscher (Kogarasu) hören bei Spells auf `afterSpellPrevented`.
    */
-  async _noteFizzledPlay(owner, cardName, heroIdx, cardType, casterOwner) {
+  async _noteFizzledPlay(owner, cardName, heroIdx, cardType, casterOwner, extra = null) {
     const ps = this.gs.players?.[owner];
     if (!ps || !cardName) return;
     const script = loadCardEffect(cardName);
@@ -47281,22 +48948,24 @@ this._deathWatch = (this._deathWatchStack || []).length
       try { await script.onFizzledPlay({ engine: this, gs: this.gs, pi: owner, heroIdx, cardName, cardType }); }
       catch (err) { console.error(`[Engine] onFizzledPlay for ${cardName} failed:`, err.message); }
     }
+    if (cardType === 'Spell') this.thaliaNotiereSupportZauber(owner, cardName);   // W49a: auch eine negierte/fizzelnde Kopie zählt für „1 Kopie je Support Spell pro Zug"
     if (cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
-      await this._meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner);
+      await this._meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner, extra);
     }
   }
 
   /**
-   * ★ Z7b — „Der Zauber durfte auflösen, sein Ergebnis wurde verhindert" (Fizzle oder Teil-Negierung
-   * wie Accidental Dodge/Test Flight). `afterSpellResolved` feuert dort nie; Hörer dieses
-   * Gegenstücks (nur Zähler, z. B. Kogarasu „1 Spell pro Zug" — der Zauber wurde BENUTZT) lauschen auf
-   * `afterSpellPrevented`. Ein ganz negierter Zauber meldet nichts (er hat nie aufgelöst).
+   * ★ „Der Zauber wurde gespielt, löst aber nicht (ganz) auf" (Fizzle, Teil-Negierung wie Accidental Dodge/Test Flight, oder — Spielgestalter-Entscheidung 16.11.2026 — Negation in der Kette).
+   * `afterSpellResolved` feuert dort nie; Hörer dieses Gegenstücks (nur Zähler, z. B. Kogarasu „1 Spell pro Zug" — der Zauber wurde BENUTZT) lauschen auf `afterSpellPrevented`.
    */
-  async _meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner) {
+  async _meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner, extra = null) {
     try {
       await this.runHooks('afterSpellPrevented', {
         heroOwner: Number.isInteger(casterOwner) ? casterOwner : owner,
         spellName: cardName, spellCardData: this._getCardDB()[cardName], heroIdx, casterIdx: owner,
+        // Spielgestalter-Entscheidung 17.11.2026 (Friendship): ein negierter Support-Spell, der als Zusatzaktion eines Gebers gespielt wurde, bleibt ein EINGESETZTER Zusatzaktions-Zauber — der Geber
+        // (`consumedInst`, wie bei `afterSpellResolved`) wird mitgegeben, damit sein „then draw" trotzdem feuern kann. Ohne `extra` (Kettennegation, Sofort-Guss): wie bisher kein Geber.
+        viaAdditionalProvider: extra?.viaAdditionalProvider ?? null,
         _skipReactionCheck: true,
       });
     } catch (err) { console.error(`[Engine] afterSpellPrevented for ${cardName} failed:`, err.message); }
@@ -47330,7 +48999,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const diebPs = this.gs.players[dieb];
       const zielIdx = diebPs.hand.length;
       diebPs.hand.push(cardName);
-      this._tagHandCardOrigin(dieb, cardName, ownerIdx);   // kehrt spaeter zum Besitzer zurueck
+      // Herkunft = der PERMANENTE Besitzer der Karte, nicht der Spieler, der sie spielte (s. Reaktionsglied-Zweig in `_resolveReactionChain`): eine gestohlene Karte, die ihr Besitzer per Key
+      // zurueckholt, bekommt keine Fremdmarke auf seiner eigenen Hand. Nur Handkarten tragen Herkunftsmarken (`opts.fromZone`).
+      const _besitzerPs = (!opts.fromZone || opts.fromZone === 'hand') ? this.handKartenBesitzerPs(ps, cardName) : ps;
+      const _kartenBesitzer = this.gs.players.indexOf(_besitzerPs);
+      this._tagHandCardOrigin(dieb, cardName, _kartenBesitzer >= 0 ? _kartenBesitzer : ownerIdx);   // kehrt spaeter zum Besitzer zurueck
       if (chainResult?.negatedStufeNull) this._stufeNullMarkieren(dieb, zielIdx, cardName);   // 24.10. Reverse Trap
       this._broadcastEvent('play_pile_transfer', {
         cardName, from: 'hand', to: 'hand',
@@ -47480,8 +49153,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** Handgeister (nur Darstellung): Reaktionsglieder, deren Karte die Hand schon verlassen hat, aber erst beim Aufloesen wegfliegt. */
   _kettenGeister(chain) {
     return chain
-      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise)
+      .filter(l => !l.isInitialCard && Number.isInteger(l.fromHandIdx) && !l.fromHero && !l.fromCreature && !l.fromDeck && !l.fromSurprise && !l.fromCreation)
       .map(l => ({ id: l.id, cardName: l.cardName, owner: l.owner, fromHandIdx: l.fromHandIdx }));
+  }
+
+  /** Rarity der Karte eines Kettenglieds, einmal beim ersten Mal festgehalten (die Karte hat die Hand dann meist schon verlassen). */
+  _rarityFuerKettenglied(l) {
+    if (l._rarity !== undefined) return l._rarity || undefined;
+    if (!this.gs?.players?.some(ps => ps && ps.rarityLedger)) return undefined;
+    let r = null;
+    try { r = require('./_rarity-track').rarityOf(this.gs, l.owner, l.cardName, ['hand', 'dp', 'S*', 'cz'], { idx: l.fromHandIdx, idxZone: l.fromCreation ? 'cz' : 'hand' }); } catch {}
+    l._rarity = r;
+    return r || undefined;
   }
 
   _broadcastChainUpdate(chain) {
@@ -47489,7 +49172,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       vorlauf: this._chainVorlauf || null,
       geister: this._kettenGeister(chain),
       links: chain.map(l => ({
-        id: l.id, cardName: l.cardName, owner: l.owner,
+        id: l.id, cardName: l.cardName, owner: l.owner, rarity: this._rarityFuerKettenglied(l),
         cardType: l.cardType, isInitialCard: l.isInitialCard,
         negated: l.negated, negationStyle: l.negationStyle || null, chainClosed: l.chainClosed,
       })),
@@ -47566,6 +49249,55 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 — die Einmal-Limits einer AKTIVIERUNG (Kreatur-/Helden-Effekt) sind mit dem BEGINN der Aktivierung verbraucht: wird sie danach negiert (Spearman,
+   * Divine Punishment, Cybug LADYBUG, Assault for Teocuilatl … in der Kette; Rolling Boulder, Frost Rune, Cool Tech Jetpack … nach der Zielwahl, siehe `negationsStand`), läuft ihr Skript nicht
+   * (zu Ende) — der Aufrufer ruft diese Stelle, die dann stempelt, was der Erfolgsweg stempeln würde: die Rundensperre `hoptKey`, „1 pro Spiel" (`markOncePerGameEffect`) und bei „up to N times
+   * per turn" (`chargesPerTurn` + `chargeKey`, 3-Headed Giant) EINE Nutzung (die Rundensperre fällt wie im Skript erst mit der letzten).
+   * Effekte mit EIGENER Buchführung (`ctx._skipCreatureEffectHopt` / `_skipHeroEffectHopt`: Analyzer, Gatherer, Sparkfly Queen, Rha'Bi, Sett) melden ihre Buchung über den optionalen Skript-Vertrag
+   *   `stempelNegierteAktivierung(engine, traeger, { pi, modus, ziele })`   → `true` = zusätzlich die Rundensperre `hoptKey` stempeln, sonst führt das Skript alles selbst.
+   * `modus` = der VOR dem Kettenfenster gewählte Modus (Skript-Vertrag `waehleModus(ctx)`, nur Kreaturen mit mehreren eigenständig begrenzten Modi), `ziele` = die im Zielfenster negierten Ziele
+   * (nur bei Negation nach der Zielwahl). Skripte ohne den Vertrag (auch Wolflesia, Clausss, Vullary: der Modus ergibt sich aus dem Zustand, der Erfolgsweg stempelt die normale Rundensperre)
+   * bekommen den Standardweg. `traeger` = Karteninstanz (Kreatur) bzw. Heldenobjekt, an dem der Ladungszähler hängt. Abbruch durch den Spieler und nicht aktivierbare Effekte rufen das nie.
+   */
+  negierteAktivierungStempeln(playerIdx, script, effectName, hoptKey, traeger, extra = {}) {
+    if (!script || !hoptKey) return;
+    const gs = this.gs;
+    this.markOncePerGameEffect(playerIdx, script, effectName);
+    if (typeof script.stempelNegierteAktivierung === 'function') {
+      let engineSperre = false;
+      try { engineSperre = script.stempelNegierteAktivierung(this, traeger, { pi: playerIdx, modus: extra.modus, ziele: extra.ziele }) === true; }
+      catch (err) { console.error('[stempelNegierteAktivierung]', effectName, err.message); }
+      if (!engineSperre) return;
+    } else if (typeof script.chargesPerTurn === 'number' && typeof script.chargeKey === 'string' && traeger) {
+      const { spendUse, usesLeft } = require('./_charges');
+      const opt = { key: script.chargeKey, max: script.chargesPerTurn };
+      spendUse(traeger, gs, opt);
+      if (usesLeft(traeger, gs, opt) > 0) return;
+    }
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[hoptKey] = gs.turn;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026 — NEGATION NACH DER ZIELWAHL einer Aktivierung (Kreatur-/Helden-/Ability-Effekt) ≠ ABBRUCH DURCH DEN SPIELER.
+   * Wird die Aktivierung im Zielfenster negiert (Rolling Boulder, Surprises wie Frost Rune/Glass Wall, Hand-Reaktionen wie Chaorc Interception, Cool Tech Jetpack, Schutz-Wächter), liefern die Pickers
+   * `null`/`[]` und das Skript bricht ab (`return false`) — für den Eintritt war das bisher ein Abbruch (Einmal-Limit blieb frei). Die Fenster melden jede echte Negation über `_merkeNegation`
+   * (`negationsBilder`, Rolling-Boulder-Sentinel, Schutz-Drop, alle Ziele geschützt); der Eintritt vergleicht den Stand vor und nach dem Skript:
+   *   const stand = engine.negationsStand();  … script …  const neg = engine.negiertSeit(stand);   // null = nicht negiert, sonst die negierten Ziele (Liste, evtl. leer)
+   * und behandelt ein `false` MIT Negation wie die Negation in der Kette (Einmal-Limits verbraucht, bezahlte Kosten bleiben bezahlt); ein `false` OHNE Negation bleibt der Abbruch (nichts verbraucht).
+   */
+  _merkeNegation(ziele) {
+    this._negZaehler = (this._negZaehler || 0) + 1;
+    this._negZiele = Array.isArray(ziele) ? ziele.slice() : (ziele ? [ziele] : []);
+  }
+
+  /** Stand des Negations-Zählers (vor dem Skript merken). */
+  negationsStand() { return this._negZaehler || 0; }
+
+  /** Wurde seit `stand` im Zielfenster etwas negiert? `null` = nein, sonst die Ziele der letzten Negation. */
+  negiertSeit(stand) { return (this._negZaehler || 0) > stand ? (this._negZiele || []) : null; }
+
+  /**
    * ★ „CONTROL OF THIS CREATURE CANNOT CHANGE." (v1021, Creepy
    * Villager.) Eigener, ENGER Vertrag statt `_cardinalImmune`: die
    * Kreatur bleibt normal angreifbar, zerstoerbar und opferbar — nur
@@ -47586,10 +49318,43 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ ZAEHLT EINE INHAERENTE AKTION ALS DIE ZWEITE? (v1019, Als Ruling
-   * 12.9.)
+   * ★ AKTIONSWIRTSCHAFT (Spielgestalter-Entscheidung 16.11.2026): „Alles nach
+   * der ersten Aktion, die KEINE Zusatz-Aktion ist, ist eine Zusatz-Aktion."
    *
-   * Regel: ALLES, was nicht die ERSTE Aktion der Action Phase ist, ist
+   * (Vorher stand hier „alles nach der ersten Aktion der Phase" — das stimmte
+   * nicht: eine Zusatzaktion VOR der Hauptaktion war nie „die erste Aktion".)
+   *
+   * Zusatzaktionen — inhaerente (Detection, Quick Attack …), per Geber gewirkte
+   * (Friendship …), Sofort-Gusse (Learning, Time Distortion …) und kostenlose
+   * Sofortaktionen — sind selbst nie die erste Aktion der Action Phase. Erst die
+   * erste Nicht-Zusatz-Aktion (die Hauptaktion) ist es; jede reguelaere Aktion
+   * DANACH ist eine Zusatzaktion (zweite Aktion: Zhigao, Duigno, Torchure …).
+   * `_actionsPlayedThisPhase` zaehlt darum erst ab der Hauptaktion: eine
+   * Zusatzaktion davor hinterlaesst keine Spur (doPlaySpell/doPlayCreature nehmen
+   * den vorlaeufigen Eintrag einer inhaerenten ersten Karte zurueck,
+   * `_spellAddlFree`/`additionalIsFree` zaehlen gar nicht).
+   *
+   * Diese Abfrage ist fuer Zusatzaktionen, die INNERHALB einer laufenden Aktion
+   * gewirkt werden, ohne selbst durch doPlaySpell/doPlayCreature zu laufen
+   * (Learning-Nachguss) und den Zaehler deshalb selbst pflegen muessten: sie
+   * zaehlen als Aktion der Phase nur, wenn die Hauptaktion schon verbraucht ist
+   * oder gerade laeuft (der Server traegt den Helden VOR `afterSpellResolved` in
+   * `heroesActedThisTurn` ein). Folgt Learning auf eine Zusatzaktion
+   * (Detection, ein Friendship-Zauber …), bleibt der Zaehler stehen — sonst
+   * wuerde die Hauptaktion zur „zweiten Aktion" und die Phase endete.
+   */
+  zusatzaktionZaehltInAktionsphase(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return false;
+    if (this.gs.currentPhase !== PHASES.ACTION) return false;
+    return (ps.heroesActedThisTurn || []).length > 0;
+  }
+
+  /**
+   * ★ ZAEHLT EINE INHAERENTE AKTION ALS DIE ZWEITE? (v1019, Als Ruling
+   * 12.9.; praezisiert durch die Entscheidung vom 16.11.2026 oben)
+   *
+   * Regel: ALLES nach der ersten Nicht-Zusatz-Aktion der Action Phase ist
    * eine Zusatzaktion — auch eine inhaerente (Aggressive Town Guard,
    * Quick Attack). Wer also mit einem Zweitaktions-Zuschlag (Zhigao)
    * in der Action Phase steht, seine erste Aktion schon hatte und dann
@@ -47601,8 +49366,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * unverbrauchtem Zhigao in der Action Phase haengen, obwohl er zwei
    * Aktionen gemacht hatte.
    *
-   * Die ERSTE Aktion der Phase bleibt ausgenommen: eine inhaerente
-   * Karte vor jeder anderen Aktion ist weiterhin gratis.
+   * Eine inhaerente Karte VOR der Hauptaktion bleibt gratis (sie ist selbst
+   * eine Zusatzaktion und nicht „die erste Aktion").
    */
   inherentCountsAsExtraAction(playerIdx) {
     const ps = this.gs?.players?.[playerIdx];
@@ -47814,7 +49579,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcName = (typeof source === 'string') ? source : (source?.name || info.sourceName || null);
 
     const gesehen = new Set();
-    for (const cardName of [...(ps.hand || [])]) {
+    for (const cardName of this._rxNamen(ps)) {   // Hand + Crestinas Vorrat
       if (gesehen.has(cardName)) continue;
       gesehen.add(cardName);
       if (this._handPlayLockedFor(ps, cardName)) continue;
@@ -47854,7 +49619,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * to it" ist ab zwei erfuellt.
    */
   beginMultiHit(anzahl) {
-    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1 };
+    this._multiHitScope = { total: anzahl || 0, tiefe: (this._multiHitScope?.tiefe || 0) + 1, ...(this._multiHitScope?._umleitZiele ? { _umleitZiele: this._multiHitScope._umleitZiele } : {}) };
     // Al 26.10. (Idej Sword - Onima „exactly 1 Hero und kein anderes Ziel"): `afterSpellResolved.damageTargets` kennt nur die GEWÄHLTEN Ziele
     // (Whirlwind Strikes Kreaturen im Support fehlen); die Klammer ist dann schon zu. Die größte Zielzahl einer Mehrziel-Klammer dieses Gusses
     // bleibt deshalb am Zielprotokoll (`gs._spellDamageLog._mehrziel`) lesbar, solange der Guss auflöst.
@@ -47882,8 +49647,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._aoeSurpriseKeys = null;
     }
     if (!this._multiHitScope) return;
+    let nachTode = [];
     try {
-      await this._todesAufschubAbschliessen();
+      nachTode = await this._todesAufschubAbschliessen();
     } finally {
       if (this._multiHitScope) {
         if ((this._multiHitScope.tiefe || 1) <= 1) {
@@ -47892,6 +49658,45 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else this._multiHitScope.tiefe -= 1;
       }
     }
+    // Spielgestalter-Entscheidung 17.11.2026: der Schlag ist komplett aufgeloest (Schaden, Tode, Trigger) — jetzt erst die Wirkungen „danach" (Explosivo's Sword).
+    for (const fn of (nachTode || [])) {
+      try { await fn(); } catch (err) { console.error('[nachFlaechenschlagTode]', err.message); }
+    }
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026: „Doppelter Treffer ist normalerweise nicht erlaubt." Schadensumleiter, die den Schaden eines Ziels auf ein ANDERES Ziel verlegen (Mean Cute Cat,
+   * Gigantisaur Brachion, Johanna, Bubbles, Prophecy of Tempeste), bieten das Ziel NICHT an, das derselbe Mehrziel-Schlag ohnehin selbst trifft (Fireball auf Held UND Kreatur, Chain Lightning, Flächenschlag).
+   * Die Klammer `beginAoeStrike` merkt dafür ihre Ziele am Scope (Helden-OBJEKTE, Kreaturen-Ids); `schlagTrifftZiel(ziel)` fragt sie ab. Ohne laufende Klammer (Einzelziel-Treffer) immer false.
+   * Gegenstück im Zielwahl-Fenster: `applyRedirectWindows` (`_bereitsGewaehlt`). Ausnahme wie dort: Redirecting Aura (Text: „even if that target was already hit by the same Spell/effect").
+   */
+  _schlagZieleFuerUmleiter(scope, opts) {
+    try {
+      const helden = new Set(), insts = new Set();
+      for (const h of (opts.heroes || [])) {
+        const hero = h?.hero || ((h?.type === 'hero' || (h?.hp === undefined && h?.owner != null)) ? this.gs.players[h.owner]?.heroes?.[h.heroIdx] : h);
+        if (hero?.name) helden.add(hero);
+      }
+      for (const k of (opts.creatures || [])) {
+        const inst = (k && k.inst) ? k.inst : k;
+        if (inst && inst.id != null) insts.add(inst.id);
+      }
+      const vorher = scope._umleitZiele;   // verschachtelte Schläge (Booby Trap im Fireball …): die Ziele des äußeren bleiben stehen, es gilt die Vereinigung
+      if (vorher) { for (const h of vorher.helden) helden.add(h); for (const i of vorher.insts) insts.add(i); }
+      scope._umleitZiele = { helden, insts };
+    } catch { /* Buchführung darf den Schlag nie stören */ }
+  }
+
+  /**
+   * Trifft der laufende Mehrziel-Schlag dieses Ziel (Heldenobjekt, Kreaturen-Instanz oder Picker-Ziel `{type:'hero',owner,heroIdx}`) selbst? Siehe `_schlagZieleFuerUmleiter`.
+   * Ohne laufenden Schlag oder ohne Ziellisten-Merker: false (Verhalten wie bisher).
+   */
+  schlagTrifftZiel(ziel) {
+    const z = this._multiHitScope?._umleitZiele;
+    if (!z || !ziel) return false;
+    const t = this._todgeweihtZiel(ziel);
+    if (!t) return false;
+    return t.hero ? z.helden.has(t.hero) : (t.inst && t.inst.id != null && z.insts.has(t.inst.id));
   }
 
   /**
@@ -47935,6 +49740,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    this._schlagZieleFuerUmleiter(scope, opts);   // Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer durch Schadensumleiter (s. `schlagTrifftZiel`)
     // ★ W78 (Pythia): Helden, die dieser Schlag sicher faellt, gelten als todgeweiht (`istHeldTodgeweiht`) — `opts.heroes`: `{hero, heroIdx?, owner?, amount?}` bzw. Heldenobjekte (+ `opts.amount`).
     if (opts.heroes?.length) await this._schlagZieleMelden(opts, null, null);
     if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
@@ -49167,6 +50973,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {boolean}
    */
   isTokenCard(inst) {
+    // Spielgestalter-Entscheidung 16.11.2026 (Magic Mirror): die Kopie, die der Spiegel wirkt, ist KEINE permanente Karte — sie verhaelt sich wie ein Token ohne echte Karte darunter
+    // (`counters._spiegelKopie`): sie wirkt/liegt als Anhaengsel auf dem Brett, geht beim Abgang aber nie in Ablage, Gelöscht-Stapel, Deck oder Hand (`tokenAbgang`).
+    if (inst?.counters?._spiegelKopie) return true;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst?.name];
     return !!(cd && hasCardType(cd, 'Token'));
   }
@@ -49218,6 +51027,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   tokenUnterkarte(inst) {
     if (!inst || !this.isTokenCard(inst)) return null;
+    if (inst.counters?._spiegelKopie) return null;   // Magic-Mirror-Kopie: es liegt keine echte Karte darunter
     const roh = this._getCardDB()[inst.name];
     return (roh && !hasCardType(roh, 'Token')) ? inst.name : null;
   }
@@ -49421,6 +51231,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.name || physOwner === pi || this.heroSideOf(physOwner, hero) !== pi) return false;
     if (hero.permaControlBy != null) return false;
     return !!hero.statuses?.charmed && this._charmBlocksFrom(hero, pi, { loveShotOhneSchutz: true });
+  }
+
+  /**
+   * ★ ATT-14: Charme Lv3 („It and its Support Zones are unaffected by other cards and effects"): Held UND Support Zones (Karten darin) der Spalte (`physOwner`, `heroIdx`) sind fuer jede
+   * andere Karte tabu — Anhaengsel werden dort weder angelegt noch entfernt. Die Marke `zonenGeschuetzt` setzt `temporaereKontrolle` nur bei `supportZonesLocked` (nur Charme Lv3 nennt
+   * die Zonen im Kartentext; Golden Apple & Co. nicht) und sie endet mit dem `charmed`-Status am Zugende.
+   */
+  heroZonenGeschuetzt(physOwner, heroIdx) {
+    return !!this.gs.players[physOwner]?.heroes?.[heroIdx]?.statuses?.charmed?.zonenGeschuetzt;
   }
 
   /**
@@ -49646,9 +51465,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
 
-    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, z. B. Cybug LADYBUG) →
+    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, heute von keiner Karte mehr gesetzt) →
     // Resistance & Co. fragen. Kosten (Weapon Storm, Quest …) sind kein Effekt auf den Helden und setzen es nicht;
     // Mehrfach-Abwuerfe EINES Effekts (Memory Wipe) fragen einmal auf Kartenebene, nicht je Ability.
+    // Spielgestalter-Entscheidung 16.11.2026: Resistance schützt vor Effekten auf den HELDEN selbst; eine Karte, die eine Ability WÄHLT
+    // (Strong Ox Headbutt, Cybug LADYBUG, Fire Bomb …), umgeht es → solche Karten setzen `effectOnHero` NICHT.
     if (opts.effectOnHero === true && eintrag.zoneKind !== 'support' && ps.heroes?.[eintrag.heroIdx]?.name
         && await this.heroNonDamageEffectBlocked(ownerIdx, eintrag.heroIdx, 'ability_discard', { sourceOwner: opts.sourceOwner, source: opts.source })) {
       return false;
@@ -49888,7 +51709,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Welle 12: Sperre je KOPIE (Lawn Gnome: Stufenaenderung dieses Zuges schon verbraucht, auch ueber Brett und Rueckkehr).
       if (typeof script.canHandActivateAt === 'function') {
         let okAt;
-        try { okAt = !!script.canHandActivateAt(this.gs, playerIdx, handIndex, this); } catch { okAt = false; }
+        try { okAt = !!script.canHandActivateAt(this.gs, playerIdx, handIndex, this, ausVorrat); } catch { okAt = false; }   // 5. Argument: Index zaehlt im Vorrat (Crestina)
         if (!okAt) continue;
       }
       result.push({
@@ -49946,11 +51767,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       catch { return false; }
     }
     if (typeof script.canHandActivateAt === 'function') {
-      try { if (!script.canHandActivateAt(this.gs, playerIdx, handIndex, this)) return false; }
+      try { if (!script.canHandActivateAt(this.gs, playerIdx, handIndex, this, !!fromCreation)) return false; }
       catch { return false; }
     }
     try {
-      const ctx = this._createContext(realInst, { event: 'handActivate', handIndex });
+      // `fromCreation`: die Karte liegt in Crestinas Vorrat (Extra-Hand), `handIndex` zaehlt dort — Karten, die sich dabei selbst abwerfen (Stormkissed Waflav), muessen
+      // aus DER Liste nehmen, sonst traefe der Abwurf eine namensgleiche Handkopie (oder gar nichts).
+      const ctx = this._createContext(realInst, { event: 'handActivate', handIndex, fromCreation: !!fromCreation });
       const result = await script.onHandActivate(ctx);
       // Engine stamps the per-turn reveal on success — script doesn't
       // need to manage it. Cancellable prompts that returned false leave
@@ -50120,8 +51943,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ v1096 („Forbidden Curse of Aging"): einzelne Ability am
         // Wirtshelden negiert — `negatesHostAbilities` am Anhaengsel.
         if (this._abilityNegatedOnHero(hs, hi, abilityName)) continue;
-        // Blinded silences targeting ability activations on the host hero.
-        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn die Ability nur gegnerische Ziele waehlen kann (`blindedEffektGesperrt`).
+        if (this.blindedEffektGesperrt(playerIdx, hs, hi, abilityName, { script, level: slot.length })) continue;
 
         // Check HOPT
         const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
@@ -50192,7 +52015,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // ★ v1096 („Forbidden Curse of Aging"): einzelne Ability am
           // Wirtshelden negiert — `negatesHostAbilities` am Anhaengsel.
           if (this._abilityNegatedOnHero(playerIdx, hi, abilityName)) continue;
-          if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+          if (this.blindedEffektGesperrt(playerIdx, oi, hi, abilityName, { script, level: slot.length })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
 
           const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -50232,7 +52055,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // ★ v1096 („Forbidden Curse of Aging"): einzelne Ability am
           // Wirtshelden negiert — `negatesHostAbilities` am Anhaengsel.
           if (this._abilityNegatedOnHero(playerIdx, hi, abilityName)) continue;
-          if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+          if (this.blindedEffektGesperrt(playerIdx, oi, hi, abilityName, { script, level: slot.length })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
 
           const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -50423,10 +52246,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `activateHeroEffects` in _cpu.js (der Pilot bewertet gar nicht erst).
    */
   isHeroEffectBlockedByGraceShield(script, playerIdx) {
-    if (!script?.heroEffectHarmfulOnly) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — ein rein schaedlicher Heldeneffekt ist auch gegen den Geschuetzten aktivierbar und verpufft (Einmal-Marker
+    // verbraucht); die Sperre (Ruling 8.8.) ist ueberholt. Die Methode bleibt (Aufrufer in Engine, Server und CPU), liefert aber immer `false`; die CPU aktiviert nutzlose Effekte weiter nicht (`_cpu.js`).
+    return false;
+  }
+
+  /** CPU-Sicht (Spielgestalter-Entscheidung 16.11.2026): der Heldeneffekt waere gegen den Erste-Runden-Geschuetzten nutzlos (`heroEffectHarmfulOnly`, `blockedByFirstTurnProtection`) — der Mensch darf ihn aktivieren, die CPU nicht. */
+  heroEffectNutzlosErsteRunde(script, playerIdx) {
+    return this.nutzlosErsteRunde(script, playerIdx);
+  }
+
+  /** CPU-Sicht: `pi` ist die CPU und der Gegner steht unter der Erste-Runden-Immunität — Gates opponent-only Aktivierungen melden dann „nicht möglich" (der Mensch sieht sie weiter als aktivierbar). */
+  cpuMeidetErsteRunde(pi) {
+    return this.isCpuPlayer(pi) && this.ersterZugGeschuetzt(this.opponentOf(pi), pi);
+  }
+
+  /**
+   * CPU-Sicht (Spielgestalter-Entscheidung 16.11.2026: „Nutzlose Aktivierungen müssen möglich sein"): ist die Aktivierung dieses Skripts (Karte, Fähigkeit, Heldeneffekt, Kreatureneffekt) für `playerIdx`
+   * gegen den Erste-Runden-Geschützten nutzlos? Skript-Marken `heroEffectHarmfulOnly` (reine Schadenseffekte) und `blockedByFirstTurnProtection` („trifft nur die Gegnerseite"). Der Mensch darf sie spielen
+   * (verpufft), die CPU verbrennt sie nicht.
+   */
+  nutzlosErsteRunde(script, playerIdx) {
+    if (!script || !(script.heroEffectHarmfulOnly || script.blockedByFirstTurnProtection)) return false;
     if (playerIdx == null || playerIdx < 0) return false;
-    const opp = this.opponentOf(playerIdx);
-    return this.gs?.firstTurnProtectedPlayer === opp;
+    return this.gs?.firstTurnProtectedPlayer === this.opponentOf(playerIdx);
   }
 
   /**
@@ -50502,13 +52345,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
 
     if (chainResult.negated) {
-      // ★ Z7b (Als Entscheidung, Welle 3): die ganz negierte Aktivierung hat nie aufgeloest — die
-      // Rundensperre (HOPT) bleibt frei; bezahlte Kosten (Aktion) bleiben bezahlt. Frueher: Stempel.
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat begonnen — die in der Kette negierte Aktivierung verbraucht ihr Einmal-Limit (Rundensperre, „1 pro Spiel", Ladung);
+      // bezahlte Kosten (Aktion) bleiben bezahlt. (Früher Z7b: ganz negiert = nie aufgelöst = Sperre frei.)
+      this.negierteAktivierungStempeln(pi, chosen.script, chosen.name, chosen.hoptKey, hero);
       return true;
     }
 
     const surprise = await this._checkSurpriseOnHeroEffect(pi, heroIdx, chosen.name, heroOwner);
     if (surprise?.negateEffect) {
+      this.negierteAktivierungStempeln(pi, chosen.script, chosen.name, chosen.hoptKey, hero);   // dieselbe Regel für die per Surprise negierte Aktivierung
       delete this.gs._pendingCardReveal;
       delete this.gs._pendingPlayLog;
       return true;
@@ -50527,13 +52372,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     this.maybeFireCpuRevealEarly();
     const ctx = this._createContext(chosen.inst, {});
-    this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
+    this.armEffectAnnounce(chosen.name, pi, 'board', { seite: heroOwner, heroIdx });   // v349; Wirker fuer Blinded
     let gerryVeto = false;
     // Welcher Zusatzaktions-Geber hat diese Aktivierung bezahlt? (Chaos-Diamond:
     // Duignos zweite Aktion sperrt dessen Zusatz-Casts schon waehrend des Effekts.)
     const _zusatzVorher = this.gs._heroEffectZusatzInst;
     this.gs._heroEffectZusatzInst = opts.zusatzInst || null;
     let resolved;
+    const negStand = this.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await this._alsAkteur(ctx, () => chosen.script.onHeroEffect(ctx));
     } finally {
@@ -50644,6 +52490,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
       delete this.gs._pendingCardReveal;
       delete this.gs._pendingPlayLog;
+      const negZiele = this.negiertSeit(negStand);
       // Gerrymander veto on a "may" confirm consumes the once-per-turn
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them.
@@ -50653,6 +52500,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
         this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
         this.log('gerrymander_veto', { player: this.gs.players[pi].username, hero: hero.name, effect: chosen.name });
+      } else if (negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (der Picker lieferte `null`, das Skript brach ab) — kein Abbruch durch den Spieler. Wie bei der
+        // Negation in der Kette (oben): Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung), bezahlte Kosten (Aktion) bleiben bezahlt — keine Rückerstattung (`onCancel`).
+        this.negierteAktivierungStempeln(pi, chosen.script, chosen.name, chosen.hoptKey, hero, { ziele: negZiele });
+        return { ok: true, resolved: false, negated: true };
       } else if (isActionCost) {
         // Plain cancellation (no Gerrymander veto, no commitment past
         // chain resolution) — refund the action resource so the player
@@ -50759,7 +52611,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const mScript = loadCardEffect('Mummy Token');
         if (!mScript?.heroEffect || typeof mScript.onHeroEffect !== 'function') continue;
         if (granted || !isMainPhase) continue;                       // freier Effekt: nur Main Phase, nie als gewaehrte Aktion
-        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && mScript.requiresTarget === true) continue;
+        if (this.blindedEffektGesperrt(playerIdx, hs, hi, 'Mummy Token', { script: mScript })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
         if (this.isHeroEffectBlockedByGraceShield(mScript, playerIdx)) continue;
         if (this.gs.hoptUsed?.[`hero-effect:MummyToken:${playerIdx}:${hi}`] === this.gs.turn) continue;
         if (this.oncePerGameEffectUsed(playerIdx, mScript, 'Mummy Token')) continue;
@@ -50791,10 +52643,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Kanaele; ihre Karten leuchteten trotzdem und der Klick lief ins
       // Leere.
       if (typeof script.onHeroEffect !== 'function') continue;
-      // Blinded silences hero effects whose script declares they need a
-      // target. The hero stays alive and can still take normal Actions
-      // — only the targeted activation is hidden (no glow, no button).
-      if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+      // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Held bleibt handlungsfaehig; nur ein Effekt, der NUR gegnerische Ziele waehlen kann, verschwindet aus dem Menue.
+      if (this.blindedEffektGesperrt(playerIdx, hs, hi, quelle.name, { script })) continue;
 
       // Rein schaedliche Helden-Effekte sind unter dem Spielstart-Schutz
       // gesperrt (Als Ruling 8.8.) — gleiches Muster wie Blinded darueber:
@@ -50889,8 +52739,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (inst.counters?._suppressEquipHooks) continue;
         const equipScript = loadCardEffect(inst.name);
         if (!equipScript?.heroEffect) continue;
-        // Equipped Artifacts are explicitly NOT blocked by Blinded —
-        // the artifact does the targeting independently of its host.
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Traeger-Held fuehrt den Effekt dieser angelegten Karte aus — gesperrt nur, wenn er nur gegnerische Ziele waehlen kann.
+        if (this.blindedEffektGesperrt(playerIdx, playerIdx, hi, inst.name, { script: equipScript })) continue;
 
         const hoptKey = this.heroHoptKey(inst.name, playerIdx);
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -50944,7 +52794,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = this.heroScript(hero);
         if (!script?.heroEffect) continue;
         if (!_fremdPhaseOk(hero, hi, script)) continue;
-        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+        if (this.blindedEffektGesperrt(playerIdx, oi, hi, hero.name, { script })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
         const hoptKey = this.heroHoptKey(hero.name, playerIdx);
@@ -50981,7 +52831,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = this.heroScript(hero);
         if (!script?.heroEffect) continue;
         if (!_fremdPhaseOk(hero, hi, script)) continue;
-        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+        if (this.blindedEffektGesperrt(playerIdx, oi, hi, hero.name, { script })) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
         const hoptKey = this.heroHoptKey(hero.name, playerIdx);
@@ -51251,8 +53101,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // placeholder with `name === null`; null-safe access keeps
           // the check working in that case (an empty slot can't carry
           // a `blinded` status anyway).
-          if (script.requiresTarget === true
-            && (this._isCreatureBlinded(inst) || BLIND_STATUSES.some(n => hero?.statuses?.[n]))) continue;
+          if (this.blindedKreaturGesperrt(inst, playerIdx, effectName, script)) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn der Effekt nur Gegner waehlen kann
 
           // Phase gate: free creature effects are Main-Phase-only
           // action-cost creatures are Action Phase or Main Phase with
@@ -51365,8 +53214,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const effectName = inst.counters?._effectOverride || inst.name;
         const script = loadCardEffect(effectName);
         if (!script?.creatureEffect) continue;
-        if (script.requiresTarget === true
-            && (this._isCreatureBlinded(inst) || BLIND_STATUSES.some(n => hero?.statuses?.[n]))) continue;
+        if (this.blindedKreaturGesperrt(inst, playerIdx, effectName, script)) continue;   // Blinded (Spielgestalter-Entscheidung 16.11.2026)
 
         const isActionCost = !!script.creatureActionCost;
         if (isActionCost) {
@@ -51702,6 +53550,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!script?.equipEffect) continue;
         // W16e (F01-22): eine Ausruestung, die als ABILITY zaehlt (Cloak of Edge), hat einen „active effect of an Ability" — The Thing in the Ship sperrt ihn.
         if (script.countsAsAbilityInZone && this.abilityActivationBlocked()) continue;
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Traeger-Held fuehrt den Ausruestungs-Effekt aus — gesperrt nur, wenn er nur gegnerische Ziele waehlen kann.
+        if (this.blindedEffektGesperrt(playerIdx, seite, hi, inst.counters?._effectOverride || cardName, { script })) continue;
         // Bound doesn't block equip-effect activation — equip effects
         // are "effects" per the Bound spec, not Actions. Frozen / Stunned
         // / Webbed DO block by default; a script may opt out via
@@ -51766,6 +53616,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ps = this.gs.players[pOwner];
       if (!ps) continue;
       for (const perm of (ps.permanents || [])) {
+        if (perm.teleportalUntil != null) continue;   // Teleportal: die wartende Karte ist noch nicht gespielt, nur „openly in front of you" — nicht aktivierbar
         const script = loadCardEffect(perm.name);
         if (!script?.canActivatePermanent) continue;
         if (script.canActivatePermanent(this.gs, playerIdx, pOwner, this)) {
@@ -51829,9 +53680,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ v1096 („Forbidden Curse of Aging"): einzelne Ability am
         // Wirtshelden negiert — `negatesHostAbilities` am Anhaengsel.
         if (this._abilityNegatedOnHero(playerIdx, hi, abilityName)) continue;
-        // Blinded silences targeting free-activation abilities — they
-        // disappear from the activatables list (no glow / button).
-        if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
+        // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn die freie Ability nur gegnerische Ziele waehlen kann.
+        if (this.blindedEffektGesperrt(playerIdx, playerIdx, hi, abilityName, { script, level: slot.length })) continue;
 
         // HOPT by ability NAME — blocks all copies for this player
         const hoptKey = `free-ability:${abilityName}:${playerIdx}`;
@@ -52139,8 +53989,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = hps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { success: false };
 
-    const handIdx = ps.hand.indexOf(cardName);
-    if (handIdx < 0) return { success: false };
+    // ★ 12.11. (Al: „Effekte/Ascension-Boni, die Abilities von der Hand anlegen, auch aus der Extra-Hand“): Quelle = Hand zuerst, dann Crestinas Vorrat (nur benutzbar).
+    const quelle0 = this._rxQuelleFuer(ps, cardName);
+    if (!quelle0) return { success: false };
     // v1356: ohne „additional" muss der Held sein Anlegen noch frei haben.
     if (!opts.skipAbilityGivenCheck && !this.kannAbilityAnlegen(playerIdx, heroIdx)) return { success: false };
     // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „allerdings z.B. beim Anlegen von Abilities NICHT die normale
@@ -52155,6 +54006,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Specific cards that legitimately install Divinity (etc.) pass
     // `opts.allowRestricted: true` to bypass.
     if (script?.restrictedAttachment && !opts.allowRestricted) return { success: false };
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return { success: false };   // Smugness: nur an einen Ascended Hero (s. `canAttachAbilityToHero`)
     // ★★ v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame
     // Guillotine) — vorher eine eigene Kopie der Schleife.
     // 24.10.: echte Ability Zone ODER Support Zone (Xal, Xalibur) — hoechstens EIN Stapel je Ability ueber beide Zonenarten.
@@ -52166,9 +54018,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     if (!ort) return { success: false };
 
-    // Defensive: re-verify card is still in hand at expected position
-    const verifyIdx = ps.hand.indexOf(cardName);
-    if (verifyIdx < 0) return { success: false };
+    // Defensive: re-verify card is still in hand (or Crestina's Creation Zone) at expected position
+    const quelle = this._rxQuelleFuer(ps, cardName);
+    if (!quelle) return { success: false };
+    const verifyIdx = quelle.idx;
 
     // Hand -> Ability-Zone-Flug. Muss VOR dem Splice raus, damit der
     // Client den Hand-Slot noch findet (`[data-hand-idx]`), und mit
@@ -52185,17 +54038,18 @@ this._deathWatch = (this._deathWatchStack || []).length
         ownerIdx: playerIdx, cardName, handIndex: verifyIdx,
         zoneType: ort.art === 'support' ? 'support' : 'ability', heroIdx, slotIdx: ort.slot,
         ...(fremd ? { destOwner: feld } : {}),
+        ...(quelle.ausVorrat ? { fromCreation: true } : {}),
         _forceOwnerAnim: true,
       });
     }
 
     // Kartenbesitzer (Ablage-Ziel) wie in `doPlayAbilityFremd` — vor dem Splice.
     const kartenBesitzer = fremd
-      ? (typeof this._handCardPileOwner === 'function' ? this._handCardPileOwner(playerIdx, cardName, verifyIdx) : playerIdx)
+      ? ((typeof this._handCardPileOwner === 'function' && !quelle.ausVorrat) ? this._handCardPileOwner(playerIdx, cardName, verifyIdx) : playerIdx)
       : null;
 
-    // Execute: remove from hand, add to zone
-    ps.hand.splice(verifyIdx, 1);
+    // Execute: remove from hand (or Crestina's Creation Zone), add to zone
+    if (quelle.ausVorrat) this._rxAbgang(ps, quelle); else ps.hand.splice(verifyIdx, 1);
 
     // Consume abilityGivenThisTurn unless opted out (v1356: zentral,
     // mit Bonus-Plaetzen von Divine Gift of Skill wie im Server-Handweg)
@@ -52268,7 +54122,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ANGREIFEN? Eine Stelle für alle Effekte, die als Attack EINES HELDEN zählen (Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected
    * Greatmaw): dieselben Sperren wie `validateActionPlay` für eine Attack-Karte — tot, Frozen, Stunned/Webbed, Bound, harte Negierung (`isHeroIncapacitated`; die leichte
    * Negierung „nur der Effekt" sperrt nicht), Heldenskript-/Support-Sperren (`canHeroPerformAction`: Saint Nicolas, Plant Golem), Kontrollrechte (`attacken === false`), Blendung
-   * (diese Effekte brauchen alle ein Ziel) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
+   * (nur gegen Effekte, die NUR gegnerische Ziele waehlen koennen — Blinded sperrt allein die gegnerische Zielwahl) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
    */
   heroKannAngreifen(seite, heroIdx, pi, opts = {}) {
     const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
@@ -52277,8 +54131,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hero.statuses?.webbed) return false;
     if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
     if (this.kontrollRechte(seite, heroIdx).attacken === false) return false;
-    if (this._isHeroBlinded(seite, heroIdx)) return false;
     const p = Number.isInteger(pi) ? pi : seite;
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur die Wahl GEGNERISCHER Ziele ist gesperrt — ein Effekt, der nur Gegner waehlen kann (`opts.name`, bei namenssensiblen Sperren `opts.blindedName`: Skript/Text, Alice, Javelin Throw), ist es;
+    // einer mit eigenen Zielen darf wirken (der Picker-Filter laesst dann nur eigene Ziele zu). Ohne Namen entscheidet allein der Picker.
+    if (this._isHeroBlinded(seite, heroIdx) && (opts.blindedName || opts.name) && this.blindedEffektGesperrt(p, seite, heroIdx, opts.blindedName || opts.name, { zielwahl: true })) return false;
     const ps = this.gs.players[p];
     if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
     // ★ W34a (Al, 22.10.2026, Punkt 3): Effekte, die als Attack zählen, unterliegen auch den Attack-ZÄHLERN und -Sperren (wie `validateActionPlay` für eine Attack-Karte):
@@ -52293,7 +54149,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * ★ W34a (Al, 22.10.2026, Punkt 2/3): Gegenstück zu `heroKannAngreifen` für Effekte, die als SPELL eines Helden zählen (Alice): kann dieser Held (Brettseite `seite`, Index `heroIdx`,
    * Kontrolleur `pi`) gerade zaubern? Dieselben kartenunabhängigen Sperren wie `validateActionPlay` für eine Spell-Karte: tot/Frozen/Stunned/Webbed/Bound/harte Negierung,
-   * Heldenskript-Sperren, Kontrollrechte (`zauber === false`), die Spell-Status Nulled (Null Zone), Magic Silenced, Frightened (Howling in the Night) und Berserked, Blendung,
+   * Heldenskript-Sperren, Kontrollrechte (`zauber === false`), die Spell-Status Nulled (Null Zone), Magic Silenced, Frightened (Howling in the Night) und Berserked, Blendung (nur bei Effekten, die nur Gegner waehlen koennen),
    * die Attack-/Spell-Sperre des Zuges (Trial of …), die Spell-Sperre (Eraser Beam, Silence; der Silence-Bonus lässt EINEN Spell durch) und Area-/Helden-/Ausrüstungs-Sperren
    * (`blocksCardPlay`, `canPlayCard`: Idej Sword - Kogarasu „1 Spell pro Zug"). `opts`: `name`, `schule`, `stufe` (für die Pseudo-Karte).
    */
@@ -52307,8 +54163,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const st = hero.statuses || {};
     if (st.nulled || st.magic_silenced || st.frightened || st.berserked || st.polymorphed) return false;
     if (opts.name && this.heroPranked(hero, opts.name)) return false;   // 24.10. Nasty Prank
-    if (this._isHeroBlinded(seite, heroIdx)) return false;
     const p = Number.isInteger(pi) ? pi : seite;
+    if (this._isHeroBlinded(seite, heroIdx) && (opts.blindedName || opts.name) && this.blindedEffektGesperrt(p, seite, heroIdx, opts.blindedName || opts.name, { zielwahl: true })) return false;   // Blinded: s. `heroKannAngreifen`
     const ps = this.gs.players[p];
     if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
     if (ps && ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell !== this.gs.turn) return false;
@@ -53358,6 +55214,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const offMap_lvr = ps_lvr?._handLevelOffsets;
     const transMap_lvr = ps_lvr?._handLevelOffsetsTransient;
     const filterMap_lvr = ps_lvr?._handLevelOffsetHeroFilter;
+    let _handBest_lvr = 0;   // bester Handabzug (fuer den namensweiten Vergleich mit Vorratskopien)
     if (cardData.name && handArr_lvr && (offMap_lvr || transMap_lvr)) {
       let bestOffset = 0;
       // ★ W15b (Al, C2: „exakt die geklickte/ausgewählte Karte"): kommt `opts.handIdx` mit, zählt bei Spells/Attacks NUR der
@@ -53381,6 +55238,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (v < bestOffset) bestOffset = v;
       }
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+      _handBest_lvr = bestOffset;
+    }
+    // ★ Karte in Crestinas Vorrat (Extra-Hand): namensweit zaehlt auch die am staerksten gesenkte VORRATSkopie (`_vorratStufenAbzug`). Eine bestimmte Handkopie (`opts.handIdx`) ist
+    // davon nicht beruehrt; ein Stapel (`pileSide`) auch nicht.
+    if (cardData.name && !Number.isInteger(opts.handIdx) && !opts.pileSide) {
+      const _vo = this._vorratStufenAbzug(lvlPi, cardData.name);
+      if (_vo < _handBest_lvr) rawLevel = Math.max(0, rawLevel + (_vo - _handBest_lvr));
     }
     // Karten-Skript `levelOffsetForHero` (You are the Chosen One!!!): die Stufe hängt vom NUTZER ab — Änderung JE Held, nie unter 0.
     {
@@ -53999,6 +55863,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (best < 0) raw = Math.max(0, raw + best);
     }
+    // (2a) ★ 12.11.: Vorratskopie (Crestinas Extra-Hand) — ohne bestimmte Handkopie und ohne Stapel zaehlt der Abzug der am staerksten gesenkten Vorratskopie.
+    if (handIdx == null && !pileSide && cardData.name) {
+      const _vo2 = this._vorratStufenAbzug(playerIdx, cardData.name);
+      if (_vo2 < 0) raw = Math.max(0, raw + _vo2);
+    }
 
     // (2b) Karten-Skript `levelOffsetForHero` — Stufe je NUTZER (You are the Chosen One!!!), nie unter 0.
     if (heroIdx != null) {
@@ -54615,6 +56484,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Starting abilities are placed at game start via _trackCard
     // directly and bypass this check entirely.
     if (script?.restrictedAttachment && !opts.allowRestricted) return false;
+    // ★ „You can only attach this Ability to an Ascended Hero" (Smugness) gilt fuer JEDES Anlegen, auch per Effekt (Training, Pressed Skill, Wise Village Elder …).
+    // Der Hand-Weg (`doPlayAbility` in server.js) prueft es selbst und geht nicht hierueber — er bleibt unveraendert.
+    if (script?.ascendedHeroOnly && this._getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
 
     // ★★ v1349: EINE Stelle fuer die Zonenwahl (siehe `abilityZielZone`); 24.10.: auch Support Zonen (`abilityZielOrt`).
     void abZones;
@@ -54874,6 +56746,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Einzel-Immunitaet wie `poison_immune`, CC-`immune`) - keine Quellen-/Aufloesungs-Schutze (Effekt-Immunitaet, Anti Magic).
    * Fuer Kosten-Karten, die einen Status auf den eigenen Helden legen MUESSEN (Sickly Cheese): ein solcher Held ist kein
    * waehlbares Ziel. `opts.appliedBy` = Seite der Quelle (Charme-Schutz), `opts.bypassImmune` wie dort.
+   * `opts.kontrolleAls` (18.11.2026, Mind Control im Status-Anhaengsel-Abgleich): Johanna und Light Ball schuetzen „Heroes you control" — der Held wird so beurteilt, als stuende er unter der Kontrolle
+   * dieses Spielers (bei Mind Control: sein Kontrolleur VOR der Uebernahme), damit die Uebernahme nicht durch den Schutz des Uebernehmers selbst wieder erlischt.
    */
   heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
@@ -54885,8 +56759,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.ohneCharme && statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
     if (hero.statuses?.shielded && statusName !== 'shielded') return true;
     if (statusDef?.negative) {
-      if (this._johannaSchuetzt(hero)) return true;
-      if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
+      if (this._johannaSchuetzt(hero, opts.kontrolleAls)) return true;
+      if (this._lightBallProtects(playerIdx, 'hero', heroIdx, opts.kontrolleAls)) return true;
       if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx, statusName)) return true;
     }
     if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
@@ -54894,6 +56768,73 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.bypassImmune && hero.statuses?.immune && ['frozen', 'stunned', 'negated', 'bound'].includes(statusName)) return true;
     if (statusDef?.immuneKey && hero.statuses?.[statusDef.immuneKey]) return true;
     return false;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip, Snow Cannon × freeze-immune Held): Ziele, auf die ein Status schon wegen einer Zustands-Immunitaet NICHT wirken
+   * wird (freeze_immune, burn_immune, `immune`, Charme, Johanna, Light Ball, Kreaturen-Schutz …), bleiben als Ziel WAEHLBAR — der Effekt verpufft, die Karte ist verbraucht. Der Picker
+   * warnt dafuer: Das Ziel traegt `wirkungslos` (englischer Hinweissatz, nur fuer die CPU) und `hinweis` (`setzeZielHinweis`: der Client zeigt ihn, solange DIESES Ziel angewaehlt und noch nicht
+   * bestaetigt ist); die CPU waehlt solche Ziele nicht (`_cpu.js`, `resolveTargetingPrompt`).
+   * Gibt den Hinweissatz fuer EIN Picker-Ziel (`{type:'hero', owner, heroIdx}` bzw. `{type:'equip', cardInstance}`) zurueck, '' wenn der Status landen kann.
+   * `pi` = Seite der Quelle (Charme-Schutz, Golden Wings), `quelleName` = Name der Karte.
+   */
+  statusWirkungslosHinweis(ziel, statusName, pi, quelleName) {
+    if (!ziel) return '';
+    const GERUND = { frozen: 'freezing', burned: 'burning', stunned: 'stunning', negated: 'negation', bound: 'binding', poisoned: 'poison' };
+    let blockt = false;
+    let name = ziel.cardName || '';
+    if (ziel.type === 'hero') {
+      const hero = this.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+      if (!hero?.name) return '';
+      name = name || hero.name;
+      blockt = this.heroBlocksStatusNow(ziel.owner, ziel.heroIdx, statusName, { appliedBy: pi });
+    } else {
+      const inst = ziel.cardInstance || ziel._cardInstance || this.kreaturAnBrett(ziel.owner, ziel.heroIdx, ziel.slotIdx);   // Listen ohne Instanz (Poison Vial) loesen ueber (Brettseite, Held, Zone) auf
+      if (!inst?.counters) return '';
+      name = name || inst.name;
+      blockt = !this.canApplyCreatureStatus(inst, statusName, { name: quelleName, owner: pi }, { gwSourceOwner: pi });
+    }
+    return blockt ? `${name} is immune to ${GERUND[statusName] || statusName} and will not be affected.` : '';
+  }
+
+  /** Markiert in `ziele` (In-place) jedes Ziel, auf das `statusName` nicht wirken wird (`statusWirkungslosHinweis` → `ziel.wirkungslos` + `ziel.hinweis`). Rueckgabe: dieselbe Liste. */
+  markiereStatusWirkungslos(ziele, statusName, pi, quelleName) {
+    for (const t of (ziele || [])) {
+      const h = this.statusWirkungslosHinweis(t, statusName, pi, quelleName);
+      if (h) { t.wirkungslos = h; this.setzeZielHinweis(t, h, 'warnung'); }
+    }
+    return ziele;
+  }
+
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (Warntext-UX: „Der soll nur erscheinen, wenn ein immunes Ziel angewählt wird, also zwischen ‚Ziel gewählt' und ‚Confirm target'"):
+   * Hinweise der Zielwahl (Warnungsprinzip) gehoeren an das einzelne ZIEL, nicht an den Beschreibungstext. Ein Kandidat in `validTargets` traegt `hinweis` (englischer Satz, nennt den Zielnamen
+   * selbst) und `hinweisArt`: 'warnung' = die Wahl verpufft (immun, volle HP, Erstrunden-Schutz), 'info' = die Wirkung ist anders als erwartet, aber NICHT nutzlos (Overheal Shock: Heilung wird zu
+   * Schaden). Der Client zeigt den Satz NUR, solange dieses Ziel angewaehlt und noch nicht bestaetigt ist (`app-board.jsx`, Zielwahl-Fenster); er rechnet nichts selbst. Die CPU liest `hinweis`
+   * nicht (sie meidet nur `wirkungslos`). Bereits gesetzte Hinweise bleiben (der speziellere gewinnt), ausser `opts.ueberschreiben`.
+   */
+  setzeZielHinweis(ziel, text, art = 'warnung', opts = {}) {
+    if (!ziel || typeof text !== 'string' || !text) return ziel;
+    if (typeof ziel.hinweis === 'string' && ziel.hinweis && !opts.ueberschreiben) return ziel;
+    ziel.hinweis = text;
+    ziel.hinweisArt = art === 'info' ? 'info' : 'warnung';
+    return ziel;
+  }
+
+  /**
+   * Erste-Runden-Immunitaet (`_ersterZugZiel`, wie `_ersterZugZielAbziehen` nach der Wahl): jedes WAEHLBARE Ziel des geschuetzten Spielers bekommt einen Hinweis (nur gegenueber dem Zugspieler,
+   * nicht bei `config.ignoreFirstTurnProtection`; ein schon gesetzter speziellerer Hinweis bleibt). Rueckgabe: dieselbe Liste.
+   */
+  ersterZugHinweisSetzen(ziele, waehler, config = {}) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    if (!Array.isArray(ziele) || prot == null || waehler === prot || config?.ignoreFirstTurnProtection) return ziele;
+    for (const t of ziele) {
+      if (!t || t.ineligible || t.hinweis || !this._ersterZugZiel(t, waehler)) continue;
+      const inst = t.cardInstance || t._cardInstance;
+      const name = t.cardName || t.name || inst?.name || 'This target';
+      this.setzeZielHinweis(t, `${name} is protected during the first turn and will not be affected.`, 'warnung');
+    }
+    return ziele;
   }
 
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
@@ -54904,6 +56845,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // „ALLE Effekte" wirklich alle sind und nicht nur der Schaden.
     // BEWUSST ohne `opts.source`-Vorbedingung: die meisten Statuswege
     // reichen ihre Quelle gar nicht mit (Divine Gift of Fire).
+    if (!schutzAus) await this.heroAffectWindow(playerIdx, heroIdx);   // „Affected"-Fenster (17.11.2026): auch Status ohne Zielwahl
     if (!schutzAus && this.hasEffectImmunity(playerIdx, heroIdx, opts.source)) {
       this.log('effect_immunity', { hero: hero.name, status: statusName });
       return;
@@ -55538,7 +57480,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typeof srcOwner !== 'number' || srcOwner < 0) return negated;
     const srcName = source?.name || null;
     const srcScript = srcName ? loadCardEffect(srcName) : null;
-    if (srcScript?.cannotBeNegated) return negated;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — gegen „cannot be negated" wird der Wächter angeboten (Hinweis in der Frage, CPU waehlt es nicht);
+    // Kosten/Limit/Kettenfenster wie immer, die Negation selbst findet nicht statt. Eine Quelle, auf die der Gegner nicht reagieren darf (`opponentCannotReact`), oeffnet weiter nichts.
+    if (srcScript?.opponentCannotReact) return negated;
+    const _negGesperrtE = !!srcScript?.cannotBeNegated;
     const owners = [...new Set(list.map(t => t.controller ?? t.owner))];
     for (const ownerIdx of owners) {
       if (ownerIdx == null || ownerIdx === srcOwner) continue;
@@ -55558,9 +57503,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(ownerIdx, {
           type: 'confirm',
           title: guardName,
-          message: g.boardEffectGuardPrompt
-            ? g.boardEffectGuardPrompt(srcName || 'an effect', mine, kind, this)
-            : `Negate ${srcName || 'this effect'} on your protected Creatures?`,
+          message: (() => {
+            const _basisE = g.boardEffectGuardPrompt
+              ? g.boardEffectGuardPrompt(srcName || 'an effect', mine, kind, this)
+              : `Negate ${srcName || 'this effect'} on your protected Creatures?`;
+            return _negGesperrtE ? `${_basisE} ${this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')} Activate it anyway?` : _basisE;
+          })(),
+          ...(_negGesperrtE ? { _nutzlos: true } : {}),
           showCard: srcName,
           showCardLeft: guardName,
           confirmLabel: '🛡️ Negate!',
@@ -55575,7 +57524,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
           continue;
         }
-        const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind);
+        // ★ Spielgestalter-Entscheidung 16.11.2026 (wie im Zielwahl-Fenster, `_checkTargetRedirectOnce`): Kosten VOR dem Kettenfenster (`payBoardEffectGuardCost`, optional;
+        // `false` = nicht zahlbar → wie ein Nein), dann die Auslösung kettbar (`_passivAusloesungNegiert`); negiert → keine Negation, die Kosten bleiben bezahlt.
+        let bezahltE;
+        if (typeof g.payBoardEffectGuardCost === 'function') {
+          bezahltE = await g.payBoardEffectGuardCost(this, ownerIdx, gInst, mine, source, kind);
+          if (!bezahltE) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
+        }
+        if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) { this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }
+        if (_negGesperrtE) { this.log('board_guard_useless', { card: guardName, source: srcName, reason: 'cannotBeNegated' }); this._noteBoardGuardDeclined(ownerIdx, srcName); continue; }   // nutzlose Aktivierung: bezahlt, keine Negation
+        const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind, bezahltE);
         for (const id of (res?.dropInstIds || [])) negated.add(id);
         if (res?.dropInstIds?.length) {
           this.log('effect_negated_by_board', {
@@ -55655,7 +57613,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!gScript) continue;
         if (gInst.counters?.negated || gInst.counters?.nulled || gInst.counters?.stunned) continue;
         const _srcScriptG = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
-        if (_srcScriptG?.cannotBeNegated) continue;
+        if (_srcScriptG?.opponentCannotReact) continue;   // Spielgestalter-Entscheidung 16.11.2026: „cannot be negated" laesst den Waechter zu (nutzlose Aktivierung); „cannot react" nicht
+        const _negGesperrtA = !!_srcScriptG?.cannotBeNegated;
         const guards = Array.isArray(gScript.boardGuards) ? gScript.boardGuards : [gScript];
         for (const g of guards) {
         if (!g?.boardAoeGuard || typeof g.onGuardAoe !== 'function') continue;
@@ -55665,9 +57624,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         const confirmed = await this.promptGeneric(ownerIdx, {
           type: 'confirm',
           title: guardName,
-          message: g.boardAoeGuardPrompt
-            ? g.boardAoeGuardPrompt(sourceCard?.name || 'an effect', mine, this)
-            : `Negate ${sourceCard?.name || 'this effect'} on your protected Creatures?`,
+          message: (() => {
+            const _basisA = g.boardAoeGuardPrompt
+              ? g.boardAoeGuardPrompt(sourceCard?.name || 'an effect', mine, this)
+              : `Negate ${sourceCard?.name || 'this effect'} on your protected Creatures?`;
+            return _negGesperrtA ? `${_basisA} ${this._nutzlosHinweis({ cannotBeNegated: true }, 'effect')} Activate it anyway?` : _basisA;
+          })(),
+          ...(_negGesperrtA ? { _nutzlos: true } : {}),
           showCard: sourceCard?.name || null,
           showCardLeft: guardName,
           confirmLabel: '🛡️ Negate!',
@@ -55676,7 +57639,15 @@ this._deathWatch = (this._deathWatchStack || []).length
           promptConfig: { extra: { _boardInstId: gInst.id } },
         });
         if (!this._confirmSaidYes(confirmed)) continue;
-        const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard);
+        // ★ Spielgestalter-Entscheidung 16.11.2026: Kosten VOR dem Kettenfenster (`payBoardAoeGuardCost`, optional), dann kettbar — siehe `_offerBoardEffectGuard`.
+        let bezahltA;
+        if (typeof g.payBoardAoeGuardCost === 'function') {
+          bezahltA = await g.payBoardAoeGuardCost(this, ownerIdx, gInst, mine, sourceCard);
+          if (!bezahltA) continue;
+        }
+        if (await this._passivAusloesungNegiert(guardName, ownerIdx, gInst.heroIdx)) continue;
+        if (_negGesperrtA) { this.log('board_guard_useless', { card: guardName, source: sourceCard?.name, reason: 'cannotBeNegated' }); continue; }   // nutzlose Aktivierung: bezahlt, keine Negation
+        const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard, bezahltA);
         const drop = new Set(res?.dropInstIds || []);
         if (drop.size === 0) continue;
         this.log('aoe_negated_by_board', {
@@ -55829,8 +57800,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `originOwner`/`originHeroIdx` und rechnet daraus ihre Richtung.
    * `delay` haelt den Ablauf so lange an, bis die Front bei den Zielen
    * ist — ohne das faellt der Schaden, bevor die Welle ankommt.
+   *
+   * ★ `kreaturenZuerst: true` (Flame Avalanche, Lawine von der Rueckkante
+   * auf den Wirker zu): die Kreaturen werden VOR den Helden getroffen
+   * (`dealDamageToTargets`). Dazu sendet die Welle `delay` (Kreaturen),
+   * `heroAt` (erster Held, ABSOLUT ab Wellenstart) und `hitDelay` (Abstand
+   * der Helden) mit — der Client rechnet daraus die Trefferbilder der
+   * Animation (Kreaturen: delay, Held i: heroAt + i * hitDelay). `vorlauf`
+   * (ms) verschiebt die Wartezeiten der ENGINE gegenueber diesen
+   * Animationszeiten (Mount-Vorlauf der Animation im Client). `einzel`
+   * (Idas Einzelziel): nur ein Ziel, es faellt bei `delay` (auch ein Held).
+   * ★ `heldenZuerst: true` (Flame Avalanche, Lawine ab dem Wirker nach hinten): die Helden werden VOR den Kreaturen getroffen — Held i bei `heroAt`
+   * (Standard `delay`) `+ i * hitDelay`, danach ALLE Kreaturen gleichzeitig bei `creatureAt` (ms ab Wellenstart). Sonst wie `kreaturenZuerst`
+   * (Ereignisfelder `delay`/`heroAt`/`hitDelay`/`creatureAt`, `vorlauf`, `einzel`).
+   * Rueckgabe: `{ t0 }` = Wellenstart (Date.now) fuer die absoluten Wartezeiten.
    */
-  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele) {
+  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele, opts) {
     const welle = config && config.waveAnimation;
     if (!welle || !welle.type) return;
     // ★★ v1346 — KULISSE ZUR WELLE (`waveAnimation.backdrop`, „Hole in
@@ -55862,8 +57847,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
       originOwner: (cardInst && cardInst.heroOwner != null) ? cardInst.heroOwner : pi,
       originHeroIdx: heroIdx,
+      ...((welle.kreaturenZuerst || welle.heldenZuerst) ? {
+        kreaturenZuerst: !!welle.kreaturenZuerst,
+        heldenZuerst: !!welle.heldenZuerst,
+        delay: welle.delay != null ? welle.delay : 380,
+        heroAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.heroAt != null ? welle.heroAt : (welle.delay != null ? welle.delay : 380)),
+        hitDelay: (opts && opts.einzel) ? 0 : (welle.hitDelay != null ? welle.hitDelay : 150),
+        creatureAt: (opts && opts.einzel) ? (welle.delay != null ? welle.delay : 380) : (welle.creatureAt != null ? welle.creatureAt : (welle.delay != null ? welle.delay : 380)),
+      } : null),
     });
-    await this._delay(welle.delay != null ? welle.delay : 380);
+    const t0 = Date.now();
+    await this._delay((welle.delay != null ? welle.delay : 380) + ((welle.kreaturenZuerst || welle.heldenZuerst) ? (welle.vorlauf || 0) : 0));
+    return { t0 };
   }
 
   async actionAoeHit(cardInst, config = {}) {
@@ -55937,7 +57932,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [{
         owner: target.owner, heroIdx: target.heroIdx,
         zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
-      }]);
+      }], { einzel: true });
 
       // Animation on single target
       if (animationType) {
@@ -56261,13 +58256,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
     }
 
-    await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
+    const _welle = await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),
       ...creatureEntries.map(e => ({
         owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
         cardName: e.inst.name,   // v1347: fuer Wellen, die die Karte selbst bewegen
       })),
     ]);
+    const _kreaturenZuerst = !!(config.waveAnimation && config.waveAnimation.kreaturenZuerst), _heldenZuerst = !!(config.waveAnimation && config.waveAnimation.heldenZuerst);
     const _sog = this._sogBeginnen(config, creatureEntries.map(e => e.inst));
 
     if (animationType) {
@@ -56305,6 +58301,41 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Die Klammer schiebt auch die Heldentode bis nach dem Schlag auf,
       // s. `_heldKoMelden`.)
       try {
+        // ★ `waveAnimation.kreaturenZuerst` (Flame Avalanche: die Lawine rollt von der Rueckkante auf den Wirker zu und ueberrollt zuerst die Kreaturenreihe, dann die Helden):
+        // alle Kreaturen in EINEM Stapel (ohne Staffelung) im ersten Treffer-Augenblick, danach die Helden — jeder zu seinem ABSOLUTEN Zeitpunkt ab Wellenstart
+        // (`heroAt` + Platz in der Zielliste * `hitDelay`, dieselbe Rechnung wie im Client, der daraus die Trefferbilder macht). Die Tode sind ohnehin bis zum Klammerende aufgeschoben.
+        if (_kreaturenZuerst || _heldenZuerst) {
+          const _w = config.waveAnimation, _t0 = _welle?.t0 ?? Date.now(), _vorl = _w.vorlauf || 0;
+          const _hd = _w.hitDelay != null ? _w.hitDelay : hitDelay, _h0 = _w.heroAt != null ? _w.heroAt : (_w.delay != null ? _w.delay : 380);
+          const _kr = creatureEntries.filter(e => e.amount > 0);
+          // ★ `heldenZuerst`: die Kreaturen kommen NACH den Helden, alle gleichzeitig bei `creatureAt` (absolut ab Wellenstart).
+          const _kreaturen = async () => {
+            if (_kr.length === 0) return;
+            if (_heldenZuerst) { const _wk = (_t0 + _vorl + (_w.creatureAt != null ? _w.creatureAt : _h0)) - Date.now(); if (_wk > 0) await this._delay(_wk); }
+            _kr._ohneStaffel = true; await this.processCreatureDamageBatch(_kr);
+          };
+          if (!_heldenZuerst) await _kreaturen();
+          let _slotZeit = _h0;
+          for (const _e of hitHeroes) {
+            const _slot = allHeroes.findIndex(a => a.owner === _e.owner && a.heroIdx === _e.heroIdx);
+            if (_slot >= 0) _slotZeit = _h0 + _slot * _hd;
+            const _warte = (_t0 + _vorl + _slotZeit) - Date.now();
+            if (_warte > 0) await this._delay(_warte);
+            if (_e.hero.hp <= 0 || !(_e.amount > 0)) continue;
+            if (hatInstanz || !opts.attrappenQuelle) {
+              await this.actionDealDamage(quelle || quellObjekt, _e.hero, _e.amount, damageType, trefferOpts);
+            } else {
+              const tmp = this._trackCard(sourceName, pi, 'hand', -1, -1);
+              try { await this.actionDealDamage(tmp, _e.hero, _e.amount, damageType, trefferOpts); }
+              finally { this._untrackCard(tmp.id); }
+            }
+            this.sync();
+          }
+          if (_heldenZuerst) await _kreaturen();
+          if (typeof opts.wirkung === 'function') {
+            await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+          }
+        } else {
         for (const { hero, amount } of hitHeroes) {
           if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
           if (hatInstanz || !opts.attrappenQuelle) {
@@ -56322,6 +58353,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ── SCHRITT 3b: Zusatzwirkung (Status, Sperren …) — noch VOR der Todesauswertung ──
         if (typeof opts.wirkung === 'function') {
           await opts.wirkung({ heroes: hitHeroes, creatures: creatureEntries.map(e => e.inst) });
+        }
         }
       } finally {
         // Vorgemerkte Heldentode JETZT — nach dem letzten Treffer.
@@ -56505,19 +58537,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1085: `_petrified` ist der gemeinsame Marker (Baihu setzt ihn
       // jetzt mit, „Petrifier" nur ihn). `_baihuPetrify` bleibt daneben
       // stehen, damit laufende Spielstaende nicht brechen.
-      if (inst?.counters?._cardinalImmune || inst?.counters?._petrified
-          || inst?.counters?._baihuPetrify
-          || isCardinalBeastByName(inst?.name)) {
+      // Spielgestalter-Entscheidung 16.11.2026 (Ida): die Versteinerung („takes no damage from any sources") hält Idas Zauberschaden NICHT ab (`e.ignoreUnaffected`, Neubewertung
+      // nach der Hook-Runde); „unaffected by ALL cards and effects" (`_cardinalImmune`, Cardinal-Namen) bleibt immun.
+      if (inst?.counters?._cardinalImmune
+          || ((inst?.counters?._petrified || inst?.counters?._baihuPetrify) && !e.ignoreUnaffected && !e.durchschlagSchutz && !e.durchschlagVersteinerung)   // Spielgestalter-Entscheidung 17.11.2026: True Damage (Acid Vial & Co.) trifft versteinerte Kreaturen
+          || cardinalNameImmun(this, inst)) {   // Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Cardinal-Illusion (Omikron) ist nicht immun
         e._immuneCreature = true;
-      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false })) {
+      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false, ignoreUnaffected: e.ignoreUnaffected === true })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
+      } else if (inst?.counters?._damageDestroyImmune && !e.ignoreUnaffected && !e.durchschlagSchutz && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
         // Beast name fallback and identity stay clean.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): „cannot take damage or be defeated" (Time Bomblebee) hält Idas Zauberschaden NICHT ab
+        // (`e.ignoreUnaffected`, siehe Ida) — nur „unaffected by ALL cards and effects" (Cardinal Beasts …) bleibt immun.
         e._immuneCreature = true;
       } else if (inst?.counters?._monkeeShieldUntilTurn != null
                  && this.gs.turn < inst.counters._monkeeShieldUntilTurn
@@ -56533,10 +58569,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         e._immuneCreature = true;
       } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
-      } else if (inst?.counters?._stealImmortal) {
+      } else if (inst?.counters?._stealImmortal && !e.ignoreUnaffected && !e.durchschlagSchutz) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
+        // Spielgestalter-Entscheidung 16.11.2026 (Ida): Idas Zauberschaden ignoriert auch diesen Schutz (`e.ignoreUnaffected`).
         e._immuneCreature = true;
-      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source)) {
+      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source, { ignoreUnaffected: e.ignoreUnaffected === true })) {
         // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
         // aura). Only fizzles damage coming FROM THE OPPONENT — friendly
         // self-damage (Cluster's blast on own creatures, etc.) still
@@ -56570,6 +58607,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async _processCreatureDamageBatchKern(entries) {
     if (!entries || entries.length === 0) return;
+    // ★ Welle mit `kreaturenZuerst` (Flame Avalanche): die Animation gibt den Takt vor, alle Kreaturen werden im selben Augenblick getroffen —
+    // keine 200 ms Staffelung je ueberlebender Kreatur (der Aufrufer setzt `entries._ohneStaffel`; die Filter unten bauen neue Arrays).
+    const ohneStaffel = !!entries._ohneStaffel;
 
     // Filter out face-down surprise creatures — they cannot be damaged
     entries = entries.filter(e => !e.inst?.faceDown);
@@ -56717,6 +58757,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (Elixir of Strength: „… cannot be reduced or negated", Kreaturen-Zwilling des Heldenpfads): ein vom Elixir verstärkter Attack-Treffer auf EIN Ziel
+    // ist unreduzier-/unnegierbar (wie True Damage: `canBeNegated: false` — Defending the Gate, Resilient Monkee, Guardian & Co. halten ihn nicht ab) und schlägt die „takes no damage"-Formen
+    // durch (Versteinerung, „cannot take damage" von Time Bomblebee, gestohlene Kreatur: `e.durchschlagSchutz`); „unaffected by …"-Effekt-Immunitäten bleiben. Der Stempel liegt VOR der
+    // Immunitäts-Markierung unten; +150 und Verbrauch des Buffs folgen im Rider weiter unten.
+    if (entries.length === 1) {
+      const e0 = entries[0];
+      if (e0 && e0.amount > 0 && this._empoweredStrikeHeld(e0.source, e0.type)) {
+        e0.canBeNegated = false;
+        e0.cannotBeNegated = true;
+        e0.cannotBeReduced = true;
+        e0._unreduzierbar = true;
+        e0.durchschlagSchutz = true;
+      }
+    }
     this._markCreatureDamageImmunity(entries);
 
     // Annotate entries with cancelled flag and init HP
@@ -56915,9 +58969,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._kreaturenSchadenSchilde(entries);   // W7a (A07-29): vergebene Schilde (Harpyformer Choir) hängen am Spieler, nicht an der Karte
     // 23.10. (Black-Thorn Dragon, Ida: „ignore any effects that make a target unaffected by them"): Idas Hook stempelt `canBeNegated = false` erst
     // in der Hook-Runde oben — die Markierung der Immunitäten lief davor. Ein Piercing-Eintrag bei einer Spell-immunen Kreatur wird deshalb neu bewertet.
+    // Spielgestalter-Entscheidung 16.11.2026: dasselbe für Idas Stempel `ignoreUnaffected` bei JEDER „unaffected by (opponent's) cards and effects"-Immunität (Golden Wings, Sparkfly Attendant,
+    // Rook/Board of Kings …) — die Neubewertung läuft die ganze Kette neu durch; Cardinal Beasts & Co. („unaffected by ALL cards and effects") bleiben dabei immun.
     for (const e of entries) {
-      if (!e?._immuneCreature || e.canBeNegated !== false || !e.inst) continue;
-      if (!loadCardEffect(e.inst.counters?._effectOverride || e.inst.name)?.unaffectedBySpells) continue;
+      if (!e?._immuneCreature || !e.inst) continue;
+      if (e.ignoreUnaffected !== true) {
+        if (e.canBeNegated !== false) continue;
+        if (!loadCardEffect(e.inst.counters?._effectOverride || e.inst.name)?.unaffectedBySpells) continue;
+      }
       e._immuneCreature = false;
       this._markCreatureDamageImmunity([e]);
     }
@@ -57018,12 +59077,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // is a no-op. Multipliers ≥ 1 still apply.
       // ── W51c: FRUEHES Hand-Reaktionsfenster „Schaden senken" (Cloud in a Bottle), Zwilling des Heldenpfads: VOR dem Multiplikatoren-Durchgang, damit die
       // Halbierung vor Einmal-Schilden/Flat-Boni/HP-Boeden greift. Die Karte legt „Cloudy" auf; der Durchgang darunter halbiert dann. Nicht senkbarer Schaden
-      // (`cannotBeReduced`, `canBeNegated === false`) bekommt kein Angebot; Zerstoeren/Opfer sind kein Schaden.
-      if (e.inst && !e._immuneCreature && e.canBeNegated !== false && !e.cannotBeReduced && e.amount > 0
+      // (`cannotBeReduced`, `canBeNegated === false`) bekommt das Angebot trotzdem (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt; Hinweis in der Frage,
+      // ein zurueckgelieferter `multiplier` wird verworfen); Zerstoeren/Opfer sind kein Schaden.
+      const _eNichtSenkbar = e.canBeNegated === false || !!e.cannotBeReduced || !!e.cannotBeNegated || e.trueDamage === true;
+      if (e.inst && !e._immuneCreature && e.amount > 0
           && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0
           && !require('./_arrows-shared').hydraWirdNullen(this, e.source, { type: e.type, _unreduzierbar: e.trueDamage === true || e._unreduzierbar === true })) {   // R5: eine nullende Hydra — die Reaktion am Ziel sieht schon die 0
-        const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type, { early: true });
-        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+        const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type,
+          { early: true, cannotBeNegated: e.canBeNegated === false || !!e.cannotBeNegated || e.trueDamage === true, cannotBeReduced: !!e.cannotBeReduced || e.trueDamage === true });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1 && !_eNichtSenkbar) {
           if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * _fr.multiplier; e._kMul = (e._kMul ?? 1) * _fr.multiplier; }
           else e.amount = Math.ceil(e.amount * _fr.multiplier);
         }
@@ -57242,7 +59304,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       // which is non-lethal too. Sibling of the pre-DEFEAT reaction
       // a few lines below (lethal-only).
       if (actualAmount > 0 && (e.inst.counters.currentHp || 0) > 0) {
-        const preDamageRes = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type);
+        // Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — auch gegen unnegier-/unsenkbaren Schaden (Hinweis in der Frage); Negation/Senkung werden dann verworfen
+        // (wie im Heldenpfad, `piercing_override`): bezahlt/verbraucht, der Treffer geht durch.
+        const _eKeineNegation = e.canBeNegated === false || !!e.cannotBeNegated || e.trueDamage === true;
+        const _eKeineSenkung = !!e.cannotBeReduced || e.trueDamage === true || e._unreduzierbar === true;
+        let preDamageRes = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type,
+          { cannotBeNegated: _eKeineNegation, cannotBeReduced: _eKeineSenkung });
+        if (preDamageRes?.negated && _eKeineNegation) {
+          this.log('piercing_override', { source: e.source?.name, reason: 'creature_pre_damage_negation' });
+          preDamageRes = { ...preDamageRes, negated: false };
+        }
+        if (typeof preDamageRes?.amountOverride === 'number' && _eKeineSenkung && preDamageRes.amountOverride < actualAmount) {
+          this.log('piercing_override', { source: e.source?.name, reason: 'creature_pre_damage_reduction' });
+          preDamageRes = { ...preDamageRes, amountOverride: undefined };
+        }
         if (preDamageRes?.negated) {
           if (e.vollOut) e.vollOut.wert = 0;   // W50a
           if (e.inst.counters._dyingThisBatch) delete e.inst.counters._dyingThisBatch;
@@ -57497,7 +59572,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         sterbende.push(e);
       } else {
         this.sync();
-        await this._delay(200);
+        if (!ohneStaffel) await this._delay(200);
       }
     }
 
@@ -57956,6 +60031,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
       const damage = await this.calculatePoisonDamage(ap, stacks);
+      // Spielgestalter-Entscheidung 17.11.2026 (MED-01): Medeas Verdopplung steckt schon in `damage` (modifyPoisonDamage) — bei Deadly Poison wird dieser KOMPLETTE, erhöhte Betrag zu Heilung (Bloom/Paraseed-Zuschläge hängen an `beforeDamage` und wirken nur auf Schaden).
       // ★ 24.10. „Deadly Poison": solange der Giftstatus die Marke `deadly` trägt, HEILT der Tick statt zu schaden (nie über die Max-HP). Weitere Stapel erhöhen nur den Heilbetrag; wird das Gift entfernt
       // (Beer, Cure …), geht die Marke mit ihm, und neues Gift schadet wieder normal.
       if (hero.statuses.poisoned.deadly) {
@@ -58209,7 +60285,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if ((supZones[zi] || []).indexOf(inst.name) >= 0) { slotIdx = zi; break; }
         }
         const effectiveCd = this.getEffectiveCardData(inst);
-        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token'));
+        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token')) || !!inst.counters?._spiegelKopie;   // Magic-Mirror-Kopie (Spielgestalter-Entscheidung 16.11.2026): kein Stapel
         // Zone-anchored fly-out so the client animates this equip from THIS
         // hero's exact slot, not the leftmost same-named one — e.g. two
         // Lifeforce Howitzers on different heroes. The client's name-keyed
@@ -58347,6 +60423,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     // Defeat creatures in the island zones being removed (rightmost block)
+    // Spielgestalter-Entscheidung 16.11.2026 (Elixir of Immortality): solange die Todes-Hooks dieser Schleife laufen, steht hier die Zonenentfernung — das Elixir belebt
+    // so einen Tod nur beim selben Helden und nur mit freier Zone (`_inselEntfernung`: Seite, Held, erster entfernter Platz). Rumpf bewusst NICHT neu eingerückt (try/finally).
+    const _inselVorher = this._inselEntfernung;
+    this._inselEntfernung = { seite: playerIdx, heroIdx, ab: firstRemoveIdx };
+    try {
     for (let zi = firstRemoveIdx; zi < totalZones; zi++) {
       const zoneCards = ps.supportZones[heroIdx][zi] || [];
       for (const cardName of [...zoneCards]) {
@@ -58387,6 +60468,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    } finally { this._inselEntfernung = _inselVorher; }
 
     // Remove the island zones from the array (rightmost block)
     ps.supportZones[heroIdx].splice(firstRemoveIdx, removeCount);
@@ -58798,6 +60880,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const isSummonable = script.summonableFromCoolnessStack === true;
     if (!isPlayable && !isSummonable) return { aborted: true, reason: 'not_playable_from_stack' };
     if (typeof script.resolveFromCoolnessStack !== 'function') return { aborted: true, reason: 'no_resolver' };
+    // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action", wie Cooldin): das Beschwoeren vom Coolness Stack (Hipdall, Swagdri, Wildur: "summon it as an additional
+    // Action from there") und das Spielen von String of Fine/Bifab (`stackPlayIstZusatzaktion`: "play it from there as an additional Action" / "This counts as an additional Action") sind
+    // Zusatzaktionen — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) passiert nichts, die Karte bleibt oben auf dem Stapel.
+    // Modnir/Swellpnir (Ausruestung anlegen) sind keine Aktion und bleiben spielbar.
+    if ((isSummonable || script.stackPlayIstZusatzaktion === true) && this.areActionsBlocked(playerIdx)) return { aborted: true, reason: 'actions_blocked' };
     const inst = this.getCoolnessStackTopInst(playerIdx);
     if (!inst) return { aborted: true, reason: 'no_inst' };
     const ctx = this._createContext(inst, { event: 'playFromCoolnessStack' });
@@ -58984,7 +61071,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = loadCardEffect(p.name);
         const s = script?.preventsAllHeroesDeadLoss;
         return typeof s === 'function' ? s(this, pi, p) : s;
-      });
+      }) || (this.gs.players || []).some((qs, qi) => qi !== pi && (qs?.permanents || []).some(p => {
+        // Spielgestalter-Entscheidung 16.11.2026 (Elixir of Immortality): ein Permanent des KONTROLLEURS eines uebernommenen Helden dieser Seite kann
+        // dessen Wiederbelebung vorgemerkt haben — `preventsAllHeroesDeadLossForSide(engine, besitzerIdx, perm, seite)`.
+        const f = loadCardEffect(p.name)?.preventsAllHeroesDeadLossForSide;
+        return typeof f === 'function' && f(this, qi, p, pi);
+      }));
       // v867: Ein Held, der VORUEBERGEHEND aus dem Spiel entfernt ist
       // (Teleportation Powder), haelt seine Seite am Leben — „A player
       // does not lose the game, even if all their other Heroes are
@@ -59402,9 +61494,33 @@ this._deathWatch = (this._deathWatchStack || []).length
     (this._playSignale || (this._playSignale = [])).push({ name, owner });
   }
 
+  /**
+   * ★ AUFLADEN VOR DEM DASH (Trailer-Look, `public/app-fx-68.jsx`): jedes Ramm-Ereignis eines HELDEN bekommt `lade` = `RAMM_LADEN_MS` — der Client haelt die Figur so lange in der Hocke
+   * (Bodenringe in Heldenfarben, Silhouetten-Flackern), DANN erst beginnt der Dash. Der Kontakt liegt damit `lade` ms nach dem Ereignis; die naechste Wartezeit des Skripts waechst um
+   * dieselbe Zeit (Schuld, wird im naechsten `_delay` desselben Atemzugs eingelöst — `rammeBisKontakt` und die Skripte mit `broadcast; await _delay(x)` brauchen keine Aenderung).
+   * Skripte, die NACH dem Ramm-Ereignis im selben Atemzug noch Zonen-Animationen senden (Venom Strike, Tiger Kick), warten vorher einmal `await engine._delay(0)`.
+   * KEIN Aufladen: Rueckwaerts-Rammen (Tail Slap), Jetpack (`trailType: 'fire'`), `fire_stars`, Rammer aus einer Support Zone (Kreaturen: `sourceZoneSlot`), ausdruecklich `lade: 0`,
+   * und der Folgedash derselben Figur binnen 1,8 s (Whirlwind Strike & Co.: einmal aufladen, dann in Serie).
+   */
+  _rammLadenAnmelden(data) {
+    if (!RAMM_LADEN_MS || data.lade != null) return data;                              // abgeschaltet bzw. das Skript legt es selbst fest (0 = nie)
+    if (data.rueckwaerts || data.trailType === 'fire' || data.trailType === 'fire_stars') return data;
+    if (data.sourceZoneSlot != null && data.sourceZoneSlot >= 0) return data;          // Kreatur rammt
+    if (!(data.sourceHeroIdx >= 0)) return data;
+    const key = data.sourceOwner + ':' + data.sourceHeroIdx, jetzt = Date.now();
+    const M = this._rammLadeLetzte || (this._rammLadeLetzte = new Map());
+    const vorher = M.get(key);
+    M.set(key, jetzt);
+    if (vorher != null && jetzt - vorher < RAMM_FOLGE_MS) return { ...data, lade: 0 };   // Serie: kein neues Aufladen
+    this._rammLadeSchuld = Math.max(this._rammLadeSchuld || 0, RAMM_LADEN_MS);
+    setImmediate(() => { this._rammLadeSchuld = 0; });                                // gilt nur im selben Atemzug (bis zum naechsten echten Warten)
+    return { ...data, lade: RAMM_LADEN_MS };
+  }
+
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    data = this._rarityMitEreignis(event, data);   // Rarity der fliegenden/aufgedeckten Karte mitgeben (Identitaetsverfolgung, _rarity-track.js)
     // Pfeilsalve: die Standard-Animationen einer Attack mit Pfeilen werden zurueckgehalten und reisen mit `play_arrow_salvo` (Fallback fuer Clients ohne Salve).
     if (event === 'reaction_chain_done' && this._pfeilSchild && !this._pfeilSchild.aktiv && !this._pfeilSchild.fertig) this._pfeilSchild.aktiv = true;   // Pfeilsalve: ab Kettenende scharf
     if (this._pfeilSchild && this._pfeilSchild.aktiv && require('./_arrows-shared').PFEIL_SCHILD_EVENTE.has(event)) { this._pfeilSchild.puffer.push([event, data, opts, Date.now()]); return; }
@@ -59539,6 +61655,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         outData = { ...outData, owner: akt.heroOwner };
       }
     }
+    // Aufladen vor dem Dash: das Ramm-Ereignis eines HELDEN bekommt `lade` (ms Vorlauf), die naechste Wartezeit waechst mit (`_delay`).
+    if (event === 'play_ram_animation' && outData && typeof outData === 'object') outData = this._rammLadenAnmelden(outData);
     // Optionale Empfaengerauswahl (12.8.). `opts.toPlayers` ist eine
     // Liste von Spielerindizes; ohne sie geht das Ereignis wie bisher an
     // BEIDE Spieler. Gebraucht vom Karten-Auftritt: eine von der Hand
@@ -59824,6 +61942,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // Spielgestalter-Entscheidung 17.11.2026 (JOH-01, ATT-15): der Status von Anhängseln wie Stowaway/Decisive Defeat/Curse/Berserk/Polymorph/Shrink folgt fortlaufend der
+    // Status-Immunität des Wirts (Johanna, Light Ball, Buff …) — s. `_attachment-shared.js` (`statusAnhaengselAbgleichen`). Vor den ATK-Abgleichen (Fluch/Polymorph buchen ATK).
+    require('./_attachment-shared').statusAnhaengselAbgleichen(this);
     this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
@@ -59933,7 +62054,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ein Zustandsversand dazwischen haette sie dort kurz gezeigt. Der
     // Index wird hier selbst gesucht; entnommen wird ueber die
     // Stapel-Schicht (Sperren, Deckkopf, Mischen), nicht per Splice.
-    const quelle = opts.fromDeck ? (ps.mainDeck || []) : this.handSourceList(pi, opts.fromCreation);
+    let quelle = opts.fromDeck ? (ps.mainDeck || []) : this.handSourceList(pi, opts.fromCreation);
     if (!quelle) return { success: false };
     if (opts.fromDeck) handIndex = quelle.indexOf(cardName);
     if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { success: false };
@@ -59995,7 +62116,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Attachment erlaesst die Zusatzbedingung, nicht die Zugehoerigkeit.
     } else if (opts.cheat) {
       if (oldHeroScript?.cheatAscensionBlocked) return { success: false };
-    } else if ((_ascGrant = (!opts.cheat && !opts.fromDeck   // Erlass haengt an einer HANDkopie
+    } else if ((_ascGrant = (!opts.cheat && !opts.fromDeck && !opts.fromCreation   // Erlass haengt an einer HANDkopie (die Stempel zaehlen Handindizes — nie eine Karte aus Crestinas Vorrat)
                              && this._handAscensionGrantFor(pi, cardName, handIndex)
                              && !this.isAscensionConditionUnskippable(cardName)
                              && this.getAscendedFormsFor(hero.name).includes(cardName)
@@ -60074,9 +62195,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         resolve: async () => true,
       });
       if (ascendChain?.negated) {
-        const hIdx = ps.hand.indexOf(cardName);
-        if (hIdx >= 0) ps.hand.splice(hIdx, 1);
-        await this.routeNegatedInitialCard(pi, cardName, ascendChain, hIdx);
+        // ★ Quelle = Hand ODER Crestinas Vorrat: `ps.hand.indexOf` fand eine Vorratskarte nie (und nahm bei einer namensgleichen Handkopie die FALSCHE Karte).
+        const negQuelle = opts.fromCreation ? (ps.creationZone || []) : ps.hand;
+        const hIdx = negQuelle.indexOf(cardName);
+        if (hIdx >= 0) negQuelle.splice(hIdx, 1);
+        await this.routeNegatedInitialCard(pi, cardName, ascendChain, hIdx, opts.fromCreation ? { fromZone: 'creation' } : {});
         this.log('ascension_negated', {
           player: ps.username, card: cardName, hero: hero.name,
         });
@@ -60103,7 +62226,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!frisch) return { success: false };
         freshIdx = frisch.idx;
       } else {
-        freshIdx = ps.hand.indexOf(cardName);
+        // ★ Aus Crestinas Vorrat (`opts.fromCreation`) in DER Liste suchen — `ps.hand.indexOf` lieferte dort -1 (Karte nur im Vorrat) und der Aufstieg brach NACH dem
+        //   Reaktionsfenster still ab; mit einer namensgleichen Handkopie traf der Index die falsche Karte. Die Liste frisch holen (Umsortieren ersetzt das Array),
+        //   ohne erneute Benutzbarkeitspruefung: der Zug ist beschlossen, eine Reaktion darf ihn nicht halb zuruecknehmen (wie bei Zaubern aus dem Vorrat).
+        if (opts.fromCreation) quelle = ps.creationZone || [];
+        freshIdx = quelle.indexOf(cardName);
       }
       if (freshIdx < 0) return { success: false };
       handIndex = freshIdx;
@@ -60126,7 +62253,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
     if (!this._fastMode && !this._inMctsSim) {
       this._broadcastEvent('attach_hero_fly', {
-        ownerIdx: pi, source: opts.fromCreation ? 'coolnessStack' : 'hand',
+        ownerIdx: pi, source: opts.fromCreation ? 'creation' : 'hand',   // 'coolnessStack' war hier falsch: der Flug startete am Coolness-Stapel und blendete dessen oberste Karte aus
         handIndex, cardName,
         destOwner: hs, destHeroIdx: heroIdx, destZoneSlot: -1,
       });

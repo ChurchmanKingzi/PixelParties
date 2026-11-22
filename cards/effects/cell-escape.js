@@ -18,8 +18,8 @@
 //  • Weniger als 2 (bzw. 4) Karten im Gegnerdeck: es werden so viele gezogen, wie da sind; der Zauber verbraucht sich trotzdem. Bei LEEREM Gegnerdeck ist er nicht spielbar
 //    (kein Verbrauch ohne Wirkung, wie Infiltration).
 //  • „This counts as an additional Action": `inherentAction: true` (Standardform wie Brainstorming).
-//  • „You can only play 1 per game": `oncePerGame`/`oncePerGameKey` — die Engine prüft das Tor und stempelt (Negation der ganzen Karte erstattet, Fizzle/Teilnegierung verbraucht,
-//    Abbruch nie; Z7b).
+//  • „You can only play 1 per game": `oncePerGame`/`oncePerGameKey` — die Engine prüft das Tor und stempelt (Negation der ganzen Karte, Fizzle und Teilnegierung verbrauchen — Spielgestalter-Entscheidung
+//    16.11.2026 —, Abbruch nie).
 //  • Gesperrt (ausgegraut, ohne Kosten/Stempel), solange der Zug der einzige Nutzen ist und nicht stattfinden kann: Hand-Sperre, Zieh-Sperre (`blockedByHandLock`/`blockedByDrawLock`),
 //    Tuscan Artist beim Gegner (beide Ziehvorgänge sind genau 2: `drawWouldBeBlocked`), Erste-Runden-Immunität des Gegners (`blockedByFirstTurnProtection`, Nicht-Schadens-Effekt,
 //    Q66) und Boris (`stealsOpponentCards`: Karten, die dem Boris-Spieler gehören, würden auf die Hand kommen — wie Infiltration; Love Shot trägt das Flag nicht).

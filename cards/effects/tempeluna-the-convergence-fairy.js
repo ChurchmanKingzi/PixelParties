@@ -80,7 +80,8 @@ function anlegbareFeen(engine, pi, heroIdx, feld = pi) {
   const schon = new Set([hero.name, ...gainedNames(hero)]);
   const gesehen = new Set();
   const raus = [];
-  for (const name of (ps.hand || [])) {
+  // ★ 12.11. (Al: „Tempeluna soll Fairy-Helden auch aus der Extra-Hand anlegen können“): Hand + Crestinas Vorrat.
+  for (const name of engine.handUndVorratListe(pi)) {
     if (gesehen.has(name)) continue;
     gesehen.add(name);
     if (schon.has(name)) continue;
@@ -348,8 +349,9 @@ module.exports = {
 
     // Index frisch suchen — zwischen Galerie und hier kann sich die
     // Hand geaendert haben (Reaktionen, Kosten).
-    const handIdx = ps.hand.indexOf(feeName);
-    if (handIdx < 0) return false;
+    const feeQuelle = engine._rxQuelleFuer(ps, feeName);   // Hand oder Crestinas Vorrat
+    if (!feeQuelle) return false;
+    const handIdx = feeQuelle.idx;
     const frei = freieZonen(hostPs, heroIdx);
     if (frei.length === 0) return false;
     const slot = frei[0];
@@ -364,12 +366,12 @@ module.exports = {
     // return;`. Mit den falschen Namen fliegt also GAR NICHTS, ohne
     // Fehler und ohne Meldung (Als Befund 18.9.).
     engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName: feeName, from: 'hand', to: 'support',
+      owner: pi, cardName: feeName, from: feeQuelle.ausVorrat ? 'creation' : 'hand', to: 'support',
       fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
       ...(feld !== pi ? { toOwner: feld } : {}),
       sfx: 'placement',
     });
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    engine.rxNimm(ps, feeQuelle);
 
     if (!hostPs.supportZones[heroIdx]) hostPs.supportZones[heroIdx] = [[], [], []];
     hostPs.supportZones[heroIdx][slot] = [feeName];

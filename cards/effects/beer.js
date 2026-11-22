@@ -62,8 +62,9 @@ module.exports = {
 
     // Kontrolle statt Seite (Styx 28.9.): „targets you control" — IDs physisch.
     const heroes = engine.heroesControlledBy(pi)
-      .filter(({ hero }) => hero?.name && hero.hp > 0
-        && hero.statuses && negKeys.some(k => hero.statuses[k]))
+      .filter(({ hero, physOwner, heroIdx }) => hero?.name && hero.hp > 0
+        && hero.statuses && (negKeys.some(k => hero.statuses[k])
+          || engine.heroHatRuhendesAnhaengsel(physOwner, heroIdx)))   // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag) macht den Helden zum Ziel
       .map(({ physOwner, heroIdx, hero }) => ({
         id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name,
       }));
@@ -165,7 +166,8 @@ module.exports = {
         const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero?.statuses) {
           for (const key of statuses) {
-            if (hero.statuses[key]) {
+            // `attach:<instId>`: ruhendes Status-Anhaengsel (Stowaway, Decisive Defeat, Aged, Mind Control) — hat keinen Status am Helden, geht aber ueber `cleanseHeroStatuses` in die Ablage
+            if (hero.statuses[key] || String(key).startsWith('attach:')) {
               engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, [key], 'Beer');
             }
           }

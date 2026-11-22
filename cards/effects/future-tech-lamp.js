@@ -15,8 +15,9 @@
 //  graut die zweite Lamp aus, Server `doUseArtifactEffect` und CPU
 //  fragen dasselbe Gate), der Stempel kommt erst im Rumpf von `resolve`
 //  (= nach der Reaktionskette, Kosten-und-Limits-erst-nach-dem-Commit):
-//  eine GANZ negierte Lamp (Rusty Touch, Misfire …) loest nie auf und
-//  stempelt nicht (Z7b); eine aufgeloeste Lamp stempelt auch dann, wenn
+//  eine GANZ negierte Lamp (Rusty Touch, Misfire …) loest nie auf, ist
+//  aber verbraucht (`onFizzledPlay`, Spielgestalter-Entscheidung
+//  16.11.2026); eine aufgeloeste Lamp stempelt auch dann, wenn
 //  die Oberen kein Artefakt enthalten. Die Lamp hat keine abbrechbare
 //  Frage, der Stempel steht deshalb am Anfang des Rumpfes.
 //
@@ -53,6 +54,9 @@ const GRUND = 1;
 const SCHAU_MS = 1100;
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT(CARD_NAME, pi); },
+
   isTargetingArtifact: false,
   blockedByHandLock: true,
 

@@ -16,8 +16,8 @@
 //  • „when your opponent activates a Spell": das oberste Kettenglied ist ein Spell eines Gegners (aus der Hand gespielt ODER als Reaktion), nicht
 //    negiert, kein bloss als Spell ZAEHLENDER Effekt (Alice: keine Karte, die in die Ablage ginge — wie bei Shamanic Curse) und von einem HELDEN
 //    gewirkt (eine Kreatur, die einen Zauber wirkt, hat keine „Stufe, die ihr Benutzer erreichen muss").
-//  • „once per turn": je Exemplar (`inst.counters._celiaTurn`), gestempelt beim Aktivieren; wird Celias Reaktion selbst negiert, ist der Stempel
-//    wieder frei (`refundOnNegation`). Zweite Celia gibt es nicht („You can only control 1": `beforeSummon`, Platzieren/Uebernehmen sperrt die Engine).
+//  • „once per turn": je Exemplar (`inst.counters._celiaTurn`), gestempelt beim Aktivieren; wird Celias Reaktion selbst negiert, bleibt der Stempel
+//    verbraucht (Spielgestalter-Entscheidung 16.11.2026). Zweite Celia gibt es nicht („You can only control 1": `beforeSummon`, Platzieren/Uebernehmen sperrt die Engine).
 //  • „If this was your opponent's Action": hat der Zauber seinem Spieler eine Aktion gekostet (Initialglied, kein `inherentAction`; Reaktionen
 //    und Zauber, die ein Effekt wirkt, zaehlen nicht) UND wurde er negiert, darf dieser SOFORT eine zusaetzliche Aktion mit einem beliebigen Helden
 //    ausfuehren (`performImmediateActionAnyHero`, abbrechbar = „may"). Sofort heisst: gleich nach der Kette — sie wird nicht als Marke fuer spaeter
@@ -57,16 +57,11 @@ module.exports = {
     return true;
   },
 
-  /** Die Reaktion ist mit dem Aktivieren verbraucht — ausser sie wird selbst negiert (`refundOnNegation`). */
+  /** Die Reaktion ist mit dem Aktivieren verbraucht — auch wenn sie selbst negiert wird (Spielgestalter-Entscheidung 16.11.2026). */
   async payActivationCost(engine, pi, chainCtx, inst) {
     if (!inst.counters) inst.counters = {};
     inst.counters._celiaTurn = engine.gs.turn;
     return true;
-  },
-
-  refundOnNegation(engine, link) {
-    const inst = engine.cardInstances.find(c => c.id === link.creatureInstId);
-    if (inst?.counters) delete inst.counters._celiaTurn;
   },
 
   async creatureReactionResolve(engine, pi, chain, myIndex, inst) {

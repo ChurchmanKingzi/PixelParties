@@ -1,0 +1,15 @@
+{
+  "creature": "Blue-Ice Dragon",
+  "sheet": "blue-ice-dragon.png",
+  "frameWidth": 68,
+  "frameHeight": 50,
+  "frames": 24,
+  "frameMs": 75,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 11,
+  "padLeft": 5,
+  "padRight": 15,
+  "padBottom": 6,
+  "faceX": 34.0
+}

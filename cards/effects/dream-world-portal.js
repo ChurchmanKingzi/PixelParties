@@ -23,6 +23,9 @@ const { portalKandidaten, zielVon } = require('./_dream-lander-shared');
 const CARD_NAME = 'Dream World Portal';
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Choose a Creature you control that can attach a Hero to itself".
+  requiresTarget: true,
+
   inherentAction: true,
   spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
 

@@ -321,7 +321,7 @@ module.exports = {
         source,
         _skipReactionCheck: true,
       });
-      await engine.actionDestroyCard(source, sacInst, { fireCreatureDeath: true });
+      await engine.actionDestroyCard(source, sacInst, { fireCreatureDeath: true, einaescherung: true });   // Opfer: verbrennt (Client: app-fx-66)
 
       // Verify the sacrifice actually emptied the slot. Absolute-
       // protection gates inside actionDestroyCard (immovable counter,

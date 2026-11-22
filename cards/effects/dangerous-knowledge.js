@@ -86,13 +86,15 @@ function kandidaten(engine, pi) {
     if (!hatEffekt(hero.name)) continue;
     // W16g (S01-17): Erste-Runden-Immunitaet — „Choose a Hero your opponent controls“ waehlt aus; geschuetzte Helden sind kein Ziel
     // (wie Compulsory Body Swap). Ohne waehlbaren Held ist die Karte nicht spielbar.
-    if (engine.ersterZugGeschuetzt(physOwner, pi)) continue;
+    // (Erste-Runden-Immunitaet: Spielgestalter-Entscheidung 16.11.2026 — waehlbar, die Wahl verpufft.)
     out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
   }
   return out;
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -100,7 +102,10 @@ module.exports = {
     impact: { type: 'gold_sparkle' }, impactMs: 260,
   },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Choose a Hero your opponent controls …") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
+  blindedEigeneZiele: false,
 
   // Ohne waehlbaren Gegnerhelden ist die Karte gar nicht erst spielbar
   // (der Client graut sie aus) — besser als ein Zauber, der ins Leere

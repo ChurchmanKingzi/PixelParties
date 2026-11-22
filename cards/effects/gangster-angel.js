@@ -172,7 +172,8 @@ module.exports = {
       // Angebot nur, wenn es auch ausfuehrbar ist: Angler in der Hand
       // UND ein freier Platz. Sonst waere die Abfrage eine Falle —
       // „ja" haette den Zug beendet, ohne den Angler zu bringen.
-      if (!(ps.hand || []).includes(PARTNER)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+      if (!engine.handUndVorratListe(pi).includes(PARTNER)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const slots = freieSlots(engine, pi);
       if (slots.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
@@ -199,9 +200,10 @@ module.exports = {
           || slots.find(z => z.heroIdx === pick?.heroIdx && z.slotIdx === pick?.slotIdx) || slots[0];
       }
 
-      const handIdx = (ps.hand || []).indexOf(PARTNER);
-      if (handIdx < 0) return;                       // Rennen: Karte ist weg
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      const partnerQuelle = engine._rxQuelleFuer(ps, PARTNER);
+      if (!partnerQuelle) return;                    // Rennen: Karte ist weg
+      const handIdx = partnerQuelle.idx;
+      engine.rxNimm(ps, partnerQuelle);
 
       const feld = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)
       const ergebnis = await engine.summonCreatureWithHooks(
@@ -211,7 +213,8 @@ module.exports = {
       if (!ergebnis?.inst) {
         // Abgebrochen (z.B. durch eine Kosten-Abfrage der Zielkarte):
         // Handkarte zurueck, und der Zug bleibt offen.
-        engine.returnToPile(ps, 'hand', PARTNER, handIdx);   // v1394
+        if (partnerQuelle.ausVorrat) engine.handkarteZurueck(pi, PARTNER, partnerQuelle);
+        else engine.returnToPile(ps, 'hand', PARTNER, handIdx);   // v1394
         engine.log('gangster_partner_failed', {
           player: ps.username, partner: PARTNER,
         });

@@ -11,9 +11,10 @@ Aufruf: python3 winged.py <tag> [ms] <variante>
              (molinda_wings.render_wing in Marys Palette, links gespiegelt),
              schlagen einmal hoch und runter und legen sich wieder an; die
              beiden Haarsträhnen oben wippen, sie schwebt.
-  crestina   Skin SOS Crestina: die Flügelchen flattern, die lila Aura liegt
-             in jedem Frame exakt 1 px um die Silhouette (wie bei Jenny),
-             sie schwebt.
+  crestina   Skin SOS Crestina: fliegt wie Fairy Queen Crestina (crestina_fq.py):
+             die Flügel schlagen kräftig (6 Schläge je Loop, kaum gestaucht),
+             sie steigt und sinkt und hebt sich bei jedem Abschlag ein wenig;
+             die lila Aura liegt in jedem Frame exakt 1 px um die Silhouette.
   molinda    Hero Cute Angel Molinda: wie Mary – die angelegten Flügel spreizen
              sich, entfalten sich zu dazugezeichneten Schwingen (ihre Palette),
              schlagen und legen sich wieder an; das Herz an ihrem Kopf pocht
@@ -47,7 +48,7 @@ CFG = {
                  strands=[(7, 1), (8, 0), (14, 1), (13, 0)]),
     'crestina': dict(slug='sos-crestina', prefix='sos_crestina', mode='shear', aura='bb99ff',
                      wing_cols=('f6ffff', 'b4f6ff'), left=3, right=14,
-                     pivots={-1: 4, 1: 13}, period=6, amp=0.4, pad=5, parts=None),
+                     pivots={-1: 4, 1: 13}, period=8, amp=0.6, pad=5, parts=None, fly=True),
     'molinda': dict(slug='cute-angel-molinda', prefix='cute_angel_molinda', mode='drawn',
                     wing_cols=('9999ff', 'ccccff', 'f6ffff', '9966ff', '292929'), left=5, right=18,
                     pivots={-1: (5.0, 7.0), 1: (18.0, 7.0)}, period=12, amp=0.26, pad=22, parts='hearts',
@@ -116,6 +117,10 @@ def rnd(k, i):
 
 
 def bob(i):
+    if CFG.get('fly'):                                  # fliegen: Auf und Ab + Auftrieb je Abschlag
+        up = 1.5 * math.sin(2 * math.pi * 2 * i / N)
+        kick = 0.6 * math.sin(2 * math.pi * i / CFG['period'] - 1.2)
+        return -int(round(up + kick))
     return int(round(math.sin(2 * math.pi * i / N * 2)))      # schweben, 2 Wellen pro Loop
 
 
@@ -220,7 +225,8 @@ def frame(i):
     for side in (-1, 1) if CFG['mode'] != 'drawn' else ():
         m = WING & ((cols < MID_X) if side < 0 else (cols >= MID_X))
         if CFG['mode'] == 'shear':
-            lift, sq = CFG['amp'] * math.sin(p), 0.8 + 0.2 * math.cos(p)
+            lift = CFG['amp'] * math.sin(p)
+            sq = 1.0 - 0.1 * max(0.0, -math.cos(p)) if CFG.get('fly') else 0.8 + 0.2 * math.cos(p)
             shear_flap(WINGSRC, m, CFG['pivots'][side], side, lift, sq, out, off, curve=1.0)
         else:
             amp = CFG['amp']

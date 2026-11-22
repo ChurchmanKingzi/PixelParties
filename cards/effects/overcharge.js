@@ -172,6 +172,9 @@ function zulaessigeZiele(engine, pi) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Choose an Artifact equipped to a Hero you control".
+  requiresTarget: true,
+
   activeIn: ['hand'],
 
   /**

@@ -4,8 +4,8 @@
 //  Spell (Reaction) — Magic Arts Lv2
 //
 //  „Play this card immediately when an opponent's Hero uses a Normal Spell. Negate that Spell and delete it. At the end of your next turn, if that Hero
-//   is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level
-//   and in spite of any negative status effects."
+//   is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an additional Action, regardless of its level,
+//   in spite of any negative status effects and even if you could not perform any Actions that turn."
 //
 //  ── Auslegung ─────────────────────────────────────────────────────
 //  • Ghostly Warning VERZOEGERT einen Zauber: Negation + Loeschen jetzt, das Wirken am Ende MEINES naechsten Zuges (`_verzoegert-zauber-shared.js`,
@@ -15,6 +15,13 @@
 //    gleich, ob er dazwischen den Stapel verlassen hat und wieder dort liegt (Name zaehlt, Kopien sind austauschbar).
 //  • Das Wirken ist PFLICHT (nicht abbrechbar, auch alle Zielwahlen nicht), ohne Stufen-, Status- und Phasenpruefung und ohne Wisdom-Abwuerfe. Der Held des
 //    GEGNERS fuehrt den Zauber aus (er entscheidet Ziele); die Aktion ist eine Zusatzaktion.
+//  • ★ Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre): „… even if you could not perform any Actions that turn." Die RUECKKEHR des Zaubers wird von keiner
+//    Aktionssperre blockiert (Overflowing Chalice, Kents Negativ-Gold-Sperre, `_playerActionLockedTurn`, `ps.actionLocked` — alles, was `engine.areActionsBlocked(pi)`
+//    liefert): `_verzoegert-zauber-shared.js` prueft sie nicht, `_castSpellImmediately` ohne `pruefen` und `performKettenfenster` lesen sie nicht. Ein vorgemerkter Zauber
+//    bleibt auch dann vorgemerkt, wenn der Spieler erst NACH dem Vormerken gesperrt wird.
+//    Umgekehrt (dieselbe Entscheidung): das NEGIEREN + LOESCHEN selbst geschieht nur, solange der Spieler NICHT aktionsgesperrt ist — sonst waere die Karte ein Weg, unter der
+//    Sperre einen kuenftigen Zauber vorzumerken. Reaktions-Zauber sind sonst unter der Sperre spielbar (Reaktionen sind keine Aktionen); hier sperrt `reactionCondition`
+//    die Karte deshalb ausdruecklich (nicht angeboten, in der Hand ausgegraut).
 //  • Die Hauptaktion des Zaubers ist verbraucht (wie bei jeder Negation); eine Ersatzaktion gibt es nicht.
 //  • „a Normal Spell" (Al, Welle 75): nur Zauber mit Untertyp Normal. Reaktions-Zauber (Untertyp Reaction) sind kein Ziel — dasselbe Wort wie bei Atta,
 //    der ebenfalls nur Normal Spells loescht.
@@ -40,6 +47,8 @@ module.exports = {
   canActivate: () => false,
 
   reactionCondition: (gs, pi, engine, chainCtx) => {
+    // ★ Spielgestalter-Entscheidung 18.11.2026: Negieren + Loeschen nur ohne Aktionssperre (siehe Kopf) — ein bereits vorgemerkter Zauber bleibt davon unberuehrt.
+    if (engine?.areActionsBlocked?.(pi)) return false;
     const chain = chainCtx?.chain || [];
     const last = chain[chain.length - 1];
     if (!last || last.negated || last.chainClosed) return false;

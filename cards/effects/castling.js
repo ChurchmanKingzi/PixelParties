@@ -43,6 +43,9 @@ function hostHeroOf(engine, inst) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Attach this card to a Hero you control".
+  requiresTarget: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -61,6 +64,8 @@ module.exports = {
 
   // ── Brett-Post-Target-Reaktion ──
   isPostTargetBoardReaction: true,
+  // Spielgestalter-Entscheidung 17.11.2026: „would be AFFECTED" — wird auch ohne Zielwahl angeboten (`heroAffectWindow`).
+  affectFenster: true,
 
   postTargetBoardCondition(gs, pi, engine, targets, source, inst, info) {
     const host = hostHeroOf(engine, inst);
@@ -84,7 +89,8 @@ module.exports = {
     if (!yes) return;
 
     await engine.showTriggeredEffect(CARD_NAME, { replace: true, playerIdx: pi });
-    engine.grantEffectImmunity(host.pi, host.heroIdx, source);
+    // Spielgestalter-Entscheidung 17.11.2026: die Immunität gilt für die GANZE Auflösung dieser einen Karte/dieses Effekts (auch über spätere Zielfenster derselben Karte, Ricochet/Duel/Divine Gift of Equality …) und endet mit ihr (`ueberFenster` → `endeEffektImmunitaeten`).
+    engine.grantEffectImmunity(host.pi, host.heroIdx, source, { ueberFenster: true });
     engine.log('castling_negate', { player: ps.username, hero: host.hero.name, source: srcName });
 
     // Beschwoerung „if possible" — keine harte Bedingung. Direkter Weg

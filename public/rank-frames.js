@@ -21,7 +21,9 @@
 (function (root) {
   'use strict';
 
-  const GRID = { card: [43, 60], sleeve: [43, 60], avatar: [35, 35] };   // Raster der Rahmen in Kunstpixeln
+  // Raster der Rahmen: Karten/Sleeves 150 × 210 (= das 5-px-Raster der 750 × 1050-Karte, Feinheit 3,5 gegenüber dem Entwurf 43 × 60), Avatar 35 × 35
+  const GRID = { card: [150, 210], sleeve: [150, 210], avatar: [35, 35] };
+  const FINE = { card: 3.5, sleeve: 3.5, avatar: 1 };
 
   // ramp: Farbleiter des Materials (Kontur · dunkel · mittel · hell · Glanz). trim: Gold-Einfassung. gem: Edelstein (dunkel, mittel, hell, weiß).
   // rows: Bandprofil von außen nach innen (Zahl = Leiterstufe, 't…' = Trim-Stufe). B = Bandbreite in Kunstpixeln.
@@ -44,10 +46,14 @@
   const snap = (hex) => (root.ppSnap ? root.ppSnap(hex) : hex);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  // ═══ Ein Rahmen zeichnen ══════════════════════════════════════════════════════════════════════
+  // ═══ Ein Rahmen zeichnen ═════════════════════════════════════════════════════════════�
   // Liefert einen Uint32Array (w × h, 0 = durchsichtig). Das Band liegt innen auf der Kante; „Bildbereich“ der Rezepte ist der Rest.
+  // Alle Maße der Rezepte stehen in GROBEN Pixeln (Entwurfsraster 43 × 60); `k(n)` rechnet sie in Rasterpixel der Ausgabe um (Faktor F).
+  // Karten/Sleeves haben F = 3,5 (150 × 210 = das 5-px-Raster der Karte selbst), der Avatar F = 1.
   function build(rankIdx, kind) {
-    const R = RANKS[rankIdx], B = R.B, [W, H] = GRID[kind] || GRID.card;
+    const R = RANKS[rankIdx], F = FINE[kind] || 1, [W, H] = GRID[kind] || GRID.card;
+    const k = (n) => (n === 0 ? 0 : Math.sign(n) * Math.max(1, Math.round(Math.abs(n) * F)));
+    const B = k(R.B);
     const iw = W - 2 * B, ih = H - 2 * B, M = B;                // Bildbereich (iw × ih), Band darum
     const ramp = R.ramp.map(h => c32(snap(h)));
     const trimC = (R.trim || R.ramp).map(h => c32(snap(h)));
@@ -56,31 +62,33 @@
     const buf = new Uint32Array(W * H);
     const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
     const put = (x, y, c) => { if (inb(x, y)) buf[y * W + x] = c; };
-    const setK = (x, y, k) => put(x, y, ramp[clamp(k, 0, 4)]);
-    const setT = (x, y, k) => put(x, y, trimC[clamp(k, 0, 4)]);
-    const setG = (x, y, k) => put(x, y, gemC[clamp(k, 0, 3)]);
+    const setK = (x, y, v) => put(x, y, ramp[clamp(v, 0, 4)]);
+    const setT = (x, y, v) => put(x, y, trimC[clamp(v, 0, 4)]);
+    const setG = (x, y, v) => put(x, y, gemC[clamp(v, 0, 3)]);
 
     // Koordinaten: Ecke (u, v nach außen; 0 = Bildecke des Bildbereichs, B = Kartenkante) und Kante (s entlang nach innen, q nach außen)
     const cx0 = M + ((iw - 1) >> 1), cy0 = M + ((ih - 1) >> 1);
     const cornerXY = (c, u, v) => (c === 0 ? [M - u, M - v] : c === 1 ? [M + iw - 1 + u, M - v] : c === 2 ? [M - u, M + ih - 1 + v] : [M + iw - 1 + u, M + ih - 1 + v]);
-    const sideXY = (s, a, b) => (s === 'T' ? [cx0 + a, M - b] : s === 'B' ? [cx0 + a, M + ih - 1 + b] : s === 'L' ? [M - b, cy0 + a] : [M + iw - 1 + b, cy0 + a]);
+    const sideXY = (s, a, b2) => (s === 'T' ? [cx0 + a, M - b2] : s === 'B' ? [cx0 + a, M + ih - 1 + b2] : s === 'L' ? [M - b2, cy0 + a] : [M + iw - 1 + b2, cy0 + a]);
     // Licht von oben links: unten/rechts eine Stufe dunkler
     const makeCtx = (xy, dk) => {
-      const w = (fn) => (p, q, k) => { const [x, y] = xy(p, q); fn(x, y, k); };
-      return { k: w((x, y, k) => setK(x, y, k - dk)), kRaw: w((x, y, k) => setK(x, y, k)), t: w((x, y, k) => setT(x, y, k - dk)), g: w((x, y, k) => setG(x, y, k)), c: w((x, y, c) => put(x, y, c)), tr: xy };
+      const w = (fn) => (p, q, v) => { const [x, y] = xy(p, q); fn(x, y, v); };
+      return { k: w((x, y, v) => setK(x, y, v - dk)), kRaw: w((x, y, v) => setK(x, y, v)), t: w((x, y, v) => setT(x, y, v - dk)), g: w((x, y, v) => setG(x, y, v)), c: w((x, y, c) => put(x, y, c)), tr: xy };
     };
     const cornerCtx = (c) => makeCtx((u, v) => cornerXY(c, u, v), c === 3 ? 1 : 0);
-    const sideCtx = (s) => makeCtx((a, b) => sideXY(s, a, b), (s === 'B' || s === 'R') ? 1 : 0);
+    const sideCtx = (s) => makeCtx((a, b2) => sideXY(s, a, b2), (s === 'B' || s === 'R') ? 1 : 0);
     const forCorners = (fn) => { for (let c = 0; c < 4; c++) fn(cornerCtx(c), c); };
     const sideList = kind === 'avatar' ? ['T', 'B', 'L', 'R'] : kind === 'sleeve' ? ['L', 'R'] : ['T', 'B'];
     const forSides = (fn) => { for (const s of sideList) fn(sideCtx(s), s); };
+    // Karten: Name (oben) und Werte (unten) bleiben frei — Zierrat nach innen gibt es nur an den senkrechten Kanten
     const edgesOf = (c) => [
-      { k: (s, q, k) => c.k(-s, q, k), t: (s, q, k) => c.t(-s, q, k), kRaw: (s, q, k) => c.kRaw(-s, q, k), c: (s, q, col) => c.c(-s, q, col), span: iw >> 1 },
-      { k: (s, q, k) => c.k(q, -s, k), t: (s, q, k) => c.t(q, -s, k), kRaw: (s, q, k) => c.kRaw(q, -s, k), c: (s, q, col) => c.c(q, -s, col), span: ih >> 1 },
-    ];
+      { k: (s, q, v) => c.k(-s, q, v), t: (s, q, v) => c.t(-s, q, v), kRaw: (s, q, v) => c.kRaw(-s, q, v), c: (s, q, col) => c.c(-s, q, col), span: iw >> 1 },
+      { k: (s, q, v) => c.k(q, -s, v), t: (s, q, v) => c.t(q, -s, v), kRaw: (s, q, v) => c.kRaw(q, -s, v), c: (s, q, col) => c.c(q, -s, col), span: ih >> 1 },
+    ].slice(kind === 'card' ? 1 : 0);
+    const bw = Math.max(1, Math.round(F * 0.55));                      // Breite einer Bevel-Stufe (Kontur bleibt 1 Rasterpixel)
 
-    // ── Bausteine ──────────────────────────────────────────────────────────────────────────────
-    // Schliff-Edelstein: Achteck mit Facetten und Kontur (opt.eye: Auge mit Schlitzpupille, opt.claws: Krappen)
+    // ── Bausteine (Maße in Rasterpixeln; die Rezepte rechnen mit k() um) ────────────────────────────
+    // Schliff-Edelstein: Achteck mit Facetten und Kontur (opt.eye: Auge mit Schlitzpupille)
     const gem = (ctx, mu, mv, r, opt) => {
       opt = opt || {};
       const lim = r + (r >> 1), inside = (du, dv) => Math.abs(du) <= r && Math.abs(dv) <= r && Math.abs(du) + Math.abs(dv) <= lim;
@@ -89,22 +97,23 @@
         const rim = !inside(du + 1, dv) || !inside(du - 1, dv) || !inside(du, dv + 1) || !inside(du, dv - 1);
         if (rim) { ctx.kRaw(mu + du, mv + dv, 0); continue; }
         const ad = Math.abs(du), av = Math.abs(dv);
-        let k = (ad <= r * 0.34 && av <= r * 0.34) ? 2 : (-dv > ad ? 2 : (-du > av ? 1 : 0));
-        if (opt.eye) { const d2 = du * du + dv * dv; k = d2 <= r * r * 0.3 ? 2 : d2 <= r * r * 0.62 ? 1 : 0; }
-        ctx.g(mu + du, mv + dv, k);
+        let v = (ad <= r * 0.34 && av <= r * 0.34) ? 2 : (-dv > ad ? 2 : (-du > av ? 1 : 0));
+        if (opt.eye) { const d2 = du * du + dv * dv; v = d2 <= r * r * 0.3 ? 2 : d2 <= r * r * 0.62 ? 1 : 0; }
+        ctx.g(mu + du, mv + dv, v);
       }
       if (opt.eye) for (let dv = -(r - 1); dv <= r - 1; dv++) ctx.kRaw(mu, mv + dv, 0);
-      if (r >= 2) ctx.g(mu - (r >> 1) - (opt.eye ? 1 : 0), mv - (r >> 1), 3); else if (r === 1) ctx.g(mu, mv, 3);
+      if (r >= 3) { const g = Math.max(1, r >> 2); for (let dv = 0; dv < g + 1; dv++) for (let du = 0; du < g + 1; du++) ctx.g(mu - (r >> 1) - (opt.eye ? 1 : 0) + du, mv - (r >> 1) + dv, 3); }
+      else if (r >= 2) ctx.g(mu - (r >> 1) - (opt.eye ? 1 : 0), mv - (r >> 1), 3); else if (r === 1) ctx.g(mu, mv, 3);
     };
-    // Platte mit Bevel (Ecken-/Seitenkoordinaten p0..p1, q0..q1): Kontur außen, Glanzkante, Fläche, innen dunkel; rim = Gold-Einfassung
+    // Platte mit Bevel (Ecken-/Seitenkoordinaten p0..p1, q0..q1): Kontur außen (1 px), Glanzkante, Fläche, innen dunkel; rim = Gold-Einfassung
     const plate = (ctx, p0, q0, p1, q1, cham, useTrim, rim) => {
       for (let q = q0; q <= q1; q++) for (let p = p0; p <= p1; p++) {
         const ep = p1 - p, eq = q1 - q;
         if (cham && ep + eq < cham) continue;
         const eo = (cham && ep + eq === cham) ? 0 : Math.min(ep, eq);
-        let k = eo === 0 ? 0 : eo === 1 ? 4 : eo === 2 ? 3 : 2;
-        if (p === p0 || q === q0) k = Math.min(k, 1);
-        if (rim && eo <= 1) ctx.t(p, q, eo === 0 ? 0 : 3); else (useTrim ? ctx.t : ctx.k)(p, q, k);
+        let v = eo === 0 ? 0 : eo <= bw ? 4 : eo <= 2 * bw ? 3 : 2;
+        if (p === p0 || q === q0) v = Math.min(v, 1);
+        if (rim && eo <= bw) ctx.t(p, q, eo === 0 ? 0 : 3); else (useTrim ? ctx.t : ctx.k)(p, q, v);
       }
     };
     // Dorn/Splitter in Achsenrichtung (dp, dq) ab (p, q): Länge len, Breite w (verjüngt), Kanten hell/dunkel, Spitze Glanz
@@ -113,24 +122,27 @@
       for (let s = 0; s < len; s++) {
         const half = Math.round((w * (1 - s / len) - 1) / 2);
         for (let o = -half; o <= half; o++) {
-          let k = o < 0 ? 3 : o > 0 ? 1 : 2;
-          if (half === 0) k = 3;
-          if (s === len - 1) k = 4;
-          put2(p + dp * s + (dq !== 0 ? o : 0), q + dq * s + (dp !== 0 ? o : 0), k);
+          let v = o < 0 ? 3 : o > 0 ? 1 : 2;
+          if (half === 0) v = 3;
+          if (s === len - 1 || (o === -half && F > 1)) v = Math.max(v, 3) + (s === len - 1 ? 1 : 0);
+          if (o === half && half > 0 && F > 1) v = 0;
+          put2(p + dp * s + (dq !== 0 ? o : 0), q + dq * s + (dp !== 0 ? o : 0), v);
         }
       }
     };
     const leaf = (ctx, p, q, dp, dq, len, w) => {
       for (let s = 0; s < len; s++) {
         const half = Math.round(((w || 3) / 2) * Math.sin(Math.PI * (s + 0.6) / (len + 0.2)));
-        for (let o = -half; o <= half; o++) ctx.k(p + dp * s + (dq !== 0 ? o : 0), q + dq * s + (dp !== 0 ? o : 0), o === 0 ? 4 : (o < 0 ? 3 : 2));
+        for (let o = -half; o <= half; o++) ctx.k(p + dp * s + (dq !== 0 ? o : 0), q + dq * s + (dp !== 0 ? o : 0), (o === half && half > 0 && F > 1) ? 0 : (o === 0 ? 4 : (o < 0 ? 3 : 2)));
       }
     };
     const glow = (ctx, p, q) => ctx.c(p, q, glowC[1]);                 // glühender Riss (Obsidian), fest eingebacken
 
     // ── Band: Ring innen auf der Kante, Gehrung (Avatar: abgeschrägte Ecken), Textur ───────────────
+    const nRows = R.rows.length;
     const rowAt = (d, lit) => {                                       // d: 1 = innen … B = Kartenkante
-      const r = R.rows[B - d];
+      let ri = nRows - 1 - Math.min(nRows - 1, Math.floor((d - 1) / (B / nRows)));
+      const r = R.rows[ri];
       if (typeof r === 'string') return { trim: true, k: parseInt(r.slice(1), 10) - (lit ? 0 : 1) };
       return { trim: false, k: r === 0 ? 0 : r - (lit ? 0 : 1) };
     };
@@ -144,86 +156,94 @@
       const horiz = dy >= dx, lit = horiz ? y < M : x < M, e = rowAt(d, lit);
       let kk = e.k, tr = e.trim;
       if (tex && (dx === 0 || dy === 0)) {
-        const t0 = horiz ? x - M : y - M, len = horiz ? iw : ih, o = tex(d, Math.min(t0, len - 1 - t0), kk, tr);
+        const t0 = horiz ? x - M : y - M, len = horiz ? iw : ih, o = tex(d, Math.min(t0, len - 1 - t0), kk, tr, F);
         if (o) { kk = o.k; if (o.trim != null) tr = o.trim; }
       }
+      // Feine Raster: 1 px Kontur an der Außenkante und zur Bildseite hin (die Karte bekommt eine klare Linie wie Kartenrahmen sonst auch)
+      if (F > 1 && (d === B || d === 1)) { kk = 0; tr = false; }
       (tr ? setT : setK)(x, y, kk);
     }
 
-    // ── Zierrat des Ranges ────────────────────────────────────────────────────────────────────────
-    const A = { forCorners, forSides, edgesOf, gem, plate, shard, leaf, glow, B, iw, ih, kind, cx0, cy0 };
+    // ── Zierrat des Ranges ──────────────────────────────────────────────────────────────�
+    const A = { forCorners, forSides, edgesOf, gem, plate, shard, leaf, glow, B, iw, ih, kind, cx0, cy0, k, F };
     const art = ART[R.id];
     if (art) art(A);
     return { buf, W, H };
   }
 
-  // Textur des Bandes (Stufe an Position t entlang der Kante, symmetrisch); null lässt das Profil stehen
+  // Textur des Bandes (Stufe an Position t entlang der Kante, symmetrisch); null lässt das Profil stehen. F: Feinheit des Rasters.
   const TEX = {};
-  TEX.diamond = (d, t, k) => (d === 2 ? { k: clamp(k + ((t & 3) < 2 ? 1 : -1), 1, 4) } : null);        // Eisfacetten
-  TEX.emerald = (d, t, k, tr) => (!tr && t % 6 === 3 ? { k: 4 } : null);                                // Ranken-Punkte
-  TEX.obsidian = (d, t) => (d === 2 && (t % 7) < 4 ? { k: 3 } : null);                                  // Glasadern
+  const texU = (t, F) => Math.floor(F > 1 ? t / (F / 2) : t);          // Position in Musterschritten (feine Raster: doppelt so fein wie der grobe Entwurf)
+  TEX.diamond = (d, t, v, tr, F) => (d === Math.round(2 * (F || 1)) ? { k: clamp(v + ((texU(t, F) & 3) < 2 ? 1 : -1), 1, 4) } : null);   // Eisfacetten
+  TEX.emerald = (d, t, v, tr, F) => (!tr && texU(t, F) % 6 === 3 ? { k: 4 } : null);                                                       // Ranken-Punkte
+  TEX.obsidian = (d, t, v, tr, F) => (d === Math.round(2 * (F || 1)) && (texU(t, F) % 7) < 4 ? { k: 3 } : null);                           // Glasadern
 
   // ═══ Zierrat je Rang (alles innerhalb der Bildkante) ════════════════════════════════════════════
   // Ecken: Platte S × S an der Kartenecke (u, v von B-S+1 bis B). Kanten: Zierrat zeigt NACH INNEN (q ≤ 0), nie nach außen.
+  // Maße in groben Pixeln, mit A.k() ins Raster der Ausgabe umgerechnet.
   const ART = {};
   ART.silver = (A) => {                                                           // Niete in der Ecke
-    const B = A.B;
-    A.forCorners((c) => { A.plate(c, B - 3, B - 3, B, B, 1); c.k(B - 1, B - 1, 4); });
+    const B = A.B, k = A.k;
+    A.forCorners((c) => { A.plate(c, B - k(3), B - k(3), B, B, k(1)); const m = B - k(1.4); for (let a = 0; a < Math.max(1, k(1) - 1); a++) for (let b2 = 0; b2 < Math.max(1, k(1) - 1); b2++) c.k(m - a, m - b2, 4); });
   };
   ART.gold = (A) => {                                                             // Plättchen mit Rubin
-    const B = A.B;
-    A.forCorners((c) => { A.plate(c, B - 4, B - 4, B, B, 2); A.gem(c, B - 2, B - 2, 1); });
+    const B = A.B, k = A.k;
+    A.forCorners((c) => { A.plate(c, B - k(4), B - k(4), B, B, k(2)); A.gem(c, B - k(2), B - k(2), k(1)); });
   };
   ART.platinum = (A) => {                                                         // Platte mit Veilchen-Stein, Perl-Zähne nach innen
-    const B = A.B;
+    const B = A.B, k = A.k;
     A.forCorners((c) => {
-      A.plate(c, B - 5, B - 5, B, B, 2); A.gem(c, B - 2, B - 2, 1);
-      for (const e of A.edgesOf(c)) for (let s = 8; s < e.span - 1; s += 7) { e.k(s, 0, 4); e.k(s - 1, 0, 3); e.k(s + 1, 0, 3); e.k(s, -1, 3); }
-    });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 1); });
-  };
-  ART.diamond = (A) => {                                                          // Kristallplatte, Eiszacken nach innen
-    const B = A.B;
-    A.forCorners((c) => {
-      A.plate(c, B - 5, B - 5, B, B, 2); A.gem(c, B - 2, B - 2, 1);
-      for (const e of A.edgesOf(c)) for (let s = 8, n = 0; s < e.span - 1; s += 5, n++) A.shard(e, s, 0, 0, -1, 2 + (n & 1), 3);
-    });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 1); A.shard(c, 0, 0, 0, -1, 4, 3); });
-  };
-  ART.ruby = (A) => {                                                             // Goldplatte mit Rubin, Flammenzungen nach innen
-    const B = A.B;
-    A.forCorners((c) => {
-      A.plate(c, B - 6, B - 6, B, B, 3, true); A.gem(c, B - 3, B - 3, 2);
-      for (const e of A.edgesOf(c)) for (let s = 9, n = 0; s < e.span - 1; s += 8, n++) A.shard(e, s, 0, 0, -1, 3, 3, true);
-    });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 1); A.shard(c, 3, 0, 0, -1, 3, 2, true); A.shard(c, -3, 0, 0, -1, 3, 2, true); });
-  };
-  ART.sapphire = (A) => {                                                         // Gold-gerahmte Platte, Saphir, Federn nach innen
-    const B = A.B;
-    A.forCorners((c) => {
-      A.plate(c, B - 6, B - 6, B, B, 3, false, true); A.gem(c, B - 3, B - 3, 2);
-      for (const e of A.edgesOf(c)) for (let s = 9; s < 18; s += 3) { A.shard(e, s, 0, 0, -1, 4 - ((s - 9) / 3 | 0), 2); }
-    });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 1); A.shard(c, 3, 0, 0, -1, 4, 2); A.shard(c, -3, 0, 0, -1, 4, 2); });
-  };
-  ART.emerald = (A) => {                                                          // Gold-gerahmte Platte, Smaragd, Blätter nach innen
-    const B = A.B;
-    A.forCorners((c) => {
-      A.plate(c, B - 6, B - 6, B, B, 3, false, true); A.gem(c, B - 3, B - 3, 2);
-      for (const e of A.edgesOf(c)) for (let s = 10; s < e.span - 2; s += 9) A.leaf(e, s, 0, 0, -1, 3, 3);
-    });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 1); A.leaf(c, 3, 0, 0, -1, 4, 3); A.leaf(c, -3, 0, 0, -1, 4, 3); });
-  };
-  ART.obsidian = (A) => {                                                         // schwarze Platte mit Auge, Dornen nach innen, glühende Risse
-    const B = A.B;
-    A.forCorners((c) => {
-      A.plate(c, B - 7, B - 7, B, B, 3); A.gem(c, B - 3, B - 3, 2, { eye: true });
-      for (const e of A.edgesOf(c)) {
-        for (let s = 10, n = 0; s < e.span - 1; s += 5, n++) A.shard(e, s, 0, 0, -1, 3 + (n & 1), 3);
-        for (let s = 9; s < e.span - 1; s++) if ((s * 5) % 11 < 4) A.glow(e, s, 2);
+      A.plate(c, B - k(5), B - k(5), B, B, k(2)); A.gem(c, B - k(2), B - k(2), k(1));
+      for (const e of A.edgesOf(c)) for (let s = k(8); s < e.span - k(1); s += k(7)) {
+        if (A.F === 1) { e.k(s, 0, 4); e.k(s - 1, 0, 3); e.k(s + 1, 0, 3); e.k(s, -1, 3); continue; }
+        const z = Math.max(1, k(1) - 1);
+        for (let a = -z; a <= z; a++) for (let b2 = 0; b2 <= z; b2++) e.k(s + a, -b2, 4 - (Math.abs(a) === z ? 1 : 0));
       }
     });
-    A.forSides((c) => { A.gem(c, 0, B - 1, 2, { eye: true }); A.shard(c, 4, 0, 0, -1, 4, 3); A.shard(c, -4, 0, 0, -1, 4, 3); });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(1)); });
+  };
+  ART.diamond = (A) => {                                                          // Kristallplatte, Eiszacken nach innen
+    const B = A.B, k = A.k;
+    A.forCorners((c) => {
+      A.plate(c, B - k(5), B - k(5), B, B, k(2)); A.gem(c, B - k(2), B - k(2), k(1));
+      for (const e of A.edgesOf(c)) for (let s = k(8), n = 0; s < e.span - k(1); s += k(5), n++) A.shard(e, s, 0, 0, -1, k(2 + (n & 1)), k(3));
+    });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(1)); if (A.kind !== 'card') A.shard(c, 0, 0, 0, -1, k(4), k(3)); });
+  };
+  ART.ruby = (A) => {                                                             // Goldplatte mit Rubin, Flammenzungen nach innen
+    const B = A.B, k = A.k;
+    A.forCorners((c) => {
+      A.plate(c, B - k(6), B - k(6), B, B, k(3), true); A.gem(c, B - k(3), B - k(3), k(2));
+      for (const e of A.edgesOf(c)) for (let s = k(9), n = 0; s < e.span - k(1); s += k(8), n++) A.shard(e, s, 0, 0, -1, k(3), k(3), true);
+    });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(1)); if (A.kind !== 'card') { A.shard(c, k(3), 0, 0, -1, k(3), k(2), true); A.shard(c, -k(3), 0, 0, -1, k(3), k(2), true); } });
+  };
+  ART.sapphire = (A) => {                                                         // Gold-gerahmte Platte, Saphir, Federn nach innen
+    const B = A.B, k = A.k;
+    A.forCorners((c) => {
+      A.plate(c, B - k(6), B - k(6), B, B, k(3), false, true); A.gem(c, B - k(3), B - k(3), k(2));
+      for (const e of A.edgesOf(c)) for (let n = 0; n < 3; n++) A.shard(e, k(9 + 3 * n), 0, 0, -1, k(4 - n), k(2));
+    });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(1)); if (A.kind !== 'card') { A.shard(c, k(3), 0, 0, -1, k(4), k(2)); A.shard(c, -k(3), 0, 0, -1, k(4), k(2)); } });
+  };
+  ART.emerald = (A) => {                                                          // Gold-gerahmte Platte, Smaragd, Blätter nach innen
+    const B = A.B, k = A.k;
+    A.forCorners((c) => {
+      A.plate(c, B - k(6), B - k(6), B, B, k(3), false, true); A.gem(c, B - k(3), B - k(3), k(2));
+      for (const e of A.edgesOf(c)) for (let s = k(10); s < e.span - k(2); s += k(9)) A.leaf(e, s, 0, 0, -1, k(3), k(3));
+    });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(1)); if (A.kind !== 'card') { A.leaf(c, k(3), 0, 0, -1, k(4), k(3)); A.leaf(c, -k(3), 0, 0, -1, k(4), k(3)); } });
+  };
+  ART.obsidian = (A) => {                                                         // schwarze Platte mit Auge, Dornen nach innen, glühende Risse
+    const B = A.B, k = A.k;
+    A.forCorners((c) => {
+      A.plate(c, B - k(7), B - k(7), B, B, k(3)); A.gem(c, B - k(3), B - k(3), k(2), { eye: true });
+      for (const e of A.edgesOf(c)) {
+        for (let s = k(10), n = 0; s < e.span - k(1); s += k(5), n++) A.shard(e, s, 0, 0, -1, k(3 + (n & 1)), k(3));
+        for (let s = k(9); s < e.span - k(1); s++) if (((A.F === 1 ? s : Math.floor(s * 2 / A.F)) * 5) % 11 < 4) A.glow(e, s, k(2));
+      }
+    });
+    A.forSides((c) => { A.gem(c, 0, B - k(1), k(2), { eye: true }); if (A.kind !== 'card') { A.shard(c, k(4), 0, 0, -1, k(4), k(3)); A.shard(c, -k(4), 0, 0, -1, k(4), k(3)); } });
   };
 
   // ═══ Zwischenspeicher und Einbacken ═════════════════════════════════════════════════════════════

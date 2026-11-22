@@ -89,6 +89,7 @@ function ausruestPlatz(engine, feld, heroIdx) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   creatureEffect: true,
 
   /**
@@ -208,13 +209,13 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
-      if (ctx.card?.zone !== 'hand') return;          // nur die Handkopie
+      if (ctx.card?.zone !== 'hand' && ctx.card?.zone !== 'creationZone') return;          // nur die Handkopie (Hand oder Crestinas Vorrat)
       if (ctx.playerIdx !== pi) return;               // nur eigene Zahlung
       if (ctx.amount !== PRICE) return;               // „exactly 4"
 
       if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return;
       if (gs[RESOLVING]?.[pi]) return;
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
       if ((ps.gold || 0) < PRICE || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
       // Kontrolle statt Seite (Styx 28.9.): auch uebernommene Helden.
       if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;
@@ -230,7 +231,7 @@ module.exports = {
         gerrymanderEligible: true,
       });
       if (!bestaetigt || bestaetigt.cancelled) return;
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
@@ -264,9 +265,9 @@ module.exports = {
             || zonen.find(passt));
           if (gewaehlt) ziel = gewaehlt;
         }
-        const i = (ps.hand || []).indexOf(CARD_NAME);
-        if (i < 0) return;
-        engine.takeFromPileSync(ps, 'hand', i);
+        const q = engine._rxQuelleFuer(ps, CARD_NAME);
+        if (!q) return;
+        engine.rxNimm(ps, q);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const seite = ziel.owner ?? pi;   // Kontrolle statt Seite (Styx 28.9.)

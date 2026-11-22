@@ -1,0 +1,15 @@
+{
+  "creature": "Glasowt",
+  "sheet": "glasowt.png",
+  "frameWidth": 41,
+  "frameHeight": 44,
+  "frames": 72,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 20.5
+}

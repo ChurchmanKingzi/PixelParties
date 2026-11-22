@@ -91,14 +91,18 @@ const CARD_NAME = 'Overheal Shock';
 const CARD_NAME_OHS = 'Overheal Shock';
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
   // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: { impact: { type: 'overheal_shock_equip' }, impactMs: 260 },
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to a Hero your opponent controls") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
   // First-turn safety: Overheal Shock can ONLY attach to an opponent's Hero,
   // so when going first it is always wasted against the first-turn shield
   // (the onPlay handler just discards it). Tell the CPU never to play it on
@@ -162,7 +166,7 @@ module.exports = {
   // sofort zum Ziel, und einen Wirker liess der Ziehweg nicht waehlen.
   spellPlayCondition(gs, pi, engine) {
     const oi = opponentOfGs(gs, pi);
-    if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return false;
+    // (Erste-Runden-Schutz: Spielgestalter-Entscheidung 16.11.2026 — spielbar, die Karte verpufft in `onPlay`: `equip_blocked`.)
     const ops = gs.players[oi];
     const heroFilter = (h, hi) => !h.statuses?.healReversed
       && !(ops?.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));

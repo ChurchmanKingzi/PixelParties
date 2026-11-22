@@ -203,6 +203,13 @@ module.exports = {
     return hasLegalTrio(activatorEligibleSpells(ctx._engine, pi));
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 17.11.2026 (ZI-03): Zis Kartentext („You may spend your Action to …") nennt KEINE Einmal-pro-Zug-Grenze — nur die Aktion begrenzt ihn (mit einer
+   * Zusatzaktion darf Zi also mehrfach wirken). Die Engine-Rundensperre fuer aktive Heldeneffekte entfaellt deshalb: `ctx._skipHeroEffectHopt` im Erfolgsweg (Kassaran-/Sett-Muster) und hier
+   * `false` — eine NEGIERTE Aktivierung stempelt keine Rundensperre (die Aktion ist bezahlt, mehr gibt es nicht zu buchen). Dajan, Champion und Omikron schreiben „once per turn" und bleiben gesperrt.
+   */
+  stempelNegierteAktivierung() { return false; },
+
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -212,6 +219,7 @@ module.exports = {
     const oppPs = gs.players[oppIdx];
     const heroIdx = ctx.cardHeroIdx;
     if (!ps || !oppPs) return false;
+    ctx._skipHeroEffectHopt = true;   // keine Engine-Rundensperre (siehe `stempelNegierteAktivierung`); Abbruch (`false`) erstattet die Aktion weiterhin
 
     const spells = activatorEligibleSpells(engine, pi);
     if (!hasLegalTrio(spells)) return false; // defensive (gated by canActivate)
@@ -351,6 +359,7 @@ module.exports = {
       await engine.zeigeFizzle(oppChoice, { playerIdx: pi, grund: 'cannot_cast_now' });
     }
 
+    let _negiertGeloescht = false;   // in der Kette negiert + „delete it" (Ghostly Warning)
     if (canPerform) {
       engine.log('timeless_king_zi_perform', { player: ps.username, spell: oppChoice });
       // Direct runHooks('onPlay') sub-cast bypasses validateActionPlay,
@@ -375,12 +384,20 @@ module.exports = {
       // Device über `gs._forcedCommitPlayer`, auf Zi's Spieler beschränkt: Reaktionen des Gegners behalten ihren Abbruch). Die Unmöglichkeit
       // ("nicht möglich") prüft vorher `kannSofortWirken` (→ Fizzeln + Ablage, "Einmal pro Spiel" bleibt frei).
       const _zwangVorher = gs._forcedCommitPlayer;
+      // „Diese Karte wird gerade gespielt" (`_currentResolvingPlayName`, wie `doPlaySpell`/`_castSpellImmediately`): Cheering Rabbit („first Attack or Spell it uses each turn") erkennt daran
+      // den Wurf des Helden, Luck zaehlt einen sich selbst legenden Area-/Anhangs-Spell nur einmal.
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays"): Zis Spell öffnet dasselbe Kettenfenster wie ein normal gespielter (Silence, Ghostly Warning, … — nicht Master's Plan/Lunar Eclipse:
+      // der Spell kommt aus dem Deck, „bereitgestellt" vom Helden). Wird er negiert, löst sein Rumpf nie auf; er zählt als benutzt und geht in die Ablage (Ghostly Warning: in den Löschstapel).
+      const _pk = await engine.performKettenfenster({ cardName: oppChoice, pi, heroIdx, heroOwner: feld, ausHand: false });
+      if (_pk.negated) gs._spellNegatedByEffect = true;
+      _negiertGeloescht = !!_pk.negatedToDeleted;
+      engine._pushResolvingPlay(oppChoice);
       try {
         // Der Zwang gilt nur für die Auflösung des Zauberkörpers (`onPlay`), nicht für die Nachwirkungs-Haken (`afterSpellResolved`: Heldenpassive mit eigenen "may"-Abfragen).
         gs._forcedCommitPlayer = pi;
         try {
           require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
-          await engine.runHooks('onPlay', {
+          if (!_pk.negated) await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: oppChoice, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
@@ -394,17 +411,22 @@ module.exports = {
         for (const t of (gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
-        await engine.runHooks('afterSpellResolved', {
+        if (!_pk.negated) await engine.runHooks('afterSpellResolved', {
           spellName: oppChoice, spellCardData: cardDB[oppChoice],
           heroIdx, heroOwner: feld, casterIdx: pi, damageTargets: uniqueTargets,
           isSecondCast: false, _skipReactionCheck: true,
         });
       } catch (err) {
         console.error('[Timeless King Zi] sub-spell error:', err?.message || err);
+      } finally {
+        engine._popResolvingPlay();
       }
       placedOnBoard = !!gs._spellPlacedOnBoard;
       // „Einmal pro Spiel" erst NACH dem Guss und nur, wenn er nicht abgebrochen wurde (allgemeine Regel Q129: Stempel erst nach dem Commit).
       const _abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+      // Der von Zi gewirkte Spell ist ein BENUTZTER Spell dieses Helden (W36a, wie jeder Sofort-Guss): ein Zaehlschritt je Spell, auch ganz/teil-negiert, ein Abbruch zaehlt nicht
+      // (`spellsPlayedThisTurn`, `hero._wuerfeZahl`, `onEffectCountedAsArt` — Cheering Rabbit, Teleport/Teleportal/True Form/Fire Bolts „second Spell"). Gezaehlt wird NACH der Aufloesung.
+      if (!_abgebrochen) await engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner: feld, name: oppChoice, karte: true });
       if (_opgKey && !_abgebrochen) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
       delete gs._spellCancelled;
       delete gs._spellNegatedByEffect;
@@ -424,8 +446,9 @@ module.exports = {
 
     // Normal performed Spell (resolved, not a board fixture) — or one
     // that couldn't be performed — goes to discard. Only the OTHER
-    // Spells are deleted per the card text.
-    ps.discardPile.push(oppChoice);
+    // Spells are deleted per the card text. (Ghostly Warning/Lunar Eclipse: der in der Kette negierte Spell wird gelöscht.)
+    if (_negiertGeloescht) { if (!ps.deletedPile) ps.deletedPile = []; ps.deletedPile.push(oppChoice); }
+    else ps.discardPile.push(oppChoice);
     engine.sync();
     return true;
   },

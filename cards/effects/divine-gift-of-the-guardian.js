@@ -41,6 +41,7 @@ module.exports = {
     return undefined;
   },
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 
@@ -92,8 +93,9 @@ module.exports = {
       ps._oncePerGameUsed.add('divineGift');
 
       // Remove from hand and discard
-      const handIdx = ps.hand.indexOf('Divine Gift of the Guardian');
-      if (handIdx >= 0) {
+      const q = engine._rxQuelleFuer(ps, 'Divine Gift of the Guardian');   // Hand oder Crestinas Vorrat
+      const handIdx = q ? q.idx : -1;
+      if (q) {
         // Play-Marker für den Trainings-Recorder (Als Befund "DGotG
         // angeblich NIE eingesetzt"): Diese Karte spielt sich per Hook
         // selbst aus der Hand — sie läuft weder über eines der 13
@@ -108,22 +110,22 @@ module.exports = {
         // afterSpellResolved laufen.
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: 'Divine Gift of the Guardian',
-          from: 'hand', to: 'discard', asPlay: 'sole',
+          from: q.ausVorrat ? 'creation' : 'hand', to: 'discard', asPlay: 'sole',
           fromHandIdx: handIdx,
         });
-        engine.takeFromPileSync(ps, 'hand', handIdx);
+        engine.rxNimm(ps, q);
         // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
         // Startplatz der abfliegenden Karte nur, solange die Hand noch so
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         engine.sync();
         engine.notePlayedFromHand(pi);
-        engine.handKartenBesitzerPs(ps, 'Divine Gift of the Guardian').discardPile.push('Divine Gift of the Guardian');   // W3/W5a: Stapel des permanenten Besitzers
+        engine._rxAblagePs(ps, 'Divine Gift of the Guardian', q).discardPile.push('Divine Gift of the Guardian');   // W3/W5a: Stapel des permanenten Besitzers
       }
       await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
 
       // Untrack hand instance
-      const handInst = engine.cardInstances.find(c =>
+      const handInst = (q && q.ausVorrat) ? null : engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === 'Divine Gift of the Guardian'
       );
       if (handInst) engine._untrackCard(handInst.id);

@@ -1,0 +1,15 @@
+{
+  "creature": "Doomed Pirate",
+  "sheet": "doomed-pirate.png",
+  "frameWidth": 30,
+  "frameHeight": 31,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 15.0
+}

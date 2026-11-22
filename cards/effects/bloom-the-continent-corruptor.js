@@ -46,6 +46,7 @@ module.exports = {
   // 'hand': der erzwungene Aufstieg feuert, waehrend die Karte noch
   // auf der Hand liegt. 'hero': die beiden Auren wirken vom Brett.
   activeIn: ['hand', 'hero'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Neuer Engine-Vertrag (v718): Aufstieg aus dem Tod heraus.
   ascendsFromDefeat: true,
@@ -93,7 +94,7 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       // Nur aus der Hand — die Brettform hat hier nichts zu tun.
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
       const pi = ctx.cardOwner;
 
       const gefallen = ctx.hero;
@@ -117,8 +118,9 @@ module.exports = {
       if (ctx.type !== 'poison') return;
       if (!heroHasParaseed(engine, owner, heroIdx)) return;
 
-      const handIdx = (gs.players[pi]?.hand || []).indexOf(CARD_NAME);
-      if (handIdx < 0) return;
+      const q = gs.players[pi] ? engine._rxQuelleFuer(gs.players[pi], CARD_NAME) : null;   // Hand oder Crestinas Vorrat
+      if (!q) return;
+      const handIdx = q.idx;
 
       // Stempel setzen, damit `ascensionCondition` traegt, und sofort
       // aufsteigen. Kein Prompt: der Text sagt „must\".
@@ -127,7 +129,7 @@ module.exports = {
       try {
         await engine.showTriggeredEffect(CARD_NAME);
         await engine.performAscension(pi, heroIdx, CARD_NAME, handIdx,
-          owner !== pi ? { heroOwner: owner } : {});
+          { ...(owner !== pi ? { heroOwner: owner } : {}), ...(q.ausVorrat ? { fromCreation: true } : {}) });
       } finally {
         delete gs._bloomAscendReady[stempelKey(owner, heroIdx)];
       }

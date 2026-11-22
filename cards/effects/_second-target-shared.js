@@ -31,6 +31,13 @@
 //
 //  `gs._bartasSecondCast` bleibt der allgemeine Zweitwurf-Marker (Saya, Idej Kunagi, Fire Bolts lesen ihn); `gs._zweitzielWurf` ist die engere Marke
 //  „ZWEITES ZIEL" (nur diese Helden): Einzelziel-Deckel + Ausschluss ohne Ausnahme.
+//
+//  ── AKTIONSSPERRE: wird hier bewusst NICHT geprüft (Spielgestalter-Entscheidung 18.11.2026) ──
+//  Prinzip des Gestalters: „Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre (`engine.areActionsBlocked(pi)`: Overflowing Chalice,
+//  Kents Schulden, `_playerActionLockedTurn`, `ps.actionLocked`) blockiert (Saya, Clone, Magic Mirror, Idej Sword Kunagi). Ein zusätzliches ZIEL für denselben, schon ausgegebenen
+//  Spell/Angriff dagegen ist dieselbe Aktion und geht auch unter Aktionssperre." Der Zweitwurf von Bartas/Grisgar/Andras („choose a second target for the Attack/Spell to hit afterwards")
+//  ist genau das zweite Ziel desselben Wurfs — darum steht in `zweitzielAngebot` KEIN `areActionsBlocked`-Tor (Chalice und Kent belegt: das Angebot kommt, der Zweitwurf läuft).
+//  Wer hier ein Tor einbaut, bricht diese Entscheidung. (Das Kettenfenster des Zweitwurfs, `performKettenfenster`, bleibt: Silence & Co. können auch ihn negieren.)
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -175,11 +182,17 @@ async function zweitzielAngebot(ctx, cfg) {
   const abbruchVorher = gs._spellCancelled;
 
   try {
-    await engine.runHooks('onPlay', {
+    // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): der Zweitwurf ist wie jedes „performs" ein Spielen (`engine.performKettenfenster`) —
+    // Silence, Anti-Magic-Reaktionen, Hand-Reaktionen auf Attacks (Pfeile) usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Nichts wird erneut bezahlt. Wird der Zweitwurf
+    // in der Kette negiert, löst sein Rumpf nie auf (kein zweites Ziel, kein Schaden); der Hauptwurf ist davon unberührt.
+    const _pfeileVorher = (hero._armedArrows || []).length;
+    const _pk = await engine.performKettenfenster({ cardName: ctx.spellName, pi, heroIdx, heroOwner: feld, ausHand: false });
+    if (!_pk.negated) await engine.runHooks('onPlay', {
       _onlyCard: tempInst, playedCard: tempInst,
       cardName: ctx.spellName, zone: 'hand', heroIdx,
       _skipReactionCheck: true,
     });
+    if (hasCardType(spellData, 'Attack') && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile, die erst in DIESEM Fenster scharf wurden, gelten nur für den Zweitwurf
   } catch (err) {
     console.error(`[Engine] ${cfg.heldName} second cast error for "${ctx.spellName}":`, err.message);
   } finally {

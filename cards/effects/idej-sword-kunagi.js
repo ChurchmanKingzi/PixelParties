@@ -45,6 +45,12 @@
 //    NICHT erneut bezahlt wird (a) das Ausspielen/die Aktion (Handkarte, Gold, Aktion: Kohta „spend your Action", Sword in a Bottle, Alluring Light, Javelin Throw als Karte) und (b) eine bloße
 //    AKTIVIERUNGSBEDINGUNG bzw. ein Auslöser (Sacrificial Dagger „when you sacrifice a target", Bamboo Staff „when a card is added from your discard pile"): deren Wiederholung kostet NICHTS extra.
 //    Das Abbrechen der Zielwahl/Kostenwahl der Wiederholung genügt als Ablehnen (kein eigenes Ja/Nein-Fenster).
+//
+//  ★ Aktionssperre (Spielgestalter-Entscheidung 18.11.2026): Prinzip „Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre
+//    (`engine.areActionsBlocked(pi)`: Overflowing Chalice, Kents Schulden, `_playerActionLockedTurn`, `ps.actionLocked`) blockiert." „May immediately perform that Attack again against a
+//    different target" ist eine solche zweite Instanz (Anwendung des Prinzips; der Gestalter hat Kunagi nicht namentlich genannt): unter der Sperre des Besitzers entfällt die Wiederholung
+//    (Karte wie Effekt, auch jede weitere Kettenstufe) — ohne Angebot, ohne Kosten, ohne Zählung; „For every Creature the equipped Hero defeats, draw 1 card" bleibt für die besiegten
+//    Kreaturen des ersten Angriffs. Ohne Sperre unverändert.
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -96,9 +102,11 @@ module.exports = {
         return n;
       };
 
+      // Aktionssperre (Spielgestalter-Entscheidung 18.11.2026, siehe Kopf): jede Wiederholung ist eine neue Aktion — unter der Sperre des Besitzers gibt es keine.
+      const wiederholungErlaubt = () => !engine.areActionsBlocked(pi);
       const heroReady = () => {
         const h = gs.players[feld]?.heroes?.[heroIdx];
-        return !!h?.name && h.hp > 0
+        return wiederholungErlaubt() && !!h?.name && h.hp > 0
           && !h.statuses?.frozen && !h.statuses?.stunned && !h.statuses?.negated
           // W41a (Al, 22.10.2026, Punkt 6): die Wiederholung ist eine eigene Attack — Attack-Limits/Sperren (Mirjam, Berserk, Rioting Village, Knife Throw …) gelten: gesperrt = kein Angebot
           && engine.heroKannAngreifen(feld, heroIdx, pi, { name: attackName });
@@ -136,16 +144,24 @@ module.exports = {
         gs._spellCancelled = false;
         const tempInst = engine._trackCard(attackName, pi, 'hand', heroIdx, -1);
         if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: geliehener Held
+        let negiert = false;
         try {
-          await engine.runHooks('onPlay', {
+          // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): „perform that Attack again" ist ein Spielen der Wiederholung
+          // (`engine.performKettenfenster`): Hand-Reaktionen auf Attacks (Pfeile, Magic Topaz …) und die Kettenglieder kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand).
+          // Nichts wird erneut bezahlt. Wird die Wiederholung in der Kette negiert, löst ihr Rumpf nie auf (kein Treffer, keine Karte, die Kette endet) — als gespielte Attack zählt sie trotzdem.
+          const _pk = await engine.performKettenfenster({ cardName: attackName, pi, heroIdx, heroOwner: feld, ausHand: false });
+          negiert = _pk.negated;
+          if (!negiert) await engine.runHooks('onPlay', {
             _onlyCard: tempInst, playedCard: tempInst,
             cardName: attackName, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
           });
+          await clearArmedArrows(engine, pi);   // Pfeile aus dem Fenster dieser Wiederholung gelten nur für sie
         } catch (err) {
           console.error(`[${CARD_NAME}] repeat-attack error for "${attackName}":`, err.message);
         }
         const targets = [...(gs._spellDamageLog || [])];
+        if (negiert) targets.negiert = true;
         engine._untrackCard(tempInst.id);
         delete gs._spellDamageLog;
         delete gs._spellExcludeTargets;
@@ -192,7 +208,7 @@ module.exports = {
       let lastTargets = ctx.damageTargets || [];
       let guard = 0;
       // W41a: Wiederholung = eigene Attack → die Original-Karte zuerst zählen, DANN die Limits prüfen (`heroReady` im Schleifenkopf)
-      if (attackScript?.hooks?.onPlay && countDefeated(lastTargets) === 1) await zaehleOriginal();
+      if (attackScript?.hooks?.onPlay && countDefeated(lastTargets) === 1 && wiederholungErlaubt()) await zaehleOriginal();
       while (
         attackScript?.hooks?.onPlay
         && countDefeated(lastTargets) === 1
@@ -200,7 +216,7 @@ module.exports = {
         && guard++ < LOOP_CAP
       ) {
         const repeatTargets = await repeatAttack(lastTargets[0]?.id || null);
-        if (repeatTargets.length > 0) {
+        if (repeatTargets.length > 0 || repeatTargets.negiert) {
           // W41a (Al, 22.10.2026, Punkt 6): auch die Wiederholung einer Attack-KARTE ist eine eigene Attack-Instanz (Zähler, Mirjam, Berserk, Rioting Village …)
           await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: attackName, karte: true });
         }

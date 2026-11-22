@@ -1,0 +1,15 @@
+{
+  "creature": "The Creepy Clown of Heaven",
+  "sheet": "the-creepy-clown-of-heaven.png",
+  "frameWidth": 41,
+  "frameHeight": 50,
+  "frames": 64,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 20.5
+}

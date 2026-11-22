@@ -27,6 +27,21 @@ function isCardinalBeastByName(name) {
 }
 
 /**
+ * Spielgestalter-Entscheidung 16.11.2026 (Omikron): „unaffected by all cards and effects" ist ein EFFEKT der Karte — solange die Kreatur NEGIERT ist
+ * (Omikrons Illusion eines Cardinal Beast: „its effects are negated until the start of your next turn"), gilt die Immunität nicht (Schaden, Zerstören,
+ * Bewegen, Status, Opfer …). Beim Namens-Rückfall fragt man deshalb hier statt `isCardinalBeastByName`:
+ *   • Echte, normal beschworene Cardinal Beasts tragen den Zähler `_cardinalImmune` (onPlay) und sind gegen JEDE Negation immun (`actionNegateCreature`,
+ *     Aura-Negation) — sie sind nie negiert, ihre Immunität gilt immer (unverändert).
+ *   • Ohne Zähler (Omikrons Illusion: kein onPlay; Puzzle-Aufbau) gilt der Name nur, solange die Kreatur nicht negiert ist; nach Ablauf der Negation
+ *     ist die Illusion wieder immun wie ein echtes Cardinal Beast.
+ */
+function cardinalNameImmun(engine, inst) {
+  if (!inst || !isCardinalBeastByName(inst.name)) return false;
+  if (inst.counters?._cardinalImmune) return true;
+  return !engine.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false });
+}
+
+/**
  * Set immune flag on the Cardinal Beast creature instance.
  */
 function _setCardinalImmune(ctx) {
@@ -59,6 +74,8 @@ async function _checkCardinalWin(ctx) {
         const inst = (engine.cardInstances || []).find(c => c.zone === 'support'
           && c.name === slot[0] && c.heroIdx === hi && c.zoneSlot === zi
           && engine.physicalSide(c) === side);
+        // Eine negierte Illusion (Omikron: „its effects are negated …") zaehlt nicht als Cardinal Beast fuer den Sieg.
+        if (inst && engine.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false })) continue;
         const wer = inst ? (inst.controller ?? inst.owner) : side;
         kontrolle[wer]?.add(slot[0]);
       }
@@ -87,4 +104,4 @@ async function _checkCardinalWin(ctx) {
   }
 }
 
-module.exports = { _setCardinalImmune, _checkCardinalWin, CARDINAL_NAMES, CARDINAL_NAMES_SET, isCardinalBeastByName };
+module.exports = { _setCardinalImmune, _checkCardinalWin, CARDINAL_NAMES, CARDINAL_NAMES_SET, isCardinalBeastByName, cardinalNameImmun };

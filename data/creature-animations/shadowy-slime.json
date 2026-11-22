@@ -1,0 +1,15 @@
+{
+  "creature": "Shadowy Slime",
+  "sheet": "shadowy-slime.png",
+  "frameWidth": 24,
+  "frameHeight": 29,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.0
+}

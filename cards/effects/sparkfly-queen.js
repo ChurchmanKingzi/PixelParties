@@ -107,6 +107,48 @@ function countSparkflies(engine, pi) {
   return n;
 }
 
+/** Die noch freien Modi dieses Zuges (nur ungenutzte; Architect nicht unter Zieh-/Hand-Sperre). */
+function modusOptionen(ctx) {
+  const engine = ctx._engine;
+  const turn   = engine.gs.turn || 0;
+  const pi     = ctx.cardOwner;
+  const inst   = ctx.card;
+  const gifts  = inst?.counters?._sparkflyGifts || {};
+  const modeOptions = [];
+  if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) {
+    modeOptions.push({ id: 'main', label: '👑  Declare a card type' });
+  }
+  if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(engine, pi)) {
+    modeOptions.push({ id: 'architect', label: '✏️  Architect gift: draw to opponent\'s hand size' });
+  }
+  if (gifts.worker && (ctx._borrowedUse || !isModeUsed(inst, 'worker', turn))) {
+    modeOptions.push({ id: 'worker', label: '🪲  Worker gift: opponent picks a non-Hero card → your hand' });
+  }
+  return modeOptions;
+}
+
+/**
+ * ★ Spielgestalter-Entscheidung 16.11.2026 — der Modus wird VOR dem Kettenfenster gewählt (Skript-Vertrag `waehleModus`, gerufen von `doActivateCreatureEffect`): jeder Modus hat sein EIGENES
+ * Einmal-Limit, eine Negation der Aktivierung (Kette oder Zielfenster) muss also wissen, WELCHER Modus verbraucht wird (`stempelNegierteAktivierung`). Liefert 'main' | 'architect' | 'worker'
+ * oder `null` (Abbruch durch den Spieler / nichts frei). Ohne Vorwahl (geliehene Verwendung: Grimoire, Kohta) wählt `onCreatureEffect` wie bisher selbst.
+ */
+async function waehleModus(ctx) {
+  const engine = ctx._engine;
+  const pi     = ctx.cardOwner;
+  const modeOptions = modusOptionen(ctx);
+  if (modeOptions.length === 0) return null;
+  if (modeOptions.length === 1) return modeOptions[0].id;
+  const choice = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    title: CARD_NAME,
+    description: 'Which effect of Sparkfly Queen do you want to use?',
+    options: modeOptions,
+    cancellable: true,
+  });
+  if (!choice || choice.cancelled || !choice.optionId) return null;
+  return choice.optionId;
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -246,6 +288,25 @@ module.exports = {
     return false;
   },
 
+  waehleModus,
+
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: wird die Aktivierung NEGIERT (Kette oder nach der Zielwahl), ist der gewählte Modus verbraucht — dieselbe Buchung wie im Erfolgsweg
+   * (`markModeUsed`). Die Engine-Rundensperre folgt der Regel des Erfolgswegs: sie wird erst mit dem LETZTEN freien Modus gestempelt (Rückgabe `true`), solange noch ein Modus frei ist, bleibt
+   * sie offen.
+   */
+  stempelNegierteAktivierung(engine, inst, { modus } = {}) {
+    const turn = engine.gs.turn || 0;
+    const gifts = inst?.counters?._sparkflyGifts || {};
+    if (!['main', 'architect', 'worker'].includes(modus) || !inst?.counters) return false;
+    markModeUsed(inst, modus, turn);
+    const stillAnyUnused =
+      !isModeUsed(inst, 'main', turn)
+      || (gifts.architect && !isModeUsed(inst, 'architect', turn))
+      || (gifts.worker    && !isModeUsed(inst, 'worker',    turn));
+    return !stillAnyUnused;
+  },
+
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs     = engine.gs;
@@ -255,33 +316,11 @@ module.exports = {
     const inst   = ctx.card;
     const gifts  = inst?.counters?._sparkflyGifts || {};
 
-    // Build the mode picker — only show modes still unused this turn.
-    const modeOptions = [];
-    if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) {
-      modeOptions.push({ id: 'main', label: '👑  Declare a card type' });
-    }
-    if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(engine, pi)) {
-      modeOptions.push({ id: 'architect', label: '✏️  Architect gift: draw to opponent\'s hand size' });
-    }
-    if (gifts.worker && (ctx._borrowedUse || !isModeUsed(inst, 'worker', turn))) {
-      modeOptions.push({ id: 'worker', label: '🪲  Worker gift: opponent picks a non-Hero card → your hand' });
-    }
+    // Modus: vorgewählt (`ctx.modus`, regulärer Weg über `waehleModus`) oder — geliehene Verwendung — hier gewählt.
+    const modeOptions = modusOptionen(ctx);
     if (modeOptions.length === 0) return false;
-
-    let chosenMode;
-    if (modeOptions.length === 1) {
-      chosenMode = modeOptions[0].id;
-    } else {
-      const choice = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Which effect of Sparkfly Queen do you want to use?',
-        options: modeOptions,
-        cancellable: true,
-      });
-      if (!choice || choice.cancelled || !choice.optionId) return false;
-      chosenMode = choice.optionId;
-    }
+    const chosenMode = ctx.modus || await waehleModus(ctx);
+    if (!chosenMode || !modeOptions.some(o => o.id === chosenMode)) return false;   // Abbruch / zwischen Vorwahl und Auflösung nicht mehr benutzbar
 
     // Track whether ANY mode actually committed this activation, so we
     // can opt out of the engine's global HOPT when we still have other

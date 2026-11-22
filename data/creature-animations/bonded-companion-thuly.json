@@ -1,0 +1,15 @@
+{
+  "creature": "Bonded Companion Thuly",
+  "sheet": "bonded-companion-thuly.png",
+  "frameWidth": 19,
+  "frameHeight": 26,
+  "frames": 48,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 9.5
+}

@@ -95,10 +95,13 @@ module.exports = {
       eligibleIndices.push(i);
     }
 
+    // Warnungsprinzip (D1): unter Hand-/Zieh-Sperre bleibt der Stab aktivierbar, nur das Nachziehen entfaellt — der Hinweis sagt es vorher.
+    const ziehGesperrt = require('./_draw-block-shared').drawBlockedFor(engine, pi);
     const result = await engine.promptGeneric(pi, {
       type: 'handPick',
       title: CARD_NAME,
-      description: 'Click cards in your hand to mark them. They will be shuffled into your deck and you will draw the same number — +1 if you commit your entire hand.',
+      description: 'Click cards in your hand to mark them. They will be shuffled into your deck and you will draw the same number — +1 if you commit your entire hand.'
+        + (ziehGesperrt ? ' You cannot draw cards right now, so nothing will replace the shuffled cards.' : ''),
       eligibleIndices,
       maxSelect: eligibleIndices.length,
       minSelect: 0,
@@ -133,7 +136,9 @@ module.exports = {
     }
 
     const count = selected.length;
-    const isAllHand = eligibleIndices.length > 0 && count === eligibleIndices.length;
+    // Spielgestalter-Entscheidung 17.11.2026: liegt ausser dem Stab nichts auf der Hand, gelten 0 Karten als GANZE Hand — wer dann ohne Wahl
+    // bestaetigt, zieht 1 Karte (+1-Bonus). Frueher verlangte die Pruefung `eligibleIndices.length > 0`, der Bonus entfiel bei leerer Rest-Hand.
+    const isAllHand = count === eligibleIndices.length;
 
     // Sort by descending hand index — actionMulliganCards iterates by
     // name and re-resolves the index each iteration, so technically
@@ -176,10 +181,10 @@ module.exports = {
 
     // Locks land AFTER our own draws complete.
     // W16e (F03-18, Al Welle 3: "Staebe sperren nur das Ziehen"): reiner Zieh-Lock wie The Sacred Jewel (Suchen/Hinzufuegen bleibt erlaubt);
-    // das Verbot, Karten aus der Ablage zu bewegen, tragen `_discardLockedTurn`/`_discardLockHard`.
+    // das Verbot, Karten aus der Ablage zu bewegen, traegt `_discardLockedTurn` (+ die Stab-Marke `_discardLockHard`).
     ps.drawLocked = true;
     ps._discardLockedTurn = gs.turn;
-    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
+    ps._discardLockHard = gs.turn;   // Marke "Stab-Sperre" (nur Meditation unterscheidet sie von der Sperre des Eye of Ren; beide sind hart, `isDiscardOutHardLocked`)
 
     engine.log('staff_of_the_teleporter', {
       player: ps.username,

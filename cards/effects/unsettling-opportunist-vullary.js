@@ -99,13 +99,13 @@ module.exports = {
     if (!ps) return false;
 
     if (!ctx.card.counters?.attachedHero) {
-      return (ps.hand || []).includes(ATTACHABLE)
+      return ctx._engine.handUndVorratListe(ctx.cardOwner).includes(ATTACHABLE)   // 12.11.: Hand + Crestinas Vorrat
         || (ps.mainDeck || []).includes(ATTACHABLE);
     }
 
     // Mode B: Mary attached — summon Lv≤3 Creature with bypass.
     if (ps.summonLocked) return false;
-    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3, ctx.cardHeroIdx).length > 0;
+    return levelMaxNCreatureNames(engine, ctx.cardOwner, engine.handUndVorratListe(ctx.cardOwner), 3, ctx.cardHeroIdx).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -129,7 +129,7 @@ module.exports = {
     // Mode B: bypass-summon a Lv≤3 Creature with negate-until-next-turn.
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3, heroIdx);
+    const eligible = levelMaxNCreatureNames(engine, pi, engine.handUndVorratListe(pi), 3, heroIdx);   // 12.11.: Hand + Crestinas Vorrat
     if (eligible.length === 0) return false;
 
     const picked = await engine.promptGeneric(pi, {
@@ -142,7 +142,7 @@ module.exports = {
     if (!picked || picked.cancelled || !picked.cardName) return false;
 
     const chosenName = picked.cardName;
-    if ((ps.hand || []).indexOf(chosenName) < 0) return false;
+    if (!engine._rxQuelleFuer(ps, chosenName)) return false;   // Hand oder Crestinas Vorrat
     // Re-verify free slot — async prompt could have shifted state.
     const slotNow = zonenFuer(engine, pi, heroIdx, chosenName)[0]?.slotIdx ?? -1;   // W63a: geteilte Zone (Alice) zuerst, dann die erste freie
     if (slotNow < 0) return false;
@@ -150,7 +150,7 @@ module.exports = {
     // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
     // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
     if (!(await engine._runBeforeSummon(chosenName, pi, heroIdx, {}, slotNow))) return false;
-    if ((ps.hand || []).indexOf(chosenName) < 0) return false;
+    if (!engine._rxQuelleFuer(ps, chosenName)) return false;   // Hand oder Crestinas Vorrat
     if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0 && !require('./_alice-shared').canShareInto(engine, pi, heroIdx, slotNow, chosenName)) return false;   // Kosten koennen den Platz belegt haben (W63a: ausser geteilt)
 
     // Place — `actionPlaceCreature` bypasses level/school via the

@@ -134,6 +134,36 @@
       "Premonition",
       "Terror"
      ]
+    },
+    {
+     "id": "ability-gold",
+     "theme": "Golden",
+     "template": "focus",
+     "prism": false,
+     "special": "golden",
+     "base": "ability/ability-gold.png",
+     "shimmer": "ability/ability-gold.shimmer.png",
+     "motifs": [
+      "Fighting",
+      "Destruction Magic",
+      "Alchemy",
+      "Leadership"
+     ]
+    },
+    {
+     "id": "ability-umbra",
+     "theme": "Umbra",
+     "template": "focus",
+     "prism": false,
+     "special": "umbra",
+     "base": "ability/ability-umbra.png",
+     "shimmer": "ability/ability-umbra.shimmer.png",
+     "motifs": [
+      "Fighting",
+      "Destruction Magic",
+      "Alchemy",
+      "Leadership"
+     ]
     }
    ]
   },
@@ -228,6 +258,30 @@
      "shimmer": "hero/hero-8.shimmer.png",
      "motifs": [
       "Monia Bot, the Foretold Rescuer of Coolness"
+     ]
+    },
+    {
+     "id": "hero-gold",
+     "theme": "Golden",
+     "template": "hero",
+     "prism": false,
+     "special": "golden",
+     "base": "hero/hero-gold.png",
+     "shimmer": "hero/hero-gold.shimmer.png",
+     "motifs": [
+      "Cute Angel Molinda"
+     ]
+    },
+    {
+     "id": "hero-umbra",
+     "theme": "Umbra",
+     "template": "hero",
+     "prism": false,
+     "special": "umbra",
+     "base": "hero/hero-umbra.png",
+     "shimmer": "hero/hero-umbra.shimmer.png",
+     "motifs": [
+      "Cute Angel Molinda"
      ]
     }
    ]
@@ -346,6 +400,30 @@
       "Heal",
       "Hand of Death"
      ]
+    },
+    {
+     "id": "clash-gold",
+     "theme": "Golden",
+     "template": "scene",
+     "prism": false,
+     "special": "golden",
+     "base": "clash/clash-gold.png",
+     "shimmer": "clash/clash-gold.shimmer.png",
+     "motifs": [
+      "Fireball"
+     ]
+    },
+    {
+     "id": "clash-umbra",
+     "theme": "Umbra",
+     "template": "scene",
+     "prism": false,
+     "special": "umbra",
+     "base": "clash/clash-umbra.png",
+     "shimmer": "clash/clash-umbra.shimmer.png",
+     "motifs": [
+      "Fireball"
+     ]
     }
    ]
   },
@@ -459,6 +537,30 @@
       "Cute Conversion",
       "Phoenix Tackle",
       "Performance"
+     ]
+    },
+    {
+     "id": "monia-gold",
+     "theme": "Golden",
+     "template": "hero",
+     "prism": false,
+     "special": "golden",
+     "base": "monia/monia-gold.png",
+     "shimmer": "monia/monia-gold.shimmer.png",
+     "motifs": [
+      "Cool Rescuer Monia"
+     ]
+    },
+    {
+     "id": "monia-umbra",
+     "theme": "Umbra",
+     "template": "hero",
+     "prism": false,
+     "special": "umbra",
+     "base": "monia/monia-umbra.png",
+     "shimmer": "monia/monia-umbra.shimmer.png",
+     "motifs": [
+      "Cool Rescuer Monia"
      ]
     }
    ]
@@ -574,6 +676,30 @@
       "Guardian Beast Shu",
       "Guardian Beast Ji"
      ]
+    },
+    {
+     "id": "future-gold",
+     "theme": "Golden",
+     "template": "scene",
+     "prism": false,
+     "special": "golden",
+     "base": "future/future-gold.png",
+     "shimmer": "future/future-gold.shimmer.png",
+     "motifs": [
+      "Armageddon"
+     ]
+    },
+    {
+     "id": "future-umbra",
+     "theme": "Umbra",
+     "template": "scene",
+     "prism": false,
+     "special": "umbra",
+     "base": "future/future-umbra.png",
+     "shimmer": "future/future-umbra.shimmer.png",
+     "motifs": [
+      "Armageddon"
+     ]
     }
    ]
   },
@@ -685,6 +811,36 @@
      "shimmer": "world1/world1-8.shimmer.png",
      "motifs": [
       "Doom Prophecy"
+     ]
+    },
+    {
+     "id": "world1-gold",
+     "theme": "Golden",
+     "template": "mosaic",
+     "prism": false,
+     "special": "golden",
+     "base": "world1/world1-gold.png",
+     "shimmer": "world1/world1-gold.shimmer.png",
+     "motifs": [
+      "Steam Dwarf Engineer",
+      "Sinister Idol",
+      "Sarcophagus of Sealed Magic",
+      "Big Gwen Guard"
+     ]
+    },
+    {
+     "id": "world1-umbra",
+     "theme": "Umbra",
+     "template": "mosaic",
+     "prism": false,
+     "special": "umbra",
+     "base": "world1/world1-umbra.png",
+     "shimmer": "world1/world1-umbra.shimmer.png",
+     "motifs": [
+      "Steam Dwarf Engineer",
+      "Sinister Idol",
+      "Sarcophagus of Sealed Magic",
+      "Big Gwen Guard"
      ]
     }
    ]
@@ -799,6 +955,38 @@
      "shimmer": "world2/world2-8.shimmer.png",
      "motifs": [
       "Cardinal Beast Zhuque"
+     ]
+    },
+    {
+     "id": "world2-gold",
+     "theme": "Golden",
+     "template": "mosaic",
+     "prism": false,
+     "special": "golden",
+     "base": "world2/world2-gold.png",
+     "shimmer": "world2/world2-gold.shimmer.png",
+     "motifs": [
+      "Pinta, the Singing Ship",
+      "Dive Bomblebee",
+      "Potion Juggler",
+      "Treasure Skeleton",
+      "Cardinal Beast Xuanwu"
+     ]
+    },
+    {
+     "id": "world2-umbra",
+     "theme": "Umbra",
+     "template": "mosaic",
+     "prism": false,
+     "special": "umbra",
+     "base": "world2/world2-umbra.png",
+     "shimmer": "world2/world2-umbra.shimmer.png",
+     "motifs": [
+      "Pinta, the Singing Ship",
+      "Dive Bomblebee",
+      "Potion Juggler",
+      "Treasure Skeleton",
+      "Cardinal Beast Xuanwu"
      ]
     }
    ]
@@ -916,6 +1104,30 @@
       "Weapon Collecting Wight",
       "Ska Harpyformer",
       "Kasperov, the King of Kings [B]"
+     ]
+    },
+    {
+     "id": "community-gold",
+     "theme": "Golden",
+     "template": "scene",
+     "prism": false,
+     "special": "golden",
+     "base": "community/community-gold.png",
+     "shimmer": "community/community-gold.shimmer.png",
+     "motifs": [
+      "Aurora Borealis"
+     ]
+    },
+    {
+     "id": "community-umbra",
+     "theme": "Umbra",
+     "template": "scene",
+     "prism": false,
+     "special": "umbra",
+     "base": "community/community-umbra.png",
+     "shimmer": "community/community-umbra.shimmer.png",
+     "motifs": [
+      "Aurora Borealis"
      ]
     }
    ]
@@ -1038,6 +1250,46 @@
      "shimmer": "trials/trials-8.shimmer.png",
      "motifs": [
       "Flaming Dragonegg"
+     ]
+    },
+    {
+     "id": "trials-gold",
+     "theme": "Golden",
+     "template": "mosaic",
+     "prism": false,
+     "special": "golden",
+     "base": "trials/trials-gold.png",
+     "shimmer": "trials/trials-gold.shimmer.png",
+     "motifs": [
+      "Moonlight Butterfly",
+      "Wise Village Elder",
+      "Alleria, the Queen of Spiders",
+      "Mimic",
+      "???, the Shapeshifter",
+      "Flaming Dragonegg",
+      "Cuberto, Supreme Lord of Edges",
+      "The Golden Gate",
+      "Mary Crestmas"
+     ]
+    },
+    {
+     "id": "trials-umbra",
+     "theme": "Umbra",
+     "template": "mosaic",
+     "prism": false,
+     "special": "umbra",
+     "base": "trials/trials-umbra.png",
+     "shimmer": "trials/trials-umbra.shimmer.png",
+     "motifs": [
+      "Moonlight Butterfly",
+      "Wise Village Elder",
+      "Alleria, the Queen of Spiders",
+      "Mimic",
+      "???, the Shapeshifter",
+      "Flaming Dragonegg",
+      "Cuberto, Supreme Lord of Edges",
+      "The Golden Gate",
+      "Mary Crestmas"
      ]
     }
    ]

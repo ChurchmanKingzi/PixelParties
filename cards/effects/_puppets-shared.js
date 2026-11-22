@@ -449,13 +449,22 @@ const LUCK_GUARD = {
     // Kontrolle statt Seite (Styx 28.9.).
     if (!selected || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
     if (!hasLuck(engine, ownerIdx, selected)) return false;
-    return (validTargets || []).some(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
+    // ★ Spielgestalter-Entscheidung 17.11.2026: kein Ziel, das derselbe Effekt schon gewählt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert; Doppeltreffer nur bei Redirecting Aura).
+    return (validTargets || []).some(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id && !t._bereitsGewaehlt
       && (t.type === 'hero' || t.type === 'equip'));
   },
-  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets) {
-    const options = (validTargets || []).filter(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id
+  // ★ Spielgestalter-Entscheidung 16.11.2026: die KOSTEN (ALLE Luck Counter entfernen) sind VOR dem Kettenfenster der Auslösung zu bezahlen und bleiben bei Negation bezahlt
+  // (Hub `_checkTargetRedirectOnce` ruft `payBoardRedirectCost`, dann das Fenster, dann `onBoardRedirect` mit dem Ergebnis als letztem Argument).
+  async payBoardRedirectCost(engine, ownerIdx) {
+    await announceRedeem(engine, ownerIdx, LAKI);
+    const removed = removeAllLuck(engine, ownerIdx);
+    engine.sync();
+    return { removed };
+  },
+  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard, bezahlt) {
+    const options = (validTargets || []).filter(t => t && engine.zielSeite(t) === ownerIdx && t.id !== selected.id && !t._bereitsGewaehlt
       && (t.type === 'hero' || t.type === 'equip'));   // Kontrolle statt Seite
-    if (options.length === 0) return null;
+    if (options.length === 0) return null;   // (Kosten sind dann schon bezahlt — der Hub zahlt vor dem Kettenfenster)
     let pick = null;
     if (options.length === 1) pick = options[0];
     else {
@@ -468,8 +477,8 @@ const LUCK_GUARD = {
       pick = (r && r.length) ? options.find(t => t.id === r[0]) : options[0];
     }
     if (!pick) return null;
-    await announceRedeem(engine, ownerIdx, LAKI);
-    const removed = removeAllLuck(engine, ownerIdx);
+    if (!bezahlt) bezahlt = await LUCK_GUARD.payBoardRedirectCost(engine, ownerIdx);   // Aufruf ohne Hub: wie bisher erst hier zahlen
+    const removed = bezahlt.removed;
     engine._broadcastEvent('play_zone_animation', {
       type: 'puppet_luck', owner: ownerIdx, heroIdx: pick.heroIdx, zoneSlot: pick.type === 'hero' ? -1 : pick.slotIdx,
     });
@@ -493,7 +502,11 @@ const PRESERVE_GUARD = {
     if (!selected || selected.type !== 'equip' || selected.owner !== ownerIdx) return false;
     return !!instForTarget(engine, selected)?.counters?.preserve;
   },
-  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config) {
+  // ★ Spielgestalter-Entscheidung 16.11.2026: die KOSTEN (ALLE Preserve Counter entfernen) sind VOR dem Kettenfenster der Auslösung zu bezahlen und bleiben bei Negation bezahlt.
+  // Die zu negierenden Ziele (= die behüteten) werden VOR dem Entfernen der Counter bestimmt und mit dem Ergebnis an die Wirkung gereicht. Das gilt für alle drei Wege:
+  // Zielwahl-Fenster (`payBoardRedirectCost` → `onBoardRedirect`), Effekte ohne Zielwahl (`payBoardEffectGuardCost` → `onGuardEffect`) und Flächenschaden
+  // (`payBoardAoeGuardCost` → `onGuardAoe`).
+  async payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config) {
     const picked = Array.isArray(config?._redirectPickedIds) && config._redirectPickedIds.length
       ? config._redirectPickedIds : [selected.id];
     const drop = [];
@@ -505,6 +518,12 @@ const PRESERVE_GUARD = {
     if (!drop.includes(selected.id)) drop.push(selected.id);
     await announceRedeem(engine, ownerIdx, VINNY);
     const removed = removeAllPreserve(engine, ownerIdx);
+    engine.sync();
+    return { drop, removed };
+  },
+  async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard, bezahlt) {
+    if (!bezahlt) bezahlt = await PRESERVE_GUARD.payBoardRedirectCost(engine, ownerIdx, inst, selected, validTargets, config);   // Aufruf ohne Hub: wie bisher erst hier zahlen
+    const { drop, removed } = bezahlt;
     engine._broadcastEvent('play_zone_animation', {
       type: 'puppet_preserve', owner: ownerIdx, heroIdx: selected.heroIdx, zoneSlot: selected.slotIdx,
     });
@@ -523,10 +542,16 @@ const PRESERVE_GUARD = {
     if (!isOpponentSource(source, ownerIdx)) return false;
     return targetInsts.some(t => t?.counters?.preserve);
   },
-  async onGuardEffect(engine, ownerIdx, inst, targetInsts, source, kind) {
+  async payBoardEffectGuardCost(engine, ownerIdx, inst, targetInsts) {
     const dropInstIds = targetInsts.filter(t => t?.counters?.preserve).map(t => t.id);
     await announceRedeem(engine, ownerIdx, VINNY);
     const removed = removeAllPreserve(engine, ownerIdx);
+    engine.sync();
+    return { dropInstIds, removed };
+  },
+  async onGuardEffect(engine, ownerIdx, inst, targetInsts, source, kind, bezahlt) {
+    if (!bezahlt) bezahlt = await PRESERVE_GUARD.payBoardEffectGuardCost(engine, ownerIdx, inst, targetInsts);   // Aufruf ohne Hub: wie bisher erst hier zahlen
+    const { dropInstIds, removed } = bezahlt;
     for (const t of targetInsts) {
       if (!dropInstIds.includes(t.id)) continue;
       engine._broadcastEvent('play_zone_animation', { type: 'puppet_preserve', owner: ownerIdx, heroIdx: t.heroIdx, zoneSlot: t.zoneSlot });
@@ -545,10 +570,16 @@ const PRESERVE_GUARD = {
     if (!isOpponentSource(sourceCard, ownerIdx)) return false;
     return entries.some(e => e.inst?.counters?.preserve);
   },
-  async onGuardAoe(engine, ownerIdx, inst, entries) {
+  async payBoardAoeGuardCost(engine, ownerIdx, inst, entries) {
     const dropInstIds = entries.filter(e => e.inst?.counters?.preserve).map(e => e.inst.id);
     await announceRedeem(engine, ownerIdx, VINNY);
     const removed = removeAllPreserve(engine, ownerIdx);
+    engine.sync();
+    return { dropInstIds, removed };
+  },
+  async onGuardAoe(engine, ownerIdx, inst, entries, sourceCard, bezahlt) {
+    if (!bezahlt) bezahlt = await PRESERVE_GUARD.payBoardAoeGuardCost(engine, ownerIdx, inst, entries);   // Aufruf ohne Hub: wie bisher erst hier zahlen
+    const { dropInstIds, removed } = bezahlt;
     for (const e of entries) {
       if (!dropInstIds.includes(e.inst?.id)) continue;
       engine._broadcastEvent('play_zone_animation', { type: 'puppet_preserve', owner: ownerIdx, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });

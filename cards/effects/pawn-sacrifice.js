@@ -22,6 +22,7 @@
 const { anyName } = require('./_alias-name');   // Shroomasaur: Zusatzname zählt für Namensfamilien
 const { PAWN, isOfKingsName, ofKingsCreatures, ofKingsCpuAnswer } = require('./_of-kings-shared');
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { waehlePfad, ablageAusgangGesperrt, ziehenGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Pawn Sacrifice';
 const key = (pi) => `pawn-sacrifice:${pi}`;
@@ -33,7 +34,9 @@ function pawnsOnBoard(engine, pi) {
 function pawnsInDiscard(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  if (!engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return [];
+  // Weg „aus der Ablage löschen": gesperrt unter Knight of Kings [B] UND unter der Stab-Sperre (Staff of the Teleporter, „cannot move any cards out of your discard pile") — Spielgestalter-
+  // Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): ist nur ein Weg frei, wird er automatisch genommen; sind beide zu, ist die Karte nicht spielbar.
+  if (ablageAusgangGesperrt(engine, pi)) return [];
   return (ps.discardPile || []).filter(isPawnName);
 }
 function prognoseFree(engine, pi) {
@@ -44,8 +47,8 @@ function prognoseFree(engine, pi) {
 }
 
 module.exports = {
-  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
-  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  // ★ FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328) oder wird sie NEGIERT (Kette), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`;
+  // Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem Beginn der Aktivierung verbraucht).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT('pawn-sacrifice', pi); },
 
   activeIn: ['hand'],
@@ -95,28 +98,22 @@ module.exports = {
       const inDiscard = pawnsInDiscard(engine, pi);
       if (!onBoard && inDiscard.length === 0) { gs._spellCancelled = true; return; }
 
-      let mode = onBoard ? 'sacrifice' : 'delete';
-      if (onBoard && inDiscard.length > 0) {
-        const pick = await engine.promptGeneric(pi, {
-          type: 'optionPicker', title: CARD_NAME,
-          message: 'Choose one:',
-          showCard: CARD_NAME,
-          options: [
-            { id: 'sacrifice', label: '♟ Sacrifice a "Pawn of Kings" → draw 3' },
-            { id: 'delete', label: '🗑️ Delete a "Pawn of Kings" from your discard pile → draw 2' },
-          ],
-          cancellable: true,
-        });
-        if (!pick || pick.cancelled || pick.optionId == null) { gs._spellCancelled = true; return; }
-        mode = String(pick.optionId);
-      }
+      // Beide Wege frei: Menü; genau einer frei: automatisch (kein Menü) — `_pfad-shared.js`.
+      const pick = await waehlePfad(engine, pi, [
+        { id: 'sacrifice', label: '♟ Sacrifice a "Pawn of Kings" → draw 3', offen: onBoard },
+        { id: 'delete', label: '🗑️ Delete a "Pawn of Kings" from your discard pile → draw 2', offen: inDiscard.length > 0 },
+      ], { title: CARD_NAME, message: 'Choose one:', showCard: CARD_NAME, cancellable: true });
+      if (pick.keiner || pick.abgebrochen) { gs._spellCancelled = true; return; }
+      const mode = pick.id;
+      // Warnungsprinzip: unter Hand-/Zieh-Sperre (z. B. Staff of the Teleporter) bleibt der Weg wählbar, zieht aber nichts — der Hinweis steht im nächsten Prompt.
+      const ziehHinweis = ziehenGesperrt(engine, pi) ? ' You cannot draw cards right now, so you will not draw.' : '';
 
       let draws = 0;
       if (mode === 'sacrifice') {
         const paid = await engine.resolveSacrificeCost(ctx, {
           minCount: 1, maxCount: 1, noHandSubstitute: true,
           filter: c => anyName(c.inst, (n) => isPawnName(n)),
-          title: CARD_NAME, description: 'Sacrifice a "Pawn of Kings" to draw 3 cards.',
+          title: CARD_NAME, description: 'Sacrifice a "Pawn of Kings" to draw 3 cards.' + ziehHinweis,
           confirmLabel: '♟ Sacrifice!',
         });
         if (!paid) { gs._spellCancelled = true; return; }
@@ -128,7 +125,7 @@ module.exports = {
           const res = await engine.promptGeneric(pi, {
             type: 'cardGallery', title: CARD_NAME,
             cards: distinct.map(n => ({ name: n, source: 'discard' })),
-            description: 'Delete a "Pawn of Kings" from your discard pile to draw 2 cards.',
+            description: 'Delete a "Pawn of Kings" from your discard pile to draw 2 cards.' + ziehHinweis,
             cancellable: true,
           });
           if (!res || res.cancelled || !res.cardName) { gs._spellCancelled = true; return; }

@@ -155,19 +155,19 @@ module.exports = {
         return;
       }
 
-      const handIdx = ps.hand.indexOf(pickedLoyal);
-      if (handIdx < 0) {
+      const loyalQuelle = engine._rxQuelleFuer(ps, pickedLoyal);   // Hand oder Crestinas Vorrat
+      if (!loyalQuelle) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      engine.rxNimm(ps, loyalQuelle);
 
       const placed = await engine.summonCreatureWithHooks(
         pickedLoyal, feld, ctx.cardHeroIdx, destSlot,
         { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}) },   // Kontrolle statt Seite (Styx 28.9.)
       );
       if (!placed) {
-        engine.handZugangSync(ps, pickedLoyal, { source: CARD_NAME, ohneInstanz: true });
+        engine.handkarteZurueck(pi, pickedLoyal, loyalQuelle, { source: CARD_NAME });
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }

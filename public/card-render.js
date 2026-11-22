@@ -9,9 +9,9 @@
 //  und setzt die Karte nach den Regeln des Karten-Templates (MSE) selbst
 //  zusammen: Rahmen, Kunst mit Maske, Namenszeile, Regeltext, Werte, Symbole,
 //  Seltenheits-Stempel und — bei Super Rares — die goldenen Rahmenelemente.
-//  Foils (Schimmer, Texturen, silberner Rand der Rares) gehoeren dem dynamischen
-//  Foil-Effekt des Spiels und werden hier bewusst NICHT gezeichnet; die Rahmen der
-//  Super Rares (Gold) und Diamonds (Cyan) bleiben.
+//  Die Effekte der Seltenheiten (Schimmer, Glanz, Glas ...) gehoeren dem Rarity-Effekt
+//  (public/rarity-fx.js) und werden hier NICHT gezeichnet; hier entstehen nur die Basiskarte der
+//  Stufe (Stempel, Gold-/Silber-/Cyan-Rahmen: `renderCard(karte, { rarity })`) und die Masken fuer den Effekt.
 //
 //  Massstab: Rahmen und Icons sind 10x-Pixel-Art und werden mit nearest
 //  neighbour auf 750x1050 gebracht; Bilder in Feldern werden gestreckt
@@ -88,9 +88,19 @@
   // nie allein am Zeilenende steht („Support Spell“, „Decay or Support Spells“). Laeuft NACH dem Ersetzen der Namen durch Symbolzeichen,
   // damit mehrteilige Namen („Support Magic“) vorher noch normal erkannt werden.
   const GLUE_SYM_RE = /[\uE000-\uE0FF](?:(?:\s*,\s*|\s+(?:or|and)\s+)[\uE000-\uE0FF])*\s+Spells?\b/g;
+  // ── Deutsch: „[Schul-Symbol]-Zauber“ ──
+  // Quelltext (data/i18n/de-cards.json) schreibt „Zerstörungsmagie-Zauber“, „Verfalls- oder Unterstützungsmagie-Zauber“, „Kampfkunst-Angriffe“;
+  // das Symbol ersetzt den Schulnamen (auch Kurzform „Zerstörungs-“), „-Zauber“/„-Angriff“ bleibt Text. Nur bei gewählter Sprache DE.
+  const DE_SYMBOLS = [['Zerstörungsmagie', 'destruction'], ['Beschwörungsmagie', 'summoning'], ['Magiekunst', 'arts'], ['Unterstützungsmagie', 'support'],
+    ['Verfallsmagie', 'decay'], ['Zerstörungs', 'destruction'], ['Beschwörungs', 'summoning'], ['Unterstützungs', 'support'], ['Verfalls', 'decay']];
+  DE_SYMBOLS.forEach(([name, key]) => { SYM_CH[name] = String.fromCharCode(0xE000 + SYM_KEYS.indexOf(key)); });
+  const DE_ALT = DE_SYMBOLS.map(x => x[0]).join('|');
+  const DE_RE2 = new RegExp('(?<![\\wäöüÄÖÜß])(' + DE_ALT + ')(?=-?(?:(?:\\s*,\\s*|\\s+(?:oder|und)\\s+)(?:' + DE_ALT + ')-?)*-?Zauber)', 'g');
+  const symbolizeDe = t => t.replace(DE_RE2, m => SYM_CH[m]).replace(/\bKampfkunst(?=-Angriff)/g, SYM_CH['Fighting']);
   const symbolize = t => {
     t = String(t == null ? '' : t);
     if (OPT.symMode === 'none') return t;
+    if (window.PP_I18N && window.PP_I18N.get() === 'de') return symbolizeDe(t);
     t = t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
     if (OPT.symMode === 'all') return t;
     t = t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
@@ -105,13 +115,13 @@
   // ihrer tatsaechlichen Farbe (`boxHintergrund`), nicht nach Kartentyp: so liest sich jedes Wort auf jedem Rahmen. `fest` (Blind, weiss)
   // behaelt seinen Ton immer. Die Tooltips des Spiels lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`).
   const STATUS_TERMS = [
-    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
-    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
-    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
-    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
-    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
-    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
-    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
+    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?|(?:ver)?gift(?:et|ete|eten|eter|etem|etes|es|s)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?|verbrann(?:t|te|ten|ter|tem|tes)|verbrenn(?:en|t|ung|ungen)',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?|bet.ub(?:t|te|ten|ter|tem|tes|en|ung|ungen)',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)|negier(?:e|st|t|en|te|ten|ung)',   hell: '#9aa3b6', dunkel: '#59606e' },
+    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?|blutung(?:en)?|blutend(?:e|en|er|em|es)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen|(?:ein)?gefroren(?:e|en|er|em|es)?|einfrier(?:en|t|e)',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?|geblendet(?:e|en|er|em|es)?|blend(?:en|et|ung)',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
   ];
   const STATUS_IDX = Object.create(null);
   STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
@@ -131,6 +141,7 @@
       if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
       // „… cannot be negated“ nennt einen Schutz, keinen Status: nicht hervorheben (Als Vorgabe 20.10.)
       if (/\b(?:cannot|can't|can not) be\s+$/i.test(t.slice(Math.max(0, a - 16), a)) && /^negat/i.test(m[0])) continue;
+      if (/\bnicht\s+$/i.test(t.slice(Math.max(0, a - 10), a)) && /^negier/i.test(m[0])) continue;   // „kann nicht negiert werden“ (DE)
       let k = 1;
       while (k < m.length && m[k] === undefined) k++;
       out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
@@ -742,7 +753,7 @@
     const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
     const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
     const nameOutF = supArtiGold ? 0.7 : 0.5;
-    if (!textOnly) drawLine(ctx, spec.name, {
+    if (!textOnly && !spec.noName) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
       align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: nameOutF,
     });
@@ -762,7 +773,7 @@
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
       // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur. Sonst wie der Name; der Glanz (Foil) liegt in der Namensmaske.
-      if (!textOnly && (spec.level != null || spec.lvOver != null)) {
+      if (!textOnly && !spec.noLv && (spec.level != null || spec.lvOver != null)) {
         const ueber = spec.lvOver != null;
         drawLine(ctx, String(ueber ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, {
           color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : nameOutF,
@@ -823,6 +834,8 @@
     const stamp = STAMP[spec.rarity];
     if (stamp && !textOnly) {
       const white = isArti2(t) && (stamp !== 'diamond' && stamp !== 'sapphire');
+      // noStamp: die Rarity-Ebene malt den Stempel selbst — ausser auf hellen Artifact-Karten (braunes Zeichen, dort malt sie keinen): der gedruckte bleibt
+      if (spec.noStamp && !white) return cv;
       sprite(ctx, (white ? 'cornerW.' : 'corner.') + stamp, 689, 989, 45, 45);
     }
     return cv;
@@ -868,17 +881,40 @@
   /**
    * @param {object} c     Karte aus cards.json
    * @param {object} [meta] reine Darstellungsdaten (data/card-render.json, cards[Name]): { r: Seltenheit, f: Rahmen, sb, sb2, soft: Zeilenumbrueche im Text sind nur Leerstellen }
-   * @param {object} [over] { name } — Skins ersetzen nur Namen (und Kunst)
+   * @param {object} [over] { name, rarity } — Skins ersetzen nur Namen (und Kunst); `rarity`: Rarity-ID der Karteninstanz (siehe rarityBase)
    */
-  // Das Foil-Kennzeichen aus cards.json ist die Seltenheit, die das Spiel kennt (Foil-Effekt, Rahmenfarbe):
-  // „diamond_rare“ -> Diamond, „secret_rare“ -> Super Rare. Es geht der aus alten Kartenbildern abgeleiteten
-  // Seltenheit (card-render.json `r`) vor.
-  const FOIL_RARITY = { diamond_rare: 'diamond', secret_rare: 'super rare' };
+  // Seltenheit je KARTEN-INSTANZ (Rarity-System): `over.rarity` ist die ID aus rarities.js (common … umbra). Die Basiskarte zeigt je Stufe
+  // Stempel, Rahmen und Namensfarbe der Vorlage (uncommon, rare, super rare); Prismatic, Storm, Spectral, Umbra und Stained tragen
+  // KEIN Stempel/Rahmen-Element ('none'), ihr Zeichen malt `public/rarity-fx.js` selbst. Ohne Angabe: Common (die alte, je Karte gedruckte
+  // Seltenheit `card-render.json` r gilt nicht mehr).
+  const RARITY_BASE = { common: 'common', uncommon: 'uncommon', rare: 'rare', prismatic: 'none', super: 'super rare', storm: 'none', spectral: 'none', umbra: 'none', stained: 'none',
+    'super rare': 'super rare', none: 'none' };
+  const rarityBase = r => RARITY_BASE[r] || 'common';
+  /**
+   * Der Stempel der Basiskarte dieser Rarity als 45x45-Canvas (genau so, wie `draw` ihn unten rechts einsetzt; durchsichtig um die Zeichnung) — oder null,
+   * wenn die Stufe keinen hat (Common ausgenommen: dessen Stempel ist der gedruckte) oder die Karte das braune Artifact-Zeichen trägt (das bleibt gedruckt). Die Rarity-Ebene (rarity-fx.js) liest daraus die 5x5-Zellen ihres
+   * eigenen Stempels; die Basiskarte mit Rarity (`renderCard(…, { noStamp: true })`, Karten-Shim `?rar=`) druckt ihn dann NICHT mehr mit, damit sich
+   * beide nicht ueberlagern.
+   */
+  const stampMemo = new Map();
+  function stampSprite(card, rarity) {
+    const spec = specFromCard(card, meta.cards[card && card.name], { rarity });
+    const stamp = STAMP[spec.rarity];
+    if (!stamp) return null;
+    if (isArti2(spec.type) && (stamp !== 'diamond' && stamp !== 'sapphire')) return null;
+    const key = stamp;
+    if (stampMemo.has(key)) return stampMemo.get(key);
+    const c = document.createElement('canvas'); c.width = 45; c.height = 45;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    const out = sprite(g, 'corner.' + stamp, 0, 0, 45, 45) ? c : null;
+    if (out) stampMemo.set(key, out);
+    return out;
+  }
   /** W77b: zwei Ability-Boni („<Ability> N" in beiden Feldern) → „A or B" in einer Zeile; sonst null. */
   function ascBonusOder(c) {
-    const a = String(c.startingAbility1 || '').trim(), b = String(c.startingAbility2 || '').trim();
+    const a = String(c.sa1De || c.startingAbility1 || '').trim(), b = String(c.sa2De || c.startingAbility2 || '').trim();
     const abilityBonus = t => /^[^\n]+ \d+$/.test(t);
-    return abilityBonus(a) && abilityBonus(b) ? a + ' or ' + b : null;
+    return abilityBonus(a) && abilityBonus(b) ? a + (window.PP_I18N && window.PP_I18N.get() === 'de' ? ' oder ' : ' or ') + b : null;
   }
   function specFromCard(c, meta, over) {
     meta = meta || {}; over = over || {};
@@ -898,16 +934,17 @@
     const asc = c.cardType === 'Ascended Hero';
     return {
       type,
-      rarity: FOIL_RARITY[c.foil] || meta.r || 'common',
-      name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
+      rarity: rarityBase(over.rarity),
+      noStamp: !!over.noStamp,   // ohne Seltenheits-Stempel (die Rarity-Ebene malt ihn selbst, siehe stampSprite)
+      name: (over.name != null ? ((window.PP_I18N && window.PP_I18N.names && window.PP_I18N.names[over.name]) || (c.displayName && c.displayName !== c.name ? c.displayName : over.name)) : (c.displayName || c.name)).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
       glue: Array.isArray(meta.glue) ? meta.glue : null,   // Wendungen, die im Umbruch zusammenbleiben („Support Spell“ -> [Symbol] Spell in einer Zeile)
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       // Ascended Heroes: die Bonus-Felder (`startingAbility1/2`) sind ALTERNATIVEN (W71a, Al: „bei zwei Ability-Boni immer ODER") — zwei Ability-Boni stehen in EINER Zeile mit „or"
       // („Fighting 3 or Destruction Magic 3", wie Taio; die Box fasst nur eine Zeile). Alle anderen Boni (Text-Boni mit Zeilenumbruch) bleiben wie gedruckt.
-      skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n')) : '',
-      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
+      skillBox: (meta.sb != null && !(window.PP_I18N && window.PP_I18N.get() === 'de')) ? meta.sb : hero ? (c.sa1De || c.startingAbility1 || '/') : asc ? (ascBonusOder(c) || [c.sa1De || c.startingAbility1, c.sa2De || c.startingAbility2].filter(Boolean).join('\n')) : '',
+      skillBox2: (meta.sb2 != null && !(window.PP_I18N && window.PP_I18N.get() === 'de')) ? meta.sb2 : (hero ? (c.sa2De || c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
       // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
       // statt der Zahl in `cost` (die der Server weiter rechnet).
       hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,
@@ -954,12 +991,13 @@
   }
 
   /** Abweichende Werte, die statt der gedruckten aufs Bild kommen (HP im Tooltip, Stufe/Kosten in der Hand, weggelassene Zahlen auf dem Brett).
-   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Namensmaske des Foils (`nameLayer`) — sonst glänzt die Schraffur auf dem gedruckten Wert. */
+   *  Gemeinsam fuer das Kartenbild (`renderCard`) und die Textmasken der Rarity-Effekte (`textMasks`) — sonst glänzt der Effekt auf dem gedruckten Wert. */
   function applyOverrides(spec, card, o) {
     if (o.hp != null) spec.hp = o.hp;
     if (o.noHp) spec.noHp = true;
     if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
     if (o.noAtk) spec.noAtk = true;
+    if (o.noNums) { spec.noHp = true; spec.noAtk = true; spec.noLv = true; spec.noName = true; }   // alle Zahlen und den Namen weglassen (statsLayer)
     // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
     if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
     // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
@@ -976,6 +1014,7 @@
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
    *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
    *                       { lv, kost: Zahl } — druckt diese aktuelle Stufe / Kosten (Hand): gruen = verringert, rot = erhoeht
+   *                       { rarity: Rarity-ID } — Stempel/Rahmen/Namensfarbe der Seltenheit (Standard Common), siehe rarityBase
    *                       { stufe: 1–3 } — Fähigkeitskarte: hebt die Box dieser Stufe hervor, die anderen beiden grau (Brett, Tooltip)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
@@ -989,12 +1028,74 @@
     const skin = o.skin ? (meta.skins[o.skin] || {}) : null;
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
-    const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
+    const spec = specFromCard(card, m, Object.assign({ rarity: o.rarity, noStamp: o.noStamp }, skin ? { name: skin.name || o.skin } : null));
     applyOverrides(spec, card, o);
-    // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
-    // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
-    if (skin && holoOn(skin)) spec.nameGold = true;
-    return draw(spec, art);
+    // Skins teilen die Foils ihrer Base-Karte: kein eigenes Skin-Holo und kein goldener Name mehr — Namensfarbe, Stempel und Effekt richten sich allein
+    // nach der Rarity der Karteninstanz (Common = schlichter Name), siehe CardFoil in app-shared.jsx.
+    const cv = draw(spec, art);
+    cv.statType = spec.type;                       // statsLayer: welche Symbole (Herz, Schwert) die Wertezeile dieses Kartentyps trägt
+    return cv;
+  }
+
+  /**
+   * Rang-Rahmen (Duplikate, rank-frames.js) liegen über dem Kartenbild und können die Zahlen am Kartenrand verdecken. Darum werden die
+   * STAT-ZAHLEN (HP, Angriff, Kosten, Stufe), die HP-/ATK-SYMBOLE (Herz, Schwert) und den NAMEN (nur der Text) nach dem Einbacken noch einmal über den Rahmen gelegt — nur die Schrift, mit dunkler Umrandung
+   * für die Lesbarkeit; Wertefelder, Symbole und Rahmen bleiben, wie sie sind.
+   * Die Schrift entsteht als Unterschied zwischen der Karte `un` (renderCard, ungerahmt) und derselben Karte ohne Zahlen und Namen (`noNums`). Schul- und Kartenart-Symbole bleiben unter dem Rahmen — angeschnitten erkennt man sie trotzdem.
+   * @returns {Promise<HTMLCanvasElement|null>} 750 × 1050, durchsichtig bis auf Ziffern + Umrandung
+   */
+  async function statsLayer(card, o, un) {
+    const base = await renderCard(card, Object.assign({}, o || {}, { noNums: true }));
+    if (!base || !un) return null;
+    const a = un.getContext('2d').getImageData(0, 0, W, H).data, b = base.getContext('2d').getImageData(0, 0, W, H).data;
+    const out = document.createElement('canvas'); out.width = W; out.height = H;
+    const g = out.getContext('2d'), img = g.createImageData(W, H), d = img.data, mask = new Uint8Array(W * H);
+    let any = false;
+    // HP-Herz und Angriffs-Schwert der Wertezeile (Teil des Kartenrahmens, kein eigenes Sprite): per Flutfüllung vom Rand des Feldes aus
+    // werden Hintergrund und Symbol getrennt — was die Füllung nicht erreicht, ist das Symbol.
+    const t = un.statType, heroBox = t && (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    const icons = [];
+    if (t && hatHp(t)) icons.push([heroBox || t === 'artifactCreature' ? 88 : 198, 978, 78, 68]);   // Herz
+    if (heroBox) icons.push([394, 974, 66, 76]);                                                      // Schwert
+    const iconPx = new Uint8Array(W * H);
+    for (const [rx, ry, rw, rh] of icons) {
+      const bg = new Set(), at = (x, y) => (y * W + x) * 4, key = (x, y) => (b[at(x, y)] << 24 | b[at(x, y) + 1] << 16 | b[at(x, y) + 2] << 8 | b[at(x, y) + 3]) >>> 0;
+      const x1 = Math.min(W, rx + rw), y1 = Math.min(H, ry + rh);
+      for (let x = rx; x < x1; x++) { bg.add(key(x, ry)); bg.add(key(x, y1 - 1)); }
+      for (let y = ry; y < y1; y++) { bg.add(key(rx, y)); bg.add(key(x1 - 1, y)); }
+      const seen = new Uint8Array(W * H), stack = [];
+      const push = (x, y) => { if (x < rx || y < ry || x >= x1 || y >= y1) return; const i = y * W + x; if (seen[i] || !bg.has(key(x, y))) return; seen[i] = 1; stack.push(i); };
+      for (let x = rx; x < x1; x++) { push(x, ry); push(x, y1 - 1); }
+      for (let y = ry; y < y1; y++) { push(rx, y); push(x1 - 1, y); }
+      while (stack.length) { const i = stack.pop(), x = i % W, y = (i / W) | 0; push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+      for (let y = ry; y < y1; y++) for (let x = rx; x < x1; x++) if (!seen[y * W + x]) iconPx[y * W + x] = 1;
+    }
+    const zeilen = new Uint8Array(H);                // Zeilen mit Ziffern: die Umrandung wird nur dort (± R) gesucht
+    for (let i = 0; i < W * H; i++) {
+      const k = i * 4;
+      if (iconPx[i] || a[k] !== b[k] || a[k + 1] !== b[k + 1] || a[k + 2] !== b[k + 2] || a[k + 3] !== b[k + 3]) {
+        mask[i] = 1; any = true; zeilen[(i / W) | 0] = 1;
+        d[k] = a[k]; d[k + 1] = a[k + 1]; d[k + 2] = a[k + 2]; d[k + 3] = 255;
+      }
+    }
+    if (!any) return null;
+    // dunkle Umrandung (harte Kante, 3 px) um die Ziffern, damit sie auf jedem Rahmen lesbar bleiben
+    const R = 3, dark = [8, 6, 12];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let nah = false; for (let q = -R; q <= R; q++) if (y + q >= 0 && y + q < H && zeilen[y + q]) { nah = true; break; }
+      if (!nah) { x = W; continue; }
+      const i = y * W + x;
+      if (mask[i] || d[i * 4 + 3]) continue;
+      let hit = false;
+      for (let dy = -R; dy <= R && !hit; dy++) for (let dx = -R; dx <= R; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > R + 1) continue;
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && mask[yy * W + xx]) { hit = true; break; }
+      }
+      if (hit) { d[i * 4] = dark[0]; d[i * 4 + 1] = dark[1]; d[i * 4 + 2] = dark[2]; d[i * 4 + 3] = 255; }
+    }
+    g.putImageData(img, 0, 0);
+    return out;
   }
 
   // ═════════════ DAUERHAFTER CACHE (IndexedDB) ═════════════
@@ -1018,7 +1119,7 @@
     if (!version || typeof indexedDB === 'undefined') return false;
     try {
       const db = await new Promise((res, rej) => {
-        const r = indexedDB.open('pp-render-cache', 1);
+        const r = indexedDB.open('pp-render-cache' + (window.PP_I18N && window.PP_I18N.get() !== 'en' ? '-' + window.PP_I18N.get() : ''), 1);
         r.onupgradeneeded = () => r.result.createObjectStore('kv');
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blockiert'));
       });
@@ -1078,7 +1179,6 @@
     dark: 0.16,          // unterhalb dieser Helligkeit (0..1) liegt nichts auf einem Pixel (Umrisse, Schatten)
     full: 0.46,          // ab dieser Helligkeit volle Staerke
     neutral: 0.50,       // Staerke fuer Graustufen (Farben: bis 1,0, je nach Saettigung)
-    allText: true,       // Super/Diamond Rares: auch aller uebrige Text (nicht nur der Name) bekommt den Glanz (Grossansichten)
   };
   /** Gilt das Holo fuer diesen Skin? (`data/card-render.json` -> skins[Name].holo = false schaltet es ab) */
   function holoOn(skinMeta) { return HOLO.on && !(skinMeta && skinMeta.holo === false); }
@@ -1200,13 +1300,6 @@
     return { type: spec.type, box: geo.box, nameStrip: NAME_STRIP, all, nameMask: o.skin ? nameMaskCanvas(spec, geo) : null };
   }
 
-  /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
-  function nameLayer(card, o) {
-    const spec = specFromCard(card, meta.cards[card.name], null);
-    if (o) applyOverrides(spec, card, o);
-    return { type: spec.type, nameStrip: NAME_STRIP, nameMask: nameMaskCanvas(spec, holoGeometry(spec.type)) };
-  }
-
   /**
    * Maske ALLEN Textes einer Karte AUSSER dem Namen (der hat seine eigene Maske): Faehigkeitsfelder, Stufe, Werte, Regeltext —
    * weiss auf durchsichtig, in voller Kartengroesse (750 x 1050). Eine halb so grosse Maske, weich gestreckt, liess die Glanzfarbe
@@ -1219,13 +1312,51 @@
     try { return draw(spec, null, null, true); } finally { TEXT_MASK = false; }
   }
 
+  // ═════════════ RARITY-EFFEKTE (public/rarity-fx.js) ═════════════
+  //  Die Effekte der Seltenheiten laufen auf dem 150 x 210-Raster der Karte (1 Rasterzelle = 5 Kartenpixel). Sie brauchen von hier:
+  //  die Geometrie je Kartentyp, die Bildfeld-Maske auf diesem Raster und die weissen Textmasken (Name/Werte und restlicher Text).
+  /** { type, full } der Karte (full = Vollbild-Held). Vor loadMeta ist der Typ der Held-Rahmen der Vorlage. */
+  function geometryOf(card) {
+    const type = specFromCard(card, meta.cards[card.name], null).type;
+    return { type, full: isFullart(type) };
+  }
+  const gridMaskMemo = new Map();
+  /** Bildfeld-Maske der Karte auf dem 150 x 210-Raster: 1 = Kunstflaeche (nur voll deckende Stellen; bei Vollbild-Karten ohne Textfelder). */
+  function artGrid(type) {
+    const key = isFullart(type) ? (type === 'superhero' ? 'mask.hero' : 'mask.fullart') : 'mask.art';
+    let m = gridMaskMemo.get(key);
+    if (m) return m;
+    const c = document.createElement('canvas'); c.width = 150; c.height = 210;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false;
+    if (isFullart(type)) artMaskSprite(g, key, 150, 210); else sprite(g, key, 14, 34, 122, 80);
+    const d = g.getImageData(0, 0, 150, 210).data;
+    m = new Uint8Array(150 * 210);
+    for (let p = 0; p < m.length; p++) m[p] = d[p * 4 + 3] >= 230 ? 1 : 0;
+    gridMaskMemo.set(key, m);
+    return m;
+  }
+  /**
+   * Weisse Textmasken in voller Kartengroesse (750 x 1050) fuer den Rarity-Effekt: `name` = Name, Stufe, Artifact-Kosten, HP und ATK (ohne
+   * Seltenheits-Stempel, der gehoert dem Effekt), `body` = aller uebrige Text (Faehigkeitsfelder, Regeltext, Symbole).
+   * `o`: wie `renderCard` ({ hp, noHp, noAtk, lv, kost, skin }) — die Maske deckt sich mit dem Text, der wirklich auf dem Bild steht.
+   */
+  function textMasks(card, o) {
+    o = o || {};
+    const skin = o.skin ? (meta.skins[o.skin] || {}) : null;
+    const spec = specFromCard(card, Object.assign({}, meta.cards[card.name]), Object.assign({ rarity: 'none' }, skin ? { name: skin.name || o.skin } : null));
+    applyOverrides(spec, card, o);
+    const name = nameMaskCanvas(spec, holoGeometry(spec.type));
+    TEXT_MASK = true;
+    let body; try { body = draw(spec, null, null, true); } finally { TEXT_MASK = false; }
+    return { type: spec.type, full: isFullart(spec.type), name, body };
+  }
+
   // Fertige Schichten fuers DOM: PNG-Blobs + die Lage in Prozent der Karte als CSS-Variablen. Je Skin einmal gerechnet
   // und gemerkt (LRU); zwei Skins gleichzeitig zu rechnen waere Verschwendung, darum reiht `holoFor` sie hintereinander ein
   // und laesst dem Browser zwischen zwei Skins Luft.
-  const HOLO_MAX = 40, NAME_MAX = 80;
+  const HOLO_MAX = 40;
   const holoDone = new Map();        // Skin -> { vars, urls } (fertig)
   const holoWait = new Map();        // Skin -> Promise (in Arbeit)
-  const nameDone = new Map();        // Kartenname -> { vars, urls }
   let holoChain = Promise.resolve();
   // PNG-Kodierung. `canvas.toBlob` kodiert im Leerlauf des Hauptthreads: auf einer belebten Seite (Animationen im Menue,
   // Deck-Editor beim Aufbauen) wartet jede Karte dadurch 1-6 s, obwohl die Kodierung selbst nur Millisekunden braucht — und
@@ -1294,7 +1425,6 @@
     if (o.noAtk) t.push('oa');
     return t.length ? '|' + t.join('|') : '';
   }
-  function nameCached(card, o) { return nameDone.get(card.name + nameVariant(card, o)) || null; }
   function holoFor(card, skin) {
     if (!HOLO.on || !card || !skin) return Promise.resolve(null);
     const hit = holoDone.get(skin);
@@ -1338,10 +1468,10 @@
     if (v === undefined) { v = isFullart(specFromCard(card, meta.cards[card.name]).type); fullartMemo.set(card.name, v); }
     return v;
   }
-  /** Bekommt die Karte die Schraffur? Fullart (nach Kartentyp) oder Super/Diamond Rare (Foil-Kennzeichen). Vor loadMeta: nein. */
+  /** Bekommt die Karte die Schraffur? Fullart-Karten (nach Kartentyp). Vor loadMeta: nein. */
   function hatchEligible(card) {
     if (!HOLO.on || !metaReady || !card || !card.name) return false;
-    return card.foil === 'secret_rare' || card.foil === 'diamond_rare' || isFullartCard(card);
+    return isFullartCard(card);
   }
   function hatchCached(card) { return hatchDone.get(card.name) || null; }
   function hatchFor(card) {
@@ -1385,14 +1515,11 @@
     if (rimMemo.has(id)) return rimMemo.get(id);
     const sk = skin ? (meta.skins[skin] || {}) : null;
     const m = Object.assign({}, meta.cards[card.name]);
-    if (sk) { if (sk.r) m.r = sk.r; if (sk.f) m.f = sk.f; }
+    if (sk) { if (sk.f) m.f = sk.f; }
     const spec = specFromCard(card, m, null);
+    // Nur die goldenen Rahmen der Vollbild-Helden glänzen hier; die Rahmen der Seltenheiten gehören dem Rarity-Effekt (rarity-fx.js).
     const goldType = spec.type === 'superhero' || spec.type === 'fullartHero';
-    let tone = null;
-    if (spec.rarity === 'diamond') tone = 'diamond';
-    else if (goldType || spec.rarity === 'super rare') tone = 'gold';
-    else if (OPT.silverRim && spec.rarity === 'rare') tone = 'silver';
-    const out = tone ? { kind: (goldType ? spec.type : 'n') + ':' + spec.rarity, tone, type: spec.type, rarity: spec.rarity } : null;
+    const out = goldType ? { kind: spec.type + ':common', tone: 'gold', type: spec.type, rarity: 'common' } : null;
     rimMemo.set(id, out);
     return out;
   }
@@ -1428,61 +1555,5 @@
   }
   function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
 
-  /** Namensglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Umriss der Buchstaben + Lage. */
-  function nameShimmerFor(card, o) {
-    if (!HOLO.on || !card) return Promise.resolve(null);
-    const sfx = nameVariant(card, o), nk = card.name + sfx;
-    const hit = nameDone.get(nk);
-    if (hit) return Promise.resolve(hit);
-    const key = 'n:' + nk;
-    if (holoWait.has(key)) return holoWait.get(key);
-    const job = holoChain.then(async () => {
-      await new Promise(r => setTimeout(r, 0));
-      let rec = await cacheGet(key);
-      if (!(rec && rec.name instanceof Blob && rec.strip)) {
-        const L = nameLayer(card, o), name = await toBlob(L.nameMask);
-        if (!name) return null;
-        rec = { name, strip: L.nameStrip };
-        cachePut(key, rec, name.size);
-      }
-      const url = urlOf(rec.name), strip = rec.strip;
-      return lru(nameDone, nk, {
-        vars: { '--sh-ny': pc(strip.y, H), '--sh-nh': pc(strip.h, H), '--sh-name': 'url(' + url + ')' },
-        urls: [url],
-      }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Namensglanz', nk, err && err.message); return null; })
-      .finally(() => holoWait.delete(key));
-    holoChain = job.catch(() => {});
-    holoWait.set(key, job);
-    return job;
-  }
-
-  /** Textglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Maske allen Textes ausser dem Namen, ueber die ganze Karte. */
-  const textDone = new Map();        // Kartenname -> { vars, urls }
-  function textCached(card) { return textDone.get(card.name) || null; }
-  function textShimmerFor(card) {
-    if (!HOLO.on || !HOLO.allText || !card) return Promise.resolve(null);
-    const hit = textDone.get(card.name);
-    if (hit) return Promise.resolve(hit);
-    const key = 't:' + card.name;
-    if (holoWait.has(key)) return holoWait.get(key);
-    const job = holoChain.then(async () => {
-      await new Promise(r => setTimeout(r, 0));
-      let rec = await cacheGet(key);
-      if (!(rec && rec.text instanceof Blob)) {
-        const text = await toBlob(textLayer(card));
-        if (!text) return null;
-        rec = { text };
-        cachePut(key, rec, text.size);
-      }
-      const url = urlOf(rec.text);
-      return lru(textDone, card.name, { vars: { '--sh-text': 'url(' + url + ')' }, urls: [url] }, NAME_MAX);
-    }).catch(err => { console.warn('[card-render] Textglanz', card.name, err && err.message); return null; })
-      .finally(() => holoWait.delete(key));
-    holoChain = job.catch(() => {});
-    holoWait.set(key, job);
-    return job;
-  }
-
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
+  root.CardRender = { OPT, last: {}, statsLayer, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, textLayer, geometryOf, artGrid, textMasks, rarityBase, stampSprite, isFullart, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -29,6 +29,7 @@ const {
   BASE_LOLEK, TRIDENT_NAME, HELMET_NAME, halfCost, equippableEntries,
   hasDestination, chooseAndEquip, checkLolekAscension, hasEquipped,
 } = require('./_lolek-shared');
+const { ziehenGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = BASE_LOLEK;
 const ASCENSION_ITEMS = [TRIDENT_NAME, HELMET_NAME];
@@ -70,7 +71,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     if (!ps) return false;
-    if (!ps.handLocked && discardEntries(engine, pi).length > 0) return true;
+    if (!ziehenGesperrt(engine, pi, 1) && discardEntries(engine, pi).length > 0) return true;
     return equipEntries(engine, pi).length > 0;
   },
 
@@ -81,7 +82,9 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    const canDiscard = !ps.handLocked && discardEntries(engine, pi).length > 0;
+    // Weg „Discard & Draw": das Ziehen ist sein Zweck — unter Hand-Sperre UND Zieh-Sperre (Sacred Jewel, Staff of the Teleporter …) ist er zu (früher nur Hand-Sperre: das Artefakt wurde für nichts
+    // abgeworfen). Spielgestalter-Entscheidung 18.11.2026: ist von beiden Wegen genau einer frei, kommt kein Menü (die Pfadliste steht darunter wie bisher als canDiscard/canEquip).
+    const canDiscard = !ziehenGesperrt(engine, pi, 1) && discardEntries(engine, pi).length > 0;
     const canEquip = equipEntries(engine, pi).length > 0;
     if (!canDiscard && !canEquip) return false;
 

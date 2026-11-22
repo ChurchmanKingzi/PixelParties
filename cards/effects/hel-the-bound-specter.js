@@ -341,7 +341,8 @@ module.exports = {
       };
 
       // "If you can't …" — every way the re-equip is impossible.
-      const handHas = !!name && (ps.hand || []).includes(name);
+      // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+      const handHas = !!name && engine.handUndVorratListe(pi).includes(name);
       const discHas = !!name && (ps.discardPile || []).includes(name);
       if (!name || !cd) return doDefeat('no_reference');
       if (!handHas && !discHas) return doDefeat('no_copy');
@@ -372,7 +373,7 @@ module.exports = {
 
       // Re-validate after the async prompt (defensive — nothing else
       // acts at our own turn end, but stay honest about the live piles).
-      const liveHandHas = (ps.hand || []).includes(name);
+      const liveHandHas = engine.handUndVorratListe(pi).includes(name);
       const liveDiscHas = (ps.discardPile || []).includes(name);
       if (fromHand && !liveHandHas) fromHand = liveDiscHas ? false : fromHand;
       if (!fromHand && !liveDiscHas) fromHand = liveHandHas ? true : fromHand;
@@ -386,9 +387,14 @@ module.exports = {
       }
 
       // Remove one copy from the chosen pile, then equip it.
-      const pile = fromHand ? ps.hand : ps.discardPile;
-      const idx = pile.indexOf(name);
-      if (idx >= 0) pile.splice(idx, 1);
+      if (fromHand) {
+        const helQuelle = engine._rxQuelleFuer(ps, name);   // Hand oder Crestinas Vorrat
+        if (helQuelle) engine.rxNimm(ps, helQuelle);
+      } else {
+        const pile = ps.discardPile;
+        const idx = pile.indexOf(name);
+        if (idx >= 0) pile.splice(idx, 1);
+      }
 
       const inst = await _equipOnHel(engine, pi, helHeroIdx, name, feld);
       if (!inst) {

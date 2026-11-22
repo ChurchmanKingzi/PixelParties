@@ -42,6 +42,17 @@
 //       Target list restricted to QUALIFYING
 //       Heroes only (status + no spell).
 //
+//  Status-Immunität (Spielgestalter-Entscheidung 17.11.2026, ATT-15): Ist der Wirt beim Anlegen gegen negative Status immun (Light Ball, Johanna,
+//  `negative_status_immune` …), bleibt die Karte wirkungslos in der Support Zone liegen (kein Status, ATK unberührt) — ABER sobald die Immunität
+//  endet, greift der Fluch (ATK auf 0, Status `cursed`); kommt sie später dazu, ruht er wieder (ATK kommt zurück). Vertrag `statusFolgtImmunitaet`
+//  (`_attachment-shared.js`, Abgleich in `engine.sync`).
+//
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ──────────
+//  „Cursed" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen
+//  `attach:<instId>`-Eintrag („Cursed (Curse)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers
+//  (die ATK bleibt unberührt — ein ruhender Fluch hat sie nie gesperrt); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `cursed` in
+//  der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt, solange der Wirt `cursed` trägt).
+//
 //  Boolean status — multiple Curse copies on the
 //  same Hero all bind the same single `cursed`
 //  status (no extra suppression from a second
@@ -56,7 +67,7 @@
 // ═══════════════════════════════════════════
 
 const { getNegativeStatuses } = require('./_hooks');
-const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { candidateHosts, pickAttachmentHost, placeAttachment, anhaengselUmgelenkt, statusErgebnisBuchen } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Curse';
@@ -135,9 +146,13 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
  */
 async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   const targetHero = engine.gs.players[owner]?.heroes?.[heroIdx];
-  if (!targetHero?.name || targetHero.hp <= 0 || targetHero.statuses?.cursed) return false;
+  if (!targetHero?.name || targetHero.hp <= 0) return false;
+  // Tea (Status übertragen) hat `cursed` am neuen Wirt schon per `addHeroStatus` angelegt, aber ohne ATK-Sperre (die macht nur diese Funktion): Status da, Zwischenspeicher leer
+  // → die Sperre jetzt nachholen. Mit Zwischenspeicher (zweite Kopie, Doomed Pirate) ist der Wirt schon gesperrt: nichts zu tun.
+  const statusSchonDa = !!targetHero.statuses?.cursed;
+  if (statusSchonDa && targetHero._cursedAtkSuppressed !== undefined) return false;
   // Wehrt der Wirt den Status ab (Light Ball, Immunität …), bleibt seine ATK unberührt — wie bei Polymorph/Shrink. Sonst stünde er ohne Status (nichts zum Heilen) auf ATK 0.
-  if (engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
+  if (!statusSchonDa && engine.heroBlocksStatusNow?.(owner, heroIdx, STATUS_NAME, { appliedBy, festesZiel: true })) return false;
   // Snapshot the live ATK so the cleanse path can restore it.
   // Subsequent grant/revoke/temp-atk while cursed will accumulate
   // into this same slot (see _isHeroAtkSuppressed in _engine.js).
@@ -157,7 +172,7 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
   }
   // `festesZiel`: „the Hero this Spell is attached to" — der Wirt wurde schon gewählt (Als Ruling 9.10., wie Polymorph/Shrink/Berserk). Ohne die Option
   // schluckt Submerged („Jump in the River") den Status, obwohl die ATK schon auf 0 steht.
-  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
+  if (!statusSchonDa) await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm', festesZiel: true });
   if (!targetHero.statuses?.[STATUS_NAME] && !schonGesperrt && targetHero._cursedAtkSuppressed !== undefined) {
     // Der Status wurde doch abgewehrt (z. B. Effekt-Immunität): die gesicherte ATK zurückgeben (ohne `cursed` bucht der Trichter sichtbar).
     const zurueck = targetHero._cursedAtkSuppressed;
@@ -165,14 +180,45 @@ async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
     engine._applyHeroAtkDelta(targetHero, owner, heroIdx, zurueck);
     return false;
   }
+  // Marke „dieser Status gehoert dieser Karte" (wie Polymorph/Shrink): ohne sie findet `engine.anhaengselFuerStatus` die Karte nicht (Tea: Status übertragen).
+  const st = targetHero.statuses?.[STATUS_NAME];
+  if (st && !st._fromAttachment) st._fromAttachment = CARD_NAME;
   return true;
+}
+
+/**
+ * Zustands-Abgleich (`statusFolgtImmunitaet`): die ATK-Sperre des Fluchs wie in `fluchAnlegen` — der Abgleich setzt den Status `cursed` selbst (vor `einsetzen`), diese Funktion sichert die ATK
+ * in den Zwischenspeicher und setzt sie auf 0. Idempotent (zweite Kopie, Doomed Pirate halten den Zwischenspeicher schon).
+ */
+function atkSperreEinsetzen(engine, targetHero, owner, heroIdx) {   // `targetHero` wie in `fluchAnlegen`: dieselbe begründete Ausnahme des ATK-Trichter-Wächters (Absenken direkt, Wert im Zwischenspeicher)
+  if (targetHero._cursedAtkSuppressed !== undefined) return;
+  const alt = targetHero.atk || 0;
+  targetHero._cursedAtkSuppressed = alt;
+  targetHero.atk = 0;
+  if (alt > 0) engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -alt });
+}
+
+/** Gegenstück: der Abgleich hat `cursed` schon genommen — die gesicherte ATK kommt zurück (wie beim Abgang der letzten Kopie; Doomed Pirate hält sie weiter fest). Idempotent. */
+function atkSperreLoesen(engine, hero, owner, heroIdx) {
+  if (hero._cursedAtkSuppressed === undefined || engine._isHeroAtkSuppressed(hero)) return;
+  const restored = hero._cursedAtkSuppressed || 0;
+  delete hero._cursedAtkSuppressed;
+  if (restored > 0) engine._applyHeroAtkDelta(hero, owner, heroIdx, restored);
 }
 
 module.exports = {
   /** Umhaengen (Inheritance Ceremony): der Fluch liegt jetzt an einem anderen Helden — dort anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await fluchAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const ok = await fluchAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, ok || !!engine.gs.players[toOwner]?.heroes?.[toHeroIdx]?.statuses?.cursed, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
+  },
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status (und mit ihm die ATK-Sperre) folgt der Status-Immunität des Wirts.
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    einsetzen(engine, inst, hero, owner, heroIdx) { atkSperreEinsetzen(engine, hero, owner, heroIdx); },
+    ruhen(engine, inst, hero, owner, heroIdx) { atkSperreLoesen(engine, hero, owner, heroIdx); },
   },
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -191,6 +237,10 @@ module.exports = {
   // gesetzt. `attachmentStatus` sagt dem Puzzle-Aufbau, welcher Status
   // dazugehoert; er legt ihn beim Start an.
   attachmentStatus: 'cursed',
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Cursed (Curse)',
+  negativeStatusIcon: '🧿',
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -298,13 +348,16 @@ module.exports = {
       const inst = await placeAttachment(ctx, CARD_NAME, { owner: targetOwner, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipEnterHook: true });
       if (!inst) { engine.sync(); return; }
       if (!targetHero.statuses?.cursed) {
-        await fluchAnlegen(engine, pi, targetOwner, targetHeroIdx);
+        const ok = await fluchAnlegen(engine, pi, targetOwner, targetHeroIdx);
+        if (!anhaengselUmgelenkt(engine, inst, { owner: targetOwner, heroIdx: targetHeroIdx })) statusErgebnisBuchen(engine, inst, ok || !!targetHero.statuses?.cursed, targetOwner, targetHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       } else {
         engine.log('curse_extra_copy_noop', {
           player: gs.players[pi]?.username,
           target: targetHero.name,
         });
       }
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection den Fluch samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, { owner: targetOwner, heroIdx: targetHeroIdx })) { engine.log('curse_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
 
       // ── Attach burst animation ──
       engine._broadcastEvent('play_zone_animation', {
@@ -365,8 +418,9 @@ module.exports = {
         && c.owner === ownerIdx
         && c.heroIdx === heroIdx
       );
-      if (copies.length > 0) {
-        const targets = [...copies];
+      // Tea uebertraegt den Status: die Karte, die mitzieht (`_anhaengselZiehtUm`), faellt nicht ab.
+      const targets = copies.filter(c => !c.counters?._anhaengselZiehtUm);
+      if (targets.length > 0) {
         engine.gs._curseCleanseInProgress = true;
         try {
           // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog

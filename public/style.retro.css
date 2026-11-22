@@ -247,35 +247,7 @@ select optgroup { background: var(--bg); color: var(--text); }
 /* Type indicators */
 /* Type classes kept for JS reference but no visual border */
 
-/* ═══════════════════════════════════════════════════════════════════
-   FOIL — v1204 (Als Vorgabe 18.9.: „schöner/beeindruckender,
-   sichtbare Textur, bessere Shine-Effekte, beeindruckendere Particles")
-
-   VIER LAGEN, von unten nach oben:
-     1. TEXTUR   — die physische Prägung der Folie. Immer da, fast
-                   unsichtbar; erst das Licht bringt sie hervor.
-     2. SCHIMMER — die farbige Interferenz der ganzen Karte (Bestand).
-     3. BÄNDER   — wandernde Lichtstreifen. Jedes Band trägt die
-                   Prägung als Rillen IN seinem Licht (::after,
-                   multiply) und einen heißen weißen Kern (::before).
-                   Genau das macht Folie physisch: die Textur ist nicht
-                   aufgemalt, sie wird beleuchtet.
-     4. FUNKEN + STAUB — Glanzpunkte mit langen Spitzen und Bloom,
-                   dazu langsam aufsteigende Staubkörner im Licht.
-
-   ★ MECHANIKWECHSEL (v1204): Die Bänder liefen bis v1203 über einen
-   JS-Zeitgeber, der pro Karte alle 150–850 ms ein Band in den React-
-   Zustand schob — bei 20 Foil-Karten auf dem Schirm sind das Dutzende
-   Re-Renders je Sekunde, nur für Deko. Jetzt sind es fünf feste Bänder
-   je Karte mit teilerfremden Laufzeiten, die per CSS endlos laufen und
-   zwischen zwei Durchgängen unsichtbar warten. Optisch dieselbe
-   unregelmäßige Dichte, aber NULL React-Arbeit nach dem ersten Render
-   (zählt auf Als Handy-Baustelle ein).
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* Ein Durchgang belegt nur die ersten 40 % des Taktes — der Rest ist
-   Pause. Vier Bänder mit unterschiedlicher Laufzeit ergeben daraus ein
-   Muster, das sich nicht sichtbar wiederholt. */
+/* ═══ GLANZBAND-KEYFRAMES (GlanzBand/LotsenGlanz, app-shared) ═══ */
 /* ★ W86u2 (Pixelart): die Neigung steckt jetzt im Verlaufswinkel des Streifens (harte Kanten, kein gedrehtes Element), das Band blendet
    hart ein/aus (statt Deckkraft 0 → .45 → 0). Gleicher Takt wie vorher (40 % Durchlauf, 60 % Pause). */
 @keyframes ppGlanzFahrt {
@@ -285,227 +257,11 @@ select optgroup { background: var(--bg); color: var(--text); }
   40%  { transform: translateX(var(--band-to)); opacity: 0; }
   100% { transform: translateX(var(--band-to)); opacity: 0; }
 }
-@keyframes foilShimmer {
-  0%, 100% { opacity: .10; background-position: 0% 0%; }
-  25% { opacity: .25; background-position: 100% 100%; }
-  50% { opacity: .12; background-position: 50% 0%; }
-  75% { opacity: .28; background-position: 0% 100%; }
-}
-/* ★★ v1248 (Als Befund 19.9.: „Foil-Karten haben anscheinend gar
-   keinen Schlagschatten"). Sie hatten keinen, weil DIESE Animation auf
-   derselben Eigenschaft läuft: eine Animation übernimmt `box-shadow`
-   vollständig, der Schatten aus der Grundregel war damit überschrieben
-   — dieselbe Falle wie bei den Materialize-Bildern (v1233).
-   Jede Stufe hängt ihn deshalb an. Außerhalb der Hand ist die Variable
-   nicht gesetzt; der Rückfall ist ein unsichtbarer Schatten, Foil auf
-   dem Brett bleibt also wie es war. */
-@keyframes foilBorderPulse {
-  0%, 100% { border-color: #72541d; box-shadow: 0 0 0 2px #72541d, var(--karten-schatten, 0 0 0 transparent); }
-  33% { border-color: #5a023a; box-shadow: 0 0 0 2px #5a023a, var(--karten-schatten, 0 0 0 transparent); }
-  66% { border-color: #59606e; box-shadow: 0 0 0 2px #3e3e51, var(--karten-schatten, 0 0 0 transparent); }
-}
-/* Funken: aufblitzen, drehen, vergehen. Die Spitzen wachsen dabei
-   stärker als der Kern — dadurch liest sich der Blitz als Lichtstern
-   und nicht als wachsender Punkt. */
-@keyframes sparkle {
-  0%   { transform: scale(0) rotate(0deg); opacity: 0; }
-  12%  { transform: scale(1.35) rotate(70deg); opacity: 1; } /* pp-ok: drehung */
-  26%  { transform: scale(.75) rotate(150deg); opacity: .65; } /* pp-ok: drehung */
-  42%  { transform: scale(1.05) rotate(250deg); opacity: .95; } /* pp-ok: drehung */
-  58%  { transform: scale(0) rotate(360deg); opacity: 0; }
-  100% { transform: scale(0) rotate(360deg); opacity: 0; }
-}
-@keyframes sparkleGlow {
-  0%, 58%, 100% { filter: none; }
-  16% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 9px currentColor); }
-  42% { filter: drop-shadow(0 0 3px currentColor); }
-}
-/* Staub im Lichtkegel: steigt langsam, dreht sich leicht, verlischt. */
-@keyframes foilMote {
-  0%   { transform: translate3d(0,0,0) scale(.6); opacity: 0; }
-  15%  { opacity: var(--mote-o, .8); }
-  70%  { opacity: var(--mote-o, .8); }
-  100% { transform: translate3d(var(--mote-dx, 4px), var(--mote-dy, -26px), 0) scale(1.1); opacity: 0; }
-}
 
-.foil-secret-rare { animation: foilBorderPulse 4s steps(24, end) infinite !important; }
-.foil-secret-rare:hover { border-color: #fad54a !important; box-shadow: 0 0 0 2px #a87c00, 0 0 0 3px #5a023a, 0 2px 0 0 #000000 !important; }
-
-/* ★ v1403 — RAHMEN OHNE NEUZEICHNEN (Al 25.9.: Loyal-Deck ruckelt).
-   Der Puls des Kartenrahmens animierte `border-color` und `box-shadow` —
-   gemessen die Haelfte der Malarbeit einer Foil-Karte, JEDEN Frame. Jetzt:
-   je Farbstation ein fester Ring (Rand + Schein), und die Ringe blenden
-   nur per Deckkraft ineinander. Gleiche Farben, gleicher Takt, der
-   Compositor erledigt es allein. Die Ringe sitzen ueber dem Kartenrand;
-   damit ihr Schein nicht am `overflow: hidden` der Karte endet, clippt
-   eine Foil-Karte mit Ring per `overflow: clip` + Rand-Zugabe.
-   Browser ohne `overflow-clip-margin` behalten den alten Puls. */
-.foil-rahmen { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-.foil-rahmen i { position: absolute; inset: calc(-1 * var(--foil-rand, 0px)); border: var(--foil-rand, 0px) solid transparent; opacity: 0; will-change: opacity; animation: var(--rahmen-name) var(--rahmen-dur) linear infinite; }
-.card-mini { --foil-rand: 2px; }
-.foil-rahmen-diamond { --rahmen-name: foilRahmen4; --rahmen-dur: 3s; }
-.foil-rahmen-diamond i:nth-child(1) { border-color: #07aec5; box-shadow: 0 0 0 2px #1a4128; animation-delay: 0s; }
-.foil-rahmen-diamond i:nth-child(2) { border-color: #07aec5; box-shadow: 0 0 0 2px #07aec5; animation-delay: -2.25s; }
-.foil-rahmen-diamond i:nth-child(3) { border-color: #9aa3b6; box-shadow: 0 0 0 2px #59606e; animation-delay: -1.5s; }
-.foil-rahmen-diamond i:nth-child(4) { border-color: #07aec5; box-shadow: 0 0 0 2px #07aec5; animation-delay: -.75s; }
-.foil-rahmen-secret { --rahmen-name: foilRahmen3; --rahmen-dur: 4s; }
-.foil-rahmen-secret i:nth-child(1) { border-color: #72541d; box-shadow: 0 0 0 2px #72541d; animation-delay: 0s; }
-.foil-rahmen-secret i:nth-child(2) { border-color: #5a023a; box-shadow: 0 0 0 2px #5a023a; animation-delay: -2.667s; }
-.foil-rahmen-secret i:nth-child(3) { border-color: #59606e; box-shadow: 0 0 0 2px #3e3e51; animation-delay: -1.333s; }
-.foil-rahmen-secret i:nth-child(4) { display: none; }
-/* Schultern bei der halben Strecke (.75 statt .5): zwei halb durch-
-   sichtige Ringe uebereinander ergeben so etwa die Mischfarbe, die der
-   fruehere Farbverlauf an dieser Stelle hatte, statt eines dunklen Lochs. */
-@keyframes foilRahmen4 { 0%, 100% { opacity: 1; } 12.5% { opacity: .75; } 25% { opacity: 0; } 75% { opacity: 0; } 87.5% { opacity: .75; } }
-@keyframes foilRahmen3 { 0%, 100% { opacity: 1; } 16.667% { opacity: .75; } 33.333% { opacity: 0; } 66.667% { opacity: 0; } 83.333% { opacity: .75; } }
-@supports (overflow-clip-margin: 1px) and selector(:has(> *)) {
-  .foil-diamond-rare:has(> .foil-rahmen), .foil-secret-rare:has(> .foil-rahmen) { animation: none !important; overflow: clip; overflow-clip-margin: 16px; box-shadow: var(--karten-schatten, 0 0 0 transparent) !important; }
-  /* Der eigene Rand bleibt durchsichtig — die Ringe malen ihn. */
-  .foil-diamond-rare:has(> .foil-rahmen), .foil-secret-rare:has(> .foil-rahmen) { border-color: transparent !important; }
-  .foil-diamond-rare > .foil-rahmen, .foil-secret-rare > .foil-rahmen { display: block; }
-  /* Hover wie bisher: kraeftiger Schein am Rahmen selbst, Ringe weg. */
-  .foil-diamond-rare:has(> .foil-rahmen):hover { border-color: #6be9fa !important; box-shadow: 0 0 0 2px #1aedff, 0 0 0 3px #59606e, 0 2px 0 0 #000000 !important; }
-  .foil-secret-rare:has(> .foil-rahmen):hover { border-color: #fad54a !important; box-shadow: 0 0 0 2px #a87c00, 0 0 0 3px #5a023a, 0 2px 0 0 #000000 !important; }
-  .foil-diamond-rare:hover > .foil-rahmen, .foil-secret-rare:hover > .foil-rahmen { display: none; }
-}
-
-/* ===== DIAMOND RARE FOIL ===== */
-@keyframes foilDiamondBorderPulse {
-  0%, 100% { border-color: #07aec5; box-shadow: 0 0 0 2px #1a4128, var(--karten-schatten, 0 0 0 transparent); }
-  25% { border-color: #07aec5; box-shadow: 0 0 0 2px #07aec5, var(--karten-schatten, 0 0 0 transparent); }
-  50% { border-color: #9aa3b6; box-shadow: 0 0 0 2px #59606e, var(--karten-schatten, 0 0 0 transparent); }
-  75% { border-color: #07aec5; box-shadow: 0 0 0 2px #07aec5, var(--karten-schatten, 0 0 0 transparent); }
-}
-@keyframes foilDiamondShimmer {
-  0%, 100% { opacity: .30; background-position: 0% 0%; }
-  25% { opacity: .55; background-position: 100% 100%; }
-  50% { opacity: .34; background-position: 50% 0%; }
-  75% { opacity: .62; background-position: 0% 100%; }
-}
-.foil-diamond-rare { animation: foilDiamondBorderPulse 3s steps(24, end) infinite !important; }
-.foil-diamond-rare:hover { border-color: #6be9fa !important; box-shadow: 0 0 0 2px #1aedff, 0 0 0 3px #59606e, 0 2px 0 0 #000000 !important; }
-/* ★ v1205 (Als Vorgabe 18.9.: „tuerkis-blaues Theming"): Der Verlauf
-   laeuft jetzt von Tuerkis ueber Aqua nach Tiefblau und zurueck, mit
-   weissen Glanzkanten dazwischen. Vorher war er blass-blau und damit
-   kaum von einer normalen Karte zu unterscheiden. */
-/* ★ v1403 (Al 25.9., Ruckeln mit Foil-Decks): Der Verlauf liegt auf einer
-   300 % grossen Pseudo-Ebene, die per `transform` wandert — dasselbe Bild
-   wie das fruehere `background-position`, aber ohne Neuzeichnen je Frame.
-   Die Ebene selbst pulsiert nur noch in der Deckkraft. */
-.foil-iridescent-diamond { position: absolute; inset: 0; overflow: hidden; animation: foilDiamondShimmerKlein 4s steps(24, end) infinite; animation-delay: var(--shimmer-offset, 0s); mix-blend-mode: screen; opacity: .4; }
-.foil-shine-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; border-radius: 0; container-type: inline-size; }
-
-/* ★ v1205 (Als Befund 18.9.): „Die gestreifte Textur sieht speziell in
-   der Closeup-Ansicht nicht gut aus." Stimmt — die Rillen haben eine
-   feste Breite, also werden sie auf einer gross gezeichneten Karte zu
-   gemalten Balken statt zu Korn. Ab 120 px Kartenbreite faellt die
-   Lage deshalb weg.
-
-   Bewusst als Groessenregel und nicht als Liste von Stellen: damit
-   greift sie automatisch im grossen Tooltip (360-400 px), in den
-   Helden-Plaetzen des Deck-Editors, im Karten-Auftritt (260 px) und in
-   allem, was spaeter dazukommt. Brett, Hand und Galerien liegen mit
-   64-100 px darunter und behalten die Praegung. */
-@container (min-width: 120px) {
-  .foil-texture { display: none; }
-  /* Die Rillen IM Band sind dieselbe Praegung, nur beleuchtet — und
-     werden im Closeup genauso zu groben Balken. Ohne sie bleibt der
-     reine Lichtstreifen mit seinem heissen Kern stehen, und genau der
-     traegt die grosse Ansicht. */
-  .foil-band::after { display: none; }
-}
-
-.foil-iridescent::before, .foil-iridescent-diamond::before { content: ''; position: absolute; left: 0; top: 0; width: 300%; height: 300%; animation: foilSchimmerWeg var(--schimmer-dur, 4s) ease-in-out infinite; animation-delay: var(--shimmer-offset, 0s); will-change: transform; }
-.foil-iridescent { --schimmer-dur: 5s; }
-.foil-iridescent::before { background: linear-gradient(135deg, transparent 0% 90%); }
-.foil-iridescent-diamond::before { background: linear-gradient(135deg, transparent 0% 95%); }
-@keyframes foilSchimmerWeg {
-  0%, 100% { transform: translate(0, 0); }
-  25%      { transform: translate(-66.667%, -66.667%); }
-  50%      { transform: translate(-33.333%, 0); }
-  75%      { transform: translate(0, -66.667%); }
-}
-
-/* ── 1) TEXTUR ────────────────────────────────────────────────────
-   Feine Schrägrillen, zwei Winkel übereinander, dazu ein ganz leichtes
-   Rautennetz. Für sich genommen kaum zu sehen (das soll sie auch,
-   sonst wirkt die Karte schmutzig) — ihre Aufgabe ist, dem Licht der
-   Bänder eine Oberfläche zu geben. `overlay` hellt auf hellen Stellen
-   auf und dunkelt auf dunklen: die Prägung folgt dem Kartenbild,
-   statt als Gitter darüberzuliegen. */
-.foil-texture { position: absolute; inset: 0; background-image: repeating-linear-gradient(112deg, #ffffff 0 1px, transparent 1px 6px); mix-blend-mode: overlay; opacity: .2; }
-/* Diamond: Facettennetz statt Rillen — 45°-Rauten, kühler. */
-/* Diamond: keine Rillen, sondern FACETTEN — breite 45°-Flächen, die
-   sich in Helligkeit minimal unterscheiden. Ein feines Gitter würde
-   sich mit dem Pixelraster der Karten beißen; Flächen lesen sich als
-   geschliffener Kristall und lassen die Kunst in Ruhe. */
-.foil-shine-diamond .foil-texture { background-image: repeating-linear-gradient(45deg,
-      transparent 0 7px, transparent 7px 14px); opacity: .38; }
-
-/* ── 2) SCHIMMER (Bestand; v1403 wie Diamond: Ebene wandert) ─────── */
-.foil-iridescent { position: absolute; inset: 0; overflow: hidden; animation: foilShimmerKlein 5s steps(24, end) infinite; animation-delay: var(--shimmer-offset, 0s); mix-blend-mode: screen; opacity: .18; }
-
-/* ── 3) BÄNDER ──────────────────────────────────────────────────── */
-.foil-band { position: absolute; top: -90%; left: 0; width: var(--band-w, 30%); height: 280%; animation: ppGlanzFahrt var(--band-dur, 4s) linear infinite; animation-delay: var(--band-delay, 0s); opacity: 0; will-change: transform, opacity; }
-/* Heißer Kern: ein schmaler, überstrahlter Streifen mitten im Band. */
-.foil-band::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to right, transparent 34% 46.67%, #ffffff 46.67% 53.33%, transparent 53.33% 66%); }
-/* Die Prägung IM Licht: `multiply` schneidet Rillen in das Band,
-   deckungsgleich mit der Texturlage darunter. Dadurch sieht man die
-   Struktur genau dann, wenn Licht über sie läuft. */
-.foil-band::after { content: ''; position: absolute; inset: -50%; background: repeating-linear-gradient(112deg,
-    #000000 0 1px, transparent 1px 7px); mix-blend-mode: multiply; }
-/* Diamond: die Facettenkanten schneiden das Licht, nicht Rillen. */
-.foil-shine-diamond .foil-band::after { background: repeating-linear-gradient(45deg,
-    transparent 0 1px, transparent 1px 14px); }
-/* Kuehler Kern: nicht reines Weiss, sondern ein Hauch Aqua darin —
-   sonst wirkt der Streifen wie der goldene der Secret Rares. */
-.foil-shine-diamond .foil-band::before { background: linear-gradient(to right, transparent 32% 45.71%, #e5edfa 45.71% 46.57%, #ffffff 46.57% 53.43%, #e5edfa 53.43% 54.29%, transparent 54.29% 68%); }
-
-/* ── 4) FUNKEN + STAUB ──────────────────────────────────────────── */
-.foil-sparkle { position: absolute; width: var(--sp-size, 5px); height: var(--sp-size, 5px); border-radius: 0; opacity: 0; background: radial-gradient(circle, #ffffff 0%, currentColor 40%, transparent 72%); box-shadow: 0 0 3px currentColor, 0 0 7px currentColor; animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); will-change: transform, opacity; }
-/* Lange, nadeldünne Spitzen mit weichem Auslauf — ein Lichtkreuz
-   statt zweier Balken. */
-.foil-sparkle::before, .foil-sparkle::after { content: ''; position: absolute; }
-.foil-sparkle::before { left: 50%; top: -170%; width: 1px; height: 440%; transform: translateX(-50%); background: linear-gradient(to bottom, transparent 0%, currentColor 32%,
-    #ffffff 50%, currentColor 68%, transparent 100%); }
-.foil-sparkle::after { top: 50%; left: -170%; height: 1px; width: 440%; transform: translateY(-50%); background: linear-gradient(to right, transparent 0%, currentColor 32%,
-    #ffffff 50%, currentColor 68%, transparent 100%); }
-/* Diamond: größer und kälter. */
-.foil-shine-diamond .foil-sparkle { width: calc(var(--sp-size, 5px) + 1px); height: calc(var(--sp-size, 5px) + 1px); }
-.foil-shine-diamond .foil-sparkle::before { width: 1.4px; height: 520%; top: -210%; }
-.foil-shine-diamond .foil-sparkle::after  { height: 1.4px; width: 520%; left: -210%; }
-
-/* ★ Funken-Schein im Hintergrund (grosse Ansicht): das Element ist 5x so gross wie der Funke (Mitte unveraendert, `margin`),
-   der Kern ist derselbe Verlauf wie zuvor, dahinter liegt ein weicher Hof (zweiter Verlauf, in Stufen auslaufend). Alles wird
-   einmal in die Ebene gemalt; kein Filter, kein Schatten. Abgestimmt auf das fruehere `drop-shadow(0 0 3px) drop-shadow(0 0 7px)`:
-   Pixelvergleich gegen den Filter 22 % naeher dran als `box-shadow`. Die Spitzen (`::before`/`::after`) behalten ihre Laenge
-   (4,4 bzw. 5,2 Funkengroessen), nur ihre Lage wird auf das groessere Element umgerechnet. Die Kleinansicht (`.foil-klein`) hat
-   weiter keinen Schein. Der Hof ist 2,4 Funkengroessen gross — mehr passt nicht in das Element (2,5), sonst wird er hart abgeschnitten. */
-@supports (color: color-mix(in srgb, red, blue)) {
-  .foil-shine-overlay:not(.foil-klein) .foil-sparkle { --s: var(--sp-size, 5px); width: calc(var(--s) * 5); height: calc(var(--s) * 5); margin: calc(var(--s) * -2) 0 0 calc(var(--s) * -2); box-shadow: none; background: radial-gradient(circle calc(var(--s) * .7071), #ffffff 0%, currentColor 40%, transparent 72%),
-      radial-gradient(circle calc(var(--s) * 2.4),
-        color-mix(in srgb, currentColor 80%, transparent) 0%,
-        color-mix(in srgb, currentColor 40%, transparent) 30%,
-        color-mix(in srgb, currentColor 20%, transparent) 60%,
-        color-mix(in srgb, currentColor 5%, transparent) 85%,
-        transparent 100%); }
-  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle { --s: calc(var(--sp-size, 5px) + 1px); }
-  .foil-shine-overlay:not(.foil-klein) .foil-sparkle::before { top: calc(var(--s) * .3); height: calc(var(--s) * 4.4); }
-  .foil-shine-overlay:not(.foil-klein) .foil-sparkle::after  { left: calc(var(--s) * .3); width: calc(var(--s) * 4.4); }
-  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle::before { top: calc(var(--s) * -.1); height: calc(var(--s) * 5.2); }
-  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle::after  { left: calc(var(--s) * -.1); width: calc(var(--s) * 5.2); }
-}
-
-.foil-mote { position: absolute; width: var(--mote-size, 2px); height: var(--mote-size, 2px); border-radius: 0; background: currentColor; box-shadow: 0 0 4px currentColor; opacity: 0; animation: foilMote var(--mote-dur, 6s) linear infinite; animation-delay: var(--mote-delay, 0s); will-change: transform, opacity; }
-
-/* ── Sparmodus: Telefone (Lite-Modus) und „Play Animations: aus" ──
-   Die Prägung bleibt (sie kostet nichts, ist ein statischer Verlauf),
-   Staub und die Hälfte der Funken fallen weg. */
-@media (pointer: coarse) and (max-height: 600px) {
-  .foil-mote { display: none; }
-  .foil-sparkle:nth-child(2n) { display: none; }
-  .foil-band::after { display: none; }
-}
+/* Die Rarity-Effekte (Canvas) liegen über dem Kartenbild: public/rarity-fx.js, Anbindung `RarityLayer` (app-shared.jsx). */
+.pp-rarity-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
+.pp-rarity-cv { image-rendering: pixelated; image-rendering: crisp-edges; }
+.card-reveal-card { position: relative; }
 
 /* ═══════════════════════════════════════════════════════════════════
    ZONEN-EINSCHLAG — v1206 (Als Vorgabe 18.9.)
@@ -1224,6 +980,9 @@ select optgroup { background: var(--bg); color: var(--text); }
    --pf parallax, --shake shake amount, --ef explosion light, --tH/--tV
    tether amplitudes, --sAmp core-scale amplitude. */
 .anim-backdrop { zoom: calc(1 / var(--ui-scale, 1)); position: absolute; inset: 0; overflow: hidden; background: #12101f; z-index: 0; pointer-events: none; --pf: 1; --shake: 1; --ef: 1; --tH: calc(var(--abw,1vw) * 0.469); --tV: calc(var(--abh,1vh) * 0.37); --sAmp: 0.021; }
+/* Die Kulissenbilder (data/animated_screen/layers2, vorgebackene Pixelart mit 3-px-Zellen + Bayer-Dither, scripts/title-pixel/bake.py) duerfen NIE geglaettet werden:
+   bei Fenstern ausser 1920x1080 mischt die bilineare Skalierung die Palettenfarben und macht aus dem Dither Moire. `image-rendering` wird vererbt (Hintergrundplatte, Figuren, Katzen). */
+.anim-backdrop, .anim-cats-front, .pp-fx45-figur { image-rendering: pixelated; }
 .anim-shake { position: absolute; inset: 0; animation: ab-shake 10s steps(1, end) infinite; will-change: transform; }
 /* Front cats overlay — a separate layer ABOVE the auth panel (z-index:2) so
    the cats fly over the login form. pointer-events:none keeps the form
@@ -4066,12 +3825,13 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 /* Card reveal — opponent's played card appears centered */
 .card-reveal-stack { position: fixed; left: 0; top: 0; bottom: 0; width: 33%; z-index: 10050; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .card-reveal-entry { position: absolute; pointer-events: auto; cursor: url("/cursor-arrow.png?v=4") 2 2, default; animation: cardRevealAnim 3.5s steps(24, end) forwards; }
-.card-reveal-card { width: var(--reveal-card-w, 340px); aspect-ratio: 750 / 1050; box-shadow: 0 0 0 3px #000000; border-radius: 0; }
+.card-reveal-card { width: round(var(--reveal-card-w, 340px), var(--pp-k75, 75px)); aspect-ratio: 750 / 1050; box-shadow: 0 0 0 2px var(--bg4), 0 0 0 3px #000000; border-radius: 0; }
+/* Kein Maßstab-Wechsel am Kartenbild (stufenloses Skalieren verwischt es): die Aufdeck-Anzeige kommt und geht nur über die Deckkraft (die Pixel-Pipeline macht daraus ein Dither-Raster). */
 @keyframes cardRevealAnim {
-  0% { transform: scale(0.8); opacity: 0; }
-  8% { transform: scale(1); opacity: 1; }
-  65% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.97); opacity: 0; }
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ═══ REACTION CHAIN VISUALIZATION ═══ */
@@ -7004,7 +6764,7 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
 /* Zone während des Zerfalls: Karte hell, Grabstein noch nicht da; Stufe 2 = Schachbrett-Schleier (hart, kein Alpha) vor der vollen Verdunklung */
 [data-pp-stirbt] .hero-dead-marker { visibility: hidden; }
 [data-pp-stirbt="1"].board-zone-dead::before { display: none; }
-[data-pp-stirbt="2"].board-zone-dead::before { background: conic-gradient(#08060c 25%, transparent 0 50%, #08060c 0 75%, transparent 0) 0 0 / calc(4px * var(--board-scale, 1)) calc(4px * var(--board-scale, 1)); }
+[data-pp-stirbt="2"].board-zone-dead::before { background: conic-gradient(#08060c 25%, transparent 0 50%, #08060c 0 75%, transparent 0) 0 0 / calc(2 * var(--pp-zelle, 2px)) calc(2 * var(--pp-zelle, 2px)); }
 
 /* ═══════════════════════════════════════════════════════════════
    RULES SCREEN
@@ -7497,7 +7257,7 @@ html:not([data-phase-bereit]) .phase-column { visibility: hidden; }
   0%, 49.99% { --tb-puls: 0; }
   50%, 100%  { --tb-puls: 1; }
 }
-.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: var(--pp-kachel-7) 0 0 / 8px 8px; pointer-events: none; animation: textbox-fade-in .2333s steps(6, end); }
+.textbox-overlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; background: var(--pp-kachel-7) 0 0 / calc(4 * var(--tb-dz, 2px)) calc(4 * var(--tb-dz, 2px)); pointer-events: none; animation: textbox-fade-in .2333s steps(6, end); }
 /* Pulstakt nur, solange Highlights stehen (Klasse vom TextBox-Render): eine dauernd animierte, vererbte Eigenschaft rechnet sonst JEDES Bild den Stil
    der ganzen Overlay-Ebene neu — auf schwachen Handys fast die halbe Rechenzeit im Tutorial (Kontrolllauf). */
 .textbox-overlay.textbox-puls { animation: textbox-fade-in .2333s linear, textbox-puls-takt 1.4s steps(1, end) infinite; }
@@ -7747,8 +7507,8 @@ body:has(.textbox-overlay) .tooltip { z-index: 90003 !important; }
 /* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
    ein paar Prozent Groesse und ein atmender Schein — beides aus dem
    gemeinsamen Takt `--tb-puls` des Overlays, also immer synchron. */
-.textbox-highlight-pulse { animation: none; box-shadow: 0 0 0 calc(4px + 2px * var(--tb-puls)) #1aedff,
-    0 0 0 calc(8px + 2px * var(--tb-puls)) #59606e; }
+.textbox-highlight-pulse { animation: none; box-shadow: 0 0 0 calc(var(--tb-dz, 2px) * (1 + var(--tb-puls))) #1aedff,
+    0 0 0 calc(var(--tb-dz, 2px) * (2 + var(--tb-puls))) #59606e; }
 /* ── Responsive ── */
 @media (max-height: 500px) {
   .textbox-overlay { padding-top: 6px; }
@@ -10116,11 +9876,6 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
      zur Laufzeit ein Stylesheet NACH dieses ein und setzt `.buff-icon`
      wieder auf einen Stufenpuls — gleiche Spezifitaet, spaeter, gewinnt. */
   html .buff-icon, html .hero-charmed { animation: none !important; }
-  .foil-sparkle, .foil-band { display: none; }
-  .foil-iridescent, .foil-iridescent-diamond,
-  .foil-iridescent::before, .foil-iridescent-diamond::before { animation: none; will-change: auto; }
-  .foil-rahmen i { animation: none; will-change: auto; }
-  .foil-rahmen i:nth-child(1) { opacity: 1; }
 
   /* ── BATTLE-LITE, ZWEITE RUNDE (v1258, Als Befunde 19.9.) ────────
      a) „Das Scrollen durch die Deck-Galerie ist immer noch etwas
@@ -11432,53 +11187,10 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   .anim-assassin-veil, .anim-assassin-moon, .anim-assassin-flash, .anim-assassin-after, .anim-assassin-spark { animation-duration: 1ms; }
 }
 
-/* ═══ v1298 — LEICHTE FOIL-SCHICHT IN KLEINANSICHTEN (Pile, Galerien) ═══
-   Als Befund 23.9.: grosse Piles mit vielen Foil-Karten ruckeln. Alles,
-   was hier stillgelegt wird, musste der Browser jeden Frame neu MALEN:
-   `background-position` des Schimmers, `filter: drop-shadow` der Funken,
-   Weichzeichner und Multiply-Rillen im Band, `box-shadow` am Rahmen.
-   Uebrig bleibt, was der Compositor allein verschiebt (transform,
-   opacity). Die Anzahl der Baender/Funken senkt `CardFoil` selbst
-   (FoilKleinContext, app-shared). */
-@keyframes foilShimmerKlein {
-  0%, 100% { opacity: .10; }
-  25% { opacity: .25; }
-  50% { opacity: .12; }
-  75% { opacity: .28; }
-}
-@keyframes foilDiamondShimmerKlein {
-  0%, 100% { opacity: .30; }
-  25% { opacity: .55; }
-  50% { opacity: .34; }
-  75% { opacity: .62; }
-}
-.foil-klein .foil-iridescent { animation-name: foilShimmerKlein; }
-.foil-klein .foil-iridescent-diamond { animation-name: foilDiamondShimmerKlein; }
-.foil-klein .foil-band { will-change: auto; }
-.foil-klein .foil-band::after { display: none; }
-.foil-klein .foil-band::before { filter: none; }
-.foil-klein .foil-sparkle { animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); box-shadow: none; }
-/* v1403: die Kleinansicht wandert weiterhin nicht, sie pulsiert nur. */
-.foil-klein .foil-iridescent::before, .foil-klein .foil-iridescent-diamond::before { animation: none; will-change: auto; }
-/* Rahmen: fester Schein statt pulsierendem `box-shadow` (Malarbeit je
-   Karte und Frame). Farbe bleibt die der Seltenheit. */
-.card-mini.foil-ruhig.foil-secret-rare { animation: none !important; border-color: #72541d !important; box-shadow: 0 0 0 1px #59606e !important; }
-.card-mini.foil-ruhig.foil-diamond-rare { animation: none !important; border-color: #07aec5 !important; box-shadow: 0 0 0 1px #1a4128 !important; }
-
 /* v1300: Puzzle-Editor-Stapel — Huelle um die CardMini (Ziehen/Entfernen).
    Das Zeichnen nur im Ausschnitt uebernimmt `.deck-viewer-grid > *`. */
 .pz-pile-card { cursor: grab; }
 .pz-pile-card:active { cursor: grabbing; }
-
-/* v1299: waehrend ein grosser Karten-Dialog offen ist (HintergrundPause,
-   app-shared), stehen die Endlos-Animationen DAHINTER still — Foil-
-   Schichten, Leuchtrahmen, Zonen-Glanz. Im Dialog selbst laeuft alles. */
-/* Ausnahme: der grosse Seiten-Tooltip (`.board-tooltip` im Spiel / `.card-tooltip`, Vorschau-Karte der Pile-Ansicht) liegt NICHT im
-   `.modal-overlay`, gehoert aber zum Dialog — sein Foil muss weiterlaufen (Als Befund 3.10.: „eingefroren"). */
-body.pp-dialog-offen .foil-shine-overlay:not(.modal-overlay .foil-shine-overlay):not(.card-tooltip .foil-shine-overlay):not(.board-tooltip .foil-shine-overlay) *,
-body.pp-dialog-offen .foil-rahmen:not(.modal-overlay .foil-rahmen):not(.card-tooltip .foil-rahmen):not(.board-tooltip .foil-rahmen) *,
-body.pp-dialog-offen .foil-secret-rare:not(.modal-overlay *):not(.card-tooltip *):not(.board-tooltip *),
-body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip *):not(.board-tooltip *) { animation-play-state: paused !important; }
 
 /* v1308 — Handkarte wird gezeigt (`hand_card_present`) */
 .hand-present-fly { position: fixed; z-index: 10160; pointer-events: none; border-radius: 0; overflow: visible; box-shadow: 0 0 0 2px #fad54a; transition: transform 460ms steps(11, end), opacity 460ms steps(11, end); transform-origin: center center; }
@@ -11518,10 +11230,10 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
    `FIZZLE_ANZEIGE_MS` (app-board.jsx) ueber `--fizzle-ms`. */
 .card-reveal-entry.card-reveal-fizzled-weg { animation: cardRevealFizzleAnim var(--fizzle-ms, 1400ms) ease-in-out forwards; }
 @keyframes cardRevealFizzleAnim {
-  0%   { transform: scale(0.8); opacity: 0; }
-  12%  { transform: scale(1); opacity: 1; }
-  72%  { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0; }
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -13194,21 +12906,6 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 @keyframes skinHoloNameRb { 0% { transform: translateX(0); } 100% { transform: translateX(-66.667%); } }
 /* Namensglanz: Streifenmuster wie oben (Kachel 0,8 Namensbreiten, ein Band kreuzt jeden Punkt alle 1,5 s). */
 .skin-holo-name .sh-gl { --kachel: .8; --takt: 1.5s; background-image: linear-gradient(90deg, transparent 0% 35%, #ffffff 35% 65%, transparent 65% 100%); }
-/* Diamond Rare: tuerkis statt gold (der Name selbst ist es schon, `C.diamond`). */
-.foil-name-diamond .skin-holo-name .sh-rb { background: linear-gradient(100deg, #6be9fa 0% 25%, #bddcef 25% 36%, #6be9fa 36% 48.67%, #ffffff 48.67% 55.33%, #6be9fa 55.33% 68.67%, #bddcef 68.67% 76%, #6be9fa 76% 100%); }
-.foil-name-diamond .skin-holo-name .sh-gl { background-image: linear-gradient(90deg, transparent 0% 30%, #e5edfa 30% 70%, transparent 70% 100%); }
-
-/* Textglanz (Als Vorgabe 12.10.): auch ALLER uebrige Text der Super-/Diamond-Rare-Karten (Faehigkeitsfelder, Werte, Regeltext)
-   glaenzt, nicht nur der Name. Dieselbe Schicht wie der Name (`.skin-holo-name`), nur mit der Maske der ganzen Karte
-   (`--sh-text`, card-render.js `textLayer`) statt des Namensstreifens, nur in Grossansichten (FoilName). Der Grundton liegt
-   kaum merklich auf dem Text (der Regeltext ist lang und muss weiss und lesbar bleiben; bei .3 faerbte er ihn dauerhaft gold), und der Glanz ist farbig statt weiss — der Text
-   selbst ist weiss, ein weisses Band waere darauf unsichtbar. Das Band ist schmal (ein Fuenftel der Kachel), damit immer nur
-   ein Streifen Text glaenzt; es kreuzt jeden Punkt alle 3,6 s. */
-.skin-holo-name.skin-holo-text { top: 0; height: 100%; -webkit-mask-image: var(--sh-text); mask-image: var(--sh-text); }
-.skin-holo-name.skin-holo-text .sh-rb { opacity: .12; }
-.skin-holo-name.skin-holo-text .sh-gl { --kachel: 1.4; --takt: 3.6s; background-image: linear-gradient(90deg, transparent 0% 46%, #fff196 46% 54%, transparent 54% 100%); }
-.foil-name-diamond .skin-holo-name.skin-holo-text .sh-gl { background-image: linear-gradient(90deg, transparent 0% 46%, #6be9fa 46% 54%, transparent 54% 100%); }
-
 /* Rahmenglanz: Gold-, Silber- und Diamant-Rahmen glaenzen in ihrer Farbe. Ein Lichtband laeuft ueber die Karte und
    leuchtet nur auf dem Rahmen auf (Maske = Form des Rahmens, halbe Kartengroesse). */
 .foil-rim-gold    { --rim-rgb: 255, 224, 110; --rim-hi: 255, 248, 205; }
@@ -13508,17 +13205,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 }
 @media (prefers-reduced-motion: reduce) { .skin-holo-rim u { animation: none; background-image: none; } }
 
-/* ═══ Name, Stufe und Kosten der Super-/Diamond-Rares tragen die Schraffur des Bildes (Al, 23.10.) ═══
-   Dieselbe Schicht wie `.skin-holo-hatch` auf der Kunst: dünne Schrägstriche (118°, gleiche Breiten in cqw) mit wanderndem Pastell-Regenbogen
-   (gleiche Farben, gleiche 14 s, gleiche Phase → läuft im Gleichtakt mit dem Bild). Sie liegt in `.skin-holo-name`, ist also auf Name,
-   Stufenzahl, Artifact-Kosten und Stempel zugeschnitten; der Regeltext (`.skin-holo-text`) bekommt sie nicht. */
-.skin-holo-name .sh-ht { position: absolute; inset: 0; overflow: hidden; opacity: .6; -webkit-mask-image: repeating-linear-gradient(118deg, #000000 0, #000000 .24cqw, transparent .34cqw, transparent .78cqw); mask-image: repeating-linear-gradient(118deg, #000000 0, #000000 .24cqw, transparent .34cqw, transparent .78cqw); }
-.skin-holo-name .sh-ht i { position: absolute; top: 0; bottom: 0; left: 0; width: 300%; background: linear-gradient(112deg, #f174ab 0% 0%, #f9b3b3 0% 4.8%, #e0c085 4.8% 12%, #fff196 12% 17.8%, #f7f7ad 17.8% 25%, #6be9fa 25% 32.2%, #bddcef 32.2% 34%, #66b6ff 34% 38.8%, #d6bbf1 38.8% 53.2%, #f174ab 53.2% 58%, #f9b3b3 58% 62.8%, #e0c085 62.8% 70.5%, #fff196 70.5% 76.6%, #f7f7ad 76.6% 83%, #6be9fa 83% 90.2%, #bddcef 90.2% 92%, #66b6ff 92% 96.8%, #d6bbf1 96.8% 100%); animation: skinHoloHatch 14s steps(24, end) infinite; animation-delay: var(--sh-phase, 0s); will-change: transform; }
-.skin-holo-name.skin-holo-text .sh-ht { display: none; }
-@container (max-width: 299px) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
-@media (pointer: coarse) { .skin-holo-name .sh-ht i { animation: none; will-change: auto; } }
-@media (pointer: coarse) and (max-height: 600px) { .skin-holo-name .sh-ht { display: none; } }
-
 /* ═══ Markierungen der Handkarten sitzen auf der KARTE, nicht am Platz (Al, 24.10.) ═══
    `.hand-slot` wird nicht geneigt — nur die Karte darin (`--hand-tilt`, Fächer). Ein Rahmen oder Schein am Platz (Ability anlegen: `.hand-card-attach-eligible`; Pflicht-Auswahl:
    `.hand-pick-eligible-urgent`) stand deshalb als gerades Rechteck neben der gekippten Karte. Jetzt zeichnet die Karte selbst den Rahmen und kippt mit; statt
@@ -13643,13 +13329,17 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* Vier gehaltene Stufen (wie `steps(4)`), Größe/Versatz je Stufe rechnet `ppFx44Stufen` (app-fx-44, im Raster der Kunstpixel) vor und legt sie als --tbs1..3 / --tbt1..3 inline ab. Die Schlüsselbilder wechseln nur
    die Hilfsvariablen --tbs/--tbt (Wirkung: `scale`/`translate` der Hülle bzw. der Phasenleiste) — der Pixel-Backer lässt sie in Ruhe und backt nichts zur Laufzeit. */
 @property --tbs { syntax: '*'; inherits: false; }
+@property --tbx { syntax: '*'; inherits: false; }
 @property --tbt { syntax: '*'; inherits: false; }
+/* Handkarte: Stufe 4 = Endzustand. `ppFx44HandStufen` (app-fx-44) rechnet vor: `--tbs1..4` = `zoom` der Hülle (die Karte wird im Layout vergrößert und in Zielgröße gezeichnet, nicht als fertige Ebene gestreckt),
+   `--tbx0..4`/`--tbt0..4` = Lage (Versatz vor dem Zoom) — jede Stufe besteht aus GANZEN Kartenpixeln auf ganzen Bildschirmpixeln (Karte = 75 x 105 Kartenpixel, aufrecht). Ohne die Inline-Werte (Rückfall)
+   gilt wie früher `scale` 1 → 1,5. */
 @keyframes tbHandGross {
-  0%   { --tbs: 1; --tbt: 0px; animation-timing-function: steps(1, end); }
-  25%  { --tbs: var(--tbs1, 1.125); --tbt: var(--tbt1, 0px); animation-timing-function: steps(1, end); }
-  50%  { --tbs: var(--tbs2, 1.25); --tbt: var(--tbt2, 0px); animation-timing-function: steps(1, end); }
-  75%  { --tbs: var(--tbs3, 1.375); --tbt: var(--tbt3, 0px); animation-timing-function: steps(1, end); }
-  100% { --tbs: 1.5; --tbt: var(--tb-hoch, 0px); }
+  0%   { --tbs: 1; --tbx: var(--tbx0, 0px); --tbt: var(--tbt0, 0px); animation-timing-function: steps(1, end); }
+  25%  { --tbs: var(--tbs1, 1.125); --tbx: var(--tbx1, 0px); --tbt: var(--tbt1, 0px); animation-timing-function: steps(1, end); }
+  50%  { --tbs: var(--tbs2, 1.25); --tbx: var(--tbx2, 0px); --tbt: var(--tbt2, 0px); animation-timing-function: steps(1, end); }
+  75%  { --tbs: var(--tbs3, 1.375); --tbx: var(--tbx3, 0px); --tbt: var(--tbt3, 0px); animation-timing-function: steps(1, end); }
+  100% { --tbs: var(--tbs4, 1.5); --tbx: var(--tbx4, 0px); --tbt: var(--tbt4, var(--tb-hoch, 0px)); }
 }
 
 /* Gehighlightete Phasenleiste (Desktop): ~50 % groesser fuer die Dauer des Highlights, gestuft statt stufenlos. */
@@ -13671,25 +13361,39 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
                          Filter, kleiner Pull-Knopf), darunter das Raster.
    Pixelart: harte Ringe aus gestapelten box-shadows, keine Unschaerfe, Bewegung
    in ganzen Pixeln mit steps(). */
-.shop-gacha { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; max-width: 900px; margin: 8px auto 18px; padding: 14px 18px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 8px 9px 0 0 #08060c; }
-.shop-gacha-machine { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding-right: 22px; border-right: 3px solid var(--bg4); }
-.shop-gacha-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 2px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
-.shop-gacha-capsule { width: 84px; height: 84px; margin: 10px 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display), sans-serif; font-size: 46px; color: #fad54a; text-shadow: 3px 3px 0 #000000; background: var(--bg3); box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 6px #fad54a, 0 0 0 9px var(--pp-kontur), 6px 7px 0 9px #08060c; }
-}
-.shop-gacha-btn { width: 100%; justify-content: center; }
-.shop-gacha-hint { font-size: 11px; color: var(--text2); }
-.shop-gacha-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.shop-gacha-preview-title { font-family: var(--font-display), sans-serif; font-size: 14px; letter-spacing: 2px; color: var(--text); text-shadow: 2px 2px 0 #000000; }
-.shop-gacha-rule { font-size: 11px; line-height: 1.5; color: var(--text2); margin-bottom: 4px; }
-.shop-pull-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 8px 8px 12px; }
-.shop-pull-tile { cursor: default; }
-.shop-pull-tile .shop-item-name { padding-bottom: 0; }
+.shop-gacha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; max-width: 900px; margin: 4px auto 8px; padding: 6px 14px; box-sizing: border-box; background: var(--bg2); border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 70%, #000000); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px color-mix(in srgb, var(--player-color, var(--accent)) 50%, #000000), 0 0 0 6px var(--pp-kontur), 6px 7px 0 0 #08060c; }
+.shop-gacha-title { font-family: var(--font-display), sans-serif; font-size: 15px; letter-spacing: 2px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+.shop-gacha-btn { flex: 0 0 auto; width: auto; justify-content: center; padding: 6px 22px; }
+.shop-gacha-hint { flex: 1 1 220px; min-width: 0; font-size: 11px; line-height: 1.4; color: var(--text2); }
 
 /* Kopfzeile der Sammlung — klebt oben, das Raster scrollt dahinter. */
-.shop-coll-head { position: sticky; top: -16px; z-index: 10; margin: 0 -16px 18px; padding: 12px 16px; background: var(--bg); border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e); box-shadow: 0 2px 0 0 var(--pp-kontur); }
+.shop-coll-head { position: sticky; top: -16px; z-index: 10; margin: 0 -16px 18px; padding: 8px 16px; background: var(--bg); border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e); box-shadow: 0 2px 0 0 var(--pp-kontur); }
 .shop-coll-head-in { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; max-width: 900px; margin: 0 auto; }
 .shop-coll-title { font-family: var(--font-display), sans-serif; font-size: 15px; letter-spacing: 2px; color: var(--text); text-shadow: 2px 2px 0 #000000; }
-.shop-coll-count { font-family: var(--font-display), sans-serif; font-size: 15px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+.shop-coll-count { position: relative; font-family: var(--font-display), sans-serif; font-size: 15px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+/* „+1!“ nach dem Pull: der Zähler blinkt in ganzen Schritten, ein kleines +1! steigt in Pixelsprüngen auf und verschwindet blinkend */
+.shop-coll-count-bump { display: inline-block; animation: shop-count-bump .72s steps(1, end) both; }
+@keyframes shop-count-bump {
+  0%   { color: #ffffff; transform: translateY(-4px); }
+  16%  { color: #fad54a; transform: translateY(0); }
+  32%  { color: #ffffff; transform: translateY(-4px); }
+  48%  { color: #fad54a; transform: translateY(0); }
+  64%  { color: #ffffff; transform: translateY(-2px); }
+  80%  { color: #fad54a; transform: translateY(0); }
+}
+.shop-coll-plus { position: absolute; left: 100%; top: -2px; margin-left: 8px; white-space: nowrap; font-size: 15px; color: #4ceb70; text-shadow: 2px 0 0 #000000, -2px 0 0 #000000; pointer-events: none; animation: shop-plus-rise 1.3s steps(1, end) both; }
+@keyframes shop-plus-rise {
+  0%   { transform: translateY(6px); }
+  12%  { transform: translateY(0); }
+  24%  { transform: translateY(-6px); }
+  36%  { transform: translateY(-12px); }
+  48%  { transform: translateY(-12px); visibility: hidden; }
+  54%  { transform: translateY(-12px); visibility: visible; }
+  66%  { transform: translateY(-14px); visibility: hidden; }
+  72%  { transform: translateY(-14px); visibility: visible; }
+  84%  { transform: translateY(-16px); visibility: hidden; }
+  100% { transform: translateY(-16px); visibility: hidden; }
+}
 .shop-coll-bar { flex: 1 1 140px; min-width: 120px; height: 14px; background: var(--bg3); box-shadow: 0 0 0 2px var(--pp-kontur), 0 0 0 4px var(--bg4); }
 .shop-coll-bar > span { display: block; height: 100%; background: repeating-linear-gradient(90deg, #fad54a 0 6px, #a87c00 6px 8px); }
 .shop-coll-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
@@ -13703,11 +13407,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .shop-coll-search::placeholder { color: var(--text2); }
 .shop-item.shop-missing { cursor: default; }
 
-@media (max-width: 760px) {
-  .shop-gacha { grid-template-columns: 1fr; gap: 16px; }
-  .shop-gacha-machine { padding-right: 0; border-right: 0; padding-bottom: 16px; border-bottom: 3px solid var(--bg4); }
-  .shop-pull-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 /* Angepinnt: Pull-Bereich + Kopfzeile der Sammlung bleiben stehen, NUR die Sammlung scrollt.
    Auf kleinen Fenstern (zu wenig Platz) bleibt es beim einfachen Scrollen der ganzen Seite. */
@@ -13720,10 +13419,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .shop-gacha-pinned .shop-coll-head { position: static; margin-bottom: 0; }
   .shop-coll-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 16px 16px 30px; }
 }
-@media (max-height: 820px) {
-  .shop-pull-strip { grid-template-columns: repeat(4, minmax(0, 96px)); justify-content: start; padding-bottom: 6px; }
-  .shop-gacha-capsule { width: 56px; height: 56px; font-size: 30px; margin: 4px 0; box-shadow: 0 0 0 3px var(--pp-kontur), 0 0 0 5px #fad54a, 0 0 0 8px var(--pp-kontur); }
-  .shop-gacha-machine { gap: 8px; }
 }
 
 /* ═══ SHOP: KAUF-FANFARE (Boards, Structure Decks) ════════════════════
@@ -13849,9 +13544,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   75%  { opacity: 1; }
 }
 
-/* Das Fragezeichen der Kapsel ist ein Pixel-Sprite (5×7 Pixel, ganzzahlig vergrößert) und sitzt dadurch exakt mittig. */
-.shop-gacha-q { width: 35px; height: 49px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='7' viewBox='0 0 5 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fad54a' d='M1 0h3v1h-3zM0 1h1v1h-1zM4 1h1v1h-1zM4 2h1v1h-1zM3 3h1v1h-1zM2 4h1v1h-1zM2 6h1v1h-1z'/%3E%3C/svg%3E") center / 100% 100% no-repeat; image-rendering: pixelated; }
-@media (max-height: 820px) { .shop-gacha-q { width: 25px; height: 35px; } }
 
 /* ═══ SHOP: SAMMLUNG OHNE DAUER-ANIMATIONEN (Performance) ══════════════
    Bis hier lief auf JEDER Kachel der Sammlung ein Satz Endlosanimationen (Puls des Rings, Regenbogen-Ecken,
@@ -13896,6 +13588,212 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 /* Rang-Aufstieg im Pull-Reveal: Zellen-Scan zwischen altem und neuem Rahmen (Canvas, ganze Pixelzellen) */
 .pull-fx-swap { display: block; width: 100%; aspect-ratio: 5 / 7; object-fit: cover; image-rendering: pixelated; }
 .pull-fx-swap.pull-fx-swap-sq { aspect-ratio: 1; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOSTERPACKS (public/app-booster.jsx): Shop-Reiter, Vollbild-Öffnung, Aufdecken. Präfix .bp-
+   Nur Pixelart: harte Ringe aus gestapelten box-shadows, Palettenfarben, ganzzahlige Größen, keine Verläufe/Schlagschatten mit Unschärfe.
+   Die Packbilder, die Bühne und alle Effekte sind Leinwände (image-rendering: pixelated).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.bp-shop { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 0 0 24px; container-type: inline-size; }
+.bp-grid { display: grid; grid-template-columns: repeat(3, 224px); gap: 28px 22px; justify-content: center; }
+@media (max-width: 800px) { .bp-grid { grid-template-columns: repeat(2, 224px); } }
+@media (max-width: 520px) { .bp-grid { grid-template-columns: 224px; } }
+.bp-tile { position: relative; width: 224px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 14px 14px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #3e3e51, 0 0 0 6px #08060c; }
+.bp-tile:hover { box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, 0 0 0 6px #08060c; }
+.bp-pack-wrap { position: relative; line-height: 0; }
+.bp-pack-cv { display: block; image-rendering: pixelated; }
+.bp-pack-theme { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; line-height: 1; font-family: var(--font-display), sans-serif; font-size: 10px; letter-spacing: 1px; color: #f7f7ad; background: #08060c; padding: 3px 0; }
+.bp-name { font-family: var(--font-display), sans-serif; font-size: 16px; color: #ffffff; text-shadow: 2px 2px 0 #000000; text-align: center; }
+.bp-tagline { font-size: 11px; color: #9aa3b6; text-align: center; min-height: 28px; }
+.bp-buy { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 13px; border-color: #fad54a; color: #fad54a; }
+.bp-buy:disabled { border-color: #3e3e51; color: #7e7d9b; }
+
+/* Vollbild-Öffnung */
+.bp-open { position: fixed; inset: 0; z-index: 90000; background: #08060c; overflow: hidden; user-select: none; }
+.bp-world, .bp-fx { position: absolute; left: 0; top: 0; }
+.bp-world { right: 0; bottom: 0; }
+.bp-fx { pointer-events: none; image-rendering: pixelated; z-index: 3; }
+.bp-stage { position: absolute; image-rendering: pixelated; display: block; }
+.bp-msg { position: absolute; left: 0; right: 0; top: 50%; text-align: center; font-family: var(--font-display), sans-serif; font-size: 16px; letter-spacing: 2px; color: #f7f7ad; z-index: 4; }
+.bp-msg-err { color: #fe5154; }
+.bp-skip { position: absolute; right: 18px; bottom: 18px; z-index: 6; font-size: 12px; letter-spacing: 1px; }
+
+/* Karten im Pack: verdeckt = unsichtbare Klickfläche über der eingebackenen Kartenrückseite */
+.bp-card { position: absolute; z-index: 2; cursor: pointer; box-sizing: border-box; }
+.bp-card-shut:hover, .bp-card-shut:focus-visible { outline: none; box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #08060c, 0 0 0 6px #72541d; }
+.bp-card-open { cursor: default; }
+.bp-card-ground { position: absolute; inset: 0; background: #08060c; }
+.bp-card-back, .bp-card-face { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bp-card-back { image-rendering: pixelated; }
+.bp-card-face { overflow: hidden; background: #08060c; }
+.bp-card-face img { display: block; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+.bp-card-flip { z-index: 4; }
+.bp-card-flipcv { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
+.bp-card-done.bp-card-hot { z-index: 5; }
+
+.bp-hud { position: absolute; z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.bp-hud > * { pointer-events: auto; }
+.bp-hud-tight { right: 10px; bottom: 10px; align-items: flex-end; }
+.bp-hud-tight .bp-btn, .bp-hud-tight .bp-btn-go { font-size: 11px; letter-spacing: 1px; padding: 6px 10px; max-width: 250px; white-space: normal; line-height: 1.3; }
+.bp-btn { font-size: 13px; letter-spacing: 2px; padding: 8px 20px; border-color: #fad54a; color: #fad54a; background: #12101f; }
+.bp-btn:disabled { border-color: #3e3e51; color: #7e7d9b; }
+.bp-btn-go { color: #fad54a; border-color: #fad54a; font-size: 15px; padding: 10px 24px; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; animation: bpGoBlink 1s steps(1) infinite; }
+.bp-btn-go:disabled { animation: none; color: #7e7d9b; box-shadow: none; }
+@keyframes bpGoBlink { 0% { color: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, 0 0 0 6px #08060c; } 50% { color: #ffffff; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; } }
+.bp-hint { font-size: 11px; color: #9aa3b6; letter-spacing: 1px; }
+.bp-tooltip { position: fixed; right: 0; top: 41px; width: 400px; height: calc(100vh - 41px); display: flex; flex-direction: column; overflow: hidden; z-index: 8; }
+@media (max-width: 760px) { .bp-tooltip { display: none; } }
+
+/* Filter-Reiter „OPPONENTS“ der Avatare/Sleeves: Kopfzeile statt der angehefteten Leiste */
+.shop-random-wrap.shop-cpu-embedded { position: static; top: auto; z-index: auto; margin: 4px 0 14px; padding: 10px 16px; background: #12101f; border: 0; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
+@media (max-height: 600px) { .bp-tooltip { display: none; } }
+
+/* ── Auslage (Showcase) rechts neben den Packs; schmal: über den Packs ── */
+.bp-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; justify-items: center; width: 100%; }
+.bp-layout-aside { width: 100%; max-width: 380px; }
+/* Mittlere Breite: Packs und Auslage nebeneinander (Auslage rechts, oben bündig) */
+@container (min-width: 1120px) and (max-width: 1479px) {
+  .bp-layout { grid-template-columns: auto auto; column-gap: 26px; align-items: start; justify-content: center; }
+  .bp-grid { grid-column: 1; grid-row: 1; }
+  .bp-layout-aside { grid-column: 2; grid-row: 1; justify-self: start; width: clamp(260px, calc(var(--scw) * 3 + 94px), 380px); position: sticky; top: 8px; }
+  .bp-layout-aside .bp-showcase { width: 100%; }
+}
+@container (min-width: 1480px) {
+  .bp-layout { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 30px; align-items: start; }
+  .bp-grid { grid-column: 2; grid-row: 1; }
+  .bp-layout-aside { grid-column: 3; grid-row: 1; justify-self: start; max-width: min(350px, 100%); }
+}
+/* Die Auslage haftet beim Scrollen der Packs oben (breites Layout) und passt immer ganz in die Höhe: die Kartenbreite (--scw) folgt der Fensterhöhe
+   (--vh = 1 % der Fensterhöhe in Layout-Pixeln unter dem UI-Zoom; 170px = Kopf- und Reiterleiste, 284px = Kopf, Namenszeilen, Knopfzeilen, Abstände). */
+@container (min-width: 1480px) { .bp-layout-aside { position: sticky; top: 8px; } }
+.bp-layout-aside { --scw: clamp(40px, calc((100 * var(--vh, 1vh) - 170px / var(--ui-scale, 1) - 284px) * 5 / 21), 150px); }
+.bp-showcase { box-sizing: border-box; width: min(100%, calc(var(--scw) * 3 + 94px)); margin: 0 auto; padding: 12px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d, 0 0 0 6px #08060c; }
+.bp-sc-head { text-align: center; margin-bottom: 8px; }
+.bp-sc-title { font-family: var(--font-display), sans-serif; font-size: 18px; letter-spacing: 3px; color: #fad54a; text-shadow: 2px 2px 0 #000000; }
+.bp-sc-sub { display: none; }
+.bp-sc-clock { display: inline-block; margin-top: 6px; padding: 4px 10px; font-size: 12px; color: #9aa3b6; background: #08060c; box-shadow: 0 0 0 2px #3e3e51; }
+.bp-sc-clock b { color: #f7f7ad; font-family: var(--font-display), sans-serif; letter-spacing: 1px; }
+.bp-sc-empty { text-align: center; padding: 30px 0; color: #7e7d9b; font-size: 12px; }
+.bp-sc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 8px; }
+.bp-sc-cell { --rc: #3e3e51; position: relative; display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 6px; min-width: 0; background: #08060c; box-shadow: 0 0 0 2px var(--rc); }
+.bp-sc-r-uncommon { --rc: #9aa3b6; }
+.bp-sc-r-rare { --rc: #6be9fa; }
+.bp-sc-r-prismatic { --rc: #ba74ff; }
+.bp-sc-r-super { --rc: #fad54a; }
+.bp-sc-r-storm { --rc: #6be9fa; }
+.bp-sc-r-spectral { --rc: #ba74ff; }
+.bp-sc-r-umbra { --rc: #903ae6; }
+.bp-sc-r-stained { --rc: #fb1ea9; }
+.bp-sc-face { position: relative; width: 100%; aspect-ratio: 5 / 7; overflow: hidden; background: #12101f; }
+.bp-sc-face img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.bp-sc-name { font-size: 9px; line-height: 1.2; color: var(--rc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.bp-sc-r-umbra .bp-sc-name { color: #ba74ff; }
+.bp-sc-own { color: #9aa3b6; }
+.bp-sc-r-uncommon { --rc: #d2d2db; }
+.bp-sc-buyrow { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: 2px; }
+.bp-sc-price { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-display), sans-serif; font-size: 12px; color: #fad54a; white-space: nowrap; }
+.bp-sc-price b { font-weight: 400; }
+.bp-sc-old { color: #7e7d9b; font-size: 10px; text-decoration-thickness: 2px; }
+.bp-coin { width: 14px; height: 14px; image-rendering: pixelated; vertical-align: middle; }
+.bp-sc-buy { padding: 3px 7px; font-size: 10px; letter-spacing: 1px; border-color: #fad54a; color: #fad54a; }
+.bp-sc-buy:disabled { border-color: #3e3e51; color: #7e7d9b; }
+.bp-sc-cell .bp-sc-buy.bp-sc-added, .bp-sc-cell .bp-sc-buy.bp-sc-added:disabled { border-color: #4ceb70; color: #4ceb70; letter-spacing: 0; padding-left: 3px; padding-right: 3px; animation: bpAddedBlink .5s steps(1) infinite; }
+@keyframes bpAddedBlink { 0% { color: #4ceb70; border-color: #4ceb70; } 50% { color: #ffffff; border-color: #ffffff; } }
+.bp-sc-special { --rc: #ee6428; animation: bpSpecialRing 1s steps(1) infinite; }
+@keyframes bpSpecialRing { 0% { box-shadow: 0 0 0 2px #ee6428, 0 0 0 4px #08060c, 0 0 0 6px #fad54a; } 50% { box-shadow: 0 0 0 2px #fad54a, 0 0 0 4px #08060c, 0 0 0 6px #ee6428; } }
+.bp-sc-flagrow { position: absolute; z-index: 3; left: 0; right: 0; top: -19px; display: flex; justify-content: center; pointer-events: none; }
+.bp-sc-flag { padding: 4px 8px 3px; font-family: var(--font-display), sans-serif; font-size: 12px; letter-spacing: 1px; white-space: nowrap; color: #08060c; background: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #ee6428, inset 0 -3px 0 0 #ee6428; animation: bpFlagBlink .8s steps(1) infinite; }
+@keyframes bpFlagBlink { 0% { background: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #ee6428, inset 0 -3px 0 0 #ee6428; } 50% { background: #ffffff; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, inset 0 -3px 0 0 #fad54a; } }
+.bp-sc-special .bp-sc-name { color: #fad54a; }
+.bp-sc-cell.bp-sc-got { --rc: #3e3e51; animation: none; }
+.bp-sc-got .bp-sc-face, .bp-sc-got .bp-sc-name, .bp-sc-got .bp-sc-price { filter: grayscale(1) brightness(.55); }
+.bp-sc-dim { position: absolute; left: 5px; right: 5px; top: 5px; aspect-ratio: 5 / 7; z-index: 2; pointer-events: none; image-rendering: pixelated; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2308060c'/%3E%3C/svg%3E"); background-size: 4px 4px; }
+.bp-sc-got .bp-sc-buy:disabled { border-color: #3e3e51; color: #7e7d9b; }
+
+/* Tooltip der Auslage: links (über Shopkeeper und Sprechblase, .shop-antonia hat z-index 500) */
+.bp-shop-tip { position: fixed; left: 24px; top: calc(96px / var(--ui-scale, 1)); box-sizing: content-box; z-index: 600; pointer-events: none; background: #08060c; box-shadow: 0 0 0 2px #08060c, 0 0 0 6px #fad54a, 0 0 0 8px #08060c; }
+.bp-shop-tip .bp-sc-face { width: 100%; height: 100%; aspect-ratio: auto; }
+.bp-shop-tip .bp-sc-face img { image-rendering: pixelated; }
+@media (max-width: 760px) { .bp-shop-tip { display: none; } }
+
+/* Sell Back! unter jeder aufgedeckten Karte (sitzt auf deren Unterkante), SC-Anzeige, Add-and-rip-Knopf */
+.bp-card { --bh: max(22px, calc(var(--bpz, 2) * 12px)); --bpx: calc(var(--bpz, 2) * 1px); }
+.bp-sell { position: absolute; z-index: 6; left: calc(var(--bpz, 2) * 2px); right: calc(var(--bpz, 2) * 2px); bottom: calc(var(--bh) / -2); height: var(--bh); box-sizing: border-box; padding: 0 calc(var(--bpz, 2) * 2px); display: flex; align-items: center; justify-content: center; gap: calc(var(--bpz, 2) * 2px); font-family: var(--font-display), sans-serif; font-size: max(11px, calc(var(--bpz, 2) * 6px)); letter-spacing: 0; line-height: 1; white-space: nowrap; cursor: pointer; border: 0; border-radius: 0; color: #08060c; background: #fad54a; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #fad54a, 0 0 0 calc(var(--bpx) * 3) #08060c, inset 0 calc(var(--bpx) * 2) 0 #f7f7ad, inset 0 calc(var(--bpx) * -2) 0 #72541d; }
+.bp-sell .bp-coin { width: calc(var(--bpz, 2) * 7px); height: calc(var(--bpz, 2) * 7px); flex: none; }
+.bp-sell:hover:not(:disabled), .bp-sell:focus-visible:not(:disabled) { background: #4ceb70; outline: none; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #4ceb70, 0 0 0 calc(var(--bpx) * 3) #08060c, inset 0 calc(var(--bpx) * 2) 0 #ffffff, inset 0 calc(var(--bpx) * -2) 0 #1a4128; }
+.bp-sell:active:not(:disabled) { transform: translateY(var(--bpx)); }
+.bp-sell:disabled { cursor: default; color: #7e7d9b; background: #12101f; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #3e3e51, 0 0 0 calc(var(--bpx) * 3) #08060c; }
+.bp-sell:disabled .bp-coin { opacity: 1; filter: grayscale(1) brightness(.6); }
+.bp-sell-val { display: inline-flex; align-items: center; gap: calc(var(--bpz, 2) * 1px); }
+.bp-sell-sold { color: #e92f38; box-shadow: 0 0 0 var(--bpx) #08060c, 0 0 0 calc(var(--bpx) * 2) #b62600, 0 0 0 calc(var(--bpx) * 3) #08060c; }
+.bp-sold-dim { position: absolute; inset: 0; z-index: 4; pointer-events: none; image-rendering: pixelated; background-color: transparent; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2308060c'/%3E%3Crect x='1' width='1' height='1' fill='%2308060c'/%3E%3C/svg%3E"); background-size: calc(var(--bpz, 2) * 2px) calc(var(--bpz, 2) * 2px); }
+.bp-sold-tag { position: absolute; left: 14%; right: 14%; top: 42%; z-index: 5; pointer-events: none; text-align: center; padding: calc(var(--bpz, 2) * 1.5px) 0; background: #08060c; box-shadow: 0 0 0 2px #e92f38; font-family: var(--font-display), sans-serif; font-size: max(10px, calc(var(--bpz, 2) * 6px)); letter-spacing: 2px; color: #e92f38; }
+.bp-hud-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.bp-hud-tight .bp-hud-row { flex-direction: column; align-items: flex-end; gap: 6px; }
+.bp-hud-tight .bp-btn-more { font-size: 11px; letter-spacing: 1px; padding: 6px 10px; }
+.bp-btn-more { display: inline-flex; align-items: center; gap: 6px; color: #4ceb70; border-color: #4ceb70; font-size: 13px; padding: 10px 18px; }
+.bp-btn-more:disabled { color: #7e7d9b; border-color: #3e3e51; }
+.bp-hint-warn { color: #ff8b1a; }
+.bp-sc { position: absolute; right: 14px; top: 12px; z-index: 7; display: flex; align-items: center; gap: 6px; padding: 5px 12px; font-family: var(--font-display), sans-serif; font-size: 16px; color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; }
+.bp-sc .bp-coin { width: 18px; height: 18px; }
+.bp-sc-hit { animation: bpScHit 1.6s steps(1) 1; }
+@keyframes bpScHit { 0%, 24%, 48%, 72% { color: #ffffff; background: #72541d; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #4ceb70, 0 0 0 6px #08060c; } 12%, 36%, 60%, 84% { color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a, 0 0 0 6px #08060c; } 100% { color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; } }
+.bp-sc-plus { position: absolute; right: calc(100% + 12px); top: 50%; margin-top: -9px; font-size: 20px; line-height: 18px; color: #4ceb70; text-shadow: 2px 2px 0 #08060c; white-space: nowrap; animation: bpScPlus 1.8s steps(6) 1 forwards; }
+@keyframes bpScPlus { 0% { transform: translateY(8px); } 25% { transform: translateY(0); } 85% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+
+/* Boosterpacks: Mengenfeld in der Pack-Kachel (− [n] + MAX), nur Pixelrahmen aus harten Ringen */
+.bp-qty { display: flex; align-items: stretch; justify-content: center; gap: 8px; width: 100%; padding: 2px 0; }
+.bp-qty-btn { box-sizing: border-box; min-width: 28px; height: 30px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display), sans-serif; font-size: 16px; line-height: 1; letter-spacing: 0; color: #fad54a; background: #12101f; border: 0; border-radius: 0; cursor: pointer; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; }
+.bp-qty-btn:hover:not(:disabled), .bp-qty-btn:focus-visible:not(:disabled) { outline: none; color: #08060c; background: #fad54a; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a; }
+.bp-qty-btn:active:not(:disabled) { transform: translateY(2px); }
+.bp-qty-btn:disabled { cursor: default; color: #7e7d9b; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #3e3e51; }
+.bp-qty-max { min-width: 40px; font-size: 10px; letter-spacing: 1px; padding: 0 4px; color: #4ceb70; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #1a4128; }
+.bp-qty-max:hover:not(:disabled), .bp-qty-max:focus-visible:not(:disabled) { background: #4ceb70; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #4ceb70; }
+.bp-qty-in { box-sizing: border-box; width: 46px; height: 30px; padding: 0; margin: 0; text-align: center; font-family: var(--font-display), sans-serif; font-size: 15px; letter-spacing: 0; color: #f7f7ad; background: #08060c; border: 0; border-radius: 0; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a; caret-color: #4ceb70; }
+.bp-qty-in:focus { outline: none; color: #ffffff; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #4ceb70; }
+.bp-qty-in::selection { color: #08060c; background: #4ceb70; }
+.bp-qty-in:disabled { color: #7e7d9b; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #3e3e51; }
+@media (pointer: coarse) {
+  .bp-qty { gap: 6px; }
+  .bp-qty-btn { min-width: 40px; height: 40px; font-size: 20px; }
+  .bp-qty-max { min-width: 44px; font-size: 11px; }
+  .bp-qty-in { width: 48px; height: 40px; font-size: 18px; }
+}
+
+/* Öffnung mit mehreren Packs: Kopfleiste, vertikal scrollbarer Bereich mit den Pack-Blöcken (3×3, untereinander), feste Knopfleiste darunter */
+.bp-mview { position: absolute; inset: 0; display: flex; flex-direction: column; pointer-events: none; animation: bpMvWipe .3s steps(8) 1; }
+@keyframes bpMvWipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+.bp-mview > * { position: relative; pointer-events: auto; }
+.bp-topbar { z-index: 6; flex: none; box-sizing: border-box; height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 190px; background: #12101f; box-shadow: 0 2px 0 0 #3e3e51; }
+.bp-top-title { font-family: var(--font-display), sans-serif; font-size: 16px; letter-spacing: 3px; color: #fad54a; text-shadow: 2px 2px 0 #000000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-top-title span { color: #9aa3b6; letter-spacing: 1px; font-size: 13px; }
+.bp-scroll { z-index: 2; isolation: isolate; flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: #08060c; }
+.bp-scroll:focus-visible { outline: none; }
+.bp-scroll::-webkit-scrollbar { width: 16px; }
+.bp-scroll::-webkit-scrollbar-track { background: #12101f; box-shadow: inset 2px 0 0 0 #3e3e51; }
+.bp-scroll::-webkit-scrollbar-thumb { min-height: 44px; border: 2px solid #08060c; background: #fad54a; box-shadow: inset 2px 2px 0 0 #f7f7ad, inset -2px -2px 0 0 #72541d; }
+.bp-scroll::-webkit-scrollbar-thumb:hover { background: #f7f7ad; }
+.bp-scroll-in { display: flex; flex-direction: column; align-items: center; padding: 12px 0 18px; }
+.bp-pk { position: relative; flex: none; padding-bottom: 18px; margin-bottom: 14px; box-shadow: 0 2px 0 0 #3e3e51; }
+.bp-pk:last-child { margin-bottom: 0; box-shadow: none; }
+.bp-pk-head { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 4px 6px; padding: 0 10px; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #3e3e51; font-family: var(--font-display), sans-serif; font-size: max(11px, calc(var(--bpz, 1) * 4px)); letter-spacing: 2px; color: #fad54a; white-space: nowrap; }
+.bp-pk-sold { display: inline-flex; align-items: center; gap: 4px; letter-spacing: 1px; color: #4ceb70; }
+.bp-pk-sold .bp-coin { width: 12px; height: 12px; }
+.bp-pk-grid { position: relative; }
+.bp-hudbar { z-index: 6; flex: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px 12px; background: #12101f; box-shadow: 0 -2px 0 0 #3e3e51; }
+.bp-hudbar .bp-hud-row { align-items: center; }
+.bp-multi-badge { position: absolute; z-index: 6; left: 0; right: 0; top: 16px; margin: 0 auto; width: max-content; padding: 6px 14px; font-family: var(--font-display), sans-serif; font-size: 16px; letter-spacing: 3px; color: #fad54a; background: #12101f; box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #72541d; }
+@media (max-height: 600px) {
+  .bp-topbar { height: 38px; }
+  .bp-open-multi .bp-sc { top: 5px; padding: 3px 10px; font-size: 14px; }
+  .bp-open-multi .bp-sc .bp-coin { width: 14px; height: 14px; }
+  .bp-top-title { font-size: 13px; }
+  .bp-hudbar { gap: 3px; padding: 6px 10px 8px; }
+  .bp-hudbar .bp-btn, .bp-hudbar .bp-btn-go, .bp-hudbar .bp-btn-more { font-size: 11px; letter-spacing: 1px; padding: 6px 10px; }
+  .bp-hudbar .bp-hud-row { gap: 8px; }
+}
+@supports not selector(::-webkit-scrollbar) { .bp-scroll { scrollbar-color: #fad54a #12101f; } }
 
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */

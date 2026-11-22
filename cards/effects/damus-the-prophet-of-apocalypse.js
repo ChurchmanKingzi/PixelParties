@@ -124,7 +124,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
-    if (!(ps?.hand || []).includes(IFRIT)) return false;
+    if (!engine.handUndVorratListe(pi).includes(IFRIT)) return false;   // 12.11.: Hand + Crestinas Vorrat
     return freieZonen(engine, pi).length > 0;
   },
 
@@ -132,8 +132,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
-    const handIdx = (ps?.hand || []).indexOf(IFRIT);
-    if (handIdx < 0) return false;
+    if (!engine.handUndVorratListe(pi).includes(IFRIT)) return false;
 
     const zonen = freieZonen(engine, pi);
     if (zonen.length === 0) return false;
@@ -159,13 +158,14 @@ module.exports = {
     const fremd = feld !== pi;
 
     // Nach der Abfrage neu pruefen.
-    const idxJetzt = (ps.hand || []).indexOf(IFRIT);
-    if (idxJetzt < 0) return false;
+    const ifritQuelle = engine._rxQuelleFuer(ps, IFRIT);   // Hand oder Crestinas Vorrat
+    if (!ifritQuelle) return false;
+    const idxJetzt = ifritQuelle.idx;
     // W62a: eine geteilte Zone (Alice) ist belegt — sie gilt, solange dort weiter nur Ifrits liegen.
     if (((engine.gs.players[feld]?.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0
         && !require('./_alice-shared').canShareInto(engine, pi, ziel.heroIdx, ziel.slotIdx, IFRIT, feld)) return false;
 
-    engine.takeFromPileSync(ps, 'hand', idxJetzt);
+    engine.rxNimm(ps, ifritQuelle);
     const res = await engine.summonCreatureWithHooks(
       IFRIT, feld, ziel.heroIdx, ziel.slotIdx,
       {
@@ -173,7 +173,7 @@ module.exports = {
         hookExtras: { _isNormalSummon: false },
       },
     );
-    if (!res?.inst) { engine.handZugangSync(ps, IFRIT, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
+    if (!res?.inst) { engine.handkarteZurueck(pi, IFRIT, ifritQuelle); return false; }   // v1395
 
     // SC „Back to Basics": die Platzierung ist ein freier Heldeneffekt und
     // damit keine Aktion (Ruling 4.8.), beendet den Bonus aber trotzdem

@@ -21,12 +21,17 @@ const { temporaereKontrolle } = require('./_charm-shared');
 const { opponentOfGs } = require('./_opp');
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
   // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
   // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
   stealsOpponentCards: true,
 
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Ability — Lv1 („Ability attached to an opponent's Hero") und Lv3 („a Hero your opponent controls") brauchen ein gegnerisches Ziel,
+  // Lv2 („make your opponent add a card from their hand to yours") waehlt nichts und ignoriert Blinded (`blindedEigeneZiele`, `level` = Stapelhoehe).
   requiresTarget: true,
+  blindedEigeneZiele: ({ level }) => (level || 0) === 2,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
   freeActivation: true,
@@ -152,7 +157,8 @@ module.exports = {
     // Lv1 kannte die Regel gar nicht. Die Fizzles bleiben als zweite
     // Absicherung stehen, falls eine Stufe über einen anderen Weg
     // erreicht wird.
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — die Fähigkeit ist auch gegen den Erste-Runden-Geschützten aktivierbar; die Fizzles unten (`charme_fizzle`) verbrauchen den Einsatz.
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten waehlen, die CPU nicht
 
     if (level >= 3) {
       // Lv3: need opponent hero alive (Main Phase only)
@@ -161,6 +167,8 @@ module.exports = {
     } else if (level >= 2) {
       // Lv2: opponent must have 1+ cards in hand (Main Phase only)
       if (!isMainPhase) return false;
+      // Spielgestalter-Entscheidung 17.11.2026 (ANG-13): der ganze Nutzen ist ein Hand-Zugang — unter der Hand-Sperre (`handLocked`) nicht aktivierbar (wie Secret Entrance & Kidnapping).
+      if (engine.handZugangGesperrt(pi)) return false;
       return (ops.hand || []).length > 0;
     } else {
       // Lv1: opponent must have activatable abilities
@@ -489,6 +497,14 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
     engine.log('charme_fizzle', { player: gs.players[pi].username, reason: 'turn-1 protection' });
     engine.sync();
     return true; // Effect was attempted (HOPT consumed) but fizzled
+  }
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ANG-13): „make your opponent add a card … to yours" ist ein Hand-Zugang — unter der Hand-Sperre ("cannot draw or add cards to your hand",
+  // `handLocked`) entfällt der Klau (Aktivierung verbraucht, nichts geschieht; Warnungsprinzip). Die reine Zieh-Sperre (`drawLocked`) sperrt ihn nicht.
+  if (engine.handZugangGesperrt(pi)) {
+    engine.log('charme_fizzle', { player: gs.players[pi].username, reason: 'hand lock' });
+    engine.sync();
+    return true;
   }
 
   engine.log('charme_steal_start', { player: gs.players[pi].username, hero: hero.name });

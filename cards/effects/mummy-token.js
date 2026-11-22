@@ -9,8 +9,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
-  requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): der Effekt PLATZIERT einen Token in der Zone eines Gegnerhelden — einen Helden/eine Zone zum Platzieren zu waehlen ist kein „Auswaehlen"
+  // eines Ziels → ignoriert Blinded (KEIN `requiresTarget`; die Heldenwahl unten traegt `ignoreBlinded`).
   activeIn: ['support'],
   // Opt-in honoured by `engine._isHeroMummified`: while a Support-Zone
   // card carrying this flag is attached to a Hero, that Hero's
@@ -87,6 +87,7 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
         maxTotal: 1,
+        ignoreBlinded: true,   // Platzieren ist kein Auswaehlen (s. o.)
       });
       if (!selectedIds || selectedIds.length === 0) return false;
       const sel = targets.find(t => t.id === selectedIds[0]);

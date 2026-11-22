@@ -31,6 +31,28 @@
 module.exports = {
   activeIn: ['hero'],
 
+  // Spielgestalter-Entscheidung 16.11.2026: Idas Stempel (`canBeNegated = false`, `ignoreUnaffected`) muss VOR den Schutz-Hooks anderer Karten stehen, die Schaden
+  // an Kreaturen verhindern/negieren (Wowkyrie, Guardian Beast Gou …) — sonst entscheidet die Reihenfolge (Zugspieler zuerst), ob Ida durchkommt, wenn sie
+  // NICHT am Zug ist (Reaktion). Der Hook ändert keinen Betrag, die Vorrang-Stufe verschiebt nur den Stempel nach vorn.
+  // Dasselbe fuer Helden-Schaden (`beforeDamage`): Idas Stempel `cannotBeReduced`/`cannotBeNegated` muss VOR den Schild-Hooks anderer Helden stehen (Chuck: `setAmount(0)`, Inya,
+  // Tazune …), sonst haengt der Durchschlag davon ab, wer am Zug ist — reagiert Ida im Zug des Gegners (Booby Trap), liefe Chucks Schild zuerst und haelt den Treffer ab.
+  // „Unreduzierbarer Schaden toppt Schilde" (Spielgestalter-Entscheidung 16.11.2026). Der Hook aendert keinen Betrag, die Vorrang-Stufe schiebt nur den Stempel nach vorn.
+  hookPriority: { beforeCreatureDamageBatch: 1, beforeDamage: 1 },
+
+  // Spielgestalter-Entscheidung 16.11.2026 („Da soll sie überall durchschlagen!"): Idas Destruction-Zauberschaden gegen Ziele des GEGNERS ignoriert auch die „takes no damage"-FORMEN
+  // am HELDEN — Kontrolle durch Deepsea Succubus/Little Lyta (`charmed.nurSchadenSchutz`), `damage_proof` (Storm Piano, Cheat Chair) und Versteinerung (Baihu, Petrifier). Diese Wege
+  // stehen in der Schadens-Pipeline VOR/unabhängig vom `beforeDamage`-Stempel unten; die Engine fragt deshalb diesen Vertrag (`_quelleDurchschlaegtHeldenSchutz`), gleiche Bedingungen
+  // wie der Stempel (Typ, eigene Quelle, Ziel des Gegners nach KONTROLLE). Kreaturen: `e.ignoreUnaffected` im Hook unten. Bleibt immun: „unaffected by ALL cards and effects"
+  // (Cardinal Beasts, Stowaway, Hot Skull Potato; Charme Lv 3), Erstrunden-Schutz, Effekt-Immunitäten.
+  piercesDamageProtection(engine, { target, type, sourceOwner, sourceHeroIdx }) {
+    if (type !== 'destruction_spell') return false;
+    const targetOwner = engine._findHeroOwner(target);
+    if (typeof targetOwner !== 'number' || targetOwner < 0) return false;
+    // „your opponent's targets" — Kontrolle statt Seite (Styx 28.9.); Idas Kontrolleur wie `ctx.cardOwner` des Hooks.
+    const ida = engine.gs.players[sourceOwner]?.heroes?.[sourceHeroIdx];
+    return engine.heroSideOf(targetOwner, target) !== engine.heroSideOf(sourceOwner, ida);
+  },
+
   hooks: {
     /**
      * On game start + on play + every turn start: register the single-
@@ -111,6 +133,14 @@ module.exports = {
         if ((e.inst.controller ?? e.inst.owner) === ctx.cardOwner) continue;
         // Mark as un-negatable
         e.canBeNegated = false;
+        // Spielgestalter-Entscheidung 16.11.2026: „ignore any effects that make a target unaffected by them" — Ida durchschlägt ALLE
+        // „unaffected by (your opponent's) cards and effects" / „unaffected by [Typ]" (Black-Thorn Dragon, Golden Wings, Sparkfly Attendant,
+        // Rook/Board of Kings), NICHT aber „unaffected by ALL cards and effects" (Cardinal Beasts, Stowaway, Hot Skull Potato …).
+        // Die Engine liest den Stempel in `_markCreatureDamageImmunity` (Neubewertung nach dieser Hook-Runde).
+        // Erweitert (Spielgestalter-Entscheidung 16.11.2026): auch „cannot take damage / cannot be defeated" (Time Bomblebee, Deepsea Succubus) und „damage is negated"
+        // (Resilient Monkee, Divine Gift of the Guardian, The Egg of God, Wowkyrie, Guardian Beast Gou) halten Idas Zauberschaden NICHT ab.
+        // Dritte Erweiterung (Spielgestalter-Entscheidung 16.11.2026): auch die Versteinerung („takes no damage from any sources": Baihu, Petrifier, `_petrified`) — Helden-Seite: `piercesDamageProtection` oben.
+        e.ignoreUnaffected = true;
       }
     },
 

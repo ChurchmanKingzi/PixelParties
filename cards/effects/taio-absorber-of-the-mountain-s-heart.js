@@ -171,6 +171,9 @@ function _matchesKind(cd, kind) {
 function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Spielgestalter-Entscheidung 18.11.2026 (Aktionssperre sperrt "as an additional Action"): die Hand-Seite filtert `getHeroEligibleActionCards` schon, die Deck-Seite unten nicht — unter der
+  // Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) gibt es gar keine Kandidaten.
+  if (engine.areActionsBlocked(pi)) return [];
   const cardDB = engine._getCardDB();
   const out = [];
   const seen = new Set();
@@ -293,13 +296,21 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   const _auftritt = engine.gussAuftrittBeginnen(cardName, pi);
   let abgebrochen = false;
 
+  let kettenNegiert = false, kettenGeloescht = false;
   try {
     const _onPlay = () => engine.runHooks('onPlay', {
       _onlyCard: inst, playedCard: inst, cardName,
       zone: 'hand', heroIdx, _skipReactionCheck: true,
     });
-    if (!fromDeck) await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
+    // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): der Nachguss öffnet dasselbe Kettenfenster wie ein normal gespielter Spell/eine Attack (Silence,
+    // Ghostly Warning, … — aus der Hand auch Master's Plan/Lunar Eclipse, aus dem Deck nicht). Negiert: der Rumpf läuft nie, der Nachguss zählt als gespielt, die Karte geht in die Ablage (Ghostly
+    // Warning/Lunar Eclipse: Löschstapel), keine Wisdom-Kosten.
+    const _pk = await engine.performKettenfenster({ cardName, pi, heroIdx, heroOwner: feld, ausHand: !fromDeck });
+    if (_pk.negated) { kettenNegiert = true; kettenGeloescht = !!_pk.negatedToDeleted; gs._spellNegatedByEffect = true; }
+    if (kettenNegiert) { /* in der Kette negiert: der Rumpf läuft nie */ }
+    else if (!fromDeck) await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
     else await _onPlay();
+    if (cardData.cardType === 'Attack') await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile aus diesem Kettenfenster gelten nur für diesen Nachguss
     delete gs._immediateActionContext;
 
     abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
@@ -363,11 +374,15 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
       engine.takeFromPileSync(ps, 'hand', idx);
     }
   }
-  if (!selbstPlatziert) (fromDeck ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+  if (!selbstPlatziert) {
+    const _zielPs = fromDeck ? ps : engine.handKartenBesitzerPs(ps, cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+    if (kettenGeloescht) { if (!_zielPs.deletedPile) _zielPs.deletedPile = []; _zielPs.deletedPile.push(cardName); }   // in der Kette negiert + „delete it" (Ghostly Warning/Lunar Eclipse)
+    else _zielPs.discardPile.push(cardName);
+  }
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — der Zauber
   // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
   // kostet nichts.
-  if (cardData.cardType === 'Spell' && !gs.result) {
+  if (cardData.cardType === 'Spell' && !gs.result && !kettenNegiert) {   // in der Kette negiert: keine Wisdom-Kosten (wie in `doPlaySpell`)
     const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cardData);
     if (wisdomCost > 0) {
       await engine.actionPromptForceDiscard(pi, wisdomCost, {

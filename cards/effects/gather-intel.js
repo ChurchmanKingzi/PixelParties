@@ -42,6 +42,8 @@
 //  etwas wert ist, und gibt sie her, wenn nicht.
 // ═══════════════════════════════════════════
 
+const { waehlePfad, ziehenGesperrt } = require('./_pfad-shared');
+
 const CARD_NAME = 'Gather Intel';
 const PEEK_MS = 1300;            // Länge der Animation (deckt sich mit `intel_peek` im Client)
 const PEEK_VOR_MS = 1450;        // die Animation läuft VOLLSTÄNDIG ab (Länge + 100 ms Einbau-Versatz + Puffer), bevor das Fenster aufgeht und die Hand aufgedeckt wird — sonst hebt die offene Hand die Karten über die Animation und die Lupe verschwindet halb unter ihnen (Als Befund 12.10.)
@@ -51,7 +53,7 @@ function wirkbar(gs, pi, oi) {
   const ps = gs.players[pi], ops = gs.players[oi];
   if (!ps || !ops) return false;
   if ((ops.hand || []).length === 0) return false;
-  if (gs.firstTurnProtectedPlayer === oi) return false;                    // Erstrunden-Schutz: die Hand ist tabu
+  // (Erstrunden-Schutz des Gegners: Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt — spielbar, verpufft in `onPlay`.)
   if (ps._oppHandInteractionLockedTurn === gs.turn) return false;          // Spreading Rumor
   return true;
 }
@@ -98,6 +100,8 @@ async function zusatzaktionKlaeren(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   // Immer gratis spielbar; ob sie als Zusatzaktion gilt, entscheidet `onPlay`.
   inherentAction: () => true,
 
@@ -122,6 +126,8 @@ module.exports = {
       const ps = gs.players[pi];
       const ops = gs.players[oi];
       if (!ps || !ops) return;
+      // Erstrunden-Schutz: die Hand des Geschuetzten ist tabu — die Karte ist gespielt, die Wirkung verpufft (Spielgestalter-Entscheidung 16.11.2026: nutzlose Aktivierungen sind erlaubt)
+      if (gs.firstTurnProtectedPlayer === oi) { engine.log('gather_intel_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return; }
       if (!wirkbar(gs, pi, oi)) { gs._spellCancelled = true; return; }
 
       // Die gespielte Karte JETZT dem Gegner zeigen, nicht erst nach den Abfragen.
@@ -174,24 +180,22 @@ module.exports = {
         if (!name) { engine.sync(); return; }
 
         // ── 4. Der Gegner entscheidet ──
+        // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): ist von beiden Wegen genau einer frei, wird er automatisch genommen — der Gegner wird nur gefragt, wenn
+        // BEIDE offen sind. „give" ist gesperrt bei Boris und Hand-Sperre des Spielers; „draw 2" bei Hand-/Zieh-Sperre des Spielers (Staff of the Teleporter, Sacred Jewel …) und unter
+        // Tuscan Artist des Gegners (negiert genau 2/3 Karten: der Gegner könnte sonst „draw" wählen und die ganze Karte verpuffen lassen).
         const boris = engine.isBorisBlocked({ stealsOpponentCards: true }, pi);
-        const geben = !boris && !ps.handLocked;
-        let entscheidung = 'draw';
-        if (geben) {
-          const e = await engine.promptGeneric(oi, {
-            type: 'optionPicker',
-            title: CARD_NAME,
-            _giPhase: 'decide',
-            description: `${ps.username} looked at your hand and chose ${name}. Add it to ${ps.username}'s hand, or let ${ps.username} draw 2 cards?`,
-            showCard: name,
-            cancellable: false,
-            options: [
-              { id: 'give', label: `Add ${name} to their hand` },
-              { id: 'draw', label: 'They draw 2 cards' },
-            ],
-          });
-          entscheidung = e?.optionId === 'give' ? 'give' : 'draw';
-        }
+        const wahl4 = await waehlePfad(engine, oi, [
+          { id: 'give', label: `Add ${name} to their hand`, offen: !boris && !ps.handLocked },
+          { id: 'draw', label: 'They draw 2 cards', offen: !ziehenGesperrt(engine, pi, 2) },
+        ], {
+          title: CARD_NAME,
+          _giPhase: 'decide',
+          description: `${ps.username} looked at your hand and chose ${name}. Add it to ${ps.username}'s hand, or let ${ps.username} draw 2 cards?`,
+          showCard: name,
+          cancellable: false,
+        });
+        // Kein Weg frei (z. B. Hand-Sperre): wie bisher passiert nichts Sichtbares (der Zug scheitert in der Engine).
+        const entscheidung = wahl4.keiner ? 'draw' : (wahl4.id === 'give' ? 'give' : 'draw');
 
         // ── 5. Ausführen ──
         if (entscheidung === 'give') {

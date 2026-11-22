@@ -140,6 +140,9 @@ module.exports = {
       if (stufe === 1) {
         // Z5 (M01-05) / W5a: ein Token ist keine Karte — er geht nie auf die Hand, sondern verschwindet vollständig (Al 14.10.2026).
         if (engine.isTokenCard(inst)) return;
+        // Spielgestalter-Entscheidung 17.11.2026 (ANG-13): „add it to your hand" ist ein Hand-Zugang — unter der Hand-Sperre ("cannot draw or add cards to your hand", `handLocked`) kein
+        // Angebot (die Kreatur kommt wie sonst in die Ablage, nichts wird verbraucht); die reine Zieh-Sperre (`drawLocked`) sperrt es nicht.
+        if (engine.handZugangGesperrt(pi)) return;
         const ja = await engine.promptGeneric(pi, {
           type: 'confirm', title: CARD_NAME,
           message: `Add ${tot.name} to your hand instead of sending it to the discard pile?`,

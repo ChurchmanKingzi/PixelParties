@@ -43,7 +43,8 @@ function getOwnStatusedTargets(gs, pi, engine) {
   const heroes = gs.players.map((_, i) => i).flatMap(p => engine.getHeroTargets(p)).filter(t => {
     const hero = gs.players[t.owner].heroes[t.heroIdx];
     if (engine.heroSideOf(t.owner, hero) !== pi) return false;
-    return hero.statuses && negKeys.some(k => hero.statuses[k]);
+    // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag) macht den Helden zum Ziel
+    return hero.statuses && (negKeys.some(k => hero.statuses[k]) || engine.heroHatRuhendesAnhaengsel(t.owner, t.heroIdx));
   });
 
   const creatures = engine.getCreatureTargets(pi).filter(t => {
@@ -356,7 +357,7 @@ module.exports = {
         && secondTarget.type === 'hero'
         && inst.zone === 'support';
       const ok = umziehen
-        ? await engine.anhaengselUmziehen(inst, secondTarget.owner, secondTarget.heroIdx)
+        ? await engine.anhaengselUmziehen(inst, secondTarget.owner, secondTarget.heroIdx, { anleger: pi })
         : false;
       if (!ok && inst.zone === 'support') {
         await engine.sendBoardCardToDiscard(inst, { source: { name: 'Tea' } });

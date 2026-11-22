@@ -292,6 +292,13 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 // ═══════════════════════════════════════════
 const ANIM_LAYERS_DIR = window.PP_RETRO ? '/data/animated_screen/layers2-retro/' : '/data/animated_screen/layers2/';
 
+// ★ TITELKULISSE VORGEBACKEN (Pixelart, Raster 3 px, Bayer-Mischdither, 256-Farben-Palette): `data/animated_screen/layers2/*.png` und `public/title.png` sind das Ergebnis von
+// `python3 scripts/title-pixel/bake.py` (Originale: scripts/title-pixel/originals/). Zur Laufzeit wird NICHTS pixelisiert; die Bilder werden nur noch mit `image-rendering: pixelated`
+// gezeichnet (Canvas: `imageSmoothingEnabled = false`) — jede Glaettung wuerde das Dither-Muster zu Mischfarben/Moire verwischen. Der Hintergrund ist schon 4,06 % ueberstreckt
+// gebacken (1998x1125 = 666x375 Zellen), liegt also 1:1 statt per `inset: -2%`-Streckung (ungleiche Zellbreiten): bei 1920x1080 sind alle Zellen genau 3 px.
+// Retro (layers2-retro) bleibt bei der alten Streckung (1920x1080, 4x-Zellen).
+const ANIM_BG_INSET = window.PP_RETRO ? '-2%' : '-2.0833% -2.03125%';
+
 // ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
 // ruckelt") ─────────────────────────────────────────────────────────────
 // Jede Figur liegt als eigenes 1920×1080-Bild vor, fast ganz transparent,
@@ -334,7 +341,7 @@ function AnimatedTitleBackdrop() {
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
         {/* 0 — background plate (overscanned so shake never reveals edges) */}
-        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat" }} />
+        <div style={{ position: 'absolute', inset: ANIM_BG_INSET, background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat", imageRendering: 'pixelated' }} />
         {/* Impact flash + lightning FLASHES render BELOW the characters
             (screen-blended onto the background plate only) so they never light the
             laser beams baked into golem/rabbit. That keeps both beams at their
@@ -428,9 +435,12 @@ function TapBackdropCanvas({ hostRef }) {
         list.forEach((im, i) => {
           const n = NAMES[i], rf = ANIM_SPRITE_RAHMEN[n + '.png'];
           // Figuren auf ihren sichtbaren Kasten zuschneiden (wie die DOM-Kulisse): nur dieser Teil wird pro Bild gezeichnet
-          const x0 = rf ? Math.max(0, rf[0] - 2) : 0, y0 = rf ? Math.max(0, rf[1] - 2) : 0, x1 = rf ? Math.min(1920, rf[2] + 2) : 1920, y1 = rf ? Math.min(1080, rf[3] + 2) : 1080;
+          const bgv = n === 'background';   // Hintergrund: ganzes (ueberstrecktes) Bild, nicht auf die Buehne zugeschnitten
+          const Z = window.PP_RETRO ? 4 : 3;   // Zellgroesse der Kulisse: Zuschnitt auf Zellgrenzen, damit die Vorskalierung keine Zelle zerschneidet
+          const x0 = rf ? Math.max(0, Math.floor((rf[0] - 2) / Z) * Z) : 0, y0 = rf ? Math.max(0, Math.floor((rf[1] - 2) / Z) * Z) : 0,
+            x1 = rf ? Math.min(1920, Math.ceil((rf[2] + 2) / Z) * Z) : (bgv ? im.naturalWidth : 1920), y1 = rf ? Math.min(1080, Math.ceil((rf[3] + 2) / Z) * Z) : (bgv ? im.naturalHeight : 1080);
           const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((x1 - x0) * sc)); c.height = Math.max(1, Math.round((y1 - y0) * sc));
-          const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren GEGLAETTET: 1920 px auf Handybreite per Naechster-Nachbar zerreisst das Motiv (Tap-Bildschirm sah kaputt aus)
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);   // Vorskalieren per Naechster-Nachbar: die Bilder sind vorgebackene Pixelart (3-px-Zellen, ab Buehnenmass 1/3 trifft jede Zelle mind. einen Bildpunkt); Glaetten wuerde Dither zu Mischfarben verwischen
           imgs[n] = { c, x0, y0, w: x1 - x0, h: y1 - y0 };
         });
         imgs._sc = sc;
@@ -475,7 +485,7 @@ function TapBackdropCanvas({ hostRef }) {
       g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#12101f'; g.fillRect(0, 0, W, H);
       // Versatz der ganzen Buehne nur in ganzen Pixeln
       g.setTransform(S * zoom, 0, 0, S * zoom, Math.round(W / 2 - 960 * S * zoom + camX * S * zoom + sh[0] * S * zoom), Math.round(H / 2 - 540 * S * zoom + camY * S * zoom + sh[1] * S * zoom));
-      g.drawImage(imgs.background.c, -38.4, -21.6, 1996.8, 1123.2);
+      { const B = imgs.background; if (B.w > 1920) g.drawImage(B.c, -(B.w - 1920) / 2, -(B.h - 1080) / 2, B.w, B.h); else g.drawImage(B.c, -38.4, -21.6, 1996.8, 1123.2); }   // vorgebacken ueberstreckt (1998x1125) 1:1; Retro: alte 4-%-Streckung
       const aI = kfLin(KF_STRIKE, pc), aA = kfLin(KF_AMB, ((tau % 13) / 13) * 100);
       // Schein: fuenf Pixelringe, Dichte nach aussen abnehmend (Bayer-Dither) — Bildschirmpixel, daher ohne Buehnen-Transformation
       const glow = (cx, cy, R, a, col) => {
@@ -804,6 +814,7 @@ function AuthScreen() {
   // erreichbar.
   const Header = (
     <div className="auth-header">
+      <LangFlag />
       {/* ★ W86u2 (Pixelart): die Glut hinter dem Logo als Dither-Pixelbild statt Radialverlauf mit Alpha (Ebene hinter dem Inhalt, `.auth-header` ist ein Stapelkontext) */}
       <PpVerlauf className="auth-header-glut" px={4} gradient="radial-gradient(ellipse 46% 58% at 50% 46%, rgba(251,200,106,.5), rgba(227,116,53,.2) 38%, rgba(240,50,50,.06) 64%, transparent 92%)"
         style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }} />
@@ -2119,6 +2130,7 @@ function MainMenu() {
           halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
           `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
           bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
+      <LangFlag menu />
       <div className="menu-topleft">
       <div className="menu-stats">
         <div className="menu-stats-row">
@@ -2199,7 +2211,7 @@ function MainMenu() {
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
             <span className="menu-nav-label">VS CPU</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
-          <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
+          <button className="btn btn-big menu-nav-btn menu-nav-btn--daily" onClick={openDaily} title="Daily Challenge">
             <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span>
             <PixelIcon name="pfeil" className="menu-nav-pfeil" />
             {/* Heute noch nicht gestartet → kleines NEW-Schild an der Ecke. */}
@@ -2839,10 +2851,14 @@ function ProfileScreen() {
   // reads this on game start and gates every animation + transition
   // when off.
   const [playAnimations, setPlayAnimations] = useState(user.play_animations == null ? true : !!user.play_animations);
+  // Screen Shake & Flash (app-fx-67.jsx): nur dieses Gerät (Browserspeicher), kein Serverfeld.
+  const [screenShake, setScreenShake] = useState(() => (window.ppFx67WackelnOption ? window.ppFx67WackelnOption() : true));
   // v1463: animierte Helden (Display Heroes) und ihr Einklappen während
   // Zielwahl-Dialogen (Dynamic Heroes). Fehlt der Wert, gelten beide als an;
   // ohne Display gibt es kein Dynamic.
   const [displayHeroes, setDisplayHeroes] = useState(user.display_heroes == null ? true : !!user.display_heroes);
+  const [displayCreatures, setDisplayCreatures] = useState(
+    (user.display_heroes == null ? true : !!user.display_heroes) && (user.display_creatures == null ? true : !!user.display_creatures));
   const [dynamicHeroes, setDynamicHeroes] = useState(
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
@@ -2858,7 +2874,7 @@ function ProfileScreen() {
   const losses = user.losses || 0;
   const gamesPlayed = wins + losses;
   const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
-  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—';
+  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString(window.ppLocale ? window.ppLocale() : 'en-US', { year: 'numeric', month: 'short' }) : '—';
 
   // Next rank progress
   const nextRank = RANK_TIERS.find(r => r.min > (user.elo || 1000));
@@ -3080,14 +3096,15 @@ function ProfileScreen() {
     } catch (e) { notify(e.message, 'error'); setPlayAnimations(!newVal); }
   };
 
-  const saveHeroDisplay = async (display, dynamic) => {
-    const vorher = [displayHeroes, dynamicHeroes];
-    const dyn = display && dynamic;
-    setDisplayHeroes(display); setDynamicHeroes(dyn);
+  // `kreaturen` (Display Creatures): Unteroption wie Dynamic; ohne Angabe bleibt die Wahl stehen, beim EINSCHALTEN von Display Heroes gehen beide Unteroptionen mit an.
+  const saveHeroDisplay = async (display, dynamic, kreaturen = displayCreatures) => {
+    const vorher = [displayHeroes, dynamicHeroes, displayCreatures];
+    const dyn = display && dynamic, kre = display && kreaturen;
+    setDisplayHeroes(display); setDynamicHeroes(dyn); setDisplayCreatures(kre);
     try {
-      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn }) });
+      const data = await api('/profile/hero-display', { method: 'PUT', body: JSON.stringify({ display_heroes: display, dynamic_heroes: dyn, display_creatures: kre }) });
       setUser(data.user);
-    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); }
+    } catch (e) { notify(e.message, 'error'); setDisplayHeroes(vorher[0]); setDynamicHeroes(vorher[1]); setDisplayCreatures(vorher[2]); }
   };
   const GameTooltipProfil = window.GameTooltip;
   const zeigeTipp = (e, text) => window.showGameTooltip && window.showGameTooltip(e, text);
@@ -3150,7 +3167,7 @@ function ProfileScreen() {
             {!editingName ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 }}>
                 <div className="orbit-font" style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: 1, textShadow: `0 0 25px ${color}44`, textAlign: 'center' }}>
-                  {user.username}
+                  {window.PpTitled ? <window.PpTitled name={user.username} title={user.title} /> : user.username}
                 </div>
                 <button className="btn" title="Edit name" onClick={startNameEdit} style={{ padding: '3px 9px', fontSize: 13, lineHeight: 1 }}>✎</button>
               </div>
@@ -3243,6 +3260,7 @@ function ProfileScreen() {
               />
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{defeatMsg.length}/80</div>
             </div>
+            {window.PpProfileCosmetics && <div style={{ marginTop: 'calc(var(--pv) * 1)' }}><window.PpProfileCosmetics /></div>}
 
             {/* Save button at bottom of identity panel */}
             <div style={{ marginTop: 'auto', paddingTop: 'calc(var(--pv) * 1.2)' }}>
@@ -3618,9 +3636,14 @@ function ProfileScreen() {
                 label="Play Animations"
                 tipp="Disable to skip battle animations — faster gameplay on low-power devices."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={screenShake}
+                onToggle={() => { const neu = !screenShake; setScreenShake(neu); if (window.ppFx67SetzeWackelnOption) window.ppFx67SetzeWackelnOption(neu); }}
+                label="Screen Shake"
+                tipp="The board shakes and flashes briefly on heavy hits and landings. Disable if it bothers you (this device only)."
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
               {/* v1463: Helden-Anzeige */}
               <ProfilSchalter an={displayHeroes}
-                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes)}
+                onToggle={() => saveHeroDisplay(!displayHeroes, !displayHeroes, !displayHeroes)}
                 label="Display Heroes"
                 tipp="Shows animated Heroes standing on their cards on the board."
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
@@ -3630,6 +3653,13 @@ function ProfileScreen() {
                 tipp={displayHeroes
                   ? 'Heroes fold back into their cards while you choose a target, so nothing blocks your view.'
                   : 'Heroes fold back into their cards while you choose a target. Needs "Display Heroes".'}
+                zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
+              <ProfilSchalter an={displayCreatures} gesperrt={!displayHeroes}
+                onToggle={() => saveHeroDisplay(displayHeroes, dynamicHeroes, !displayCreatures)}
+                label="Display Creatures"
+                tipp={displayHeroes
+                  ? 'Shows animated Creatures standing on their cards on the board. Turn off for a calmer board or on low-power devices. Never shown on phones.'
+                  : 'Shows animated Creatures standing on their cards on the board. Needs "Display Heroes".'}
                 zeigeTipp={zeigeTipp} versteckeTipp={versteckeTipp} />
             </div>
             {GameTooltipProfil && <GameTooltipProfil />}
@@ -3736,43 +3766,6 @@ function PurchaseCelebration({ cx, cy, onDone }) {
 
 // „Mögliche Pulls“: ein Streifen mit Beispielen aus dem Pool (nur, was der Spieler noch NICHT besitzt —
 // genau das kann der nächste Pull ergeben). Wechselt alle paar Sekunden hart (kein Überblenden: Pixelart).
-function ShopPullPreview({ pool, type, count = 4, onHover, dupes }) {
-  const sig = pool.map(p => p.id).join('|');
-  const order = useMemo(() => {
-    const a = pool.slice();
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a;
-  }, [sig]);
-  const [start, setStart] = useState(0);
-  useEffect(() => {
-    setStart(0);
-    if (order.length <= count) return undefined;
-    const t = setInterval(() => setStart(s => (s + count) % order.length), 3500);
-    return () => clearInterval(t);
-  }, [order, count]);
-  const shown = Array.from({ length: Math.min(count, order.length) }, (_, i) => order[(start + i) % order.length]);
-  return (
-    <div className="shop-pull-strip">
-      {shown.map(it => (
-        <div key={it.id} className={'shop-item shop-unowned-skin shop-pull-tile' + (type === 'avatar' ? ' shop-sq-item' : '') + (dupes && dupes[it.id] > 0 ? ' shop-item-ranked' : '')}
-          onMouseEnter={() => onHover && onHover(it)} onMouseLeave={() => onHover && onHover(null)}>
-          <span className="shop-item-zier" aria-hidden="true" />
-          <div className="shop-item-img-wrap">
-            {(() => {
-              // Besitzt man den Kandidaten schon, zeigt die Vorschau seinen aktuellen Rahmen (Duplikate)
-              const d = (dupes && dupes[it.id]) || 0;
-              if (d > 0 && type !== 'skin') return <FramedImg src={it.src} kind={type} dupes={d} draggable={false} />;
-              return <img src={d > 0 ? it.src + '?rahmen=' + d : it.src} draggable={false} />;
-            })()}
-          </div>
-          {it.name && <div className="shop-item-name" title={it.name}>{it.name}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
 // Gemeinsame Partikel-Salve für Shop-Effekte (Kauf-Fanfare und Pull-Reveal): bunte Pixelsprites in Palettenfarben
 // plus ein Funkenring. Gezeichnet von `ppPixelPartikel` (app-shared.jsx): ganze Kunstpixel, Dither statt Alpha.
 function shopBurstParticles(ox, oy, n, speedMul) {
@@ -4560,6 +4553,11 @@ function ShopScreen() {
   const [cpuSleeves, setCpuSleeves] = useState({ need: 5, sleeves: [] });
   // Gegner-Avatare (cpu-avatars.js): nicht käuflich, der erste Sieg gegen die CPU schaltet das Portrait frei.
   const [cpuAvatars, setCpuAvatars] = useState({ need: 1, avatars: [] });
+  // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
+  const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
+  const wheelClaimRef = useRef(null);
+  const [wheelLock, setWheelLock] = useState(false);   // Glücksrad-Ergebnis mit ungeöffneten Packs: Shop kann nicht verlassen/gewechselt werden
+  const [pendingPacks, setPendingPacks] = useState(null); // [{ id, packId, variantId, cards: [{ name, rarity }], sold }] (alle offenen Packs, Kaufreihenfolge) | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -4571,6 +4569,12 @@ function ShopScreen() {
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
+  // Das Ergebnis eines Pulls (Besitz, Kopien, Zähler) wird erst NACH der Pull-Animation angewendet — sonst verrät der Zähler im Hintergrund
+  // schon vorher, dass etwas Neues gezogen wurde. Beim Schließen des Reveals (oder Verlassen des Shops) wird es nachgetragen.
+  const [countBump, setCountBump] = useState(0);   // Zähler für die „+1!“-Animation am Sammlungszähler
+  const pendingPull = useRef(null);
+  const flushPull = () => { const f = pendingPull.current; pendingPull.current = null; if (f) f(); };
+  useEffect(() => () => { flushPull(); }, []);
   const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
   const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
   // Skin ids currently flipped to show the original Hero art instead of the
@@ -4597,13 +4601,19 @@ function ShopScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData, structData, cpuData, cpuAvData] = await Promise.all([
+        const [catData, ownData, structData, cpuData, cpuAvData, boosterData, pendData] = await Promise.all([
           api('/shop/catalog'),
           api('/shop/owned'),
           api('/shop/structure-decks'),
           api('/shop/cpu-sleeves').catch(() => null),
           api('/shop/cpu-avatars').catch(() => null),
+          api('/boosters').catch(() => null),
+          api('/boosters/pending').catch(() => null),
         ]);
+        if (boosterData) setBoosters(boosterData);
+        // Wiederaufnahme: ein gekauftes, noch nicht eingefordertes Pack liegt offen -> Pack-Ansicht sofort fortsetzen
+        const pendList = pendData && (pendData.packs && pendData.packs.length ? pendData.packs : (pendData.pending ? [pendData.pending] : null));
+        if (pendList) { setPendingPacks(pendList); setTab('boosters'); }
         setCatalog(catData);
         setOwned(ownData.owned);
         setDupes({ avatar: {}, sleeve: {}, skin: {}, ...(ownData.dupes || {}) });
@@ -4813,8 +4823,11 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind: 'card' });
     try {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
-      if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
-      else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
+      pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
+        if (data.isNew) setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
+        else setDupes(prev => ({ ...prev, skin: { ...prev.skin, [data.skinName]: data.dupes } }));
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       setRandomReveal({
@@ -4824,7 +4837,7 @@ function ShopScreen() {
         subtitle: data.isNew ? data.heroName : data.heroName + ' · ' + frameName(data.dupes) + '!',
         kind: 'card', isNew: data.isNew, dupes: data.dupes,
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4838,9 +4851,12 @@ function ShopScreen() {
     setRandomReveal({ pending: true, kind });
     try {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
-      if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
-      else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
-      if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
+      pendingPull.current = () => {
+        if (data.isNew) setCountBump(n => n + 1);
+        if (data.isNew) setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
+        else setDupes(prev => ({ ...prev, [itemType]: { ...prev[itemType], [data.itemId]: data.dupes } }));
+        if (itemType === 'avatar') window.ppAvatarRankForget(user.username);   // Rang des getragenen Avatars kann gestiegen sein
+      };
       setUser(u => ({ ...u, sc: data.sc }));
       triggerPurchaseFanfare(pos, { pull: true });
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
@@ -4852,7 +4868,27 @@ function ShopScreen() {
         subtitle: data.isNew ? 'New ' + noun + '!' : frameName(data.dupes) + '! (' + data.dupes + '/' + maxDupes + ')',
         kind, isNew: data.isNew, dupes: data.dupes, frameKind: itemType,        // Rahmen wird beim Anzeigen eingebacken (useFramedSrc)
       });
-    } catch (e) { setRandomReveal(null); notify(e.message, 'error'); }
+    } catch (e) { flushPull(); setRandomReveal(null); notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
+  // Boosterpacks kaufen (20 SC je Pack, `count` Stück in einer Buchung): der Server würfelt je Pack die 9 Karten und speichert sie als offene Packs; danach öffnet
+  // die Vollbild-Ansicht (BoosterOpening) alle auf einmal. Sind schon Packs offen, liefert die Antwort diese (kaufen ist dann nicht erlaubt) und die Ansicht wird fortgesetzt.
+  const buyBooster = async (packId, count) => {
+    if (buying || pendingPacks) return;
+    const price = boosters && boosters.price != null ? boosters.price : 20;
+    const n = count > 0 ? count : 1;
+    if (!((user.sc || 0) >= price * n)) { notify('Not enough 🪙!', 'error'); return; }
+    setBuying(true);
+    try {
+      const r = await window.ppBoosterApi.buy(packId, n);
+      const got = r.data && (r.data.packs && r.data.packs.length ? r.data.packs : (r.data.pending ? [r.data.pending] : null));
+      if (got) setPendingPacks(got);
+      if (r.ok) {
+        if (r.data.sc != null) setUser(u => ({ ...u, sc: r.data.sc }));
+        triggerPurchaseFanfare({ cx: window.innerWidth / 2, cy: window.innerHeight / 2 }, { pull: true });
+      } else if (!got) notify((r.data && r.data.error) || 'Purchase failed', 'error');
+    } catch (e) { notify(e.message, 'error'); }
     setBuying(false);
   };
 
@@ -4913,16 +4949,18 @@ function ShopScreen() {
   // Gegner-Sleeves: Trophäen aus dem Singleplayer. Freigeschaltete lassen sich
   // ausrüsten wie gekaufte; gesperrte zeigen den Fortschritt gegen ihre CPU.
   // Noch unbekannte Gegner bleiben verdeckt, damit nichts vorweggenommen wird.
+  // Sie erscheinen im Filter-Reiter „OPPONENTS“ neben ALL / OWNED / MISSING (Reiter „Sleeves“ bzw. „Avatars“).
   const renderCpuSleeves = () => {
-    const list = cpuSleeves.sleeves || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
+    const all = cpuSleeves.sleeves || [];
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent sleeves available yet</div>;
     const need = cpuSleeves.need || 5;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent plays with its own sleeve. Defeat an opponent {need} times to claim it!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -4961,15 +4999,16 @@ function ShopScreen() {
   };
 
   const renderCpuAvatars = () => {
-    const list = cpuAvatars.avatars || [];
-    if (list.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
+    const all = cpuAvatars.avatars || [];
+    const list = all;
+    if (all.length === 0) return <div className="shop-empty">No opponent avatars available yet</div>;
     const need = cpuAvatars.need || 1;
-    const earned = list.filter(it => it.unlocked).length;
+    const earned = all.filter(it => it.unlocked).length;
     return (
       <React.Fragment>
-        <div className="shop-random-wrap">
+        <div className="shop-random-wrap shop-cpu-embedded">
           <div className="shop-cpu-sleeves-intro">🏆 Every CPU opponent has a portrait. Defeat an opponent {need === 1 ? 'once' : need + ' times'} to claim it as your avatar!</div>
-          <span className="shop-random-hint">{earned} / {list.length} earned</span>
+          <span className="shop-random-hint">{earned} / {all.length} earned</span>
         </div>
         <div className="shop-grid">
           {list.map(item => {
@@ -5059,48 +5098,42 @@ function ShopScreen() {
     );
 
     const heroQuery = skinFilter.trim().toLowerCase();
+    const cpuList = type === 'sleeve' ? (cpuSleeves.sleeves || []) : type === 'avatar' ? (cpuAvatars.avatars || []) : null;
+    const opponentsView = !!cpuList && collFilter === 'opponents';       // Reiter „OPPONENTS“: statt der Sammlung die Gegner-Items
     const filtered = items.filter(it => {
       if (type === 'skin' && heroQuery && !String(it.heroName).toLowerCase().includes(heroQuery)) return false;
       const own = ownedSet[type].has(it.id);
-      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;
+      return collFilter === 'owned' ? own : collFilter === 'missing' ? !own : true;       // 'opponents' (nur Avatare/Sleeves) zeigt eine eigene Liste, bei Skins gilt es wie ALL
     });
     const chips = [
       { id: 'all', label: 'ALL', n: items.length },
       { id: 'owned', label: 'OWNED', n: ownedN },
       { id: 'missing', label: 'MISSING', n: missing.length },
+      ...(cpuList ? [{ id: 'opponents', label: 'OPPONENTS', n: cpuList.length }] : []),
     ];
 
     return (
       <div className="shop-gacha-page">
         <div className="shop-gacha-pinned">
+        {/* Flache Pull-Leiste: Titel, Pull-Knopf, Tempo-Schalter und ein Hinweis in EINER Zeile — den Platz bekommt die Sammlung */}
         <div className="shop-gacha">
-          <div className="shop-gacha-machine">
-            <div className="shop-gacha-title">{def.title}</div>
-            <div className="shop-gacha-capsule" aria-hidden="true"><span className="shop-gacha-q" /></div>
-            <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
-            {speedToggle}
-            <div className="shop-gacha-hint">
-              {missing.length > 0
-                ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover'
-                : eligible.length > 0 ? 'Collection complete — duplicates upgrade frames!' : 'Everything is at maximum rank!'}
-            </div>
-          </div>
-          <div className="shop-gacha-preview">
-            <div className="shop-gacha-preview-title">
-              {missing.length > 0 ? 'POSSIBLE PULLS' : eligible.length > 0 ? 'UPGRADE CANDIDATES' : 'MAXED OUT'}
-            </div>
-            <div className="shop-gacha-rule">No buying — every pull is a random {def.noun.toLowerCase()}. Pull one you own again and its frame ranks up!</div>
-            {eligible.length > 0 && (
-              <ShopPullPreview pool={missing.length > 0 ? missing : eligible} type={type} dupes={dp}
-                onHover={type === 'skin' ? (it => setHoverSkin(it ? { skinName: it.name, heroName: it.heroName } : null)) : null} />
-            )}
+          <div className="shop-gacha-title">{def.title}</div>
+          <button className="btn shop-random-btn shop-gacha-btn" disabled={!canPull} onClick={pull}>{pullLabel}</button>
+          {speedToggle}
+          <div className="shop-gacha-hint" title="Every pull is random. Pull one you own again and its frame ranks up!">
+            {missing.length > 0
+              ? missing.length + ' ' + (missing.length === 1 ? def.noun.toLowerCase() : def.plural) + ' still to discover · copies rank up frames'
+              : eligible.length > 0 ? 'Collection complete — copies rank up frames!' : 'Everything is at maximum rank!'}
           </div>
         </div>
 
         <div className="shop-coll-head">
           <div className="shop-coll-head-in">
             <div className="shop-coll-title">YOUR COLLECTION</div>
-            <div className="shop-coll-count">{ownedN} / {items.length}</div>
+            <div className="shop-coll-count">
+              <span key={'n' + countBump} className={countBump ? 'shop-coll-count-bump' : ''}>{ownedN} / {items.length}</span>
+              {countBump > 0 && <span key={'p' + countBump} className="shop-coll-plus" aria-hidden="true">+1!</span>}
+            </div>
             <div className="shop-coll-bar" role="progressbar" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={ownedN}>
               <span style={{ width: pct + '%' }} />
             </div>
@@ -5122,7 +5155,7 @@ function ShopScreen() {
 
         <div className="shop-coll-scroll">
 
-        {filtered.length === 0 ? (
+        {opponentsView ? (type === 'sleeve' ? renderCpuSleeves() : renderCpuAvatars()) : filtered.length === 0 ? (
           <div className="shop-empty">
             {collFilter === 'owned'
               ? 'Nothing here yet — pull to start your ' + def.noun.toLowerCase() + ' collection!'
@@ -5268,8 +5301,8 @@ function ShopScreen() {
     { id: 'skins', label: '🎨 Skins', count: tabCount('skin') },
     { id: 'avatars', label: '👤 Avatars', count: tabCount('avatar') },
     { id: 'sleeves', label: '🃏 Sleeves', count: tabCount('sleeve') },
-    { id: 'cpuSleeves', label: '🏆 Opponent Sleeves', count: (cpuSleeves.sleeves || []).length },
-    { id: 'cpuAvatars', label: '🏆 Opponent Avatars', count: (cpuAvatars.avatars || []).length },
+    { id: 'boosters', label: '📦 Boosterpacks', count: ((boosters && boosters.packs) || []).length },
+    { id: 'wheel', label: 'Wheel', count: '' },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
     { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
@@ -5296,9 +5329,27 @@ function ShopScreen() {
         </span>
       </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
-      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => setRandomReveal(null)} />}
+      {pendingPacks && window.BoosterOpening && (
+        <window.BoosterOpening key={pendingPacks[0].id + ':' + pendingPacks.length} packs={pendingPacks} boosters={boosters} sc={user.sc || 0}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))}
+          onClaimed={(data, info) => {
+            // „Add and rip one more!“ ohne genug SC: das Pack ist trotzdem eingelöst (Server), der Kontostand steht in der Antwort
+            if (data && data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPacks(null);
+            // Am Glücksrad gewonnene Packs: das Rad ersetzt das Pack in den Gewinnen durch die Karten
+            if (wheelClaimRef.current) { try { wheelClaimRef.current(data); } catch (e) { /* ohne */ } wheelClaimRef.current = null; }
+            if (info && info.ripFailed) notify('Cards added to your collection! ' + info.ripFailed + '.', 'error');
+            else notify('Cards added to your collection!', 'success');
+          }}
+          onRipMore={(data) => {
+            // Alte Packs eingelöst + gleich viele neue gekauft: die Ansicht wechselt (key) sofort zu den neuen Packs und ihrer Öffnungsanimation
+            if (data.sc != null) setUser(u => ({ ...u, sc: data.sc }));
+            setPendingPacks(data.packs && data.packs.length ? data.packs : [data.pending]);
+          }} />
+      )}
+      {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => { flushPull(); setRandomReveal(null); }} />}
       <div className="top-bar">
-        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" disabled={wheelLock} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
         <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
@@ -5308,17 +5359,18 @@ function ShopScreen() {
       </div>
       <div className="shop-tabs">
         {tabs.map(t => (
-          <button key={t.id} className={'shop-tab' + (tab === t.id ? ' shop-tab-active' : '')} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={'shop-tab' + (tab === t.id ? ' shop-tab-active' : '') + (wheelLock && tab !== t.id ? ' shop-tab-off' : '')} disabled={wheelLock && tab !== t.id} onClick={() => { if (!wheelLock) setTab(t.id); }}>
             {t.label} <span className="shop-tab-count">{t.count}</span>
           </button>
         ))}
       </div>
-      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '')}>
+      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '') + (tab === 'wheel' ? ' shop-content-wheel' : '')}>
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
-        {tab === 'cpuSleeves' && renderCpuSleeves()}
-        {tab === 'cpuAvatars' && renderCpuAvatars()}
+        {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
+          onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
+        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list, cb) => { wheelClaimRef.current = cb || null; setPendingPacks(list); }} onLock={setWheelLock} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>
@@ -5778,7 +5830,7 @@ function RulesScreen({ onBack }) {
             </div>
             <div className="rules-status-entry rules-status-blinded">
               <div className="rules-status-name">Blinded</div>
-              <p>The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.</p>
+              <p>Cannot choose a target the opponent controls with Attacks, Spells or effects.</p>
             </div>
             <div className="rules-status-entry rules-status-poisoned">
               <div className="rules-status-name">Poisoned</div>

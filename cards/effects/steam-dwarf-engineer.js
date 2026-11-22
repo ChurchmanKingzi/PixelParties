@@ -121,7 +121,7 @@ module.exports = attachSteamEngine({
 
     // Sacrifice the Engineer — actionDestroyCard fires the proper
     // onCreatureDeath hooks and clears the zone.
-    await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx }, inst);
+    await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx }, inst, { einaescherung: true });   // Opfer: verbrennt (Client: app-fx-66)
     await engine._delay(200);
 
     // Summon the chosen Creature into the freed slot. `skipBeforeSummon`

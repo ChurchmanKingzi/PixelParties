@@ -78,6 +78,8 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   if (st.berserked) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
+  // Spielgestalter-Entscheidung 17.11.2026: die Helden-Voraussetzung der Beschwörung („can only be summoned by a Hero equipped with …", Spirits) gilt auf jedem Weg.
+  if (!engine.beschwoerHeldBedingungOk(cd.name, physOwner, heroIdx, pi)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
 }
 
@@ -177,13 +179,16 @@ function kopieFuerHeld(engine, pi, name, ziel) {
  *   `source`       — Quellname fuer Log/Prompt
  *   `zonenFilter`  — (zone) → bool, schraenkt die Zonen weiter ein
  *   `nachZonenwahl`— async () → void, laeuft NACH der bindenden Wahl und
- *                    VOR der Beschwoerung (Platz fuer den Auftritt)
+ *                    VOR der Beschwoerung (Platz fuer den Auftritt). Liefert
+ *                    es 'negiert' (die Beschwoerung wurde in einem Gegenreaktions-
+ *                    Fenster negiert, Front Soldier), findet sie nicht statt.
  * @returns {Promise<boolean>} beschworen? Abbruch in der Zonenwahl → false.
  */
 async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
   const { source, zonenFilter, nachZonenwahl } = opts;
   const ps = engine.gs.players[pi];
-  if (!ps || !(ps.hand || []).includes(name)) return false;
+  const _q = ps ? engine._rxQuelleFuer(ps, name) : null;   // Hand ODER Crestinas Vorrat (11.11.: alle Hand-Reaktionen auch aus der Extra-Hand)
+  if (!ps || !_q) return false;
   // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
   let zonen = eligibleSummonZones(engine, pi, name, { nachKontrolle: true });
   if (typeof zonenFilter === 'function') zonen = zonen.filter(zonenFilter);
@@ -200,16 +205,19 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
       && (z.owner ?? pi) === (wahl.owner ?? pi)) || null;
     if (!ziel) return false;
   }
-  if (typeof nachZonenwahl === 'function') await nachZonenwahl(ziel);
+  if (typeof nachZonenwahl === 'function' && (await nachZonenwahl(ziel)) === 'negiert') return false;
   // Als Ruling (Al 26.10.): „Rocky Slime reduziert nur das Level einer einzelnen Kopie!" — `eligibleSummonZones` fragt namensweit („irgendeine Kopie genügt"), BESCHWOREN wird aber GENAU EINE Kopie:
   // die günstigste (niedrigste Handstufe), die der gewählte Held wirklich spielen darf — nicht die erste nach Namen (sonst käme eine ungesenkte Kopie durch das Tor der gesenkten).
-  const _kopie = kopieFuerHeld(engine, pi, name, ziel);
-  const inst = await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, {
+  const _kopie = _q.ausVorrat ? -1 : kopieFuerHeld(engine, pi, name, ziel);
+  const _beschwoerOpts = {
     source: source || name, hookExtras: { _isNormalSummon: false },
     ...(_kopie >= 0 ? { handIdx: _kopie } : {}),
     alsZusatzaktion: true,   // v1349: „as an additional Action" ist eine Aktion
     ...((ziel.owner ?? pi) !== pi ? { heldSeite: ziel.owner } : {}),
-  });
+  };
+  const inst = _q.ausVorrat
+    ? await engine.summonFromCreation(pi, name, ziel.heroIdx, ziel.slotIdx, _beschwoerOpts)
+    : await engine.summonFromPile(pi, 'hand', name, ziel.heroIdx, ziel.slotIdx, _beschwoerOpts);
   return !!inst;
 }
 

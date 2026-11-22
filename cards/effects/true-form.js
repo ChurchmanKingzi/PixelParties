@@ -36,13 +36,14 @@ function kontrollierteNamen(engine, pi) {
   return new Set(engine.heroesControlledBy(pi).map(h => h.hero.name));
 }
 
-/** Wählbare Hero-Karten der Hand (eindeutige Namen). */
-function waehlbareHelden(engine, pi) {
+/** Wählbare Hero-Karten der Hand (eindeutige Namen). `vorrat`: aus Crestinas Extra-Hand statt der Hand. */
+function waehlbareHelden(engine, pi, vorrat = false) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const namen = kontrollierteNamen(engine, pi);
   const out = [];
-  for (const n of (ps?.hand || [])) {
+  const quelle = vorrat ? (engine.isCreationZoneUsable(pi) ? (ps?.creationZone || []) : []) : (ps?.hand || []);
+  for (const n of quelle) {
     if (out.includes(n)) continue;
     if (db[n]?.cardType !== 'Hero') continue;
     if (namen.has(n)) continue;
@@ -65,7 +66,7 @@ module.exports = {
   /** Grau, solange keine wählbare Hero-Karte auf der Hand liegt. */
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
-    return waehlbareHelden(engine, pi).length > 0;
+    return waehlbareHelden(engine, pi).length > 0 || waehlbareHelden(engine, pi, true).length > 0;
   },
 
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
@@ -73,7 +74,7 @@ module.exports = {
     const hs = engine.heldSeiteFuer ? engine.heldSeiteFuer(pi, heroIdx) : pi;
     const hero = gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    return waehlbareHelden(engine, pi).length > 0;
+    return waehlbareHelden(engine, pi).length > 0 || waehlbareHelden(engine, pi, true).length > 0;
   },
 
   hooks: {
@@ -87,12 +88,16 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[hs]?.heroes?.[heroIdx];
       if (!ps || !hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
-      const namen = waehlbareHelden(engine, pi);
+      const handNamen = waehlbareHelden(engine, pi);
+      const vorratNamen = waehlbareHelden(engine, pi, true);     // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu)
+      const namen = [...new Set([...handNamen, ...vorratNamen])];
       if (namen.length === 0) { gs._spellCancelled = true; return; }
 
       // ── Wahl in der Hand: anklicken oder auf den Nutzer ziehen ──
       const eligibleIndices = [];
-      (ps.hand || []).forEach((cn, i) => { if (namen.includes(cn)) eligibleIndices.push(i); });
+      (ps.hand || []).forEach((cn, i) => { if (handNamen.includes(cn)) eligibleIndices.push(i); });
+      const vorratIndices = [];
+      (ps.creationZone || []).forEach((cn, i) => { if (vorratNamen.includes(cn)) vorratIndices.push(i); });
       const hosts = {};
       for (const n of namen) hosts[n] = [{ heroIdx, slotIdx: -1 }];
       const pick = await engine.promptGeneric(pi, {
@@ -102,19 +107,22 @@ module.exports = {
         instruction: `Click a highlighted Hero in your hand — or drag it onto ${hero.name}.`,
         showCard: CARD_NAME,
         eligibleIndices,
+        creationEligibleIndices: vorratIndices,
         eligibleHostsByCardName: hosts,
         dragSummonMode: true,
         hostZoneKind: 'hero',
         cancellable: true,
       });
       if (!pick || pick.cancelled || pick.handIndex == null) { gs._spellCancelled = true; return; }
-      const zielName = pick.cardName || ps.hand[pick.handIndex];
+      const ausVorrat = !!pick.fromCreation;
+      if (ausVorrat && !vorratIndices.includes(pick.handIndex)) { gs._spellCancelled = true; return; }
+      const zielName = pick.cardName || (ausVorrat ? (ps.creationZone || [])[pick.handIndex] : ps.hand[pick.handIndex]);
       if (!namen.includes(zielName)) { gs._spellCancelled = true; return; }
       if (pick.targetHeroIdx != null && pick.targetHeroIdx !== heroIdx) { gs._spellCancelled = true; return; }
 
       // Zwischen Abfrage und Antwort kann sich der Zustand verschoben haben.
-      if (!waehlbareHelden(engine, pi).includes(zielName) || hero.hp <= 0) { gs._spellCancelled = true; return; }
-      const handIndex = ps.hand.indexOf(zielName);
+      if (!waehlbareHelden(engine, pi, ausVorrat).includes(zielName) || hero.hp <= 0) { gs._spellCancelled = true; return; }
+      const handIndex = ausVorrat ? (ps.creationZone || []).indexOf(zielName) : ps.hand.indexOf(zielName);
       if (handIndex < 0) { gs._spellCancelled = true; return; }
 
       const vorher = hero.name;
@@ -125,6 +133,7 @@ module.exports = {
         skipCondition: true,        // Hero-Karten haben keine Aufstiegsbedingung
         forceFormStack: true,       // der Rückweg braucht die Form darunter
         keepHp: true,               // aktuelle HP bleiben, nur max HP wechselt (aktuelle HP über max HP sind erlaubt)
+        ...(ausVorrat ? { fromCreation: true } : {}),
       });
       if (!res?.success) { gs._spellCancelled = true; return; }
 

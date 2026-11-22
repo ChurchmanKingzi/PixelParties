@@ -16,12 +16,12 @@
 //    (`_resolveImmediateActionPick`: Guardian Beast Hu, Celia …) und die Zusatznutzung der Secret Lab Entrance (Al: ja) — die drei letzten über `engine.abilityAktivierungsFenster`
 //    (Initialglied mit `abilityZone`, Surprise-Fenster, Stufe danach neu gelesen). Vollständige Wegeliste: CARD_API, Abschnitt „Welle 82 — Sinister Idol".
 //    Wird die Aktivierung einer ZUSATZaktion im Fenster NEGIERT (Ragnarock …), bleibt die Zusatzaktion unverbraucht (Al): Sofort-Aktion = der Auswahl-Prompt geht erneut auf (ist nichts mehr zu wählen,
-//    ist sie weg), Anbieter-Zusatzaktion = Anbieter zurück; Einmal-Stempel der negierten Ability nach Z7b frei. Secret Lab Entrance ist keine Zusatzaktion in diesem Sinn (Lab-Stempel bleibt gesetzt).
+//    ist sie weg), Anbieter-Zusatzaktion = Anbieter zurück; Einmal-Stempel der negierten Ability bleibt verbraucht (Spielgestalter-Entscheidung 16.11.2026). Secret Lab Entrance ist keine Zusatzaktion in diesem Sinn (Lab-Stempel bleibt gesetzt).
 //  • „your opponent activates": der Aktivierer ist ein Gegner des Idol-Spielers (2–4 Sitze). Bezauberte/geliehene Abilities (Charme Lv 3, Lizbeth/Smugbeth): das Glied
 //    trägt den Stapel, der aktiviert wird — die Kopie fällt von DIESEM Stapel („the user" = der Held, auf dem sie liegt), auch wenn er dem Idol-Spieler gehört.
 //  • Wirkung: BEVOR die Ability auflöst (die Kette löst rückwärts auf, die Initialkarte zuletzt) wird die OBERSTE Kopie des Stapels in die ABLAGE ihres Besitzers geschickt
-//    (`discardAbilityTopCopy`: Flug Brett → Ablage, Besitzer-Regel der Stapel, Leave-Hooks — Fighting nimmt seinen ATK-Bonus zurück …). Als Effekt auf den Helden fragt die Engine
-//    Resistance (`effectOnHero`); bleibt die Kopie liegen (Resistance, Leafagami Snake), bleibt die Stufe 3.
+//    (`discardAbilityTopCopy`: Flug Brett → Ablage, Besitzer-Regel der Stapel, Leave-Hooks — Fighting nimmt seinen ATK-Bonus zurück …). Idol wählt die Ability, nicht den Helden: Resistance
+//    wird UMGANGEN (Spielgestalter-Entscheidung 16.11.2026); bleibt die Kopie liegen (nur Leafagami Snake), bleibt die Stufe 3.
 //    Idol NEGIERT die Aktivierung nicht — sie läuft weiter („The Ability then resolves at the lowered level"): der Server liest die Stufe NACH dem Fenster neu
 //    (`abilityStufeNachKette`, server.js), die Auflösung rechnet alle stufenabhängigen Werte (Wirkung, Ziele, Mengen) mit der gesenkten Stufe.
 //  • KOSTEN der Ability (Al): sie bleiben die der Stufe BEIM Aktivieren — der Aktivierer zahlt nie rückwirkend nach der gesenkten Stufe (Alchemy Lv 3: gratis, auch wenn Idol auf
@@ -113,7 +113,9 @@ module.exports = {
     const eintrag = engine.getAbilityTargets(az.heroOwner, { heroIdx: az.heroIdx })
       .find(e => e.zoneKind === az.zoneKind && e.slotIdx === az.zoneIdx && e.cardName === link.cardName);
     if (!eintrag) return;
-    await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi, effectOnHero: true });   // Effekt auf den Helden → Resistance fragt
+    // Spielgestalter-Entscheidung 16.11.2026: Idol zielt auf die gerade aktivierte ABILITY (nicht auf den Helden) und umgeht deshalb Resistance — daher KEIN `effectOnHero`
+    // (Resistance fragt nicht, verbraucht keine Ladung). Leafagami Snake schützt weiter (`abilityEntfernungVerhindert` in `sendBoardCardToDiscard`): bleibt die Kopie liegen, bleibt die Stufe 3.
+    await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi });
     await engine._delay(FLUG_MS);
 
     const neu = stapelDerKette(engine, az);

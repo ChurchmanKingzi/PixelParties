@@ -71,7 +71,7 @@ module.exports = {
     const sel = targets.find(t => t.id === pick[0]);
     if (!sel) return false;
 
-    const discarded = await W.discardFromHand(engine, pi, CARD_NAME, ctx.handIndex, CARD_NAME);
+    const discarded = await W.discardFromHand(engine, pi, CARD_NAME, ctx.handIndex, CARD_NAME, { fromCreation: !!ctx.fromCreation });
     if (!discarded) return false;
 
     W.addEvo(engine, sel.owner ?? pi, sel.heroIdx, 1, CARD_NAME);   // Als Vorgabe 29.9.: Brettseite

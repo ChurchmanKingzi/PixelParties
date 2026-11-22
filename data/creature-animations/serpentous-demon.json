@@ -1,0 +1,15 @@
+{
+  "creature": "Serpentous Demon",
+  "sheet": "serpentous-demon.png",
+  "frameWidth": 23,
+  "frameHeight": 39,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 11.5
+}

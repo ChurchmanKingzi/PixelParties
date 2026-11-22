@@ -13,9 +13,17 @@
 //
 //  ── DER STATUS `polymorphed` ────────────────────────────────────────────
 //  „Treated as a negative status effect": ein ECHTER, heilbarer Status (`_hooks.js` → `STATUS_EFFECTS.polymorphed`), angelegt über `addHeroStatus` (Immunität gegen negative Status,
-//  Resistance, Charme-Schutz gelten). Ist der Held immun, bleibt die Karte ohne Wirkung am Helden liegen (kein Spell-Verbot, kein ATK-Bonus). Der Status trägt die Karte
+//  Resistance, Charme-Schutz gelten). Ist der Held immun, bleibt die Karte ohne Wirkung am Helden liegen (kein Spell-Verbot, kein ATK-Bonus) — Spielgestalter-Entscheidung 17.11.2026: ABER sobald die
+//  Status-Immunität endet (Johanna stirbt, Light Ball weg, Buff läuft ab), greift der Status der liegenden Karte (Spell-Verbot + ATK-Bonus); kommt sie später dazu, ruht er wieder
+//  (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`, Abgleich in `engine.sync`). Der Status trägt die Karte
 //  (`anhaengselStatusHooks`, `heilenWirftAb`): wird er GEHEILT (Juice, Beer, Cure, Exorcism …), fällt Polymorph in die Ablage seines Besitzers (der Spieler, der es gespielt hat);
 //  verlässt die Karte den Helden aus anderem Grund, endet der Status mit ihr.
+//
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ────────────────
+//  „Polymorphed" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen `attach:<instId>`-Eintrag
+//  („Polymorphed (Polymorph)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers (der +100-ATK-Bonus ruht mit dem Status und
+//  wird dabei nicht angefasst); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `polymorphed` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag entfällt,
+//  solange der Wirt `polymorphed` trägt).
 //
 //  ── „CANNOT USE ANY SPELLS" ─────────────────────────────────────────────
 //  Dieselben Sperr-Stellen wie `magic_silenced`/`frightened` (`validateActionPlay`, Hand-Grau, Reaktions-/Surprise-Wirker, `heroKannZaubern` für sofortige Zauber): der Held wirkt weder
@@ -38,7 +46,7 @@
 //  Klänge in ZONE_ANIM_SFX; Log `polymorph_attached`.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero, anhaengselStatusHooks } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, anhaengselStatusHooks, anhaengselUmgelenkt, statusErgebnisBuchen } = require('./_attachment-shared');
 
 const CARD_NAME = 'Polymorph';
 const STATUS_NAME = 'polymorphed';
@@ -108,6 +116,16 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,            // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Polymorphed (Polymorph)',
+  negativeStatusIcon: '🐱',
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts; der +100-ATK-Bonus hängt am Status (kommt mit ihm, geht mit ihm).
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    einsetzen(engine, inst) { engine.actionSetAtkGrant(inst, ATK_BONUS); },
+    ruhen(engine, inst) { engine.actionRevokeAtkAmTraeger(inst); },
+  },
   spellVisual: { impact: { type: 'polymorph_poof' }, impactMs: 420 },
   cpuMeta: { optionalInherent: true },      // auch als normale Aktion spielbar (ohne Gegnerkreatur)
 
@@ -127,7 +145,8 @@ module.exports = {
 
   /** Umhängen (Inheritance Ceremony, Secret Spell Book): Status und Bonus am neuen Wirt wieder anlegen (der alte Wirt hat beides beim Abgang verloren). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await polymorphAnlegen(engine, inst, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const gesetzt = await polymorphAnlegen(engine, inst, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, gesetzt, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
   },
 
@@ -156,6 +175,9 @@ module.exports = {
       await engine._delay(POOF_VOR_MS);
 
       const gesetzt = await polymorphAnlegen(engine, inst, pi, host.owner, host.heroIdx);
+      // ★ Spielgestalter-Entscheidung 17.11.2026: hat eine Reflection Polymorph samt Karte an einen anderen Helden umgelenkt, ist dort alles angelegt — hier bleibt nichts mehr zu tun.
+      if (anhaengselUmgelenkt(engine, inst, host)) { engine.log('polymorph_reflected', { player: gs.players[pi]?.username }); engine.sync(); return; }
+      statusErgebnisBuchen(engine, inst, gesetzt, host.owner, host.heroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       if (!gesetzt) engine.log('polymorph_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       engine.sync();
       await engine._delay(POOF_MS - POOF_VOR_MS);

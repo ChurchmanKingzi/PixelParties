@@ -59,6 +59,7 @@ module.exports = {
   // Hooks need to fire from the hand (trigger) AND from the hero
   // zone (loss-on-defeat).
   activeIn: ['hand', 'hero'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Never proactively playable. The card enters play only through
   // its reactive descent trigger; until then it sits dimmed in
@@ -75,7 +76,7 @@ module.exports = {
       if (ctx.cardZone === 'hero') {
         return handleLossOnDefeat(ctx);
       }
-      if (ctx.cardZone === 'hand') {
+      if (ctx.cardZone === 'hand' || ctx.cardZone === 'creationZone') {   // Hand oder Crestinas Vorrat
         return handleHandTrigger(ctx);
       }
     },
@@ -190,8 +191,9 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   const fremdUebernommen = kontrolliert.filter(e => e.physOwner !== pi);
 
   // ── 1. Pull Quetzahuitl out of hand. ──
-  const handIdx = ps.hand.indexOf(CARD_NAME);
-  if (handIdx < 0) return;
+  const q = engine._rxQuelleFuer(ps, CARD_NAME);   // Hand oder Crestinas Vorrat
+  if (!q) return;
+  const handIdx = q.idx;
   // Einsatz-Beleg für den Trainings-Recorder. Als Verdachtsfall
   // "Quetzahuitl 0% — lehnt die CPU ab?": nein, hier gibt es gar keinen
   // Prompt, der Abstieg läuft vollautomatisch und funktioniert (gegen
@@ -205,11 +207,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   // eigene play_zone_animation des Abstiegs.
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: CARD_NAME,
-    from: 'hand', to: 'hero',
+    from: q.ausVorrat ? 'creation' : 'hand', to: 'hero',
     fromHandIdx: handIdx, toHeroIdx: targetHeroIdx,
     asPlay: 'sole',
   });
-  engine.takeFromPileSync(ps, 'hand', handIdx);
+  engine.rxNimm(ps, q);
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
   // Startplatz der abfliegenden Karte nur, solange die Hand noch so
   // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -217,6 +219,19 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   engine.sync();
   if (handInst) {
     engine.cardInstances = engine.cardInstances.filter(c => c.id !== handInst.id);
+  }
+
+  // ★ 12.11. (Al: „Quetza soll auch Divinity aus der Extra-Hand holen können“): Crestina wird gleich mit allen Helden gelöscht — danach ist ihr Vorrat nicht mehr nutzbar. Die
+  // Divinity-Kopien, die bis zu den drei Anlagen aus dem Vorrat kommen (Hand zuerst, dann Vorrat), werden darum JETZT zurückgelegt und unten wie Handkarten angelegt.
+  const vorratReserve = [];
+  if (engine.isCreationZoneUsable(pi)) {
+    let noetig = Math.max(0, 3 - (ps.hand || []).filter(n => n === DIVINITY).length);
+    while (noetig-- > 0) {
+      const vi = (ps.creationZone || []).indexOf(DIVINITY);
+      if (vi < 0) break;
+      engine._rxAbgang(ps, { liste: ps.creationZone, ausVorrat: true, idx: vi });
+      vorratReserve.push(DIVINITY);
+    }
   }
 
   engine.log('quetzahuitl_descent_begin', {
@@ -360,7 +375,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   const blockiert = await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME);
   for (let n = 0; n < (blockiert ? 0 : 3); n++) {
     if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, { allowRestricted: true })) break;
-    const pulledFrom = pullDivinityFromAnySource(ps, engine);
+    const pulledFrom = pullDivinityFromAnySource(ps, engine, vorratReserve);
     if (!pulledFrom) break;
 
     // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine); 24.10.: auch Support Zonen (Xal).
@@ -385,13 +400,16 @@ async function performDescent(engine, pi, dyingHero, handInst) {
     attached++;
   }
 
+  // Nicht verbrauchte Reserve (Anlage kam nicht zustande) zurück in den Vorrat — er liegt ohne Crestina brach, aber die Karten verschwinden nicht.
+  for (const _ of vorratReserve.splice(0)) { ps.creationZone.push(DIVINITY); engine._trackCard(DIVINITY, pi, 'creationZone'); }
+
   engine.log('quetzahuitl_divinity_attached', {
     player: ps.username, count: attached,
   });
   engine.sync();
 }
 
-function pullDivinityFromAnySource(ps, engine) {
+function pullDivinityFromAnySource(ps, engine, vorratReserve = []) {
   // Order matches the card text "from your deck, hand or discard
   // pile" — but deck-first would force a shuffle reveal even when
   // a free hand copy is available, so prefer hand → deck → discard
@@ -399,6 +417,9 @@ function pullDivinityFromAnySource(ps, engine) {
   // user wants strict left-to-right text ordering.
   const fromHand = ps.hand.indexOf(DIVINITY);
   if (fromHand >= 0) { engine.takeFromPileSync(ps, 'hand', fromHand); return 'hand'; }
+  // ★ 12.11. (Al: „Quetza soll auch Divinity aus der Extra-Hand holen können“): „from your … hand“ gilt auch für Crestinas Vorrat (Extra-Hand) — die Kopien liegen als
+  // `vorratReserve` bereit (siehe `performDescent`: Crestina und damit der Vorrat sind zu diesem Zeitpunkt schon gelöscht).
+  if (vorratReserve.length > 0) { vorratReserve.pop(); return 'creation-reserve'; }
   const _taken_fromDeck = engine.takeFromPileSync(ps, 'deck', DIVINITY, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (_taken_fromDeck) {
     return 'deck';
@@ -414,6 +435,7 @@ function refundDivinity(engine, pi, source) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
   if (source === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
+  else if (source === 'creation-reserve') { ps.creationZone.push(DIVINITY); engine._trackCard(DIVINITY, pi, 'creationZone'); }
   else if (source === 'deck') { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
   else if (source === 'discard') ps.discardPile.push(DIVINITY);
 }

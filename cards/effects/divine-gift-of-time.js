@@ -62,7 +62,7 @@ function queueTimeRescue(engine, ps, pi, names, viaPush) {
   if (!ps) return;
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   // Time must still be in hand to spend.
-  if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;   // Hand oder Crestinas Vorrat
   // ★ W21a (Al, 20.10.2026: „ja"): ohne einen Wirker-Helden mit Magic Arts 2 (eigener oder uebernommener) wird die Karte nicht angeboten.
   if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
   // Defensive — bail if there are no rescuable names.
@@ -116,7 +116,7 @@ async function tryTimeRescue(engine, pi, ps, names) {
   // Re-validate each guard before the prompt — board could have
   // shifted since the events that filled the queue.
   if (ps._oncePerGameUsed?.has('divineGift')) return;
-  if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
   if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;   // W21a: Wirker-Held mit passender Schule/Stufe (Board kann sich verschoben haben)
 
   // Only names actually still in discard are rescuable. A name might
@@ -146,14 +146,13 @@ async function tryTimeRescue(engine, pi, ps, names) {
 
   // Re-validate post-prompt.
   if (ps._oncePerGameUsed?.has('divineGift')) return;
-  const timeHandIdx = (ps.hand || []).indexOf(CARD_NAME);
-  if (timeHandIdx < 0) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
   // ★ W21a: Wirker waehlen (2+ Wirker: Picker; Abbruch = nichts passiert), vor jeder Zahlung.
   const _wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
   if (!_wirkerPlan) return;
   if (ps._oncePerGameUsed?.has('divineGift')) return;
-  if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
   // Mark Divine Gift used now to block re-entry.
   if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -206,8 +205,9 @@ async function tryTimeRescue(engine, pi, ps, names) {
   // Send Time itself to the discard pile (no hook fire — direct push,
   // matching the pattern used by other once-per-game spells that
   // self-discard outside the standard play flow).
-  const ti = (ps.hand || []).indexOf(CARD_NAME);
-  if (ti >= 0) {
+  const q = engine._rxQuelleFuer(ps, CARD_NAME);   // Hand oder Crestinas Vorrat
+  const ti = q ? q.idx : -1;
+  if (q) {
     // Einsatz-Beleg für den Trainings-Recorder. Genau die Lücke, die
     // Cosmic Malfunction (v81), Demon's Gate (v86) und Quetzahuitl
     // (v87) hatten: die Karte spielt sich in ihrem EIGENEN Hook aus der
@@ -221,17 +221,17 @@ async function tryTimeRescue(engine, pi, ps, names) {
     // die es hier gerade NICHT gibt.
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: CARD_NAME,
-      from: 'hand', to: 'discard',
+      from: q.ausVorrat ? 'creation' : 'hand', to: 'discard',
       fromHandIdx: ti, asPlay: 'sole',
     });
-    engine.takeFromPileSync(ps, 'hand', ti);
-    engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
+    engine.rxNimm(ps, q);
+    engine._rxAblagePs(ps, CARD_NAME, q).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
     // Startplatz der abfliegenden Karte nur, solange die Hand noch so
     // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
     // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
     engine.sync();
-    const timeInst = engine.cardInstances.find(c =>
+    const timeInst = q.ausVorrat ? null : engine.cardInstances.find(c =>
       c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME
     );
     if (timeInst) timeInst.zone = 'discard';
@@ -269,6 +269,7 @@ module.exports = {
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Reaktion aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // Time has no proactive hand-play path. The reactive hooks below
   // are the only way to activate it — keep it locked out of normal

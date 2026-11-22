@@ -38,6 +38,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { isEquipArtifact, equipDestinations, equipArtifactToHero } = require('./_orchestra-shared');
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'The Weather Orchestra';
 const EXACT_COST = 12;
@@ -124,7 +125,7 @@ module.exports = {
 
   reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
-    if (!inst || inst.zone !== 'hand') return 0;
+    if (!inst || !['hand', 'creationZone'].includes(inst.zone)) return 0;   // Hand oder Crestinas Vorrat
     if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     return singingOnBoard(engine);
   },
@@ -173,9 +174,11 @@ module.exports = {
         if (cards.some(c => c.name === name && c.source === source)) return;
         cards.push({ name, source, cost: cd.cost || 0 });
       };
-      for (const n of (ps.hand || [])) add(n, 'hand');
-      for (const n of (ps.discardPile || [])) add(n, 'discard');
-      for (const n of (ps.mainDeck || [])) add(n, 'deck');
+      for (const n of engine.handUndVorratListe(pi)) add(n, 'hand');   // 12.11.: Hand + Crestinas Vorrat
+      // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your hand, deck or discard pile" — Ablage unter der Stab-Sperre (Staff of the
+      // Teleporter) / Knight of Kings [B] und Deck unter Knight of Kings [B] sind als Quelle zu (früher angeboten, das Ausrüsten scheiterte danach).
+      if (!ablageAusgangGesperrt(engine, pi)) for (const n of (ps.discardPile || [])) add(n, 'discard');
+      if (!deckAusgangGesperrt(engine, pi)) for (const n of (ps.mainDeck || [])) add(n, 'deck');
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
       if (cards.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
@@ -229,6 +232,7 @@ module.exports = {
             description: `Choose a Support Zone (any Hero on the board) for ${c.name}.`,
             confirmLabel: '🎼 Equip here!', confirmClass: 'btn-success', cancellable: false, greenSelect: true,
             previewCardName: c.name, exclusiveTypes: true, maxPerType: { equip: 1 },
+            ignoreBlinded: true,   // Blinded (Spielgestalter-Entscheidung 16.11.2026): einen Platz zum Ausruesten zu waehlen ist kein „Auswaehlen" eines Ziels
           });
           const hit = ids && zoneTargets.find(t => t.id === ids[0]);
           if (hit) dest = dests.find(d => d.side === hit.owner && d.heroIdx === hit.heroIdx && d.slotIdx === hit.slotIdx) || dests[0];

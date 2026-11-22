@@ -45,7 +45,7 @@ function meineZaehlerTraeger(engine, pi) {
 async function angebotsRunde(engine, pi, runde) {
   const gs = engine.gs;
   const ps = gs.players[pi];
-  if (!(ps.hand || []).includes(CARD_NAME)) return false;
+  if (!engine._rxQuelleFuer(ps, CARD_NAME)) return false;   // Hand oder Crestinas Vorrat
   const traeger = meineZaehlerTraeger(engine, pi);
   if (traeger.length === 0) return false;
   if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return false;
@@ -116,6 +116,7 @@ async function angebotAmZugende(ctx) {
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
@@ -166,7 +167,7 @@ module.exports = {
 
   hooks: {
     onTurnEnd: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
       await angebotAmZugende(ctx);
     },
   },

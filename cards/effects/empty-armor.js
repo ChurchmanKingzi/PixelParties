@@ -33,9 +33,12 @@
 //      negiert o.ae.);
 //    • „the first time every turn … if possible": einmal je Runde und
 //      Instanz (Einheitszaehler). Verbraucht wird die Nutzung NUR, wenn
-//      wirklich umgeleitet wird — ein Waehlen, das nicht umgeleitet
+//      die Ruestung wirklich ausloest — ein Waehlen, das nicht umgeleitet
 //      werden kann (die Quelle trifft nur Helden), kostet nichts (Als
 //      Bestaetigung 24.9.; der Text sagt es seit v1332b ausdruecklich).
+//      ★ Spielgestalter-Entscheidung 16.11.2026: ausgeloest = der Zaehler
+//      steht VOR dem Kettenfenster (`payBoardRedirectCost`); wird die
+//      Ausloesung danach negiert, bleibt die Nutzung trotzdem verbraucht.
 //  Flaechenschaden waehlt nicht und loest nichts aus.
 //
 //  ── ③ DER DASH (Als Vorgabe 24.9., wie Johanna) ───────────────────
@@ -177,10 +180,15 @@ module.exports = {
     return !!eigenerEintrag(inst, validTargets);
   },
 
+  // ★ Spielgestalter-Entscheidung 16.11.2026: das „first time every turn" wird bei der Auslösung gestempelt (Hub `_checkTargetRedirectOnce`: Pflicht-Umleitung → `payBoardRedirectCost` →
+  // Kettenfenster → `onBoardRedirect`), auch wenn sie danach negiert wird. `false` = schon verbraucht → keine Auslösung.
+  async payBoardRedirectCost(engine, ownerIdx, inst) {
+    return spendUse(inst, engine.gs, ZAEHLER) ? { begrenzt: true } : false;
+  },
+
   async onBoardRedirect(engine, ownerIdx, inst, selected, validTargets, config, sourceCard) {
     const ziel = eigenerEintrag(inst, validTargets);
     if (!ziel) return null;
-    spendUse(inst, engine.gs, ZAEHLER);
     await engine.showTriggeredEffect(CARD_NAME, { playerIdx: inst.controller ?? inst.owner });
     // ③ Der Dash — fuer jeden abgefangenen Effekt, im Moment der Umleitung.
     await engine.rammeBisKontakt({

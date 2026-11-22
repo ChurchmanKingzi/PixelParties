@@ -60,10 +60,11 @@ function kandidaten(engine, pi) {
 }
 
 /** Kann das Duell stattfinden? (spielbar-Bedingung UND zweite Prüfung beim Auflösen) */
-function moeglich(engine, pi, oi) {
+function moeglich(engine, pi, oi, opts = {}) {
   const gs = engine.gs;
   if (oi == null || oi === pi) return false;
-  if (gs.firstTurnProtectedPlayer === oi) return false;
+  // Spielgestalter-Entscheidung 16.11.2026: Spielbarkeit (`opts.ohneErstrunde`) ignoriert den Erstrunden-Schutz — aktivierbar, das Duell verpufft beim Aufloesen.
+  if (!opts.ohneErstrunde && gs.firstTurnProtectedPlayer === oi) return false;
   return kandidaten(engine, pi).length > 0 && kandidaten(engine, oi).length > 0;
 }
 
@@ -103,6 +104,13 @@ async function waehle(engine, chooser, liste, beschreibung, markierung) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Both players choose a Hero they control".
+  requiresTarget: true,
+  // Jeder Duellant waehlt einen EIGENEN Helden (der Nutzer selbst darf es sein) → unter Blinded immer spielbar (Vertrag `blindedEigeneZiele`).
+  blindedEigeneZiele: true,
+
   // ★ W76a: die Zahl der Beteiligten legt der Kartentext fest („Both players choose a Hero …", ein Zweikampf zweier Duellanten) — Zusatzziel-Helden (Andras mit Fighting 4) bieten keinen
   // Zweitschlag an: eine Wiederholung ließe dieselben Duellanten ein zweites Mal gegeneinander antreten (statt „ein zweites Ziel zu treffen").
   fixedTargetCount: true,
@@ -110,7 +118,7 @@ module.exports = {
   // Ohne zwei Duellanten und bei Erstrunden-Schutz des Gegners ausgegraut.
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
-    return moeglich(engine, pi, engine.opponentOf(pi));
+    return moeglich(engine, pi, engine.opponentOf(pi), { ohneErstrunde: true });
   },
 
   hooks: {
@@ -121,7 +129,8 @@ module.exports = {
       const oi = engine.opponentOf(pi);
       const ps = gs.players[pi], ops = gs.players[oi];
       if (!ps || !ops) return;
-      if (!moeglich(engine, pi, oi)) { gs._spellCancelled = true; return; }
+      if (!moeglich(engine, pi, oi, { ohneErstrunde: true })) { gs._spellCancelled = true; return; }
+      if (gs.firstTurnProtectedPlayer === oi) { engine.log('duel_fizzle', { player: ps.username, reason: 'first-turn protection' }); engine.sync(); return; }   // Spielgestalter-Entscheidung 16.11.2026: gespielt, verpufft
 
       // Die gespielte Karte JETZT dem Gegner zeigen — er wird gleich zuerst gefragt.
       if (gs._pendingCardReveal) engine._firePendingCardReveal();

@@ -16,6 +16,8 @@ module.exports = {
     onResourceGain: (ctx) => {
       // Only boost during Resource Phase
       if (ctx.phaseIndex !== 1) return;
+      // Spielgestalter-Entscheidung 17.11.2026: die +6 sind Effekt-Gold (Einkommens-Zuschlag) — `actionGainGold` meldet sie nach der Buchung als eigenes
+      // Ereignis (`afterResourceGain`, `_einkommensBonus`), auf das Monkees, Royal Treasury und Humby reagieren; nur das Grund-Einkommen (4) zaehlt nicht.
       // v1344: NUR das Rundeneinkommen erhoehen (`_isResourceGain`), nicht
       // jeden Gewinn in der Resource Phase. Seit Golden Ladybug gibt es dort
       // auch Effekt-Gold — der Bonus haette sich sonst je Gewinn wiederholt.

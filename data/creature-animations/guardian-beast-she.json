@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast She",
+  "sheet": "guardian-beast-she.png",
+  "frameWidth": 48,
+  "frameHeight": 50,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 4,
+  "padRight": 4,
+  "padBottom": 4,
+  "faceX": 24.0
+}

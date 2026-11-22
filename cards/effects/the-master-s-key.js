@@ -40,7 +40,8 @@ function kandidaten(engine, pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const zaehler = new Map();
-  for (const n of (ps?.hand || [])) {
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     const cd = db[n];
     if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) continue;
     if (!isOwnSideSummonableCreature(cd, n)) continue;
@@ -83,6 +84,9 @@ function schonGespielt(gs, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT('masters-key', pi); },
+
   neverMultiTarget: true,   // genau EINE Creature wird platziert
   blockedBySummonLock: true,
 

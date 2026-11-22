@@ -166,6 +166,22 @@ module.exports = {
           const _kosten = loadCardEffect(found)?.payActivationCost;
           if (typeof _kosten === 'function') await _kosten.call(loadCardEffect(found), engine._createContext(subInst, {}));
           require('./_monia-shared').neuerGuss(gs);   // W83a (Al 28.10.): der gewirkte Spell ist für Cool Rescuer Monia ein EIGENER Effekt (eigenes Angebot)
+          // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): auch der von Chaos Magic gewirkte Spell öffnet das Kettenfenster eines normal gespielten
+          // (Silence, Ghostly Warning, … — er kommt aus dem Deck, nicht aus der Hand: kein Master's Plan). Negiert: der Rumpf läuft nie, der Spell zählt NICHT als aufgelöst (kommt aus der Liste, ein
+          // späteres Chaos Magic kann ihn wieder aufdecken); seine Karte wurde schon beim Aufdecken gelöscht.
+          const _pk = await engine.performKettenfenster({ cardName: found, pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ausHand: false });
+          if (_pk.negated) {
+            gs._spellCancelled = _cancelVorher;
+            if (!_warSchonAufgeloest) { const _ri = resolved.lastIndexOf(found); if (_ri >= 0) resolved.splice(_ri, 1); }
+            engine.log('chaos_magic_negated', { player: ps.username, spell: found });
+            delete gs._spellNegatedByEffect;
+            delete gs._spellDamageLog;
+            delete gs._spellExcludeTargets;
+            delete gs._bartasSecondCast;
+            engine._untrackCard(subInst.id);
+            engine.sync();
+            return;
+          }
           await engine.runHooks('onPlay', {
             _onlyCard: subInst, playedCard: subInst,
             cardName: found, zone: 'hand', heroIdx,

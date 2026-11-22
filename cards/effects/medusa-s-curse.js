@@ -147,6 +147,7 @@ module.exports = {
         // Parallel damage-block buff (damageMultiplier: 0 comes from BUFF_EFFECTS).
         // ★ W15a: ein per Reaktion (Barrier of Faith) geschützter Held ist von ALLEN Wirkungen der Karte ausgenommen — auch vom Schadensschutz-Buff.
         if (engine.hasEffectImmunity(ht.owner, ht.heroIdx, ctx.card)) continue;
+        if (engine.ersterZugGeschuetzt(oppIdx, pi)) continue;   // Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — die Betaeubung verpufft, also gibt es auch den Schadensschutz-Buff nicht
         await engine.actionAddBuff(ht.hero, ht.owner, ht.heroIdx, 'medusa_petrified', {
           sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           expiresAtTurn,

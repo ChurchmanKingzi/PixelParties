@@ -88,7 +88,8 @@ module.exports = {
       if (ps._golemSummonTurn !== gs.turn && host?.name) {
         const slot = freierPlatz(engine, seite, heroIdx, pi);
         const karten = [];
-        const inHand = (ps.hand || []).filter(n => n === CARD_NAME).length;
+        // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+        const inHand = engine.handUndVorratListe(pi).filter(n => n === CARD_NAME).length;
         const imDeck = (ps.mainDeck || []).filter(n => n === CARD_NAME).length;
         if (slot >= 0 && inHand > 0) karten.push({ name: CARD_NAME, source: 'hand', count: inHand });
         if (slot >= 0 && imDeck > 0) karten.push({ name: CARD_NAME, source: 'deck', count: imDeck });

@@ -34,11 +34,13 @@ module.exports = {
     if (!ps) return false;
     // Need at least one Guardian Beast Creature in hand AND a free
     // Support slot on at least one alive Hero.
-    const hasGBInHand = (ps.hand || []).some(isGuardianBeastCreature);
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+    const handListe = engine ? engine.handUndVorratListe(pi) : (ps.hand || []);
+    const hasGBInHand = handListe.some(isGuardianBeastCreature);
     if (!hasGBInHand) return false;
     // Kontrolle statt Seite (Styx 28.9.) — „any Hero you control".
     // W62a: mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Bestie (`beschwoerZonenFuer`, je Karte).
-    return [...new Set(ps.hand.filter(isGuardianBeastCreature))]
+    return [...new Set(handListe.filter(isGuardianBeastCreature))]
       .some(n => engine.hatBeschwoerZone(pi, n, { nachKontrolle: true, livingHeroesOnly: true }));
   },
 
@@ -54,7 +56,7 @@ module.exports = {
       // by name and surface the count so the player can see they have
       // multiples of one type.
       const counts = {};
-      for (const cn of (ps.hand || [])) {
+      for (const cn of engine.handUndVorratListe(pi)) {
         if (!isGuardianBeastCreature(cn)) continue;
         counts[cn] = (counts[cn] || 0) + 1;
       }
@@ -92,9 +94,9 @@ module.exports = {
       // so the empty-discard summon gate is bypassed (matches "ignoring
       // its summoning restrictions"). Hooks fire so the placed Beast's
       // own onPlay (per-turn flag stamp) and any board reactions land.
-      const handIdx = ps.hand.indexOf(beastName);
-      if (handIdx < 0) return;
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      const beastQuelle = engine._rxQuelleFuer(ps, beastName);   // Hand oder Crestinas Vorrat
+      if (!beastQuelle) return;
+      engine.rxNimm(ps, beastQuelle);
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'summoning_glow',

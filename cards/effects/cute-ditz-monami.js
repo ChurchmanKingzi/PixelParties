@@ -44,7 +44,8 @@ function cuteHandCards(engine, pi) {
   const ps = engine.gs.players[pi];
   const cardDB = engine._getCardDB();
   const counts = new Map();
-  for (const n of (ps?.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  for (const n of engine.handUndVorratListe(pi)) {
     const cd = cardDB[n];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (!hasCuteInName(n)) continue;
@@ -96,7 +97,7 @@ module.exports = {
       });
       if (!wahl || wahl.cancelled || !wahl.cardName) return;
       const cardName = wahl.cardName;
-      if ((ps.hand || []).indexOf(cardName) < 0) return;
+      if (!engine._rxQuelleFuer(ps, cardName)) return;   // Hand oder Crestinas Vorrat
       await engine.showTriggeredEffect(CARD_NAME);   // Regel: aktivierter Effekt zeigt seine Karte
 
       const zonen = freieZonenDesHelden(engine, pi, heroIdx, seite, cardName);   // W62a: Zone der gewaehlten Karte (frei oder geteilt)

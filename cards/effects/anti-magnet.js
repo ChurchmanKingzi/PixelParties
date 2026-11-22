@@ -25,16 +25,18 @@
 //  Challenge/Martyry share the same limitation).
 //
 //  ── Differences from Challenge / Martyry ──
-//   • Artifact, Cost 2: the redirect system does
-//     NOT auto-deduct gold (Challenge/Martyry are
-//     free Spell/Attack reactions). `canRedirect`
-//     gates on affordability (gold ≥ 2, not gold-
-//     locked); `onRedirect` pays it via
-//     `actionSpendGold` only once a new target is
-//     locked in. If the spend fails (a goldLock
-//     race) we return null → no redirect, the card
-//     is NOT consumed (engine: `if
-//     (!result?.redirectTo) continue;`).
+//   • Artifact, Cost 2: `canRedirect` gates on
+//     affordability (`canAffordGold`: gold ≥ 2
+//     or Kent/Debt-O-Tron credit, not gold-
+//     locked). Spielgestalter-Entscheidung 16.11.2026
+//     (Umleiter sind kettbar): die ENGINE spielt die
+//     Karte VOR der Wirkung — Hand → Ablage, die 2 Gold
+//     (`cost`, Kreditrahmen, Item Lock wie bei jedem
+//     Hand-Artefakt), Aufdecken — und lässt den Gegner
+//     mit einer Reaktion antworten (Cute Camera, Front
+//     Soldier …). Erst danach läuft `onRedirect`: der
+//     Gegner wählt das Ersatzziel. Wird Anti-Magnet
+//     negiert, bleibt das Ziel, die 2 Gold sind weg.
 //   • Redirects ALL THREE source kinds (Attack,
 //     Spell, Creature effect) — the resolution
 //     wording "Attack/Spell/effect" matches
@@ -77,7 +79,25 @@ const GOLD_COST = 2;
 function getOtherValidTargets(selected, validTargets, engine) {
   if (!Array.isArray(validTargets)) return [];
   // Al, 25.10.2026: „target" = Held oder Kreatur - Ausruestung, Anhaengsel, Areas ... sind keine Umleitungsziele und zaehlen nicht als „other possible target".
-  return validTargets.filter(t => t && t.id !== selected.id && istHeldOderKreatur(engine, t));
+  // ★ Spielgestalter-Entscheidung 17.11.2026: „different target" — ein Ziel, das derselbe Effekt schon gewaehlt/getroffen hat (`_bereitsGewaehlt`, vom Umleitungs-Hub markiert), ist kein
+  // Ersatzziel (kein Doppeltreffer; nur Redirecting Aura darf das).
+  return validTargets.filter(t => t && t.id !== selected.id && !t._bereitsGewaehlt && istHeldOderKreatur(engine, t));
+}
+
+/**
+ * „exactly 1 target you control is chosen" (wie Alleria, W24d): Anzahl der vom Effekt GEWAEHLTEN Ziele (Held/Kreatur), die `ownerIdx` kontrolliert — die Umleitungsfenster geben die
+ * ganze Auswahl in `config._redirectPickedIds` mit (nur das aktuelle Ziel, wenn der Aufrufer sie nicht fuehrt).
+ */
+function gewaehlteEigeneZiele(engine, ownerIdx, selected, validTargets, config) {
+  const ids = Array.isArray(config?._redirectPickedIds) && config._redirectPickedIds.length
+    ? config._redirectPickedIds : [selected.id];
+  let n = 0;
+  for (const id of ids) {
+    const v = id === selected.id ? selected : (validTargets || []).find(t => t && t.id === id);
+    if (!v || !istHeldOderKreatur(engine, v)) continue;
+    if ((engine?.zielSeite ? engine.zielSeite(v) : v.owner) === ownerIdx) n++;
+  }
+  return n;
 }
 
 module.exports = {
@@ -104,10 +124,12 @@ module.exports = {
     // Must be a target the Anti-Magnet player controls.
     // Kontrolle statt Seite (Styx 28.9.).
     if ((engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== pi) return false;
+    // „exactly 1 target you control is chosen": waehlt der Effekt mehrere eigene Ziele (Fireball auf zwei eigene Helden), ist Anti-Magnet nicht ausloesbar.
+    if (gewaehlteEigeneZiele(engine, pi, selected, validTargets, config) !== 1) return false;
 
-    // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow).
+    // Cost 2 — must be able to pay (and not gold-locked, e.g. Golden Arrow). Kreditrahmen (Kent, Debt-O-Tron) zaehlt wie bei jeder Hand-Reaktion (`canAffordGold`, vorher roh `gold >= 2`).
     const ps = gs.players[pi];
-    if (!ps || ps.goldLocked || (ps.gold || 0) < GOLD_COST) return false;
+    if (!ps || !engine.canAffordGold(pi, GOLD_COST, CARD_NAME)) return false;
 
     // "while you control other possible targets" → W12 (Al, Q88/F01-08): „Es braucht mindestens ein zweites **eigenes**
     // legales Ziel." Der Besitzer muss selbst (Kontrolle statt Seite) ein ZWEITES legales Ziel des Effekts kontrollieren;
@@ -117,11 +139,13 @@ module.exports = {
   },
 
   /**
-   * Execute the redirect: opponent picks the new target among all the
-   * original effect's other valid targets; pay the 2 gold; chain UI.
+   * Execute the redirect (nach dem Spielen der Karte und dem Gegenreaktions-Fenster der Engine): the
+   * opponent picks the new target among all the original effect's other valid targets; chain UI.
+   * Gold, Ablage und Aufdecken erledigt die Engine (`_checkTargetRedirectOnce`) schon vorher — die
+   * Aufdeckung der Karte für den wählenden Gegner liegt damit ebenfalls VOR der Wahl.
    * @returns {{ redirectTo: object }|null}
    */
-  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
+  onRedirect: async (engine, pi, selected, validTargets, config, sourceCard, plan) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
     const eligible = getOtherValidTargets(selected, validTargets, engine);
@@ -135,21 +159,6 @@ module.exports = {
     if (eligible.length === 1) {
       redirectTarget = eligible[0]; // Only one option — auto.
     } else {
-      // Stream Anti-Magnet's card image to the opponent (the player
-      // about to choose) + spectators as a `card_reveal` overlay BEFORE
-      // the pick dialogue, so it's obvious what just happened. The
-      // engine's own redirect-card reveal only fires AFTER onRedirect
-      // returns — too late for the chooser. Mirrors the Jump in the
-      // River reveal pattern.
-      const oppSid = gs.players[oppIdx]?.socketId;
-      if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-      if (engine.room?.spectators) {
-        for (const spec of engine.room.spectators) {
-          if (spec.socketId) engine.io.to(spec.socketId).emit('card_reveal', { cardName: CARD_NAME });
-        }
-      }
-      await engine._delay(100);
-
       const picked = await engine.promptEffectTarget(oppIdx, eligible, {
         title: CARD_NAME,
         description: `Choose where ${sourceCard?.name || 'the effect'} is redirected.`,
@@ -165,10 +174,6 @@ module.exports = {
       redirectTarget = eligible.find(t => t.id === id) || eligible[0];
     }
     if (!redirectTarget) return null;
-
-    // ── Pay the 2 gold (only now that a target is locked in) ──
-    const paid = await engine.actionSpendGold(pi, GOLD_COST);
-    if (!paid) return null; // goldLock race — no redirect, card not consumed.
 
     // ── Chain visualization (mirrors Challenge / Martyry) ──
     const attackerName = config.title || sourceCard?.name || 'Effect';

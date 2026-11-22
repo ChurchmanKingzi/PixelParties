@@ -1,0 +1,15 @@
+{
+  "creature": "Potion Juggler",
+  "sheet": "potion-juggler.png",
+  "frameWidth": 36,
+  "frameHeight": 44,
+  "frames": 54,
+  "frameMs": 70,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 18.0
+}

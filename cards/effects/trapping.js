@@ -31,6 +31,8 @@ module.exports = {
     const aktivierer = ctx.cardController ?? ctx.cardOwner;
     const deckPs = gs.players[aktivierer];
     if (!deckPs) return false;
+    // Spielgestalter-Entscheidung 17.11.2026 (Arcane Eyes): „cannot place Surprises" — die Ability ist dann gesperrt (grau), nicht erst beim Anklicken wirkungslos.
+    if (engine.surprisesLockedFor(aktivierer)) return false;
 
     // Check for a free placement zone
     const { hasSurpriseZone, hasBakhmSlot } = _getFreePlacementZones(ps, heroIdx, pi, engine);

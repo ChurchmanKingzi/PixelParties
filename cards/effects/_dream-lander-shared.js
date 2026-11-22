@@ -49,7 +49,7 @@ function portalKandidaten(engine, pi, loadCardEffect) {
     if (c.counters?.attachedHero) continue;
     const helden = loadCardEffect(c.name)?.attachableHeroes;
     if (!Array.isArray(helden) || helden.length === 0) continue;
-    const verfuegbar = helden.filter(h => (ps?.hand || []).includes(h) || (ps?.mainDeck || []).includes(h));
+    const verfuegbar = helden.filter(h => engine.handUndVorratListe(pi).includes(h) || (ps?.mainDeck || []).includes(h))   // 12.11.: Hand + Crestinas Vorrat;
     if (verfuegbar.length === 0) continue;
     out.push({ inst: c, helden: verfuegbar });
   }

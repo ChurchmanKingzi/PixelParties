@@ -73,7 +73,10 @@ function countLoyalCreatures(engine, playerIdx) {
  */
 function getLoyalsInHand(ps, engine, opts = {}) {
   const counts = {};
-  for (const cn of (ps?.hand || [])) {
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat (Loyal Pinpom, Orthos).
+  const pi = engine?.gs?.players?.indexOf(ps);
+  const quellen = (engine && pi >= 0) ? engine.handUndVorratListe(pi) : (ps?.hand || []);
+  for (const cn of quellen) {
     if (opts.exclude && cn === opts.exclude) continue;
     if (!isLoyalCreature(cn, engine)) continue;
     counts[cn] = (counts[cn] || 0) + 1;

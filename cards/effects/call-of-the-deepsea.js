@@ -33,6 +33,7 @@
 const { isSummonablePileCreature } = require('./_hooks');
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const { canHeroSummon } = require('./_summon-eligibility');
+const { ablageAusgangGesperrt } = require('./_pfad-shared');
 
 const CARD_NAME = 'Call of the Deepsea';
 
@@ -45,8 +46,10 @@ function kandidaten(engine, pi, heroIdx, ausserName, seite = pi) {
   const db = engine._getCardDB();
   const out = [];
   for (const quelle of ['hand', 'discard']) {
-    if (quelle === 'discard' && !engine.pileOutAllowed(pi, 'discard', { source: CARD_NAME })) continue;
-    const pool = quelle === 'hand' ? (ps?.hand || []) : (ps?.discardPile || []);
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar): auch die Stab-Sperre (Staff of the Teleporter) schliesst die Ablage als Quelle (früher nur Knight of Kings [B]).
+    if (quelle === 'discard' && ablageAusgangGesperrt(engine, pi, { sourceOwner: pi })) continue;
+    // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen — hier: beschwoeren —, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+    const pool = quelle === 'hand' ? engine.handUndVorratListe(pi) : (ps?.discardPile || []);
     const zaehler = new Map();
     for (const n of pool) {
       if (n === ausserName) continue;
@@ -110,7 +113,9 @@ module.exports = {
       // „delete it": die besiegte Karte muss in einer Ablage liegen.
       const stapelBesitzer = tod.originalOwner ?? tod.owner;
       if (!(gs.players[stapelBesitzer]?.discardPile || []).includes(tod.name)) return;
-      if (!engine.pileOutAllowed(stapelBesitzer, 'discard', { source: CARD_NAME })) return;
+      // „delete it" und „summon" sind EIN Paket: kann die besiegte Karte die Ablage nicht verlassen (Knight of Kings [B], Stab-Sperre des Staff of the Teleporter), wird gar nicht angeboten —
+      // früher kam die Wahl, die Kosten wurden gezahlt und das Löschen scheiterte danach (`delete_failed`).
+      if (ablageAusgangGesperrt(engine, stapelBesitzer, { sourceOwner: pi })) return;
       // Derselbe Platz muss frei sein.
       if (engine.supportSlotBelegt(seite, heroIdx, slotIdx)) return;
       const karten = kandidaten(engine, pi, heroIdx, tod.name, seite);

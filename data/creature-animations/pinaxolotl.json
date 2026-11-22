@@ -1,0 +1,15 @@
+{
+  "creature": "Pinaxolotl",
+  "sheet": "pinaxolotl.png",
+  "frameWidth": 45,
+  "frameHeight": 21,
+  "frames": 60,
+  "frameMs": 64,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 2,
+  "faceX": 22.5
+}

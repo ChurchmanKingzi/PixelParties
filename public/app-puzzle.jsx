@@ -13,6 +13,31 @@ const GALLERY_PAGE = 120;
 const GALLERY_GROW_MARGIN = 600;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, BleedingOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
 
+// ── Stun im Editor ──
+// Der Editor zeigt seine Helden/Kreaturen als stehende Karten (keine Sprite-Figur). Der Stun-Status bekommt hier dieselben kreisenden Pixelsterne wie im
+// Spiel (app-fx-64, `window.PpFx64Sterne`), nicht mehr die alten Blitze: deren `.status-stunned-overlay` färbte die Karte unter den Blitzen schwarz
+// (die Pixel-Pipeline `pixel-hart.js` mischt einen hellen Alpha-Hintergrund zu einer deckenden Farbe; Überlagerungen über Karten gehören nicht dazu).
+// Maße in Sprite-Pixeln (1 Zelle = Hero-Pixel = 2,8125 × --board-scale, genau wie `HeroIdleSprite`): Ursprung = obere Mitte der Zone, die Sterne kreisen
+// auf dem oberen Kartendrittel (Mitte 10 Zellen unter dem Zonenrand) und bleiben so ganz innerhalb der Zone (`.board-zone` schneidet ab). Die Kopfbreite 18 ergibt die
+// Standardbahn der Helden (Halbachse 8 Zellen). Eine feste Fassung: ein neues Objekt je Zeichnen würde die Leinwand neu aufsetzen (die Sterne sprängen auf Anfang).
+const PZ_STUN_KERN = { x0: -9, x1: 9, y0: 0, y1: 34, oben: 13 };
+const PZ_HERO_PIXEL = 2.8125;
+/**
+ * Stun-Darstellung einer Karte im Editor. Mit der neuen Fassung der Sterne (nicht Retro, keine reduzierte Bewegung, Animationen an) die Leinwand aus dem
+ * Spiel; sonst — wie im Spiel — die alten Blitze als Rückfall (`.status-stunned-overlay`).
+ */
+function PzStunEffekt() {
+  const sterne = !!(window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv());
+  if (!sterne) {
+    return <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>;
+  }
+  return (
+    <div className="status-stunned-sterne" aria-hidden="true">
+      <window.PpFx64Sterne kern={PZ_STUN_KERN} mitteX={0} s={PZ_HERO_PIXEL} zf={1} intro={false} />
+    </div>
+  );
+}
+
 // ── Ambient pixel motes for the Puzzle Creator ─────────────────────────
 // Same visual language as the battle board (reuses the global
 // .board-ambiance / .board-mote CSS and the hand-mote-float keyframes),
@@ -176,7 +201,7 @@ const PLAYER_DEBUFF_REGISTRY = [
   { key: 'actionLocked',      label: '🚫 Action-locked (no Actions, placing still works)', flagKey: 'actionLocked'  },
   { key: 'damageLocked',      label: '🛡️ Damage-locked',                              flagKey: 'damageLocked'        },
   { key: 'oppHandLocked',     label: '🫲 Opp-hand-locked',                            flagKey: 'oppHandLocked'       },
-  { key: 'itemLocked',        label: '🔨 Item-locked (must delete to play artifact)', flagKey: 'itemLocked'          },
+  { key: 'itemLocked',        label: '🔨 Artifact-locked (must delete 1 card to play an Artifact)', flagKey: 'itemLocked'          },
   { key: 'potionLocked',      label: '🧪 Potion-locked',                              flagKey: 'potionLocked'        },
   { key: 'supportSpellLocked',label: '💚 Support-spell-locked',                       flagKey: 'supportSpellLocked'  },
   { key: 'forsaken',          label: '🏴‍☠️ Forsaken (discards delete instead)',         flagKey: '_discardToDeleteActive' },
@@ -258,7 +283,7 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, k
           boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
         }}>
           <div style={{ padding: '4px 8px 6px', fontSize: 10, color: accent, opacity: 0.85, borderBottom: `1px solid ${accent}33`, marginBottom: 4 }}>
-            {isOpp ? "Opponent's" : "Your"} starting debuffs
+            {isOpp ? "Opponent's starting debuffs" : "Your starting debuffs"}
           </div>
           {PLAYER_DEBUFF_REGISTRY.map(d => {
             const checked = selected.includes(d.key);
@@ -413,7 +438,7 @@ function schadensHistorieImPuzzle(players, hand, oppHand) {
 function funFunImPuzzle(players, hand, oppHand, getCard) {
   const istFunFun = (n) => {
     const c = typeof n === 'string' ? getCard(n) : null;
-    return !!c && (/^Fun-Fun/.test(c.archetype || '') || /Applause Counter/.test(c.effect || ''));
+    return !!c && (/^Fun-Fun/.test(c.archetype || '') || /Applause Counter/.test(c.effectEn || c.effect || ''));
   };
   if ((hand || []).some(istFunFun) || (oppHand || []).some(istFunFun)) return true;
   return (players || []).some(p => p && (p.supportZones || []).some(hz => (hz || []).some(slot => (slot || []).some(istFunFun))));
@@ -423,7 +448,7 @@ function funFunImPuzzle(players, hand, oppHand, getCard) {
 // nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
 // spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
 function cardUsesDemonCounters(card) {
-  return !!card && typeof card.effect === 'string' && card.effect.includes('Demon Counter');
+  return !!card && typeof card.effect === 'string' && (card.effectEn || card.effect).includes('Demon Counter');
 }
 const PUZZLE_HERO_COUNTER_BADGES = [
   { key: '_changeCounters',    icon: '🌌', label: 'Change Counters' },
@@ -1296,9 +1321,9 @@ function PuzzleCreator() {
     const map = {};
     const allCards = window.AVAILABLE_CARDS || [];
     for (const c of allCards) {
-      if (c.cardType !== 'Ascended Hero' || !c.effect) continue;
+      if (c.cardType !== 'Ascended Hero' || !(c.effectEn || c.effect)) continue;
       // Pattern: on top of a/an "Base Hero Name"  OR  Ascend from "Base Hero Name"
-      const m = c.effect.match(/(?:on top of an? |Ascend from )"([^"]+)"/);
+      const m = (c.effectEn || c.effect).match(/(?:on top of an? |Ascend from )"([^"]+)"/);
       if (m) {
         const baseName = m[1];
         // Waflav variants reference just "Waflav" — resolve to the actual Hero card
@@ -4077,7 +4102,7 @@ function PuzzleCreator() {
                     </div>
                   )}
                   {hero.statuses?.frozen && <FrozenOverlay />}
-                  {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                  {(hero.statuses?.stunned || hero.statuses?.webbed) && <PzStunEffekt />}
                   {hero.statuses?.negated && <NegatedOverlay />}
                   {hero.statuses?.burned && <BurnedOverlay />}
                   {hero.statuses?.bleeding && <BleedingOverlay />}
@@ -4315,6 +4340,7 @@ function PuzzleCreator() {
                           <div style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(47,78,29,.9)', color: '#b3f9b8', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(75,205,124,.6)', pointerEvents: 'none' }}>Lv{cs.biomancyLevel}</div>
                         )}
                         {cs.frozen && <FrozenOverlay />}
+                        {cs.stunned && <PzStunEffekt />}
                         {cs.burned && <BurnedOverlay />}
                         {cs.bleeding && <BleedingOverlay />}
                         {cs.negated && <NegatedOverlay />}
@@ -4444,13 +4470,13 @@ function PuzzleCreator() {
               value={puzzleFilters.cardType}
               onChange={e => setPuzzleFilters(p => ({ ...p, cardType: e.target.value }))}>
               <option value="">All Types</option>
-              {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.subtype}
               onChange={e => setPuzzleFilters(p => ({ ...p, subtype: e.target.value }))}>
               <option value="">All Subtypes</option>
-              {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             {/* ★ v1166: Doppelschulen — nur Attacks/Spells/Creatures mit zwei Spell Schools */}
             <PPSelect className="db-filter-select"
@@ -4468,31 +4494,31 @@ function PuzzleCreator() {
               value={puzzleFilters.archetype}
               onChange={e => setPuzzleFilters(p => ({ ...p, archetype: e.target.value }))}>
               <option value="">All Archetypes</option>
-              {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.ss1}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss1: e.target.value }))}>
               <option value="">Spell School 1</option>
-              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.ss2}
               onChange={e => setPuzzleFilters(p => ({ ...p, ss2: e.target.value }))}>
               <option value="">Spell School 2</option>
-              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.sa1}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa1: e.target.value }))}>
               <option value="">Starting Ability 1</option>
-              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <PPSelect className="db-filter-select"
               value={puzzleFilters.sa2}
               onChange={e => setPuzzleFilters(p => ({ ...p, sa2: e.target.value }))}>
               <option value="">Starting Ability 2</option>
-              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{window.ppT(t)}</option>)}
             </PPSelect>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               <input className="db-filter-input" type="number" placeholder="Level"

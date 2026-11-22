@@ -30,6 +30,9 @@ const EXPLOSION_DAMAGE = 100;
 const MAX_TARGETS = 3;
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Choose up to 3 targets your opponent controls". → nur Gegnerziele, also unter Blinded nie spielbar (Engine liest den gedruckten Text, `istReineGegnerKarte`).
+  requiresTarget: true,
+
   // ★ Als Ruling (Al 26.10., Flame Avalanche: „Am besten gleich die Karten ganz sperren statt den Schaden fizzeln zu lassen"): die Karte richtet NUR Schaden an Zielen des Gegners an —
   // unter der Schadenssperre (`ps.damageLocked`) unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; Sperr-Stutzen `engine._cardBlockedBySearchLock`).
   blockedByDamageLock: true,

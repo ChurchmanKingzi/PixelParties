@@ -17,6 +17,7 @@
 // ═══════════════════════════════════════════
 
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { waehlePfad } = require('./_pfad-shared');
 
 /**
  * Die waehlbaren Fahrten. Faellt eine Option der Zieh-Sperre zum Opfer,
@@ -34,6 +35,9 @@ function wheelsOptionen(engine, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { engine.claimHOPT('wheels', pi); },
+
   isTargetingArtifact: true,
 
   // Gerrymander redirect — when opp activates Wheels, our Gerrymander
@@ -63,21 +67,21 @@ module.exports = {
     if (!ps) return { cancelled: true };
 
     // Prompt for mode selection (with cancel)
-    const choice = await engine.promptGeneric(pi, {
-      type: 'optionPicker',
+    // ── Tuscan Artist (Als Ruling 16.8.) ──
+    // Der 3er-Zug ist gesperrt, der 4er nicht. Dann verschwindet die
+    // Option ganz, statt eine Wahl anzubieten, die nichts zieht — Al
+    // ausdruecklich: "bei Wheels gibt es dann KEINE Auswahl mehr".
+    // Der 4er-Zweig bleibt und wird automatisch gewaehlt (Spielgestalter-Entscheidung 18.11.2026, allgemeine Regel „ein freier Pfad → automatisch", `_pfad-shared.js`;
+    // früher blieb ein Menü mit einer einzigen Option stehen).
+    const wahl = await waehlePfad(engine, pi, wheelsOptionen(engine, pi), {
       title: 'Wheels',
       description: 'Choose your ride:',
-      // ── Tuscan Artist (Als Ruling 16.8.) ──
-      // Der 3er-Zug ist gesperrt, der 4er nicht. Dann verschwindet die
-      // Option ganz, statt eine Wahl anzubieten, die nichts zieht — Al
-      // ausdruecklich: "bei Wheels gibt es dann KEINE Auswahl mehr".
-      // Der 4er-Zweig bleibt und wird unten automatisch gewaehlt.
-      options: wheelsOptionen(engine, pi),
       cancellable: true,
       gerrymanderEligible: true, // 2 distinct effects (Draw3+Discard1 vs Draw4+Delete2).
     });
 
-    if (!choice || choice.cancelled) return { cancelled: true };
+    if (wahl.abgebrochen || wahl.keiner) return { cancelled: true };
+    const choice = { optionId: wahl.id };
 
     // Claim HOPT only after confirming a mode (cancel doesn't consume it)
     if (!engine.claimHOPT('wheels', pi)) return;
@@ -105,7 +109,8 @@ module.exports = {
       if (exclude < 0) return undefined;
       const out = [];
       for (let i = 0; i < ps.hand.length; i++) if (i !== exclude) out.push(i);
-      return out.length > 0 ? out : undefined;
+      // Keine andere Handkarte: LEERE Auswahl (der Helfer bricht dann ohne Abfrage ab) — nicht `undefined`, das hieße „alles wählbar" und ließe Wheels sich selbst ablegen/löschen.
+      return out;
     };
 
     if (choice.optionId === 'draw3') {

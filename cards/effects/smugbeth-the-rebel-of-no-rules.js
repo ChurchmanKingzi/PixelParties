@@ -55,7 +55,7 @@ module.exports = {
     if (ctx.card.counters?.attachedHero) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    const hasLizbeth = (ps.hand || []).includes(ATTACHABLE)
+    const hasLizbeth = ctx._engine.handUndVorratListe(ctx.cardOwner).includes(ATTACHABLE)   /* 12.11.: Hand + Crestinas Vorrat */
       || (ps.mainDeck || []).includes(ATTACHABLE);
     return hasLizbeth;
   },

@@ -14,6 +14,21 @@
 //  per the card text. It runs through the standard
 //  onPlay flow of the reflected Spell, so nested
 //  reaction chains still work.
+//
+//  ── DIE KOPIE IST KEINE KARTE (Spielgestalter-Entscheidung 16.11.2026: „Magic Mirror soll keine Kartenkopie als permanente Karte erzeugen") ──
+//  Sie wirkt — bei einem Anhängsel-Spell (Curse, Berserk, Anti Magic, Stoneskin, Polymorph, Regeneration, Guardian Angel, Shrink, Spell Shackle …)
+//  liegt sie für die Dauer ihrer Wirkung am Helden —, erzeugt aber nie eine echte Karte in einem Stapel (Ablage, Gelöscht-Stapel, Deck, Hand):
+//  • Brett: die Instanz trägt `counters._spiegelKopie` (die Engine stempelt jede beim Wirken entstehende Brettinstanz desselben Namens, `_trackCard`/
+//    `_spiegelKopieName`); `engine.isTokenCard` liest die Marke → jeder Abgang (Zerstören, Ablegen, Wirtstod, Bounce, „delete this card" …) lässt sie
+//    verschwinden (`tokenAbgang`, Ereignis `token_disintegrate`), nie ein Stapel.
+//  • Zauber, die sich selbst in einen Stapel schreiben („Delete this card": Forbidden Zone, Liberation, Meditation …): `kopieStapelBereinigen` nimmt
+//    nach dem Wirken genau die Einträge wieder heraus, die der Stapelstand des Spiegel-Besitzers durch die Kopie zusätzlich bekam.
+//  Das ORIGINAL des negierten Zaubers geht wie immer in den Stapel seines Besitzers.
+//
+//  ── AKTIONSSPERRE (Spielgestalter-Entscheidung 18.11.2026) ──
+//  „the user immediately performs a copy of it as an additional Action" ist eine Aktion: ist der Besitzer des Spiegels aktionsgesperrt (`engine.areActionsBlocked(ownerIdx)`:
+//  Overflowing Chalice, Kents Negativ-Gold-Sperre, `_playerActionLockedTurn`, `ps.actionLocked`), wird die KOPIE nicht gewirkt (keine Kosten, kein Einmal-Stempel, kein Kettenfenster).
+//  Der Zauber wird trotzdem negiert und die Pollution Tokens werden trotzdem gelegt — nur die Kopie entfällt.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -29,9 +44,40 @@ function eigenesLimitVerbraucht(gs, ownerIdx, script, cardName) {
   return !!gs.players[ownerIdx]?._oncePerGameUsed?.has(script.oncePerGameKey || cardName);
 }
 
+const KOPIE_STAPEL = ['discardPile', 'deletedPile', 'hand', 'mainDeck'];
+
+/** Summe der Einträge `cardName` in Ablage, Gelöscht-Stapel, Hand und Deck des Spielers (die Kopie erzeugt Einträge, ein Zug/Ziehen verschiebt sie nur). */
+function kopieStapelSumme(gs, pi, cardName) {
+  const ps = gs.players[pi];
+  let n = 0;
+  for (const z of KOPIE_STAPEL) for (const c of (ps?.[z] || [])) if (c === cardName) n++;
+  return n;
+}
+
+/**
+ * Spielgestalter-Entscheidung 16.11.2026: die Kopie ist keine Karte. Hat das Wirken (ein Zauber, der „this card" selbst ablegt/löscht/zurücklegt) zusätzliche Einträge
+ * `cardName` im Stapelstand des Spiegel-Besitzers hinterlassen, werden genau so viele wieder entfernt (Ablage, Gelöscht-Stapel, Hand, Deck — in dieser Reihenfolge, von hinten).
+ */
+function kopieStapelBereinigen(engine, pi, cardName, summeVorher) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  let ueberschuss = kopieStapelSumme(gs, pi, cardName) - summeVorher;
+  if (!ps || ueberschuss <= 0) return;
+  for (const z of KOPIE_STAPEL) {
+    const arr = ps[z];
+    while (ueberschuss > 0 && Array.isArray(arr)) {
+      const i = arr.lastIndexOf(cardName);
+      if (i < 0) break;
+      arr.splice(i, 1);
+      ueberschuss--;
+      engine.log('magic_mirror_copy_vanished', { player: ps.username, card: cardName, pile: z });
+    }
+  }
+}
+
 module.exports = {
-  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
-  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  // „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; nur Hammer Throws Item Lock liest es noch —
+  // Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
   negatesWholeCard: true,
 
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
@@ -135,6 +181,11 @@ module.exports = {
     // mehr (`spellPlayCondition` der Kostenzahler) oder bricht der Spieler die Kostenwahl ab (`false`), gibt es keine Kopie —
     // das Original bleibt negiert.
     let kopieMoeglich = !!script?.hooks?.onPlay;
+    // Spielgestalter-Entscheidung 18.11.2026: unter einer Aktionssperre des Besitzers entfällt NUR die Kopie (Negation und Pollution Tokens bleiben) — siehe Kopf.
+    if (kopieMoeglich && engine.areActionsBlocked(ownerIdx)) {
+      kopieMoeglich = false;
+      engine.log('magic_mirror_copy_blocked', { player: gs.players[ownerIdx]?.username, spell: sourceCard, reason: 'actions_blocked' });
+    }
     let synthInstVorab = null;
     if (kopieMoeglich && eigenesLimitVerbraucht(gs, ownerIdx, script, sourceCard)) kopieMoeglich = false;
     if (kopieMoeglich && typeof script.payActivationCost === 'function' && script.payActivationCost.length <= 1) {
@@ -156,15 +207,13 @@ module.exports = {
       }
     }
     if (kopieMoeglich) {
-      // Eigenes „once per game"-Limit des Spiegel-Besitzers verbrauchen; `_surpriseStempel` schützt es vor dem Z7b-Abzug,
-      // falls der Spiegel-Besitzer zugleich Wirker des negierten Zaubers ist.
+      // Eigenes „once per game"-Limit des Spiegel-Besitzers verbrauchen.
       const opgKey = script.oncePerGameKey || (script.oncePerGame ? sourceCard : null);
       if (opgKey) {
         const ops = gs.players[ownerIdx];
         if (ops) {
           if (!ops._oncePerGameUsed) ops._oncePerGameUsed = new Set();
           ops._oncePerGameUsed.add(opgKey);
-          (engine._surpriseStempel || (engine._surpriseStempel = new Set())).add(`${ownerIdx}|${opgKey}`);
         }
       }
     }
@@ -174,6 +223,7 @@ module.exports = {
       // zone 'hand' so downstream cost logic in the spell treats it as a
       // normal play.
       const synthInst = synthInstVorab || engine._trackCard(sourceCard, ownerIdx, 'hand', hostHeroIdx, -1);
+      synthInst.counters._spiegelKopie = true;   // Spielgestalter-Entscheidung 16.11.2026: eine Kopie, keine Karte (kein Stapel, siehe Kopf)
       // Als Vorgabe 29.9.: Wirker ist der Traeger auf seiner Brettseite
       // (geliehener Held) — `cardHeroOwner` der Kopie zeigt dorthin.
       if (!synthInstVorab && ctx.cardHeroOwner != null && ctx.cardHeroOwner !== ownerIdx) synthInst.heroOwner = ctx.cardHeroOwner;
@@ -183,18 +233,27 @@ module.exports = {
       // the original caster out.
       gs._immediateActionContext = true;
       gs._magicMirrorBypassLevel = true; // Advisory flag for future use
+      const _kopieVorher = engine._spiegelKopieName;
+      const _stapelVorher = kopieStapelSumme(gs, ownerIdx, sourceCard);
+      engine._spiegelKopieName = sourceCard;   // `_trackCard` stempelt die beim Wirken entstehende Brettinstanz (Anhängsel) als Kopie
 
       try {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): „the user performs a copy of it" ist ein Spielen der Kopie
+        // (`engine.performKettenfenster`): Silence, Anti-Magic-Reaktionen usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Kosten/Limit sind oben schon bezahlt/verbraucht,
+        // Tokens liegen schon. Wird die Kopie in der Kette negiert, löst ihr Rumpf nie auf (die Instanz verschwindet unten wie sonst; das Original bleibt negiert).
+        const _pk = await engine.performKettenfenster({ cardName: sourceCard, pi: ownerIdx, heroIdx: hostHeroIdx, heroOwner: ctx.cardHeroOwner ?? ownerIdx, ausHand: false });
         // Fire the Spell's onPlay hook scoped to this instance.
-        await engine.runHooks('onPlay', {
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: synthInst, playedCard: synthInst,
           cardName: sourceCard, zone: 'hand',
           heroIdx: hostHeroIdx,
           _skipReactionCheck: true,
         });
       } finally {
+        engine._spiegelKopieName = _kopieVorher;
         delete gs._immediateActionContext;
         delete gs._magicMirrorBypassLevel;
+        kopieStapelBereinigen(engine, ownerIdx, sourceCard, _stapelVorher);   // Selbst-Ablage/-Löschen der Kopie (Forbidden Zone …) hinterlässt keine Karte
         // Die synthetische Instanz ist eine KOPIE, keine Karte: sie verschwindet nach der Ausführung.
         // ★ W16b (A01-pollution-15, Text „performs a copy of it"): sie landet NICHT in der Ablage des Spiegel-Besitzers
         // (sonst Kartenvermehrung + Rückholfutter); das Original liegt in der Ablage seines Spielers. Auf dem Brett

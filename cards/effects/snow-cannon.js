@@ -4,6 +4,14 @@
 //  or Creature that isn't Immune. Freeze it
 //  until the end of its owner's next turn.
 //  Goes to discard after resolving.
+//
+//  ★ Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): gegen Frost
+//  immune Ziele (Helden UND Kreaturen: freeze_immune, `immune`, Charme,
+//  Cardinal Beasts …) bleiben WAEHLBAR — nicht ausgegraut, nicht
+//  herausgefiltert. Die Zielwahl warnt („… is immune to freezing and will
+//  not be affected."), der Frost verpufft, die Karte ist verbraucht. Die CPU
+//  waehlt solche Ziele nicht. Nur Unwaehlbares (tot, schon gefroren,
+//  verdeckt, untargetable) steht weiter nicht in der Liste.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -37,7 +45,7 @@ module.exports = {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if ((hero.charmedBy ?? hero.permaControlBy ?? po) !== oppIdx) continue;
-      if (hero.statuses?.immune) continue;
+      // `immune` (Auftau-Puffer), freeze_immune & Co. nehmen den Helden NICHT aus der Liste (Spielgestalter-Entscheidung 17.11.2026): wählbar, Warnung im Picker, der Frost verpufft.
       if (hero.statuses?.frozen) continue;
       targets.push({
         id: `hero-${po}-${hi}`,
@@ -65,8 +73,7 @@ module.exports = {
         if (inst.counters?.frozen) continue;
         // Harte Unwählbarkeit (Thicket): „cannot be chosen by cards and effects" — wie im Engine-Sammler (F03-04).
         if (inst.counters?.untargetable_all) continue;
-        if (typeof engine.canApplyCreatureStatus === 'function'
-            && !engine.canApplyCreatureStatus(inst, 'frozen', { name: 'Snow Cannon' })) continue;
+        // Frost-Immunitaet (freeze_immune, Cardinal Beast …) schliesst die Kreatur NICHT aus (Spielgestalter-Entscheidung 17.11.2026): wählbar, Warnung im Picker, der Frost verpufft.
         targets.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip',
@@ -78,6 +85,8 @@ module.exports = {
         });
       }
     }
+    // Immune Ziele markieren (`wirkungslos`): der Picker warnt, die CPU wählt sie nicht.
+    if (engine?.markiereStatusWirkungslos) engine.markiereStatusWirkungslos(targets, 'frozen', playerIdx, 'Snow Cannon');
     return targets;
   },
 
@@ -99,8 +108,11 @@ module.exports = {
   async resolve(engine, playerIdx, selectedIds, validTargets) {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target) return;
+    // Immunes Ziel (Spielgestalter-Entscheidung 17.11.2026): der Frost verpufft — `addHeroStatus`/`applyCreatureStatus` weisen ihn ab (`status_blocked`), die Karte ist gespielt.
+    let angewendet = false;
     if (target.type === 'hero') {
       await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', { appliedBy: playerIdx });
+      angewendet = !!engine.gs.players[target.owner]?.heroes?.[target.heroIdx]?.statuses?.frozen;
     } else {
       // Kreatur — Instanz bevorzugt aus dem Ziel, sonst ueber die Zone
       // nachschlagen (das Ziel kann eine ueber den Client gelaufene
@@ -110,11 +122,11 @@ module.exports = {
           && c.owner === target.owner && c.heroIdx === target.heroIdx
           && c.zoneSlot === target.slotIdx);
       if (!inst) return;
-      await engine.applyCreatureStatus(inst, 'frozen', {
+      angewendet = !!(await engine.applyCreatureStatus(inst, 'frozen', {
         source: { name: 'Snow Cannon', owner: playerIdx },
         appliedBy: playerIdx,
-      });
+      }));
     }
-    engine.log('freeze', { target: target.cardName, by: 'Snow Cannon' });
+    if (angewendet) engine.log('freeze', { target: target.cardName, by: 'Snow Cannon' });
   },
 };

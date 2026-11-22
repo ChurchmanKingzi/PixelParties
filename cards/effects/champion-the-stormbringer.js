@@ -37,6 +37,9 @@
 //    (b) Ist der GEGNER Boris-Spieler, darf er den erzwungenen Abwurf („must discard the same number") ignorieren: er wirft nichts ab und zieht
 //        auch nichts („draw that many" = tatsächlich abgeworfene Anzahl 0 — Annahme, Rückfrage an Al). Der eigene Zug des Champion-Spielers bleibt.
 //
+//  ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout): Ambush negiert NUR die Seite des Ambush-Spielers (seinen Zwangsabwurf) — Abwurf und Ziehen des Champion-Spielers sind schon passiert und
+//  bleiben. Wer nichts abwirft, zieht auch nichts („draw that many"): der Ambush-Spieler zieht in diesem Fall KEINE Karten (wie bei Boris' Verzicht, W74c).
+//
 //  Visual: each of the player's discarded cards
 //  flies hand → discard via the windstorm flight
 //  style first added for Tengu Windstorm
@@ -65,6 +68,8 @@ function _stormCap(gs, pi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hero'],
   heroEffect: true,
   // Adventurousness-style activation cost: spend an Action (Action Phase
@@ -93,8 +98,8 @@ module.exports = {
     // protection either — the protection is absolute. Rather than
     // letting the player burn their Action on a fizzle, gate the
     // activation entirely while turn-1 shielding is up.
-    const oi = engine.opponentOf(pi);
-    if (gs.firstTurnProtectedPlayer === oi) return false;
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — aktivierbar, der Teil am Gegner (Abwurf/Zug) verpufft, die eigene Seite wirkt wie gedruckt.
+    if (engine.cpuMeidetErsteRunde(pi)) return false;   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
     return _stormCap(gs, pi) >= 1;
   },
 
@@ -192,8 +197,10 @@ module.exports = {
     // that propagates the splice — so the source hand-slot rect is
     // still in the client DOM when the animation captures it.
     let gegnerBorisVerzicht = false;
+    let gegnerAmbush = false;   // 17.11.2026: Ambush the Scout hat den Zwangsabwurf negiert → der Gegner zieht nichts
     if ((ops.hand || []).length > 0) {
       const stempelVor = engine._borisStempelHeute(oi);
+      const negiertVor = engine.handInteraktionenNegiert();
       await engine.actionPromptForceDiscard(oi, N, {
         source:        CARD_NAME,
         selfInflicted: false,
@@ -203,6 +210,7 @@ module.exports = {
       });
       // ★ W74c (Al): ignoriert der Gegner den Zwangsabwurf per Boris, wurde nichts abgeworfen — „draw that many" ist dann 0 (Annahme, Rückfrage an Al).
       gegnerBorisVerzicht = !stempelVor && engine._borisStempelHeute(oi);
+      gegnerAmbush = engine.handInteraktionenNegiert() > negiertVor;
       // Hold for the last opp-side gust to land before the draw begins,
       // identical pacing to the player's own discard → draw transition
       // above. Without this the opp's tutor flies in while their wind-
@@ -214,7 +222,7 @@ module.exports = {
     // `_unpreventable: true` bypasses handLocked + any BEFORE_DRAW
     // cancel listener — see actionDrawCards in _engine.js for the
     // bypass branches added alongside this card.
-    if (!gegnerBorisVerzicht) {
+    if (!gegnerBorisVerzicht && !gegnerAmbush) {
       await engine.actionDrawCards(oi, N, {
         source: CARD_NAME,
         _unpreventable: true,

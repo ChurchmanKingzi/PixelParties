@@ -25,6 +25,20 @@
 //  diesen zurück). Umhängen an einen anderen Helden (Tea/Inheritance Ceremony) wandert die Kontrolle mit (`attachmentMovedToHost`, Eintritts-/Austritts-Hook). Resistance & Co. am Wirt
 //  fangen die Kontroll-Übernahme selbst ab: die Karte verpufft dann (Ablage).
 //
+//  ── STATUS-IMMUNITÄT (Spielgestalter-Entscheidung 18.11.2026) ───────────
+//  „This is treated as a negative status effect": ist der Wirt im Moment gegen negative Status immun (Johanna, Light Ball, `negative_status_immune`, Immunitäts-Anhängsel …), liegt die Karte
+//  wirkungslos am Helden — kein Status `mind_controlled`, KEINE Kontrolle. Endet die Immunität (Johanna stirbt, Light Ball geht, Buff läuft ab …), greift die Karte und der Besitzer übernimmt den Helden;
+//  kommt sie später dazu, ruht die Karte wieder und die Kontrolle geht zurück — wie Curse, Berserk und Stowaway (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`; der Abgleich in `engine.sync`
+//  setzt/nimmt den Status). Die KONTROLLE selbst ist asynchron und hängt am Status: `kontrolleAbgleichen` gleicht sie in den Haken, in denen sich eine Immunität ändern kann (Eintritt/Austritt einer Karte,
+//  Heldentod/-wiederbelebung, Zugbeginn/-ende, nach jeder aufgelösten Aktion), mit dem Status ab. Die Kontrolle, die die Karte selbst ausübt, zählt für die Immunität des Wirts nicht (`kontrolleAls`): sonst
+//  schützten die Johanna/der Light Ball des Übernehmers den übernommenen Helden vor der Übernahme selbst, und sie flackerte an und aus.
+//
+//  ── HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026) ────────────────
+//  „Mind Controlled" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie dann als eigenen `attach:<instId>`-Eintrag
+//  („Mind Controlled (Mind Control)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers; Cure zählt ihn als einen entfernten
+//  Effekt (+100 HP). Die ruhende Karte übt keine Kontrolle aus — Heilen gibt also nichts zurück und ändert die Kontrolle nicht (`gibZurueck` findet keinen Eintrag in `mcZiele`). Aktiv steht nur der
+//  Status `mind_controlled` in der Liste (kein Doppeleintrag); ihn zu heilen wirft die Karte ab und gibt die Kontrolle zurück wie bisher.
+//
 //  ── OBERGRENZE ──────────────────────────────────────────────────────────
 //  „If either player controls more than 2 Heroes, immediately send this card to the discard pile." Gezählt werden die UNBESIEGTEN Helden, die ein Spieler kontrolliert (besiegte Helden zählen
 //  nicht — sonst wäre die Karte nach der Spielbedingung [2 eigene Helden besiegt + ein Held] nie legal: 3 + 1 > 2). Geprüft nach jeder Wiederbelebung, jedem Kontrollwechsel, zu jedem Zugbeginn und nach
@@ -79,6 +93,7 @@ async function uebernehme(engine, inst) {
   const seite = inst.owner, hi = inst.heroIdx;
   const hero = engine.gs.players[seite]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return false;
+  if (inst.counters?._statusRuht) return false;                              // 18.11.2026: Status-Immunität des Wirts — die Karte ruht, die Kontrolle kommt erst, wenn sie endet
   const kontrolleur = Number.isInteger(inst.originalOwner) ? inst.originalOwner : engine.opponentOf(seite);
   if (engine.heroSideOf(seite, hero) === kontrolleur) return false;          // gehört ihm schon (z. B. zweite Kopie): nichts zu übernehmen
   if (!inst.counters) inst.counters = {};
@@ -121,6 +136,33 @@ async function gibZurueck(engine, inst, seite, heroIdx) {
   engine.sync();
 }
 
+/**
+ * 18.11.2026 (Status-Immunität): die Kontrolle dieser Karte folgt ihrem Status. Der Wirt trägt `mind_controlled` (der Abgleich in `engine.sync` legt ihn an/nimmt ihn, je nach Immunität) und die Karte
+ * ruht nicht → sie soll den Helden führen; sonst nicht. Gleicht beides ab (Übernahme nachholen / Kontrolle zurückgeben). Läuft in den Haken, in denen sich eine Immunität ändern kann.
+ */
+async function kontrolleAbgleichen(engine, inst) {
+  if (!inst || inst.name !== CARD_NAME || inst.zone !== 'support' || inst.faceDown) return;
+  if (!inst.counters) inst.counters = {};
+  if (inst.counters._mcAbraeumt || inst.counters._mcAbgleich) return;
+  inst.counters._mcAbgleich = true;
+  try {
+    for (let durchgang = 0; durchgang < 3; durchgang++) {
+      const seite = inst.owner, hi = inst.heroIdx;
+      const hero = engine.gs.players[seite]?.heroes?.[hi];
+      if (!hero?.name || !(hero.hp > 0) || inst.zone !== 'support') return;   // besiegter Wirt: Austritt/Heldentod (unten) geben die Kontrolle zurück
+      const hat = !!inst.counters.mcZiele?.[`${seite}:${hi}`];
+      const soll = !!hero.statuses?.[STATUS_NAME] && !inst.counters._statusRuht;
+      if (soll === hat) return;
+      if (soll) {
+        if (!(await uebernehme(engine, inst))) return;                       // false: gehört ihm schon (zweite Kopie) oder abgewehrt (Resistance → Ablage)
+        await pruefeObergrenze(engine);
+      } else {
+        await gibZurueck(engine, inst, seite, hi);
+      }
+    }
+  } finally { if (inst.counters) delete inst.counters._mcAbgleich; }
+}
+
 /** „If either player controls more than 2 Heroes, immediately send this card to the discard pile." */
 async function pruefeObergrenze(engine, ausser) {
   // `ausser`: die Karte, die gerade selbst geht (im Austritts-Hook liegt sie noch im Support) — sie nicht ein zweites Mal abräumen.
@@ -151,11 +193,27 @@ module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER: wird die Karte NEGIERT, spielt die Engine dieses Bild.
   spellVisual: { impact: { type: 'mind_control_hex' }, impactMs: 260 },
 
-  requiresTarget: true,                    // wählt ein Ziel (Blinded-Sperre)
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to 1 of your opponent's Heroes") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
+  requiresTarget: true,
+  blindedEigeneZiele: false,
   takesControlOfTargets: true,             // Boris & Co.: übernimmt fremde Ziele
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: 'Mind Controlled (Mind Control)',
+  negativeStatusIcon: '🧠',
+  // Spielgestalter-Entscheidung 18.11.2026: der Status (und mit ihm die Kontrolle) folgt der Status-Immunität des Wirts (Curse/Berserk-Muster). `kontrolleAls`: die Übernahme, die diese Karte selbst
+  // ausübt, zählt für die Immunität des Wirts nicht — er wird als Held seines Kontrolleurs VOR der Übernahme beurteilt (sonst Flackern bei eigener Johanna/eigenem Light Ball).
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    kontrolleAls(engine, inst, seite, heroIdx) {
+      const z = inst.counters?.mcZiele?.[`${seite}:${heroIdx}`];
+      return z ? (z.vorher != null ? z.vorher : seite) : null;
+    },
+  },
 
   spellPlayCondition(gs, pi, engine) {
     const eng = engine || gs._engineRef;
@@ -199,8 +257,8 @@ module.exports = {
       if (!inst) { engine.sync(); return; }                        // Anti Magic / Resistance / Immunität: die Karte geht in die Ablage
       // Status, dann Kontrolle (Eintritts-Hook der Karte läuft hier selbst, damit beides in EINER Reihenfolge steht).
       const wirt = gs.players[host.owner]?.heroes?.[host.heroIdx];
-      await statusHooks.onCardEnterZone({ ...ctx, card: inst, enteringCard: inst, toZone: 'support', _engine: engine });
-      if (wirt?.name && !wirt.statuses?.[STATUS_NAME]) {
+      await statusHooks.onCardEnterZone({ ...ctx, card: inst, enteringCard: inst, toZone: 'support', _engine: engine });   // legt den Status an — oder markiert die Karte als ruhend (Status-Immunität des Wirts)
+      if (wirt?.name && !wirt.statuses?.[STATUS_NAME] && !inst.counters?._statusRuht) {
         require('./_attachment-shared').setzeAnhaengselStatus(engine, host.owner, host.heroIdx, CARD_NAME, STATUS_NAME);
       }
       await uebernehme(engine, inst);
@@ -215,12 +273,12 @@ module.exports = {
     onCardEnterZone: async (ctx) => {
       await statusHooks.onCardEnterZone(ctx);
       const inst = ctx.card;
-      if (!inst || inst.name !== CARD_NAME || ctx.enteringCard?.id !== inst.id) return;
-      if (ctx._mcSchon) return;
-      if (ctx.toZone && ctx.toZone !== 'support') return;
-      if (inst.zone !== 'support' || inst.faceDown) return;
-      await uebernehme(ctx._engine, inst);
-      await pruefeObergrenze(ctx._engine);
+      if (!inst || inst.name !== CARD_NAME) return;
+      if (ctx.enteringCard?.id === inst.id && !ctx._mcSchon && (!ctx.toZone || ctx.toZone === 'support') && inst.zone === 'support' && !inst.faceDown) {
+        await uebernehme(ctx._engine, inst);
+        await pruefeObergrenze(ctx._engine);
+      }
+      await kontrolleAbgleichen(ctx._engine, inst);   // 18.11.2026: auch beim Eintritt EINER ANDEREN Karte (Light Ball …) kann sich die Immunität des Wirts ändern
     },
 
     /** Austritt: Status nehmen (Hook des Bausteins) und die Kontrolle zurückgeben. */
@@ -229,17 +287,27 @@ module.exports = {
       const inst = ctx.card;
       if (!inst || inst.name !== CARD_NAME) return;
       const gehend = ctx.leavingCard || ctx._onlyCard;
-      if (gehend?.id !== inst.id) return;
-      if (ctx.fromZone && ctx.fromZone !== 'support') return;
       const engine = ctx._engine;
+      if (gehend?.id !== inst.id) { await kontrolleAbgleichen(engine, inst); return; }   // eine ANDERE Karte geht (Light Ball …): die Immunität des Wirts kann enden
+      if (ctx.fromZone && ctx.fromZone !== 'support') return;
       await gibZurueck(engine, inst, ctx.fromOwner ?? inst.owner, ctx.fromHeroIdx ?? inst.heroIdx);
       await pruefeObergrenze(engine, inst);
     },
 
     // Obergrenze nach jeder Wiederbelebung / jedem Kontrollwechsel / zu jedem Zugbeginn.
-    onHeroRevive: async (ctx) => { await pruefeObergrenze(ctx._engine); },
+    // 18.11.2026 (Status-Immunität): dazu die Kontrolle mit dem Status abgleichen — in den Haken, in denen sich die Immunität des Wirts ändern kann (Johanna stirbt/wird wiederbelebt, Buff läuft ab)
+    // und nach jeder aufgelösten Aktion/Wirkung (Johanna wird eingefroren/aufgetaut, ein Schutz fällt weg …). NICHT in `onStatusApplied`/`onStatusRemoved`: dort hat der Status-Abgleich der Engine
+    // (`engine.sync`) noch nicht gelaufen (`STATUS_ABGLEICH_HOOKS` in `_engine.js` meidet sie bewusst).
+    onHeroRevive: async (ctx) => { await pruefeObergrenze(ctx._engine); await kontrolleAbgleichen(ctx._engine, ctx.card); },
     onTakeControl: async (ctx) => { await pruefeObergrenze(ctx._engine); },
-    onTurnStart: async (ctx) => { await pruefeObergrenze(ctx._engine); },
+    onTurnStart: async (ctx) => { await pruefeObergrenze(ctx._engine); await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onTurnEnd: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onHeroKO: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onAnyActionResolved: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onActiveEffectUsed: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterSpellResolved: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterCreatureEffect: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterAllStatusDamage: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
   },
 
   /** CPU: den wertvollsten Gegnerhelden wählen. */

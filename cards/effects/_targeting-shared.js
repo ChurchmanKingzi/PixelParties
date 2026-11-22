@@ -111,24 +111,12 @@ function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
 
-  // Erst-Runden-Schutz: Karten des geschützten Spielers kann
-  // `actionDestroyCard` gar nicht zerstören (es loggt `destroy_blocked`
-  // und kehrt zurück). Sie hier anzubieten hieße, ein Ziel zu zeigen,
-  // das die Bezahlung anschließend verweigert — der Spieler zahlt 150
-  // Selbstschaden für nichts. Der dafür vorgesehene Engine-Helfer heißt
-  // `isAbilityRemovalProtected` und ist ausdrücklich für getValidTargets
-  // gedacht.
-  const EngineClass = engine?.constructor;
-  const isProtected = (owner) => (
-    typeof EngineClass?.isAbilityRemovalProtected === 'function'
-      ? EngineClass.isAbilityRemovalProtected(gs, owner)
-      : gs.firstTurnProtectedPlayer === owner
-  );
-
+  // Erst-Runden-Schutz: Karten des geschützten Spielers kann `actionDestroyCard` gar nicht zerstören (es loggt `destroy_blocked` und kehrt zurück).
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — sie werden trotzdem als Ziel angeboten (der Spieler will vielleicht Karten loswerden bzw. den
+  // Selbstschaden/Preis zahlen): die Wahl verpufft, die Zerstörung blockt die Engine (`destroy_blocked`). Früher: Schutz → nicht gelistet (`isAbilityRemovalProtected`).
   for (const inst of engine.cardInstances) {
     if (inst.zone === 'hand' || inst.zone === 'discard' || inst.zone === 'deleted' || inst.zone === 'hero' || inst.zone === 'deck') continue;
     if (inst.counters?.immovable) continue;
-    if (isProtected(inst.owner)) continue;
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
 
@@ -267,6 +255,8 @@ function zielAnzeigeFuer(engine, validTargets, viewer) {
     const huelle = { id: inst.id, zone: inst.zone, faceDown: true, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot };
     const out = { ...t, cardName: '' };
     if ('name' in out) out.name = '';
+    // Spielgestalter-Entscheidung 17.11.2026 (Warntext am Ziel): der Hinweissatz nennt den Kartennamen und verriete die verdeckte Karte (z. B. „… is immune to freezing") — maskierte Ziele tragen keinen.
+    delete out.hinweis; delete out.hinweisArt; delete out.wirkungslos;   // `wirkungslos` (Satz mit Namen, nur fuer die CPU) liest der Client nie
     if (t.cardInstance) out.cardInstance = huelle;
     if (t._cardInstance) out._cardInstance = huelle;
     return out;

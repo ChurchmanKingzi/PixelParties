@@ -113,8 +113,19 @@ function drawBlockedFor(engine, playerIdx, amount) {
   return amount == null ? false : drawWouldBeBlocked(engine, playerIdx, amount);
 }
 
+/**
+ * Spielgestalter-Entscheidung 17.11.2026 (Leadership x Tuscan Artist): Mischkarten duerfen unter Tuscan Artist weiter mit genau 2/3 Karten gewaehlt werden
+ * (das Mischen laeuft, nur das Nachziehen von genau 2/3 ist negiert) — der Auswahldialog warnt aber. Warnungsprinzip wie `engine._nutzlosHinweis`:
+ * kurzer englischer Hinweis, kein Ausgrauen. `amount` = die Menge, die das Skript an `actionDrawCards` uebergeben wuerde. '' = keine Warnung noetig.
+ */
+function tuscanArtistHinweis(engine, playerIdx, amount) {
+  if (!drawWouldBeBlocked(engine, playerIdx, amount)) return '';
+  return `${BLOCKER_NAME} negates drawing exactly ${Number(amount)} cards \u2013 you will shuffle but not draw.`;
+}
+
 module.exports = {
   drawBlockedFor,
+  tuscanArtistHinweis,
   BLOCKER_NAME,
   MIN_BLOCKED,
   MAX_BLOCKED,

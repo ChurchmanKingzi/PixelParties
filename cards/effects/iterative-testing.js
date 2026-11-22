@@ -71,8 +71,8 @@ function magicArts(gs, pi, heroIdx, engine) {
 }
 
 module.exports = {
-  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
-  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  // ★ FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328) oder wird sie NEGIERT (Kette), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`;
+  // Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem Beginn der Aktivierung verbraucht).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT('iterative-testing', pi); },
 
   // CPU: bei „up to 2“ die Höchstzahl (Q17).

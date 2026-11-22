@@ -1,0 +1,15 @@
+{
+  "creature": "Chaorc Friendly Fireballer",
+  "sheet": "chaorc-friendly-fireballer.png",
+  "frameWidth": 61,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 62,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 8,
+  "padRight": 2,
+  "padBottom": 4,
+  "faceX": 30.5
+}

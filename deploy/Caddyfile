@@ -40,3 +40,8 @@ pixelpartiestcg.com {
 neu.pixelpartiestcg.com {
         import pixelparties
 }
+
+# www.* auf die Hauptdomain umleiten (ein Host im Index, keine Dubletten). Braucht einen DNS-Eintrag fuer www.
+www.pixelpartiestcg.com {
+        redir https://pixelpartiestcg.com{uri} permanent
+}

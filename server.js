@@ -84,6 +84,8 @@ const funnelModule = require('./funnel');   // Spieler-Trichter (Besucher -> Gas
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
+const RarityTrack = require('./cards/effects/_rarity-track');   // Rarity je physischer Kartenkopie (Identitaetsverfolgung ueber Zonenwechsel)
+const RARITIES = require('./rarities');   // Seltenheiten (UMD, auch im Browser): Namen, Gewichte, Würfeln, Pack-Pools, Deck-Rechnung
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -853,6 +855,14 @@ function serveIndexHtml(req, res) {
     // Expose the public Google OAuth client id to the front-end. Empty string
     // when unset, which hides the "Sign in with Google" button client-side.
     html = html.split('__GOOGLE_CLIENT_ID__').join(process.env.GOOGLE_CLIENT_ID || '');
+    // Google Search Console: Bestaetigung per Meta-Tag (Umgebungsvariable GOOGLE_SITE_VERIFICATION = nur der Inhalt/„content"-Wert).
+    const gsv = String(process.env.GOOGLE_SITE_VERIFICATION || '').replace(/[^A-Za-z0-9_\-]/g, '');
+    if (gsv) html = html.replace('</title>', `</title>\n  <meta name="google-site-verification" content="${gsv}">`);
+    if (!isCanonicalHost(req)) {
+      // Test-/Vorschau-Host: nicht indexieren, und der Canonical zeigt auf die Produktionsseite (keine Dubletten).
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      html = html.replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${canonicalOrigin()}/">`);
+    }
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
     res.setHeader('Cache-Control', 'no-cache');
     // 12.8.: index.html ging als einzige Seite ungepackt raus (die
@@ -875,60 +885,30 @@ function serveIndexHtml(req, res) {
 app.get(['/', '/index.html'], serveIndexHtml);
 
 // ───────────────────────────────────────────────────────────────
-//  SUCHMASCHINEN: robots.txt + sitemap.xml
+//  SUCHMASCHINEN (SEO): robots.txt, sitemap.xml, Kartenliste, Kartenseiten
 //
-//  Beide fehlten bis v485 — und weil der SPA-Auffangpfad ganz unten
-//  (`app.get('*')`) JEDEN Pfad mit der index.html beantwortet, kam
-//  auf `/robots.txt` bisher HTML mit Status 200 zurueck statt einer
-//  Robots-Datei. Googles Crawler behandelt Unlesbares zwar als
-//  „alles erlaubt", aber eine HTML-Seite unter /robots.txt ist ein
-//  Fehlsignal, und /sitemap.xml war gar nicht erst zu finden.
+//  Die App selbst hat nur EINE URL ("/") und darunter nur einen Ladebildschirm –
+//  fuer Google gab es also nichts zu finden. Darum rendert seo.js oeffentliche,
+//  ohne JavaScript lesbare Seiten (`/cards`, `/card/<name>`) samt Sitemap.
+//  Details und Regeln: seo.js. Die Routen stehen VOR `express.static`, damit sie
+//  auch dann gewinnen, wenn spaeter eine gleichnamige Datei in `public/` landet.
 //
-//  Beide Routen stehen VOR `express.static`, damit sie auch dann
-//  gewinnen, wenn spaeter einmal eine gleichnamige Datei in
-//  `public/` landet — und sie bauen ihre URLs aus `resolveOrigin`,
-//  genau wie die Share-Vorschau. Damit stimmt der Host automatisch,
-//  egal ob die Seite unter der eigenen Domain oder unter der
-//  Render-Adresse ausgeliefert wird.
-//
-//  Die Sitemap fuehrt heute genau EINEN Eintrag, weil die App genau
-//  eine URL hat („/"). Das ist kein Versehen: Client-Routen gibt es
-//  nicht (kein pushState im ganzen Frontend). Kommen oeffentliche
-//  Seiten dazu (Kartenliste, Regeln), gehoeren sie hier hinein.
+//  Nur der Produktionshost darf in den Index (siehe isCanonicalHost): `neu.…`,
+//  Vorschau- und Testadressen liefern `X-Robots-Tag: noindex` und zeigen mit ihrem
+//  Canonical auf die echte Seite, damit keine Dubletten entstehen.
 // ───────────────────────────────────────────────────────────────
-app.get('/robots.txt', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    'User-agent: *',
-    'Allow: /',
-    // Nichts von Wert fuer den Index, aber viel Crawl-Budget:
-    // Kartenkunst und Klaenge sind ~800 Dateien.
-    'Disallow: /api/',
-    'Disallow: /sounds/',
-    'Disallow: /music/',
-    '',
-    `Sitemap: ${origin}/sitemap.xml`,
-    '',
-  ].join('\n'));
-});
-
-app.get('/sitemap.xml', (req, res) => {
-  const origin = resolveOrigin(req);
-  res.setHeader('Content-Type', 'application/xml; charset=UTF-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send([
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    '  <url>',
-    `    <loc>${origin}/</loc>`,
-    '    <changefreq>weekly</changefreq>',
-    '    <priority>1.0</priority>',
-    '  </url>',
-    '</urlset>',
-    '',
-  ].join('\n'));
+function canonicalOrigin() { return (process.env.PUBLIC_BASE_URL || SHARE_BASE_DEFAULT).replace(/\/+$/, ''); }
+function hostOf(u) { try { return new URL(u).host.toLowerCase(); } catch { return ''; } }
+/** true, wenn die Anfrage ueber den Produktionshost kam (Schema egal: hinter Caddy kann `http` ankommen). */
+function isCanonicalHost(req) { return hostOf(resolveOrigin(req)) === hostOf(canonicalOrigin()); }
+require('./seo').registerSeoRoutes(app, {
+  resolveOrigin,
+  isIndexable: isCanonicalHost,
+  canonicalOrigin,
+  getCardArray,
+  hasCardEffect,
+  cardNamesWithImage: (cards) => require('./card-images').cardNamesWithImage(cards),
+  cardsJsonMtime: () => fs.statSync(path.join(__dirname, 'data', 'cards.json')).mtimeMs,
 });
 
 // ── AUSGEHENDE BANDBREITE / AKTUALITAET (v350, angepasst v351) ──────
@@ -953,7 +933,22 @@ app.get('/sitemap.xml', (req, res) => {
 // zu 7 Tage einplanen — oder den Dateinamen aendern.
 // Pixel-Emoji-Schrift: der Dateiname traegt einen Inhalts-Hash (`?v=…`, scripts/pixel-emoji/build_font.py) — ein Jahr cachen, ohne Rueckfrage.
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '365d', immutable: true }));
+// Rarity-Modul (UMD, Repo-Wurzel): derselbe Quelltext laeuft im Server (require) und im Browser (window.PpRarities).
+app.get('/rarities.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.sendFile(path.join(__dirname, 'rarities.js'), { etag: true, lastModified: true });
+});
+// Glücksrad-Modul (UMD, Repo-Wurzel): Gewinntabellen und Würfeln — Server (require) und Browser-Vorschau (window.PpWheel).
+app.get('/wheel.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.sendFile(path.join(__dirname, 'wheel.js'), { etag: true, lastModified: true });
+});
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
+// Creature-Sheets: die URL trägt den Zeitstempel der Datei (`?v=`, `/api/creature-animations`) — lange zwischenspeichern, damit das Vorladen aller Sheets zu Spielbeginn
+// nach dem ersten Mal ohne Netzanfragen auskommt.
+app.use('/data/creature-animations', express.static(path.join(__dirname, 'data', 'creature-animations'), { maxAge: '30d', immutable: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
 // reload / re-login serves them straight from disk instead of re-fetching
@@ -1001,6 +996,8 @@ async function initDatabase() {
   try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN skins TEXT DEFAULT '{}'"); } catch {}
+  // Rarity je Kartenkopie im Deck (JSON, Form siehe rarities.js: { main, potion, side, heroes }). Leer = alles Common.
+  try { await db.execute("ALTER TABLE decks ADD COLUMN rarities TEXT DEFAULT '{}'"); } catch {}
   // Cube Draft mode: a deck row with mode='cube' is a 512-card cube list
   // (single section, no heroes / potions / side). Default 'standard' keeps
   // every existing row unchanged.
@@ -1025,6 +1022,7 @@ async function initDatabase() {
   // Einklappen während Zielwahl-Dialogen (Dynamic Heroes) — beide an.
   try { await db.execute("ALTER TABLE users ADD COLUMN display_heroes INTEGER DEFAULT 1"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN dynamic_heroes INTEGER DEFAULT 1"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN display_creatures INTEGER DEFAULT 1"); } catch {}   // Creature-Figuren auf dem Brett (Unteroption von display_heroes)
   // Ranked-games counter — incremented when a ranked SET (Bo1/Bo3/Bo5)
   // finishes. Used to filter the leaderboard to "actually competed"
   // players so fresh accounts at the default 1000 ELO don't pollute the
@@ -1053,6 +1051,7 @@ async function initDatabase() {
   // to verified=1 once. New accounts only ever land in `users` AFTER they
   // verify (see pending_signups), so they arrive already verified.
   try { await db.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN lang TEXT DEFAULT NULL"); } catch {}   // Sprache des Kontos ('en' | 'de'): Oberflaeche + E-Mails
   try { await db.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("UPDATE users SET email_verified = 1 WHERE email IS NULL AND email_verified = 0"); } catch {}
   try { await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
@@ -1113,6 +1112,7 @@ async function initDatabase() {
     attempts INTEGER DEFAULT 0,
     created_at INTEGER DEFAULT (unixepoch())
   )`);
+  try { await db.execute("ALTER TABLE pending_signups ADD COLUMN lang TEXT DEFAULT NULL"); } catch {}
 
   // One-time codes for password reset and for grandfathered accounts
   // adding an email later. `purpose` is 'reset' | 'add_email'.
@@ -1256,6 +1256,59 @@ async function initDatabase() {
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user ON sc_log(user_id)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user_date ON sc_log(user_id, created_at)');
+
+  // Rarity-Sammlung: gesammelte Kopien je (Karte, Rarity) — Common gehört jedem unbegrenzt und steht nicht in der Tabelle.
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_card_rarities (
+    user_id TEXT NOT NULL,
+    card TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, card, rarity)
+  )`);
+  // Emotes und Titel (emotes-titles.js): Besitz je Nutzer (Start-Emotes gehören jedem und stehen nicht in der Tabelle), gewählte Emotes (Tasten 1–3), ausgerüsteter Titel
+  await db.execute('CREATE TABLE IF NOT EXISTS user_emotes (user_id TEXT NOT NULL, emote_id TEXT NOT NULL, PRIMARY KEY (user_id, emote_id))');
+  await db.execute('CREATE TABLE IF NOT EXISTS user_titles (user_id TEXT NOT NULL, title_id TEXT NOT NULL, PRIMARY KEY (user_id, title_id))');
+  try { await db.execute('ALTER TABLE users ADD COLUMN emote_slots TEXT'); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN title TEXT'); } catch {}
+  // Glücksrad (wheel-api.js): gewonnene Rarity-Upgrade-Tickets je (Nutzer, Rarity) — ein Ticket wertet eine freie Kopie dieser Rarity auf die nächsthöhere auf.
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_wheel_tickets (
+    user_id TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, rarity)
+  )`);
+  // Offene (gekaufte, noch nicht eingelöste) Booster-Packs: mehrere je Nutzer möglich (Mengenkauf, bis BOOSTER_MAX_BUY je Kauf).
+  await db.execute(`CREATE TABLE IF NOT EXISTS pending_booster (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    pack_id TEXT NOT NULL,
+    variant_id TEXT NOT NULL,
+    cards_json TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+  // Sell Back: Index der aus diesem Pack zurückgegebenen Karte (-1 = noch keine). Je Pack nur eine; bestehende Zeilen bekommen den Default.
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN sold_idx INTEGER NOT NULL DEFAULT -1'); } catch {}
+  // Herkunft des Packs: '' = gekauft, 'wheel' = am Glücksrad gewonnen (kein „Add and rip one more“: das kostet 20 SC und gehört zum Kauf)
+  try { await db.execute("ALTER TABLE pending_booster ADD COLUMN source TEXT NOT NULL DEFAULT ''"); } catch {}
+  // Rarity-Umbenennung Diamond → Storm Rare in Sammlung, Decks und offenen Packs (idempotent, siehe rarity-migrate.js)
+  try {
+    const rm = await require('./rarity-migrate').migrateRarityRenames(db);
+    if (rm.collection || rm.decks || rm.packs) console.log(`[rarity] Umbenennung Diamond → Storm: Sammlung ${rm.collection}, Decks ${rm.decks}, offene Packs ${rm.packs}`);
+  } catch (err) { console.error('[rarity] Umbenennung Diamond → Storm fehlgeschlagen:', err.message); }
+  // seq: Laufnummer des Packs innerhalb eines Kaufs (0 … n-1) — stabile Reihenfolge der Packs (created_at hat nur Sekundenauflösung).
+  try { await db.execute('ALTER TABLE pending_booster ADD COLUMN seq INTEGER NOT NULL DEFAULT 0'); } catch {}
+  // Früher: UNIQUE INDEX auf user_id (höchstens ein offenes Pack). Der Index wird entfernt (bestehende Zeilen bleiben unverändert gültig) und durch einen
+  // gewöhnlichen ersetzt. Die Doppelkauf-Sperre liegt jetzt in der Kauf-Transaktion (BEGIN IMMEDIATE: Prüfung „kein offenes Pack“ + Einfügen sind atomar).
+  await db.execute('DROP INDEX IF EXISTS idx_pending_booster_user');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_booster_user_order ON pending_booster(user_id, created_at, seq)');
+
+  // Auslage: je Stunde und Platz kann jeder Spieler die Karte nur EINMAL kaufen (danach ausgegraut bis zum nächsten Wechsel).
+  await db.execute(`CREATE TABLE IF NOT EXISTS display_buys (
+    user_id TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    slot INTEGER NOT NULL,
+    PRIMARY KEY (user_id, hour, slot)
+  )`);
 
   // Shop purchases table
   await db.execute(`CREATE TABLE IF NOT EXISTS user_shop_items (
@@ -1463,21 +1516,37 @@ function recordEmailSend(email) {
   _emailSends.set(key, hits);
 }
 
-function codeEmail(kind, code) {
-  const intro = kind === 'reset'
-    ? 'Use this code to reset your Pixel Parties password:'
-    : kind === 'add_email'
-      ? 'Use this code to confirm this email address for your Pixel Parties account:'
-      : 'Welcome to Pixel Parties! Use this code to verify your email and finish creating your account:';
-  const subject = kind === 'reset'
-    ? 'Your Pixel Parties password reset code'
-    : 'Your Pixel Parties verification code';
-  const text = `${intro}\n\n    ${code}\n\nThis code expires in 15 minutes. If you didn't request it, you can ignore this email.`;
+// Sprache eines Kontos / einer Anfrage: nur 'en' oder 'de' (alles andere = Englisch)
+function normLang(x) { return String(x || '').toLowerCase().startsWith('de') ? 'de' : 'en'; }
+
+const CODE_MAIL_TEXTE = {
+  en: {
+    reset: 'Use this code to reset your Pixel Parties password:',
+    add_email: 'Use this code to confirm this email address for your Pixel Parties account:',
+    signup: 'Welcome to Pixel Parties! Use this code to verify your email and finish creating your account:',
+    subjectReset: 'Your Pixel Parties password reset code', subjectOther: 'Your Pixel Parties verification code',
+    expiry: "This code expires in 15 minutes. If you didn't request it, you can ignore this email.",
+    expiryHtml: "This code expires in 15 minutes. If you didn't request it, you can safely ignore this email.",
+  },
+  de: {
+    reset: 'Mit diesem Code setzt du dein Pixel-Parties-Passwort zurück:',
+    add_email: 'Mit diesem Code bestätigst du diese E-Mail-Adresse für dein Pixel-Parties-Konto:',
+    signup: 'Willkommen bei Pixel Parties! Mit diesem Code bestätigst du deine E-Mail-Adresse und schließt die Erstellung deines Kontos ab:',
+    subjectReset: 'Dein Code zum Zurücksetzen des Pixel-Parties-Passworts', subjectOther: 'Dein Pixel-Parties-Bestätigungscode',
+    expiry: 'Dieser Code läuft in 15 Minuten ab. Wenn du ihn nicht angefordert hast, kannst du diese E-Mail ignorieren.',
+    expiryHtml: 'Dieser Code läuft in 15 Minuten ab. Wenn du ihn nicht angefordert hast, kannst du diese E-Mail einfach ignorieren.',
+  },
+};
+function codeEmail(kind, code, lang) {
+  const T = CODE_MAIL_TEXTE[normLang(lang)];
+  const intro = kind === 'reset' ? T.reset : kind === 'add_email' ? T.add_email : T.signup;
+  const subject = kind === 'reset' ? T.subjectReset : T.subjectOther;
+  const text = `${intro}\n\n    ${code}\n\n${T.expiry}`;
   const html = `<div style="font-family:system-ui,Segoe UI,sans-serif;background:#0a0a12;color:#e0e0f0;padding:32px;border-radius:12px;max-width:440px;margin:auto">
     <div style="font-size:22px;font-weight:800;letter-spacing:4px;color:#00f0ff;text-transform:uppercase;margin-bottom:16px">Pixel Parties</div>
     <p style="color:#c0c0d8;line-height:1.5">${intro}</p>
     <div style="font-size:34px;font-weight:800;letter-spacing:10px;color:#00f0ff;background:#12121f;border:1px solid #252540;border-radius:10px;padding:18px;text-align:center;margin:20px 0">${code}</div>
-    <p style="color:#8888aa;font-size:13px">This code expires in 15 minutes. If you didn't request it, you can safely ignore this email.</p>
+    <p style="color:#8888aa;font-size:13px">${T.expiryHtml}</p>
   </div>`;
   return { subject, text, html };
 }
@@ -1485,7 +1554,7 @@ function codeEmail(kind, code) {
 // Issue + email a code. Returns { ok } or { ok:false, error, status }.
 // `purpose`: 'reset' | 'add_email' (stored in email_codes against a user);
 // signup uses pending_signups directly and calls sendMail itself.
-async function issueAndSendCode({ userId, email, purpose }) {
+async function issueAndSendCode({ userId, email, purpose, lang }) {
   const status = emailSendStatus(email);
   if (!status.ok) {
     return status.capped
@@ -1498,7 +1567,7 @@ async function issueAndSendCode({ userId, email, purpose }) {
     'INSERT INTO email_codes (id, user_id, email, code_hash, purpose, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
     [uuidv4(), userId || null, email, hashCode(code), purpose, Date.now() + CODE_TTL_MS],
   );
-  const { subject, text, html } = codeEmail(purpose, code);
+  const { subject, text, html } = codeEmail(purpose, code, lang);
   try {
     await sendMail({ to: email, subject, text, html });
   } catch (e) {
@@ -1733,7 +1802,9 @@ app.post('/api/auth/signup', async (req, res) => {
     'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [uuidv4(), uname, email, await bcrypt.hash(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
   );
-  const { subject, text, html } = codeEmail('signup', code);
+  const signupLang = normLang(req.body.lang);
+  await db.run('UPDATE pending_signups SET lang = ? WHERE username = ? COLLATE NOCASE', [signupLang, uname]);
+  const { subject, text, html } = codeEmail('signup', code, signupLang);
   try {
     await sendMail({ to: email, subject, text, html });
   } catch (e) {
@@ -1784,6 +1855,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
   // Give the new account a first deck, a pinned Starter Deck (honouring a
   // specific one if a registering guest passed theirs), and the CPU roster.
   await bootstrapNewAccount(id, { starterDeckId: req.body.starterDeckId });
+  if (pending.lang) await db.run('UPDATE users SET lang = ? WHERE id = ?', [pending.lang, id]);
   await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
@@ -1818,7 +1890,7 @@ app.post('/api/auth/resend', async (req, res) => {
   const code = genCode();
   await db.run('UPDATE pending_signups SET code_hash = ?, expires_at = ?, attempts = 0 WHERE id = ?',
     [hashCode(code), Date.now() + CODE_TTL_MS, pending.id]);
-  const { subject, text, html } = codeEmail('signup', code);
+  const { subject, text, html } = codeEmail('signup', code, pending.lang || normLang(req.body.lang));
   try { await sendMail({ to: email, subject, text, html }); }
   catch (e) { console.error('[mailer] resend failed:', e.message); return res.status(502).json({ error: 'Could not send the email. Please try again later.' }); }
   recordEmailSend(email);
@@ -1831,7 +1903,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
   if (user) {
-    const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset' });
+    const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset', lang: user.lang || normLang(req.body.lang) });
     // Swallow rate-limit/send errors into the generic response except the
     // cooldown hint, which is safe and useful to surface.
     if (!r.ok && r.status === 429) return res.status(429).json({ error: r.error });
@@ -1934,6 +2006,7 @@ app.post('/api/auth/google', async (req, res) => {
         'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified, google_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
         [id, username, unusable, getRandomDefaultAvatar(), getRandomDefaultColor(), email, googleId],
       );
+      if (req.body && req.body.lang) await db.run('UPDATE users SET lang = ? WHERE id = ?', [normLang(req.body.lang), id]);
     } catch (e) {
       console.error('[auth/google] create failed:', e.message);
       return res.status(500).json({ error: 'Could not create your account. Please try again.' });
@@ -2027,7 +2100,7 @@ async function purgeGuest(userId) {
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
-  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items']) {
+  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items', 'user_card_rarities', 'pending_booster', 'user_wheel_tickets', 'user_emotes', 'user_titles']) {
     try { await db.run(`DELETE FROM ${t} WHERE user_id = ?`, [userId]); } catch {}
   }
   await db.run('DELETE FROM users WHERE id = ? AND is_guest = 1', [userId]);
@@ -2136,9 +2209,18 @@ function parseHeroSkins(raw) {
     return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
   } catch { return {}; }
 }
+/** Gewählte Emotes aus der Spalte; null = nie gesetzt (der Client nimmt dann die Start-Emotes in Standardreihenfolge). */
+function parseEmoteSlots(json) { try { const a = JSON.parse(json || 'null'); return Array.isArray(a) ? a.filter(x => typeof x === 'string').slice(0, 3) : null; } catch { return null; } }
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, lang: u.lang || null, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), display_creatures: (u.display_heroes === 0) ? 0 : (u.display_creatures == null ? 1 : (u.display_creatures ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest, title: u.title || null, emoteSlots: parseEmoteSlots(u.emote_slots) };
 }
+
+// Sprache des Kontos speichern (Oberflaeche + E-Mails)
+app.post('/api/profile/lang', authMiddleware, async (req, res) => {
+  const lang = normLang(req.body && req.body.lang);
+  await db.run('UPDATE users SET lang = ? WHERE id = ?', [lang, req.user.userId]);
+  res.json({ ok: true, lang });
+});
 
 // ===== PROFILE ROUTES =====
 // Live username-availability check powering the profile name editor's
@@ -2271,6 +2353,10 @@ app.put('/api/profile/hero-display', authMiddleware, async (req, res) => {
   const display = req.body.display_heroes ? 1 : 0;
   const dynamic = display && req.body.dynamic_heroes ? 1 : 0;
   await db.run('UPDATE users SET display_heroes = ?, dynamic_heroes = ? WHERE id = ?', [display, dynamic, req.user.userId]);
+  // `display_creatures` (Creature-Figuren): Unteroption wie `dynamic_heroes`. Ein Client, der das Feld nicht schickt (alte Fassung), lässt die Wahl unberührt;
+  // ohne Heldenfiguren ist sie aus, beim Wiedereinschalten ohne Angabe wieder an.
+  if (req.body.display_creatures !== undefined) await db.run('UPDATE users SET display_creatures = ? WHERE id = ?', [display && req.body.display_creatures ? 1 : 0, req.user.userId]);
+  else if (display) await db.run('UPDATE users SET display_creatures = 1 WHERE id = ? AND display_creatures IS NULL', [req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
@@ -2282,7 +2368,8 @@ app.post('/api/profile/email/request', authMiddleware, async (req, res) => {
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
   const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
   if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
-  const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email' });
+  const meRow = await db.get('SELECT lang FROM users WHERE id = ?', [req.user.userId]);
+  const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email', lang: (meRow && meRow.lang) || normLang(req.body.lang) });
   if (!r.ok) return res.status(r.status || 500).json({ error: r.error });
   res.json({ ok: true, email });
 });
@@ -2480,9 +2567,17 @@ app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }),
 
   // Restore decks — delete existing, insert from backup
   await db.run('DELETE FROM decks WHERE user_id = ?', [req.user.userId]);
+  const eigeneRarities = await ownedRarities(req.user.userId);
   for (const d of (data.decks || [])) {
-    await db.run('INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uuidv4(), req.user.userId, d.name, d.main_deck, d.heroes, d.potion_deck, d.side_deck, d.is_default ? 1 : 0, Math.floor(Date.now()/1000), Math.floor(Date.now()/1000)]);
+    // Rarities aus dem Backup nur soweit, wie sie dem Konto gehoeren.
+    let rarityJson = '{}';
+    try {
+      const zonen = { mainDeck: JSON.parse(d.main_deck || '[]'), heroes: JSON.parse(d.heroes || '[]'), potionDeck: JSON.parse(d.potion_deck || '[]'), sideDeck: JSON.parse(d.side_deck || '[]') };
+      const r = RARITIES.downgradeToOwned(zonen, JSON.parse(d.rarities || '{}'), eigeneRarities);
+      if (RARITIES.hasAnyRarity(r)) rarityJson = JSON.stringify(r);
+    } catch { /* kaputtes Backup-Deck: ohne Rarities */ }
+    await db.run('INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uuidv4(), req.user.userId, d.name, d.main_deck, d.heroes, d.potion_deck, d.side_deck, d.is_default ? 1 : 0, rarityJson, Math.floor(Date.now()/1000), Math.floor(Date.now()/1000)]);
   }
 
   // Restore hero stats
@@ -3082,9 +3177,27 @@ app.post('/api/decks', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/decks/:id', authMiddleware, async (req, res) => {
-  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins } = req.body;
+  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins, rarities } = req.body;
   const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!deckRow) return res.status(404).json({ error: 'Deck not found' });
+
+  // Rarity je Kartenkopie: die Zonen, wie sie nach dem Speichern aussehen, und die zugehoerigen Rarities.
+  // Ohne `rarities` im Body bleiben die gespeicherten nur, wenn sich keine Kartenliste aendert (sonst passten die Positionen nicht mehr) — sonst alles Common.
+  const neueZonen = {
+    mainDeck: mainDeck || JSON.parse(deckRow.main_deck),
+    heroes: heroes || JSON.parse(deckRow.heroes),
+    potionDeck: potionDeck || JSON.parse(deckRow.potion_deck),
+    sideDeck: sideDeck || JSON.parse(deckRow.side_deck),
+  };
+  const zonenGeaendert = !!(mainDeck || heroes || potionDeck || sideDeck);
+  let rarityRoh = rarities;
+  if (rarityRoh === undefined) { try { rarityRoh = zonenGeaendert ? {} : JSON.parse(deckRow.rarities || '{}'); } catch { rarityRoh = {}; } }
+  const neueRarities = RARITIES.normalizeDeckRarities(neueZonen, rarityRoh);
+  if (deckRow.mode !== 'drafted' && deckRow.mode !== 'cube') {
+    // Sicherung gegen kaputte/gefaelschte Clients: pro (Karte, Rarity) ueber ALLE Zonen hoechstens so viele Kopien wie besessen (Common unbegrenzt).
+    const verstoss = RARITIES.firstOwnershipViolation(neueZonen, neueRarities, await ownedRarities(req.user.userId));
+    if (verstoss) return res.status(400).json({ error: `You only own ${verstoss.have} ${RARITIES.label(verstoss.rarity)} ${verstoss.have === 1 ? 'copy' : 'copies'} of "${verstoss.card}" (deck uses ${verstoss.need}).`, card: verstoss.card, rarity: verstoss.rarity });
+  }
 
   if (isDefault) await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
 
@@ -3100,7 +3213,7 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
     }
   }
 
-  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
+  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, rarities=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || deckRow.name,
     JSON.stringify(mainDeck || JSON.parse(deckRow.main_deck)),
     JSON.stringify(heroes || JSON.parse(deckRow.heroes)),
@@ -3109,6 +3222,7 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
     isDefault ? 1 : (isDefault === false ? 0 : deckRow.is_default),
     coverCard !== undefined ? (coverCard || '') : (deckRow.cover_card || ''),
     skinsClean !== undefined ? JSON.stringify(skinsClean) : (deckRow.skins || '{}'),
+    JSON.stringify(RARITIES.hasAnyRarity(neueRarities) ? neueRarities : {}),
     req.params.id, req.user.userId
   ]);
 
@@ -3246,10 +3360,10 @@ app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
 
     const newId = uuidv4();
     await db.run(
-      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, unixepoch(), unixepoch())',
+      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, unixepoch(), unixepoch())',
       [newId, req.user.userId, name || original.name + ' (Copy)',
        original.main_deck, original.heroes, original.potion_deck, original.side_deck,
-       original.cover_card || '', original.skins || '{}', original.mode || 'standard']
+       original.cover_card || '', original.skins || '{}', original.mode || 'standard', original.rarities || '{}']
     );
 
     const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
@@ -3953,6 +4067,37 @@ app.get('/api/hero-animations', async (req, res) => {
   res.json({ animations });
 });
 
+// ===== CREATURE-IDLE-ANIMATIONEN =====
+// Gegenstück zu `/api/hero-animations` für `data/creature-animations/`. Schlüssel ist der Slug des KARTENNAMENS aus dem Feld `creature`
+// (nicht der Dateiname: `demons-gate.json` gehört zu „Demon's Gate" = `demon-s-gate`, `fruit-bat.json` zu „Fruit Bat, Nosferapple").
+// Einträge ohne Sheet kommen nur durch, wenn sie `kopiert` tragen (Clone zeigt die Figur des Heroes seiner Spalte).
+const CREATURE_ANIM_DIR = path.join(__dirname, 'data', 'creature-animations');
+const animSlug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+app.get('/api/creature-animations', async (req, res) => {
+  const animations = {};
+  try {
+    const files = (await fs.promises.readdir(CREATURE_ANIM_DIR)).filter(f => f.endsWith('.json'));
+    await Promise.all(files.map(async (f) => {
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(path.join(CREATURE_ANIM_DIR, f), 'utf-8'));
+        const key = animSlug(meta.creature) || f.replace(/\.json$/, '');
+        if (typeof meta.sheet !== 'string' || !meta.sheet) {
+          if (meta.kopiert) animations[key] = { creature: meta.creature, sheet: null, kopiert: meta.kopiert };
+          return;
+        }
+        const st = await fs.promises.stat(path.join(CREATURE_ANIM_DIR, meta.sheet));
+        if (!(meta.frameWidth > 0 && meta.frameHeight > 0 && meta.frames > 0)) return;
+        animations[key] = {
+          ...meta,
+          sheetUrl: '/data/creature-animations/' + encodeURIComponent(meta.sheet) + '?v=' + Math.floor(st.mtimeMs),
+        };
+      } catch {}
+    }));
+  } catch {}
+  res.set('Cache-Control', 'no-cache');
+  res.json({ animations });
+});
+
 // ===== SHOP SYSTEM =====
 // ★ v1384 (Als Vorgabe 24.9.): alle Shop-Preise auf das FUENFFACHE —
 // Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
@@ -4290,6 +4435,387 @@ app.post('/api/shop/buy', authMiddleware, async (req, res) => {
   res.json({ ok: true, sc: updated.sc });
 });
 
+// ═══════════════════════════════════════════
+//  RARITIES — Sammlung, Booster-Packs, Draft-Würfeln (Gemeinsames Modul: rarities.js)
+//  Alle Karten gehören jedem unbegrenzt als Common. Höhere Rarities sind gesammelte Kopien (user_card_rarities).
+//  Ein Booster-Pack wird beim KAUF serverseitig gewürfelt und als offenes Pack gespeichert (pending_booster, mehrere je Nutzer bei Mengenkauf, höchstens BOOSTER_MAX_BUY je Kauf);
+//  erst /api/boosters/claim bucht die Karten in die Sammlung. So überlebt ein Neuladen mitten in der Öffnung.
+// ═══════════════════════════════════════════
+const BOOSTER_DIR = path.join(__dirname, 'data', 'shop', 'Boosterpacks');
+const BOOSTER_URL_DIR = '/data/shop/Boosterpacks/';
+// Obergrenze je Kauf: 20 Packs = 180 Karten = 400 SC. Hält die Öffnungsansicht (ein Kartenblock je Pack, Rarity-Ebene je sichtbarer Karte), die Antwort (~10 KB JSON)
+// und die Kauf-Transaktion (je Pack ein Insert + ein Log-Eintrag) klein; mehr kauft man mit „Add and rip one more!“ oder einem zweiten Kauf.
+const BOOSTER_MAX_BUY = 20;
+const BOOSTER_SC_REASON = 'shop:booster';   // sc_log.reward_id des Packkaufs (Betrag negativ = Ausgabe)
+const BOOSTER_SELLBACK_REASON = 'shop:booster_sellback';   // Gutschrift für „Sell Back!“ (Betrag positiv)
+const BOOSTER_DISPLAY_REASON = 'shop:display';             // Kauf aus der Auslage (Betrag negativ)
+
+let _boosterCache = null;
+function boosterManifest() {
+  if (!_boosterCache) _boosterCache = JSON.parse(fs.readFileSync(path.join(BOOSTER_DIR, 'boosters.json'), 'utf8'));
+  return _boosterCache;
+}
+
+/** Motiv-Masken (data/subject-masks.json): nur die Kartennamen werden gebraucht (Umbra/Stained/Storm setzen eine Maske voraus). */
+let _maskNames = null;
+function maskNameSet() {
+  if (!_maskNames) {
+    try { _maskNames = new Set(Object.keys(JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'subject-masks.json'), 'utf8')).cards || {})); }
+    catch (err) { console.error('[rarity] subject-masks.json nicht lesbar:', err.message); _maskNames = new Set(); }
+  }
+  return _maskNames;
+}
+function cardHasMask(name) { return maskNameSet().has(name); }
+
+let _artIndex = null;
+function cardArtIndex() {
+  if (!_artIndex) {
+    try { _artIndex = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-art', 'index.json'), 'utf8')); }
+    catch { _artIndex = null; }
+  }
+  return _artIndex;
+}
+
+/** Pack-Pool (Kartenobjekte) — Tokens und Karten ohne Motiv sind nie darin. */
+const _packPools = {};
+function packPool(packId) {
+  if (!_packPools[packId]) _packPools[packId] = RARITIES.cardsOfPack(packId, getCardArray(), cardArtIndex() || undefined);
+  return _packPools[packId];
+}
+
+/** Besitz eines Nutzers: { "<Karte>": { rare: n, … } } — nur Nicht-Common, nur count > 0. */
+async function ownedRarities(userId, dbh) {
+  const rows = await (dbh || db).all('SELECT card, rarity, count FROM user_card_rarities WHERE user_id = ? AND count > 0', [userId]);
+  const out = {};
+  for (const r of rows) {
+    if (!RARITIES.isRarity(r.rarity) || r.rarity === 'common') continue;
+    (out[r.card] || (out[r.card] = {}))[r.rarity] = Number(r.count);
+  }
+  return out;
+}
+
+/** Bucht Kopien in die Sammlung: items = [{ name, rarity }] (Common wird ignoriert). */
+async function addRarityCopies(userId, items, dbh) {
+  const h = dbh || db;
+  for (const it of items) {
+    if (!it || !it.name || !RARITIES.isRarity(it.rarity) || it.rarity === 'common') continue;
+    await h.run(
+      'INSERT INTO user_card_rarities (user_id, card, rarity, count) VALUES (?, ?, ?, 1) ON CONFLICT(user_id, card, rarity) DO UPDATE SET count = count + 1',
+      [userId, it.name, it.rarity]);
+  }
+}
+
+function pendingBoosterView(row) {
+  let cards = [];
+  try { cards = JSON.parse(row.cards_json); } catch { /* leer */ }
+  const sold = Number.isInteger(Number(row.sold_idx)) ? Number(row.sold_idx) : -1;
+  return { id: row.id, packId: row.pack_id, variantId: row.variant_id, cards, sold: sold >= 0 && sold < cards.length ? sold : -1, source: row.source || '' };
+}
+
+// GET /api/collection — gesammelte Rarities { rarities: { "<Karte>": { uncommon: n, … } } } (Common implizit unbegrenzt)
+app.get('/api/collection', authMiddleware, async (req, res) => {
+  try { res.json({ rarities: await ownedRarities(req.user.userId) }); }
+  catch (err) { console.error('[collection]', err.message); res.status(500).json({ error: 'Failed to load collection' }); }
+});
+
+// GET /api/boosters — Packs mit Cover-Varianten (Pack-Bild `base`, Schimmer-Streifen `shimmer`; relativ zu `dir`, dazu fertige URLs)
+//  `sellback`: Gutschrift je Rarity für „Sell Back!“ (eine Karte je Pack)
+app.get('/api/boosters', authMiddleware, (req, res) => {
+  try {
+    const man = boosterManifest();
+    res.json({
+      price: RARITIES.PACK_PRICE, maxCount: BOOSTER_MAX_BUY, sellback: RARITIES.SELLBACK, size: man.size, frames: man.frames, frameMs: man.frameMs, dir: BOOSTER_URL_DIR,
+      packs: man.packs.map(p => ({
+        id: p.id, name: p.name, tagline: p.tagline || man.tagline,
+        variants: p.variants.map(v => ({
+          id: v.id, theme: v.theme, base: v.base, shimmer: v.shimmer, special: v.special || '',
+          baseUrl: BOOSTER_URL_DIR + v.base, shimmerUrl: BOOSTER_URL_DIR + v.shimmer,
+        })),
+      })),
+    });
+  } catch (err) { console.error('[boosters]', err.message); res.status(500).json({ error: 'Failed to load boosters' }); }
+});
+
+// GET /api/boosters/pending — offene Packs (Wiederaufnahme nach Neuladen), in Kaufreihenfolge.
+//  { pending: <erstes offenes Pack | null> (altes Format), packs: [pending …] }; `sold` = Index der zurückgegebenen Karte oder -1
+app.get('/api/boosters/pending', authMiddleware, async (req, res) => {
+  try {
+    const rows = await pendingBoosterRows(db, req.user.userId);
+    const packs = rows.map(pendingBoosterView);
+    res.json({ pending: packs[0] || null, packs });
+  } catch (err) { console.error('[boosters/pending]', err.message); res.status(500).json({ error: 'Failed to load pack' }); }
+});
+
+/** Offene Packs eines Nutzers in stabiler Kaufreihenfolge; `ids` (Array) schränkt ein. */
+async function pendingBoosterRows(dbh, userId, ids) {
+  const rows = await dbh.all('SELECT * FROM pending_booster WHERE user_id = ? ORDER BY created_at, seq, rowid', [userId]);
+  return Array.isArray(ids) ? rows.filter(r => ids.includes(r.id)) : rows;
+}
+
+/**
+ * Kauf von Packs: `packIds` = eine Pack-Art je zu kaufendem Pack (Mengenkauf: dieselbe Art n-mal). Je Pack 20 SC ab, Karten würfeln, als offenes Pack speichern —
+ * alles in EINER Transaktion (SC-Prüfung für die Gesamtsumme; entweder alle Packs oder keins). Gemeinsam für /buy und /rip-more.
+ * Liefert { status, body } — 200 { pending (erstes), packs, sc } · 402 { error, sc } · 404 · 409 { error, pending, packs } · 500.
+ */
+async function buyBoosterPacks(userId, packIds) {
+  const man = boosterManifest();
+  const n = packIds.length;
+  const packs = packIds.map(id => man.packs.find(p => p.id === id));
+  if (!n || packs.some(p => !p)) return { status: 404, body: { error: 'Unknown booster pack' } };
+  const rolled = [];
+  for (const pack of packs) {
+    const pool = packPool(pack.id);
+    if (!pool.length) return { status: 500, body: { error: 'This pack is empty right now.' } };
+    const regular = pack.variants.filter(v => !v.special);   // Gold-/Umbra-Varianten vergibt nur das Glücksrad
+    const variant = regular[Math.floor(Math.random() * regular.length)];
+    rolled.push({ id: uuidv4(), packId: pack.id, variantId: variant.id, cards: RARITIES.rollPack(pool, { hasMask: cardHasMask }) });
+  }
+  const price = RARITIES.PACK_PRICE, total = price * n;
+  let nichtGenug = false, offen = null;
+  try {
+    await db.transaction(async (tx) => {
+      // BEGIN IMMEDIATE: ab hier schreibt niemand sonst. Liegen noch offene Packs, wird nicht gekauft (die Antwort liefert sie; doppelter Klick / zweites Fenster).
+      const liegen = await pendingBoosterRows(tx, userId);
+      if (liegen.length) { offen = liegen; throw new Error('open-packs'); }
+      // Atomar: SC nur abziehen, wenn für die Gesamtsumme genug da sind; Packs und Buchungen gehen mit oder gar nicht.
+      const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [total, userId, total]);
+      if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
+      for (let i = 0; i < n; i++) {
+        const r = rolled[i];
+        await tx.run('INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq) VALUES (?, ?, ?, ?, ?, ?)',
+          [r.id, userId, r.packId, r.variantId, JSON.stringify(r.cards), i]);
+        await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), userId, BOOSTER_SC_REASON, r.packId, -price]);   // ein Eintrag je Pack (wie beim Einzelkauf)
+      }
+    });
+  } catch (err) {
+    if (nichtGenug) {
+      const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+      return { status: 402, body: { error: 'Not enough SC', sc: u?.sc || 0 } };
+    }
+    if (offen) { const views = offen.map(pendingBoosterView); return { status: 409, body: { error: 'You still have an unopened pack.', pending: views[0], packs: views } }; }
+    throw err;
+  }
+  const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+  const views = rolled.map(r => ({ id: r.id, packId: r.packId, variantId: r.variantId, cards: r.cards, sold: -1 }));
+  return { status: 200, body: { pending: views[0], packs: views, sc: u?.sc || 0 } };
+}
+
+/**
+ * Einlösen offener Packs: die Karten in die Sammlung (+1 je (Karte, Rarity)), je Pack die zurückverkaufte Karte (sold_idx) NICHT, Packs löschen.
+ * `ids` = nur diese Packs, sonst ALLE offenen des Nutzers. Auswahl, Löschen und Buchen laufen in einer Transaktion (kein Verkauf dazwischen).
+ * Liefert { status, body } — 200 { ok, added (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, packId, rarities } · 404.
+ */
+async function claimBoosterPacks(userId, ids) {
+  const done = [];
+  await db.transaction(async (tx) => {
+    const rows = await pendingBoosterRows(tx, userId, ids);
+    for (const row of rows) {
+      const view = pendingBoosterView(row);
+      const del = await tx.run('DELETE FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!del.rowsAffected) continue;   // doppelter Klick: nur einmal buchen
+      const added = view.cards.filter((c, i) => i !== view.sold);
+      await addRarityCopies(userId, added, tx);
+      done.push({ id: row.id, packId: view.packId, added, sold: view.sold >= 0 ? view.cards[view.sold] : null });
+    }
+  });
+  if (!done.length) return { status: 404, body: { error: 'No such open pack' } };
+  const soldCards = done.map(d => d.sold).filter(Boolean);
+  return { status: 200, body: {
+    ok: true, added: done.flatMap(d => d.added), sold: soldCards[0] || null, soldCards, packs: done, count: done.length, packId: done[0].packId,
+    rarities: await ownedRarities(userId),
+  } };
+}
+
+/** `ids` aus dem Request: `ids` (Array) oder `id` (String); leer/fehlend = alle offenen Packs (undefined). */
+function boosterIdsFromBody(body) {
+  if (Array.isArray(body?.ids)) return body.ids.map(String);
+  const id = body?.id != null ? String(body.id) : '';
+  return id ? [id] : undefined;
+}
+
+// POST /api/boosters/buy { packId, count = 1 } — count Packs (1 … BOOSTER_MAX_BUY) für je 20 SC in EINER Transaktion kaufen, würfeln und als offene Packs speichern.
+//  400 { error, max }: count ungültig (nur Ganzzahlen 1 … max) · 402 { error, sc }: zu wenig SC für die Gesamtsumme · 404: Pack unbekannt
+//  409 { error, pending, packs }: es liegen noch offene Packs (Antwort liefert sie) · 200 { pending (erstes Pack), packs: [alle], sc }
+app.post('/api/boosters/buy', authMiddleware, async (req, res) => {
+  try {
+    const raw = req.body?.count;
+    const count = raw === undefined ? 1 : raw;
+    if (!Number.isInteger(count) || count < 1 || count > BOOSTER_MAX_BUY) return res.status(400).json({ error: 'Invalid pack count (1 to ' + BOOSTER_MAX_BUY + ')', max: BOOSTER_MAX_BUY });
+    const packId = String(req.body?.packId || '');
+    const r = await buyBoosterPacks(req.user.userId, Array(count).fill(packId));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/buy]', err.message); res.status(500).json({ error: 'Failed to buy pack' }); }
+});
+
+// POST /api/boosters/claim { ids? | id? } — die Karten (ohne die je Pack zurückverkaufte) in die Sammlung, die Packs löschen. Ohne ids: ALLE offenen Packs.
+//  Antwort { ok, added: [{ name, rarity }] (alle Packs), sold (erste verkaufte Karte | null), soldCards, packs: [{ id, packId, added, sold }], count, rarities }
+app.post('/api/boosters/claim', authMiddleware, async (req, res) => {
+  try {
+    const r = await claimBoosterPacks(req.user.userId, boosterIdsFromBody(req.body));
+    res.status(r.status).json(r.body);
+  } catch (err) { console.error('[boosters/claim]', err.message); res.status(500).json({ error: 'Failed to add cards' }); }
+});
+
+// POST /api/boosters/rip-more { ids? | id? } — „Add and rip one more!“: ALLE offenen Packs einlösen UND sofort dieselbe Anzahl Packs derselben Art(en) kaufen
+//  (ids/id dienen nur der Absicherung: passt keines zu einem offenen Pack → 404). Zwei getrennte Transaktionen, damit die alten Packs nie verloren gehen:
+//  erst wird eingelöst (bleibt eingelöst, was danach auch passiert), dann gekauft (alle oder keins, Gesamtsumme n × 20 SC).
+//  Antwort 200 { ok, added, sold, soldCards, rarities, pending (erstes neues Pack), packs: [neue Packs], sc } · 402 { error, sc, claimed: true, added, rarities } (zu wenig SC: die Packs
+//  sind trotzdem eingelöst, neue gibt es nicht) · 404 (kein offenes Pack) · 5xx { error, claimed } (Kauf gescheitert; `claimed`: alte Packs schon eingelöst).
+//  Eine Gutschrift aus „Sell Back!“ steht schon im Kontostand (sie wird beim Verkauf gebucht) und zählt damit für den Preis.
+app.post('/api/boosters/rip-more', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let claimed = null;
+  try {
+    const ids = boosterIdsFromBody(req.body);
+    const alle = await pendingBoosterRows(db, userId);
+    if (ids && !alle.some(r => ids.includes(r.id))) return res.status(404).json({ error: 'No such open pack' });
+    // „Rip one more“ löst ALLE offenen Packs ein und kauft nach: am Glücksrad gewonnene Packs sind davon ausgenommen
+    if (alle.some(r => r.source === 'wheel')) return res.status(400).json({ error: 'Packs won on the wheel cannot be re-bought.' });
+    const c = await claimBoosterPacks(userId, undefined);
+    if (c.status !== 200) return res.status(c.status).json(c.body);
+    claimed = c.body;
+    const b = await buyBoosterPacks(userId, claimed.packs.map(p => p.packId));
+    const carry = { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities };
+    if (b.status === 200) return res.json({ ok: true, ...carry, pending: b.body.pending, packs: b.body.packs, sc: b.body.sc });
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    return res.status(b.status === 404 || b.status === 409 ? 500 : b.status).json({
+      ...b.body, sc: b.body.sc != null ? b.body.sc : (u?.sc || 0), claimed: true, ...carry,
+    });
+  } catch (err) {
+    console.error('[boosters/rip-more]', err.message);
+    res.status(500).json({
+      error: claimed ? 'Your cards were added, but the next pack could not be bought.' : 'Failed to add cards', claimed: !!claimed,
+      ...(claimed ? { added: claimed.added, sold: claimed.sold, soldCards: claimed.soldCards, rarities: claimed.rarities } : {}),
+    });
+  }
+});
+
+// POST /api/boosters/sell { id, index } — „Sell Back!“: EINE Karte dieses offenen Packs zurückgeben, Gutschrift in SC nach Rarity
+//  (RARITIES.SELLBACK). Je Pack unabhängig; idempotent: ein zweiter Verkauf im selben Pack (auch einer anderen Karte) → 409. Die Karte kommt beim Einlösen nicht in die Sammlung.
+//  Ohne id gilt das einzige offene Pack (liegen mehrere, ist die id Pflicht → 404).
+//  Antwort 200 { ok, sold: index, amount, sc } · 400 (Index / Common) · 404 (kein offenes Pack) · 409 { error, sold }
+app.post('/api/boosters/sell', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const id = req.body?.id != null ? String(req.body.id) : '';
+    const index = req.body?.index;
+    const rows = await pendingBoosterRows(db, userId);
+    const row = id ? rows.find(r => r.id === id) : (rows.length === 1 ? rows[0] : null);
+    if (!row) return res.status(404).json({ error: 'No such open pack' });
+    const view = pendingBoosterView(row);
+    if (!Number.isInteger(index) || index < 0 || index >= view.cards.length) return res.status(400).json({ error: 'No such card' });
+    if (view.sold >= 0) return res.status(409).json({ error: 'You already sold a card from this pack.', sold: view.sold });
+    const amount = RARITIES.sellbackValue(view.cards[index].rarity);
+    if (!(amount > 0)) return res.status(400).json({ error: 'This card cannot be sold back.' });
+    let schonVerkauft = false;
+    await db.transaction(async (tx) => {
+      // Atomar: nur der erste Verkauf setzt die Markierung (sold_idx < 0); er bucht die Gutschrift im selben Zug.
+      const upd = await tx.run('UPDATE pending_booster SET sold_idx = ? WHERE id = ? AND user_id = ? AND sold_idx < 0', [index, row.id, userId]);
+      if (!upd.rowsAffected) { schonVerkauft = true; return; }
+      await tx.run('UPDATE users SET sc = sc + ? WHERE id = ?', [amount, userId]);
+      await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), userId, BOOSTER_SELLBACK_REASON, view.cards[index].rarity + ':' + view.cards[index].name, amount]);
+    });
+    if (schonVerkauft) {
+      const jetzt = await db.get('SELECT * FROM pending_booster WHERE id = ? AND user_id = ?', [row.id, userId]);
+      if (!jetzt) return res.status(404).json({ error: 'No such open pack' });
+      return res.status(409).json({ error: 'You already sold a card from this pack.', sold: pendingBoosterView(jetzt).sold });
+    }
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    res.json({ ok: true, sold: index, amount, sc: u?.sc || 0 });
+  } catch (err) { console.error('[boosters/sell]', err.message); res.status(500).json({ error: 'Failed to sell the card' }); }
+});
+
+// ── Auslage (Showcase): je Rarity eine Karte, wechselt jede volle Stunde (UTC), für alle gleich ──
+// Pool = alle Pack-Pools zusammen (sammelbare Karten: keine Tokens, nur Karten mit Kartenbild); Umbra/Stained/Storm nur mit Motiv-Maske.
+let _displayPool = null;
+function displayPool() {
+  if (!_displayPool) {
+    const seen = new Set(), out = [];
+    for (const id of RARITIES.PACK_IDS) for (const c of packPool(id)) if (!seen.has(c.name)) { seen.add(c.name); out.push(c.name); }
+    _displayPool = out;
+  }
+  return _displayPool;
+}
+const _displayCache = { hour: null, cards: null };
+/** Auslage der Stunde `hour` (zwischengespeichert für die jeweils letzte Stunde). */
+function displayForHour(hour) {
+  if (_displayCache.hour !== hour) { _displayCache.cards = RARITIES.rollDisplay(hour, displayPool(), cardHasMask); _displayCache.hour = hour; }
+  return _displayCache.cards;
+}
+async function displayView(userId, now) {
+  const t = typeof now === 'number' ? now : Date.now();
+  const hour = RARITIES.displayHourIndex(t);
+  const own = userId ? await ownedRarities(userId) : {};
+  const bought = userId ? (await db.all('SELECT slot FROM display_buys WHERE user_id = ? AND hour = ?', [userId, hour])).map(r => r.slot) : [];
+  return {
+    bought, hour, msLeft: RARITIES.msToNextHour(t), nextAt: (hour + 1) * RARITIES.HOUR_MS, serverTime: t,
+    cards: displayForHour(hour).map(c => ({ ...c, owned: (own[c.name] && own[c.name][c.rarity]) || 0 })),
+  };
+}
+
+// GET /api/boosters/display — aktuelle Auslage { hour, msLeft, nextAt, serverTime, cards: [{ rarity, name, price, owned, special? , fullPrice? }] }
+//  Plätze 0–7: je Rarity eine Karte (aufsteigend); Platz 8: Sonderangebot (`special: true`, halber Preis aufgerundet, `fullPrice` = Normalpreis)
+app.get('/api/boosters/display', authMiddleware, async (req, res) => {
+  try { res.json(await displayView(req.user.userId)); }
+  catch (err) { console.error('[boosters/display]', err.message); res.status(500).json({ error: 'Failed to load the showcase' }); }
+});
+
+// POST /api/boosters/display/buy { slot, rarity?, hour?, name?, price?, special? } — eine Karte der aktuellen Auslage kaufen (je Spieler, Stunde und
+//  Platz nur EINMAL: danach 409 „already bought“, `bought` in der Auslage nennt die gekauften Plätze):
+//  SC ab (sc_log 'shop:display'), Karte+Rarity +1 in user_card_rarities. `slot` = Platz in `cards` (0–7 je Rarity, 8 = Sonderangebot zum halben
+//  Preis); ohne `slot` zählt der reguläre Platz der Rarity. Der PREIS kommt immer vom Server (Platz der aktuellen Stunde). Weicht etwas vom Platz ab,
+//  was der Client mitschickt (Stunde, Name, Rarity, Sonderangebot, Preis — Wechsel an der Stundengrenze), antwortet der Server 409 mit der
+//  aktuellen Auslage und bucht nichts.
+//  Antwort 200 { ok, card, owned, sc, display } · 400 · 402 { error, sc } · 409 { error, display }
+app.post('/api/boosters/display/buy', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const body = req.body || {};
+    const now = Date.now(), hour = RARITIES.displayHourIndex(now);
+    const cards = displayForHour(hour);
+    let idx;
+    if (body.slot != null) idx = body.slot;
+    else {
+      if (!RARITIES.DISPLAY_PRICE[String(body.rarity || '')]) return res.status(400).json({ error: 'Unknown rarity' });
+      idx = cards.findIndex(c => c.rarity === body.rarity && !c.special);
+    }
+    if (!Number.isInteger(idx) || idx < -1 || idx >= RARITIES.DISPLAY_RARITIES.length + 1) return res.status(400).json({ error: 'Unknown slot' });
+    const slot = cards[idx];
+    const stale = !slot
+      || (body.hour != null && Number(body.hour) !== hour)
+      || (body.name != null && String(body.name) !== slot.name)
+      || (body.rarity != null && String(body.rarity) !== slot.rarity)
+      || (body.special != null && !!body.special !== !!slot.special)
+      || (body.price != null && Number(body.price) !== slot.price);
+    if (stale) return res.status(409).json({ error: 'The showcase just changed. Take a look at the new cards!', display: await displayView(userId, now) });
+    let nichtGenug = false, schonGekauft = false;
+    try {
+      await db.transaction(async (tx) => {
+        const ins = await tx.run('INSERT OR IGNORE INTO display_buys (user_id, hour, slot) VALUES (?, ?, ?)', [userId, hour, idx]);
+        if (!ins.rowsAffected) { schonGekauft = true; throw new Error('already-bought'); }
+        const upd = await tx.run('UPDATE users SET sc = sc - ? WHERE id = ? AND sc >= ?', [slot.price, userId, slot.price]);
+        if (!upd.rowsAffected) { nichtGenug = true; throw new Error('not-enough-sc'); }
+        await tx.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), userId, BOOSTER_DISPLAY_REASON, slot.rarity + ':' + slot.name + (slot.special ? ':special' : ''), -slot.price]);
+        await addRarityCopies(userId, [{ name: slot.name, rarity: slot.rarity }], tx);
+      });
+    } catch (err) {
+      if (schonGekauft) return res.status(409).json({ error: 'You already bought this card. New cards arrive with the next rotation.', display: await displayView(userId, now) });
+      if (nichtGenug) {
+        const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+        return res.status(402).json({ error: 'Not enough SC', sc: u?.sc || 0 });
+      }
+      throw err;
+    }
+    db.run('DELETE FROM display_buys WHERE hour < ?', [hour - 48]).catch(() => {});
+    const u = await db.get('SELECT sc FROM users WHERE id = ?', [userId]);
+    const own = await ownedRarities(userId);
+    res.json({ ok: true, card: { name: slot.name, rarity: slot.rarity, price: slot.price, special: !!slot.special }, owned: (own[slot.name] && own[slot.name][slot.rarity]) || 0, sc: u?.sc || 0, display: await displayView(userId, now) });
+  } catch (err) { console.error('[boosters/display/buy]', err.message); res.status(500).json({ error: 'Failed to buy the card' }); }
+});
+
 // ───── Duplikate: Rahmen-Ränge ─────
 // Zieht man ein Item, das man schon hat, wird es „geupgradet“: `dupes` zählt die Kopien über das Original hinaus und bestimmt den Rahmen
 // (public/rank-frames.js): 1 = Silber, 2 = Gold, 3 = Platin, 4 = Diamant, 5 = Rubin, 6 = Saphir, 7 = Smaragd, 8 = Obsidian (Maximum).
@@ -4348,13 +4874,13 @@ async function shopDupes(userId) {
 
 /** Rahmen-Ränge eines Spielers für den Spielzustand: Avatar, Sleeve und die im Deck benutzten Skins. */
 async function framesForPlayer(userId, usr, deckSkins) {
-  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {} };
+  const none = { avatarRank: 0, cardbackRank: 0, skinRanks: {}, title: null };
   if (!usr) return none;
   try {
     const d = await shopDupes(userId);
     const skinRanks = {};
     for (const sk of Object.values(deckSkins || {})) if (d.skin[sk]) skinRanks[sk] = d.skin[sk];
-    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks };
+    return { avatarRank: d.avatar[shopIdOfUrl(usr.avatar, 'avatars')] || 0, cardbackRank: d.sleeve[shopIdOfUrl(usr.cardback, 'sleeves')] || 0, skinRanks, title: usr.title || null };
   } catch (err) { console.error('[frames] Ränge nicht ermittelt:', err.message); return none; }
 }
 
@@ -4362,8 +4888,8 @@ async function framesForPlayer(userId, usr, deckSkins) {
  * Zieht ein zufälliges Item aus `pool` (Ids): der ganze Pool, außer was schon das Maximum erreicht hat. Besitzt der Spieler es schon,
  * steigt `dupes` um 1 (Upgrade), sonst wird es neu eingetragen. Liefert { id, isNew, dupes } oder null, wenn alles auf dem Maximum ist.
  */
-async function pullFromPool(userId, itemType, pool, preowned = []) {
-  const rows = await db.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
+async function pullFromPool(userId, itemType, pool, preowned = [], dbh = db) {
+  const rows = await dbh.all('SELECT item_id, dupes FROM user_shop_items WHERE user_id = ? AND item_type = ?', [userId, itemType]);
   const have = new Map(rows.map(r => [r.item_id, r.dupes || 0]));
   // `preowned`: schon besessene Items außerhalb des Shop-Pools (Standard-/Gegner-Avatare und -Sleeves, exklusive Skins) –
   // sie sind NUR als Duplikat ziehbar; ohne eigene Zeile zählt der erste Treffer als erste Kopie (Rang 1).
@@ -4372,15 +4898,15 @@ async function pullFromPool(userId, itemType, pool, preowned = []) {
   if (!eligible.length) return null;
   const id = eligible[Math.floor(Math.random() * eligible.length)];
   if (!have.has(id) && extra.includes(id)) {
-    await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
+    await dbh.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 1)', [uuidv4(), userId, itemType, id]);
     return { id, isNew: false, dupes: 1 };
   }
   if (have.has(id)) {
     const dupes = have.get(id) + 1;
-    await db.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
+    await dbh.run('UPDATE user_shop_items SET dupes = ? WHERE user_id = ? AND item_type = ? AND item_id = ?', [dupes, userId, itemType, id]);
     return { id, isNew: false, dupes };
   }
-  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
+  await dbh.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id, dupes) VALUES (?, ?, ?, ?, 0)', [uuidv4(), userId, itemType, id]);
   return { id, isNew: true, dupes: 0 };
 }
 
@@ -4422,6 +4948,17 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ ok: true, sc: updated.sc, itemId: got.id, itemType, isNew: got.isNew, dupes: got.dupes, extra: extra ? { src: extra.src, name: extra.name } : null });
+});
+
+// ───── Emotes & Titel (emotes-titles.js) ─────
+const emotesTitles = require('./emotes-titles')({ db, app, authMiddleware });
+emotesTitles.register();
+
+// ───── Glücksrad (wheel-api.js) ─────
+require('./wheel-api')({
+  app, db, authMiddleware, uuidv4, path, RARITIES, ownedRarities, addRarityCopies, packPool, cardHasMask, boosterManifest,
+  emotesTitles, getAvailableSkins, unlockableSkinNames, heroOfSkin, pullFromPool, extraPullItems, scanShopDir, avatarDisplayName, sleeveDisplayName, debugEnabled: DEBUG_TOOLS_ENABLED,
+  get cpuSleeves() { return cpuSleeves; }, get cpuAvatars() { return cpuAvatars; },
 });
 
 // ───── Structure decks (shop-gated sample decks) ─────
@@ -4581,18 +5118,23 @@ function parseDeck(row) {
   try { skins = JSON.parse(row.skins || '{}'); } catch {}
   let cubeDraftMeta = null;
   try { cubeDraftMeta = row.cube_draft_meta ? JSON.parse(row.cube_draft_meta) : null; } catch {}
+  const mainDeck = JSON.parse(row.main_deck), heroes = JSON.parse(row.heroes);
+  const potionDeck = JSON.parse(row.potion_deck), sideDeck = JSON.parse(row.side_deck);
   return {
     id: row.id,
     name: row.name,
-    mainDeck: JSON.parse(row.main_deck),
-    heroes: JSON.parse(row.heroes),
-    potionDeck: JSON.parse(row.potion_deck),
-    sideDeck: JSON.parse(row.side_deck),
+    mainDeck,
+    heroes,
+    potionDeck,
+    sideDeck,
     isDefault: !!row.is_default,
     coverCard: row.cover_card || '',
     skins,
     mode: row.mode || 'standard',
     cubeDraftMeta,
+    rarities: RARITIES.normalizeDeckRarities(
+      { mainDeck, heroes, potionDeck, sideDeck },
+      (() => { try { return JSON.parse(row.rarities || '{}'); } catch { return {}; } })()),
   };
 }
 
@@ -4945,6 +5487,31 @@ function revealedMitStufe(ps, liste, engine, pi) {
   });
 }
 
+/**
+ * Rarity je Karte in den Client-Zustand: `players[i].rarity` (fehlt = alles Common) hat dieselbe Form wie die Zonen
+ * (heroes, abilityZones, supportZones, surpriseZones, hand, creationZone, coolnessStack, discardPile, deletedPile; area = areaZones[i]),
+ * mit Rarity-Id oder null je Karte; aufgedeckte Gegner-Handkarten tragen `rarity` direkt. Gerechnet auf der bereits verborgenen
+ * Spielersicht — verdeckte Karten ('?') bleiben Common, nichts Verstecktes verraet sich. Zuordnung: siehe rarities.js (Kopienvorrat).
+ */
+function attachRarityToState(gs, state) {
+  try {
+    if (!(gs.players || []).some(ps => ps && ps.rarityLedger)) return;
+    RarityTrack.reconcile(gs);   // Identitaet je Kartenkopie: Schattenzustand gegen die echten Zonen abgleichen (cards/effects/_rarity-track.js)
+    (state.players || []).forEach((pv, i) => {
+      const ps = gs.players?.[i];
+      if (!ps || !ps.rarityLedger) return;
+      const r = RarityTrack.annotate(ps, pv, (state.areaZones || [])[i]);
+      if (r) pv.rarity = r;
+      if (pv.revealedHandCards && pv.revealedHandCards.length) {
+        pv.revealedHandCards = pv.revealedHandCards.map(c => {
+          const rr = c && Number.isInteger(c.index) ? RarityTrack.at(ps, 'hand', c.index, c.name) : null;
+          return rr ? { ...c, rarity: rr } : c;
+        });
+      }
+    });
+  } catch (err) { console.error('[rarity] Zustand nicht beschriftbar:', err.message); }
+}
+
 function sendGameState(room, playerIdx, extra) {
   if (room.engine?._fastMode) return; // Silent during MCTS simulations.
   // ── STILLGELEGTE ENGINE SENDET NICHTS MEHR ────────────────────────
@@ -5059,7 +5626,7 @@ function sendGameState(room, playerIdx, extra) {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
-      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {}, title: ps.title || null,   // Rahmen-Ränge (Duplikate), Titel
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -5353,7 +5920,7 @@ function sendGameState(room, playerIdx, extra) {
       // v657: Handkarten mit selbstgerechneten Kosten (manualGoldCost)
       // bleiben beim Gratis-Kauf grau — nur fuer den Besitzer relevant.
       manualCostArtifactsInHand: (pi === playerIdx && room.engine?.freeArtifactArmed(pi))
-        ? (ps.hand || []).filter(n => !!loadCardEffect(n)?.manualGoldCost) : [],
+        ? [...(ps.hand || []), ...(ps.creationZone || [])].filter(n => !!loadCardEffect(n)?.manualGoldCost) : [],   // 12.11.: auch Vorratskarten (Gratis-Kauf gilt dort wie in der Hand)
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: room.engine ? room.engine.arePotionsLockedFor(pi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
@@ -5600,6 +6167,22 @@ function sendGameState(room, playerIdx, extra) {
       // client renders an effective-cost badge on each tagged hand
       // card, and the play-from-hand path uses the same map to compute
       // what the owner actually pays.
+      // ★ 12.11. (Vorgabe: Karten in Crestinas Vorrat werden wie Handkarten GESPIELT): wirksame STUFE der Karten in Crestinas Vorrat, nur wo sie vom Druck abweicht (Great Vanguard Demon, Stufensenker der Hand,
+      // Mana Absorbing Crystal …) — Index = Platz im Vorrat. Owner-only wie die Hand-Abzuege; die Engine rechnet dieselbe Stufe fuer die Spielbarkeit (`effectiveCardLevel`).
+      creationLevels: pi === playerIdx ? (() => {
+        const out = {};
+        if (!room.engine || !(ps.creationZone || []).length) return out;
+        const cardDB = getCardDB();
+        for (let i = 0; i < ps.creationZone.length; i++) {
+          const cd = cardDB[ps.creationZone[i]];
+          if (!cd || typeof cd.level !== 'number' || cd.level <= 0 && cd.cardType !== 'Spell') continue;
+          try {
+            const eff = room.engine.effectiveCardLevel(cd, pi, {});
+            if (Number.isFinite(eff) && eff !== cd.level) out[i] = eff;
+          } catch { /* ohne Anzeige weiter */ }
+        }
+        return out;
+      })() : {},
       handCostReductions: pi === playerIdx ? (() => {
         // Per-hand-index reduction the client renders/affordability-
         // checks against = the per-turn map (Play Money) PLUS the
@@ -6298,7 +6881,7 @@ function sendGameState(room, playerIdx, extra) {
       return result;
     })() : [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), title: ps.title || null })),   // v1374
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
     ...extra,
@@ -6328,6 +6911,7 @@ function sendGameState(room, playerIdx, extra) {
   //    Zustand. `extra` (challengeStart, reconnected) erzwingt ebenfalls.
   //  • `stateSeq` zaehlt nur noch tatsaechlich gesendete Zustaende.
   //  • Abschalten: PP_STATE_DEDUPE=0.
+  attachRarityToState(gs, state);   // Rarity je Karte (nur Spieler mit Nicht-Common-Karten im Deck)
   let sig = null;
   // ★ W64b: Frage des Besitzers offen, Karte noch nicht gezeigt → der Gegner sieht den Zustand von VOR der Karte, nur die Hülle der Frage ist neu
   // (eine Karte, die vor einer abbrechbaren Frage schon etwas verändert hat, verriete sich sonst im Zustand).
@@ -6396,7 +6980,7 @@ function sendSpectatorGameState(room) {
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
-      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {},   // Rahmen-Ränge (Duplikate)
+      avatarRank: ps.avatarRank || 0, cardbackRank: ps.cardbackRank || 0, skinRanks: ps.skinRanks || {}, title: ps.title || null,   // Rahmen-Ränge (Duplikate), Titel
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -6559,6 +7143,7 @@ function sendSpectatorGameState(room) {
       handZusatzaktion: {},
       handLevelOffsetHeroFilter: {},
       handLevelOffsetsDynamic: {},
+      creationLevels: {},
       handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       comboLockHeroOwner: ps.comboLockHeroOwner ?? null,
@@ -6732,11 +7317,12 @@ function sendSpectatorGameState(room) {
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), title: ps.title || null })),   // v1374
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
   };
 
+  attachRarityToState(gs, state);
   if (_auftrittHalt === 'huelle' && room._zuschauerSig) {   // W64b: Zustand von vor der Karte, nur die Hülle der Frage ist neu (s. sendGameState)
     try { state = { ...JSON.parse(room._zuschauerSig), effectPrompt: state.effectPrompt, potionTargeting: state.potionTargeting }; } catch { /* aktueller Zustand */ }
   }
@@ -7628,10 +8214,10 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
   ps.supportZones[heroIdx][supIdx].push(cardName);
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   engine.notePlayedFromHand(pi);
-  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill) — gemerkt, damit ein Negieren den richtigen zurückgibt.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // Standardplatz zuerst, sonst Bonus-Platz (Divine Gift of Skill). ★ Spielgestalter-Entscheidung 16.11.2026: mit dem Beginn des Anlegens ist der Platz verbraucht — wird die Ability
+  // danach negiert, bekommt der Held ihn NICHT zurück (wie bei jedem Einmal-Limit, siehe CARD_API „Einmal-Limits werden bei Aktivierungsbeginn verbraucht"). Ein Abbruch VOR diesem Punkt
+  // (Held-/Zonenwahl abbrechen) hat noch nichts verbraucht.
   engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const inst = engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
   engine.log('ability_attached', { player: ps.username, card: cardName, hero: hero.name, zone: 'support' });
@@ -7650,17 +8236,8 @@ async function abilityInSupportAnlegen(room, pi, { cardName, handIndex, heroIdx,
       const negatedAbilityOwner = engine._consumeHandCardOrigin(pi, cardName);
       await engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'support', fromHeroIdx: heroIdx, fromSlotIdx: supIdx });
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        hero.buffs.blessed_skill.remaining++;
-        hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
-      }
+      // Der Platz bleibt verbraucht (s. o.); nur die Sperrmarke des Blessed-Buffs wird neu gelesen (die Ability liegt nicht mehr in der Zone, Magic-Arts-Stufe kann gefallen sein).
+      if (hero.buffs?.blessed_skill) hero.buffs.blessed_skill.locked = engine.isHeroSkillLocked(pi, heroIdx);
       engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -7786,13 +8363,12 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
   room.engine.notePlayedFromHand(pi);
   // Consume the standard slot first; if it's already used, spend a bonus
-  // attachment from Divine Gift of Skill instead. Track which slot was
-  // consumed so a negation refund can return it cleanly.
+  // attachment from Divine Gift of Skill instead.
   // v1356: Verbrauch (Standard zuerst, sonst Bonus-Platz) und Blessed-Buff
   // an EINER Stelle — derselbe Helfer wie im Engine-Anlegeweg.
-  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Platz ist mit dem Beginn des Anlegens verbraucht und kommt bei einer Negation der Ability NICHT zurück (Standard- wie Bonus-Platz);
+  // ein Abbruch vor diesem Punkt (Zonen-/Heldenwahl) hat nichts verbraucht.
   room.engine.verbraucheAbilityAnlegen(pi, heroIdx);
-  const _consumedBonusSlot = !_hatteStandard;
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -7821,26 +8397,10 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       // `zoneSlotFound` merkt sich, aus welchem Slot sie entfernt wurde.
       await room.engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult, -1,
         { fromZone: 'ability', fromHeroIdx: heroIdx, fromSlotIdx: zoneSlotFound });
-      // Refund whichever slot was consumed (regular vs Skill bonus).
-      if (_consumedBonusSlot) {
-        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
-        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
-        // Restore the Blessed buff: re-add the slot to the visible
-        // counter, and re-create the buff entry if it was deleted when
-        // remaining hit 0 mid-resolve.
-        if (!hero.buffs) hero.buffs = {};
-        if (!hero.buffs.blessed_skill) {
-          hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
-        }
-        hero.buffs.blessed_skill.remaining++;
+      // Kein Zurückgeben des Platzes (s. o.). Die Ability liegt nicht mehr in der Zone — Magic Arts
+      // kann unter 1 gefallen sein, also die Sperrmarke des Blessed-Buffs neu lesen.
+      if (hero.buffs?.blessed_skill) {
         hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-      } else {
-        ps.abilityGivenThisTurn[heroIdx] = false;
-        // The regular slot was the consumer — Magic Arts level may have
-        // dropped back below 1, so re-evaluate the lock flag.
-        if (hero.buffs?.blessed_skill) {
-          hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-        }
       }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -8173,10 +8733,13 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
           }
-          const result = room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
+          // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — eine Ausruestung (Future Tech Control Device, Free-Side-Equip) an einen Helden des Geschuetzten wird gespielt und bezahlt,
+          // das Anlegen verpufft (Karte in die Ablage). Frueher: `blockedByFirstTurnProtection` machte nur FTCD unspielbar.
+          const result = (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi))
+            ? null : room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
           if (!result) {
             room.engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
-            room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
+            room.engine.log('equip_fizzle', { card: cardName, reason: (placementOwner !== pi && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? 'first-turn protection' : 'zone_occupied_by_chain' });
             return true;
           }
           const { inst, actualSlot } = result;
@@ -8399,7 +8962,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // sieben laufe nicht durch `summonCreatureWithHooks`. Geprueft
           // hatte ich nur die KARTENSKRIPTE (Powder Keg) — nicht diesen
           // Zweig hier, der genau das tut. Dritte Auflage derselben Lehre.
-          const placed = await room.engine.summonCreatureWithHooks(
+          // Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — Powder Keg & Co. in die Zone des Geschuetzten: gespielt/bezahlt, die Platzierung verpufft (Fizzle-Zweig unten: Ablage).
+          const placed = (_isCrossSideArtifact && room.engine.ersterZugGeschuetzt(placementOwner, pi)) ? null : await room.engine.summonCreatureWithHooks(
             cardName, placementOwner, heroIdx, finalSlot,
             {
               source: 'Artifact-Creature play',
@@ -8790,6 +9354,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') room.engine._popResolvingPlay();
   };
 
+  // 17.11.2026 (ARW-01): Zustand des Pfeil-Fensters nach der Zielwahl (`gs._pfeilFenster`, siehe unten) — bei jedem Ausgang zuruecksetzen (verschachtelte Wuerfe behalten den Stand der aeusseren Karte).
+  const _pfeilVorher = gs._pfeilFenster;
+  const _pfeilAufraeumen = () => { if (_pfeilVorher) gs._pfeilFenster = _pfeilVorher; else delete gs._pfeilFenster; };
+
   try {
     // ★ v1277: `_spellFreeAction` gehoert zu GENAU EINER Aufloesung — jeder
     // Setzer ist das `onPlay` des Zaubers selbst. Ein Rest aus einem
@@ -8808,7 +9376,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // ★ W63d (Al, 22.10.2026): der Auftritt (Bild, Protokollzeile, Flug) wird SCHON JETZT vorgemerkt — Kostenwahl (`payActivationCost`), Reaktionsfenster und Zielwahl kommen danach,
     // und alles davon ist noch abbrechbar. Der Auftritts-Puffer der Engine hält zurück, was an Gegner/Zuschauer gehen würde, bis die Karte committed ist.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // eine noch offene Vormerkung der AUSLOESENDEN Karte (Kreatur-Effekt, der einen Zauber wirkt) ist längst committed
-    gs._pendingCardReveal = { cardName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName, ownerIdx: pi, wirker: (heroless || _viaCreature) ? null : { owner: heroOwner, heroIdx: heroIdxPub, art: String(cardData.cardType || 'spell').toLowerCase() } };   // `wirker`: der Held, der wirkt (hero_cast, app-fx-68: Hüpfer + Flackern beim Commit)
     if ((cardData.subtype || '').toLowerCase() === 'attachment') {
       broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'hero', heroIdx });
     }
@@ -8832,10 +9400,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // gleich nummerierten eigenen Helden. Verschachtelt → wiederherstellen.
     const _wirkerVorher = gs._wirkerSeite;
     gs._wirkerSeite = { pi, heroIdx: heroIdxPub, heroOwner };
+    // ★ Spielgestalter-Entscheidung 17.11.2026 (ARW-01): „ERST das Ziel wählen, DANN werden die Pfeile und Topaz angeboten! Nach der Zielwahl kann man dann nicht mehr abbrechen." Eine Attack mit Zielwahl
+    // (`requiresTarget`) bietet Pfeile/Magic Topaz/Bow of the Hunt Goddess nicht in diesem Fenster an, sondern erst nach der bestätigten Zielwahl (`engine._pfeilFensterNachZielwahl`); der Zustand dafür
+    // (`gs._pfeilFenster`) steht unten, sobald die Karte nicht in der Kette negiert wurde. Ohne Zielwahl (Flächen-/Ohne-Ziel-Attacks), ohne Helden oder über eine Kreatur gewirkt: wie bisher.
+    const _pfeileNachZiel = cardData.cardType === 'Attack' && script?.requiresTarget === true && !heroless && !_viaCreature && Number.isInteger(heroIdxPub) && heroIdxPub >= 0;
     let chainResult;
     try {
     chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx: heroIdxPub,
+      pfeileNachZielwahl: _pfeileNachZiel,
       resolve: null,
       // Handkarte des Initialglieds: fliegt beim AUFLOESEN des Glieds (nicht erst nach der ganzen Aufloesung). Nur eigene Karten aus der Hand (keine Creation-Karte, keine fremde Herkunft).
       handFlug: (() => {
@@ -8889,7 +9462,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // Master's Plan …) — der Zauber hat nie gewirkt, also fallen auch
       // KEINE Wisdom-Kosten an. (Vorher wurden sie hier trotzdem gezahlt.)
       if (additionalConsumed && consumedInst) {
-        room.engine.restoreAdditionalAction(consumedInst);
+        // ★ Spielgestalter-Entscheidung 18.11.2026 (Friendship): „ja, Friendship zieht auch nach Negation" — die Zusatzaktion von Friendship bleibt bei Negation in der Kette VERBRAUCHT und
+        // „then draw" feuert trotzdem (`zusatzaktionNachKettennegation`); jeder andere Geber bekommt die Zusatzaktion wie bisher zurück.
+        const _geberSkript = loadCardEffect(consumedInst.name);
+        if (typeof _geberSkript?.zusatzaktionNachKettennegation === 'function') {
+          try { await _geberSkript.zusatzaktionNachKettennegation(room.engine, consumedInst, { spellName: cardName, spellCardData: cardData }); }
+          catch (err) { console.error(`[doPlaySpell] zusatzaktionNachKettennegation (${consumedInst.name}):`, err.message); }
+        } else {
+          room.engine.restoreAdditionalAction(consumedInst);
+        }
       }
       if (cardData.cardType === 'Attack') {
         // ★ W35a (Al, 22.10.2026, Frage 4): EIN Zählschritt für jede gespielte Attack (auch inhärente/negierte): `engine.zaehleAlsArt` zählt Spieler-/Helden-Zähler UND meldet
@@ -8906,6 +9487,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // follow-up attack this turn would inherit them.
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
+        _pfeilAufraeumen();
       } else if (cardData.cardType === 'Spell') {
         await room.engine.zaehleAlsArt('spell', { pi, heroIdx: heroIdxPub, heroOwner, name: cardName, karte: true });   // W36a: EIN Zählschritt für jede gespielte Spell-Karte (wie die Attack-Karten)
       }
@@ -8925,6 +9507,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._spellDamageLog = [];
     gs._spellExcludeTargets = [];
     gs._spellCancelled = _kostenAbbruch;   // Z7c
+    // 17.11.2026 (ARW-01): die Attack wurde nicht negiert/fizzelt nicht — das Pfeil-Fenster wartet auf die Zielwahl (`engine._zielwahlAbschliessen`, Rueckfall `_fireAttackDeclare`).
+    if (_pfeileNachZiel && !_gefizzelt && !_kostenAbbruch) gs._pfeilFenster = { cardName, owner: pi, heroIdx: heroIdxPub, casterOwner: heroOwner, geoeffnet: false };
 
     // (W63d: vorgemerkt wird oben, vor der Kostenwahl. Ist inzwischen etwas dazwischengekommen, das die Vormerkung verbraucht hat — z. B. das Reaktionsfenster des Gegners —,
     //  bleibt es dabei: der Auftritt ist dann längst gezeigt.)
@@ -8943,9 +9527,6 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.maybeFireCpuRevealEarly();
     // Z1 (R02-21): Wirker-Seite auch um den onPlay-Lauf stempeln (vorher nur um die Kette) - sonst liest
     // `effectiveSchoolLevelForCaster` (ohne 4. Argument) die Zonen des gleich indizierten EIGENEN Helden.
-    // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
-    // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
-    const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
     let _wisdomVorab = false;   // die Karte hat ihre Wisdom-Kosten selbst schon gezahlt (`engine.zahleOffeneWisdom`)
     if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
@@ -9018,6 +9599,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // v1313: gerettetes Opfer (Barrier of Undying) → der Spell fizzelt,
     // ist aber GESPIELT — kein Abbruch, keine Rueckgabe auf die Hand.
     if (room.engine.nimmOpferFizzle()) delete gs._spellCancelled;
+    // ★ 17.11.2026 (ARW-01): sobald das Pfeil-Fenster nach der Zielwahl offen war, gibt es keinen Abbruch mehr — Pfeile/Gold sind verbraucht, die Attack ist gespielt (spaetere Abbrueche der
+    // Skripte lassen nur den restlichen Effekt aus, geben die Karte aber nicht auf die Hand zurueck).
+    if (gs._pfeilFenster?.geoeffnet && gs._spellCancelled) delete gs._spellCancelled;
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
       // Player aborted the spell mid-resolve (target cancel, etc.) —
@@ -9039,6 +9623,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
       }
+      _pfeilAufraeumen();
       // Roll back ALL action-economy bookkeeping — the Spell never
       // resolved, so the Action resource wasn't actually spent. Without
       // this, a cancelled action-2 attempt leaves _actionsPlayedThisPhase
@@ -9162,18 +9747,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
       _wisdomBezahlt = true;
     }
-    // ★ Z7b (Als Entscheidung, Welle 3): ob der Slot verbraucht ist, hängt daran, ob die Karte AUFLÖSEN
-    // durfte. GANZ negiert nach der Zielwahl („Negate that Spell": MOE Shield, Storm Ring, Invisibility
-    // Cloak, Frost Rune, Flooding …) → Stempel zurück (bezahlte Kosten bleiben bezahlt), kein
-    // `afterSpellResolved`. Nur Ergebnis verhindert (Schadens-/Teil-Negierung wie Test Flight,
-    // Fizzle v1328) → verbraucht; Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
-    const _ganzNegiert = !!(gs._spellNegatedByEffect && gs._negationWhole);
-    if (_ganzNegiert) room.engine._stempelZurueck(_stempelVorher);
-    else if (gs._spellNegatedByEffect && !_gefizzelt && Number.isInteger(heroIdx) && heroIdx >= 0
-             && cardData.cardType === 'Spell') {
-      await room.engine._meldeZauberVerhindert(pi, cardName, heroIdx, heroOwner);
+    // ★ Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem BEGINN der Aktivierung verbraucht — auch wenn der Zauber nach der Zielwahl GANZ negiert wird („Negate that Spell":
+    // MOE Shield, Storm Ring, Invisibility Cloak, Frost Rune, Flooding …) oder nur sein Ergebnis verhindert wird (Schadens-/Teil-Negierung wie Test Flight, Fizzle v1328). Die Stempel aus dem
+    // `onPlay` bleiben, bezahlte Kosten bleiben bezahlt (früher Z7b: `_stempelZurueck`); kein `afterSpellResolved`, Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
+    // Negation nach der Zielwahl: `onPlay` ist früh ausgestiegen — Marken, die er sonst erst NACH der Zielwahl setzt, meldet die Karte über `onFizzledPlay` (idempotent, `_noteFizzledPlay`).
+    if (gs._spellNegatedByEffect && !_gefizzelt) {
+      await room.engine._noteFizzledPlay(pi, cardName, heroIdx, cardData.cardType, heroOwner, { viaAdditionalProvider: additionalConsumed ? consumedInst : null });   // Friendship: „then draw" trotz Negation
     }
-    if (!_ganzNegiert && cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug (ganz negiert stempelt nicht, Z7b)
+    if (cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
     if (!gs._spellNegatedByEffect) {
       // Per-player, whole-game record of Spell names whose effect has
       // successfully resolved (negated Spells are excluded — we're
@@ -9214,6 +9795,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Held der Gegenseite hat angegriffen" unterscheiden.
         heroOwner,
         spellName: cardName, spellCardData: cardData, heroIdx: _hookHeroIdx, casterIdx: pi,
+        // Spielgestalter-Entscheidung 17.11.2026 (Clone × Teleport): „Es gilt zum Zeitpunkt des Wirkens, also VOR dem Tausch" — `heroIdxWirkzeit` ist der Platz des Wirkers VOR der Auflösung
+        // (bei Teleport ≠ `heroIdx`). Spaltengebundene Kreaturen (Clone: „when the corresponding Hero uses …") vergleichen damit.
+        heroIdxWirkzeit: heroIdxPub,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         // The provider instance whose additional-action token was just
         // consumed by THIS spell-play, or null if the spell was cast as
@@ -9248,6 +9832,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
       await clearArmedArrows(room.engine, pi);
     }
+    _pfeilAufraeumen();
 
     await room.engine.resolveDeferredRecoil();
     await room.engine._executeDeferredSurprises();
@@ -9582,7 +10167,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
     delete gs._preventPhaseAdvance;
 
-    if (script?.oncePerGame && !_ganzNegiert) {   // Z7b: ganz negiert = nie aufgeloest
+    if (script?.oncePerGame) {
       const opgKey = script.oncePerGameKey || cardName;
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add(opgKey);
@@ -9603,6 +10188,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // this is a no-op if resolution already released normally above. Only
     // fires on error / early returns that skipped the explicit release.
     _releaseSpellDepth();
+    _pfeilAufraeumen();   // 17.11.2026 (ARW-01)
     // Always clear the spell-caster animation override so it never
     // leaks into a subsequent cast.
     if (gs._spellCasterOverride) delete gs._spellCasterOverride;
@@ -9720,10 +10306,9 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
-  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Kreatur ODER ihr Wirtsheld geblendet + Zielwahl-Effekt `requiresTarget`).
-  // Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
-  if (!anyPlayer && script.requiresTarget === true
-      && (room.engine._isCreatureBlinded(inst) || room.engine._isHeroBlinded(heroOwner, heroIdx))) return false;
+  // B1/S3: Blinded auch serverseitig — dieselbe Prüfung wie in `getActivatableCreatures` (Spielgestalter-Entscheidung 16.11.2026: Kreatur ODER ihr Wirtsheld geblendet UND der Effekt kann NUR
+  // gegnerische Ziele wählen — `blindedKreaturGesperrt`). Vorher sperrte nur die Angebotsliste: ein direkter Aufruf (veralteter Client, Skript) aktivierte den Effekt trotz Blendung. (`anyPlayer`: wie die Liste ohne Blendungsprüfung.)
+  if (!anyPlayer && room.engine.blindedKreaturGesperrt(inst, pi, effectName, script)) return false;
   // ★ EINMAL PRO SPIEL FUER DEN EFFEKT (v1030, Als Auftrag 12.9.).
   // Eigener Schluessel (`effect:…`), damit „1 Beschwoerung je Partie"
   // und „1 Aktivierung je Partie" nebeneinander stehen koennen.
@@ -9861,6 +10446,39 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     gs._pendingCardReveal = { cardName: creatureName, ownerIdx: pi };
 
+    // ★ Spielgestalter-Entscheidung 16.11.2026 — Effekte mit MEHREREN, je für sich einmal-pro-Zug-begrenzten Modi (Analyzer, Gatherer, Sparkfly Queen; optionaler Skript-Vertrag `waehleModus`):
+    // der Modus wird VOR dem Kettenfenster gewählt. Eine Negation der Aktivierung (Kette oder nach der Zielwahl) verbraucht dann genau diesen Modus (`stempelNegierteAktivierung`); ohne Vorwahl
+    // ließe sich der negierte Modus nicht zuordnen. Abbruch der Modus-Wahl = Abbruch vor dem Beginn: nichts verbraucht (Gerrymander-Veto wie bisher verbraucht).
+    let _modus;
+    if (typeof script.waehleModus === 'function') {
+      const _modusCtx = room.engine._createContext(inst, {});
+      room.engine._promptCardStack.push(inst.name);
+      try { _modus = await room.engine._alsAkteur(_modusCtx, () => script.waehleModus(_modusCtx)); }
+      finally { room.engine._promptCardStack.pop(); }
+      if (_modus == null || _modus === false) {
+        room.engine.beendeDarkDeal(inst);
+        if (charmedHeroCreature) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        } else if (isStolenByPi) {
+          delete inst.heroOwner;
+        }
+        delete gs._pendingCardReveal;
+        delete gs._pendingPlayLog;
+        if (room.engine._lastPromptGerryDeclined) {
+          room.engine._lastPromptGerryDeclined = false;
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+          room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+        } else if (consumedAdditionalCreatureInst) {
+          room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
+        }
+        for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+        return true;
+      }
+    }
+
     // Open a reaction window around the creature-effect activation so
     // Reaction Artifacts that target THIS event (Gigantisaur Skull) can
     // chain in. `cardType: 'CreatureEffect'` keeps existing reactions
@@ -9886,7 +10504,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
     // Negation path — Spearman / Skull negate the activation. Refund any
     // consumed additional-action provider and bail without running the
-    // script's onCreatureEffect. Z7b: no HOPT stamp (the effect never resolved).
+    // script's onCreatureEffect. The Einmal-Limits are used up (stamped below).
     if (creatureEffectChainResult?.negated) {
       room.engine.beendeDarkDeal(inst);
       if (charmedHeroCreature) {
@@ -9901,17 +10519,16 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       if (consumedAdditionalCreatureInst) {
         room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
-      // ★ Z7b (C01-12, Als Entscheidung, Welle 3): die GANZ negierte Aktivierung (Spearman …) hat nie
-      // aufgelöst — weder die Rundensperre (HOPT) noch eine Nutzung bei „up to N times per turn"
-      // (3-Headed Giant, `chargesPerTurn`) ist verbraucht; bezahlte Kosten bleiben bezahlt.
-      // (Früher: Z7 stempelte, vorher die Rundensperre ganz.)
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Spearman …) verbraucht die Rundensperre (HOPT), „1 pro Spiel" und bei
+      // „up to N times per turn" (3-Headed Giant, `chargesPerTurn`) eine Nutzung; bezahlte Kosten bleiben bezahlt. (Früher Z7b: ganz negiert = nie aufgelöst = nichts verbraucht.)
+      room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { modus: _modus });
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
-    const ctx = room.engine._createContext(inst, {});
+    const ctx = room.engine._createContext(inst, _modus != null ? { modus: _modus } : {});
     // Mark this Creature as the ambient prompt source so any confirm /
     // optionPicker its activated effect opens via promptGeneric shows its
     // image (general "which card is prompting" rule; ctx helpers already
@@ -9952,6 +10569,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     const _vorigerCasterCreature = gs._spellCasterCreature;
     gs._spellCasterCreature = inst;
     let resolved;
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     try {
       resolved = await room.engine._alsAkteur(ctx, () => script.onCreatureEffect(ctx));   // 29.9.: Animationen auf die Brettseite
       if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
@@ -10048,11 +10666,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       // even though `resolved` came back false — the activator did
       // commit, opp's Gerrymander declined for them. Stamp HOPT so
       // the activation can't be retried this turn.
+      const _negZiele = room.engine.negiertSeit(_negStand);
       if (room.engine._lastPromptGerryDeclined) {
         room.engine._lastPromptGerryDeclined = false;
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      } else if (_negZiele) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Rolling Boulder, Frost Rune, Chaorc Interception, Cool Tech Jetpack …; der Picker lieferte
+        // `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei der Negation in der Kette sind die Einmal-Limits verbraucht (Rundensperre, „1 pro Spiel", Ladung);
+        // der Zusatzaktions-Geber wird wie dort zurückgegeben.
+        room.engine.negierteAktivierungStempeln(pi, script, effectName, hoptKey, inst, { ziele: _negZiele, modus: _modus });
+        if (consumedAdditionalCreatureInst) room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       } else if (consumedAdditionalCreatureInst) {
         // Standard cancel — refund the additional-action provider
         // consumed upfront. The action-counter increment / heroesActedThisTurn
@@ -10127,7 +10752,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
   // fallback covers puzzle setups: puzzle-placed Cardinals never
   // fire their onPlay, so `_cardinalImmune` is unset, and the
   // counter check alone would let them be stolen.
-  const { CARDINAL_NAMES } = require('./cards/effects/_cardinal-shared');
+  const { cardinalNameImmun } = require('./cards/effects/_cardinal-shared');
   let stolenCount = 0;
   for (const inst of room.engine.cardInstances) {
     if (inst.zone !== 'support') continue;
@@ -10136,7 +10761,7 @@ async function doTriggerTreacherousCrystal(room, pi) {   // W71b: async — das 
     if (inst.stolenBy != null) continue;
     if (inst.counters?._cardinalImmune) continue;
     if (room.engine.kreaturGegnerEffektImmun(inst, pi)) continue;   // W17b: Golden Wings (eigene Marke `_gwImmune`)
-    if (CARDINAL_NAMES.includes(inst.name)) continue;
+    if (cardinalNameImmun(room.engine, inst)) continue;   // Spielgestalter-Entscheidung 16.11.2026: eine negierte Omikron-Illusion ist nicht immun
     // Restrict to Creature card type. Equipment / token instances
     // shouldn't be stealable, even if some future card flagged them
     // as supportable.
@@ -10242,6 +10867,8 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
@@ -10305,7 +10932,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   try {
     // v353: `'board'` — eine Ability liegt im Ability-Slot am Brett,
     // beide Seiten sehen den Auftritt.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');   // v349
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // v349; Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
@@ -10326,9 +10953,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       // sonst sieht der Gegner nie, WAS seine Negation getroffen hat.
       room.engine.announceActiveEffect();
       room.engine.clearEffectAnnounce();
-      // ★ Z7b (Als Entscheidung, Welle 3): GANZ negiert (Master's Plan, Cybug LADYBUG …) = die
-      // Aktivierung hat nie aufgelöst → die Rundensperre wird freigegeben (Auftritt/Kosten bleiben).
-      releaseHopt();
+      // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung hat BEGONNEN — die negierte Aktivierung (Master's Plan, Cybug LADYBUG …) behält die Rundensperre
+      // (vorab gestempelt, siehe oben); Auftritt/Kosten bleiben. Nur Abbruch/Fehler geben sie frei. (Früher Z7b: ganz negiert = Sperre frei.)
+      hoptReserved = false;
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -10351,7 +10978,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       inst.heroOwner = borrowerOwner;
     }
 
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
 
     // Live CPU: stream the Ability AND play its activation flash BEFORE
@@ -10368,6 +10995,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren, auch wenn die Kette die Stufe gesenkt hat
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): die Kette hat die Stufe gesenkt → die Auflösung ist Pflicht (kein Abbrechen)
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     const resolved = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onFreeActivate(ctx, aufLevel)));
     // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
     // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
@@ -10445,6 +11073,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
         hoptReserved = false;
         if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
         room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert (Zielfenster-Reaktion/-Surprise/-Wächter) ist kein Abbruch durch den Spieler — die Rundensperre bleibt verbraucht,
+        // wie bei der Negation in der Kette (oben).
+        hoptReserved = false;
       } else {
         releaseHopt();
       }
@@ -11163,6 +11795,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg; wirkender Held = der Leiher (Lizbeth) bzw. der Held der Zone.
+  if (room.engine.blindedEffektGesperrt(pi, borrowedFromOwner != null ? borrowerOwner : heroOwner, borrowedFromOwner != null ? borrowerHeroIdx : heroIdx, abilityName, { script, level })) return false;
   if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -11272,6 +11906,19 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     return false;
   }
   let _heroCostFinalized = false;
+  // Ausgang einer NEGIERTEN Aktivierung (Kette/Surprise-Fenster ODER Negation nach der Zielwahl): Helden-Vorkosten zurück (Saint Nicolas behält den markierten Trank), eine ZUSATZaktion bleibt
+  // unverbraucht (Anbieter zurück, Aktionszähler zurückgedreht), die Hauptaktion bleibt — wie bei jeder negierten Karte — verbraucht.
+  const negierterAusgang = async () => {
+    await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+    _heroCostFinalized = true;
+    if (consumedAdditionalInst) {
+      // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
+      // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
+      room.engine.restoreAdditionalAction(consumedAdditionalInst);
+      if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
+    } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+  };
 
   try {
     // 24.10.: auch Abilities in Support Zonen (Xal, Xalibur) — Instanz mit zone 'support'.
@@ -11283,12 +11930,12 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // ★ W63d: der Auftritt wird VOR Reaktionsfenster und Handler vorgemerkt (die Aktivierung kann in ihren Fragen noch abbrechen); die Aktivierungs-Animation
     // (`ability_activated`) und alle Protokollzeilen halten sich im Auftritts-Puffer, bis die Fähigkeit committed ist. Das Reaktionsfenster des Gegners committet.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
-    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
+    gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi, wirker: { owner: heroOwner, heroIdx, art: 'ability' } };
     // v353: Auftritt auch fuer Abilities MIT Aktionskosten. Bisher hatte
     // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
     // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
     // Luecke, keine Absicht. `'board'`: beide Seiten sehen sie.
-    room.engine.armEffectAnnounce(abilityName, pi, 'board');
+    room.engine.armEffectAnnounce(abilityName, pi, 'board', { seite: borrowedFromOwner != null ? borrowerOwner : heroOwner, heroIdx: borrowedFromOwner != null ? borrowerHeroIdx : heroIdx });   // Wirker fuer Blinded
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
@@ -11308,19 +11955,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();   // W63d: gefeuert und gekontert = gespielt
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
-      // ★ Z7b: ganz negiert = nie aufgelöst → die Rundensperre (oben vorab gestempelt) wird frei.
-      if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
-      // Negated — refund the Hero pre-action cost (Saint Nicolas
-      // keeps the marked Potion).
-      await room.engine.refundHeroActionCost(heroOwner, heroIdx);
-      _heroCostFinalized = true;
-      if (consumedAdditionalInst) {
-        // ★ W82 (Sinister Idol, Al): wird die Aktivierung im Kettenfenster NEGIERT, bleibt eine ZUSATZaktion UNVERBRAUCHT — der Anbieter wird zurückgegeben und die Aktionszähler zurückgedreht
-        // (wie beim Abbruch); die Hauptaktion einer normalen Aktivierung bleibt, wie bei jeder negierten Karte, verbraucht.
-        room.engine.restoreAdditionalAction(consumedAdditionalInst);
-        if (actionCounterIncrementedHere) actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
-        if (bonusMainActionsConsumedHere) actingPs._bonusMainActions = 1;
-      } else if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
+      // ★ Spielgestalter-Entscheidung 16.11.2026: negiert = Aktivierung begonnen → die Rundensperre (oben vorab gestempelt) bleibt verbraucht.
+      // Negated — refund the Hero pre-action cost (Saint Nicolas keeps the marked Potion); Zusatzaktion/Hauptaktion s. `negierterAusgang`.
+      await negierterAusgang();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -11355,6 +11992,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     ctx.kostenStufe = level;   // W82 (Sinister Idol): Kosten bleiben die der Stufe beim Aktivieren
     const aufLevel = abilityStufeNachKette(room.engine, heroOwner, heroIdx, zoneKind, zoneIdx, abilityName, level);
     const idolPflicht = aufLevel < level;   // W82 (Sinister Idol, Al): gesenkte Auflösung = Pflicht, kein Abbrechen
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let result = await mitIdolPflicht(room.engine, pi, idolPflicht, () => room.engine._alsAkteur(ctx, () => script.onActivate(ctx, aufLevel)));
     if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
@@ -11392,6 +12030,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
           room.engine.log('sinister_idol_declined', { player: gs.players[pi].username, ability: abilityName });
         }
         room.engine._lastPromptGerryDeclined = false;
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: NACH der Zielwahl negiert ist kein Abbruch durch den Spieler — die Rundensperre (oben vorab gestempelt) bleibt verbraucht und der Ausgang ist
+        // derselbe wie bei der Negation in der Kette (`negierterAusgang`).
+        await negierterAusgang();
       } else {
         // Player cancelled — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(heroOwner, heroIdx);
@@ -11610,6 +12252,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       script: { heroEffect: `Remove ${trueFormRevert.formName} (discard pile) and return to ${trueFormRevert.baseName}.` },
     });
   }
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg (wie `getActiveHeroEffects`) — ein Effekt, der nur gegnerische Ziele waehlen kann, faellt aus der Auswahl.
+  for (let i = availableEffects.length - 1; i >= 0; i--) {
+    const e = availableEffects[i];
+    if (!e.trueFormRevert && room.engine.blindedEffektGesperrt(pi, heroOwner, heroIdx, e.name, { script: e.script })) availableEffects.splice(i, 1);
+  }
   if (availableEffects.length === 0) return false;
 
   // ── Re-entry guard ─────────────────────────────────────────────────
@@ -11820,6 +12467,7 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
 
   const perm = (ownerPs.permanents || []).find(p => p.id === permId);
   if (!perm) return false;
+  if (perm.teleportalUntil != null) return false;   // Teleportal: die wartende Karte ist inert, bis sie auf der Hand liegt und gespielt wird
 
   const script = loadCardEffect(perm.name);
   if (!script?.canActivatePermanent || !script?.onActivatePermanent) return false;
@@ -11977,6 +12625,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
   if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): auch auf dem Socket-Weg — gesperrt nur, wenn der Traeger-Held (Kontrolleur `pi`) den Effekt nur gegen Gegner richten koennte.
+  if (!_crossInst && room.engine.blindedEffektGesperrt(pi, _brett, heroIdx, inst.counters?._effectOverride || cardName, { script })) return false;
   // W27a (Al, 21.10.2026): Spell-Anhängsel (Prayer) liegen bei Frozen/Stunned nicht still; W29a (Al, 21.10.2026: „Webbed negiert NICHT Attachments!"): auch nicht bei Webbed.
   if (!script.bypassHostStatusFilter) {
     const _anhaengsel = room.engine._istSpellAnhaengsel(inst);
@@ -12021,7 +12671,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
     // v353: Auftritt — das Artefakt liegt ausgeruestet am Brett
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
-    room.engine.armEffectAnnounce(cardName, pi, 'board');
+    room.engine.armEffectAnnounce(cardName, pi, 'board', _crossInst ? undefined : { seite: _brett, heroIdx });
+    const _negStand = room.engine.negationsStand();   // Negation nach der Zielwahl ≠ Abbruch (unten, `negiertSeit`)
     let resolved = await room.engine._alsAkteur(ctx, () => script.onEquipEffect(ctx));
     if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
@@ -12038,6 +12689,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
         room.engine._lastPromptGerryDeclined = false;
         hoptReserved = false; // keep HOPT consumed
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, equip: cardName });
+      } else if (room.engine.negiertSeit(_negStand)) {
+        // ★ Spielgestalter-Entscheidung 16.11.2026: die Aktivierung wurde NACH der Zielwahl NEGIERT (Zielfenster-Reaktion/-Surprise/-Wächter: Cool Tech Jetpack, Rolling Boulder, Glass Wall …;
+        // der Picker lieferte `null`, das Skript brach ab) — kein Abbruch durch den Spieler: wie bei Kreatur-/Helden-/Ability-Aktivierungen ist die Einmal-pro-Zug-Sperre verbraucht.
+        // (Ausrüstungs-Effekte haben kein Kettenfenster; Abbruch/„Nein" gibt die Sperre weiter frei.)
+        hoptReserved = false; // keep HOPT consumed
       } else {
         releaseHopt();
       }
@@ -12122,7 +12778,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
 
-  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation } = gs.potionTargeting;
+  const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation, config: _ptConfig } = gs.potionTargeting;
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
   if (script.validateSelection && !script.validateSelection(selectedIds, validTargets, room.engine, pi)) return false;   // W29a: Engine/Spieler fuer Paarregeln (Sword in a Bottle × Alliance)
@@ -12149,11 +12805,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   //   Als Befund vom 31.8. (Book of Doom auf 1 Ziel: Monia Bot meldet
   //   sich; auf 2+: gar nichts). Die Schleife ueber alle gewaehlten
   //   Ziele steht jetzt EINMAL in `engine.applyRedirectWindows`.
-  if (!script.cannotBeRedirected) {
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt — auch eine Quelle mit `cannotBeRedirected` (Acid Vial) oeffnet das Fenster: die Umleiter werden angeboten
+  // (Hinweis in der Frage), die Umleitung selbst findet nicht statt (`config.cannotBeRedirected` → `_noRedirectOutcome` in `_checkTargetRedirectOnce`).
+  {
     const srcInst = { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' };
     try {
       selectedIds = await room.engine.applyRedirectWindows(
-        selectedIds, validTargets, { title: potionName, sourceCard: srcInst }, srcInst
+        selectedIds, validTargets, { title: potionName, sourceCard: srcInst, ...(script.cannotBeRedirected ? { cannotBeRedirected: true } : {}) }, srcInst
       );
     } catch (err) {
       console.error('[Engine] targeting-session redirect error:', err.message);
@@ -12233,6 +12891,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
   let chainResult;
+  let _effektT0 = 0;
   try {
     chainResult = await room.engine.executeCardWithChain({
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
@@ -12244,6 +12903,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         return (t && t.type === 'hero' && Number.isInteger(t.heroIdx)) ? { owner: t.owner, heroIdx: t.heroIdx } : null;
       })(),
       resolve: script.resolve ? async () => {
+        _effektT0 = Date.now();   // Beginn der sichtbaren Wirkung: die Handkarte bleibt danach mindestens HAND_MIN_MS in der Hand (cards/effects/_potion-hand-flight.js)
         if (broadcastPotionAnim) broadcastPotionAnim();
         // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
         // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
@@ -12256,6 +12916,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // Als Ruling (Al 26.10., Winged Skeleton): auch die GEWÄHLTEN KREATUREN eines Ziel-Tranks/-Artefakts öffnen das Wahl-Fenster der Kreaturen-Reaktionen (negiert: die Karte ist gespielt, wirkt aber nicht).
         const _kreaturWahl = await room.engine.kreaturenWahlFenster(pi, selectedIds, validTargets, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });
         if (_kreaturWahl?.effectNegated) return {};
+        // ★ Spielgestalter-Entscheidung 16.11.2026: Erste-Runden-Immunitaet — geschuetzte Ziele sind waehlbar und verpuffen: sie fallen aus der Auswahl; bleibt nichts uebrig, wirkt die Karte nicht (gespielt, bezahlt).
+        const _ftAuswahl = room.engine._ersterZugZielAbziehen(pi, validTargets, selectedIds, _ptConfig || {});
+        if (_ftAuswahl.abgezogen) {
+          if (_ftAuswahl.ids.length === 0) return {};
+          selectedIds = _ftAuswahl.ids;
+        }
         return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });
@@ -12315,6 +12981,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     }
     // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): die neu aufgebaute Liste der erneut geöffneten Zielwahl läuft sonst am Taunt vorbei (`normalizeValidTargets` wurde hier nie gerufen).
     if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });   // W43a: Quelle = die Karte der Zielwahl (Taunt nur für Attack/Spell/Creature effect)
+    if (Array.isArray(freshTargets) && typeof room.engine.ersterZugHinweisSetzen === 'function') room.engine.ersterZugHinweisSetzen(freshTargets, pi, config);   // Spielgestalter-Entscheidung 17.11.2026: Warntext am Ziel
     gs.potionTargeting = {
       potionName, handIndex,
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
@@ -12370,7 +13037,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     room.engine._firePendingCardReveal();
   }
 
+  // Hand-Verweildauer (Nutzer 13.11.): die Karte fliegt erst, wenn ihre Wirkung schon sichtbar war (Mount-Vorlauf 120 ms + 350 ms); Karten mit frühem Abflug (Life Serum, Acid Vial) haben das schon.
+  if (_effektT0 && !(ps._resolvingCard && ps._resolvingCard.fruehFlug != null)) await require('./cards/effects/_potion-hand-flight').haltBisSichtbar(room.engine, _effektT0);
   const hi = getResolvingHandIndex(ps);
+  const fruehFlug = ps._resolvingCard ? ps._resolvingCard.fruehFlug : undefined;   // Potion-Projektil (cards/effects/_potion-hand-flight.js): der Flug Hand → Gelöscht ging schon beim Laden raus
   ps._resolvingCard = null;
   // Magic Gems' "discard another card to keep this in hand" rule —
   // mirrors the same flag in doUseArtifactEffect. Skip the splice +
@@ -12406,9 +13076,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // der Flug nicht: er trug EINEN `owner` fuer beide Enden. Jetzt
     // wird die Herkunft VOR dem Flug gelesen und der Flug endet dort,
     // wo die Karte auch landet.
-    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
+    const pileOwner = fruehFlug != null ? fruehFlug : room.engine._consumeHandCardOrigin(pi, potionName, fromCreation ? undefined : hi);
     const pilePs = gs.players[pileOwner];
-    if (!_gestohlen) room.engine._broadcastEvent('play_pile_transfer', {
+    if (!_gestohlen && fruehFlug == null) room.engine._broadcastEvent('play_pile_transfer', {
       fromOwner: pi, toOwner: pileOwner, cardName: potionName,
       // ★ 28.8.: Fluganker folgt der HERKUNFT. Ohne das startete der
       // Flug einer Vorratskarte am gleichnamigen Platz der HAND.
@@ -12433,10 +13103,13 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       // the next card play.
       delete gs._spellPlacedOnBoard;
     } else if (cardType === 'Potion') {
-      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+      const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true, flugMs: (fruehFlug == null && !_gestohlen) ? 560 : 0, pileOwner };   // flugMs: der Handflug nach Gelöscht läuft gerade (Biomancy wartet ihn ab, bevor ihr Fenster/Reveal aufgeht); pileOwner/imStapel: Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (biomancy.js)
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
       _markOncePerGamePotion(ps, loadCardEffect(potionName), potionName);   // ★ v1028
-      if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
+      if (potionHookCtx.imStapel) {
+        // Biomancy hat die Potion schon in den Stapel gelegt (und NICHT zum Token gemacht): übernimmt danach ein späterer Listener die Potion (`placed`, z. B. Saint Nicolas), nimmt sie hier wieder heraus
+        if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', potionName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+      } else if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
       checkPotionLock(ps, gs, pi);
     } else {
       // ── ★ 28.8., Als Befund: FLUG UND STAPEL WAREN UNEINIG ────────
@@ -12676,20 +13349,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
       && typeof engine.filterSelbstKontrollierteGegnerHelden === 'function') {
     engine.filterSelbstKontrollierteGegnerHelden(validTargets, casterPi, cardName);
   }
-  // Erst-Runden-Immunität — Gegenstück zum Filter in
-  // `promptEffectTarget`. Targeting-Karten (getValidTargets +
-  // targetingConfig) laufen NICHT durch diesen Prompt, sondern über die
-  // potionTargeting-Session, also muss die Regel auch hier greifen.
-  const ftProtected = engine?.gs?.firstTurnProtectedPlayer;
-  if (ftProtected != null && casterPi !== ftProtected
-      && !config?.ignoreFirstTurnProtection) {
-    for (let i = validTargets.length - 1; i >= 0; i--) {
-      const t = validTargets[i];
-      const inst = t?.cardInstance || t?._cardInstance;
-      const side = inst ? (inst.controller ?? inst.owner) : t?.owner;
-      if (side === ftProtected) validTargets.splice(i, 1);
-    }
-  }
+  // Erst-Runden-Immunität — Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Die Ziele des Geschützten bleiben in der Liste (früher hier entfernt, ebenso
+  // ausgegraut in `promptEffectTarget`): wählbar, der Effekt verpufft — `doConfirmPotion` zieht sie nach der Wahl ab (`engine._ersterZugZielAbziehen`, Karte gespielt/bezahlt, keine Wirkung).
   for (const t of validTargets) {
     if (t?.type !== 'equip') continue;
     const inst = t.cardInstance;
@@ -12801,6 +13462,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     }
     for (const t of geblockt2) t.ineligible = true;
   }
+  // Spielgestalter-Entscheidung 17.11.2026 (Warntext am Ziel): waehlbare Ziele des Erste-Runden-Geschuetzten tragen `hinweis` (nur der Client zeigt ihn, solange das Ziel angewaehlt und unbestaetigt ist).
+  if (engine && typeof casterPi === 'number' && typeof engine.ersterZugHinweisSetzen === 'function') engine.ersterZugHinweisSetzen(validTargets, casterPi, config);
   return validTargets;
 }
 
@@ -12956,10 +13619,14 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
           potionName: cardName, potionOwner: pi,
           fromHandIndex: currentIdx,
           placed: false, _skipReactionCheck: true,
+          pileOwner,   // Biomancy legt die Potion schon VOR der Rückfrage sichtbar in den Gelöscht-Stapel (`imStapel`, biomancy.js)
         };
         await room.engine.runHooks('afterPotionUsed', potionHookCtx);
         _markOncePerGamePotion(ps, script, cardName);      // ★ v1028
-        if (potionHookCtx.placed) {
+        if (potionHookCtx.imStapel) {
+          if (potionHookCtx.placed) room.engine.takeFromPileSync(pileOwner, 'deleted', cardName, { last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed' });
+          checkPotionLock(ps, gs, pi);
+        } else if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
         } else {
           pilePs.deletedPile.push(cardName);
@@ -13427,15 +14094,10 @@ function cubeShuffle(arr) {
 /**
  * Draft-Packs bauen: 32 Packs a 16 Karten, jede Karte genau einmal.
  *
- * Drei "Toepfe" werden moeglichst GLEICHMAESSIG auf alle Packs verteilt:
- *   1) Heroes (cardType 'Hero')
- *   2) Rare       (foil 'rare')            — Heroes dieser Seltenheit zaehlen mit
- *   3) Ueber Rare (secret_rare, diamond_rare, alles andere mit Foil) — ein grosser
- *      Topf, ebenfalls inkl. der bereits verteilten Heroes dieser Seltenheit
- * Je Topf geht die naechste Karte in das Pack mit der bisher geringsten Anzahl
- * dieses Topfes (Gleichstand: das Pack mit weniger Karten, dann Zufall). Danach
- * fuellen die uebrigen Karten die freien Plaetze. Gibt es nicht genau
- * packCount*packSize Karten, bleibt es beim reinen Zufallsschnitt.
+ * Nur der Helden-Topf wird moeglichst GLEICHMAESSIG auf alle Packs verteilt (cardType 'Hero'): die naechste Karte geht in das Pack
+ * mit der bisher geringsten Heldenzahl (Gleichstand: das Pack mit weniger Karten, dann Zufall). Danach fuellen die uebrigen Karten
+ * die freien Plaetze. Gibt es nicht genau packCount*packSize Karten, bleibt es beim reinen Zufallsschnitt.
+ * (Die frueheren Foil-Toepfe sind mit dem Rarity-System entfallen: Rarities werden pro Karte gewuerfelt, siehe cubeRollDraftRarities.)
  */
 function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CUBE_ROUNDS, packSize = CUBE_PACK_SIZE) {
   const shuffled = cubeShuffle(cubeCards);
@@ -13444,36 +14106,44 @@ function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CU
     for (let i = 0; i < packCount; i++) packs[i] = shuffled.slice(i * packSize, (i + 1) * packSize);
     return packs;
   }
-  const info = (name) => {
-    const cd = cardDB[name] || {};
-    return { hero: cd.cardType === 'Hero', tier: cd.foil === 'rare' ? 1 : (cd.foil ? 2 : 0) };
-  };
-  // Zaehler je Topf und Pack: [heroes, rare, ueberRare]
-  const cnt = packs.map(() => [0, 0, 0]);
-  const place = (name, potIdx) => {
+  const isHero = (name) => (cardDB[name] || {}).cardType === 'Hero';
+  const heroCount = packs.map(() => 0);
+  const place = (name, hero) => {
     let best = [], bestKey = null;
     for (let i = 0; i < packCount; i++) {
       if (packs[i].length >= packSize) continue;
-      const key = potIdx == null ? [-(packSize - packs[i].length)] : [cnt[i][potIdx], packs[i].length];
+      const key = hero ? [heroCount[i], packs[i].length] : [-(packSize - packs[i].length)];
       if (bestKey == null || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] ?? 0) < (bestKey[1] ?? 0))) { bestKey = key; best = [i]; }
       else if (key[0] === bestKey[0] && (key[1] ?? 0) === (bestKey[1] ?? 0)) best.push(i);
     }
     const pick = best[Math.floor(Math.random() * best.length)];
     packs[pick].push(name);
-    const inf = info(name);
-    if (inf.hero) cnt[pick][0]++;
-    if (inf.tier === 1) cnt[pick][1]++;
-    if (inf.tier === 2) cnt[pick][2]++;
+    if (hero) heroCount[pick]++;
   };
-  const heroes = shuffled.filter(n => info(n).hero);
-  const rares = shuffled.filter(n => !info(n).hero && info(n).tier === 1);
-  const supers = shuffled.filter(n => !info(n).hero && info(n).tier === 2);
-  const rest = shuffled.filter(n => !info(n).hero && info(n).tier === 0);
-  for (const n of heroes) place(n, 0);
-  for (const n of rares) place(n, 1);
-  for (const n of supers) place(n, 2);
-  for (const n of rest) place(n, null);
+  for (const n of shuffled.filter(isHero)) place(n, true);
+  for (const n of shuffled.filter(n => !isHero(n))) place(n, false);
   return packs.map(pk => cubeShuffle(pk));
+}
+
+/**
+ * Draft-Rarities: JEDE Karte des Cubes bekommt serverseitig eine Rarity aus RARITIES.DRAFT_TABLE (Umbra/Stained/Storm nur mit Motiv-Maske,
+ * sonst wird neu gewuerfelt). Karten sind im Draft einmalig, darum genuegt eine Abbildung Name → Rarity; Common steht nicht darin.
+ * Die Rarities sind im Draft TEMPORAER; nach dem Turnier behaelt jeder Spieler alle Rarity-Karten seines Decks in der Sammlung (cubeAwardDeckRarities).
+ */
+function cubeRollDraftRarities(cubeCards) {
+  const out = {};
+  for (const name of new Set(cubeCards)) {
+    const r = RARITIES.rollDraftRarity(name, Math.random, cardHasMask);
+    if (r !== 'common') out[name] = r;
+  }
+  return out;
+}
+
+/** Abbildung Name → Rarity (nur Nicht-Common) fuer die Namen einer Liste. */
+function cubeRaritiesOf(map, names) {
+  const out = {};
+  for (const n of names || []) if (n && map && map[n]) out[n] = map[n];
+  return out;
 }
 
 /**
@@ -13544,6 +14214,8 @@ async function cubeDraftStart(room, db, parseDeck, io) {
   // cubeDraftFinalize for the "0 heroes drafted" auto-assign rule
   // (need the cube contents to know which heroes are NOT in the cube).
   cd.cubeCards = [...cubeCards];
+  // Rarity jeder Draft-Karte (temporaer, nur fuer diesen Draft)
+  cd.draftRarities = cubeRollDraftRarities(cubeCards);
 
   // Ring order (0..7 → seat indices) — governs which seat passes to which
   // during the snake. Menschen sitzen GLEICHMAESSIG verteilt im Ring (nie ein
@@ -13616,6 +14288,8 @@ function cubeDraftPlayerView(room, seatIdx) {
     direction: draft.direction,
     myPack: draft.currentPacks[seatIdx] || [],
     myPool: draft.pools[seatIdx] || [],
+    // Rarity der Karten in meinem Pack, Pool und der gerade gewaehlten Karte: { Name: Rarity } (fehlt = Common). Temporaer, nur fuer diesen Draft.
+    rarities: cubeRaritiesOf(cd.draftRarities, [...(draft.currentPacks[seatIdx] || []), ...(draft.pools[seatIdx] || []), draft.pendingPicks[seatIdx]]),
     myPicked: draft.pendingPicks[seatIdx] != null,
     // Bereits gewaehlte, aber noch nicht aufgeloeste Karte — der Client zeigt sie sofort im Pool.
     myPendingPick: draft.pendingPicks[seatIdx] || null,
@@ -13956,6 +14630,7 @@ function cubeBuildBroadcast(room, io) {
       phase: cd.phase,
       seatIdx,
       pool,
+      rarities: cubeRaritiesOf(cd.draftRarities, pool),   // Draft-Rarities der Pool-Karten: { Name: Rarity } (fehlt = Common)
       assignedHero: cd.assignedHeroes?.[seatIdx] || null,
       swapHeroes: require('./cards/effects/_cube-swap-shared').tauschHelden(pool, getCardDB()),   // W77 (Cuberto): Helden im Pool, die Karten tauschen dürfen → max. Anzahl
       cubeName: cd.cubeName,
@@ -14681,6 +15356,9 @@ async function cubeFinalizeTournament(room, io) {
         if (player.socketId) io.to(player.socketId).emit('cube_sc_award', { amount: scAward, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] SC error:', err.message); }
     }
+    // Draft-Belohnung: ALLE Karten mit Rarity aus dem eigenen Draft-Deck wandern dauerhaft in die Sammlung (jeder Spieler, jede Platzierung; samt Popups).
+    try { await cubeAwardDeckRarities(room, s.seat, io, s.placement); }
+    catch (err) { console.error('[cubeFinalize] Rarity-Belohnung error:', err.message); }
     // Ranked-Elo (nur Ranked-Draft): einfacher K-Faktor nach Platzierung auf die NORMALE `elo`
     // (keine eigene Draft-Wertung); ein Turnier zaehlt als ein Ranked-Spiel (`ranked_games`, Bestenliste).
     // Higher placement = bigger gain; lowest = biggest loss.
@@ -14710,6 +15388,33 @@ async function cubeFinalizeTournament(room, io) {
   if (eloGeaendert) io.emit('leaderboard_updated');
   cubeTournamentBroadcast(room, io);
   console.log(`[cube_tournament] room ${room.id} complete — winner ${standings[0]?.username}`);
+}
+
+/**
+ * Draft-Belohnung (Rarity-System): JEDER Mensch am Tisch behaelt ALLE Karten mit Rarity (alles ueber Common) aus seinem Draft-Deck (Main, Potion, Side,
+ * Helden samt Faehigkeiten) als dauerhafte Kopien (Karte, Rarity) in seiner Sammlung — unabhaengig von der Platzierung. Besteht das Deck nur aus Common,
+ * gibt es nichts. Der Client bekommt je Karte (hoechste Rarity zuerst) `rarity_bonus` { card, rarity, source: 'draft', placement } fuer das Popup (Vorbild: `skin_unlocked`).
+ * @returns {Promise<Array<{card:string, rarity:string}>>}
+ */
+async function cubeAwardDeckRarities(room, seat, io, placement) {
+  const cd = room.cubeDraft;
+  const player = room.players[seat];
+  const deck = cd?.builtDecks?.[seat];
+  if (!player || !deck || !player.userId || player.isBot) return [];
+  const copies = RARITIES.deckCopies(
+    { mainDeck: deck.mainDeck || [], potionDeck: deck.potionDeck || [], sideDeck: deck.sideDeck || [], heroes: deck.heroes || [] },
+    cubeDeckRarities(deck, cd.draftRarities));
+  const kept = copies.filter(c => RARITIES.rank(c.rarity) > 0).map(c => ({ name: c.name, rarity: c.rarity }));
+  if (!kept.length) return [];
+  await addRarityCopies(player.userId, kept);
+  // Popups: je (Karte, Rarity) eins, die seltensten zuerst
+  const seen = new Set(), list = [];
+  for (const c of kept.slice().sort((a, b) => RARITIES.rank(b.rarity) - RARITIES.rank(a.rarity) || a.name.localeCompare(b.name))) {
+    const k = c.name + '|' + c.rarity; if (seen.has(k)) continue; seen.add(k); list.push({ card: c.name, rarity: c.rarity });
+  }
+  if (player.socketId) for (const it of list) io.to(player.socketId).emit('rarity_bonus', { ...it, source: 'draft', placement: placement || 0 });
+  console.log(`[cube_tournament] room ${room.id} ${player.username} keeps ${kept.length} rarity card(s)`);
+  return list;
 }
 
 /** Auto-build a legal-ish deck from a player's drafted pool. Used by
@@ -14869,7 +15574,7 @@ async function cubeBuildAutoFillNonReady(room, io) {
     const deckName = `${p.username}'s ${cd.cubeName} Draft (auto)`;
     const deck = cubeAutoBuildDeck(pool, cardDB, deckName);
     try {
-      await cubeSaveDraftedDeck(p.userId, deck, cd.cubeName, room.id);
+      await cubeSaveDraftedDeck(p.userId, deck, cd.cubeName, room.id, cd.draftRarities);
     } catch (err) {
       console.error('[cubeBuildAutoFillNonReady] save error:', err.message);
       continue;
@@ -14889,19 +15594,49 @@ async function cubeBuildAutoFillNonReady(room, io) {
 }
 
 /** Save a finalized cube-drafted deck to the player's deck list. */
-async function cubeSaveDraftedDeck(userId, deck, cubeName, roomId) {
+/** Rarity-Form eines gedrafteten Decks aus der Abbildung Name → Rarity (serverseitig bestimmt, nie vom Client uebernommen). */
+function cubeDeckRarities(deck, rarityMap) {
+  const zonen = { mainDeck: deck.mainDeck || [], heroes: deck.heroes || [], potionDeck: deck.potionDeck || [], sideDeck: deck.sideDeck || [] };
+  const m = (n) => (n && rarityMap && rarityMap[n]) || 'common';
+  return RARITIES.normalizeDeckRarities(zonen, {
+    main: zonen.mainDeck.map(m), potion: zonen.potionDeck.map(m), side: zonen.sideDeck.map(m),
+    heroes: zonen.heroes.map(h => ({ hero: m(h && h.hero), ability1: m(h && h.ability1), ability2: m(h && h.ability2) })),
+  });
+}
+
+async function cubeSaveDraftedDeck(userId, deck, cubeName, roomId, rarityMap) {
   const newId = uuidv4();
   const meta = JSON.stringify({ cubeName, draftedAt: new Date().toISOString(), roomId });
+  const rarities = cubeDeckRarities(deck, rarityMap);
   await db.run(
-    "INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, cube_draft_meta, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '{}', 'drafted', ?, unixepoch(), unixepoch())",
+    "INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, cube_draft_meta, rarities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '{}', 'drafted', ?, ?, unixepoch(), unixepoch())",
     [newId, userId, deck.name || `Drafted Deck`,
      JSON.stringify(deck.mainDeck || []),
      JSON.stringify(deck.heroes || []),
      JSON.stringify(deck.potionDeck || []),
      JSON.stringify(deck.sideDeck || []),
-     meta]
+     meta, JSON.stringify(RARITIES.hasAnyRarity(rarities) ? rarities : {})]
   );
   return newId;
+}
+
+/**
+ * Kopienvorrat eines Decks fuer den Spielzustand: { Kartenname: [Rarity, …] } (nur Nicht-Common, absteigend) oder null.
+ * Menschliche Decks werden gegen den Besitz geprueft (zu viele Kopien einer Rarity → Common); gedraftete Decks (temporaere Rarities),
+ * CPU- und Beispiel-Decks sind ausgenommen. Bricht nie ab.
+ */
+async function rarityLedgerFor(userId, deck) {
+  try {
+    if (!deck || !deck.rarities || !RARITIES.hasAnyRarity(deck.rarities)) return null;
+    let r = RARITIES.normalizeDeckRarities(deck, deck.rarities);
+    if (!deck.rarityTemp && deck.mode !== 'drafted' && userId && !isCpuUserId(userId)) {
+      r = RARITIES.downgradeToOwned(deck, r, await ownedRarities(userId));
+    }
+    return { ledger: RARITIES.deckLedger(deck, r), zones: RARITIES.deckZoneInfo(deck, r) };
+  } catch (err) {
+    console.error('[rarity] Kopienvorrat nicht berechenbar:', err.message);
+    return null;
+  }
 }
 
 /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
@@ -14972,6 +15707,11 @@ async function setupGameState(room) {
       }
 
       deck = await withProfileHeroSkins(p.userId, deck);
+      // Rarity je Kartenkopie: Besitz-Konsistenz pruefen (Fallback: auf Common herabstufen, nie abbrechen) und als Kopienvorrat je Name festhalten.
+      const rarityInfo = await rarityLedgerFor(p.userId, deck);
+      const rarityLedger = rarityInfo ? rarityInfo.ledger : null;
+      const rarityZones = rarityInfo ? rarityInfo.zones : null;
+      if (deck) deck = { ...deck, rarityLedger, rarityZones };
 
       // Save original deck state at match start (for side-deck reset)
       if (!room._originalDecks) room._originalDecks = [{}, {}];
@@ -14979,6 +15719,8 @@ async function setupGameState(room) {
         mainDeck: deck?.mainDeck || [], heroes: deck?.heroes || [],
         potionDeck: deck?.potionDeck || [], sideDeck: deck?.sideDeck || [],
         skins: deck?.skins || {},
+        rarityLedger,   // Name → Rarities der Kopien (bleibt beim Seitendeck-Tausch gueltig, anders als Positionen)
+        rarityZones,    // dieselben Kopien nach Zone (Hauptdeck/Traenke/Seitendeck/Helden) — Ausgangszuordnung der Identitaetsverfolgung
       }));
       if (!room._currentDecks) room._currentDecks = [null, null];
       room._currentDecks[idx] = JSON.parse(JSON.stringify(room._originalDecks[idx]));
@@ -14990,7 +15732,11 @@ async function setupGameState(room) {
       room._deckIdentity[idx] = playerProfile.deckIdentityOf(deck);
     }
 
-    const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
+    // Headless-Trainingsspiele (`runHeadlessTrainingGame`, userId `cpu-train-…`) haben kein Benutzerkonto und laufen laut Kopf des Trainingsmodus
+    // ohne Datenbank: kein Nachschlagen, die Tabelle muss nicht einmal existieren. (Vorher scheiterte jede Partie mit `SQLITE_ERROR: no such table:
+    // users`, sobald `data/pixel-parties.db` das Schema nicht trug — auf Entwicklungsrechnern, auf denen der Spielserver je lief, fiel das nie auf.)
+    // Auf einer Datenbank mit Schema liefert die Abfrage für diese Kennungen ohnehin nichts: das Ergebnis ist dasselbe.
+    const usr = String(p.userId).startsWith('cpu-train-') ? undefined : await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
     // Win/loss speech-bubble lines: a human uses their own profile messages;
     // a CPU (no user record) draws from the per-opponent CPU_MESSAGES table.
     const cpuMsgs = usr ? null : getCpuMessages(p.deckId);
@@ -15017,6 +15763,9 @@ async function setupGameState(room) {
     });
     const mainDeck = shuffle(deck?.mainDeck||[]);
     const potionDeck = shuffle(deck?.potionDeck||[]);
+    // Kopienvorrat (Rarity je Kartenname) dieses Spielers: aus dem Deck-Schnappschuss, sonst frisch berechnet (voreingestellte Decks von CPU-Duellen).
+    const spielerInfo = deck && deck.rarityLedger !== undefined ? { ledger: deck.rarityLedger, zones: deck.rarityZones || null } : await rarityLedgerFor(p.userId, deck);
+    const spielerLedger = spielerInfo ? spielerInfo.ledger : null;
     // Side Deck snapshot at game start. The pre-game side-deck phase has
     // already finalized swaps (room._currentDecks reflects post-swap state),
     // so the remaining names are the truly out-of-game pool. Effects like
@@ -15041,7 +15790,8 @@ async function setupGameState(room) {
       hand:[], mainDeck, potionDeck, sideDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
-      permanents:[], coolnessStack:[], creationZone:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
+      permanents:[], coolnessStack:[], creationZone:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {},
+      rarityLedger: spielerLedger || null, rarityZones: spielerLedger ? (spielerInfo.zones || null) : null });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
@@ -15055,6 +15805,7 @@ async function setupGameState(room) {
       return sock ? getSocketIP(sock) : 'unknown';
     }),
   };
+  RarityTrack.reconcile(room.gameState);   // Rarity je Kartenkopie: Ausgangszuordnung (Helden, Faehigkeiten, Deck) vor dem ersten Ziehen festlegen
   room.status = 'playing';
   room.players.forEach(p => activeGames.set(p.userId, room.id));
 }
@@ -15830,7 +16581,7 @@ io.on('connection', (socket) => {
     // Save the deck to the user's deck list under "Drafted Decks".
     try {
       const newDeckId = await cubeSaveDraftedDeck(
-        currentUser.userId, deck, room.cubeDraft.cubeName, roomId
+        currentUser.userId, deck, room.cubeDraft.cubeName, roomId, room.cubeDraft.draftRarities
       );
       console.log(`[cube_draft] seat ${seatIdx} (${currentUser.username}) saved drafted deck ${newDeckId}`);
     } catch (err) {
@@ -16153,6 +16904,7 @@ io.on('connection', (socket) => {
         }
       }
     }
+    if (validMap) RarityTrack.permute(room.gameState, pi, 'hand', validMap);   // Rarity je Kopie: folgt der Kopie durch das Umsortieren
     ps.hand = hand;
     // Array reassignment wiped the splice interceptor — re-install.
     if (room.engine) room.engine._installHandRevealInterceptor(pi);
@@ -16727,6 +17479,18 @@ io.on('connection', (socket) => {
   });
 
   // ─── CHAT SYSTEM ──────────────────────────
+  // Emote im Duell (emotes-titles.js): an alle im Raum (Spieler und Zuschauer), nur eigene Emotes, mit Abklingzeit
+  socket.on('emote', emotesTitles.onEmote({
+    rooms, getUser: () => currentUser,
+    sendTo: (room, event, payload) => {
+      const sids = new Set();
+      for (const p of room.players || []) if (p.socketId) sids.add(p.socketId);
+      for (const ps of (room.gameState && room.gameState.players) || []) if (ps && ps.socketId) sids.add(ps.socketId);
+      for (const sp of room.spectators || []) if (sp.socketId) sids.add(sp.socketId);
+      for (const sid of sids) io.to(sid).emit(event, payload);
+    },
+  }));
+
   socket.on('chat_message', ({ roomId, text }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -16745,6 +17509,7 @@ io.on('connection', (socket) => {
       color: isSpec ? '#888' : playerColor,
       avatar: bildRef(gsPlayer?.avatar || currentUser.avatar) || null,   // v1374
       isSpectator: isSpec,
+      title: isSpec ? null : (gsPlayer?.title || null),
       text: msg,
       timestamp: Date.now(),
     };
@@ -18439,6 +19204,7 @@ io.on('connection', (socket) => {
       mainDeck: d.mainDeck || [], heroes: d.heroes || [],
       potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
       skins: d.skins || {},
+      rarities: d.rarities || null, rarityTemp: d.mode === 'drafted',   // Rarity je Kopie (setupGameState prueft sie gegen den Besitz)
     }));
 
     // CPU-Skin-System: ggf. traegt der mittlere Gegner-Held einen Skin.
@@ -21097,7 +21863,9 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
     let legacy = 0;
     const take = (file, isMain) => {
       let txt = '';
-      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch { return; }
+      // Nur „Datei fehlt" ist harmlos. Jeder andere Lesefehler (zu große Datei: ERR_STRING_TOO_LONG ab ~512 MB) muss laut abbrechen —
+      // sonst gälte die Datei als leer, und `writeMerged` überschriebe sie am Ende mit den Spielen dieser einen Runde.
+      try { txt = fs.readFileSync(file, { encoding: 'utf-8' }); } catch (err) { if (err && err.code === 'ENOENT') return; throw err; }
       for (const line of txt.split('\n')) {
         if (!line.trim()) continue;
         let idx = idxOf(line);
@@ -21155,7 +21923,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
   process.on('exit', killAll);
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { killAll(); process.exit(130); });
 
-  let crashes = 0;
+  let crashes = 0, fatal = false;
   const maxRespawns = 2 * n;
   const startWorker = (k) => new Promise((resolve) => {
     const env = { ...process.env, PP_TRAIN_WORKER: '1', PP_TRAIN_JOBS: '1', PP_TRAIN_OUT: `${outPath}.w${k}`,
@@ -21166,6 +21934,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
     kid.on('exit', async (code, signal) => {
       kids.delete(kid);
       if (code === 0) return resolve();
+      if (code === 4) { fatal = true; killAll(); return resolve(); }   // systematischer Fehler (siehe throwsInARow): kein Neustart, die übrigen Worker beenden
       crashes++;
       console.warn(`[train] parallel: Worker ${k} beendet mit ${code ?? signal}`);
       try { fs.copyFileSync(`${outPath}.w${k}.inflight.json`, outPath + '.inflight.json'); } catch { /* keine Brotkrume */ }
@@ -21185,7 +21954,7 @@ async function collectTrainingSharded({ jobs, count, outPath }) {
   const missing = count - [...after.keys()].filter(k => k < count).length;
   if (missing > 0) console.warn(`[train] parallel: ${missing} Spiel(e) fehlen (Worker-Absturz) — Wiederanlauf holt sie nach`);
   else { try { fs.unlinkSync(outPath + '.inflight.json'); } catch { /* war nie da */ } }
-  return { failed: missing > 0 };
+  return { failed: missing > 0, fatal };
 }
 
 async function runTrainingBatch() {
@@ -21281,6 +22050,22 @@ async function runTrainingBatch() {
   const outPath = process.env.PP_TRAIN_OUT
     || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
   console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
+  // Ausgabedateien werden an mehreren Stellen als EINE Zeichenkette gelesen (Wiederaufnahme, Zusammenführen der Worker, Auswertung);
+  // Node erlaubt höchstens ~512 MB. Lieber vorher laut aufhören als mittendrin Daten zu verlieren: große Sammlungen gehören in Segmente
+  // (`scripts/train-all-decks.js --segment`, je ~1.000 Spiele; dort `PP_TRAIN_GAME_OFFSET`).
+  try {
+    const grenzeMb = parseInt(process.env.PP_TRAIN_MAX_FILE_MB || '400', 10) || 400;
+    const mb = fs.statSync(outPath).size / 1048576;
+    if (mb > grenzeMb) {
+      console.error(`[train] Ausgabedatei ${outPath} ist ${mb.toFixed(0)} MB groß (Grenze ${grenzeMb} MB, Node liest höchstens ~512 MB als Zeichenkette). `
+        + 'Große Sammlungen in Segmenten ablegen: node scripts/train-all-decks.js --games N --segment 1000');
+      process.exit(3);
+    }
+  } catch { /* Datei existiert noch nicht */ }
+  // Segment-Versatz: Spiel i dieser Datei ist das Spiel `gameOffset + i` der Gesamtsammlung — Gegner (`% Gegnerzahl`) und Sitz (`% 2`) laufen
+  // über alle Segmente hinweg exakt so durch, wie bei einer einzigen Datei.
+  const gameOffset = Math.max(0, parseInt(process.env.PP_TRAIN_GAME_OFFSET || '0', 10) || 0);
+  if (gameOffset > 0 && !process.env.PP_TRAIN_WORKER) console.log(`[train] Segment-Versatz: Spiel 1 dieser Datei = Gesamtspiel ${gameOffset + 1}`);
   // Zustandslog fürs Wertnetz (PP_VALUE_NET=log): Binärdatei neben der jsonl, ein Block je Partie, Schlüssel gameIdx. Ein beim Absturz
   // abgeschnittener letzter Block wird vor dem Weiterschreiben entfernt, sonst läge der nächste hinter Müll.
   const statesFile = valueEnc.enabled() ? valueEnc.statesPath(outPath) : null;
@@ -21360,6 +22145,7 @@ async function runTrainingBatch() {
   if (shardWorker) startIdx = 0;               // der Worker arbeitet über Claims, nicht über die Zeilenzahl seiner Datei
   if (jobsWanted > 1) {
     const r = await collectTrainingSharded({ jobs: jobsWanted, count, outPath });
+    if (r.fatal) { console.error('[train] Worker meldet einen systematischen Fehler (Exit-Code 4) — Abbruch ohne Wiederanlauf.'); process.exit(4); }
     parallelFailed = r.failed;
     wins = losses = ties = 0; resumedWins = resumedLosses = resumedTies = 0;
     try {
@@ -21371,13 +22157,15 @@ async function runTrainingBatch() {
     } catch { /* leere Datei */ }
     startIdx = count;                          // die Schleife unten läuft nicht — die Worker haben alles erledigt
   }
+  let throwsInARow = 0;      // Fehler hintereinander: ein systematischer Fehler (Schema fehlt, Konfiguration) soll nicht tausende Spiele lang durchlaufen
   for (let i = startIdx; i < count; i++) {
     if (shardWorker && (workerDone.has(i) || !workerClaim(i))) continue;   // fertig oder von einem anderen Worker beansprucht
     // Round-robin opponents so every archetype contributes equally;
     // alternate the pinned deck's seat so first-player advantage and
     // seat-dependent quirks average out.
-    const opp = opponents[i % opponents.length];
-    const pinnedIdx = i % 2;
+    const gi = i + gameOffset;                 // Index in der Gesamtsammlung (ohne Segmente: gleich i)
+    const opp = opponents[gi % opponents.length];
+    const pinnedIdx = gi % 2;
     // ── ABSTURZ-ATTRIBUTION (31.7.) ──────────────────────────────────
     // Ein OOM tötet den PROZESS — kein catch, kein finally, kein Log
     // darüber, welches Match gerade lief. Die Konsole zeigt dann nur
@@ -21410,11 +22198,17 @@ async function runTrainingBatch() {
         : oppProfiles ? { profileAllowedSide: 1 - pinnedIdx } : {};
       gOpts.trailPath = inflightPath;
       gOpts.trailHead = trailHead;
+      if (process.env.PP_TRAIN_TEST_THROW === '1') throw new Error('Testfehler (PP_TRAIN_TEST_THROW=1)');   // nur für test/train-no-db.test.js
       record = await runHeadlessTrainingGame(pinned, opp, pinnedIdx, gOpts);
     } catch (err) {
       console.error(`[train] game ${i + 1} threw:`, err.message);
+      if (++throwsInARow >= 10) {
+        console.error('[train] 10 Spiele hintereinander mit einem Fehler abgebrochen — das ist kein Zufall, sondern ein Fehler im Aufbau/der Konfiguration. Abbruch (Exit-Code 4).');
+        process.exit(4);
+      }
       continue;
     }
+    throwsInARow = 0;
     // Stamp the hero trio as PLAIN NAMES — the runtime profile matcher
     // keys on sorted hero-name strings. Sample-deck hero entries are
     // objects ({ hero, ability1, ability2 }); unwrap them.
@@ -21431,6 +22225,8 @@ async function runTrainingBatch() {
     // Sicht der Profil-Seite gelabelt (pinnedIdx = profiledIdx).
     if (abMode) { record.abMode = true; record.profiledIdx = pinnedIdx; }
     if (oppProfiles) record.oppProfiles = true;
+    record.valueNet = process.env.PP_VALUE_NET || 'off';   // mit welchem System gespielt wurde (Herkunft der Daten, Rückweg über --net 0)
+    record.gameNo = gi;                                    // Nummer in der Gesamtsammlung (ohne Segmente = gameIdx)
     record.gameIdx = i;   // Spielindex als LETZTES Feld (Orchestrator: collectTrainingSharded liest ihn vom Zeilenende)
     fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
     // Zustandslog NACH der Zeile: ein Absturz dazwischen lässt ein Spiel ohne Zustände (nur schlechter nutzbar), nie Zustände ohne Spiel.

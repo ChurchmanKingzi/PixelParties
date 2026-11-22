@@ -38,6 +38,7 @@
 
 const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 
 function getOwnControlledCreatureInsts(engine, pi) {
   const cardDB = engine._getCardDB();
@@ -76,8 +77,10 @@ function buildReplacementGallery(engine, ps, pi, maxLevel, excludeName) {
     if (lvl > maxLevel) return;
     seen.set(baseCardName(cn), { name: cn, source, level: lvl });
   };
-  for (const cn of (ps.mainDeck || [])) tryAdd(cn, 'deck');
-  for (const cn of (ps.hand || [])) tryAdd(cn, 'hand');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+  if (!deckAusgangGesperrt(engine, pi)) for (const cn of (ps.mainDeck || [])) tryAdd(cn, 'deck');
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  for (const cn of engine.handUndVorratListe(pi)) tryAdd(cn, 'hand');
   return [...seen.values()].sort(
     (a, b) => (a.level - b.level) || a.name.localeCompare(b.name)
   );
@@ -236,14 +239,16 @@ module.exports = {
       // Deck zuerst (Stapel-Schicht, mischt), sonst Hand.
       const _taken_deckIdx = await engine.deckEntnahme(ps,  repName, { source: 'Divine Gift of the Deepsea', shuffle: true });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) {
-        const handIdx = (ps.hand || []).indexOf(repName);
-        if (handIdx < 0) { engine.sync(); return; }
-        // Untrack the matching hand instance so the support track is clean.
-        const handInst = engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'hand' && c.name === repName
-        );
-        if (handInst) engine._untrackCard(handInst.id);
-        engine.takeFromPileSync(ps, 'hand', handIdx);
+        const repQuelle = engine._rxQuelleFuer(ps, repName);   // Hand oder Crestinas Vorrat
+        if (!repQuelle) { engine.sync(); return; }
+        // Untrack the matching hand instance so the support track is clean (Vorratskarten raeumt `rxNimm` selbst ab).
+        if (!repQuelle.ausVorrat) {
+          const handInst = engine.cardInstances.find(c =>
+            c.owner === pi && c.zone === 'hand' && c.name === repName
+          );
+          if (handInst) engine._untrackCard(handInst.id);
+        }
+        engine.rxNimm(ps, repQuelle);
       }
 
       // ── Step 4: place into the bounced creature's slot ──

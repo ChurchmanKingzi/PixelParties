@@ -31,6 +31,9 @@ module.exports = {
   activeIn: ['ability'],
   // W16f (M02-08): die Rücknahme des ATK-Bonus beim Abgang der Kopie läuft auch bei gefrorenem/betäubtem/negiertem Helden (Engine: runHooks-Filter).
   bypassStatusFilterOnLeave: true,
+  // Gegenstück beim Anlegen: auch die VERGABE des ATK-Bonus läuft bei gefrorenem/betäubtem/negiertem Helden (sonst blieb er für immer aus — Toughness macht es per `bypassStatusFilter` richtig).
+  // Bewusst NUR für `onPlay` der eigenen Karte: ob der Bonus unter Negation ruht, ist davon unberührt.
+  bypassStatusFilterOnPlay: true,
   // Lizbeth/Smugbeth: Fighting is opted OUT of the engine's auto-mirror
   // because the spec wants override semantics (highest opponent
   // Fighting bonus replaces Lizbeth's own if greater, only one

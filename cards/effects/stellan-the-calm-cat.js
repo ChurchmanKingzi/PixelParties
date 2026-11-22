@@ -161,7 +161,7 @@ async function runStellanEffect(ctx) {
   const freeSlots = freeStellanSlots(fs, heroIdx);
   const teilt = require('./_alice-shared').sharingActive(gs, pi);   // W63a: Alice-Teilung — die Zahl freier Zonen begrenzt dann nicht mehr
   // W63a: nur Namen, fuer die Stellan eine Zone hat (frei oder geteilt)
-  const handEligible = levelZeroCreatureNames(engine, pi, ps.hand).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
+  const handEligible = levelZeroCreatureNames(engine, pi, engine.handUndVorratListe(pi)).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
   const deckEligible = levelZeroCreatureNames(engine, pi, ps.mainDeck).filter(cn => zonenFuer(engine, pi, feld, heroIdx, cn).length > 0);
   if (freeSlots.length === 0 && !teilt) return false;
   if (handEligible.length === 0 && deckEligible.length === 0) return false;
@@ -196,7 +196,7 @@ async function runStellanEffect(ctx) {
       // Re-verify the card is still in hand — a prior placement's onPlay
       // could have moved cards around, which would invalidate our
       // pre-computed list.
-      if ((ps.hand || []).indexOf(cardName) < 0) continue;
+      if (!engine._rxQuelleFuer(ps, cardName)) continue;   // Hand oder Crestinas Vorrat
       // W63a: Zone je Karte, frisch gefragt — geteilte Zone (Alice) zuerst, dann die erste freie (eine eben belegte Zone faellt weg).
       const zielZone = zonenFuer(engine, pi, feld, heroIdx, cardName)[0];
       if (!zielZone) continue;

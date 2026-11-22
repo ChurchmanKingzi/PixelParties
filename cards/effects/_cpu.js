@@ -1877,8 +1877,8 @@ async function activateHeroEffects(engine, helpers) {
       if (mumieInst) {
         const ms = loadCardEffect('Mummy Token');
         let ok = !!(ms?.heroEffect && ms?.onHeroEffect) && gs.hoptUsed?.[`hero-effect:MummyToken:${cpuIdx}:${hi}`] !== gs.turn
-          && !engine.isHeroEffectBlockedByGraceShield(ms, cpuIdx);
-        if (ok && hero.statuses && ['blinded', 'blinded_hit'].some(n => hero.statuses[n]) && ms.requiresTarget === true) ok = false;
+          && !engine.heroEffectNutzlosErsteRunde(ms, cpuIdx);
+        if (ok && engine.blindedEffektGesperrt(cpuIdx, cpuIdx, hi, 'Mummy Token', { script: ms })) ok = false;   // Blinded (Spielgestalter-Entscheidung 16.11.2026): nur gesperrt, wenn der Effekt nur Gegner waehlen kann
         if (ok && ms.canActivateHeroEffect) {
           try { ok = !!ms.canActivateHeroEffect(engine._createContext(mumieInst, { event: 'canHeroEffectCheck' })); } catch { ok = false; }
         }
@@ -1903,7 +1903,7 @@ async function activateHeroEffects(engine, helpers) {
       // (autoritativ) — hier steht sie, damit der Pilot die Gelegenheit
       // gar nicht erst bewertet: sonst faehrt er je Main-Phase-Durchlauf
       // eine Gate-Recon fuer einen Effekt, der nichts ausrichten kann.
-      if (available && engine.isHeroEffectBlockedByGraceShield(script, cpuIdx)) {
+      if (available && engine.heroEffectNutzlosErsteRunde(script, cpuIdx)) {
         cpuLog(`      hero-effect "${hero.name}": Spielstart-Schutz — rein schaedlich, gesperrt`);
         available = false;
       }
@@ -1997,7 +1997,7 @@ async function activateHeroEffects(engine, helpers) {
         if (!eq?.heroEffect || !eq?.onHeroEffect) return false;
         const hk = `hero-effect:${ci.name}:${cpuIdx}:${hi}`;
         if (gs.hoptUsed?.[hk] === gs.turn) return false;
-        if (engine.isHeroEffectBlockedByGraceShield(eq, cpuIdx)) return false;
+        if (engine.heroEffectNutzlosErsteRunde(eq, cpuIdx)) return false;
         // Same canActivate pre-check for equipped providers.
         if (eq.canActivateHeroEffect) {
           try {
@@ -2228,6 +2228,7 @@ async function activatePermanents(engine, helpers) {
       for (const perm of (gs.players[owner]?.permanents || [])) {
         const key = `${owner}|${perm.id}`;
         if (tried.has(key)) continue;
+        if (perm.teleportalUntil != null) continue;   // Teleportal: wartende Karte ist inert
         const script = loadCardEffect(perm.name);
         if (!script?.onActivatePermanent || !script?.canActivatePermanent) continue;
         try {
@@ -3068,6 +3069,7 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   // calls doConfirmPotion to finish resolution.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return null;
+  if (isTargeted && nurWirkungsloseZiele(engine, pi, script, handIdx)) return null;   // Spielgestalter-Entscheidung 17.11.2026: nur immune Ziele — der Mensch darf, die CPU spielt nichts Nutzloses
   // Per-card CPU sanity gate. Cards whose value is strictly conditional
   // on board state (Golden Ankh's "only revive if I'll use the Hero
   // this turn", any future "useless without a follow-up" artifact)
@@ -3340,6 +3342,15 @@ async function playPotions(engine, helpers) {
   }   // Ende des zweiten Quellen-Durchgangs
 }
 
+// Spielgestalter-Entscheidung 17.11.2026 (Warnungsprinzip): Ziele, auf die ein Status nicht wirken wird (freeze_immune …), bleiben fuer den MENSCHEN waehlbar (der Picker warnt, `wirkungslos` am Ziel,
+// `engine.markiereStatusWirkungslos`); die CPU waehlt sie nie und spielt die Karte nicht, wenn ALLE Ziele so markiert sind.
+function nurWirkungsloseZiele(engine, pi, script, handIdx) {
+  if (!script?.getValidTargets) return false;
+  let ziele;
+  try { ziele = script.getValidTargets(engine.gs, pi, engine, handIdx); } catch { return false; }
+  return Array.isArray(ziele) && ziele.length > 0 && ziele.every(t => t && t.wirkungslos);
+}
+
 function isPotionPlayable(engine, pi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -3353,6 +3364,7 @@ function isPotionPlayable(engine, pi, cardName) {
   // Targeted Potions play via doUsePotion → gs.potionTargeting → resolveTargetingPrompt.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return false;
+  if (isTargeted && nurWirkungsloseZiele(engine, pi, script)) return false;   // Spielgestalter-Entscheidung 17.11.2026: nur immune Ziele — die CPU spielt nichts Nutzloses
   // First-turn shield: damage / debuff / forced-discard Potions (Bottled
   // Flame, Bottled Lightning, …) waste their effect under the opponent's
   // turn-1 immunity. The same gate that filters Spells/Attacks applies.
@@ -3479,11 +3491,13 @@ async function resolveTargetingPrompt(engine, helpers) {
     // nie kaputt — die Markierung wurde hier schlicht nicht gelesen.
     // `promptEffectTarget` filtert fuer seinen eigenen CPU-Zweig laengst
     // (`_waehlbar`); dieser zweite Eingang tat es nicht.
-    const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible);
+    // Spielgestalter-Entscheidung 17.11.2026: `wirkungslos` (immunes Ziel, der Mensch bekommt einen Hinweis) waehlt die CPU nie; bleibt nichts anderes, bricht sie die Zielwahl ab (die Karte bleibt auf der Hand).
+    const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible && !t?.wirkungslos);
+    if (waehlbar.length === 0 && (tgt.validTargets || []).some(t => t?.wirkungslos)) { engine.gs.potionTargeting = null; return; }
     const picks = engine._getCpuTargetResponse(waehlbar, cfg);
     // W7b (Nachtrag 2, Al 15.10.): die CPU unterliegt denselben Picker-Regeln wie ein Spieler - eine regelwidrige Wahl wird auf eine gueltige
     // reduziert/aufgefuellt (`korrigiereZielAuswahl`), statt am Server-Tor abzuprallen (sonst 4 Fehlversuche, dann Abbruch).
-    const korrigiert = engine.korrigiereZielAuswahl(tgt.validTargets, { ...engine.pickerRegelKonfig(tgt), cancellable: false }, Array.isArray(picks) ? picks : []);
+    const korrigiert = engine.korrigiereZielAuswahl((tgt.validTargets || []).filter(t => !t?.wirkungslos), { ...engine.pickerRegelKonfig(tgt), cancellable: false }, Array.isArray(picks) ? picks : []);   // ohne `wirkungslos`: die Auffuellung greift nie zu einem immunen Ziel
     const selectedIds = Array.isArray(korrigiert) ? korrigiert : [];
     cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
     await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });
@@ -3532,7 +3546,8 @@ function cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cardData) {
   // Any own-side or ownerless target = usable (buff / heal / area).
   if (targets.some(t => t.owner === cpuIdx || t.owner == null)) return true;
   // All remaining targets are enemy-side. At least one must be non-immune.
-  return targets.some(t => !isTargetImmune(engine, t));
+  const _td = cardDealsTrueDamage(cardName);
+  return targets.some(t => !isTargetImmune(engine, t, _td));
 }
 
 // ─── Ascension / virtual-school helpers ─────────────────────────────────
@@ -3676,6 +3691,9 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
   const oppIdx = cpuIdx === 0 ? 1 : 0;
   // Not turn 1, or opponent isn't the shielded side → all plays are fine.
   if (gs.firstTurnProtectedPlayer !== oppIdx) return true;
+  // ★ Spielgestalter-Entscheidung 16.11.2026: der Mensch darf nutzlose Aktivierungen spielen (Karten mit `blockedByFirstTurnProtection` sind nicht mehr gesperrt) — die CPU verbrennt sie nicht:
+  // eine Karte, die nur die Gegnerseite trifft, spielt sie gegen den Erste-Runden-Geschuetzten weiter nie (wie bisher unspielbar).
+  if (loadCardEffect(cardName)?.blockedByFirstTurnProtection) return false;
   // Creatures always play — only their effects might fizzle, not their presence.
   if (cardData.cardType === 'Creature') return true;
   // Abilities, Heroes, Areas, Permanents play freely; only attack-shaped
@@ -6966,6 +6984,10 @@ function installCpuBrain(engine) {
     if (!validTargets || validTargets.length === 0) return [];
     throwIfAborted(engine, 'promptEffectTarget');
 
+    // Blinded (Spielgestalter-Entscheidung 16.11.2026): wirkt ein GEBLENDETER Held die Attack/den Spell hinter dieser Wahl, ist Gegnerisches nicht waehlbar. Die Markierung der Engine
+    // (`promptEffectTarget`) laeuft fuer die CPU nie — dieser Wrapper kehrt ohne sie zurueck —, also hier vor der `ineligible`-Bereinigung darunter (idempotent).
+    engine.markiereBlindGesperrte?.(validTargets, playerIdx, config);
+
     // ── AUSGEGRAUTE (`ineligible`) ZIELE SIND FUER DIE KI NICHT WAEHLBAR ──
     // Geschuetzte Ziele (Butterfly Cloud `untargetable`, Stealth, Invisibility,
     // `blocksTargeting`-Vertraege …) kommen als MARKIERTE Eintraege an, damit der
@@ -7404,6 +7426,7 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // blieben.
   const cardName = config.source || config.title;
   const cd = cardName ? engine._getCardDB()[cardName] : null;
+  const _trueDmg = cardDealsTrueDamage(cardName);
 
   // Per-card target override: cards can export `cpuResponse(engine, 'target',
   // { validTargets, config })` and return an array of selected IDs. Falls
@@ -7465,7 +7488,7 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     // Simulate-and-score across the full pool. Drop fully immune
     // candidates first (sim would just return ~no delta for them),
     // then rank by eval delta, take top N for multi-select.
-    const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t));
+    const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t, _trueDmg));
     if (pool.length > 0) {
       // Maßstab „nichts passiert": `evaluateState` liegt in der Größenordnung von Tausend, ein Treffer ändert sie um Zehner. Ein
       // eigenes Ziel zählt nur, wenn der Treffer die Stellung gegenüber diesem Ausgangswert VERBESSERT (Soul Shard in der Ablage
@@ -7601,13 +7624,14 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
       quelle: cardName ? { name: cardName, owner: cpuIdx, controller: cpuIdx, heroIdx: -1 } : null,
       damageType: config.damageType || (cd?.cardType === 'Attack' ? 'attack' : 'destruction_spell'),
       cancellable: config.cancellable !== false,
+      trueDamage: _trueDmg,
     };
     const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz, _aoeOpts);
     if (picks.length) return picks.map(p => p.id);
     // All enemy targets are immune. If the prompt is cancellable, decline
     // to avoid wasting the Attack/Spell/effect; the card stays in hand.
     // If it's not cancellable, fall through so we still pick SOMETHING.
-    const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t));
+    const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t, _trueDmg));
     if (allEnemyImmune && config.cancellable !== false) return [];
   }
 
@@ -7950,6 +7974,14 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // die Wahl steht EINMAL in der Engine (`_cpuWaehleSofortaktion`).
   if (type === 'heroAction' && !promptData._gerryRewritten) {
     return engine._cpuWaehleSofortaktion(promptData, cpuIdx);
+  }
+
+  // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt (Mensch) — die CPU waehlt sie NICHT: eine Schutz-/Negations-/Umleitungs-Aktivierung gegen Schaden bzw.
+  // Effekte, die laut Kartentext nicht verringert/umgeleitet/negiert werden koennen (`promptData._nutzlos`, gesetzt von den Reaktionsfenstern der Engine), verbrennt nur die Karte.
+  // VOR allen Karten-Overrides (`cpuResponse` einzelner Karten wuerde sonst zusagen, Homerun!).
+  if (type === 'confirm' && promptData._nutzlos === true && promptData.cancellable) {
+    try { confirmDiag(engine, promptData, false); } catch { /* Diagnose ist Beiwerk */ }
+    return null;
   }
 
   // ── Gerrymander redirect handling ──
@@ -8761,9 +8793,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Threshold 50 ≈ "not scarce, not a tracked combo piece" — safe to return.
     // Past minSelect, stop once we'd be shuffling back something useful.
     const selected = [];
+    const typBenutzt = {};
     for (const s of scored) {
       if (selected.length >= maxSelect) break;
       if (selected.length >= minSelect && s.value >= 50) break;
+      // Typ-Obergrenzen des Prompts (`cardTypes`/`typeLimits`, Shard of Chaos): nie mehr Karten eines Typs waehlen, als zulaessig (der Server prueft sie, 17.11.2026).
+      const typ = promptData.cardTypes?.[s.idx];
+      if (typ != null && promptData.typeLimits?.[typ] != null) {
+        if ((typBenutzt[typ] || 0) >= promptData.typeLimits[typ]) continue;
+        typBenutzt[typ] = (typBenutzt[typ] || 0) + 1;
+      }
       selected.push({ cardName: s.name, handIndex: s.idx });
     }
     return { selectedCards: selected };
@@ -9182,7 +9221,18 @@ function simulateDamageTargetScore(engine, target, damage, ownerIdx) {
 //   • creature that's face-down (surprise), targeting_immune, control_immune,
 //     _cardinalImmune, or _baihuPetrify
 // Conservative: when in doubt, treat as non-immune so we don't over-skip.
-function isTargetImmune(engine, target) {
+// Spielgestalter-Entscheidung 17.11.2026: True Damage („cannot be reduced or negated": Rockfall, Pressure Projectile, Acid Vial, Surefire Shot …) durchschlaegt die Versteinerung
+// (Baihu/Petrifier) – die CPU betrachtet versteinerte Kreaturen (und Helden) dafuer als regulaere Ziele.
+// Spielgestalter-Entscheidung 18.11.2026: ebenso Time Bomblebee (Bomb Counters) und Succubus-gestohlene Kreaturen (`durchschlagSchutz`) — die Bilanz (`_kreaturen-bilanz.js`, `opts.trueDamage`) wertet sie
+// fuer diese Karten nicht mehr als geschuetzt; `isTargetImmune` kennt diese beiden Schutzformen nie (nur die Pruefung, die der Kreaturenpfad wirklich ueberspringt, faellt weg).
+const CPU_TRUE_DAMAGE_KARTEN = new Set(['Rockfall', 'Pressure Projectile', 'Acid Vial', 'Surefire Shot', 'Piercer of Heavens', 'Glasowt']);   // Quellen ueber `engine.actionDealTrueDamage` („cannot be reduced or negated", Versteinerung durchschlagen)
+function cardDealsTrueDamage(cardName) {
+  if (!cardName) return false;
+  if (CPU_TRUE_DAMAGE_KARTEN.has(cardName)) return true;
+  try { return !!loadCardEffect(cardName)?.damageCannotBeReducedOrNegated; } catch { return false; }
+}
+
+function isTargetImmune(engine, target, trueDamage = false) {
   const gs = engine.gs;
   if (!target) return false;
   if (target.owner != null && gs.firstTurnProtectedPlayer === target.owner) return true;
@@ -9191,7 +9241,7 @@ function isTargetImmune(engine, target) {
     const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero || hero.hp <= 0) return true;
     if (hero.statuses?.immune) return true;
-    if (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) return true;   // v1085
+    if (!trueDamage && (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify)) return true;   // v1085 (True Damage durchschlaegt, s. cardDealsTrueDamage)
     if (hero.charmedBy != null && hero.charmedBy !== target.owner) return true;
     // Submerged (Als Demo-Befund, damage_blocked reason 'submerged'):
     // die Engine blockt Schaden UND Status-Effekte auf getauchte
@@ -9213,7 +9263,7 @@ function isTargetImmune(engine, target) {
     if (inst.counters?.targeting_immune) return true;
     if (inst.counters?.control_immune) return true;
     if (inst.counters?._cardinalImmune) return true;
-    if (inst.counters?._petrified || inst.counters?._baihuPetrify) return true;   // v1085
+    if (!trueDamage && (inst.counters?._petrified || inst.counters?._baihuPetrify)) return true;   // v1085 (True Damage durchschlaegt, s. cardDealsTrueDamage)
     // Registry-Audit (Als Auftrag): golden_wings setzt zusätzlich
     // untargetable_by_opponent — für Ziele der GEGENSEITE immun (eigene
     // Kreaturen mit dem Counter bleiben für den Besitzer wählbar).
@@ -9338,7 +9388,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
   // and the user explicitly wants to avoid wasting effects on them. If this
   // empties the pool, the caller (cpuPickTargets) will decline cancellable
   // prompts, which cancels the spell and leaves the card in hand.
-  let viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
+  let viable = enemyTargets.filter(t => !isTargetImmune(engine, t, !!aoeOpts?.trueDamage));
   if (viable.length === 0) return [];
   // ★ W83a (Al 27.10.2026: "Geschuetzte, die bereits zum Zeitpunkt der Evaluation geschuetzt sind, sollen ueberall nicht einbezogen werden"): Kreaturen, die die Wirkung nachweislich nicht
   // nehmen (SICHERER Schutz laut `engine.kreaturGeschuetztVor`: Schadensimmunitaet, Anti Magic, Erstrunden-Schutz, Zielschutz …), fallen als Ziel heraus; WEICH Geschuetzte (bereite
@@ -9350,7 +9400,7 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect, heldZusatz = 
       if (t.type !== 'creature' && t.type !== 'equip') continue;
       const inst = t.cardInstance || findSupportInstance(engine, t);
       if (!inst) continue;
-      const sa = KreaturenBilanz.schutzAnteil(engine, aoeOpts.quelle, inst, 'damage', { amount: damage, damageType: aoeOpts.damageType, sourceOwner: aoeOpts.quelle.owner, gerichtet: true, nurSicher: !!engine._inMctsSim });   // im Rollout nur der billige sichere Teil
+      const sa = KreaturenBilanz.schutzAnteil(engine, aoeOpts.quelle, inst, 'damage', { amount: damage, damageType: aoeOpts.damageType, sourceOwner: aoeOpts.quelle.owner, gerichtet: true, nurSicher: !!engine._inMctsSim, trueDamage: !!aoeOpts.trueDamage });   // im Rollout nur der billige sichere Teil; True Damage schlägt die Schutz-Immunitäten durch (Spielgestalter-Entscheidung 18.11.2026)
       if (sa.geschuetzt) schutzVon.set(t, sa);
     }
     const ungeschuetzt = viable.filter(t => !(schutzVon.get(t)?.faktor === 0));

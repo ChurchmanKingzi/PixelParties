@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pixel Parties</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Pixel Parties — Desktop-Startseite (Launcher).
+  Wird vom Electron-Fenster zuerst geladen (electron/main.js); „PLAY“ lädt dann das Spiel vom Server. Alles Pixelart: die Kulisse ist die animierte Titelkulisse des Spiels
+  (assets/scene, scripts/electron/build_assets.py), Bewegung in ganzen Pixeln (steps), harte Rahmen aus Schatten-Ringen, keine Weichzeichner, nur Palettenfarben.
+  Inhalte (Links, Neuigkeiten) stehen in launcher-config.json. Ohne Electron (Browser-Test) arbeitet eine Attrappe `ppLauncher`.
+-->
+<style>
+  @font-face { font-family: 'PP Pixel'; src: url('assets/fonts/PixelIntv.otf'); }
+  :root { --px: 3px; --u: 16px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #08060c; color: #ffffff; font-family: 'PP Pixel', monospace; user-select: none; cursor: default; }
+  img, canvas { image-rendering: pixelated; }
+
+  /* ── Kulisse: 1920×1080-Bühne, per JS auf das Fenster gestreckt (Deckung, Mitte) ── */
+  #art { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #art img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: block; }
+  #art img.bg { left: -39px; top: -22px; width: 1998px; height: 1125px; }
+  /* Figuren: Grundversatz (--bx/--by) + Schweben/Kette (--mx/--my), Bewegung in ganzen Pixelstufen (steps). Die Kämpfer an der Laserkette
+     (golem, rabbit) und der Explosionskern laufen im selben Takt (4,8 s) wie in der Titelkulisse des Spiels, damit die Laser nie abreißen. */
+  .f { transform: translate(var(--bx, 0px), var(--by, 0px)); animation: f var(--d, 5s) steps(var(--n, 10)) infinite alternate; animation-delay: var(--z, 0s); will-change: transform; }
+  @keyframes f { to { transform: translate(calc(var(--bx, 0px) + var(--mx, 0px)), calc(var(--by, 0px) + var(--my, 0px))) scale(var(--sc, 1)); } }
+  .f.core { transform-origin: 1046px 410px; }
+  #embers { position: fixed; inset: 0; pointer-events: none; }
+  #vig { position: fixed; inset: 0; background: url('assets/vignette.png') center / cover; }
+
+  /* ── Oberfläche ── */
+  .ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: calc(var(--u) * 1.4) calc(var(--u) * 2) calc(var(--u) * 1.4); }
+  #logo { width: min(40vw, calc(var(--u) * 38)); margin-top: calc(var(--u) * .6); animation: bob 2.4s steps(4) infinite alternate; filter: drop-shadow(0 calc(var(--px) * 2) 0 #08060c); }
+  @keyframes bob { from { transform: translateY(0); } to { transform: translateY(calc(var(--px) * -2)); } }
+  .mid { flex: 1; }
+  .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
+  .center { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * .8); }
+
+  /* PLAY: Pixelart-Band im Stil des Banners, zur Laufzeit Zelle für Zelle gemalt (Skript unten). Die Leinwand ist die Taste; die Schrift liegt als Text darüber. */
+  .playwrap { position: relative; margin: calc(var(--u) * .2) 0; animation: bobp 1.2s steps(1) infinite; }
+  @keyframes bobp { 0% { transform: translateY(0); } 50% { transform: translateY(calc(var(--px) * -1)); } }
+  #play { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; position: relative; display: block; font-family: inherit; }
+  #playcv { display: block; }
+  #play:active { transform: translateY(calc(var(--px) * 2)); }
+  .pl { position: absolute; display: flex; align-items: center; justify-content: center; padding-top: calc(var(--px) * 1); font-size: calc(var(--u) * 3.9); letter-spacing: .28em; text-indent: .28em; color: #ffffff; pointer-events: none; /* Textschatten: aus dem Skript (Zelle = 0,6 px) */ }
+
+  /* Discord-Knopf oben rechts (wie im Hauptmenü: Discord-Blau, Pixel-Logo) */
+  #discord { z-index: 5; position: fixed; right: calc(var(--u) * 1.4); top: calc(var(--u) * 1.3); appearance: none; border: 0; cursor: pointer; background: #3866f0; padding: calc(var(--px) * 4) calc(var(--px) * 6);
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #6d9bf8, inset 0 calc(var(--px) * 2) 0 #6d9bf8, inset 0 calc(var(--px) * -2) 0 #0351c9, calc(var(--px) * 3) calc(var(--px) * 3) 0 calc(var(--px) * 2) #08060c; }
+  #discord svg { display: block; } #discord:hover { background: #6d9bf8; transform: translateY(calc(var(--px) * -1)); } #discord:active { transform: translateY(var(--px)); }
+  #discord[hidden] { display: none; }
+
+  .row { display: flex; gap: calc(var(--u) * .7); justify-content: center; flex-wrap: wrap; }
+  .btn { appearance: none; border: 0; cursor: pointer; font-family: inherit; color: #ffffff; background: #12101f; font-size: calc(var(--u) * .85); letter-spacing: .1em; padding: calc(var(--u) * .5) 0; width: calc(var(--u) * 8.6); text-align: center;
+    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
+  .btn:hover { color: #12101f; background: #66b6ff; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #b3d8f9; }
+  .btn[hidden] { display: none; }
+
+  .status { white-space: nowrap; display: flex; align-items: center; gap: calc(var(--u) * .6); font-size: calc(var(--u) * .85); letter-spacing: .08em; background: #12101f; padding: calc(var(--u) * .4) calc(var(--u) * .8); align-self: flex-start; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #3e3e51; }
+  .dot { width: calc(var(--px) * 4); height: calc(var(--px) * 4); background: #7e7d9b; box-shadow: 0 0 0 var(--px) #08060c; }
+  .ok .dot { background: #66ffa2; } .wake .dot { background: #fad54a; animation: arr .8s steps(1) infinite; } .bad .dot { background: #fe5154; }
+  .foot { font-size: calc(var(--u) * .7); color: #a5b0c0; letter-spacing: .1em; text-shadow: var(--px) var(--px) 0 #08060c; }
+  .left { display: flex; align-items: flex-end; } .right { display: flex; align-items: flex-end; justify-content: flex-end; }
+
+  /* Verbinden-Ansicht */
+  #go { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: calc(var(--u) * 1.4); background: #08060c; z-index: 10; }
+  #go.on { display: flex; }
+  #go .t { font-size: calc(var(--u) * 2); letter-spacing: .2em; color: #ffffff; }
+  #go .bar { width: calc(var(--u) * 24); height: calc(var(--u) * 1.4); background: #12101f; box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #66b6ff; position: relative; overflow: hidden; }
+  #go .bar i { position: absolute; top: 0; bottom: 0; width: 25%; background: #66b6ff; animation: bar 1.4s steps(14) infinite; }
+  @keyframes bar { from { left: -25%; } to { left: 100%; } }
+  #go .s { font-size: calc(var(--u) * .85); color: #a5b0c0; letter-spacing: .08em; max-width: calc(var(--u) * 30); text-align: center; line-height: 1.5; }
+
+  @media (max-width: 1000px) { .bottom { grid-template-columns: 1fr; justify-items: center; } .left, .right { display: none; } }
+</style>
+</head>
+<body>
+<button id="discord" title="Join our Discord" hidden data-sprite="discord"></button>
+<div id="art">
+  <img class="bg" src="assets/scene/background.png" alt="">
+  <!-- Laserkette: Rabbit, Explosion und Golem tragen vorgeschnittene Laserstücke (senkrechte Schnittkanten), die nur in EINER Lage nahtlos aufeinandertreffen:
+       Rabbit und Explosion mit gleichem Versatz, der Golem exakt +111 px (5,781 vw, wie in der Titelkulisse) rechts davon — dort ist der Strahl des Golems
+       (y 339–410) genauso dick wie die Spitze der Explosion. Alle drei teilen den Grundversatz E (-70) und laufen im selben Takt; nie einzeln verschieben!
+       Reihenfolge wie in der Titelkulisse (hinten → vorn); der Ninja (unten links) liegt zuoberst, über Blonde und Engel. -->
+  <img class="f" style="--bx:120px;--by:40px;--mx:9px;--my:-15px;--d:2.1s;--n:12" src="assets/scene/hammer.png" alt="">
+  <img class="f core" style="--bx:-70px;--my:4px;--sc:1.021;--d:2.4s;--n:8" src="assets/scene/explosion.png" alt="">
+  <img class="f" style="--bx:41px;--by:3px;--mx:-9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/golem.png" alt="">
+  <img class="f" style="--bx:40px;--by:161px;--mx:-11px;--my:-15px;--d:3s;--n:12;--z:-1s" src="assets/scene/horned.png" alt="">
+  <img class="f" style="--bx:-100px;--by:60px;--my:-12px;--d:2.5s;--n:10" src="assets/scene/angel.png" alt="">
+  <img class="f" style="--bx:-70px;--mx:4px;--my:-9px;--d:3.25s;--n:10;--z:-.7s" src="assets/scene/blonde.png" alt="">
+  <img class="f" style="--bx:-70px;--mx:9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/rabbit.png" alt="">
+  <img class="f" style="--bx:-30px;--by:215px;--mx:8px;--my:-14px;--d:2.75s;--n:12;--z:-1.2s" src="assets/scene/ninja.png" alt="">
+  <img class="f" style="--mx:36px;--my:-14px;--d:7s;--n:16" src="assets/scene/cat_mid.png" alt="">
+  <img class="f" style="--mx:36px;--my:-14px;--d:9s;--n:18;--z:-3s" src="assets/scene/cat_top.png" alt="">
+  <img class="f" style="--mx:36px;--my:-14px;--d:7s;--n:16;--z:-2s" src="assets/scene/cat_bottom.png" alt="">
+</div>
+<canvas id="embers"></canvas>
+<div id="vig"></div>
+
+<div class="ui">
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <img id="logo" src="assets/logo.png" alt="Pixel Parties">
+  </div>
+  <div class="mid"></div>
+  <div class="bottom">
+    <div class="left"><div style="display:flex;flex-direction:column;gap:calc(var(--u)*.6)">
+      <div class="status" id="status"><span class="dot"></span><span id="stxt">Checking server…</span></div>
+    </div></div>
+    <div class="center">
+      <div class="playwrap">
+        <button id="play"><canvas id="playcv"></canvas><span class="pl">PLAY</span></button>
+      </div>
+      <div class="row">
+        <button class="btn" id="b-web" hidden>IN BROWSER</button>
+        <button class="btn" id="b-itch" hidden>ITCH.IO</button>
+        <button class="btn" id="b-music">MUSIC: ON</button>
+        <button class="btn" id="b-full">FULLSCREEN</button>
+        <button class="btn" id="b-quit">QUIT</button>
+      </div>
+    </div>
+    <div class="right"><div class="foot" id="ver"></div></div>
+  </div>
+</div>
+
+<audio id="bgm" src="assets/music/title.ogg" loop preload="auto"></audio>
+<div id="go"><div class="t">CONNECTING</div><div class="bar"><i></i></div><div class="s" id="gos">Entering the Pixel Parties…</div></div>
+
+<script>
+(() => {
+  // ── Brücke zu Electron (preload.js); im Browser eine Attrappe ──
+  const L = window.ppLauncher || {
+    config: async () => ({ version: 'dev', serverUrl: '', links: { discord: 'x', website: 'x' } }),
+    status: async () => ({ state: 'ok', ms: 42 }),
+    play: () => { document.getElementById('gos').textContent = '(preview: no game server attached)'; },
+    openExternal: () => {}, toggleFullscreen: () => {}, quit: () => {}, onPlayFailed: () => {},
+  };
+  const $ = (id) => document.getElementById(id);
+
+  // ── Maßstab: Zelle (--px) und Einheit (--u) folgen der Fensterhöhe; die Bühne deckt das Fenster ab ──
+  const art = $('art'), cv = $('embers'), g = cv.getContext('2d');
+  const fit = () => {
+    const w = innerWidth, h = innerHeight, px = Math.max(2, Math.round(h / 330));
+    document.documentElement.style.setProperty('--px', px + 'px');
+    document.documentElement.style.setProperty('--u', Math.max(12, Math.round(h / 45)) + 'px');
+    const s = Math.max(w / 1920, h / 1080);
+    art.style.transform = 'translate(' + Math.round((w - 1920 * s) / 2) + 'px,' + Math.round((h - 1080 * s) / 2) + 'px) scale(' + s + ')';
+    cv.width = w; cv.height = h; g.imageSmoothingEnabled = false;
+  };
+  addEventListener('resize', fit); fit();
+
+  // ── Funken (30 Hz, ganze Pixelzellen) ──
+  const cols = ['#f29a3e', '#fad54a', '#f7f7ad', '#fe5154', '#ffffff'];
+  const P = []; const N = 70;
+  const mk = (init) => ({ x: Math.random() * innerWidth, y: init ? Math.random() * innerHeight : innerHeight + 10, v: 0.6 + Math.random() * 1.6, dx: (Math.random() - 0.5) * 0.5, c: cols[Math.floor(Math.random() * cols.length)], s: Math.random() < 0.25 ? 2 : 1, ph: Math.random() * 60 });
+  for (let i = 0; i < N; i++) P.push(mk(true));
+  setInterval(() => {
+    const c = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--px'), 10) || 3;
+    g.clearRect(0, 0, cv.width, cv.height);
+    for (const p of P) {
+      p.y -= p.v * c * 0.5; p.x += p.dx * c * 0.4 + Math.sin((p.y + p.ph) / 30) * 0.6;
+      if (p.y < -10) Object.assign(p, mk(false));
+      g.fillStyle = p.c; g.fillRect(Math.round(p.x / c) * c, Math.round(p.y / c) * c, p.s * c, p.s * c);
+    }
+  }, 33);
+
+  // ── Sprites (wie PIXEL_ICONS des Spiels): Zeilen aus Zeichen → SVG mit scharfen Kanten, Zelle = --px ──
+  const SPR = {
+    discord: { c: { '#': '#ffffff' }, z: 2, r: ['...##..........##...', '..#####......#####..', '..################..', '.##################.', '.##################.', '.######.####.######.', '######...##...######', '######...##...######', '######...##...######', '#######.####.#######', '####################', '.##################.', '.#######....#######.', '..####........####..', '...##..........##...'] },
+    chev: { c: { '#': '#12101f' }, z: 2, n: 2, r: ['##.....', '###....', '.###...', '..###..', '...###.', '..###..', '.###...', '###....', '##.....'] },
+    gem: { c: { o: '#08060c', r: '#fe5154', '+': '#ffffff' }, z: 2, r: ['..ooo..', '.orrro.', 'orr+rro', 'orrrrro', '.orrro.', '..ooo..'] },
+  };
+  const sprite = (k, cell) => {
+    const d = SPR[k], w = d.r[0].length, h = d.r.length, paths = {};
+    d.r.forEach((row, y) => { for (let x = 0; x < w;) { const ch = row[x]; if (ch === '.') { x++; continue; } let e = x; while (e < w && row[e] === ch) e++; paths[ch] = (paths[ch] || '') + 'M' + x + ' ' + y + 'h' + (e - x) + 'v1h' + (x - e) + 'z'; x = e; } });
+    const one = '<svg viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges" style="width:calc(' + w + ' * var(--px) * ' + (d.z || 1) + ');height:calc(' + h + ' * var(--px) * ' + (d.z || 1) + ')">' + Object.keys(paths).map(c => '<path d="' + paths[c] + '" fill="' + d.c[c] + '"/>').join('') + '</svg>';
+    return one.repeat(d.n || 1);
+  };
+  for (const el of document.querySelectorAll('[data-sprite]')) el.innerHTML = sprite(el.getAttribute('data-sprite'));
+
+  // ── PLAY-Taste im Stil des Banners (assets/logo.png): gebogenes Band (Bogen in Stufen), 2 Zellen schwarzer Rand, mittelblaue Fassung, weiße Fläche mit feinem
+  //    Schachbrett-Dither nach Eisblau, Schwalbenschwanz-Enden mit Falte, Schrift mit 2-Zellen-Rand und blauem Schlagschatten. Zelle = 0,6 × --px (wie das Banner, das
+  //    verkleinert ebenfalls feiner als die Kulisse gerastert ist). Gemalt zur Laufzeit; Hover = mehr Blau in der Fläche. ──
+  const playCv = $('playcv'), playBtn = $('play'), playTxt = playBtn.querySelector('.pl');
+  const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const K = { out: rgb('#08060c'), w: rgb('#ffffff'), ice: rgb('#b3d8f9'), lt: rgb('#66b6ff'), md: rgb('#4e77ca'), dk: rgb('#02398c') };
+  const BAY = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const chk = (x, y) => (x + y) & 1;                       // feines Schachbrett (1 Zelle)
+  let pa = null, hov = false;
+  const buildPlay = () => {
+    const css = (n, d) => parseInt(getComputedStyle(document.documentElement).getPropertyValue(n), 10) || d;
+    const px = css('--px', 3), u = css('--u', 16), cs = Math.max(1, Math.round(px * 0.6));
+    const bw = Math.round(u * 19 / cs), bh = Math.round(u * 5.4 / cs), A = Math.max(3, Math.round(bw * 0.04));
+    const tw = Math.round(bh * 0.5), th = Math.round(bh * 0.78), Ml = tw + 4, Mr = tw + 4, Mt = 3;
+    const ty0 = Mt + A + Math.round(bh * 0.14), W = bw + Ml + Mr, H = Mt + A + bh + 4;
+    playCv.width = W; playCv.height = H; playCv.style.width = W * cs + 'px'; playCv.style.height = H * cs + 'px';
+    Object.assign(playTxt.style, { left: Ml * cs + 'px', right: Mr * cs + 'px', top: Mt * cs + 'px', bottom: (H - Mt - bh) * cs + 'px' });
+    // Schrift: Rand 2 Zellen schwarz, darunter/rechts blauer Schlagschatten (Offsets 0..4 → liegt außerhalb des Rands sichtbar)
+    const sh = []; const o = (dx, dy, c) => sh.push(dx * cs + 'px ' + dy * cs + 'px 0 ' + c);
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx || dy) o(dx, dy, '#08060c');
+    for (let dy = 0; dy <= 4; dy++) for (let dx = 0; dx <= 4; dx++) if (dx > 2 || dy > 2) o(dx, dy, '#4e77ca');
+    playTxt.style.textShadow = sh.join(',');
+    const base = new Uint8ClampedArray(W * H * 4), pt = new Float32Array(W * H).fill(-1);
+    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = 255; pt[y * W + x] = -1; };
+    // ── Enden: Maske (Rechteck mit V-Kerbe), dann Rand / Fassung / Fläche mit Dither und Falte zum Band ──
+    const mid = ty0 + (th - 1) / 2, nd = Math.round(th * 0.4), tm = new Uint8Array(W * H);
+    for (const side of [-1, 1]) for (let e = 0; e < tw + 4; e++) for (let k = 0; k < th; k++) {
+      const x = side < 0 ? Ml - tw + e : Ml + bw + tw - 1 - e, y = ty0 + k;
+      if (Math.abs(y - mid) <= nd - e - 1) continue;
+      tm[y * W + x] = 1;
+    }
+    const inM = (m, x, y) => x >= 0 && y >= 0 && x < W && y < H && m[y * W + x] === 1;
+    const d0 = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (tm[y * W + x] && !(inM(tm, x - 1, y) && inM(tm, x + 1, y) && inM(tm, x, y - 1) && inM(tm, x, y + 1))) d0[y * W + x] = 1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!tm[y * W + x]) continue;
+      const d1 = !d0[y * W + x] && (inM(d0, x - 1, y) || inM(d0, x + 1, y) || inM(d0, x, y - 1) || inM(d0, x, y + 1));
+      let c;
+      if (d0[y * W + x]) c = K.out;
+      else if (d1) c = (y - ty0) < th / 2 ? K.lt : K.md;
+      else {
+        const fy = (y - ty0) / th, fold = Math.min(Math.abs(x - Ml), Math.abs(x - (Ml + bw - 1)));
+        const b = BAY[y & 3][x & 3] / 16;
+        c = fy < 0.45 ? (b < (0.45 - fy) * 1.6 ? K.ice : K.lt) : (b < (fy - 0.45) * 1.5 ? K.md : K.lt);
+        if (fold < 9 && chk(x, y) === 0 && b < (9 - fold) / 9) c = K.md;
+      }
+      put(x, y, c);
+    }
+    // ── Band: Bogen (Mitte höher, Ränder um A tiefer, in ganzzahligen Stufen), gleichbleibende Dicke ──
+    for (let x = 0; x < bw; x++) {
+      const t = (x - (bw - 1) / 2) / ((bw - 1) / 2), yt = Mt + Math.round(A * t * t), yb = yt + bh - 1;
+      for (let y = yt; y <= yb; y++) {
+        const dx = Math.min(x, bw - 1 - x), dy = Math.min(y - yt, yb - y), depth = Math.min(dx, dy), lit = dy <= dx ? (y - yt) <= (yb - y) : x < bw / 2;
+        if (depth === 0 && dx === 0 && dy === 0) continue;
+        let c;
+        if (depth === 0) c = K.out;
+        else if (depth === 1) c = lit ? K.lt : K.md;
+        else if (depth <= 3) c = lit ? K.md : (chk(x, y) ? K.dk : K.md);
+        else { pt[(y) * W + x + Ml] = (y - yt) / bh; continue; }
+        put(x + Ml, y, c);
+      }
+    }
+    // ── Rand um alles (1 Zelle; zusammen mit dem inneren Rand 2 Zellen) ──
+    const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && base[(y * W + x) * 4 + 3] > 0;
+    const edge = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (solid(x, y)) continue;
+      for (let dy = -1; dy <= 1; dy++) { let hit = false; for (let dx = -1; dx <= 1; dx++) if (solid(x + dx, y + dy)) { hit = true; break; } if (hit) { edge.push(y * W + x); break; } }
+    }
+    for (const k of edge) put(k % W, Math.floor(k / W), K.out);
+    pa = { W, H, base, pt, img: new ImageData(W, H), ctx: playCv.getContext('2d') };
+  };
+  const drawPlay = () => {
+    if (!pa) return;
+    const { W, H, base, pt, img, ctx } = pa, d = img.data; d.set(base);
+    const ramp = [K.w, K.ice, K.lt];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const f = pt[y * W + x]; if (f < 0) continue;
+      // oben wenig Eisblau (Lichtkante), Mitte weiß, unten zunehmend Eisblau, ganz unten Hellblau — als Schachbrett/Bayer-Dither
+      let v = f < 0.16 ? (0.16 - f) * 2.2 : f < 0.52 ? 0 : (f - 0.52) * 2.5;
+      if (hov) v += 0.4;
+      const idx = Math.max(0, Math.min(2, Math.floor(v * 2 + BAY[y & 3][x & 3] / 16 * 0.95)));
+      const c = ramp[idx], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+  playBtn.addEventListener('mouseenter', () => { hov = true; drawPlay(); }); playBtn.addEventListener('mouseleave', () => { hov = false; drawPlay(); });
+  const rebuild = () => { buildPlay(); drawPlay(); };
+  addEventListener('resize', rebuild); rebuild();
+
+  // ── Inhalt ──
+  let cfg = { links: {} };
+  const open = (u) => u && L.openExternal(u);
+  L.config().then(c => {
+    cfg = c || cfg;
+    $('ver').textContent = 'v' + (cfg.version || '?') + (cfg.serverUrl ? '  ·  ' + cfg.serverUrl.replace(/^https?:\/\//, '') : '');
+    const lk = cfg.links || {};
+    for (const [id, key] of [['b-itch', 'itch'], ['b-web', 'website']]) if (lk[key]) { $(id).hidden = false; $(id).onclick = () => open(lk[key]); }
+    if (lk.discord) { $('discord').hidden = false; $('discord').onclick = () => open(lk.discord); }
+  });
+
+  // ── Serverstatus (Hauptprozess; wach halten, falls der Server schläft) ──
+  const st = $('status');
+  const poll = async () => {
+    let r; try { r = await L.status(); } catch { r = { state: 'bad' }; }
+    st.className = 'status ' + (r.state === 'ok' ? 'ok' : r.state === 'wake' ? 'wake' : 'bad');
+    $('stxt').textContent = r.state === 'ok' ? 'Server online' : r.state === 'wake' ? 'Waking up the server…' : 'Server not reachable';
+    setTimeout(poll, r.state === 'ok' ? 20000 : 4000);
+  };
+  poll();
+
+  // ── Musik (Titelmusik des Spiels); Wahl „aus“ bleibt gespeichert ──
+  const bgm = $('bgm'); bgm.volume = 0.55;
+  let muted = false; try { muted = localStorage.getItem('ppLauncherMuted') === '1'; } catch {}
+  const showMusic = () => { $('b-music').textContent = muted ? 'MUSIC: OFF' : 'MUSIC: ON'; };
+  const startMusic = () => { if (!muted) bgm.play().catch(() => {}); };
+  showMusic(); startMusic();
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (bgm.paused) startMusic(); }, { once: false });
+  $('b-music').onclick = () => {
+    muted = !muted; try { localStorage.setItem('ppLauncherMuted', muted ? '1' : '0'); } catch {}
+    if (muted) bgm.pause(); else startMusic();
+    showMusic();
+  };
+
+  // ── Knöpfe ──
+  let going = false;
+  const play = () => {
+    if (going) return; going = true;
+    $('go').classList.add('on');
+    setTimeout(() => { $('gos').textContent = 'Still connecting… the server may be waking up, this can take a moment.'; }, 6000);
+    L.play();
+  };
+  if (L.onPlayFailed) L.onPlayFailed(() => {
+    going = false; $('go').classList.remove('on');
+    $('stxt').textContent = 'Server not reachable — please try again';
+  });
+  $('play').onclick = play;
+  $('b-full').onclick = () => L.toggleFullscreen();
+  $('b-quit').onclick = () => L.quit();
+  addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); } else if (e.key === 'F11') { e.preventDefault(); L.toggleFullscreen(); } });
+})();
+</script>
+</body>
+</html>

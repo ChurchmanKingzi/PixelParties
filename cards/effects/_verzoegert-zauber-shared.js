@@ -3,11 +3,19 @@
 //  VERZOEGERTE ZAUBER — gemeinsamer Baustein fuer Ghostly Warning und Atta, Speaker of Desires
 //
 //  „At the end of your next turn, if that Hero is not defeated and that Spell is still deleted, that Hero immediately performs that Spell as an
-//   additional Action, regardless of its level and in spite of any negative status effects."  (Ghostly Warning)
+//   additional Action, regardless of its level, in spite of any negative status effects and even if you could not perform any Actions that turn."  (Ghostly Warning)
 //  „At the end of your opponent's next turn, if this Hero is not defeated and that Spell is still deleted, this Hero immediately uses it as an
-//   additional Action, regardless of its level and in spite of any negative status effects."  (Atta)
+//   additional Action, regardless of its level, in spite of any negative status effects and even if you could not perform any Actions that turn."  (Atta)
 //
 //  Ein Zauber wird gelöscht und kommt am Ende eines kuenftigen Zuges zurueck — Ghostly Warning / Atta VERZOEGERN den Zauber nur.
+//
+//  ★ Spielgestalter-Entscheidung 18.11.2026 — AKTIONSSPERRE: die Rueckkehr wird von KEINER Aktionssperre blockiert (Overflowing Chalice, Kents Negativ-Gold-Sperre,
+//  `_playerActionLockedTurn`, `ps.actionLocked` — alles, was `engine.areActionsBlocked(pi)` liefert). Darum liest `ausfuehren` sie absichtlich NICHT, und der Guss geht
+//  ueber `_castSpellImmediately` OHNE `opts.pruefen` (das `kannSofortWirken` → `validateActionPlay` → `areActionsBlocked` aufriefe) und `performKettenfenster`
+//  (liest keine Sperre). Wer diesen Baustein erweitert, darf hier kein Sperren-Tor einbauen. Ein bereits vorgemerkter Zauber bleibt vorgemerkt, auch wenn der Spieler
+//  danach gesperrt wird. Umgekehrt gilt die Sperre fuer das VORMERKEN: Ghostly Warning (`reactionCondition`) und Atta (`onCardsRevealed`) loeschen/negieren nur, solange
+//  der Spieler NICHT aktionsgesperrt ist. (Zauber, die der zurueckgekehrte Zauber selbst als eigene Zusatzaktion wirkt — Time Distortion, Chaos Magic … —
+//  unterliegen weiter ihren normalen Regeln inkl. Aktionssperre: die Ausnahme gilt nur fuer die Rueckkehr selbst.)
 //
 //  ── Modell (Hand of Death) ─────────────────────────────────────────
 //  • Die Vormerkung ist ein reiner DATENSATZ in `gs._verzoegerteZauber` (kein Closure, ueberlebt snapshot/restore, haengt an keiner Karteninstanz:

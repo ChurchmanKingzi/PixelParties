@@ -19,6 +19,9 @@
 //    schon KEIN Gold, wird nicht gestohlen, sondern 2 × Menge gezogen — und
 //    die Creature ist fuer den Rest des Zuges negiert (Ablauf am Beginn des naechsten
 //    Zuges; eigenverursacht, ohne Immunitaets-Nachwirkung).
+//  • Gold-Gewinn-Sperre des Diebes (Tuscan Aristocrat, Golden Arrow) — Spielgestalter-Entscheidung 16.11.2026
+//    (wie Thieving): die Rueckfrage kommt weiter; bei „Ja" VERLIERT der Gegner das Gold, der Dieb bekommt nichts
+//    (`verlustBleibtBeiSperre`). Erstzug-Schutz des Gegners: kein Diebstahl (`actionStealGold` fizzelt, nichts verloren).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Dirty Smuggler';
@@ -75,7 +78,7 @@ module.exports = {
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
       if (!keinGold) {
         // Kein Gold mehr nach der Zahlung des Zugs? Der Diebstahl nimmt, was da ist.
-        await engine.actionStealGold(pi, gold, { sourceName: CARD_NAME });
+        await engine.actionStealGold(pi, gold, { sourceName: CARD_NAME, verlustBleibtBeiSperre: true });
         engine.log('dirty_smuggler_steal', { player: ps.username, gold });
       } else {
         await engine.actionDrawCards(pi, karten, { source: CARD_NAME });

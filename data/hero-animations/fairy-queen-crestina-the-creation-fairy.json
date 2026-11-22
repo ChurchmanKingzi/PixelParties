@@ -3,7 +3,7 @@
   "sheet": "fairy-queen-crestina-the-creation-fairy.png",
   "frameWidth": 28,
   "frameHeight": 34,
-  "frames": 32,
+  "frames": 48,
   "frameMs": 90,
   "loop": true,
   "layout": "horizontal",

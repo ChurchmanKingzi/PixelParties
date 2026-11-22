@@ -63,6 +63,9 @@ const ENTRIES = [
   'app-shared',
   'app-areas',            // v1410: Area-Hintergruende (Registry + Szenen)
   'app-screens',
+  'app-booster',          // Boosterpacks: Shop-Reiter, Öffnung, Aufdecken
+  'app-emotes',           // Emotes (Duell, Profil) und Titel am Namen
+  'app-wheel',            // Glücksrad: Shop-Reiter „Wheel“ (Karten einsetzen, Dartpfeile, Gewinne)
   'app-player-profile',   // v1289: Spielerprofil-Popup
   'app-social',           // Who's Online, private Chats, Herausforderungen
   'app-puzzle',
@@ -103,7 +106,6 @@ const ENTRIES = [
   'app-fx-32',
   'app-fx-33',
   'app-fx-34',
-  'app-fx-35',
   'app-fx-36',
   'app-fx-37',
   'app-fx-38',
@@ -125,6 +127,19 @@ const ENTRIES = [
   'app-fx-56',
   'app-fx-57',
   'app-fx-58',
+  'app-fx-59',
+  'app-fx-60',
+  'app-fx-61',
+  'app-fx-63',
+  'app-fx-62',
+  'app-fx-64',
+  'app-fx-65',
+  'app-fx-66',
+  'app-fx-69',
+  'app-fx-70',
+  'app-fx-67',
+  'app-fx-68',
+  'app-fx-71',
   'app-campaign',
   'app-skilltest',        // Modus „Skill Test" (Lobby, Vorbereitung, Kampfanzeige)
   'app-main',
@@ -149,7 +164,7 @@ function compileOne(name) {
   // It still handles loop-closure semantics correctly, so it's a safe match.
   const { code } = Babel.transform(src, {
     presets: ['react'],
-    plugins: ['transform-block-scoping'],
+    plugins: [require('./i18n/jsx-template').plugin(Babel), 'transform-block-scoping'],
     compact: false,
     comments: false,
     sourceType: 'script',
@@ -193,6 +208,8 @@ function buildAll({ force = false, quiet = false } = {}) {
     }
   }
   if (!quiet && built === 0) console.log('[build] up to date');
+  // Motiv-Masken (Umbra/Stained Rare) als kompakte Binärdatei für den Client (public/cardgen/masks.bin)
+  try { require('./build-masks.js').build({ quiet }); } catch (e) { console.warn('[build] masks.bin:', e.message); }
   return built;
 }
 

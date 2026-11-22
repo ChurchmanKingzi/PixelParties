@@ -68,6 +68,7 @@ module.exports = {
 
   // Must stay live while in hand (so the `onEquipGained` hook fires there).
   activeIn: ['hand'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   hooks: {
     /**
@@ -84,13 +85,13 @@ module.exports = {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const inst = ctx.card;
-      if (!inst || inst.zone !== 'hand') return;
+      if (!inst || (inst.zone !== 'hand' && inst.zone !== 'creationZone')) return;   // Hand oder Crestinas Vorrat
 
       // Only the instance's own player; only if the AME name is still
       // physically in their hand array (after one plays, the others skip).
       const pi = inst.owner;
       const ps = gs.players[pi];
-      if (!ps || !ps.hand.includes('Anti Magic Enchantment')) return;
+      if (!ps || !engine._rxQuelleFuer(ps, 'Anti Magic Enchantment')) return;
 
       const entering = ctx.equipCard;
       if (!entering || entering.zone !== 'support') return;
@@ -155,8 +156,9 @@ module.exports = {
 
       // Commit — remove AME from the hand, pay the pollution token, apply
       // the counter + buff icon, and move AME's instance to discard.
-      const handIdx = ps.hand.indexOf('Anti Magic Enchantment');
-      if (handIdx < 0) return; // Raced with another consumer — bail.
+      const q = engine._rxQuelleFuer(ps, 'Anti Magic Enchantment');   // Hand oder Crestinas Vorrat
+      if (!q) return; // Raced with another consumer — bail.
+      const handIdx = q.idx;
 
       // ★ SICHTBARER WEG HAND → ABLAGE (Als Befund 21.8.: „kein
       // visueller Weg von der Hand zum Discard"). Die Karte buchte sich
@@ -171,12 +173,12 @@ module.exports = {
       // Kosmetik.
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: 'Anti Magic Enchantment',
-        from: 'hand', to: 'discard', fromHandIdx: handIdx,
+        from: q.ausVorrat ? 'creation' : 'hand', to: 'discard', fromHandIdx: handIdx,
       });
       await engine._delay(AME_FLUG_MS);
 
-      engine.takeFromPileSync(ps, 'hand', handIdx);
-      const _ablagePs = engine.handKartenBesitzerPs(ps, 'Anti Magic Enchantment');   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
+      engine.rxNimm(ps, q);
+      const _ablagePs = engine._rxAblagePs(ps, 'Anti Magic Enchantment', q);   // W63c: Ablage des permanenten Besitzers (gestohlene Handkarte)
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie

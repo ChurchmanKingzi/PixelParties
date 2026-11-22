@@ -13,7 +13,7 @@
 //  this card in your hand. Once per turn.
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Amethyst';
@@ -26,8 +26,21 @@ function _supportAbilities(engine, oi, hi) {
   try { return engine?.collectSupportZoneAbilities?.(oi, hi) || []; } catch { return []; }
 }
 
+/**
+ * „a Hero your opponent controls" = Kontrolle (`heroesControlledBy`, wie Magic Ruby/Cobalt/Arcane Lamp, W16e F02-08), nicht die Brettspalte: ein eigener, vom Gegner
+ * kontrollierter Held ist wählbar, ein vom Wirker übernommener Held der Gegnerspalte nicht. `physOwner` = Brettseite (dort liegen Ability- und Support-Zonen).
+ * Ohne Engine: die Spalte des Gegners.
+ */
+function _gegnerHelden(gs, pi, engine) {
+  const oi = opponentOfGs(gs, pi);
+  if (engine?.heroesControlledBy) return engine.heroesControlledBy(oi);
+  return (gs.players[oi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: oi, heroIdx, hero }));
+}
+
 /** True iff the opp hero at `hi` has at least 1 Ability stacked anywhere (Ability Zones oder Support Zonen). */
 function _heroHasAbilities(ps, hi, engine, oi) {
+  // v1375 (Love-Shot-Errata): die Ability-Karten eines TEMPORÄR gesteuerten Helden (Charme, Love Shot, Golden Apple) sind „unaffected by all effects" — es gibt dort nichts abzuwerfen.
+  if (engine?.istTemporaerGesteuert?.(ps.heroes?.[hi])) return false;
   const zones = ps.abilityZones?.[hi] || [];
   for (const slot of zones) {
     if ((slot || []).length > 0) return true;
@@ -83,6 +96,9 @@ function _buildAbilityGallery(ps, hi, engine, oi) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
   // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten/Einmal-Stempel; `engine.ersterZugGeschuetzt`).
   blockedByFirstTurnProtection: true,
@@ -97,19 +113,15 @@ module.exports = {
   cpuMeta: {
     alwaysCommit: (engine, pi) => {
       try {
-        const oppIdx = engine.opponentOf(pi);
-        const oppPs = engine.gs?.players?.[oppIdx];
-        if (!oppPs) return false;
-        for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-          const h = oppPs.heroes[hi];
-          if (!h?.name || h.hp <= 0) continue;
-          const zones = oppPs.abilityZones?.[hi];
+        for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(engine.gs, pi, engine)) {   // Kontrolle, nicht Spalte (F02-08)
+          if (!h?.name || h.hp <= 0 || engine.istTemporaerGesteuert(h)) continue;   // temporär gesteuert: Abilities unberührbar (v1375)
+          const zones = engine.gs?.players?.[physOwner]?.abilityZones?.[hi];
           if (Array.isArray(zones)) {
             for (const z of zones) {
               if (Array.isArray(z) ? z.length > 0 : !!z) return true;
             }
           }
-          if (_supportAbilities(engine, oppIdx, hi).length > 0) return true;   // N5-12
+          if (_supportAbilities(engine, physOwner, hi).length > 0) return true;   // N5-12
         }
       } catch { /* konservativ: Gate entscheidet */ }
       return false;
@@ -121,26 +133,20 @@ module.exports = {
   canActivate(gs, pi, engine) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one opp hero with at least one ability to discard.
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
-    if (!ops) return false;
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(gs, pi, engine)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (_heroHasAbilities(ops, hi, engine, oi)) return true;
+      if (_heroHasAbilities(gs.players[physOwner], hi, engine, physOwner)) return true;
     }
     return false;
   },
 
+  // W16e-Linie (F02-08): „a Hero your opponent controls" = Kontrolle; die Ziel-IDs tragen die Brettseite des Helden.
   getValidTargets(gs, pi, engine) {
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
     const out = [];
-    for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of _gegnerHelden(gs, pi, engine)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (!_heroHasAbilities(ops, hi, engine, oi)) continue;
-      out.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
+      if (!_heroHasAbilities(gs.players[physOwner], hi, engine, physOwner)) continue;
+      out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
     return out;
   },
@@ -159,18 +165,29 @@ module.exports = {
     const id = (selectedIds || [])[0] || '';
     const m = id.match(/^hero-(\d+)-(\d+)$/);
     if (!m) return { keepInHand: false };
-    const oi = parseInt(m[1]);
+    const seite = parseInt(m[1]);   // Brettseite des Helden (dort liegen Ability- und Support-Zonen)
     const hi = parseInt(m[2]);
-    if (oi === pi) return { keepInHand: false };
-
-    const ops = engine.gs.players[oi];
-    if (!ops) return { keepInHand: false };
+    const ops = engine.gs.players[seite];
+    const zielHeld = ops?.heroes?.[hi];
+    // Fizzle (CARD_API Z7b): ist das Ziel beim Auflösen kein Gegnerheld mehr, war die Karte trotzdem gespielt — Einmal-Stempel und Behalten-Angebot
+    // wie beim Verpuffen ohne Abilities (unten); nur der Abbruch durch den Spieler stempelt nie.
+    if (!zielHeld?.name) return await maybeKeepGemInHand(engine, pi, CARD_NAME);
+    const oi = engine.heroSideOf(seite, zielHeld);   // Kontrolleur des Helden: er wählt die Ability (F02-08, Kontrolle statt Spalte)
+    if (oi === pi) return await maybeKeepGemInHand(engine, pi, CARD_NAME);
 
     // Re-build the gallery at resolve time — the board state may have
     // shifted between target pick and resolve (rare via reactions).
-    const gallery = _buildAbilityGallery(ops, hi, engine, oi);
-    if (gallery.length === 0) {
+    const gallery = _buildAbilityGallery(ops, hi, engine, seite);
+    if (gallery.length === 0 || engine.istTemporaerGesteuert(zielHeld)) {   // v1375: Abilities eines temporär gesteuerten Helden sind unberührbar
       // No abilities left → silent fizzle on the main effect.
+      return await maybeKeepGemInHand(engine, pi, CARD_NAME);
+    }
+
+    // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt, fremden Ability-Abwurf ausdrücklich): der Effekt wählt den HELDEN und wirft eine seiner Abilities ab
+    // (wie Memory Wipe) — einmal je Effekt fragen, bevor der Kontrolleur wählt. Geblockt: nichts wird abgeworfen; der Einmal-Einsatz der Karte zählt trotzdem als gewirkt.
+    if (await engine.heroNonDamageEffectBlocked(seite, hi, 'ability_discard', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('magic_amethyst_blocked', { player: engine.gs.players[pi]?.username, hero: zielHeld.name });
+      engine.sync();
       return await maybeKeepGemInHand(engine, pi, CARD_NAME);
     }
 
@@ -205,7 +222,7 @@ module.exports = {
       if (sInst && sInst.zone === 'support') {
         await engine.sendBoardCardToDiscard(sInst, { source: { name: CARD_NAME, owner: pi } });
         engine.log('magic_amethyst_discard', {
-          player: ops.username, ability: entry.realName, hero: ops.heroes[hi]?.name,
+          player: engine.gs.players[oi]?.username, ability: entry.realName, hero: ops.heroes[hi]?.name,
         });
         engine.sync();
       }
@@ -219,32 +236,23 @@ module.exports = {
     if (chosen && chosenSlot >= 0) {
       const slotArr = ops.abilityZones[hi]?.[chosenSlot];
       if (slotArr && slotArr.length > 0 && slotArr[slotArr.length - 1] === chosen) {
-        // Pop the top of the stack and route through the standard
-        // discard pile. Untrack the ability inst so the engine's
-        // tracking stays consistent.
-        slotArr.pop();
-        const inst = engine.cardInstances.find(c =>
-          c.zone === 'ability' && c.owner === oi && c.heroIdx === hi
-          && c.zoneSlot === chosenSlot && c.name === chosen
+        // Oberste Kopie über die EINE Brett→Ablage-Primitive (wie die Support-Zonen-Variante oben): sie fährt den Leave-Hook (Fighting nimmt seinen ATK-Bonus zurück),
+        // untrackt die Karte, legt sie in die Ablage ihres BESITZERS (nicht der Spalte des Helden — „Verbotene Muster", CARD_API) und fragt die Leafagami Snake
+        // (die Ability bleibt liegen, der Kontrolleur der Schlange zieht).
+        const vorher = slotArr.length;
+        await engine.discardAbilityTopCopy(
+          { owner: seite, heroIdx: hi, slotIdx: chosenSlot, zoneKind: 'ability' },
+          { source: { name: CARD_NAME, owner: pi }, sourceOwner: pi },
         );
-        if (inst) {
-          // Fire onCardLeaveZone before untracking so any per-card
-          // cleanup (like Fighting's atkGranted revoke) runs.
-          await engine.runHooks('onCardLeaveZone', {
-            _onlyCard: inst, leavingCard: inst, fromZone: 'ability',
-            fromOwner: oi, fromHeroIdx: hi, fromZoneSlot: chosenSlot,
-            toZone: 'discard', _skipReactionCheck: true,
+        if (slotArr.length < vorher) {   // wirklich abgeworfen (nicht von der Leafagami Snake gehalten)
+          await engine.runHooks('onDiscard', {
+            playerIdx: oi, cardName: chosen, discardedCardName: chosen,
+            _skipReactionCheck: true,
           });
-          engine._untrackCard(inst.id);
+          engine.log('magic_amethyst_discard', {
+            player: engine.gs.players[oi]?.username, ability: chosen, hero: ops.heroes[hi]?.name,
+          });
         }
-        ops.discardPile.push(chosen);
-        await engine.runHooks('onDiscard', {
-          playerIdx: oi, cardName: chosen, discardedCardName: chosen,
-          _skipReactionCheck: true,
-        });
-        engine.log('magic_amethyst_discard', {
-          player: ops.username, ability: chosen, hero: ops.heroes[hi]?.name,
-        });
         engine.sync();
       }
     }

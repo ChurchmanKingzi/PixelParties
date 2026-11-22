@@ -116,12 +116,24 @@ module.exports = {
       // project against this SAME final size or land half a card off.
       const finalHandSize = oppPs.hand.length + ids.length;
       let returned = 0;
+      const gehalten = new Set();   // von der Leafagami Snake gehaltene Instanzen dieses Effekts
       for (let k = 0; k < ids.length; k++) {
         const t = targets.find(x => x.id === ids[k]);
         if (!t) continue;
         const slot = (oppPs.abilityZones?.[tHeroIdx] || [])[t.slotIdx] || [];
         const ci = slot.indexOf(t.cardName);
         if (ci < 0) continue;
+        // Spielgestalter-Entscheidung 16.11.2026: Leafagami Snake schützt gegen JEDE Ability-Entfernung — auch dieses Zurückwerfen auf die Hand: die Ability bleibt
+        // liegen, der Kontrolleur der Schlange zieht je Ability 1 Karte (gleicher Stapel: jede Kopie einzeln, `gehalten` merkt die schon gehaltenen Instanzen).
+        {
+          const kopie = engine.cardInstances.find(c =>
+            c.zone === 'ability' && c.owner === oppIdx && c.heroIdx === tHeroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName && !gehalten.has(c.id));
+          if (kopie && await engine.abilityEntfernungVerhindert(kopie, 'hand', { source: { name: CARD_NAME, owner: ctx.cardOwner } })) {
+            gehalten.add(kopie.id);
+            if (k < ids.length - 1) await engine._delay(420);
+            continue;
+          }
+        }
         slot.splice(ci, 1);
         const inst = engine.cardInstances.find(c =>
           c.zone === 'ability' && c.owner === oppIdx

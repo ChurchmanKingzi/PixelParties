@@ -1,0 +1,15 @@
+{
+  "creature": "Hardy Slime",
+  "sheet": "hardy-slime.png",
+  "frameWidth": 34,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 7,
+  "padLeft": 2,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 17.0
+}

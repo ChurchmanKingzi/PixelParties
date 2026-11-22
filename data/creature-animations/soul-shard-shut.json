@@ -1,0 +1,15 @@
+{
+  "creature": "Soul Shard Shut",
+  "sheet": "soul-shard-shut.png",
+  "frameWidth": 25,
+  "frameHeight": 30,
+  "frames": 48,
+  "frameMs": 65,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 12.5
+}

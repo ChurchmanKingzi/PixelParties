@@ -110,7 +110,8 @@ function moeglicheZiele(engine, pi) {
   //   vorher ins Leere — aber der Knopf SAH aktivierbar aus. Eine leere
   //   Zielliste macht `canActivateHeroEffect` falsch und damit den
   //   Knopf grau, statt den Spieler in eine tote Aktion zu locken.
-  if (engine?.gs?.firstTurnProtectedPlayer === gegner) return [];
+  // (Spielgestalter-Entscheidung 16.11.2026: ÜBERHOLT — auch der Erste-Runden-Geschuetzte ist waehlbar, die Wahl verpufft.)
+  if (engine?.cpuMeidetErsteRunde?.(pi)) return [];   // CPU (Spielgestalter-Entscheidung 16.11.2026): der Mensch darf die nutzlose Aktivierung gegen den Erste-Runden-Geschuetzten wählen, die CPU nicht
   const helden = engine?.gs?.players?.[gegner]?.heroes || [];
   const out = [];
   for (let hi = 0; hi < helden.length; hi++) {
@@ -143,6 +144,8 @@ function bezahlbar(hero) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: trifft nur die Gegnerseite. Der Erste-Runden-Schutz des Gegners sperrt die Karte NICHT mehr (aktivierbar, die Wirkung verpufft) — die Markierung dient nur noch der CPU (`engine.nutzlosErsteRunde`: sie aktiviert sie nicht gegen den Geschuetzten).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hero'],
   heroEffect: true,
 
@@ -194,6 +197,19 @@ module.exports = {
     return [bestes.id];
   },
 
+  /**
+   * ★ Spielgestalter-Entscheidung 16.11.2026: eine NEGIERTE Aktivierung verbraucht, was sie verbraucht hätte. Der Effekt hat KEIN Limit pro Aktivierung („as many times as you want") — nur jeder
+   * gegnerische Held darf je Zug einmal gewählt werden (`merkeWahl`). Wird die Aktivierung in der Kette negiert, ist noch kein Held gewählt: nichts zu buchen. Wird sie NACH der Zielwahl negiert
+   * (`ziele` = die negierten Ziele), ist dieser Held „chosen by this effect" und für den Rest des Zuges gesperrt; die Kosten (HP, Deckkarte) werden erst NACH der Zielwahl gezahlt und
+   * sind damit nicht angefallen. Rückgabe `false`: die Engine stempelt keine Rundensperre (der Effekt ist beliebig oft nutzbar).
+   */
+  stempelNegierteAktivierung(engine, rhabiHeld, { pi, ziele } = {}) {
+    for (const z of (ziele || [])) {
+      if (z && z.type === 'hero' && Number.isInteger(z.heroIdx) && z.owner !== pi) merkeWahl(engine, pi, z.heroIdx);
+    }
+    return false;
+  },
+
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -215,6 +231,7 @@ module.exports = {
       cancellable: true,
       maxTotal: 1,
       minRequired: 1,
+      ignoreBlinded: true,   // Blinded (Spielgestalter-Entscheidung 16.11.2026): einen Helden/eine Zone zum PLATZIEREN zu waehlen ist kein „Auswaehlen" eines Ziels
     });
     if (!wahl || wahl.length === 0) return false;
     const ziel = ziele.find(z => z.id === wahl[0]);

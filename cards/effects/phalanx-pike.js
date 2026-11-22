@@ -10,23 +10,32 @@
 //    === 'attack' so the same hero's Spells / Hero
 //    effects / Creature activations still open the
 //    window normally.
-//  ③ Maximum 1 Phalanx Pike per Hero.
+//  ③ Spielgestalter-Entscheidung 17.11.2026: KEIN Limit je Held
+//  (der Kartentext nennt keines). Mehrere Phalanx Pike am selben
+//  Helden sind erlaubt, jede gibt +30 ATK; die Surprise-Regel gilt,
+//  solange mindestens eine liegt.
 //
 //  Wiring: the engine reads `hero._skipAttackSurprises`
 //  inside `_checkSurpriseWindow`. We stamp the flag
 //  on the equipped hero in onPlay/onGameStart and
 //  clear it in onCardLeaveZone (only when no other
-//  Pike is still equipped).
+//  Pike — or Heart-Shaped Bow, which uses the same
+//  flag — is still equipped: the flag ends with the
+//  LAST suppressor).
 // ═══════════════════════════════════════════
 
 const ATK_BONUS = 30;
 const CARD_NAME = 'Phalanx Pike';
 
+// Heart-Shaped Bow stempelt dasselbe Flag (`_skipAttackSurprises`) — ihr Abgang raeumt es nur, wenn kein Pike/Bogen mehr liegt (dort schon so);
+// umgekehrt darf der Abgang der letzten Pike das Flag nicht loeschen, solange ein Bogen am Helden liegt.
+const SUPPRESSOR_NAMES = [CARD_NAME, 'Heart-Shaped Bow, the Final Proof of Cuteness'];
+
 function _otherPikeOnHero(engine, ownerIdx, heroIdx, excludeId) {
   return engine.cardInstances.some(c =>
     c.id !== excludeId &&
     c.owner === ownerIdx && c.zone === 'support' &&
-    c.heroIdx === heroIdx && c.name === CARD_NAME
+    c.heroIdx === heroIdx && SUPPRESSOR_NAMES.includes(c.counters?._effectOverride || c.name)
   );
 }
 
@@ -44,18 +53,10 @@ function _clearSurpriseSkipIfLast(engine, ownerIdx, heroIdx, excludeId) {
 module.exports = {
   activeIn: ['support'],
 
-  /**
-   * Block placement if this hero already has a Phalanx Pike equipped.
-   * Mirrors Vampiric Sword / Slippery Skates' anti-stack guard so the
-   * +30 ATK can't be doubled up via repeated equips.
-   */
-  canEquipToHero(gs, playerIdx, heroIdx) {
-    const supportZones = gs.players[playerIdx]?.supportZones[heroIdx] || [];
-    for (const slot of supportZones) {
-      if ((slot || []).includes(CARD_NAME)) return false;
-    }
-    return true;
-  },
+  // „Equip this card to a Hero you control." — Seitenbindung (CARD_API `equipOwnSideOnly`). Ersetzt das frühere
+  // `canEquipToHero` („Maximum 1 Phalanx Pike per Hero", Spielgestalter-Entscheidung 17.11.2026: kein Limit), das die Karte
+  // nebenbei an die eigene Seite gebunden hatte.
+  equipOwnSideOnly: true,
 
   hooks: {
     onPlay: (ctx) => {

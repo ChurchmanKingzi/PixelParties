@@ -240,7 +240,7 @@ module.exports = {
             zoneSlot: inst.zoneSlot, source,
             _skipReactionCheck: true,
           });
-          await engine.actionDestroyCard(source, inst);
+          await engine.actionDestroyCard(source, inst, { einaescherung: true });   // Opfer: verbrennt (Client: app-fx-66)
         }
       }
 

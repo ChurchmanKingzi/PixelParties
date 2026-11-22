@@ -31,6 +31,12 @@
 //  ATK und Fähigkeitsstufen sind die des Helden. Test: `docs/niche-tests/repro/W72/c-05`.
 //  Die Kopie ist KEIN Gebrauch einer Karte durch den Helden: keine Zähler (gespielte Attacks/Spells), kein `afterSpellResolved`, keine Aktion, keine Ablage — die Instanz verschwindet danach.
 //
+//  ── AKTIONSSPERRE (Spielgestalter-Entscheidung 18.11.2026) ───────────────
+//  Prinzip: Eine zweite INSTANZ eines Spells/Angriffs zu wirken ist eine neue Aktion und wird von der Aktionssperre (`engine.areActionsBlocked(pi)`: Overflowing Chalice, Kents Schulden,
+//  `_playerActionLockedTurn`, `ps.actionLocked`) blockiert. Die Kopie des Clone („may perform an exact copy of it") ist so eine zweite Instanz: ist der Kontrolleur des Klons
+//  aktionsgesperrt, entfällt die Kopie KOMPLETT — kein Angebot, keine Kosten, kein Einmal-Stempel „once per turn", kein Kettenfenster; das Original läuft normal weiter (wie Magic Mirror).
+//  Ohne Sperre unverändert.
+//
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  Keine eigene Zonen-Animation (das Echo-Abbild am Helden ist entfallen, Al 24.10.): nur der Auftritt der Karte (`showTriggeredEffect`) und das Glühen am Klon beim Auslösen — danach die Kopie selbst.
 // ═══════════════════════════════════════════
@@ -110,7 +116,10 @@ module.exports = {
 
       // ── der „corresponding Hero" hat gewirkt ──
       const feld = engine.physicalSide(inst);                           // Brettseite des Klons = Reihe seines Helden
-      if (ctx.heroOwner !== feld || ctx.heroIdx !== inst.heroIdx) { dbg('anderer Held'); return; }
+      // Spielgestalter-Entscheidung 17.11.2026: „corresponding Hero" gilt zum Zeitpunkt des WIRKENS, also VOR einem Tausch (Teleport): `heroIdxWirkzeit` ist der Platz des Wirkers vor der Auflösung,
+      // `ctx.heroIdx` bei Teleport schon der Platz danach. Wirkt Sid (Clone-Spalte) das Teleport, bietet der Clone die Kopie an; wirkt der Held der Nachbarspalte es, nicht.
+      const wirkSpalte = ctx.heroIdxWirkzeit ?? ctx.heroIdx;
+      if (ctx.heroOwner !== feld || wirkSpalte !== inst.heroIdx) { dbg('anderer Held'); return; }
       const pi = engine.kontrolleurVon(inst);
       if (ctx.casterIdx !== pi) { dbg('anderer Wirker'); return; }                                 // der Kontrolleur des Klons spielt die Karte
       const hero = gs.players[feld]?.heroes?.[inst.heroIdx];
@@ -134,6 +143,13 @@ module.exports = {
       // Einschränkungen der Karte gelten für die Kopie (Al, 24.10.): die Voraussetzungen des SPIELENS (`spellPlayCondition`) müssen jetzt noch erfüllt sein.
       try { if (script.spellPlayCondition && !script.spellPlayCondition(gs, pi, engine)) { dbg('spellPlayCondition false'); return; } }
       catch (err) { console.error('[Clone] spellPlayCondition', name, err.message); return; }
+
+      // ── Aktionssperre (Spielgestalter-Entscheidung 18.11.2026): die Kopie ist eine zweite Instanz = neue Aktion → entfällt komplett (siehe Kopf) ──
+      if (engine.areActionsBlocked(pi)) {
+        engine.log('clone_copy_blocked', { player: gs.players[pi]?.username, card: name, reason: 'actions_blocked' });
+        dbg('Aktionssperre');
+        return;
+      }
 
       // ── „may": der Spieler entscheidet ──
       const ja = await ctx.promptConfirmEffect({
@@ -178,9 +194,15 @@ module.exports = {
       const geloeschtVor = (gs.players[pi].deletedPile || []).filter(n => n === name).length;
       const fireBoltsAlt = engine._fireBoltsEntscheid;   // W75a: Entscheidung 200/50 des äußeren Fire Bolts (Zweitwurf) — die Kopie entscheidet für sich
       try {
-        await engine.runHooks('onPlay', {
+        // ★ Spielgestalter-Entscheidung 18.11.2026 („Kopien/Wiederholungen eines gespielten Zaubers öffnen Kettenfenster"): die Kopie ist wie jedes „performs" ein Spielen (`engine.performKettenfenster`):
+        // Silence, Anti-Magic-Reaktionen, Hand-Reaktionen auf Attacks (Pfeile) usw. kommen zum Zug; Master's Plan/Lunar Eclipse nicht (Herkunft nicht Hand). Wirker ist die KREATUR (`trotzStatus`: kein
+        // Helden-Wirker, wie Demon's Gate). Nichts wird erneut bezahlt; das Limit „1 pro Zug" ist ab dem Ja verbraucht. Wird die Kopie in der Kette negiert, löst ihr Rumpf nie auf.
+        const _pfeileVorher = (hero._armedArrows || []).length;
+        const _pk = await engine.performKettenfenster({ cardName: name, pi, heroIdx: inst.heroIdx, heroOwner: feld, ausHand: false, trotzStatus: true });
+        if (!_pk.negated) await engine.runHooks('onPlay', {
           _onlyCard: synth, playedCard: synth, cardName: name, zone: 'hand', heroIdx: inst.heroIdx, _skipReactionCheck: true,
         });
+        if (cd.cardType === 'Attack' && _pfeileVorher === 0 && (hero._armedArrows || []).length > 0) await require('./_arrows-shared').clearArmedArrows(engine, pi);   // Pfeile, die erst in DIESEM Fenster scharf wurden, gelten nur für die Kopie
       } catch (err) {
         console.error(`[Clone] copy of "${name}" failed:`, err.message);
       } finally {

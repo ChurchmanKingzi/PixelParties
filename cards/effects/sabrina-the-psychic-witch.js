@@ -234,6 +234,7 @@ module.exports = {
     await engine.actionDestroyCard(
       { name: CARD_NAME, owner: pi, heroIdx, heroOwner: seite },
       sacInst,
+      { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
     );
     engine.log('sabrina_sacrifice', {
       player: ps.username, victim: sacInst.name, level: sacLevel,

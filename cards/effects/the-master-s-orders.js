@@ -17,13 +17,28 @@
 //     Effekt-Immunität laufen im Baustein. Heldenwahl abbrechbar — dann bleibt die Karte auf der Hand. Helden, die schon unter Orders stehen, stehen ausgegraut in der Liste.
 //  2. Der Status `ordered` („Under Orders", negativ, heilbar) wird angelegt — wie bei Berserk als ECHTER Status über `addHeroStatus` (Immunität gegen negative Status, Resistance,
 //     Charme-Schutz … gelten). Er trägt die Karte: wird er GEHEILT (Juice, Beer, Cure …), fallen ALLE Orders-Kopien am Helden in die Ablage ihres Besitzers; verlässt die letzte Kopie den
-//     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts.
-//  3. KONTROLLE: am Beginn jedes Zuges des Anhängers (`onTurnStart`) — und sofort, wenn die Karte in seinem EIGENEN Zug angelegt wird — übernimmt er den Helden für den Rest des
+//     Helden, endet der Status. Der Status ist auch der Schalter für alles Weitere — ohne ihn (immun, geheilt) passiert nichts. Spielgestalter-Entscheidung 17.11.2026 (ATT-15): unter Status-Immunität des Wirts
+//     liegt die Karte wirkungslos da, ABER sobald die Immunität endet, greift der Status (die Übernahme beginnt dann SOFORT, wenn der Anhänger am Zug ist — Spielgestalter-Entscheidung 19.11.2026, s. 3.; sonst mit
+//     seinem nächsten Zugbeginn); kommt sie später dazu, ruht er wieder und eine laufende Übernahme endet (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`). Dafür trägt der Status die Marke `_fromAttachment` (wie bei Berserk/Curse/Polymorph/Shrink; sie ist auch der
+//     Griff, an dem Tea die Karte beim Übertragen des Status mitnimmt) — ohne sie erkennt der Abgleich den aktiven Status nicht und lässt ihn trotz Immunität stehen. Die Übernahme, die die Karte selbst ausübt, zählt
+//     für die Immunität des Wirts nicht (`kontrolleAls`, wie Mind Control): er wird als Held seines Besitzers beurteilt, sonst schützte die Johanna/der Light Ball des Anhängers ihn vor seinem eigenen Status.
+//     HEIL-LISTEN (Spielgestalter-Entscheidung 18.11.2026): „Under Orders" steht in den Heil-Listen (Cure, Beer, Juice, Tea, Coffee …), AUCH WENN die Karte gerade ruht: `countsAsNegativeStatus` führt sie
+//     dann als eigenen `attach:<instId>`-Eintrag („Under Orders (The Master's Orders)"), wie Stowaway und Decisive Defeat. Wählt man ihn, geht genau diese Karte in die Ablage ihres ursprünglichen Besitzers
+//     (eine Übernahme gab es nie: sie hängt am Status); Cure zählt ihn als einen entfernten Effekt (+100 HP). Aktiv steht nur der Status `ordered` in der Liste (kein Doppeleintrag; der `attach:`-Eintrag
+//     entfällt, solange der Wirt `ordered` trägt).
+//  3. KONTROLLE: am Beginn jedes Zuges des Anhängers (`onTurnStart`) — und sofort, wenn die Karte in seinem EIGENEN Zug angelegt (oder umgehängt) wird — übernimmt er den Helden für den Rest des
 //     Zuges: dieselbe Übernahme wie Charme/Love Shot/Control Device (`temporaereKontrolle`, Marken `charmedBy`/`charmedFromOwner`/`charmedHeroIdx`, Status `charmed`), OHNE Schutzklausel
 //     (`ohneSchutz`: der Text verspricht keinen), Rechte „beschwören + ausrüsten" (keine Abilities hinlegen). Die Rückgabe am nächsten Zugbeginn ist generisch (Engine). Während der
 //     Übernahme zählt der Held für ALLE Abfragen als Held des Anhängers (`heroSideOf`): „you control" trifft ihn, „all targets your opponent controls" trifft ihn NICHT mehr. Die
 //     Effekt-Vorbedingungen der Übernahme gelten (Erste-Runden-Schutz, Resistance einmal pro Zug, Effekt-Immunität): scheitert sie, bleibt die Karte liegen und versucht es am nächsten
 //     Zugbeginn erneut.
+//     „ORDERS WIRKT SOFORT, SOBALD DIE IMMUNITÄT ENDET" (Spielgestalter-Entscheidung 19.11.2026): wird der Status `ordered` MITTEN im Zug des Anhängers (wieder) aktiv — Light Ball weg, Johanna tot, Buff/Schutz/
+//     Einzel-Immunität vorbei, oder eine Immunität kam dazu und ging im selben Zug wieder —, beginnt (bzw. kehrt) die Übernahme SOFORT, nicht erst am nächsten Zugbeginn; kommt die Immunität dazu, endet sie wie bisher
+//     sofort. Das gilt nur im Zug des ANHÄNGERS (die Karte gibt ihm Kontrolle nur in seinen eigenen Zügen); endet die Immunität im Zug des Besitzers, beginnt die Übernahme am nächsten Zugbeginn des Anhängers wie bisher.
+//     Umsetzung: der synchrone Status-Abgleich der Engine ruft `einsetzen` (Marke `_ordersNeu`), `kontrolleAbgleichen` holt die asynchrone Übernahme in den Haken nach, in denen sich eine Immunität ändern kann
+//     (wie Mind Control; Liste in `hooks`). EINE Prüfung der Effekt-Vorbedingungen je Zug und Wirt (`_ordersVersuch`): ein gescheiterter Versuch (Resistance, Erste-Runden-Schutz, Effekt-Immunität) wird in diesem Zug
+//     nicht wiederholt (Resistance „einmal pro Zug" bliebe sonst umgehbar); eine Übernahme, die in diesem Zug schon gelang und nur durch eine Status-Immunität unterbrochen wurde, setzt sich ohne neue Prüfung fort
+//     (`fortsetzung` in `temporaereKontrolle`: Resistance wird nicht ein zweites Mal verbraucht oder umgangen). Jede Wiederaufnahme meldet `onTakeControl` (Johanna als Wirt reinigt für den neuen Kontrolleur).
 //  4. HANDELN: alles läuft über die bestehende Übernahme-Infrastruktur — Spells/Attacks, Creatures beschwören (sie liegen dann auf fremdem Gebiet und gehören DAUERHAFT dem Anhänger),
 //     Abilities aktivieren (Adventurousness), Heldeneffekte (Zi, Friedhelm …), Artefakte. Die Karten in den Ability Zones des übernommenen Helden sind dabei von allen Effekten unberührt
 //     (allgemeine Regel für zeitweise Übernahmen).
@@ -33,8 +48,8 @@
 //     Zug bleiben frei. Heldeneffekte, Abilities und Creature-Effekte sind nicht erfasst (der Text sagt „Attack or Spell").
 //
 //  ── ANNAHMEN ────────────────────────────────────────────────────────────
-//  • Die Übernahme beginnt mit dem Zugbeginn des Anhängers; wird die Karte im eigenen Zug gespielt, gilt sie ab sofort (er darf z. B. in Main Phase 2 eine inherente Zusatzaktion mit
-//    dem Helden ausführen). Im Zug des Besitzers hat der Anhänger keine Aktionen.
+//  • Die Übernahme beginnt mit dem Zugbeginn des Anhängers; wird die Karte im eigenen Zug gespielt (oder umgehängt) oder endet die Immunität des Wirts in seinem Zug, gilt sie ab sofort (er darf z. B. in
+//    Main Phase 2 eine inherente Zusatzaktion mit dem Helden ausführen). Im Zug des Besitzers hat der Anhänger keine Aktionen.
 //  • Das Truth-Seeing Eye des Anhängers hebt die Selbstwahl-Sperre mit auf (die Zielschutz-Schicht der Engine entfällt dann als Ganzes).
 //  • Erste-Runden-Schutz des Wirts: die Karte ist unspielbar (`blockedByFirstTurnProtection`).
 //
@@ -43,7 +58,7 @@
 //  gewöhnliche Übernahme-Logik der Engine.
 // ═══════════════════════════════════════════
 
-const { candidateHosts, attachToHero } = require('./_attachment-shared');
+const { candidateHosts, attachToHero, statusErgebnisBuchen } = require('./_attachment-shared');
 const { temporaereKontrolle } = require('./_charm-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -83,9 +98,12 @@ async function ordersAnlegen(engine, appliedBy, owner, heroIdx) {
     appliedBy,
     source: CARD_NAME,
     animationType: 'dark_swarm',
+    _fromAttachment: CARD_NAME,   // Marke „dieser Status gehört dieser Karte" (wie Berserk/Curse/Polymorph/Shrink): ohne sie erkennt der Immunitäts-Abgleich (`statusFolgtImmunitaet`) den aktiven Status nicht
     festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewählt
   });
-  return !!hero.statuses?.[STATUS_NAME];
+  const st = hero.statuses?.[STATUS_NAME];
+  if (st && !st._fromAttachment) st._fromAttachment = CARD_NAME;
+  return !!st;
 }
 
 /** Orders-Kopien am Wirt (Brettseite `owner`). */
@@ -101,17 +119,32 @@ async function nimmKontrolle(engine, inst) {
   const gs = engine.gs;
   if (gs.result || gs._endGameLaeuft) return false;
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
+  if (inst.counters) delete inst.counters._ordersNeu;   // jeder Versuch beantwortet die Marke „Status ist gerade (wieder) aktiv geworden" (`einsetzen`, `kontrolleAbgleichen`)
   const owner = inst.owner, heroIdx = inst.heroIdx;
   const hero = gs.players[owner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0 || !hero.statuses?.[STATUS_NAME]) return false;
   const pi = anhaenger(engine, inst);
   if (gs.activePlayer !== pi) return false;
   if (hero.charmedBy != null || hero.permaControlBy != null || hero.controlledBy != null) return false;   // schon übernommen (auch vom Anhänger selbst)
-  const ok = await temporaereKontrolle(engine, {
-    controllerPi: pi, ownerPi: owner, heroIdx, sourceName: CARD_NAME,
-    marker: 'ohneSchutz',          // der Kartentext verspricht keinen Schutz (wie Styx, Control Device)
-    supportZonesLocked: false,     // Rechte: beschwören + ausrüsten
-  });
+  if (!inst.counters) inst.counters = {};
+  // Spielgestalter-Entscheidung 19.11.2026: pro Zug und Wirt höchstens EINE Prüfung der Effekt-Vorbedingungen (Erste-Runden-Schutz, Resistance, Effekt-Immunität). Scheiterte sie in diesem Zug, wird nicht erneut
+  // versucht (sonst ließe sich Resistance „einmal pro Zug" umgehen: der zweite Versuch wäre nicht mehr geblockt); sie gelang, setzt sich dieselbe Übernahme nach einer Unterbrechung durch Status-Immunität
+  // ohne neue Prüfung fort (`fortsetzung`: Resistance wird nicht ein zweites Mal verbraucht).
+  const vor = inst.counters._ordersVersuch;
+  const gleicherZug = !!vor && vor.turn === gs.turn && vor.owner === owner && vor.heroIdx === heroIdx;
+  if (gleicherZug && !vor.ok) return false;
+  // `_ordersUebernimmt`: solange `temporaereKontrolle` läuft (sie ruft `engine.sync()`), ist `charmed.quelle` noch nicht gesetzt — `kontrolleAls` (unten) erkennt die eigene Übernahme an dieser Marke.
+  inst.counters._ordersUebernimmt = true;
+  let ok;
+  try {
+    ok = await temporaereKontrolle(engine, {
+      controllerPi: pi, ownerPi: owner, heroIdx, sourceName: CARD_NAME,
+      marker: 'ohneSchutz',          // der Kartentext verspricht keinen Schutz (wie Styx, Control Device)
+      supportZonesLocked: false,     // Rechte: beschwören + ausrüsten
+      fortsetzung: gleicherZug,
+    });
+  } finally { if (inst.counters) delete inst.counters._ordersUebernimmt; }
+  if (inst.counters) inst.counters._ordersVersuch = { turn: gs.turn, owner, heroIdx, ok: !!ok.ok };
   if (!ok.ok) return false;
   if (hero.statuses?.charmed) hero.statuses.charmed.quelle = CARD_NAME;
   await engine.runHooks('onTakeControl', {
@@ -128,6 +161,26 @@ async function nimmKontrolle(engine, inst) {
   return true;
 }
 
+/**
+ * Spielgestalter-Entscheidung 19.11.2026 („Orders wirkt sofort, sobald die Immunität endet"): greift der Status `ordered` MITTEN im Zug des Anhängers wieder (Light Ball weg, Johanna tot, Buff/Schutz/
+ * Einzel-Immunität vorbei — oder eine Immunität kam dazu und ging im selben Zug wieder), beginnt (bzw. kehrt) die Übernahme SOFORT, nicht erst am nächsten Zugbeginn. Der Status-Abgleich der Engine
+ * (`statusAnhaengselAbgleichen`, in `sync()` und vor den Meldungen aus `STATUS_ABGLEICH_HOOKS`) ist synchron und legt nur den Status an: `einsetzen` (Vertrag `statusFolgtImmunitaet`) merkt sich das hier mit der Marke
+ * `_ordersNeu`, und dieser Abgleich holt die — asynchrone — Übernahme in den Haken nach, in denen sich eine Immunität ändern kann (wie Mind Control, `kontrolleAbgleichen` dort; `onStatusApplied`/`onStatusRemoved`
+ * bewusst nicht: der Engine-Abgleich ist dort noch nicht gelaufen). Außerhalb des Zuges des Anhängers (z. B. im Zug des Besitzers) verfällt die Marke: dort bleibt es beim Beginn am nächsten Zugbeginn
+ * (`onTurnStart`). Alles Weitere (Anhänger am Zug? Held schon übernommen? Vorbedingungen? Versuch dieses Zuges schon gescheitert?) prüft `nimmKontrolle`; die Marke wird vor jedem Versuch gelöscht — kein Doppelversuch.
+ */
+async function kontrolleAbgleichen(engine, inst) {
+  if (!inst || inst.name !== CARD_NAME || inst.zone !== 'support' || inst.faceDown) return;
+  if (!inst.counters?._ordersNeu || inst.counters._ordersAbgleich) return;
+  inst.counters._ordersAbgleich = true;
+  try {
+    // Nicht im Zug des Anhängers: die Marke verfällt (nimmKontrolle löscht sie sonst vor dem Versuch ohnehin).
+    const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+    if (!hero?.name || engine.gs.activePlayer !== anhaenger(engine, inst)) { delete inst.counters._ordersNeu; return; }
+    await nimmKontrolle(engine, inst);
+  } finally { if (inst.counters) delete inst.counters._ordersAbgleich; }
+}
+
 /** Grober Wert eines Wirts für die CPU (hoch = lohnt sich mehr). */
 function wirtWert(engine, side, hi) {
   const h = engine.gs.players[side]?.heroes?.[hi];
@@ -135,11 +188,17 @@ function wirtWert(engine, side, hi) {
 }
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte, aber die Wahl eines GEGNERISCHEN Ziels ist Pflicht („Attach this card to a Hero your opponent controls") — ein geblendeter Held darf nur eigene Ziele waehlen,
+  // also ist sie unter Blinded nicht spielbar (Vertrag `blindedEigeneZiele`, `engine.blindedAttackSpellGesperrt`).
   requiresTarget: true,
-  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  blindedEigeneZiele: false,
   blockedByFirstTurnProtection: true,      // trifft nur die Gegnerseite
   activeIn: ['hand', 'support'],
   attachmentStatus: STATUS_NAME,           // Puzzle-Aufbau legt den Status an (kein `onPlay` im Puzzle)
+  // Spielgestalter-Entscheidung 18.11.2026: auch die RUHENDE Karte steht in den Heil-Listen (`attach:`-Eintrag, s. Kopf).
+  countsAsNegativeStatus: true,
+  negativeStatusLabel: "Under Orders (The Master's Orders)",
+  negativeStatusIcon: '📜',
   spellVisual: { impact: { type: 'dark_swarm' }, impactMs: 260 },
 
   spellPlayCondition(gs, pi, engine) {
@@ -151,8 +210,45 @@ module.exports = {
 
   /** Umhängen (Inheritance Ceremony, Secret Spell Book): den Status am neuen Wirt wieder anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
   async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
-    await ordersAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    const ok = await ordersAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    statusErgebnisBuchen(engine, inst, ok, toOwner, toHeroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität des neuen Wirts → Karte ruht
     engine.sync();
+    // 19.11.2026: wie beim Anlegen im eigenen Zug — steht der Status am neuen Wirt und ist der Anhänger am Zug, beginnt die Übernahme sofort (`kontrolleAbgleichen`; ruhend: erst, wenn die Immunität endet).
+    if (inst.zone === 'support' && !inst.counters?._statusRuht && engine.gs.players[toOwner]?.heroes?.[toHeroIdx]?.statuses?.[STATUS_NAME]) {
+      if (!inst.counters) inst.counters = {};
+      inst.counters._ordersNeu = true;
+      await kontrolleAbgleichen(engine, inst);
+    }
+  },
+
+  /** Reflection (Spielgestalter-Entscheidung 17.11.2026): die Karte hängt nur an einem Helden, den ein GEGNER des Anhängers kontrolliert („a Hero your opponent controls") — ein Reflection-Ziel (Held des Anhängers) ist keiner. */
+  attachmentHostAllowed(engine, inst, owner, heroIdx) {
+    return engine.opponentsOf(anhaenger(engine, inst)).includes(engine.kontrolleurVonHeld(owner, heroIdx));
+  },
+
+  // Spielgestalter-Entscheidung 17.11.2026 (ATT-15): der Status folgt der Status-Immunität des Wirts; beginnt sie mitten im Zug, endet die laufende Übernahme (sie hing am Status).
+  statusFolgtImmunitaet: {
+    status: STATUS_NAME,
+    // Wie Mind Control: die Übernahme, die diese Karte selbst ausübt, zählt für die Status-Immunität des Wirts nicht — er wird als Held seines Besitzers beurteilt. Sonst schützte die Johanna / der Light Ball /
+    // der Immunitäts-Buff des ANHÄNGERS den übernommenen Helden vor dem Status, der die Übernahme trägt, und sie erlösche im selben Augenblick, in dem sie beginnt.
+    kontrolleAls(engine, inst, seite, heroIdx) {
+      const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
+      if (!hero || hero.charmedBy == null || hero.permaControlBy != null) return null;
+      if (hero.statuses?.charmed?.quelle !== CARD_NAME && !inst.counters?._ordersUebernimmt) return null;   // eine fremde Übernahme (Love Shot, Charme …) bleibt, wie sie ist
+      return seite;
+    },
+    // 19.11.2026: der Status ist (wieder) aktiv — die Übernahme soll jetzt beginnen, wenn der Anhänger am Zug ist (`kontrolleAbgleichen`, asynchron in den Haken).
+    einsetzen(engine, inst) {
+      if (!inst.counters) inst.counters = {};
+      inst.counters._ordersNeu = true;
+    },
+    ruhen(engine, inst, hero) {
+      if (inst.counters) delete inst.counters._ordersNeu;
+      if (hero.charmedBy != null && hero.statuses?.charmed?.quelle === CARD_NAME && hero.permaControlBy == null) {
+        delete hero.charmedBy; delete hero.charmedFromOwner; delete hero.charmedHeroIdx;
+        delete hero.statuses.charmed; delete hero._kontrollRechte;
+      }
+    },
   },
 
   /**
@@ -197,6 +293,7 @@ module.exports = {
       const { host, inst } = res;
       const hero = gs.players[host.owner]?.heroes?.[host.heroIdx];
       const gesetzt = await ordersAnlegen(engine, pi, host.owner, host.heroIdx);
+      statusErgebnisBuchen(engine, inst, gesetzt || !!hero?.statuses?.[STATUS_NAME], host.owner, host.heroIdx, STATUS_NAME);   // 17.11.2026: Status-Immunität → Karte ruht, bis die Immunität endet
       if (!gesetzt && !hero?.statuses?.[STATUS_NAME]) {
         engine.log('masters_orders_noop', { player: gs.players[pi]?.username, hero: hero?.name });
       }
@@ -223,6 +320,17 @@ module.exports = {
       await nimmKontrolle(ctx._engine, inst);
     },
 
+    // 19.11.2026: Übernahme sofort nachholen, wenn der Status mitten im Zug des Anhängers (wieder) aktiv wurde (`kontrolleAbgleichen`). Dieselben Haken wie bei Mind Control, ohne Zugende (dort wäre es sinnlos:
+    // die Rückgabe läuft am nächsten Zugbeginn) und ohne `onStatusApplied`/`onStatusRemoved` (der Engine-Abgleich ist dort noch nicht gelaufen, `STATUS_ABGLEICH_HOOKS` in `_engine.js`).
+    onCardEnterZone: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onHeroRevive: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onHeroKO: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onAnyActionResolved: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    onActiveEffectUsed: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterSpellResolved: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterCreatureEffect: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+    afterAllStatusDamage: async (ctx) => { await kontrolleAbgleichen(ctx._engine, ctx.card); },
+
     /**
      * Cleanse-Routing wie bei Berserk: wird `ordered` GEHEILT (Juice, Beer, Cure …), fallen ALLE Orders-Kopien am Helden in die Ablage ihres ursprünglichen Besitzers. Mit der Heilung endet
      * auch eine laufende Übernahme dieses Zuges (die Kontrolle hing an der Karte).
@@ -232,7 +340,8 @@ module.exports = {
       const engine = ctx._engine;
       const owner = ctx.heroOwner, heroIdx = ctx.heroIdx;
       if (typeof owner !== 'number' || typeof heroIdx !== 'number') return;
-      const kopien = kopienAmWirt(engine, owner, heroIdx);
+      // Tea überträgt den Status: die Karte, die mitzieht (`_anhaengselZiehtUm`), fällt nicht ab (Marke `_fromAttachment` am Status, `engine.anhaengselFuerStatus`); mit ihrem Abgang endet die Übernahme (`onCardLeaveZone`).
+      const kopien = kopienAmWirt(engine, owner, heroIdx).filter(c => !c.counters?._anhaengselZiehtUm);
       if (kopien.length === 0) return;
       engine.gs._ordersCleanseInProgress = true;
       try {
@@ -256,7 +365,7 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       const card = ctx.card;
       if (!card || card.name !== CARD_NAME) return;
-      if ((ctx.leavingCard || ctx._onlyCard)?.id !== card.id) return;
+      if ((ctx.leavingCard || ctx._onlyCard)?.id !== card.id) { await kontrolleAbgleichen(ctx._engine, card); return; }   // eine ANDERE Karte geht (Light Ball …): die Immunität des Wirts kann enden
       if (ctx.fromZone && ctx.fromZone !== 'support') return;
       const engine = ctx._engine;
       const gs = engine.gs;

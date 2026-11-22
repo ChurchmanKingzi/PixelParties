@@ -28,9 +28,13 @@ Bugfix-Note: _alice-shared | Summons no longer stay on the board after their own
   (z. B. Skript passte nicht zum Kartentext), schreibe eine `Bugfix-Note` für diese Karte; dann erscheint sie auch im Bugfix-Kanal.
 * Ohne `Bugfix-Note` erscheint die Karte trotzdem (erkannt am geänderten Skript), nur ohne Erklärung.
 * **Reine Anpassung an eine NEUE Karte ist kein Bugfix:** Wird ein bestehendes Skript (oder ein gemeinsamer Baustein, auch `_engine`) nur geändert, damit es zu einer neuen Karte passt (neuer Engine-Vertrag, Wechselwirkung, Zielfilter für die neue Karte), schreibe pro betroffener Karte/Baustein eine Zeile
-  `Bugfix-Skip: <Kartenname oder _baustein>` (optional `| Grund`) in die Commit-Nachricht – **keine** `Bugfix-Note`. Der Bot meldet das Ziel dann nicht im Bugfix-Kanal. Dasselbe gilt für Nachbesserungen an einer neuen Karte, die für Spieler noch nicht
-  freigegeben ist, auch wenn sie schon in `data/cards.json` steht. Ein `Bugfix-Skip` hat Vorrang vor einer `Bugfix-Note` desselben Ziels im selben Bot-Zeitraum (so nimmt man eine zu Unrecht geschriebene Note in einem späteren Commit zurück) –
-  also nicht für eine Karte schreiben, an der im selben Zeitraum auch ein echter Fehler behoben wurde.
+  `Bugfix-Skip: <Kartenname oder _baustein>` (optional `| Grund`) in die Commit-Nachricht – **keine** `Bugfix-Note`. Der Bot meldet die Änderung dieses Commits dann nicht im Bugfix-Kanal. Dasselbe gilt für Nachbesserungen an einer neuen Karte, die für Spieler noch nicht
+  freigegeben ist, auch wenn sie schon in `data/cards.json` steht.
+  * **Ein `Bugfix-Skip` unterdrückt nur die Änderung seines eigenen Commits.** Ändert ein anderer Commit im selben Bot-Zeitraum dasselbe Skript (bzw. denselben Baustein) inhaltlich ohne eigenen Skip, wird das Ziel trotzdem gemeldet; auch eine `Bugfix-Note` eines anderen Commits bleibt davon unberührt
+    (der Skip hat **keinen** Vorrang vor Notes anderer Commits). Nur innerhalb EINES Commits gewinnt der Skip: Trägt ein Commit Note und Skip für dasselbe Ziel, entfällt die Note dieses Commits. Eine Karte, die nur über einen Baustein betroffen ist, unterdrückt der Commit mit `Bugfix-Skip: <Karte>` oder `Bugfix-Skip: <baustein>`.
+    Die Zeilen gehören in die Nachricht des Commits, der die Änderung enthält (bei Squash-Merge in die Squash-Nachricht); Skip-Zeilen in der Nachricht eines reinen Merge-Commits wirken nicht, weil er keine eigene Änderung trägt.
+  * **Eine zu Unrecht geschriebene `Bugfix-Note` lässt sich nicht mehr durch einen späteren Skip zurücknehmen.** Das Ziel erscheint dann im Bugfix-Kanal (der Bot zeigt eine Karte mit Note auch ohne erkannte Skript-Änderung) — im Zweifel die Meldung dort löschen; vor dem Merge lässt sich der Commit-Text noch korrigieren.
+    Einen Skip also nur in dem Commit schreiben, der selbst kein Bugfix ist — nie in dem Commit, der den echten Fehler behebt.
 
 ## Grafik-Regel: Jede Animation und jedes Highlight ist Pixelart
 
@@ -52,6 +56,9 @@ Das Spiel hat eine feste Palette (`data/palette.json`, 8 Bit = höchstens 256 Fa
 * Farben, die erst **zur Laufzeit** entstehen (Spielerfarbe, Zufallspartikel, `hsl(${hue})`, Farben aus Kartenskripten), rastet `public/palette.js` ein (Stile, Canvas, SVG-Attribute). Die **Spielerfarbe** wird beim Speichern serverseitig auf die nächste Palettenfarbe gesetzt (`palette.js` im Wurzelverzeichnis, `snapHex`) und im Farbfeld des Profils live eingerastet.
 * Die Palette selbst ändert man nur bewusst: `python3 scripts/palette/build_palette.py` (Gewichte der Oberfläche: `data/palette-ui-gewichte.json`), danach `node scripts/palette/anwenden.js` und `python3 scripts/pixel-emoji/build_font.py` (die Emoji-Schrift nutzt dieselben 256 Farben).
 * **Feste Farben des Spielgestalters** stehen in `data/palette-fest.json` (z. B. die Farben der Gold-Münze). Sie kommen **exakt** in die Palette (`build_palette.py`, nie auf Nachbarfarben gerastet) und werden dort, wofür sie gedacht sind, unverändert verwendet — Gold im Spiel (Münze, Goldzahl, Gold-Zahlen im Duell) nutzt genau diese fünf Farben. Gibt der Gestalter ein Icon oder Farben vor, werden sie dort eingetragen und das Icon pixelgenau übernommen (die 🪙-Münze der Emoji-Schrift ist sein 12×12-Sprite).
+
+* **Titelbild und Login-Kulisse sind vorgebackene Pixelart** (Raster 3 px, Bayer-Mischdither, Palette): `public/title.png`, `electron/assets/title.png` und `data/animated_screen/layers2/*.png` sind Ergebnisse von `python3 scripts/title-pixel/bake.py` — **nie von Hand ändern, zur Laufzeit wird nichts pixelisiert**. Die Originale liegen unter `scripts/title-pixel/originals/` (nicht ausgeliefert; das Skript liest nur von dort). Neue Grafik: Original dort ersetzen und neu backen.
+* Nach **jeder Änderung an `data/palette.json`** (oder an Originalen/Skript) neu backen: `python3 scripts/title-pixel/bake.py` (wenige Sekunden); `npm test` schlägt sonst fehl (`test/title-pixel.test.js`, Stand-Hash in `scripts/title-pixel/stand.json`). Gebackene Bilder nie mit Glättung zeichnen (`image-rendering: pixelated`, `imageSmoothingEnabled = false`).
 
 ## Offene Baustellen (für andere Instanzen; erledigte Einträge löschen)
 

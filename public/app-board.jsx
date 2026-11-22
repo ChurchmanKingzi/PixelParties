@@ -161,6 +161,10 @@ window._boardTooltipLock = (an) => { _boardTooltipLocked = !!an; };
 // den Fehler nicht behoben und den Tooltip spuerbar klebrig gemacht —
 // auf Als Wunsch zurueckgebaut. Siehe die Notiz bei `StatusBadges` in
 // app-shared.jsx.
+// Handy-Befund (Eye of Ren): „Cancel (Esc)" — auf Touch-Geräten (grober Zeiger) gibt es keine Esc-Taste, dort steht nur „Cancel". Beide Texte stehen im Wörterbuch (data/i18n/*-ui.json).
+function ppCancelEsc() {
+  try { return window.matchMedia('(pointer: coarse)').matches ? 'Cancel' : 'Cancel (Esc)'; } catch (e) { return 'Cancel (Esc)'; }
+}
 function setBoardTooltip(card) {
   if (card && card.name) window._boardTooltipLast = card;
   // When locked (prompt card hovered), ignore external clears
@@ -412,8 +416,10 @@ function ZaehlZahl({ wert }) {
 }
 window.ZaehlZahl = ZaehlZahl;
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, tooltipDarunter, tooltipDarunterTitel, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, rarity: rarityProp, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
+  // Rarity der Karteninstanz (Prop vor card.rarity; Test-Schalter ?rarity=… vor beidem). Auf dem Brett und in der Hand nur als Standbild (CardFoil, FoilBrettContext).
+  const rar = faceDown ? 'common' : ppRarityOf(card, rarityProp);
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
   // die gedruckten Zahlen bleiben weg (Als Vorgabe 12.10.): sonst schimmern sie
@@ -430,7 +436,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Ability auf dem Brett (Als Vorgabe 13.10.): die Box der aktuellen Stufe (1–3) ist hervorgehoben, die anderen beiden sind grau.
   // Der Renderer wendet das nur auf Faehigkeitskarten mit drei Stufen an; bei allen anderen Karten bleibt es ohne Wirkung.
   if (abilityLevel != null) bildParams.push('stufe=' + abilityLevel);
-  const boardImgUrl = imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl;
+  const boardImgUrl = ppRarityUrl(imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl, rar);
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
@@ -454,7 +460,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     ? CARDS_BY_NAME[cardName]
     : card;
   // Gewählter Skin gilt auch im Hover-Tooltip (CardTooltipContent liest `_skinUrl`).
-  const tooltipBase0 = tooltipCardOverride || tooltipCardData;
+  const tooltipBase00 = tooltipCardOverride || tooltipCardData;
+  const tooltipBase0 = tooltipBase00 && rar !== 'common' && tooltipBase00.rarity !== rar ? { ...tooltipBase00, rarity: rar } : tooltipBase00;   // der Tooltip zeigt dieselbe Rarity (animiert)
   const tooltipBase = (tooltipBase0 && !faceDown && skins && skins[cardName] && imgUrl) ? { ...tooltipBase0, _skinUrl: imgUrl } : tooltipBase0;
   const tooltipTarget0 = (() => {
     if (!tooltipBase) return null;
@@ -499,14 +506,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // Zweite Karte unter dem Tooltip (verwandelte Hulijing: oben die Kreatur, darunter der Held — `tooltipDarunter` = Kartendaten samt Live-Werten).
   const tooltipTarget = (tooltipTarget0 && tooltipDarunter) ? { ...tooltipTarget0, _darunterKarte: tooltipDarunter, _darunterTitel: tooltipDarunterTitel } : tooltipTarget0;
 
-  // Foil support — Bänder, Schimmer und Funken kommen komplett aus
-  // `CardFoil` (app-shared, v1203). Hier bleibt nur die Randklasse, die
-  // am Kartenrahmen selbst haengt.
-  const foilType = card?.foil || null;
-  const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
-
+  // Rarity-Effekt (Standbild) und Skin-Holo kommen komplett aus `CardFoil` (app-shared).
   return (
-    <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
+    <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '')}
       style={style}
       ref={(el) => { if (el) el._ppTip = (noTooltip || (faceDown && !revealTooltipWhenFaceDown)) ? null : tooltipTarget; }}   // fuer ppHandTipp (Tipp auf Handkarten)
       onMouseEnter={() => !noTooltip && (revealTooltipWhenFaceDown || !faceDown) && tooltipTarget && setBoardTooltip(tooltipTarget)}
@@ -520,7 +522,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
+      <CardFoil card={card} rarity={rar} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null}
         werte={(ohneGedruckt.length || handLevel != null || handCost != null) ? {
           noHp: ohneGedruckt.includes('hp') || undefined, noAtk: ohneGedruckt.includes('atk') || undefined,
           lv: handLevel != null ? handLevel : undefined, kost: handCost != null ? handCost : undefined } : null} />
@@ -584,8 +586,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack, rarities, stapelN }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
+  // ★ Trailer-Look (app-fx-67.jsx): Deck, Potion-Deck und Ablage mit sichtbarer Dicke (Kanten unter der Karte) und Zähler-Pop der Ablage. `stapelN` = Kartenzahl (Deck/Potion-Deck; Ablage: aus `cards`).
+  const K67 = (type === 'deck' || type === 'potion' || type === 'discard') ? window.PpStapelKanten : null;
+  const kantenN = !K67 ? 0 : (stapelN != null ? stapelN : (type === 'discard' ? (cards ? cards.length : 0) : 0));
+  const kantenStil = kantenN > 0 && !window.__ppFx67KantenAus && !window.__ppFx67Aus && !window.PP_RETRO ? { ...(style || {}), overflow: 'visible' } : style;   // die Kanten ragen in die Lücke unter der Zone
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   // For discard/deleted zones, the top card's effective level is the
@@ -622,17 +628,20 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
     const e = pileIdentities[(cards || []).length - 1];
     return (e && e.name === topCardName && e.identity) ? e.identity : null;
   })();
-  const hoverPayload = topCardName == null ? null : ((topLevelInfo || topIdentity)
+  // Rarity der obersten Karte (Server: players[i].rarity.discardPile/deletedPile) — der Hover-Tooltip zeigt sie animiert.
+  const topRarity = topCardName != null && rarities ? (rarities[(cards || []).length - 1] || undefined) : undefined;
+  const hoverPayload = topCardName == null ? null : ((topLevelInfo || topIdentity || topRarity)
     ? {
       name: topCardName,
       effectiveLevel: topLevelInfo?.effectiveLevel,
       stampBonus: topLevelInfo?.stampBonus,
       identity: topIdentity || undefined,
+      rarity: topIdentity ? undefined : topRarity,
     }
     : topCardName);
   return (
     <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
-      style={style}
+      style={kantenStil}
       {...(dataAttrs || {})}
       onClick={onClick && cards?.length > 0 ? onClick : undefined}
       onMouseEnter={() => hoverPayload && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(hoverPayload)}
@@ -654,16 +663,19 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
         renderStack ? renderStack(cards) : (
         cards.length === 1 ? (
           <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip}
+            rarity={(rarities && rarities[0]) || undefined}
             effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
         ) : (
           <div className="board-stack">
             <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip}
+              rarity={(rarities && rarities[cards.length - 1]) || undefined}
               effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
           </div>
         ))
       ) : children || (
         <div className="board-zone-empty">{label || ''}</div>
       )}
+      {kantenN > 0 ? <K67 n={kantenN} art={type} /> : null}
     </div>
   );
 }
@@ -769,13 +781,16 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      // ★ Trailer-Look (app-fx-67.jsx): aufrechte Pixelziffern statt Textschrift; läuft sie, zeichnet diese Komponente nichts.
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Matches the CreatureDamageNumber and HealNumber forms.
@@ -796,13 +811,15 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Heal-for-0 (full-HP target, or Nao's overheal blocked because the
   // target is already > maxHp) → plain "0", no plus sign. Mirrors the
   // CreatureDamageNumber's "0 damage absorbed" rendering.
@@ -826,13 +843,17 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot, pixel }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      if (!pixel) {   // ★ Trailer-Look (app-fx-67.jsx); die grüne Steam-Zahl (`pixel`) bleibt wie sie ist
+        const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'heilung' });
+        if (px67) { setPos({ pixel67: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
+      }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel67) return null;
   const label = amount > 0 ? `+${amount}` : '0';
   // `pixel` = gruene Pixel-Zahl der Steam Dwarfs (Steam Engine, +10 HP je Karte).
   return (
@@ -850,13 +871,15 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
     if (el) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      const px67 = window.ppFx67Zahl && window.ppFx67Zahl({ el, amount, art: 'schaden' });   // ★ Trailer-Look (app-fx-67.jsx), siehe DamageNumber
+      if (px67) { setPos({ pixel: true }); return () => { try { px67.stopp(); } catch (e) { /* weg */ } }; }
       const r = el.getBoundingClientRect();
       const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
       setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
-  if (!pos) return null;
+  if (!pos || pos.pixel) return null;
   // Damage absorbed to 0 → render the bare "0" (no minus sign), so
   // the player sees that the hit was absorbed rather than blocked
   // entirely. Anything > 0 keeps the standard `-N` form.
@@ -994,7 +1017,7 @@ function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
 }
 
 // Floating card that animates from deck position to hand slot position
-function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
+function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed, rarity }) {
   const [endPos, setEndPos] = useState(null);
   const flugRef = useRef(null);
   // Pixelart-Schweif + Abheb-Funken (app-fx-49): eine Leinwand von der Stapelmitte bis zur Mitte des Handplatzes, sobald die Karte fliegt.
@@ -1044,7 +1067,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   return (
     <div ref={flugRef} className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
       style={{ left, top, '--dx': dx, '--dy': dy, '--fan-rot': endPos.rot || '0deg' }}>
-      <BoardCard cardName={cardName} />
+      <BoardCard cardName={cardName} rarity={rarity} />
     </div>
   );
 }
@@ -1552,7 +1575,7 @@ function ppJetzt() {
   return (typeof performance !== 'undefined' ? performance.now() : Date.now());
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand, startW, startH, endW }) {
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand, startW, startH, endW, rarity, owner }) {
   // ★ v1331: Brettquellen bringen ihr Bildschirmmass mit (`startW/H`, aus
   // `kartenMassAmBildschirm`) und das des Zielstapels (`endW`). Die Karte
   // startet dann exakt so gross wie auf dem Brett und endet in
@@ -1603,7 +1626,11 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
       '— verstrichen', Math.round(verstrichen), 'ms, Versatz', Math.round(versatz), 'ms');
   }
   const card = CARDS_BY_NAME[cardName];
-  const imgUrl = card ? cardImageUrl(card.name) : null;
+  // Rarity der fliegenden Karte: vom Eintrag, sonst aus dem zuletzt bekannten Zustand — einmal festgehalten (der Flug darf nicht umspringen).
+  const rarRef = useRef(null);
+  if (rarRef.current === null) rarRef.current = ppRarityOf(card, rarity || ppRarityLookup(cardName, owner));
+  const rarF = rarRef.current;
+  const imgUrl = card ? ppRarityUrl(cardImageUrl(card.name), rarF) : null;
   const isDeleted = dest === 'deleted';
   const isDeckReturn = dest === 'deck';
   // `delay` (ms) staggers a simultaneous multi-card batch. The flight
@@ -1627,6 +1654,7 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
         : <div className="board-card-text">{cardName || '?'}</div>}
+        {imgUrl && rarF !== 'common' && <RarityLayer card={card} rarity={rarF} animated={false} />}
       </div>
       {isDeleted && <div className="delete-energy-overlay" />}
     </div>
@@ -2160,11 +2188,15 @@ function _ppTzFahre(bc, nach) {
   // Teilbaum seinen Stil neu berechnen (jede Stufe ~60 ms bei 6× Drosselung), ein Inline-`transform` fasst nur die beiden Ebenen an.
   const ruhe = (v) => {
     for (const e of ebenen()) { e.style.transform = ''; e.style.transition = ''; }
-    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(3));
+    bc.style.setProperty('--tz-x', v.x.toFixed(1) + 'px'); bc.style.setProperty('--tz-y', v.y.toFixed(1) + 'px'); bc.style.setProperty('--tz-s', v.s.toFixed(4));
     window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
+    if (window.ppTbDimmerZelle) window.ppTbDimmerZelle();
   };
   const stufe = (v) => {
-    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(3)})`;
+    // Pixelart: auch die Zwischenbilder der Fahrt liegen auf den Zoomstufen (Hero-Pixel × Zoom = ganze Bildschirmpixel, s. ppTutorialZoom) und auf ganzen Verschiebungen — kein stufenloses Skalieren
+    const h0 = window._ppTzH0;
+    if (h0 > 0) v = { x: Math.round(v.x), y: Math.round(v.y), s: Math.max(1, Math.round(v.s * h0) / h0) };
+    const t = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.s.toFixed(4)})`;
     for (const e of ebenen()) e.style.transform = t;
     window._ppTzAnz = { x: v.x, y: v.y, s: v.s };
   };
@@ -2199,9 +2231,48 @@ function ppTutorialZoomAus() {
     if (!bc || !bc.classList.contains('tut-zoom') || !window._ppTz) return null;
     window._ppTz = null;
     _ppTzFahre(bc, { x: 0, y: 0, s: 1 });
-    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) bc.classList.remove('tut-zoom'); fertig(); }, 560));
+    return new Promise((fertig) => setTimeout(() => { if (!window._ppTz) { bc.classList.remove('tut-zoom'); window._ppTzH0 = 0; if (window.ppTbDimmerZelle) window.ppTbDimmerZelle(); } fertig(); }, 560));
   } catch { return null; }
 }
+// Hero-Pixel (CSS-px, Kommazahl) der Brettreihe der Ziele OHNE Zoom. Gemessen wird nur im unzoomten Zustand (je Fenstergröße/Brettskala gemerkt, beide Reihen); steht der Zoom schon, gilt der gemerkte
+// Wert — fehlt er, wird der Messwert durch den laufenden Zoom geteilt (nur im Ruhezustand verlässlich). 0 = unbekannt (dann Rückfall auf 0,05er-Stufen).
+function _ppTzH0Messen(liste, py, cur) {
+  try {
+    if (typeof ppFxHeldPixel !== 'function') return 0;
+    const sig = window.innerWidth + 'x' + window.innerHeight + '|' + (document.documentElement.style.getPropertyValue('--board-scale') || '');
+    const zoomt = !!document.querySelector('.board-center.tut-zoom') && window._ppTz;
+    let c = window._ppTzH0Cache;
+    if (!c || c.sig !== sig) c = window._ppTzH0Cache = { sig, me: 0, opp: 0 };
+    if (!zoomt) {
+      const H = window.innerHeight;
+      const m = ppFxHeldPixel({ x: window.innerWidth / 2, y: H * 0.75 }).px, o = ppFxHeldPixel({ x: window.innerWidth / 2, y: H * 0.25 }).px;
+      if (m > 0) c.me = m; if (o > 0) c.opp = o;
+    }
+    const reihe = py < window.innerHeight * 0.5 ? 'opp' : 'me';
+    let h0 = c[reihe] || c.me || c.opp;
+    if (!(h0 > 0) && zoomt && !window._ppTzRaf && cur && cur.s > 0) { const p = ppFxHeldPixel(liste[0]).px; if (p > 0) h0 = p / cur.s; }
+    return h0 > 0 ? h0 : 0;
+  } catch (e) { return 0; }
+}
+// Textbox-Dimmer (Dither-Raster über dem Brett): Zelle = Hero-Pixel des Bretts, im Tutorial-Zoom = das gezoomte Hero-Pixel (k ganze Pixel). Außerhalb des Bretts (Menü) und im Retro-Modus bleibt es bei 2 px.
+// Setzt `--tb-dz` am Overlay (style.css `.textbox-overlay`) und gibt die Zelle zurück; die Textbox ruft es beim Rendern, der Zoom nach jeder Fahrt.
+function ppTbDimmerZelle() {
+  let z = 2;
+  try {
+    if (!window.PP_RETRO) {
+      const pa = window.PPPixelAnim;
+      if (pa && pa.KONFIG && pa.KONFIG.aktiv && document.querySelector('.board-center')) {
+        z = pa.standardRaster();
+        if (window._ppTz && window._ppTzH0 > 0 && document.querySelector('.board-center.tut-zoom')) z = Math.round(window._ppTzH0 * window._ppTz.s);
+      }
+    }
+    z = Math.max(2, Math.min(8, Math.round(z) || 2));
+    const ov = document.querySelector('.textbox-overlay');
+    if (ov && ov.style.getPropertyValue('--tb-dz') !== z + 'px') ov.style.setProperty('--tb-dz', z + 'px');
+  } catch (e) { /* bleibt bei 2 px */ }
+  return z;
+}
+window.ppTbDimmerZelle = ppTbDimmerZelle;
 function ppTutorialZoom(elemente) {
   try {
     if (window.ppIsPhone && window.ppIsPhone()) return null;
@@ -2233,9 +2304,20 @@ function ppTutorialZoom(elemente) {
     if (tb) { const q = tb.getBoundingClientRect(); if (q.height > 0 && q.top + q.height / 2 < window.innerHeight / 2) oben = Math.max(oben, q.bottom + 8); }
     const Aw = bcr.width, Ah = Math.max(80, unten - oben);
     const bw = (br - bl) + 28, bh = (bb - bt) + 28;
-    let s = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
-    if (!(s >= 1.12)) return ppTutorialZoomAus();
-    s = Math.round(s * 20) / 20;
+    const sFit = Math.min((Aw * 0.8) / bw, (Ah * 0.8) / bh, 2);
+    if (!(sFit >= 1.12)) return ppTutorialZoomAus();
+    // ★ PIXELART-ZOOM (Tutorial-Befund „Zoom nicht ganzzahlig, Raster gröber als die Heldenpixel"): Die Zoomstufen sind nicht mehr stufenlos (vorher in 0,05er-Schritten, 1,15–2,0), sondern
+    // s = k / h0 mit ganzem k — h0 = Hero-Pixel der Reihe im Brett OHNE Zoom (CSS-px). Dann ist das Hero-Pixel im Zoom exakt k ganze Bildschirmpixel (jedes Sprite-Pixel gleich breit, die
+    // Rasterzelle der Effekte S·s und der Textbox-Dimmer `ppTbDimmerZelle` ebenso ganzzahlig). 1080p (h0 ≈ 3): 1,33 · 1,67 · 2,0; 720p (h0 ≈ 2): 1,5 · 2,0. Gewählt wird die größte Stufe, die in die freie Fläche passt.
+    const h0 = _ppTzH0Messen(liste, (bt + bb) / 2, cur);
+    let s = sFit, kz = 0;
+    if (h0 > 0) {
+      const kmin = Math.ceil(1.12 * h0 - 1e-6), kmax = Math.floor(2 * h0 + 1e-6);
+      for (let k = kmin; k <= kmax; k++) if (k / h0 <= sFit + 1e-6) kz = k;
+      if (!kz && kmin / h0 <= sFit * 1.1) kz = kmin;               // knapp unter der kleinsten Stufe: sie noch nehmen
+      if (!kz) return ppTutorialZoomAus();
+      s = kz / h0;
+    } else s = Math.round(sFit * 20) / 20;
     const Cx = bcr.left + Aw / 2, Cy = oben + Ah / 2, px = (bl + br) / 2, py = (bt + bb) / 2;
     let tx = Cx - O.x - s * (px - O.x), ty = Cy - O.y - s * (py - O.y);
     // das gezoomte Brett soll den Kasten weiter ausfuellen (keine leeren Raender): Kanten begrenzen
@@ -2243,8 +2325,11 @@ function ppTutorialZoom(elemente) {
     const klemme = (v, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
     tx = klemme(tx, bcr.right - O.x - s * W, bcr.left - O.x);
     ty = klemme(ty, bcr.bottom - O.y - s * H, bcr.top - O.y);
+    tx = Math.round(tx); ty = Math.round(ty);                         // ganze Bildschirmpixel: das Raster der Figuren/Sprites verschiebt sich nicht um Bruchteile
     if (Math.abs(tx - cur.x) < 2 && Math.abs(ty - cur.y) < 2 && Math.abs(s - cur.s) < 0.02) return null;
     window._ppTz = { x: tx, y: ty, s };
+    window._ppTzH0 = h0 > 0 ? h0 : 0;
+    if (window.ppTbDimmerZelle) window.ppTbDimmerZelle();
     bc.classList.add('tut-zoom');
     _ppTzFahre(bc, { x: tx, y: ty, s });
     return new Promise((fertig) => setTimeout(fertig, 580));
@@ -2754,6 +2839,8 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     // preventDefault: der Browser behaelt den Wisch fuers native
     // Scrollen. Maus-Drag am Desktop war nie betroffen.
     if (e.touches && _ppPanelHatScrollbaresKind(panelRef.current)) return;
+    // ★ X2: Mausdruck auf der Bildlaufleiste eines Scrollbereichs im Fenster (Text, Antwortliste, Innenschicht): die Leiste ziehen, nicht das Fenster.
+    { const t = e.target; if (!e.touches && t && t.nodeType === 1 && t.scrollHeight > t.clientHeight + 1 && e.nativeEvent && e.nativeEvent.offsetX > t.clientWidth && /(auto|scroll)/.test(getComputedStyle(t).overflowY)) return; }
     // Don't start a drag when the pointer-down lands on an interactive
     // form control. `preventDefault()` below would otherwise swallow the
     // native mousedown that opens a <select> dropdown, focuses an <input>,
@@ -2784,11 +2871,24 @@ function DraggablePanel({ children, className, style, zielwahl }) {
     ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
     : (zielwahl && autoPos ? { left: autoPos.x, top: autoPos.y } : {});
   const lueckeStyle = (zielwahl && autoPos) ? { '--zielwahl-luecke': autoPos.luecke + 'px' } : {};
+  // ★ Handy-Befund X2 (Duell-Dialoge höher als der Bildschirm): Jedes Duell-Fenster der Familie `.first-choice-panel` bekommt eine INNENSCHICHT (`.fcp-inhalt`), die höchstens bis
+  // zur Bildschirmhöhe wächst und darüber innen scrollt (CSS bei `.fcp-hat-inhalt`). Der Rahmen mit Eck-Ornamenten (`::after`) bleibt am Außenelement und scrollt nicht mit.
+  // Ausgenommen: die Zielwahl-Fenster (`zielwahl`; ihre Lage, die randbündige Kartenvorschau und die Griffe hängen an der Außenform) und die Fenster mit eigener Aufteilung
+  // (`fcp-begrenzt`: Auswahl/Ja-Nein/Spieler-/Statuswahl scrollen Text und Antwortliste getrennt, Titel und Knöpfe bleiben stehen). Die Zeilen-Aufteilung, die ein Aufrufer am
+  // Fenster setzt (`display: flex; gap; alignItems` …), gehört an die Innenschicht, alles andere bleibt am Außenelement.
+  const fcpInnen = !zielwahl && /(^|\s)first-choice-panel(\s|$)/.test(className || '') && !/(^|\s)fcp-begrenzt(\s|$)/.test(className || '');
+  let aussenStil = style, innenStil;
+  if (fcpInnen && style) {
+    aussenStil = { ...style }; innenStil = {};
+    for (const k of ['display', 'flexDirection', 'flexWrap', 'gap', 'rowGap', 'columnGap', 'alignItems', 'alignContent', 'justifyContent']) {
+      if (k in aussenStil) { innenStil[k] = aussenStil[k]; delete aussenStil[k]; }
+    }
+  }
   return (
-    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '')} style={{ ...style, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
+    <div ref={panelRef} className={className + (zielwahl ? ' panel-zielwahl' : '') + (fcpInnen ? ' fcp-hat-inhalt' : '')} style={{ ...aussenStil, ...lueckeStyle, ...posStyle, ...(bereit ? null : { visibility: 'hidden' }), cursor: dragging ? 'grabbing' : 'grab' }}
       data-zieht={dragging ? '1' : undefined}
       onMouseDown={onDown} onTouchStart={phoneP ? undefined : onDown} onClick={e => e.stopPropagation()}>
-      {children}
+      {fcpInnen ? <div className="fcp-inhalt" style={innenStil}>{children}</div> : children}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-l" />}
       {zielwahl && <div className="panel-zielwahl-griff panel-zielwahl-griff-r" />}
     </div>
@@ -2858,6 +2958,92 @@ const HeroIdleAnims = (() => {
         });
     }
     return listeLaedt;
+  }
+  // ── Creature-Figuren (`data/creature-animations`, `/api/creature-animations`) ──
+  // Dieselbe Maschine wie die Helden (Laden, Takt, Sprite-Ebene, Malen); eigene Liste, Schlüssel im Zwischenspeicher mit Vorsatz `c:` (ein Held und eine
+  // Creature dürfen denselben Slug tragen). Die Liste ist nach dem Slug des KARTENNAMENS geordnet (Server). Sonderfall `kopiert` (Clone): kein Sheet,
+  // das Brett zeigt die Figur des Heroes der Spalte (`kopiertHeld`).
+  let kListe = null, kListeLaedt = null;
+  function ladeKreaturListe() {
+    if (!kListeLaedt) {
+      kListeLaedt = fetch('/api/creature-animations', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { kListe = (d && d.animations) || {}; return kListe; })
+        .catch(() => { kListeLaedt = null; return {}; });
+    }
+    return kListeLaedt;
+  }
+  const kKey = (name) => 'c:' + slug(name);
+  // ★ Vorladen zu Spielbeginn (Als Vorgabe 14.11.: „für alle Creatures in allen Decks"): Der Client kennt das Deck des Gegners nicht und soll es auch nicht erfahren — eine
+  // Liste „Creatures dieser Partie" vom Server verriete es (eigene Karten abziehen = Deck des Gegners). Deshalb lädt JEDER Client ALLE Creature-Sheets (zusammen ~3 MB PNG,
+  // lange zwischengespeichert), in zwei Stufen: `zuerst` (was der eigene Spielstand nennt: Brett, Hand, eigene Stapel) sofort, der Rest einzeln im Leerlauf
+  // (`requestIdleCallback`, ein Sheet je Leerlauf-Scheibe: Bild holen, dekodieren, Umriss messen). Danach steht jede Figur im selben Bild wie ihre Karte.
+  // Einmal je Seitenaufbau (der Zwischenspeicher `fertig` bleibt über Partien erhalten). Auf dem Handy und bei abgeschalteten Creature-Figuren wird das nie aufgerufen.
+  let vorladenLaeuft = false;
+  function kreaturenVorladen(zuerst) {
+    return ladeKreaturListe().then((l) => {
+      for (const n of (zuerst || [])) { const k = slug(n); if (l[k] && l[k].sheetUrl) hole('c:' + k); }
+      if (vorladenLaeuft) return;
+      vorladenLaeuft = true;
+      const rest = Object.keys(l).filter(k => l[k] && l[k].sheetUrl);
+      let i = 0;
+      const leerlauf = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 30));
+      const weiter = () => {
+        while (i < rest.length && eintraege.has('c:' + rest[i])) i++;
+        if (i >= rest.length) return;
+        hole('c:' + rest[i++]).then(() => leerlauf(weiter), () => leerlauf(weiter));
+      };
+      leerlauf(weiter);
+    });
+  }
+  // Platzierung der Creature-Sheets in die Felder übersetzen, die `HeroIdleSprite` kennt: Standlinie = Unterkante der RUHEFIGUR (`frameHeight − padBottom`),
+  // mit `kern {x,y,w,h}` (Frame enthält Sprung-/Flugraum) Unterkante und Mitte des Ruhe-Körpers. Ausdrückliche `anchorX`/`footY` im Sheet gewinnen.
+  function kreaturMeta(m) {
+    const zahl = (v) => typeof v === 'number' && Number.isFinite(v);
+    const aus = { ...m };
+    const k = m.kern && zahl(m.kern.x) && zahl(m.kern.y) && m.kern.w > 0 && m.kern.h > 0 ? m.kern : null;
+    if (!zahl(aus.footY)) aus.footY = k ? k.y + k.h : m.frameHeight - (zahl(m.padBottom) ? m.padBottom : 0);
+    if (!zahl(aus.anchorX) && k) aus.anchorX = k.x + k.w / 2;
+    // ★ Obergrenze (Als Vorgabe 14.11.: „Zu große Creatures müssen herunterskaliert werden"): die RUHEFIGUR (`kern`, sonst Frame minus Leerrand) ist auf dem Brett höchstens
+    // KREATUR_MAX_B × KREATUR_MAX_H Hero-Pixel groß (64 × 68 = gut 2,6 Zonenbreiten × 2 Zonenhöhen — die Größe der großen Heldenfiguren: Nero Zira 92 × 76, Medea 96 × 73,
+    // Flamebathed Waflav 86 × 56; Median der Helden 24 × 28). Größere Figuren bekommen den größten Faktor aus KREATUR_STUFEN, mit dem sie hineinpassen (saubere Verhältnisse,
+    // gleichmäßig, `image-rendering: pixelated` — ihr Sprite-Pixel ist dann bewusst kleiner als der Hero-Pixel); kleiner als 2/5 wird nicht verkleinert (darunter fiele ein
+    // Sprite-Pixel bei 100 % Anzeige unter einen Bildschirmpixel und würde weich). Derselbe Hebel wie `boardScale` bei den Helden; ein ausdrückliches `boardScale` im Sheet gewinnt.
+    if (!(Number(aus.boardScale) > 0)) {
+      const b = k ? k.w : m.frameWidth - (m.padLeft || 0) - (m.padRight || 0), h = k ? k.h : m.frameHeight - (m.padTop || 0) - (m.padBottom || 0);
+      const stufe = KREATUR_STUFEN.find(f => b * f <= KREATUR_MAX_B && h * f <= KREATUR_MAX_H) || KREATUR_STUFEN[KREATUR_STUFEN.length - 1];
+      // ★ 16.11. (Als Vorgabe: „die Creatures können ruhig etwas kleiner dargestellt sein"): ALLE Creature-Figuren stehen im Creature-Maßstab KREATUR_MASS (3/4 des
+      // Hero-Maßstabs), die Stufe der zu großen kommt obendrauf (Faktoren multipliziert). Untergrenze KREATUR_MIN = 2/5 des Hero-Maßstabs: darunter fiele ein Sprite-Pixel
+      // am Desktop (Brettskala ≈ 0,97, hintere Reihe ≈ 0,91) unter einen Bildschirmpixel und würde weich — das trifft die Stufen 1/2 und 2/5 (Cybug ANTS, The Spawn Mother,
+      // Demon's Gate), die bei 2/5 stehen bleiben.
+      aus.boardScale = Math.max(KREATUR_MIN, kreaturMass() * stufe);
+    }
+    return aus;
+  }
+  const KREATUR_MAX_B = 64, KREATUR_MAX_H = 68, KREATUR_STUFEN = [1, 3 / 4, 2 / 3, 3 / 5, 1 / 2, 2 / 5];
+  // Creature-Maßstab: Anteil des Hero-Maßstabs (2,8125 Kartenpixel je Sprite-Pixel) — DIE Stellschraube für die Größe aller Creature-Figuren (auch Clone, der die Heldenfigur
+  // seiner Spalte in diesem Maßstab zeigt). `window.__ppKreaturMass` (vor dem Laden der Sheets gesetzt) überschreibt sie nur für Vergleichsaufnahmen.
+  const KREATUR_MASS = 3 / 4, KREATUR_MIN = 2 / 5;
+  function kreaturMass() { const t = typeof window !== 'undefined' ? Number(window.__ppKreaturMass) : 0; return t > 0 ? t : KREATUR_MASS; }
+  // `deckkraft` < 1 (Yuki-Onna, Lunatic Golem): die Figur scheint durch — per Bayer-Raster in Sprite-Pixeln ausgedünnt (jeder Pixel bleibt voll deckend
+  // oder fällt weg), nie per Alpha. Raster in FRAME-Koordinaten, damit es auf jedem Bild gleich liegt. Einmal beim Laden.
+  function ausduennen(meta, img) {
+    const f = Number(meta.deckkraft);
+    if (!(f > 0) || f >= 1) return img;
+    try {
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, fw = meta.frameWidth, fh = meta.frameHeight, vertikal = meta.layout === 'vertical';
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const bild = ctx.getImageData(0, 0, w, h), d = bild.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4 + 3;
+        if (d[i] && (BAYER[(vertikal ? y % fh : y) & 3][(vertikal ? x : x % fw) & 3] + 0.5) / 16 >= f) d[i] = 0;
+      }
+      ctx.putImageData(bild, 0, 0);
+      return c;
+    } catch { return img; }
   }
 
   // Umriss der DECKENDEN Figur über alle Frames (Alpha ≥ 160), in
@@ -2943,6 +3129,18 @@ const HeroIdleAnims = (() => {
       kopfX1 = kopfX1 ? Math.min(kopfX1, Math.round(kopfMitte + (x1 - x0) * 0.4)) : Math.round(kopfMitte + (x1 - x0) * 0.2);
       let punkte = [];
       const schwelle = Math.max(1, Math.round(frames * 0.6));
+      // ★ Stun-Sterne (app-fx-64): Oberkante des KOPFES = erste Zeile über der Gesichtsspalte (± Kopfbreite), die in mindestens der Hälfte der Bilder mindestens max(3, 18 % der Spaltenbreite) deckende Pixel hat.
+      // `y0` allein taugt nicht (ein einzelner Pixel setzt es zu hoch: Bubbles y0 = 3, Kopf erst bei ≈ 25; dünne Stangen/Fahnen bei den Idej-Helden), eine Mindestbreite und Bildanteil schließen sie aus; bei Sheets mit
+      // `alphaScale` (Medea: Gas über dem Kopf) zählen nur fast volle Pixel (≥ 250), sonst läge die Oberkante im Gas.
+      let obenKopf = y0;
+      { const hw = Math.max(4, Math.min(14, kopfX1 - kopfMitte)), xa = Math.max(0, kopfMitte - hw), xb = Math.min(fw - 1, kopfMitte + hw), nMin = Math.max(3, Math.round(0.18 * (xb - xa + 1)));
+        const aS = Number(meta.alphaScale), aSchw = aS > 0 && aS < 1 ? 250 : 160, bildMin = Math.ceil(frames * 0.5), zeilen = new Uint16Array(fh);
+        for (let fi = 0; fi < frames; fi++) for (let ly = y0; ly < y1; ly++) {
+          let n = 0;
+          for (let lx = xa; lx <= xb; lx++) { const px = vertikal ? lx : fi * fw + lx, py = vertikal ? fi * fh + ly : ly; if (px < w && py < h && d[(py * w + px) * 4 + 3] >= aSchw) n++; }
+          if (n >= nMin) zeilen[ly]++;
+        }
+        for (let ly = y0; ly < y1; ly++) if (zeilen[ly] >= bildMin) { obenKopf = ly; break; } }
       for (let i = 0; i < zaehler.length; i++) if (zaehler[i] >= schwelle) punkte.push([i % fw, Math.floor(i / fw)]);
       let saat = (fw * 2654435761) ^ (fh * 40503);
       for (let i = punkte.length - 1; i > 0; i--) {
@@ -2951,7 +3149,7 @@ const HeroIdleAnims = (() => {
         const t = punkte[i]; punkte[i] = punkte[j]; punkte[j] = t;
       }
       punkte = punkte.slice(0, 400);
-      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte };
+      return { x0, y0, x1, y1, kopfX: n ? summe / n : (x0 + x1) / 2, kopfX1, kopfY: gesichtY, punkte, oben: obenKopf };
     } catch { return rueckfall; }
   }
 
@@ -2983,15 +3181,17 @@ const HeroIdleAnims = (() => {
   function hole(key) {
     if (!key) return Promise.resolve(null);
     if (eintraege.has(key)) return eintraege.get(key);
-    const p = ladeListe().then(l => {
-      const meta = l[key];
-      if (!meta) { if (liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+    const istKreatur = key.indexOf('c:') === 0;
+    const p = (istKreatur ? ladeKreaturListe() : ladeListe()).then(l => {
+      const roh = istKreatur ? l[key.slice(2)] : l[key];
+      if (!roh || !roh.sheetUrl) { if (istKreatur ? kListe : liste) fertig.set(key, null); else eintraege.delete(key); return null; }
+      const meta = istKreatur ? kreaturMeta(roh) : roh;
       return new Promise(res => {
         const img = new Image();
         img.onload = () => {
           // Geometrie aus dem ORIGINAL, damit `alphaScale` nichts verschiebt
           const kern = kernRahmen(meta, img);
-          const e = { meta, img: halbtransparenzSkalieren(meta, img), kern };
+          const e = { meta, img: istKreatur ? ausduennen(meta, img) : halbtransparenzSkalieren(meta, img), kern };
           fertig.set(key, e); res(e);
         };
         img.onerror = () => { fertig.set(key, null); res(null); };
@@ -3062,7 +3262,7 @@ const HeroIdleAnims = (() => {
   if (typeof window !== 'undefined') {
     window.ppHeldenAnimationen = () => {
       const zeilen = [...diagnose.values()].map(d => ({
-        Held: d.held,
+        Held: d.held, Art: d.art || 'Held',
         Frame: `${d.st.frame + 1}/${d.frames}`,
         Schritte: d.st.schritte,
         angehalten: !!d.zustand.current.angehalten,
@@ -3136,14 +3336,25 @@ const HeroIdleAnims = (() => {
     const cs = getComputedStyle(plane);
     const t = cs.transform || 'none', o = cs.transformOrigin;
     const clip = plane.parentElement;
-    const huellenBox = huelle && clip ? `${clip.offsetLeft}|${clip.offsetTop}|${clip.offsetWidth}|${clip.offsetHeight}` : '';
+    // ★ 14.11. (Als Vorgabe: „Figuren sollen NICHT am oberen Brettrand abgeschnitten werden"): Abgeschnitten hat `overflow: hidden` von `.board-center` und `.game-board` —
+    // die Figuren der hinteren gegnerischen Reihe ragen über die Brettoberkante. Im Normalfall (Desktop, kein Scrollmodus, kein Tutorial-Zoom; style.css `.hero-sprite-huelle`)
+    // ist die Hülle deshalb `position: fixed`: sie verlässt den Zuschnitt ihrer Vorfahren und wird hier in FENSTER-Koordinaten auf die Box des Clips gelegt (Box von
+    // `.board-center` im Fenster + Lage des Clips darin; ohne die Transformation des Clips selbst). Seiten und Unterkante schneidet sie selbst (`clip-path`), nur oben ist sie offen.
+    const fest = !!huelle && !!clip && getComputedStyle(huelle).position === 'fixed';
+    let hx = clip ? clip.offsetLeft : 0, hy = clip ? clip.offsetTop : 0;
+    if (fest) {
+      const mitte = huelle.parentElement, mr = mitte.getBoundingClientRect();
+      hx = mr.left + mitte.clientLeft + clip.offsetLeft - mitte.scrollLeft;
+      hy = mr.top + mitte.clientTop + clip.offsetTop - mitte.scrollTop;
+    }
+    const huellenBox = huelle && clip ? `${hx}|${hy}|${clip.offsetWidth}|${clip.offsetHeight}` : '';
     const stand = `${plane.offsetLeft}|${plane.offsetTop}|${plane.offsetWidth}|${plane.offsetHeight}|${t}|${o}|${huellenBox}`;
     if (stand === ebeneStand) return;
     ebeneStand = stand;
     if (huelle && clip) {
       const hs = huelle.style;
-      hs.left = clip.offsetLeft + 'px';
-      hs.top = clip.offsetTop + 'px';
+      hs.left = hx + 'px';
+      hs.top = hy + 'px';
       hs.width = clip.offsetWidth + 'px';
       hs.height = clip.offsetHeight + 'px';
     }
@@ -3301,6 +3512,14 @@ const HeroIdleAnims = (() => {
       const k = slug(name);
       return !!(liste && liste[k]) && fertig.get(k) !== null;
     },
+    // Creature-Figuren: Liste, Schlüssel für `hole`/`schonDa`, „steht eine Figur bereit?" und der Clone-Sonderfall (`kopiert`: Figur des Heroes der Spalte)
+    ladeKreaturListe, kreaturKey: kKey, kreaturenVorladen, kreaturMass,
+    kreaturVorladeStand: () => { let n = 0, da = 0; if (kListe) for (const k in kListe) if (kListe[k].sheetUrl) { n++; if (fertig.get('c:' + k)) da++; } return { n, da }; },
+    hatKreaturAnimation: (name) => {
+      const k = slug(name);
+      return !!(kListe && kListe[k] && kListe[k].sheetUrl) && fertig.get('c:' + k) !== null;
+    },
+    kopiertHeld: (name) => { const m = kListe && kListe[slug(name)]; return !!(m && !m.sheetUrl && m.kopiert === 'host-hero'); },
   };
 })();
 window.HeroIdleAnims = HeroIdleAnims;   // fuer das Vorladen der Tutorial-Helden (app-screens.jsx)
@@ -3511,6 +3730,7 @@ const HERO_TOENUNGEN = [
   { status: 'burned',       farbe: 'rgba(248,116,32,0.2)' },
   { status: 'berserked',    farbe: 'rgba(192,20,28,0.24)' },
   { status: 'healReversed', farbe: 'rgba(102,255,162,0.14)' },
+  { status: 'sporen',       farbe: 'rgba(192,20,28,0.3)' },      // Deepsea Spores an Creature-Figuren (die Karte darunter wird dunkelrot gefiltert)
   // ★ v1460 (Als Vorgabe 27.9.): Cursed „flasht lila", Charmed pink —
   // pulsierende Tönung (Stärke zwischen min und max, siehe `puls` im
   // Zeichenschritt).
@@ -3590,10 +3810,11 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
   const px = (n) => `calc(${+n.toFixed(3)}px * var(--board-scale))`;
   const lage = (x, y) => ({ left: px(x * s), top: px(y * s) });
   const flaeche = cw * ch * s * s;
+  const sternModus = !!(window.ppFx64Aktiv && window.PpFx64Sterne && window.ppFx64Aktiv());
   const teile = useMemo(() => {
     const aus = [];
     const hat = (k) => effekte.includes(k);
-    if (hat('stunned')) {
+    if (hat('stunned') && !sternModus) {   // app-fx-64: mit den Stun-Sternen entfallen die Blitze (Rückfall: Retro, reduzierte Bewegung, Animationen aus)
       const z = heroFxZufall(saat + 'stun');
       // Anzahl und Größe wachsen mit der Figur (bei Bubbles sonst winzig)
       const breitePx = cw * s, mass = Math.max(1, Math.min(2, breitePx / 70));
@@ -3657,7 +3878,7 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
       }
     }
     return aus;
-  }, [effekte, kern, s, mitteX, saat]);
+  }, [effekte, kern, s, mitteX, saat, sternModus]);
   return (
     <>
       {effekte.includes('webbed') && (
@@ -3724,7 +3945,9 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
       const wJetzt = (w0 && w0.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(destEl) : { dx: 0, dy: 0 };
       const driftX = (w0 && w0.welt) ? (w0.dx - wJetzt.dx) : 0, driftY = (w0 && w0.welt) ? (w0.dy - wJetzt.dy) : 0;
       const tx = dr.left + dr.width / 2, ty = dr.top + dr.height / 2;
-      fly.style.transform = `translate(${(tx - sx) * e - driftX}px, ${(ty - sy) * e - driftY}px) scale(${1 + (dr.width / sr.width - 1) * e})`;
+      // Pixelart: das Kartenbild wird nicht stufenlos skaliert (jede Zwischengröße sampelt es neu und ungleichmäßig) — Startgröße, ein Wechsel auf die Zielgröße kurz vor der Landung (wie `kartenflugBilder`, pixel-anim.js)
+      const groesse = q < 0.55 ? 1 : dr.width / sr.width;
+      fly.style.transform = `translate(${Math.round((tx - sx) * e - driftX)}px, ${Math.round((ty - sy) * e - driftY)}px) scale(${groesse})`;
       fly.style.opacity = String(1 - (1 - opEnd) * e);
       if (spur) spur.punkt(sx + (w0 ? w0.dx : 0) + (tx - sx) * e - driftX, sy + (w0 ? w0.dy : 0) + (ty - sy) * e - driftY);
     }
@@ -3736,10 +3959,10 @@ function ppFlugVerfolgen(fly, sourceEl, destEl, w0, ms, opEnd, farbe) {
  * Lage aller Heldenzonen/Support-Zonen im Moment des Aufrufs (Element -> Rechteck). Einschlag-Animationen (Magic Hammer, Keule, Dino …) suchen ihr Ziel
  * erst nach 300–500 ms; Verschiebt sich das Brett dazwischen (Handy: Kamerafahrt), lag der naechste Treffer ploetzlich ueber einem anderen Helden.
  */
-// Einschlag-Animationen, die ihre Zielzone selbst quetschen: bekommen das Zonen-Element direkt (`zoneEl`)
-const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash']);
+// Einschlag-Animationen, die ihre Zielzone selbst quetschen (bzw. deren Silhouette/Karte sie beschichten: acid_splash): bekommen das Zonen-Element direkt (`zoneEl`)
+const PP_SQUASH_ANIMS = new Set(['stranglehold_squeeze', 'magic_hammer', 'heavy_hit_smash', 'hammer_skeleton_smash', 'hammer_throw', 'shattering_strike', 'spiked_club_smash', 'giant_dino_stomp', 'mammoth_stomp', 'ankylo_tail_smash', 'acid_splash', 'venom_strike', 'ox_headbutt', 'tiger_kick', 'tiger_blood']);
 // Mindestlebensdauer (ms) je Animationstyp: `options.duration` (Engine `animDuration`) ist oft kuerzer als die Animation selbst — die Hammer-Animationen (app-fx-57) laufen 1,2–1,8 s.
-const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450 };
+const PP_ANIM_MINDAUER = { magic_hammer: 2000, heavy_hit_smash: 1700, hammer_skeleton_smash: 1450, hammer_throw: 1500, flame_avalanche: 2000, venom_strike: 1800, ox_headbutt: 2100, tiger_kick: 1500, tiger_blood: 1200 };   // ox_headbutt (app-fx-62): 40 Bilder + 19 Bilder Anlauf = 1967 ms + Vorlauf + Reserve; hammer_throw (app-fx-59): 32 Bilder = 1070 ms + Vorlauf + Reserve; tiger_kick (app-fx-63): 34 Bilder = 1130 ms + Vorlauf + Reserve; tiger_blood (app-fx-63, Blut bei der Heilung): 26 Bilder = 870 ms + Vorlauf + Reserve; venom_strike (app-fx-61): 37 Bilder = 1230 ms + Vorlauf + Reserve
 function ppZonenFrost() {
   const m = new Map();
   try { document.querySelectorAll('[data-hero-zone],[data-support-zone]').forEach(el => m.set(el, el.getBoundingClientRect())); } catch (e) { /* ohne Frost: live messen */ }
@@ -3828,11 +4051,18 @@ function HeroStatusSymbole({ st, links, oben, k }) {
   );
 }
 
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
-  const key = HeroIdleAnims.slug(cardName);
+// `massstab`: Faktor auf den Maßstab (Clone: Heldenfigur im Creature-Maßstab). `kreatur`: `cardName` ist eine Creature (Sheet aus `data/creature-animations`, sonst identische Darstellung). `ohnePartikel`: nur Tönung/Eis/Stein an der Figur,
+// keine Status-Partikel und -Symbole (Creatures in Support-Zonen behalten die Status-Overlays ihrer Karte).
+function HeroIdleSprite({ cardName, kreatur, massstab, ohnePartikel, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg, statusIcons }) {
+  const key = kreatur ? HeroIdleAnims.kreaturKey(cardName) : HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
   const [eisPhase, setEisPhase] = useState(eingefroren ? 'da' : 'weg');
+  // Stun-Sterne (app-fx-64): `stunAuslosen` = der Status wechselte WÄHREND der Darstellung auf stunned (auffälliger Auftritt); beim ersten Aufbau eines schon betäubten Helden nicht.
+  const stunJetzt = !!(effekte && effekte.includes('stunned'));
+  const stunVorher = useRef(null);
+  const stunAuslosen = stunVorher.current === false && stunJetzt;
+  useEffect(() => { stunVorher.current = stunJetzt; });
   useEffect(() => {
     if (eingefroren) { setEisPhase('da'); return undefined; }
     setEisPhase(p => (p === 'da' ? 'schmilzt' : p));
@@ -3871,6 +4101,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     zone._ppFigurPlatz = platz;
     platz._ppEintrag = eintrag;   // Sheet + aktueller Frame (`platz._ppFrame`, s. `male`) für die Nachbilder beim Rammen (app-fx-27.jsx)
     platz._ppZone = zone;         // Heldentod (app-fx-32.jsx): der Beobachter der Sprite-Ebene findet zum entfernten Platz seine Zone
+    platz._ppSchluessel = key;    // Slug des Helden (Todesstil „sturz“/„shatter“, app-fx-71.jsx)
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3995,6 +4226,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
           }
         }
       }
+      // (Kein Einfahren für fremde Zonen: beim Hover fährt nur die Figur DIESER Zone ein — Als Befund 16.11.: „nicht nur diese, sondern auch ihre Nachbarn".)
       const weg = !rammt && (hover || phasenHover || !!zustand.current.eingeklappt);
       if (weg !== st.weg) {
         st.weg = weg;
@@ -4033,7 +4265,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         st.fehler = was + ': ' + (err && err.message ? err.message : String(err));
         if (!st.gewarnt) {
           st.gewarnt = true;
-          try { console.warn('[Helden-Animation] ' + (meta.hero || '?') + ' — ' + st.fehler, err); } catch {}
+          try { console.warn('[Helden-Animation] ' + (meta.hero || meta.creature || '?') + ' — ' + st.fehler, err); } catch {}
         }
       }
     };
@@ -4081,7 +4313,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
         || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt
         || (zustand.current.weiss || 0) !== (st.weissGemalt || 0)) sicher('Malen', male);
-    }, { held: meta.hero || '?', frames, st, zustand });
+    }, { held: meta.hero || meta.creature || '?', art: meta.creature && !meta.hero ? 'Creature' : 'Held', frames, st, zustand });
     sicher('Zonenlage', folgeZone);
     sicher('Malen', male);
     // Scharfe Pixel beim Vergrößern, weiches Verkleinern (`pixelated`
@@ -4129,7 +4361,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   // ★ v1455: `boardScale` im Sheet-JSON ist ein Faktor für Einzelfälle
   // (Als Vorgabe 27.9.: Bubbles in voller Größe „geht so gar nicht, der
   // sitzt viel zu hoch und wird fast komplett abgeschnitten").
-  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1);
+  // `massstab` (Clone): zusätzlicher Faktor für eine HELDENfigur, die als Creature auf dem Brett steht (Creature-Maßstab; Creature-Sheets tragen ihn schon in `boardScale`).
+  const s = 2.8125 * (Number(meta.boardScale) > 0 ? Number(meta.boardScale) : 1) * (massstab > 0 ? massstab : 1);
   const bs = (n) => `${+n.toFixed(3)}px * var(--board-scale)`;
   // ★ v1452 (Als Vorgabe 27.9.): „Sofern nicht anders angegeben, bildet
   // immer das GESICHT des Heroes den Bildmittelpunkt." Reihenfolge:
@@ -4193,15 +4426,18 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     <>
       {anker}
       {ReactDOM.createPortal(
-        <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
+        <div ref={platzRef} data-held={cardName} data-kreatur={kreatur ? '1' : undefined}
+          className={'hero-idle-platz' + (kreatur ? ' hero-idle-kreatur' : '') + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle + (window.ppFx33Pose ? ' hero-idle-asc33' : '') : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
-              {statusIcons && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
+              {statusIcons && !ohnePartikel && (statusIcons.burn || statusIcons.poison || statusIcons.bleed) && (
                 <HeroStatusSymbole st={statusIcons} k={Math.max(1, Math.min(3, Math.round(s * (parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 1) / 1.4)))}
                   links={`calc(${bs((kern.kopfX1 || kern.x1) * s + 3)})`} oben={`calc(${bs((kern.kopfY != null ? kern.kopfY - 4 : kern.y0 + ch * 0.18) * s)})`} />
+              )}
+              {stunJetzt && !versteinert && !(aufstieg && aufstieg.rolle === 'alt') && window.PpFx64Sterne && window.ppFx64Aktiv && window.ppFx64Aktiv() && (
+                <window.PpFx64Sterne kern={kern} mitteX={mitteX} s={s} zf={Math.max(1, Math.round(2.8125 / s))} intro={stunAuslosen} />
               )}
               {eisPhase !== 'weg' && (
                 <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
@@ -4214,7 +4450,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               <HeroAufstiegLicht />
             </div>
           )}
-          {effekte && (
+          {effekte && !ohnePartikel && (
             <div className="hero-idle-fx" style={fxStil}>
               <HeroStatusPartikel effekte={effekte} kern={kern} s={s} mitteX={mitteX}
                 fw={fw} fh={fh} saat={key} />
@@ -4297,7 +4533,7 @@ function CardRevealOverlay({ reveals, onRemove }) {
   return (
     <div className="card-reveal-stack">
       {reveals.map((rev, idx) => (
-        <CardRevealEntry key={rev.id} cardName={rev.cardName} fizzled={rev.fizzled} onDone={() => onRemove(rev.id)} />
+        <CardRevealEntry key={rev.id} cardName={rev.cardName} rarity={rev.rarity} fizzled={rev.fizzled} onDone={() => onRemove(rev.id)} />
       ))}
     </div>
   );
@@ -4307,10 +4543,10 @@ function CardRevealOverlay({ reveals, onRemove }) {
 // (Glitch, entsaettigt, 🚫 gross AUF der Karte, KEIN Schriftzug — Al 27.10.) —
 // der Effekt wurde ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
 const FIZZLE_ANZEIGE_MS = 1400;
-function CardRevealEntry({ cardName, onDone, fizzled }) {
+function CardRevealEntry({ cardName, onDone, fizzled, rarity }) {
   const card = CARDS_BY_NAME[cardName];
-  const imgUrl = card ? cardImageUrl(card.name) : null;
-  const foilType = card?.foil || null;
+  const rar = ppRarityOf(card, rarity);
+  const imgUrl = card ? ppRarityUrl(cardImageUrl(card.name), rar) : null;
   // v1360 (Als Befund: „die gefizzelte Karte bleibt deutlich zu lange
   // sichtbar"): ein Fizzeln ist eine kurze Meldung — 1,4 s statt 3,5 s,
   // die letzten 300 ms blendet es aus (`.card-reveal-fizzled-weg`).
@@ -4328,13 +4564,13 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
   return (
     <div className={'card-reveal-entry' + (fizzled ? ' card-reveal-fizzled-weg' : '')}
       style={fizzled ? { '--fizzle-ms': FIZZLE_ANZEIGE_MS + 'ms' } : undefined}
-      onMouseEnter={() => { gehovert.current = true; setBoardTooltip(card); }}
+      onMouseEnter={() => { gehovert.current = true; setBoardTooltip(rar !== 'common' ? { ...card, rarity: rar } : card); }}
       onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
+        {imgUrl && rar !== 'common' && <CardFoil card={card} rarity={rar} />}
         {imgUrl ? (
-          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
-            border: foilType === 'diamond_rare' ? '3px solid rgba(104,198,253,.7)' : foilType === 'secret_rare' ? '3px solid rgba(250,213,74,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
@@ -5503,7 +5739,7 @@ function HeldenRammkarte({ r }) {
   if (r.figur && !figurFehlt) return null;                           // die Figur fährt in der Sprite-Ebene, hier gibt es nichts zu zeigen
   return (
     <div ref={el} className="ram-anim-card ram-clash" style={{ left: r.srcX - c.w / 2, top: r.srcY - c.h / 2, width: c.w, height: c.h }}>
-      <BoardCard cardName={r.cardName} noTooltip />
+      <BoardCard cardName={r.cardName} rarity={ppRarityLookup(r.cardName) || undefined} noTooltip />
     </div>
   );
 }
@@ -6667,7 +6903,7 @@ function TempesteRainOverlay() {
  * Zielwahl der Zone getrennt — die Zone bleibt fuer Potion-Ziele
  * zustaendig, die Karte fuer ihre eigene Aktivierung.
  */
-function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting }) {
+function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting, rarities }) {
   return (
     <div className="board-area-stack">
       {cards.map((name, i) => {
@@ -6694,7 +6930,7 @@ function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting
               cursor: (waehlbar || aktivierbar) ? 'pointer' : undefined }}
             data-area-stack-idx={i}
             onClick={klick}>
-            <BoardCard cardName={name} />
+            <BoardCard cardName={name} rarity={(rarities && rarities[i]) || undefined} />
           </div>
         );
       })}
@@ -8757,6 +8993,57 @@ function ppSzene(malen, ende, vorbereiten, opts) {
     );
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  VOLLBILD-SCHEIN AUS DITHER (Area-Landung, `area_descend`) — eine Leinwand in Rasterzellen (Zelle = Hero-Pixel, `ppFxZelle`), 30 Bilder/s
+//  Ersetzt den CSS-Radialverlauf über dem ganzen Fenster (`radial-gradient(ellipse at center, …)`, vom Netz als 160-Zellen-Pixelbild gerastert: 12-px-Zellen, 4× gröber als die Heroes, Moiré auf dem Brett).
+//  Verlauf wie vorher (Ellipse zur fernsten Ecke: 0 % Creme-Gold 55 %, 30 % Orange 25 %, 70 % leer), Hüllkurve 0 → 1 (30 %) → 0; Deckung als Bayer-Schwelle je Zelle (einmal vorgerechnet), je Bild nur ein enger Durchlauf.
+// ═══════════════════════════════════════════════════════════════════
+function ppAreaSchein(dauer) {
+  try {
+    if (window._playAnimations === false) return;
+    let S = 3; try { S = ppFxZelle(null); } catch (e) { /* Rückfall */ }
+    const W = Math.ceil(window.innerWidth / S), H = Math.ceil(window.innerHeight / S);
+    if (W < 8 || H < 8) return;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    cv.setAttribute('aria-hidden', 'true'); cv.setAttribute('data-pp-px', 'aus');
+    cv.style.cssText = `position:fixed;left:0;top:0;width:${W * S}px;height:${H * S}px;z-index:9995;pointer-events:none;image-rendering:pixelated;`;
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), u32 = new Uint32Array(img.data.buffer);
+    const snap = (c) => { try { return window.ppSnapRgb ? window.ppSnapRgb(c[0], c[1], c[2]) : c; } catch (e) { return c; } };
+    const pack = (c) => { const q = snap(c); return ((255 << 24) | (q[2] << 16) | (q[1] << 8) | q[0]) >>> 0; };
+    const C1 = pack([255, 241, 150]), C2 = pack([249, 172, 32]);
+    const a0 = new Float32Array(W * H), thr = new Float32Array(W * H), col = new Uint32Array(W * H);
+    const ex = W / 2, ey = H / 2, rx = ex * Math.SQRT2, ry = ey * Math.SQRT2;
+    for (let y = 0; y < H; y++) {
+      const v = (y + 0.5 - ey) / ry;
+      for (let x = 0; x < W; x++) {
+        const u = (x + 0.5 - ex) / rx, d = Math.sqrt(u * u + v * v), i = y * W + x;
+        const a = d < 0.3 ? 0.55 - 0.30 * (d / 0.3) : d < 0.7 ? 0.25 * (1 - (d - 0.3) / 0.4) : 0;
+        a0[i] = a; col[i] = d < 0.15 ? C1 : C2;
+        thr[i] = Math.pow(ppBayer(x + 2, y + 1), 1 / 0.62);        // Schwelle so, dass `a·env > thr` dem `a^0,62 > Bayer` des Pixelierers entspricht
+      }
+    }
+    document.body.appendChild(cv);
+    const t0 = performance.now(); let raf = 0, letzte = -1;
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      if (t >= dauer) { cv.remove(); return; }
+      const fr = Math.floor(t / 33);
+      if (fr !== letzte) {
+        letzte = fr;
+        const uu = t / dauer, env = uu < 0.3 ? 1 - Math.pow(1 - uu / 0.3, 2) : 1 - (uu - 0.3) / 0.7;
+        const n = W * H;
+        for (let i = 0; i < n; i++) u32[i] = (a0[i] * env > thr[i]) ? col[i] : 0;
+        ctx.putImageData(img, 0, 0);
+      }
+      raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    setTimeout(() => { try { cancelAnimationFrame(raf); cv.remove(); } catch (e) { /* weg */ } }, dauer + 300);
+  } catch (e) { /* rein kosmetisch */ }
+}
+window.ppAreaSchein = ppAreaSchein;
 
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-GESCHOSSE — Quelle → Ziel (24.10., Welle 3: Doomed Pirate, Zira Racer, Glasowt, Buttap)
@@ -20808,7 +21095,7 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  flame_avalanche: ppR1FlameAvalanche,   // v1215 — W86r1: Pixelart-Leinwand (ganzzahlige Hüpfer, keine halben Pixel)
+  flame_avalanche: ppR1FlameAvalanche,   // v1215 — W86r1: Pixelart-Leinwand (ganzzahlige Hüpfer, keine halben Pixel); app-fx-60 ersetzt den Eintrag durch die Lawine, diese Salve bleibt als Rückfall
   hole_in_the_sky_pull: HoleInTheSkyPullEffekt,   // v1346/v1347 — W86r1: Pixelart (Leinwand fürs Loch, Karten als <div>s auf fester Spiralbahn)
   guillotine_drop: (() => {
     // ★★ v1349 — „Madame Guillotine": ein Fallbeil saust auf die Zone der
@@ -23891,41 +24178,29 @@ const ANIM_REGISTRY = {
     };
   })(),
   acid_splash: (() => {
-    return function AcidSplashEffect({ x, y }) {
-      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
-        xOff: -50 + Math.random() * 100,
-        size: 8 + Math.random() * 16,
-        delay: Math.random() * 120,
-        dur: 500 + Math.random() * 600,
-        wobble: -20 + Math.random() * 40,
-        color: ['#c80000','#ef2929','#ef2929','#c80000','#be0e0e','#e92f38','#ff1a1a','#c80000'][Math.floor(Math.random() * 8)],
-      })), []);
-      const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
-        xOff: -25 + Math.random() * 50,
-        yOff: -15 + Math.random() * 30,
-        delay: 50 + Math.random() * 200,
-        dur: 600 + Math.random() * 400,
-        size: 18 + Math.random() * 8,
-      })), []);
+    // DOM-Rueckfall (nur mit `window.__ppFxAlt`; sonst ersetzt die Leinwand-Fassung in app-fx-9.jsx diesen Eintrag): rote Saeure faellt von oben auf die Zone — harte Streifen und eine flache Lache,
+    // keine Flaeschchen, keine Blasen. Einfache Entsprechung der Pixelart-Animation, ohne Silhouette.
+    return function AcidSplashEffect({ x, y, w, h }) {
+      const cw = w || 80, ch = h || 100;
+      const streifen = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
+        left: -cw * 0.5 + (i + Math.random() * 0.8) * (cw / ppFxN(14)),
+        breite: 4 + Math.round(Math.random() * 6),
+        hoehe: 14 + Math.round(Math.random() * 16),
+        delay: Math.round(Math.random() * 60),
+        dur: 200 + Math.round(Math.random() * 90),
+        farbe: ['#c80000', '#ef2929', '#ef2929', '#780000'][Math.floor(Math.random() * 4)],
+      })), [cw]);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(200,0,0,.95) 0%, rgba(190,14,14,.5) 35%, rgba(120,0,0,.2) 60%, transparent 80%)', width: 120, height: 120, marginLeft: -60, marginTop: -60 }} />
-          {drops.map((d, i) => (
-            <div key={'ad'+i} className="anim-beer-bubble" style={{
-              '--xOff': d.xOff + 'px', '--size': d.size + 'px', '--wobble': d.wobble + 'px',
-              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
-            }} />
+          {streifen.map((s, i) => (
+            <div key={'ag' + i} style={{ position: 'absolute', left: s.left, top: -ch * 0.9, width: s.breite, height: s.hoehe, background: s.farbe, opacity: 0, '--agdy': (ch * 0.9) + 'px', animation: `acid-guss-fall ${s.dur}ms steps(8, end) ${s.delay}ms forwards, acid-guss-weg 520ms steps(4, end) 380ms forwards` }} />
           ))}
-          {splats.map((s, i) => (
-            <div key={'as'+i} style={{
-              position: 'absolute', left: s.yOff, bottom: -10, width: s.size, height: s.size, opacity: 0, '--wobble': '0px',
-              animation: `animBeerBubble ${s.dur}ms ease-out ${s.delay}ms forwards`,
-            }}>
-              {/* ★ W86p: Blase und Reagenzglas getrennt — ein Textkind in der maskierten Partikelklasse blieb beim Pixelieren unbehandelt (Schrift mit Mischfarben) */}
-              <i style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#8f0000' }} />
-              <span style={{ position: 'absolute', left: 0, top: 0, fontSize: s.size, lineHeight: 1 }}>🧪</span>
-            </div>
-          ))}
+          <div style={{ position: 'absolute', left: -cw * 0.45, top: ch * 0.5 - 2, width: cw * 0.9, height: 6, background: '#c80000', opacity: 0, animation: 'acid-guss-lache 700ms steps(6, end) 260ms forwards' }} />
+          <style>{`
+            @keyframes acid-guss-fall { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 1; transform: translateY(var(--agdy)); } }
+            @keyframes acid-guss-weg { 0% { opacity: 1; } 100% { opacity: 0; } }
+            @keyframes acid-guss-lache { 0% { opacity: 1; transform: scaleX(0.3); } 60% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+          `}</style>
         </div>
       );
     };
@@ -25446,6 +25721,37 @@ const ANIM_REGISTRY = {
         </div>
       );
     };
+  })(),
+
+  // ── Area-Einschlag (`area_descend`: die fallende Area-Karte landet) — PIXELART (Canvas-Szene `ppSzene`, Rasterzelle = Hero-Pixel) ──
+  // Vorher DOM: Ring mit `border-radius: 50 %` (anti-aliaster Kreis, Schein-Schatten), Radialverlauf-Scheibe und 18 runde Staubkörner (Alpha) — alles weichgezeichnet. Jetzt auf einer Leinwand: Ring 2 Zellen dick
+  // (Deckung gedithert), Dither-Scheibe, Staub als Zellenquadrate. Zeiten/Wege wie vorher: Ring 0,9 s (Radius 0,06 → 1,56 → 2,52 Zonenbreiten), Blitz 0,7 s, Staub 0,7 s.
+  area_impact: (() => {
+    const STAUB = ['#fbe181', '#ffe469', '#f9ac20', '#e0c085', '#fff196', '#ffb91a'].map(ppHex);
+    return ppSzene((g, t, sz, tl) => {
+      const S = sz.S, cx = sz.cx, cy = sz.cy, zw = (sz.props.w || 100) / S;
+      { const u = t / 700;                                   // Blitz: Scheibe 0,1 → 1,8 (40 %) → 3,5 mal 0,8 Zonenbreiten, Deckung 0 → 1 → 0
+        if (u >= 0 && u <= 1) {
+          const k = u < .4 ? .1 + 1.7 * (u / .4) : 1.8 + 1.7 * ((u - .4) / .6), o = u < .4 ? u / .4 : 1 - (u - .4) / .6, r = zw * 0.8 * k;
+          g.radial(cx, cy, r, r, [[0, [255, 251, 210], .95], [.35, [255, 208, 102], .55], [.75, [255, 208, 102], 0], [1, [255, 208, 102], 0]], o);
+        } }
+      { const u = t / 900;                                   // Ring: Radius 0,6·zw·(0,1 → 2,6 → 4,2), 2 Zellen dick + 1 Zelle heller Innenrand
+        if (u >= 0 && u <= 1) {
+          const k = u < .6 ? .1 + 2.5 * (u / .6) : 2.6 + 1.6 * ((u - .6) / .4), o = u < .6 ? 1 - .4 * (u / .6) : .6 * (1 - (u - .6) / .4), r = zw * 0.6 * k;
+          g.band(cx, cy, r, r, 2, ppHex('#ffe469'), o);
+          g.band(cx, cy, r - 2, r - 2, 1, ppHex('#fff196'), o * .85);
+        } }
+      tl.staub.forEach((p) => {                              // Staub: Quadrate (6–16 px → ganze Zellen), Deckung 0 → 1 (30 %) → 0, Größe 0,3 → 1,4
+        const u = t / 700; if (u < 0 || u > 1) return;
+        const e = 1 - Math.pow(1 - u, 2), o = u < .3 ? u / .3 : 1 - (u - .3) / .7, n = Math.max(1, Math.round(p.size * (.3 + 1.1 * u) / S));
+        g.rect(cx + p.dx * e / S - n / 2, cy + p.dy * e / S - n / 2, n, n, p.farbe, o);
+      });
+    }, 950, () => ({
+      staub: Array.from({ length: ppFxN(18) }, (_, i) => {
+        const w = (i / 18) * Math.PI * 2 + Math.random() * 0.3, d = 60 + Math.random() * 80;
+        return { dx: Math.cos(w) * d, dy: Math.sin(w) * d * 0.6, size: 6 + Math.random() * 10, farbe: STAUB[Math.floor(Math.random() * STAUB.length)] };
+      }),
+    }), { radius: (p) => Math.max(120, (p.w || 100) * 2.7), z: 10005 });
   })(),
 
   // ── Pollution Token placement ─────────────────────────────
@@ -35761,7 +36067,7 @@ function GameAnimationRenderer({ type, x, y, w, h, _gemountet, prewarm, prewarmB
 //     eine andere Kreatur. Richtung wie bei `attachedHero` — ungehovert
 //     steht die OBENLIEGENDE Kreatur da (das ist der Spielzustand),
 //     beim Hovern kommt die verdeckte Karte zum Vorschein (🪺).
-function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, heldHero, ...boardCardProps }) {
+function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, heldHero, overlayRarity, ...boardCardProps }) {
   // `useStickyHoverFlag` statt eines nackten useState: der Hover TAUSCHT
   // hier das Kartenbild, der Knoten unter dem Zeiger wird also mitten in
   // der Bewegung ersetzt — genau die Lage, in der ein mouseleave
@@ -35799,6 +36105,7 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
       style={{ position: 'relative', width: '100%', height: '100%' }}
       {...hoverProps}>
       <BoardCard {...boardCardProps} cardName={showName}
+        {...(hovered && overlayRarity !== undefined ? { rarity: overlayRarity } : null)}
         {...(darunter ? { tooltipDarunter: darunter, tooltipDarunterTitel: 'Also treated as a Hero' } : null)} />
       {!hovered && overlay && (
         <div className="attached-hero-badge"
@@ -35866,7 +36173,7 @@ function ReactionChainOverlay({ chain, myIdx, fx }) {
             + (!fx && link.status === 'negated' ? ' chain-negated' : '')
             + (!fx && link.status === 'resolved' ? ' chain-resolved' : '')
           }>
-            <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+            <BoardCard cardName={link.cardName} rarity={link.rarity || undefined} style={{ width: 80, height: 112, borderRadius: 4 }} />
             {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
             {!fx && link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
             {link.status === 'negated' && link.negationStyle === 'thief' && (
@@ -35898,7 +36205,7 @@ function ReactionChainOverlay({ chain, myIdx, fx }) {
   );
 }
 
-function AbilityStack({ cards }) {
+function AbilityStack({ cards, rarities }) {
   // Gleiche Bauform wie AttachableCreatureCard oben — der Hover tauscht
   // das Bild der obersten Performance-Karte, also dieselbe Falle.
   const stackRef = useRef(null);
@@ -35920,7 +36227,8 @@ function AbilityStack({ cards }) {
         }
         return (
           <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)} />
+            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)}
+              rarity={(rarities && rarities[ci]) || undefined} />
           </div>
         );
       })}
@@ -35935,7 +36243,7 @@ function AbilityStack({ cards }) {
  * eigenen Hover-Tooltip (jede Karte ist ein eigenes `BoardCard`; unter dem Zeiger gewinnt die Karte, deren Streifen er trifft). Die Stueckzahl steht als Pixel-Ziffernbadge
  * an der obersten Karte. Der Klick geht an die Zone durch (dort oeffnet er die Galerie bzw. waehlt das Ziel).
  */
-function EquipStack({ cards, skins, geist }) {
+function EquipStack({ cards, skins, geist, rarities }) {
   const n = cards.length;
   const schritt = equipStapelVersatz(n);
   return (
@@ -35943,7 +36251,7 @@ function EquipStack({ cards, skins, geist }) {
       {cards.map((c, ci) => (
         // `geist`: die LETZTE Karte ist die Vorschau der gerade gezogenen Ausruestung (gestrichelter harter Rand statt Durchsichtigkeit).
         <div key={ci} className={'board-equip-stack-card' + (geist && ci === n - 1 ? ' board-equip-stack-geist' : '')} style={{ top: `max(${ci}px, calc(${ci * schritt}px * var(--board-scale)))`, zIndex: ci + 1 }}>
-          <BoardCard cardName={c} skins={skins} noTooltip={!!(geist && ci === n - 1)} />
+          <BoardCard cardName={c} skins={skins} noTooltip={!!(geist && ci === n - 1)} rarity={(rarities && rarities[ci]) || undefined} />
           {ci === n - 1 && n > 1 && <div className="board-equip-stack-count">{n}</div>}
         </div>
       ))}
@@ -36203,7 +36511,7 @@ function OptionPickerDropdown({ ep, respondToPrompt }) {
           onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
         {ep.cancellable !== false && (
           <button className="btn" style={{ padding: '10px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
         )}
       </div>
     </div>
@@ -36311,7 +36619,7 @@ function IdentityPileCard({ traegerCard, identityCard, nutzbar = false, onActiva
  * NAMEN abgehakt, und bei zwei Prototypes traf es die falsche Karte
  * (Als Befund 22.8.). Die Sortierung fuehrt den Index deshalb mit.
  */
-function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLetheStamps = null, entries = null, onActivate = null }) {
+function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLetheStamps = null, entries = null, onActivate = null, rarities = null }) {
   const [filter, setFilter] = useState('');
   const TYPE_ORDER = ['Hero', 'Creature', 'Spell', 'Attack', 'Artifact', 'Ability', 'Potion', 'Ascended Hero', 'Token'];
   const sorted = useMemo(() => {
@@ -36387,9 +36695,11 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                 const isCreature = card.cardType === 'Creature' && card.level != null;
                 const stamp = (isCreature && ownerLetheStamps?.[idx]) || 0;
                 const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
-                const displayCard = stamp > 0
+                const stapelRar = (rarities && rarities[idx]) || null;   // Rarity DIESES Stapelplatzes (null = Common)
+                const displayCard0 = stamp > 0
                   ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
                   : card;
+                const displayCard = stapelRar ? { ...displayCard0, rarity: stapelRar } : displayCard0;
                 // Geliehene Identitaet (Future Tech Copy Device): die
                 // Karte liegt unter ihrem echten Namen in der Ablage,
                 // IST aber gerade eine andere. Ueberfahren zeigt, was
@@ -37006,10 +37316,11 @@ function StatusSelectPrompt({ ep, onRespond }) {
   }, [localSelected, onRespond]);
 
   return (
-    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#3ddc57', minWidth: 260 }}>
+    // ★ X2: `fcp-begrenzt` (Aufteilung wie Auswahl/Ja-Nein): bei vielen Status scrollt NUR die Liste, Titel, Text und „Confirm"/„Back" bleiben sichtbar.
+    <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: '#3ddc57', minWidth: 260, display: 'flex', flexDirection: 'column' }}>
       <div className="orbit-font" style={{ fontSize: 13, color: '#3ddc57', marginBottom: 4 }}>{ep.title}</div>
-      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+      <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+      <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {(ep.statuses || []).map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
             background: localSelected.includes(s.key) ? 'rgba(61,220,87,.15)' : 'rgba(255,255,255,.03)',
@@ -37023,7 +37334,7 @@ function StatusSelectPrompt({ ep, onRespond }) {
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14 }}>
         <button className="btn btn-success" style={{ padding: '6px 20px', fontSize: 11 }}
           onClick={() => onRespond({ selectedStatuses: localSelected })}>
           {ep.confirmLabel || 'Confirm'}
@@ -37430,7 +37741,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
             {participants.players.map(p => (
               <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
                 {p.avatar && <window.PlayerAvatar className="player-list-avatar" name={p.username} src={p.avatar} alt="" />}
-                <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-name" style={{ color: p.color }}>{window.PpTitled ? <window.PpTitled name={p.username} title={p.title} /> : p.username}{p.username === myUsername ? ' (you)' : ''}</span>
                 <span className="player-list-badge">PLAYER</span>
               </div>
             ))}
@@ -37450,7 +37761,7 @@ const ChatPanel = React.memo(function ChatPanel({ roomId, participants: particip
                 <span className="chat-msg-name"
                   style={{ color: msg.isSpectator ? '#7f7f7f' : (msg.color || '#fff') }}
                   onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
-                >{msg.from || msg.username}</span>
+                >{window.PpTitled ? <window.PpTitled name={msg.from || msg.username} title={msg.title} /> : (msg.from || msg.username)}</span>
                 <span className="chat-msg-text">: {msg.text}</span>
               </div>
             ))}
@@ -37928,6 +38239,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // v1463: Profil-Optionen „Display Heroes" / „Dynamic Heroes" (beide
   // standardmäßig an; ohne Display kein Dynamic).
   const heldenAnzeigen = user?.display_heroes == null ? true : !!user.display_heroes;
+  // Creature-Figuren (`data/creature-animations`): eigene Profil-Option „Display Creatures" (Standard an), Unteroption von „Display Heroes" wie „Dynamic Heroes" — ohne
+  // Heldenfiguren auch keine Creature-Figuren (gleiche Sprite-Ebene, Clone zeigt die Heldenfigur). Auf dem HANDY (`ppIsPhone`, dieselbe Schwelle wie `battle-lite`) gibt es sie
+  // gar nicht (Als Vorgabe 14.11.: „zu viel Last"): keine Liste, keine Sheets, keine Figur.
+  const kreaturenAnzeigen = heldenAnzeigen && (user?.display_creatures == null ? true : !!user.display_creatures) && !(window.ppIsPhone && window.ppIsPhone());
+  useEffect(() => { if (kreaturenAnzeigen) HeroIdleAnims.ladeKreaturListe().then(() => setHeldenAnimListe(n => n + 1)); }, [kreaturenAnzeigen]);
+  // Vorladen zu Spielbeginn: ALLE Creature-Sheets (siehe `kreaturenVorladen` — verrät nichts über das Deck des Gegners), zuerst die, die der eigene Spielstand nennt.
+  useEffect(() => {
+    if (!kreaturenAnzeigen || !gameState?.roomId) return;
+    const namen = new Set();
+    const lauf = (o, tiefe) => {
+      if (typeof o === 'string') { if (CARDS_BY_NAME[o]) namen.add(o); }
+      else if (Array.isArray(o)) { for (const x of o) lauf(x, tiefe + 1); }
+      else if (o && typeof o === 'object' && tiefe < 6) { for (const k in o) lauf(o[k], tiefe + 1); }
+    };
+    try { lauf(gameState.players, 0); } catch {}
+    HeroIdleAnims.kreaturenVorladen([...namen]).then(() => setHeldenAnimListe(n => n + 1));
+  }, [kreaturenAnzeigen, gameState?.roomId]);
   // Spielstart-Effekt (app-fx-51: Held-Ausbruch + Brettaufbau-Welle, nur Optik): im Render entscheiden, ob er laeuft — die Figuren melden sich schon in ihren Layout-Effekten, die vor dem
   // Layout-Effekt dieser Komponente laufen. Die Leinwaende entstehen erst im ersten Bild nach dem Einhaengen (kein Mehraufwand beim Mounten); `ppFx51Abbruch` raeumt beim Verlassen auf.
   useState(() => (window.ppFx51Vorbereiten ? window.ppFx51Vorbereiten(gameState, { figuren: heldenAnzeigen }) : 0));
@@ -38203,6 +38531,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Auftritts-Animation — die Figuren steigen aus den Karten.
   const tutorialFigurenGesperrt = (window.useTutorialFigurenGesperrt || (() => false))();
   const heldenFigurenZeigen = heldenAnzeigen && !(gameState?.isTutorial && tutorialFigurenGesperrt);
+  const kreaturFigurenZeigen = heldenFigurenZeigen && kreaturenAnzeigen;
   // Die Sheets schon waehrend des Gespraechs laden, damit die Figuren beim
   // Aufsteigen nicht erst noch auf ihr Bild warten.
   useEffect(() => {
@@ -39492,7 +39821,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [bounceBehalten, setBounceBehalten] = useState({});
   // Der Socket-Hörer unten hängt mit `[]` am ERSTEN Render: der aktuelle Brettzustand kommt über diese Referenz.
   const spielerLiveRef = useRef(gameState.players);
+  // Rarity-Gedächtnis für Flüge ohne Ereignis-Rarity (`ppRarityLookup`): die Spielerlisten des jetzigen und des vorigen Zustands.
+  const spielerVorherRef = useRef(null);
+  if (spielerLiveRef.current !== gameState.players) spielerVorherRef.current = spielerLiveRef.current;
   spielerLiveRef.current = gameState.players;
+  window.ppRarityMem = { jetzt: gameState.players, vorher: spielerVorherRef.current };
   // ★ v1366: Surprise-Abflug-Schluessel (`sp-<owner>-<hero>`) fallen weg,
   // sobald der Zustand die Zone geleert hat — eine danach neu gesetzte
   // Surprise darf nicht mitverborgen werden.
@@ -40851,9 +41184,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // the rest so the player's eye lands on the legal picks.
     const pickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (pickHandCard) {
-      // Handzugriffs-Effekte meinen die HAND — Vorratskarten sind
-      // keine legalen Ziele (Als Ruling), also immer ausgegraut.
-      if (fromCreation) return true;
+      // 12.11.: Vorratskarten nur, wenn der Prompt sie anbietet (`creationEligibleIndices`) — „Karte aus der Hand benutzen“ gilt auch fuer Crestinas Vorrat.
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);
       const eligible = gameState.effectPrompt.eligibleIndices;
       return !(!eligible || eligible.includes(handIdx));
     }
@@ -40861,7 +41193,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand Pick mode (Shard of Chaos) — dim ineligible cards
     const handPickActive = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickActive) {
-      if (fromCreation) return true;   // siehe oben
+      if (fromCreation) return !(gameState.effectPrompt.creationEligibleIndices || []).includes(handIdx);   // 12.11.: Vorrat nur, wenn der Prompt ihn anbietet
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       return !eligible.includes(handIdx);
     }
@@ -40893,7 +41225,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
     // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
     // Als Ruling (Al 26.10., Flame Avalanche): dieselbe Liste graut unter der Schadenssperre die reinen Gegner-Schadenskarten aus (`blockedByDamageLock`).
-    if ((me.searchLocked || me.damageLocked) && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
+    // Handy-Befund (Eye of Ren): `searchLockBlockedCards` ist die Ausgrau-Liste des Servers (`_cardBlockedBySearchLock`) und nur gefuellt, wenn eine Sperre wirkt — auch die harte
+    // Ablage-Ausgangssperre (Stäbe, Auge von Ren) und die Hand-Sperre, die KEINE der beiden Flaggen `searchLocked`/`damageLocked` setzen. Die Flaggen als Bedingung liessen
+    // Spontaneous Reappearance & Co. dort spielbar aussehen (der Server verweigert still); die Liste selbst ist die Wahrheit, andere Karten werden nicht beruehrt.
+    if (card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
@@ -41029,7 +41364,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out Ascended Heroes if no eligible base hero exists
       // (v704: Helden-Formen wie Tri Ad ebenso)
       if (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) {
-        return !irgendeinAufstieg(cardName, handIdx);
+        return !irgendeinAufstieg(cardName, fromCreation ? null : handIdx);   // Erlasse (Perilous Journey) zaehlen Handindizes — nie fuer eine Vorratskarte
       }
       return false;
     } else if (currentPhase === 3) {
@@ -41690,6 +42025,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const irgendeinAufstieg = (cardName, handIdx) =>
     (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx))
     || ((gameState.fremdAufstiegZiele || {})[cardName] || []).length > 0;
+  // Alle Helden (eigene + geliehene der Gegnerspalte), auf die diese Karte jetzt aufsteigen kann. Ein EINZIGER Ort fuer Klick-Aufstieg und die Wahl „Discard / Ascend"
+  // (Karten mit Abwurf-Handeffekt wie Stormkissed Waflav). Erlasse je Handkopie zaehlen Handindizes — fuer eine Vorratskarte (`fromCreation`) nie.
+  const aufstiegsHelden = (cardName, handIdx, fromCreation) => {
+    const eligible = [];
+    for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+      const h = me.heroes[hi];
+      if (heroCanAscendTo(h, hi, cardName, fromCreation ? null : handIdx)) eligible.push({ idx: hi, name: h.name });
+    }
+    // 29.9.: geliehene Helden (Gegnerspalte)
+    for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+      if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
+    }
+    return eligible;
+  };
+  // Aufstieg von einer Karte aus Hand/Vorrat starten: ein Held → sofort, mehrere → Heldenwahl.
+  const aufstiegStarten = ({ cardName, handIndex, fromCreation, card, eligible }) => {
+    if (eligible.length === 1) {
+      hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex, fromCreation: fromCreation || undefined,
+        heroOwner: eligible[0].heroOwner,
+      });
+    } else if (eligible.length > 1) {
+      setSpellHeroPick({ cardName, handIndex, fromCreation, card, eligible, isAscension: true });
+    }
+  };
 
   const canHeroPlayCard = (playerData, heroIdx, card, handIdx) => {
     const isOwn = playerData === me;
@@ -42197,6 +42556,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `targetHeroIdx` + `targetSlotIdx` in the response so the
     // script can skip its zone-pick prompt. Plain clicks behave
     // identically to the existing flow.
+    // ★ 12.11.: Klick auf eine Vorratskarte, die der Prompt anbietet (`creationEligibleIndices`) — die Antwort tragt `fromCreation: true` (Ziehen auf eine Zone gibt es dort nicht).
+    if (fromCreation && gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx
+        && (gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) {
+      if (e.cancelable) e.preventDefault();
+      ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation: true });
+      return;
+    }
     const pickHandCardActive = !fromCreation && gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     const pickHandCardPrompt = pickHandCardActive ? gameState.effectPrompt : null;
     const pickHandCardHosts = pickHandCardPrompt?.eligibleHostsByCardName?.[cardName] || null;
@@ -42224,6 +42590,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
+    // ★ 12.11.: Vorratskarten (`creationEligibleIndices`) wechseln ihre Auswahl in `handPickSelectedCz` (gleiche Obergrenze `maxSelect` fuer beide zusammen).
+    if (fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx) {
+      if (!(gameState.effectPrompt.creationEligibleIndices || []).includes(idx)) return;
+      if (e.cancelable) e.preventDefault();
+      const maxSelectCz = gameState.effectPrompt.maxSelect || 3;
+      if (!handPickSelectedCz.has(idx) && handPickSelected.size + handPickSelectedCz.size >= maxSelectCz) return;
+      if (window.playSFX) window.playSFX('ui_click');
+      setHandPickSelectedCz(prev => {
+        const next = new Set(prev);
+        if (next.has(idx)) next.delete(idx); else next.add(idx);
+        return next;
+      });
+      return;
+    }
     const handPickPrompt = !fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
       const eligible = gameState.effectPrompt.eligibleIndices || [];
@@ -42254,7 +42634,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         willChange = true; // Deselection always succeeds.
       } else if (nameLockActive && me.hand[idx] !== lockedName) {
         willChange = false; // Different name — locked out.
-      } else if (handPickSelected.size >= maxSelect) {
+      } else if (handPickSelected.size + handPickSelectedCz.size >= maxSelect) {
         willChange = false;
       } else if (thisType && typeLimits[thisType] !== undefined) {
         let selectedOfType = 0;
@@ -42269,7 +42649,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setHandPickSelected(prev => {
         const next = new Set(prev);
         if (next.has(idx)) { next.delete(idx); return next; }
-        if (next.size >= maxSelect) return prev;
+        if (next.size + handPickSelectedCz.size >= maxSelect) return prev;
         // Re-check the name lock inside the updater since `prev` may
         // differ from the closure-captured `handPickSelected` under
         // StrictMode/double-invocation. Same lookup pattern: peek any
@@ -42400,7 +42780,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) // v704: Helden-Formen (Tri Ad)
-      && irgendeinAufstieg(cardName, idx);
+      && irgendeinAufstieg(cardName, fromCreation ? null : idx);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     // ★★ v1225 (Als Befund 18.9.: „die Kopie der Karte haelt man
@@ -43316,7 +43696,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
-              if (heroCanAscendTo(hero, hi, cardName, idx)) {
+              if (heroCanAscendTo(hero, hi, cardName, fromCreation ? null : idx)) {
                 targetHero = hi; targetHeroOwner = undefined;
               }
             } else if (el.dataset.heroOwner === 'opp') {
@@ -43407,14 +43787,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               summonEligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
             }
           }
-          if (summonEligible.length > 0) {
+          // ★ 11.11. (Als Vorgabe): eine ASCENDED-Karte mit Abwurf-Handeffekt (Stormkissed Waflav: „discard this card … 1 Evolution Counter" ODER Aufstieg) bietet beim Klick
+          // die Wahl „Discard / Ascend", sobald der Aufstieg JETZT moeglich ist (Hand und Vorrat); sonst gilt der Handeffekt allein (Standard = Discard).
+          const ascendEligible = isAscensionPlayable ? aufstiegsHelden(cardName, idx, fromCreation) : [];
+          if (summonEligible.length > 0 || ascendEligible.length > 0) {
             // ★ 28.8., Als Befund: „Luna Kiai ist gehighlightet, aber der
             // Klick tut nichts." Luna Kiai ist eine CREATURE, der Klick
             // landet also in diesem Waehler — und der trug die Herkunft
             // nicht weiter. Beide Knoepfe sendeten danach einen
             // Vorrats-Index als HAND-Index; der Server lehnte ab, und
             // sichtbar passierte nichts.
-            setSummonOrRevealPick({ cardName, handIndex: idx, fromCreation, card, summonEligible });
+            setSummonOrRevealPick({ cardName, handIndex: idx, fromCreation, card, summonEligible, ascendEligible });
           } else {
             if (window.playSFX) window.playSFX('ui_click');
             socket.emit('activate_hand_card', {
@@ -43814,24 +44197,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           } else if (isAscensionPlayable) {
             // Click on Ascended Hero — find eligible base heroes
-            const eligible = [];
-            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-              const h = me.heroes[hi];
-              if (heroCanAscendTo(h, hi, cardName, idx)) {
-                eligible.push({ idx: hi, name: h.name });
-              }
-            }
-            // 29.9.: geliehene Helden (Gegnerspalte)
-            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-              if (kannFremdAufsteigen(hi, cardName)) eligible.push({ idx: hi, name: opp.heroes[hi].name, heroOwner: oppIdx });
-            }
-            if (eligible.length === 1) {
-              hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
-            heroOwner: eligible[0].heroOwner,
-          });
-            } else if (eligible.length > 1) {
-              setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isAscension: true });
-            }
+            aufstiegStarten({ cardName, handIndex: idx, fromCreation, card, eligible: aufstiegsHelden(cardName, idx, fromCreation) });
           } else if (isSurprisePlayable) {
             // Click on a Surprise card — find heroes with empty surprise zones
             const eligible = [];
@@ -44248,6 +44614,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // kippen behauptet einen Zusammenhang, den es nicht gibt.
   const handZieh = handDrag || playDrag || abilityDrag || null;
 
+  // ★ Beschwörung (app-fx-69, Bug „Kreatur springt nach dem Drop kurz wieder in die Hand"): Ab dem Drop (`play_creature`) bis der Server die Hand aktualisiert (je nach Engine-Vorlauf
+  // 0,3–0,6 s) war `playDrag` schon null, die Handkarte also wieder sichtbar, obwohl die Zone noch leer war. Jetzt bleibt SIE verborgen (Klasse `hand-dragging`, Platz eingeklappt wie beim Ziehen), bis sich
+  // die Hand ändert (Karte weg) oder `HAND_PLAY_WARTE_MS` um sind (Server lehnt ab / Frage abbricht: sie erscheint wieder). Zentral am Emit, damit Drop, Klick-Beschwörung und Touch-Drag gleich laufen.
+  const handPlayWartet = useRef(null), handLaengeRef = useRef(0);
+  handLaengeRef.current = hand.length;
+  const [, setHandPlayTick] = useState(0);
+  useEffect(() => {
+    if (!socket || typeof socket.emit !== 'function') return undefined;
+    const orig = socket.emit;
+    socket.emit = function (ev, d) {
+      try {
+        if (ev === 'play_creature' && d && Number.isInteger(d.handIndex) && !d.fromCreation && !window.__ppFx69HandAus) {
+          const alt = handPlayWartet.current;
+          if (alt && alt.timer) clearTimeout(alt.timer);
+          const w = { idx: d.handIndex, name: d.cardName, laenge: handLaengeRef.current, timer: setTimeout(() => { if (handPlayWartet.current === w) { handPlayWartet.current = null; setHandPlayTick(t => t + 1); } }, 1600) };
+          handPlayWartet.current = w;
+          Promise.resolve().then(() => setHandPlayTick(t => t + 1));
+        }
+      } catch (e) { /* ohne */ }
+      return orig.apply(this, arguments);
+    };
+    return () => { socket.emit = orig; if (handPlayWartet.current && handPlayWartet.current.timer) clearTimeout(handPlayWartet.current.timer); handPlayWartet.current = null; };
+  }, [socket]);
+  useEffect(() => {
+    const w = handPlayWartet.current;
+    if (!w) return;
+    if (hand[w.idx] !== w.name || hand.length !== w.laenge) { clearTimeout(w.timer); handPlayWartet.current = null; setHandPlayTick(t => t + 1); }
+  }, [hand]);
+
   // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
   // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
   // werden hinten angehaengt, ihre `origIdx` sind also die hoechsten.
@@ -44402,6 +44797,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const setPileViewer = useCallback((v) => { if (v && window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.7 }); _setPileViewerRaw(v); }, []);
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [handPickSelected, setHandPickSelected] = useState(new Set()); // hand indices selected for handPick prompt
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Vorrat zu): Auswahl im Vorrat (`creationEligibleIndices` des Prompts), zaehlt gegen dasselbe `maxSelect`.
+  const [handPickSelectedCz, setHandPickSelectedCz] = useState(new Set());
   const [blindPickSelected, setBlindPickSelected] = useState(new Set()); // opp hand indices selected for blindHandPick prompt
   const [stealMarkedMe, setStealMarkedMe] = useState(new Set()); // own hand indices marked for stealing (victim's screen)
   const [stealHiddenMe, setStealHiddenMe] = useState(new Set()); // own hand indices hidden during steal flight (victim)
@@ -44484,7 +44881,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
   // Clear stale hoveredPileCard when force-discard prompt ends
-  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
+  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setHandPickSelectedCz(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
   // Broadcast blind-pick selection to opponent so they see highlighted cards
   useEffect(() => {
     if (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx) {
@@ -44694,7 +45091,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `replace` (v694): raeumt den Stapel und zeigt NUR diese Karte —
     // ein Held, der in die Kette greift (Key), loest die Karte ab, auf
     // die er reagiert, statt sich daneben zu stellen.
-    const onReveal = ({ cardName, sfx, replace, fizzled }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName, fizzled: !!fizzled }]); };
+    const onReveal = ({ cardName, sfx, replace, fizzled, rarity, owner }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName, fizzled: !!fizzled, rarity: rarity || (window.ppRarityLookup ? window.ppRarityLookup(cardName, owner) : undefined) }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx, castOnly }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx && !castOnly) {
@@ -44731,14 +45128,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const onChainGeister = ({ geister }) => geisterSetzen(geister);
     const onChainUpdate = ({ links, vorlauf, geister }) => {
-      const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved' }] : [];
+      const vor = vorlauf ? [{ id: 'vorlauf', cardName: vorlauf.cardName, owner: vorlauf.owner, cardType: vorlauf.cardType, isInitialCard: true, _vorlauf: true, status: 'resolved', rarity: vorlauf.rarity || window.ppRarityLookup(vorlauf.cardName, vorlauf.owner) }] : [];
       geisterKettenRef.current = links.map(l => l.id);
       chainVorlaufRef.current = !!vorlauf;
       if (geister) geisterSetzen(geister);
       // Pixelart-Leiste (app-fx-53): beim ersten Update der Kette festlegen, ob sie läuft (sonst die schlichte Darstellung von heute)
       if (!chainFxRef.current && links.length >= 2) { const an = !!(window.ppFx53 && window.ppFx53.aktiv()); chainFxRef.current = an; setChainFx(an); }
       if (chainFxRef.current && window.ppFx53) window.ppFx53.vorladen(links.map(l => l.cardName));
-      setReactionChain([...vor, ...links.map(l => ({ ...l, isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
+      setReactionChain(prevK => [...vor, ...links.map(l => ({ ...l, rarity: l.rarity || ((prevK || []).find(x => x.id === l.id) || {}).rarity || window.ppRarityLookup(l.cardName, l.owner), isInitialCard: vorlauf ? false : l.isInitialCard, status: l.negated ? 'negated' : 'pending' }))]);
     };
     const chainIdx = (prev, i) => i + (prev?.[0]?._vorlauf ? 1 : 0);
     const fxDomIdx = (linkIndex) => linkIndex + (chainVorlaufRef.current ? 1 : 0);
@@ -44866,6 +45263,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ENTIRE rendering side here — including the SFX-for-anim cue,
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
+      // ★ Kraftstrom-Kugeln (app-fx-69): Biomancy-Token (`biomancy_bloom` mit `kraftstrom`) und Alchemy (`alchemy_kraftstrom`); true = erledigt, false = der normale Verteiler (Blumen) spielt.
+      if ((type === 'alchemy_kraftstrom' || (type === 'biomancy_bloom' && rest.kraftstrom === true)) && window.ppFx69Zone && window.ppFx69Zone({ type, owner, heroIdx, zoneSlot, ...rest }, myIdx)) {
+        if (type === 'biomancy_bloom' && window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
+        return;
+      }
+      if (type === 'alchemy_kraftstrom') return;   // nur ein Kraftstrom-Ereignis, kein eigener Animationstyp
+      // ★ Strong Ox Headbutt (app-fx-62): der Client entscheidet über den Rückfall. Geht der neue Sprung-Kopfstoß nicht (Retro, reduzierte Bewegung, Quelle ohne Figur …), spielt er die alte Kombination
+      // (Ramm-Anlauf + Explosion + Ochsen-Symbol) selbst — so, dass der Einschlag auf den Schadenszeitpunkt der Engine fällt (SCHADEN_MS 825 ms nach dem Ereignis: Anlauf 470 ms vorher + 150 ms Kontakt + 200 ms).
+      if (type === 'ox_headbutt' && window.ppFx62Pruefe && rest.von && (rest.von.owner === 0 || rest.von.owner === 1)) {
+        const hz = (o, hi) => document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(o, myIdx)}"][data-hero-idx="${hi}"]`);
+        const vEl = hz(rest.von.owner, rest.von.heroIdx);
+        const tEl = zoneSlot >= 0 ? document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(owner, myIdx)}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`) : hz(owner, heroIdx);
+        const grund = window.ppFx62Pruefe(vEl, tEl);
+        window.__ppFx62Grund = grund || 'neu';
+        // Aufladen vor dem Dash (app-fx-68): die Hocke des Kopfstoßes (Bild −19…−16, dazu der Absprung: 5 Bilder) bekommt Bodenringe — innerhalb des vorhandenen Anlaufs (125 ms Vorlauf), KEINE zusätzliche Zeit; Engine-Zeiten unverändert.
+        if (!grund && window.ppFx68Laden && vEl) setTimeout(() => { try { window.ppFx68Laden({ srcEl: vEl, ms: 150, nurRinge: true }); } catch (e) { /* ohne */ } }, 125);
+        if (grund) {
+          const ram = { sourceOwner: rest.von.owner, sourceHeroIdx: rest.von.heroIdx, targetOwner: owner, targetHeroIdx: heroIdx, cardName: rest.cardName, duration: 1200, ...(zoneSlot >= 0 ? { targetZoneSlot: zoneSlot } : null) };
+          setTimeout(() => onRamAnimation(ram), 470);
+          setTimeout(() => { onZoneAnim({ type: 'explosion', owner, heroIdx, zoneSlot }); onZoneAnim({ type: 'ox_impact', owner, heroIdx, zoneSlot }); }, 620);
+          return;
+        }
+      }
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
       const ownerLabel = ownerLbl(owner, myIdx);
       // ── `zoneType: 'board'` — die ganze Kampfflaeche (v580) ─────────
@@ -45021,6 +45441,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 x: q2.left + q2.width / 2, y: q2.top + q2.height / 2,
                 w: q2.width, h: q2.height, cardName: t.cardName || null,
                 zoneSlot: t.zoneSlot, el: el2,
+                idx: rest.targets.indexOf(t),   // Platz in der Zielliste der Engine (Flame Avalanche, app-fx-60: Trefferbild je Held aus seinem Platz)
               });
             }
             if (punkte.length) extra.targetPoints = punkte;
@@ -45101,12 +45522,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const v = rest.von;
         if (!v || !ankerEl || (v.owner !== 0 && v.owner !== 1)) return null;
         const lbl = ownerLbl(v.owner, myIdx);
-        const vSel = v.zoneType === 'surprise'
+        // `pile` ('deleted' | 'discard' | 'deck' | 'potion-deck'): ein Stapel des Besitzers als Quelle (Life Serum / Acid Vial, app-fx-70); Rückfall auf den Ablagestapel
+        // `handIdx`: die Handkarte des Besitzers an diesem Platz als Quelle (Potions, app-fx-70: der Effekt beginnt ÜBER der gespielten Karte); fehlt der Platz im DOM → Rückfall auf die Hand (Mitte)
+        const handEl = (v.handIdx != null && v.handIdx >= 0)
+          ? (document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} .hand-slot[data-hand-idx="${v.handIdx}"]`) || document.querySelector(`.game-hand-${lbl === 'me' ? 'me' : 'opp'} [data-hand-idx="${v.handIdx}"]`))
+          : null;
+        const vSel = handEl ? null : v.pile
+          ? `[data-${lbl === 'me' ? 'my' : 'opp'}-${/^(deleted|discard|deck|potion-deck)$/.test(v.pile) ? v.pile : 'discard'}]`
+          : v.zoneType === 'surprise'
           ? `[data-surprise-zone][data-surprise-owner="${lbl}"][data-surprise-hero="${v.heroIdx}"]`
           : (v.zoneSlot != null && v.zoneSlot >= 0)
             ? `[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${v.heroIdx}"][data-support-slot="${v.zoneSlot}"]`
             : `[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${v.heroIdx}"]`;
-        const vEl = document.querySelector(vSel);
+        const vEl = handEl || document.querySelector(vSel);
         if (!vEl) return null;
         const a = ankerEl.getBoundingClientRect(), b = vEl.getBoundingClientRect();
         if (!b.width) return null;
@@ -45115,6 +45543,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           vonDx: (b.left + b.width / 2) - (a.left + a.width / 2),
           vonDy: (b.top + b.height / 2) - (a.top + a.height / 2),
           vonW: b.width, vonH: b.height,
+          ...(handEl ? { vonHand: true } : null),   // Quelle ist eine Handkarte (app-fx-70: Effekt beginnt über der Karte)
+          ...(v.el === true ? { vonEl: vEl } : null),   // `von.el`: das Quell-Element selbst (Hammer Throw, app-fx-59: Fußlinie/Höhe der Figur des Werfers, Rückstoß)
         };
       };
       setTimeout(() => {
@@ -45193,6 +45623,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // zu — das Ereignis verpuffte still. Jetzt wackelt die Spielflaeche
     // (`.game-layout`) kurz; die Klasse wird per Reflow neu gestartet.
     const onScreenShake = ({ intensity }) => {
+      // ★ Trailer-Look (app-fx-67.jsx): Wackeln in ganzen Pixeln auf Brett und Effektschichten statt der weichen CSS-Fassung auf dem ganzen Spielfeld (samt Hand); aus → alte Fassung unten
+      if (window.ppFx67EngineWackeln && window.ppFx67EngineWackeln(intensity)) return;
       const el = document.querySelector('.game-layout');
       if (!el) return;
       const klasse = intensity === 'heavy' ? 'pp-wackeln-stark' : 'pp-wackeln';
@@ -45401,7 +45833,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-to-board card-fly animation. The server fires this right before
     // the sendGameState that removes the card from the owner's hand, so the
     // source cardback is still in the DOM at the handIndex we were told.
-    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim, destOwner }) => {
+    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim, destOwner, fromCreation }) => {
       // Don't animate for the owner — they already saw their own
       // drag/drop. `_forceOwnerAnim: true` opts the owner back in,
       // used for card-effect chain summons (Raptoren's bonus summon)
@@ -45410,9 +45842,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // server-side flight is the ONLY visual cue.
       const ownerIsMe = ownerIdx === myIdx;
       if (ownerIsMe && !_forceOwnerAnim) return;
-      const sourceEl = ownerIsMe
-        ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
-        : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      // ★ 12.11.: `fromCreation` — die Karte kommt aus Crestinas Vorrat (Extra-Hand); `handIndex` zaehlt dort.
+      const sourceEl = fromCreation
+        ? document.querySelector(`[data-creation-owner="${ownerIsMe ? 'me' : 'opp'}"] [data-creation-idx="${handIndex}"]`)
+        : (ownerIsMe
+          ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
+          : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`));
       // For cross-side placement (Powder Keg etc.), the destination is
       // on the OPPOSITE side from the playing player — `destOwner` (if
       // provided by the server) points at the host side, not the
@@ -45527,6 +45962,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sourceEl = ownerIdx === myIdx
           ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
           : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      } else if (source === 'creation') {
+        // Crestinas Vorrat („Extra-Hand"): Aufstieg aus dem Vorrat (`performAscension`, `fromCreation`) — der Flug startet am Vorratsplatz, nicht am Coolness-Stapel.
+        sourceEl = document.querySelector(`[data-creation-owner="${ownerIdx === myIdx ? 'me' : 'opp'}"] [data-creation-idx="${handIndex}"]`);
       } else if (source === 'coolnessStack') {
         // Stack-equip path (Modnir / Swellpnir / Swagdri free-play /
         // Glorious Rebirth / Hipdall self-summon). Source is the
@@ -46572,7 +47010,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Zone. Self-contained (raw DOM, like onPunchImpact) plus a
     // React-state slot-mask so the real card stays hidden across the
     // re-renders that happen mid-flight (damage application etc.).
-    const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration }) => {
+    const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration, rarity }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_pusher_fling');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
@@ -46621,7 +47059,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ].join(';');
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner);
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         img.draggable = false;
         card.appendChild(img);
@@ -46641,7 +47079,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('play_pusher_fling', onPusherFling);
     // ★ 25.10. (Ultimate Destroyer Punch, Crash Landing): die KARTE selbst fliegt in Pixelschritten (`ppKartenWurf`) — `throw` zum Helden, `crash` in den Ablagestapel. Die Quell-Zone ist
     // währenddessen leer gemalt (gleiche Maske wie beim Pusher), der Standardflug zur Ablage wird auf Wunsch unterdrückt (`suppressDiscard`, gleicher Eimer wie Brackle).
-    const onCardThrow = ({ mode, cardName, fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, discardOwner, suppressDiscard, duration }) => {
+    const onCardThrow = ({ mode, cardName, fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, discardOwner, suppressDiscard, duration, rarity }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(mode === 'crash' ? 'ev_card_crash' : mode === 'shatter' ? 'ev_card_shatter' : 'ev_card_throw');
       const srcEl = document.querySelector(`[data-support-zone][data-support-owner="${ownerLbl(fromOwner, myIdx)}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromSlot}"]`);
       const dstEl = mode === 'shatter' ? srcEl : mode === 'crash'
@@ -46663,7 +47101,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sm.set(suppressKey, (sm.get(suppressKey) || 0) + 1);
       }
       const stop = ppKartenWurf({
-        mode, cardUrl: window.cardImageUrl ? window.cardImageUrl(cardName) : null, dauer,
+        mode, cardUrl: window.cardImageUrl ? ppRarityUrl(window.cardImageUrl(cardName), ppRarityOf(CARDS_BY_NAME[cardName], rarity || ppRarityLookup(cardName, fromOwner)), true) : null, dauer,   // Basiskarte der Rarity (Rahmen/Stempel); der Wurf ist Pixelwerk ohne Funkenebene
         A: { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2, w: sr.width, h: sr.height },
         B: { x: dr.left + dr.width / 2, y: dr.top + dr.height / 2, w: dr.width, h: dr.height },
       });
@@ -46824,7 +47262,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('red_lightning_rain', onRedLightningRain);
     // ── Area card placement: big flashy descend + shockwave ──
-    const onAreaDescend = ({ owner, cardName, fromPile }) => {
+    const onAreaDescend = ({ owner, cardName, fromPile, rarity }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
       const zonenSel = `[data-area-zone][data-area-owner="${ownerLabel}"]`;
       const tgtEl = document.querySelector(zonenSel);
@@ -46866,36 +47304,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             85%  { transform: translate(-50%, 6px) rotateZ(-1deg) scale(1.12); filter: brightness(1.3); } /* pp-ok: drehung */
             100% { transform: translate(-50%, 0) rotateZ(0deg) scale(1); opacity: 1; filter: brightness(1); }
           }
-          @keyframes areaImpactRing {
-            0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 1; }
-            60%  { transform: translate(-50%, -50%) scale(2.6); opacity: 0.6; }
-            100% { transform: translate(-50%, -50%) scale(4.2); opacity: 0; }
-          }
-          @keyframes areaImpactFlash {
-            0%   { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
-            40%  { transform: translate(-50%, -50%) scale(1.8); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
-          }
-          @keyframes areaDustParticle {
-            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
-            30%  { opacity: 1; }
-            100% { opacity: 0; transform: translate(calc(-50% + var(--adx)), calc(-50% + var(--ady))) scale(1.4); }
-          }
-          @keyframes areaBgFlash {
-            0%   { opacity: 0; }
-            30%  { opacity: 1; }
-            100% { opacity: 0; }
-          }
         `;
         document.head.appendChild(style);
       }
 
-      // Full-viewport flash dimming (feels "important")
-      const flashBg = document.createElement('div');
-      // Pixelart: der Verlauf steht fest im Stil (das Netz in pixel-hart.js macht ihn zum gedithertem Pixelbild, Groesse aus width/height), nur die Deckkraft laeuft
-      flashBg.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;pointer-events:none;z-index:9995;background:radial-gradient(ellipse at center, rgba(255,241,150,.55) 0%, rgba(249,172,32,.25) 30%, transparent 70%);animation:areaBgFlash 1.1s ease-out forwards;`;
-      document.body.appendChild(flashBg);
-      setTimeout(() => flashBg.remove(), 1200);
+      // Vollbild-Schein (Dither-Leinwand in Hero-Pixel-Zellen, s. ppAreaSchein)
+      if (window.ppAreaSchein) window.ppAreaSchein(1100);
 
       // Falling card body — uses card image when available, large scale
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
@@ -46936,7 +47350,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner);
         img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:6px;box-shadow:0 0 28px rgba(255,208,102,.9),0 0 60px rgba(249,172,32,.5);border:2px solid rgba(251,225,129,.95);`;
         img.draggable = false;
         cardEl.appendChild(img);
@@ -46958,55 +47372,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       };
       requestAnimationFrame(folgeBild);
 
-      // Impact ring + flash at landing point — fires right before the
-      // card fully settles (~75% into the fall). Ziel und Breite dort, wo die Zone zu diesem Zeitpunkt steht.
+      // Aufprall (Ring, Blitz, Staub) — Pixelart-Szene `area_impact`; feuert kurz bevor die Karte sich ganz setzt (~75 % des Falls), an der Stelle, wo die Zone JETZT steht.
       setTimeout(() => {
-        const { cx, cy, w: zoneW } = zielJetzt();
-        const ring = document.createElement('div');
-        ring.style.cssText = [
-          `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${zoneW * 1.2}px`, `height:${zoneW * 1.2}px`,
-          `border:4px solid rgba(255,228,105,.95)`, `border-radius:50%`,
-          `box-shadow:0 0 40px rgba(251,225,129,.8), inset 0 0 30px rgba(255,208,102,.4)`,
-          `pointer-events:none`, `z-index:10005`,
-          `animation:areaImpactRing .9s ease-out forwards`,
-        ].join(';');
-        document.body.appendChild(ring);
-        setTimeout(() => ring.remove(), 950);
-
-        const flash = document.createElement('div');
-        flash.style.cssText = [
-          `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-          `width:${zoneW * 1.6}px`, `height:${zoneW * 1.6}px`,
-          `background:radial-gradient(circle, rgba(255,251,210,.95) 0%, rgba(255,208,102,.55) 35%, transparent 75%)`,
-          `border-radius:50%`,
-          `pointer-events:none`, `z-index:10004`,
-          `animation:areaImpactFlash .7s ease-out forwards`,
-        ].join(';');
-        document.body.appendChild(flash);
-        setTimeout(() => flash.remove(), 750);
-
-        // Radial dust particles
-        for (let i = 0; i < 18; i++) {
-          const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.3;
-          const dist = 60 + Math.random() * 80;
-          const dx = Math.cos(angle) * dist;
-          const dy = Math.sin(angle) * dist * 0.6;
-          const size = 6 + Math.random() * 10;
-          const p = document.createElement('div');
-          p.style.cssText = [
-            `position:fixed`, `left:${cx}px`, `top:${cy}px`,
-            `width:${size}px`, `height:${size}px`,
-            `border-radius:50%`,
-            `background:rgba(${200 + Math.random() * 55},${160 + Math.random() * 70},${60 + Math.random() * 80},.9)`,
-            `box-shadow:0 0 10px rgba(251,200,106,.5)`,
-            `pointer-events:none`, `z-index:10006`,
-            `--adx:${dx}px`, `--ady:${dy}px`,
-            `animation:areaDustParticle .7s ease-out forwards`,
-          ].join(';');
-          document.body.appendChild(p);
-          setTimeout(() => p.remove(), 750);
-        }
+        const el = tgtEl.isConnected ? tgtEl : document.querySelector(zonenSel);
+        if (el) playAnimation('area_impact', el, { duration: 1000 });
       }, 820);
     };
     socket.on('area_descend', onAreaDescend);
@@ -47116,7 +47485,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Eine Angelschnur haengt an einem Punkt ueber der Ziel-Zone; der Haken packt die Karte im Ablagestapel,
     // zieht sie hoch zum Aufhaengepunkt, sie pendelt hin und her (gedaempfte Schwingung) und wird dann in die
     // Ziel-Zone abgeseilt. Reine DOM-/rAF-Animation (Schnur = gedrehtes Element zwischen Anker und Karte).
-    const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs }) => {
+    const onFishingCatch = ({ owner, cardName, toOwner, toHeroIdx, toSlotIdx, durationMs, rarity }) => {
       if (window._playAnimations === false) return;
       const ownerLabel = ownerLbl(owner, myIdx);
       const toLabel = ownerLbl((toOwner ?? owner), myIdx);
@@ -47138,7 +47507,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const haken = mk(`left:0;top:0;width:12px;height:12px;border:3px solid #ebdcc1;border-top-color:transparent;border-radius:50%;z-index:10022;box-shadow:0 0 6px rgba(255,248,232,.7);`);
       const karte = mk(`left:0;top:0;width:${cardW}px;height:${cardH}px;border-radius:5px;z-index:10019;box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 14px rgba(104,198,253,.7);border:2px solid rgba(180,223,248,.9);overflow:hidden;background:linear-gradient(135deg,#77c8ee,#405f8c);`);
       karte.className = 'card-flight';
-      if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
+      if (imgUrl) { const im = document.createElement('img'); im.src = imgUrl; ppFlugRarity(im, cardName, rarity, owner); im.draggable = false; im.style.cssText = 'width:100%;height:100%;object-fit:cover;'; karte.appendChild(im); }
       const sfx = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
       sfx('elem_water', { rate: 1.35, volume: 1.2 }, 0);              // Auswerfen/Platschen
       sfx('reveal', { rate: 0.9, volume: 1.0 }, 0.18 * total);          // Haken packt zu
@@ -48699,8 +49068,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 500);
     };
     socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
-    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch }) => {
-      if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType, rueckwaerts, durch, lade }) => {
+      // `lade` (ms): Aufladen vor dem Dash (app-fx-68, Server `_rammLadenAnmelden`) — der Dash beginnt erst nach dieser Zeit, der Server wartet entsprechend länger. Der Ton gehört zum Dash-Start.
+      const ladeMs = (lade > 0 && lade <= 600 && !rueckwaerts && trailType !== 'fire') ? lade : 0;   // (auch bei Kill-Switch/Retro/reduzierter Bewegung: die Wartezeit bleibt, nur Ringe und Flackern entfallen)
+      if (window.playSFX) { if (ladeMs) setTimeout(() => window.playSFX('attack_ram', { category: 'effect' }), ladeMs); else window.playSFX('attack_ram', { category: 'effect' }); }
       const srcLabel = ownerLbl(sourceOwner, myIdx);
       const tgtLabel = ownerLbl(targetOwner, myIdx);
       // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
@@ -48748,8 +49119,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       // ★ Trailer-Look (app-fx-27.jsx): rammt ein HELD mit animierter Figur, fährt die FIGUR (Streckung, Nachbilder, Federung), und die Karte bleibt stehen. Dieselbe Dauer und dieselben
       // Aufprallanteile wie die Keyframes (`rammeBisKontakt` im Server wartet darauf). Ohne fahrbereite Figur (Kreatur, Held ohne Sheet, versteinert/gelähmt/unsichtbar, tot) → alter Kartenpfad.
-      if (!(sourceZoneSlot != null && sourceZoneSlot >= 0) && window.ppFx27RammFigur) {
-        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch });
+      const heldDash = !(sourceZoneSlot != null && sourceZoneSlot >= 0);
+      if (ladeMs && heldDash && window.ppFx68Laden) { try { window.ppFx68Laden({ srcEl, tgtEl, ms: ladeMs }); } catch (e) { /* ohne Aufladen */ } }
+      if (heldDash && window.ppFx27RammFigur) {
+        const fahrt = window.ppFx27RammFigur({ srcEl, tgtEl, dur, trailType, rueckwaerts: !!rueckwaerts, cardName, durch, lade: heldDash ? ladeMs : 0 });
         if (fahrt) {
           // Nur der Jetpack-Schweif (`MoniaJetTrail`) braucht einen Eintrag: auf Körperhöhe der Figur statt an den Füßen, bis dorthin, wo die Figur landet. `figur: true` → die Zone
           // blendet dabei NICHTS aus (`isRamming` ignoriert diese Einträge).
@@ -48765,8 +49138,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
       }
+      const _kartenFahrt = () => {
+      // Rarity der rammenden Karte: die der Karte auf dem Quellplatz im jetzigen Zustand (Held: die des Helden), sonst aus dem Gedächtnis.
+      const _ramRar = (() => {
+        const pr = spielerLiveRef.current?.[sourceOwner]?.rarity;
+        if (!pr) return undefined;
+        if (sourceZoneSlot != null && sourceZoneSlot >= 0) return (pr.supportZones?.[sourceHeroIdx]?.[sourceZoneSlot] || [])[0] || undefined;
+        return pr.heroes?.[sourceHeroIdx] || undefined;
+      })();
       setRamAnims(prev => [...prev, {
-        id, cardName,
+        id, cardName, rarity: _ramRar,
         srcX: sr.left + sr.width / 2 + _fo.dx, srcY: sr.top + sr.height / 2 + _fo.dy,
         tgtX: tr.left + tr.width / 2 + _fo.dx, tgtY: tr.top + tr.height / 2 + _fo.dy,
         srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx,
@@ -48783,8 +49164,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // deshalb unsichtbar, er hält nur die Ebene am Leben.
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)),
         dur + (trailType === 'fire' ? JET_TAIL_MS : 0));
+      };
+      if (ladeMs && heldDash) setTimeout(_kartenFahrt, ladeMs); else _kartenFahrt();   // Kartenpfad (Held ohne Figur): Aufladen = Wartezeit (die Ringe zeichnet ppFx68Laden)
     };
     socket.on('play_ram_animation', onRamAnimation);
+    // Der Held wirkt (Spell/Attack aus der Hand, Fähigkeit): Hüpfer + Silhouetten-Flackern (app-fx-68). Nur Optik; der Server sendet es beim Commit der Karte.
+    const onHeroCast = ({ owner, heroIdx, art }) => {
+      try {
+        if (!window.ppFx68Wirkt) return;
+        const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(owner, myIdx)}"][data-hero-idx="${heroIdx}"]`);
+        if (el) window.ppFx68Wirkt(el, art);
+      } catch (e) { /* nur Optik */ }
+    };
+    socket.on('hero_cast', onHeroCast);
 
     // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER — eine durchgehende Choreografie über alle Hits (Schlag auf Schlag): die Heldenkarten rasen aus ihren Zonen in
     // die Mitte, krachen ineinander (Hit 1), prallen zurück, krachen wieder (Hit 2, 3), und gehen erst nach dem letzten Hit heim. Jedes `play_hero_clash` mit Phase `hit` hängt der
@@ -50125,7 +50517,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('divine_time_rewind', onDivineTimeRewind);
 
-    const onDiscardToDeck = ({ owner, cardNames }) => {
+    const onDiscardToDeck = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       const discardSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
       const deckSel = isMe ? '[data-my-deck]' : '[data-opp-deck]';
@@ -50175,7 +50567,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `;
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -50193,7 +50585,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx, chainLinkId, flugMs, halten, rarity }) => {
+      // Einäscherung (app-fx-66): sich selbst zerstörende Karte vom Brett — brennt auf ihrem Platz, die Essenz fliegt zum Stapel (Rückfall: alter Flug)
+      const _ea = flightStyle === 'einaescherung' && from === 'support' && (to === 'discard' || to === 'deleted') && typeof window.ppFx66Moeglich === 'function' && window.ppFx66Moeglich();
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -50649,7 +51043,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             next.delete(hideKey);
             return next;
           });
-        }, 720);
+        }, _ea ? (window.PP_FX66_LANDUNG_MS || 2033) + 600 : 720);   // Einäscherung: der Platz bleibt bis nach der Landung verborgen
       }
 
       // ★★ v1347: die eingesogene Kreatur hat ihre Zone verborgen
@@ -50665,14 +51059,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      if (halten && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+      // ★ app-fx-70 (Nutzer 14.11.: „die anderen Handkarten rücken noch nicht auf"): auch der Abflug einer Potion Hand → Gelöscht lässt ihren Platz sofort aus dem Hand-Layout fallen (kein unsichtbarer
+      // Platzhalter, die übrigen Karten rücken mit dem Hand-Übergang nach), solange der Zustand die Karte noch in der Hand führt (früher Flug von Life Serum / Acid Vial: erst das Ende der Auflösung
+      // nimmt sie heraus). Kommt der Zustand, passt `len` nicht mehr → kein zweites Springen. Notnagel 6 s (bleibt die Karte aus irgendeinem Grund in der Hand, klappt der Platz wieder auf).
+      const _potionAbflug = !halten && from === 'hand' && to === 'deleted' && !chainLinkId && !window.__ppFx70FlugAus && !window.__ppFx70HandAus;
+      if ((halten || _potionAbflug) && from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
         const _lp = spielerLiveRef.current?.[srcOwner];
         const _len = srcIsMe ? (_lp?.hand?.length ?? null) : (_lp?.handCount ?? null);
         if (_len != null) {
           const rec = { owner: srcOwner, idx: fromHandIdx, card: cardName, len: _len };
           handFlipRef.current = performance.now();
           setHandFrueh(prev => [...prev, rec]);
-          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), 60000);
+          setTimeout(() => setHandFrueh(prev => prev.filter(r => r !== rec)), halten ? 60000 : 6000);
         }
       }
       if (chainLinkId) geisterFreigeben(chainLinkId);   // Maße sind genommen: der Geist darf aus der Hand (die Kopie fliegt von seinem Platz los)
@@ -50817,6 +51215,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const laneDelay = usesPileLane
         ? takePileFlightLane(1)
         : boardDelay;
+      // Einäscherung starten (misst Quelle/Ziel einmal, malt in eigene Leinwände); null → alter Flug unten
+      const _eaLauf = _ea ? window.ppFx66Starten({ srcEl, tgtEl, cardName, delayMs: laneDelay || 0 }) : null;
 
       const card = document.createElement('div');
       // `card-flight` opts the element out of the no-animations CSS
@@ -50866,7 +51266,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : isWindstorm
           ? 'pileTransferWindstorm'
           : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : (flugMs > 0 ? flugMs : 700)));   // flugMs: kurzer Kettenflug (Server `_kettenTakt`)
+      const durationMs = _eaLauf ? _eaLauf.landungMs : _ausDemSog ? SOG_FLUG_MS : (isZickzack ? ZICKZACK_FLUG_MS : isSchleuder ? SCHLEUDER_FLUG_MS : (isWindstorm ? 1200 : (flugMs > 0 ? flugMs : 700)));   // flugMs: kurzer Kettenflug (Server `_kettenTakt`)
       const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
         : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
@@ -50913,7 +51313,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Karte im Stapel stand — ein kurzes Loch (Als Befund, Diamond).
         // Die Kopie liegt in diesem Moment noch deckend ueber dem Platz.
         setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
-          Math.max(0, (laneDelay || 0) + Math.round(durationMs * 0.8) - PILE_AUFDECKEN_VORLAUF_MS));
+          Math.max(0, (laneDelay || 0) + Math.round(durationMs * (_eaLauf ? 1 : 0.8)) - PILE_AUFDECKEN_VORLAUF_MS));   // Einäscherung: die Essenz trifft zum Ende der Laufzeit
       }
       // ★ LANDEKLANG (Als Befund 26.9., Idej-Anlegen zu Spielbeginn war
       // stumm). Gegenstueck zu `sfx` (Abflug): ein Flug darf auch einen
@@ -50925,6 +51325,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX(landSfx, { dedupe: 0 }),
           (laneDelay || 0) + Math.round(durationMs * 0.8));
       }
+      if (_eaLauf) return;   // Einäscherung läuft in eigenen Leinwänden (app-fx-66): kein Flugkarten-Element
       // ★ v1062: Start UND Weg auf ganze Pixel runden. `srcX`/`srcY`
       // kommen aus `getBoundingClientRect()` und sind fast immer
       // gebrochen; zusammen mit der laufenden `scale()`-Fahrt muss die
@@ -50972,6 +51373,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const mZiel = STAPEL_ORTE[to] ? kartenMassAmBildschirm(tgtEl, 'stapel')
         : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
         : massFuer(to);
+      // ★ app-fx-70 (Nutzer 13.11.: „die Potion wird weg TELEPORTIERT"): Handkarten, die in den GELÖSCHT-Stapel gehen (Potions), fliegen über den Kartenflug-Baustein (app-fx-65): Bogen, Abhebe-Funken,
+      // Pixel-Schatten, Schweif, Landeringe in Rot — offen (kein Umdrehen), ca. 0,56 s, 30 Bilder/s auf dem globalen Takt (der alte CSS-Flug hing an der Dokumentuhr). Der Stapel wächst bei 560 ms
+      // (die `setHidden`-Zähler oben rechnen mit 0,8 · 700 ms). Quelle gemessen im selben Augenblick (der Handplatz klappt erst danach zusammen). Rückfall (`null`): Retro, reduzierte Bewegung,
+      // `__ppFx65Aus`, `window.__ppFx70FlugAus`, Reihe (laneDelay > 0) → der CSS-Flug darunter.
+      if (from === 'hand' && to === 'deleted' && cardName && !faceDown && !chainLinkId && !halten && !flightStyle && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 560, akzent: 'rot', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
+      // ★ app-fx-70 (Nutzer 14.11., Biomancy): die Potion wird VOM GELÖSCHT-STAPEL als Token in die Support Zone bewegt (`flightStyle: 'biomancy'`): derselbe Kartenflug in Grün, 700 ms (die Zone ist bis 720 ms
+      // verborgen, der Token erscheint mit der Landung; seine Landung zeigt `ppFx69BioLandung`, das `biomancy_bloom`-Ereignis hat die Zone gemerkt). Rückfall: der CSS-Flug darunter.
+      if (from === 'deleted' && to === 'support' && flightStyle === 'biomancy' && cardName && !faceDown && !laneDelay && !window.__ppFx70FlugAus && window.PpFx65 && window.PpFx65.kartenFlug) {
+        const kf = window.PpFx65.kartenFlug({
+          von: srcEl, nach: tgtEl, owner: tgtOwner, karten: [{ name: cardName, rarity }], versatz: 0, reise: 700, akzent: 'gruen', umdrehen: false,
+          start: { b: mQuelle.b, h: mQuelle.h }, masse: { b: mZiel.b, h: mZiel.h },
+        });
+        if (kf) return;
+      }
       // Zickzack-Flug: die Karte hebt gleich im Mass ihres Ziels ab (keine stufenlose Skalierung eines Kartenbildes).
       const flugB = (isZickzack || isSchleuder) ? mZiel.b : mQuelle.b, flugH = (isZickzack || isSchleuder) ? mZiel.h : mQuelle.h;
       const ptScale = (!isZickzack && !isSchleuder && mQuelle.b > 0) ? (mZiel.b / mQuelle.b) : 1;
@@ -51013,7 +51434,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, document);
       if (imgUrl) {
         const img = document.createElement('img');
-        img.src = imgUrl;
+        img.src = imgUrl; if (!faceDown) ppFlugRarity(img, cardName, rarity, fromOwner ?? owner);
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         img.draggable = false;
         inhalt.appendChild(img);
@@ -52533,7 +52954,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('side_deck_appear', onSideDeckAppear);
 
-    const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
+    const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration, rarities }) => {
       const isMe    = owner === myIdx;
       // Pre-register the milled names so the pile-growth auto-detector
       // doesn't spawn a phantom board→pile flight when one of these
@@ -52574,6 +52995,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = document.querySelector(deckSel);
       const tgtEl = document.querySelector(discardSel);
       if (!srcEl || !tgtEl || !cardNames || cardNames.length === 0) return;
+
+      // ★ app-fx-65 (Trailer-Look): Karte hebt verdeckt vom Deck ab, dreht sich im Flug um, Pixel-Schatten am Boden, Abhebe-Funken, Schweif, Schockringe bei der Landung.
+      // Zeitvertrag mit der Engine unveraendert (Start der Karte i = i · 200 ms, Landung 560 ms bzw. 700 ms bei Haltephase, Stapel waechst ueber die Zaehler oben).
+      // Gibt `kartenFlug` null zurueck (Retro, reduzierte Bewegung, Animationen aus, Notbremse `__ppFx65Aus`), laeuft die alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 200, reise: (holdDuration || 0) > 0 ? 700 : 560, halten: holdDuration || 0, akzent: deleteMode ? 'rot' : 'violett', masse: flugMass('stapel'),
+      })) return;
 
       const sr  = srcEl.getBoundingClientRect();
       const tr  = tgtEl.getBoundingClientRect();
@@ -52643,7 +53072,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src        = imgUrl;
+          img.src        = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable  = false;
           card.appendChild(img);
@@ -52665,7 +53094,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // physically migrate from one pile to the other instead of just
     // silently disappearing. Mirrors `onDeckToDiscard` but with the
     // discard pile as the source.
-    const onDiscardToDeleted = ({ owner, cardNames }) => {
+    const onDiscardToDeleted = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       // Pre-register the names with the deletedPile-growth auto-
@@ -52681,6 +53110,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = document.querySelector(srcSel);
       const tgtEl = document.querySelector(tgtSel);
       if (!srcEl || !tgtEl) return;
+      // ★ app-fx-65: derselbe Trailer-Flug wie Deck → Ablage (offen, rot); Landung 560 ms = `landAtMs` der Engine (Phase C), Versatz 160 ms je Karte. Rueckfall: alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 160, reise: 560, akzent: 'rot', umdrehen: false, masse: flugMass('stapel'),
+      })) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const srcX = sr.left + sr.width / 2;
@@ -52728,7 +53162,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -52749,7 +53183,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // out of the deleted pile (Yang). Distinct green-cyan glow ("back
     // from oblivion") so a glance distinguishes it from the red-purple
     // deletion flight.
-    const onDeletedToDiscard = ({ owner, cardNames }) => {
+    const onDeletedToDiscard = ({ owner, cardNames, rarities }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       // Pre-register so the discardPile-growth auto-detector doesn't
@@ -52764,6 +53198,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = document.querySelector(srcSel);
       const tgtEl = document.querySelector(tgtSel);
       if (!srcEl || !tgtEl) return;
+      // ★ app-fx-65: derselbe Trailer-Flug wie Deck → Ablage (offen, gruen wie der bisherige Schein „zurueck aus dem Nichts"); Landung 560 ms, Versatz 160 ms je Karte (`_scheduleSelfDeleteTransit`). Rueckfall: alte CSS-Fassung unten.
+      if (window.PpFx65 && window.PpFx65.kartenFlug({
+        von: srcEl, nach: tgtEl, owner, karten: cardNames.map((n, i) => ({ name: n, rarity: rarities && rarities[i] })),
+        versatz: 160, reise: 560, akzent: 'gruen', umdrehen: false, masse: flugMass('stapel'),
+      })) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const srcX = sr.left + sr.width / 2;
@@ -52810,7 +53249,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl;
+          img.src = imgUrl; ppFlugRarity(img, cardNames[i], rarities && rarities[i], owner);
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false;
           card.appendChild(img);
@@ -52826,7 +53265,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deleted_to_discard_animation', onDeletedToDiscard);
 
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner, zoneKind }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source, destOwner, zoneKind, rarity }) => {
       const ownerLabel = ownerLbl(owner, myIdx);
       // 29.9.: Ziel-Zone eines geliehenen Helden liegt auf der anderen Seite.
       const zielLabel = ownerLbl((destOwner ?? owner), myIdx);
@@ -52890,7 +53329,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ].join(';');
         if (imgUrl) {
           const img = document.createElement('img');
-          img.src = imgUrl; img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.src = imgUrl; ppFlugRarity(img, cardName, rarity, owner); img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
           img.draggable = false; card.appendChild(img); card.style.opacity = '1';
         } else {
           card.style.background = 'linear-gradient(135deg,#332300,#27180c)';
@@ -53084,7 +53523,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
-    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount }) => {
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs, toBaseCount, rarities }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_hand_steal');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
@@ -53190,7 +53629,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const imgUrl = name ? window.cardImageUrl(name) : null;
           if (imgUrl) {
             const img = document.createElement('img');
-            img.src = imgUrl;
+            img.src = imgUrl; ppFlugRarity(img, name, rarities && rarities[i], fromPlayer);
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
             img.draggable = false;
             flyEl.appendChild(img);
@@ -53680,6 +54119,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('hero_cast', onHeroCast);
       socket.off('play_hero_clash', onHeroClash);
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
@@ -56720,7 +57160,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const supZones = p.supportZones || [];
     const surZones = p.surpriseZones || [];
     const islandCounts = p.islandZoneCount || [0, 0, 0];
+    // Rarity je Karteninstanz dieser Seite (Server: players[i].rarity in Zonenform, null = Common; fehlt = alles Common).
+    const rar = p.rarity || {};
+    const rarAb = (hi, z) => ((rar.abilityZones || [])[hi] || [])[z] || [];
+    const rarSup = (hi, z) => ((rar.supportZones || [])[hi] || [])[z] || [];
     const ownerLabel = isOpp ? ((Number.isInteger(sideOwner) && sideOwner !== outerOppIdx) ? 'mini' + sideOwner : 'opp') : 'me';
+    // Name der Figur, die für den Helden `hi` dieser Seite auf dem Brett steht (vorgezogene Gestalt → Skin des Besitzers → Basis-Held).
+    // Skins sind ebenfalls animiert (`data/hero-animations/<skin-slug>`): Traegt der Besitzer dieses Helden einen Skin fuer die Karte, steht
+    // dessen Figur auf dem Brett statt der des Basis-Helden. Nach dem BESITZER (`p.deckSkins`) statt nach `gameSkins`, denn dort
+    // ueberschreibt der Gegner bei gleichem Helden den eigenen Skin. Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
+    // Auch die Creature „Clone" nutzt das: sie zeigt immer die Figur des Heroes ihrer Spalte.
+    const heldFigurName = (hi) => {
+      const basis = (formPreview && formPreview.owner === (isOpp ? oppIdx : myIdx) && formPreview.heroIdx === hi
+        && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : p?.heroes?.[hi]?.name;
+      const sk = basis ? p?.deckSkins?.[basis] : null;
+      return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : basis;
+    };
 
     // Board skin: extract number from board ID (e.g. "board1" → "1")
     const boardNum = p.board ? p.board.replace(/\D/g, '') : null;
@@ -56825,7 +57280,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const surpriseTarget = isDraggingSurpriseCard && playDrag?.isSurprise && playDrag.targetHero === i;
           const ascensionIneligible = playDrag?.isAscension && (isOpp
             ? (hero?.charmedBy === myIdx && !kannFremdAufsteigen(i, playDrag.cardName))   // 29.9.: geliehener Held
-            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.idx));
+            : !heroCanAscendTo(heroes[i], i, playDrag.cardName, playDrag.fromCreation ? null : playDrag.idx));
           const ascensionTarget = playDrag?.isAscension && playDrag.targetHero === i
             && (isOpp ? playDrag.targetHeroOwner === oppIdx : playDrag.targetHeroOwner == null);
           // v673: pickHandCard-Drag auf HELDEN-Zonen (Open Invitation).
@@ -57022,18 +57477,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Karte, zeigt SIE die Status (Partikel, Tönung, Eis, Stein) — die
           // Status-Overlays der Karte entfallen dann (doppelt und teuer).
           // Helden ohne Spritesheet behalten ihre Karten-Overlays.
-          const figurBasisName = (formPreview && formPreview.owner === pi && formPreview.heroIdx === i
-            && CARDS_BY_NAME[formPreview.cardName]) ? formPreview.cardName : hero?.name;
-          // Skins sind ebenfalls animiert (`data/hero-animations/<skin-slug>`):
-          // Traegt der Besitzer dieses Helden einen Skin fuer die Karte, steht
-          // dessen Figur auf dem Brett statt der des Basis-Helden. Nach dem
-          // BESITZER (`p.deckSkins`) statt nach `gameSkins`, denn dort
-          // ueberschreibt der Gegner bei gleichem Helden den eigenen Skin.
-          // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
-          const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
-          const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
-          // ★ Held als Kreatur (Hulijing): liegt eine Kreatur auf dem Helden, zeigt das Brett deren Karte — die Heldenfigur steht dann nicht darüber.
-          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && HeroIdleAnims.hatAnimation(figurName));
+          const figurName = heldFigurName(i);
+          // ★ Held als Kreatur (Hulijing): liegt eine Kreatur auf dem Helden, zeigt das Brett deren Karte — die Heldenfigur steht dann nicht darüber,
+          // sondern die Figur der KREATUR (`data/creature-animations`), sofern sie eine hat; sonst wie bisher nur die Karte.
+          const kreaturFigur = !!(kreaturFigurenZeigen && hero?.heldKreatur && HeroIdleAnims.hatKreaturAnimation(hero.heldKreatur.name));
+          const figurMoeglich = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (!hero.heldKreatur || kreaturFigur));
+          const figurDa = figurMoeglich && (kreaturFigur || HeroIdleAnims.hatAnimation(figurName));
           // Aufstiegs-Morph dieses Helden (s. HeroIdleSprite): alte und neue Figur stehen zugleich da.
           const aufstiegHier = !!(ascMorph && ascMorph.ownerLabel === ownerLabel && ascMorph.heroIdx === i);
           // Chain target pick
@@ -57229,8 +57678,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         })}
                       </div>
                     ));
+                    const heroRar = (rar.heroes || [])[i] || undefined;
                     const heroCardProps = {
-                      hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
+                      hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero', rarity: heroRar,
                       children: orbsEl || undefined,
                       orbs: hero.ascensionOrbs,
                       skins: p.deckSkins ? window.ppSkinMerge(gameSkins, p.deckSkins) : gameSkins, abilities: p.abilityZones?.[i],
@@ -57262,14 +57712,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return <AttachableCreatureCard
                         creatureName={hero.heldKreatur.name}
                         heldHero={hero.name}
-                        {...heroCardProps} />;
+                        {...heroCardProps} rarity={undefined} overlayRarity={heroRar} />;
                     }
                     if (hero._shapeshiftBase && CARDS_BY_NAME[hero._shapeshiftBase]) {
                       return <AttachableCreatureCard
                         creatureName={hero.name}
                         shapeshiftBase={hero._shapeshiftBase}
                         tooltipCardOverride={CARDS_BY_NAME[hero._shapeshiftBase]}
-                        {...heroCardProps} />;
+                        {...heroCardProps} rarity={undefined} overlayRarity={heroRar} />;
                     }
                     // v1188: vorgezogene Gestalt (siehe formPreview)
                     const _vorgezogen = (formPreview
@@ -57306,11 +57756,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && !hero.heldKreatur && (() => {
+                {figurMoeglich && (() => {
                   const skinFuer = (n) => { const sk = n ? p?.deckSkins?.[n] : null; return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : n; };
                   const basis = (
                   <HeroIdleSprite
-                    cardName={figurName}
+                    cardName={kreaturFigur ? hero.heldKreatur.name : figurName}
+                    kreatur={kreaturFigur}
                     eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
                     angehalten={!!(isFrozen || isStunned)}
                     eingefroren={!!isFrozen}
@@ -57342,8 +57793,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // Immer ein Feld mit Schluesseln: die Hauptfigur behaelt ihre Identitaet,
                   // wenn die alte Figur fuer den Morph dazukommt und wieder geht.
                   return aufstiegHier ? [
-                    React.cloneElement(basis, { key: 'alt', cardName: skinFuer(ascMorph.oldHero), aufstieg: { rolle: 'alt', t0: ascMorph.t0 } }),
-                    React.cloneElement(basis, { key: 'haupt', cardName: skinFuer(ascMorph.newHero), aufstieg: { rolle: 'neu', t0: ascMorph.t0 } }),
+                    React.cloneElement(basis, { key: 'alt', kreatur: false, cardName: skinFuer(ascMorph.oldHero), aufstieg: { rolle: 'alt', t0: ascMorph.t0 } }),
+                    React.cloneElement(basis, { key: 'haupt', kreatur: false, cardName: skinFuer(ascMorph.newHero), aufstieg: { rolle: 'neu', t0: ascMorph.t0 } }),
                   ] : [React.cloneElement(basis, { key: 'haupt' })];
                 })()}
                 {/* Aufstiegs-Morph: weisses Licht ueber der Karte; der Kartenwechsel (Sync) faellt in den Hoehepunkt. */}
@@ -57785,7 +58236,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     selbst, nicht an ihrem Rahmen — sonst verschwand die
                     ganze Surprise Zone kurz mit (die Regel verbirgt alle
                     Kinder des markierten Elements). */}
-                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={(isOpp ? !(p.surpriseKnown || [])[i] : (surZones[i] || []).length > 0) && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
+                <BoardZone type="surprise" cards={surZones[i] || []} rarities={((rar.surpriseZones || [])[i]) || undefined} faceDown={(isOpp ? !(p.surpriseKnown || [])[i] : (surZones[i] || []).length > 0) && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
                   dataAttrs={(bounceOutgoingHidden.has(`sp-${pi}-${i}`) && (surZones[i] || []).length > 0) ? { 'data-bounce-hiding': 'true' } : undefined} />
                 {/* Reduced-level badge — only when the server-computed
                     effective Surprise level differs from the printed
@@ -58064,7 +58515,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     style={zsMerge('ability', (canActivate || attachPickZoneValid || isValidPotionTarget || isPengueSrc || isPengueDestActive) ? { cursor: 'pointer' } : undefined)}>
                     {cards.length > 0 ? (
                       <>
-                        <AbilityStack cards={cards} />
+                        <AbilityStack cards={cards} rarities={rarAb(i, z)} />
                         {/* Ladungen einer „up to X times per turn"-Ability.
                             Al will den Zaehler ausdruecklich AN DER ABILITY
                             sehen, nicht am Helden (16.8.) — Lethes
@@ -58174,6 +58625,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _behalten = bounceBehalten[`${isOpp ? oppIdx : myIdx}-${i}-${z}`];
               const cards = (_behalten != null && cardsVoll.length > _behalten && _behalten > 0
                 && cardsVoll.every(n => n === cardsVoll[0])) ? cardsVoll.slice(0, _behalten) : cardsVoll;
+              const rarCards = rarSup(i, z);   // Rarity je Karte dieses Platzes (gleiche Reihenfolge wie `cards`)
               // Cross-side equip drag (Powder Keg etc.) drops onto OPP's
               // row instead of own — flip the side gate to `isOpp` when
               // the drag is flagged cross-side.
@@ -58861,13 +59313,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // ★ Darion: die gezogene Ausruestung kommt als Vorschau OBEN auf den Stapel (der Stapel bleibt sichtbar).
                     <EquipStack cards={[...cards, playDrag.cardName]} skins={gameSkins} geist />
                   ) : (isPlayTarget || isAutoTarget) && playDrag.card && !(cards.length > 0 && cards.every(n => n === playDrag.cardName)) ? (
-                    <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
+                    <BoardCard cardName={playDrag.cardName} rarity={me.rarity?.[playDrag.fromCreation ? 'creationZone' : 'hand']?.[playDrag.idx] || undefined} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === pendingAdditionalPlay.cardName))) ? (
-                    <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                    <BoardCard cardName={pendingAdditionalPlay.cardName} rarity={ppRarityLookup(pendingAdditionalPlay.cardName, myIdx)} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z
                       && !(cards.length > 0 && cards.every(n => n === oppPendingPlacement.cardName))) ? (
-                    <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                    <BoardCard cardName={oppPendingPlacement.cardName} rarity={ppRarityLookup(oppPendingPlacement.cardName, oppIdx)} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
                     if (cc?._dying) return null;
@@ -58877,7 +59329,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // sah ein Stapel der Hoehe 2 wie eine einzelne
                     // Karte aus (Als Befund 5.9.).
                     if (CARDS_BY_NAME[cards[0]]?.cardType === 'Ability') {
-                      return <AbilityStack cards={cards} />;
+                      return <AbilityStack cards={cards} rarities={rarCards} />;
                     }
                     // Multi-zone Creature placeholder slot (Populated
                     // Island Turtle's `_ZoneBlocked` sentinel). The
@@ -58918,10 +59370,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (cc?.faceDown) {
                       if (isOpp) {
                         // Opponent sees known re-set surprise: face-up, semi-transparent
-                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6, filter: 'sepia(0.3)' }} />;
+                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} style={{ opacity: 0.6, filter: 'sepia(0.3)' }} />;
                       } else {
                         // Owner sees own face-down surprise: face-up, semi-transparent (like surprise zones)
-                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
+                        return <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} style={{ opacity: 0.6 }} />;
                       }
                     }
                     // ── Geliehene Identität (Future Tech Copy Device) ──
@@ -58937,6 +59389,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return <AttachableCreatureCard
                         creatureName={cc._ftCopyOf}
                         mimicCreature={cards[0]}
+                        overlayRarity={rarCards[0] || undefined}
                         skins={gameSkins}
                       />;
                     }
@@ -58984,8 +59437,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       : undefined; return !isCreature ? (
                       <>
                         {equipStapelAnzeige
-                          ? <EquipStack cards={cards} skins={gameSkins} />
-                          : <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />}
+                          ? <EquipStack cards={cards} skins={gameSkins} rarities={rarCards} />
+                          : <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} rarity={rarCards[cards.length-1] || undefined} />}
                         {ladung ? (
                           <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
                             onMouseEnter={e => showGameTooltip(e, ladung.max != null
@@ -59110,6 +59563,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           return <AttachableCreatureCard
                             creatureName={cards[0]}
                             attachedHero={cc.attachedHero}
+                            rarity={rarCards[0] || undefined}
                             hp={curHp} maxHp={mHp} hpPosition="creature"
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}
@@ -59138,6 +59592,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                               <AttachableCreatureCard
                                 creatureName={cards[0]}
                                 nestedUnder={cc._nestedUnder}
+                                rarity={rarCards[0] || undefined}
                                 hp={curHp} maxHp={mHp} hpPosition="creature"
                                 skins={gameSkins} style={creatureStyle}
                                 tooltipCardOverride={tooltipOverride}
@@ -59154,6 +59609,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           return <AttachableCreatureCard
                             creatureName={cards[0]}
                             mimicCreature={cc._effectOverride}
+                            rarity={rarCards[0] || undefined}
                             hp={curHp} maxHp={mHp} hpPosition="creature"
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}
@@ -59175,12 +59631,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         const _effLvl = CARDS_BY_NAME[cards[0]]?.level != null || cc?._cardDataOverride?.level != null
                           ? _cardLvl + _delta + _letheBonus
                           : null;
-                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
-                          effectiveLevel={_effLvl} stampBonus={_letheBonus} />;
+                        // ★ CREATURE-FIGUR: wie bei den Helden steht die Idle-Figur der Creature auf ihrer Karte (gleiche Sprite-Ebene, gleicher Maßstab, gleicher Takt —
+                        // `HeroIdleSprite`). Nur für die schlichte, offene Einzelkreatur dieses Zweigs: keine Figur bei verdeckt/sterbend (oben schon abgezweigt), im
+                        // Rammflug oder Abflug der Karte, bei Stapeln, Nest, angelegtem Helden, Mimik/Kopie und Illusionen (dafür hat die Figur keine Darstellung) —
+                        // dort bleibt es bei der Karte. Ohne Sheet (noch nicht animierte Creatures) ebenso. Die Karte behält ihre Status-Overlays; die Figur zeigt
+                        // nur, was sie selbst kann: Stillstand, Eis, Stein, Tönungen. „Clone" hat kein eigenes Sheet und zeigt die Figur des Heroes seiner Spalte.
+                        const _figur = (() => {
+                          if (!kreaturFigurenZeigen || isSupportRamming || cc?._xuanwuRevived || cc?._illusionSummon) return null;
+                          if (!p.equipShareHeroes?.[i] && (bounceOutgoingHidden.has(cKey) || bounceOutgoingHidden.has(`${cKey}::${cards[0] || ''}`))) return null;
+                          let name = cards[0], kreatur = true;
+                          if (HeroIdleAnims.kopiertHeld(name)) {
+                            const wirt = p.heroes?.[i];
+                            if (!wirt?.name || !(wirt.hp > 0)) return null;
+                            if (wirt.heldKreatur) name = wirt.heldKreatur.name;
+                            else { name = heldFigurName(i); kreatur = false; }
+                          }
+                          if (!(kreatur ? HeroIdleAnims.hatKreaturAnimation(name) : HeroIdleAnims.hatAnimation(name))) return null;
+                          const stein = !!(cc?._petrified || cc?._baihuPetrify);
+                          return <HeroIdleSprite key="figur" cardName={name} kreatur={kreatur} massstab={kreatur ? undefined : HeroIdleAnims.kreaturMass()} ohnePartikel
+                            eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
+                            angehalten={!!(cc?.frozen || cc?.stunned || stein)}
+                            eingefroren={!!cc?.frozen}
+                            versteinert={stein}
+                            effekte={[
+                              cc?.stunned && !stein ? 'stunned' : '',
+                              cc?.burned ? 'burned' : '',
+                              cc?.poisoned ? 'poisoned' : '',
+                              (cc?.negated || cc?.nulled) ? 'negated' : '',
+                              _ccSporified ? 'sporen' : '',
+                            ].filter(Boolean).join(' ')} />;
+                        })();
+                        return <>
+                          <BoardCard cardName={cards[0]} rarity={rarCards[0] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
+                            effectiveLevel={_effLvl} stampBonus={_letheBonus} />
+                          {_figur}
+                        </>;
                       })()
                     ) : (
                       <div className="board-stack">
-                        {(() => { const curHp = cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
+                        {(() => { const curHp = cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} rarity={rarCards[cards.length-1] || undefined} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
                     {/* ── Geteilte Zone: Stueckzahl + Nachschlagen ──
@@ -59486,7 +59975,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 tutorialGegner ? tutorialGegner.name
                 : (gameState.isCpuBattle && opp.username === 'CPU')
                   ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
-                  : opp.username
+                  : (window.PpTitled ? <window.PpTitled name={opp.username} title={opp.title} /> : opp.username)
               }</span>
               {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
             </div>
@@ -59572,7 +60061,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={i}
                   ref={(el) => {
                     if (!el) return;
-                    const c = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    const c0 = revealEntry && CARDS_BY_NAME[revealEntry.name];
+                    const c = c0 && revealEntry.rarity ? { ...c0, rarity: revealEntry.rarity } : c0;   // aufgedeckte Gegnerkarte in ihrer Rarity
                     el._ppTip = c ? (revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c) : null;   // fuer ppHandTipp
                   }}
                   className={'board-card hand-card'
@@ -59633,13 +60123,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('trigger_treacherous_crystal', { roomId: gameState.roomId });
                   } : undefined))}>
                   {revealEntry ? (
-                    <img src={cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : '')} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
+                    <><img src={ppRarityUrl(cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : ''), ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity))} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
                       onMouseEnter={() => {
-                        const c = CARDS_BY_NAME[revealEntry.name];
+                        const c0 = CARDS_BY_NAME[revealEntry.name];
+                        const c = c0 && revealEntry.rarity ? { ...c0, rarity: revealEntry.rarity } : c0;
                         // 23.10.: eine aufgedeckte Gegnerkarte mit gesenkter Stufe (Great Vanguard Demon) zeigt sie auf der Karte (`?lv=`, wie die eigene Hand) und im Tooltip
                         if (c) setBoardTooltip(revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c);
                       }}
                       onMouseLeave={() => setBoardTooltip(null)} />
+                    {CARDS_BY_NAME[revealEntry.name] && ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity) !== 'common' && <CardFoil card={CARDS_BY_NAME[revealEntry.name]} rarity={ppRarityOf(CARDS_BY_NAME[revealEntry.name], revealEntry.rarity)} />}</>
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                   )}
@@ -59661,7 +60153,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {(opp.creationZone || []).map((cardName, ci) => (
                   <div key={'oppcz' + ci} className="creation-slot"
                     data-creation-idx={ci} data-card-name={cardName}>
-                    <BoardCard cardName={cardName} skins={gameSkins} />
+                    <BoardCard cardName={cardName} skins={gameSkins} rarity={opp.rarity?.creationZone?.[ci] || undefined} />
                   </div>
                 ))}
               </div>
@@ -59790,8 +60282,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} rarities={opp.rarity?.discardPile} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} rarities={opp.rarity?.deletedPile} /></div>
               <div className="board-util-spacer" />
             </div>
             {/* ★ v1472 (Als Vorgabe 28.9.: „Ganz links im Battle-Screen,
@@ -59824,8 +60316,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} rarities={me.rarity?.deletedPile} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries} rarities={me.rarity?.discardPile}
                 /* Liegt etwas Benutzbares in der Ablage (Future Tech
                    Prototypes), leuchtet der STAPEL — sonst muesste man
                    ihn jede Runde aufklappen, um nachzusehen. Das
@@ -60171,7 +60663,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? `☠️${gameState.doomCounters?.[myIdx] || 0}/20` : null}
                     onClick={onMyAreaClick}
                     renderStack={(cards) => (
-                      <AreaStack cards={cards} entries={myAreaEntries}
+                      <AreaStack cards={cards} entries={myAreaEntries} rarities={me.rarity?.area}
                         onActivate={activateArea(myIdx)} effectLocked={isEffectLocked}
                         targeting={zielwahlFuer(myIdx)}
                         charge={(gameState.zoneCharges || []).find(c => c.zone === 'area') || null} />
@@ -60184,7 +60676,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? `☠️${gameState.doomCounters?.[oppIdx] || 0}/20` : null}
                     onClick={onOppAreaClick}
                     renderStack={(cards) => (
-                      <AreaStack cards={cards} entries={oppAreaEntries}
+                      <AreaStack cards={cards} entries={oppAreaEntries} rarities={opp.rarity?.area}
                         onActivate={activateArea(oppIdx)} effectLocked={isEffectLocked}
                         targeting={zielwahlFuer(oppIdx)}
                         charge={null} />
@@ -60229,7 +60721,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               || (opp.coolnessStack || []).length > 0
               || (gameState.areaZones?.[oppIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-opp">
-                {(opp.permanents || []).map(perm => {
+                {(opp.permanents || []).map((perm, permIdx) => {
                   const permTargetId = `perm-${oppIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -60249,7 +60741,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
                         ...(csVerdeckt.has(`${oppIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
                       }}>
-                      <BoardCard cardName={perm.name} />
+                      <BoardCard cardName={perm.name} rarity={opp.rarity?.permanents?.[permIdx] || undefined} />
                       {perm.teleportalUntil != null && (
                         <div className="perm-tohand-badge"
                           title="Joins their hand at the start of their next turn">
@@ -60277,6 +60769,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     : (fullyMasked
                         ? opp.coolnessStack[stackLen - 1]
                         : opp.coolnessStack[visibleLen - 1]);
+                  const csTopRar = (opp.rarity?.coolnessStack || [])[fullyMasked ? stackLen - 1 : visibleLen - 1] || undefined;
                   const stackTargetId = `coolness-${oppIdx}`;
                   const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
                   const isSelectedStackTarget = selectedSet.has(stackTargetId);
@@ -60284,13 +60777,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div data-opp-coolness="1"
                       className={'board-coolness-slot' + (isValidStackTarget ? ' potion-target-valid' : '') + (isSelectedStackTarget ? ' potion-target-selected' : '')}
                       onClick={isValidStackTarget ? () => togglePotionTarget(stackTargetId)
-                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack, preserveOrder: true }) : undefined)}
-                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack, preserveOrder: true, rarities: opp.rarity?.coolnessStack }) : undefined)}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(csTopRar ? { name: topName, rarity: csTopRar } : topName)}
                       onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
                       style={isValidStackTarget ? { cursor: 'pointer' } : undefined}>
                       {topName ? (
                         <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
-                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                          <BoardCard cardName={topName} rarity={csTopRar} label={visibleLen > 1 ? `${visibleLen}` : null} />
                         </div>
                       ) : (
                         // Empty placeholder — same dimensions as a card
@@ -60308,7 +60801,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               || (me.coolnessStack || []).length > 0
               || (gameState.areaZones?.[myIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-me">
-                {(me.permanents || []).map(perm => {
+                {(me.permanents || []).map((perm, permIdx) => {
                   const permTargetId = `perm-${myIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -60328,7 +60821,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1284: verdeckt, solange die Enthuellung noch fliegt.
                         ...(csVerdeckt.has(`${myIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
                       }}>
-                      <BoardCard cardName={perm.name} />
+                      <BoardCard cardName={perm.name} rarity={me.rarity?.permanents?.[permIdx] || undefined} />
                       {/* ★ v1084 („Teleportal", Als Vorgabe 14.9.): das
                           offene Permanent ist hier nur ZWISCHENSTATION —
                           es kommt am naechsten Rundenbeginn auf die Hand.
@@ -60359,6 +60852,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     : (fullyMasked
                         ? me.coolnessStack[stackLen - 1]
                         : me.coolnessStack[visibleLen - 1]);
+                  const csTopRar = (me.rarity?.coolnessStack || [])[fullyMasked ? stackLen - 1 : visibleLen - 1] || undefined;
                   const stackTargetId = `coolness-${myIdx}`;
                   const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
                   const isSelectedStackTarget = selectedSet.has(stackTargetId);
@@ -60382,7 +60876,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ? () => togglePotionTarget(stackTargetId)
                     : canPlayFromStack
                       ? () => socket.emit('play_from_coolness_stack', { roomId: gameState.roomId })
-                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack, preserveOrder: true }) : undefined);
+                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack, preserveOrder: true, rarities: me.rarity?.coolnessStack }) : undefined);
                   return (
                     <div data-my-coolness="1"
                       className={'board-coolness-slot'
@@ -60390,12 +60884,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         + (isSelectedStackTarget ? ' potion-target-selected' : '')
                         + (canPlayFromStack ? ' coolness-playable' : '')}
                       onClick={onStackClick}
-                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(csTopRar ? { name: topName, rarity: csTopRar } : topName)}
                       onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
                       style={(isValidStackTarget || canPlayFromStack) ? { cursor: 'pointer' } : undefined}>
                       {topName ? (
                         <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
-                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                          <BoardCard cardName={topName} rarity={csTopRar} label={visibleLen > 1 ? `${visibleLen}` : null} />
                         </div>
                       ) : (
                         <div style={{ width: 'var(--zone-w, 68px)', height: 'var(--zone-h, 95px)' }} />
@@ -60431,7 +60925,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           <div className="board-util board-util-right">
             <div className="board-util-side">
-              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')} stapelN={opp.deckCount}>
                 {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"
                   onMouseEnter={(e) => {
                     const top = opp.deckTopVisible?.[0];
@@ -60465,7 +60959,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="board-card-label">{opp.deckCount}</div></div>
                 : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
-              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')} stapelN={opp.potionDeckCount}>
                 {opp.potionDeckCount > 0 ? <div className="board-card face-down" data-opp-potion-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
                 : <div className="board-card" data-opp-potion-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
@@ -60475,13 +60969,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }} data-my-potion-deck="1">
-              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
+              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')} stapelN={me.potionDeckCount}>
                 {me.potionDeckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>
                 : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
-              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
+              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')} stapelN={me.deckCount}>
                 {me.deckCount > 0 ? <div className="board-card face-down"
                   onMouseEnter={(e) => {
                     const top = me.deckTopVisible?.[0];
@@ -60519,7 +61013,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
-            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
+            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{window.PpTitled ? <window.PpTitled name={me.username} title={me.title} /> : me.username}</span>
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
           {isSpectator ? (
@@ -60549,7 +61043,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (item.isGeist) return (
                   <div key={'g-' + item.geist.id} className="hand-slot hand-geist hand-card-dimmed" data-hand-geist={item.geist.id} data-card-name={item.card}
                     style={{ ...(window.handFanStyle?.(i, anzeigeHand.length, { seite: 'me' })) }}>
-                    <BoardCard cardName={item.card} noTooltip skins={gameSkins} />
+                    <BoardCard cardName={item.card} noTooltip skins={gameSkins} rarity={ppRarityLookup(item.card, myIdx)} />
                   </div>
                 );
                 // ★ 28.8., Als Befund: „wird immer in der Main-Hand
@@ -60557,7 +61051,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // einen VORRATS-Index — der darf hier keine Handkarte
                 // treffen. `handDragEigen`/`playDragEigen` sind bereits
                 // auf die eigene Quelle gefiltert.
-                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
+                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx) || (handPlayWartet.current && handPlayWartet.current.idx === item.origIdx && handPlayWartet.current.name === item.card);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
                 const isHandLockBlocked = dimmed && me.handLocked && (me.handLockBlockedCards || []).includes(item.card);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
@@ -60608,7 +61102,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                   return selectedOfType >= typeLimits[thisType];
                 })();
-                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size >= (gameState.effectPrompt.maxSelect || 3);
+                const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size + handPickSelectedCz.size >= (gameState.effectPrompt.maxSelect || 3);
                 // Heinz-style name lock — once a card is picked, all
                 // hand cards with a different name are dimmed and
                 // un-clickable. Already-selected cards stay highlighted
@@ -60797,9 +61291,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
-                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
+                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(me.rarity?.hand?.[item.origIdx] ? { name: item.card, rarity: me.rarity.hand[item.origIdx] } : item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} rarity={me.rarity?.hand?.[item.origIdx] || undefined}
                       handLevel={handEffectiveLevel} handCost={handEffectiveCost} handNotes={handNotes} />
                     {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
@@ -60836,11 +61330,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   // einzige indexbasierte Regel, deshalb blieb eine
                   // aktivierbare Luna Kiai im Vorrat ausgegraut.
                   const czDimmed = getCardDimmed(cardName, item.origIdx, true);
+                  // ★ 12.11.: Vorratskarten werden wie Handkarten GESPIELT — AKTUELLE Stufe und Kosten stehen auf der Karte (gruen = verringert, rot = erhoeht), wie in der Hand. Stufe vom Server
+                  // (`creationLevels`, nur bei Abweichung vom Druck); Kosten: Rusting-Crystal-Aufschlag (`applyCrystalCostMods`), sonst gedruckt.
+                  const czLevel = (me.creationLevels || {})[item.origIdx] ?? null;
+                  const czKosten = (() => {
+                    if (czCard?.cost == null || czCard.costLabel) return null;
+                    const k = applyCrystalCostMods(me, cardName, czCard.cost);
+                    return k !== czCard.cost ? Math.max(0, k) : null;
+                  })();
+                  const czNotes = [];
+                  if (czLevel != null) czNotes.push({ color: czLevel > (czCard?.level ?? 0) ? '#fe5154' : '#75f091', text: `Level ${czLevel} in your Creation Zone (printed ${czCard?.level}).` });
+                  if (czKosten != null) czNotes.push({ color: czKosten > czCard.cost ? '#fe5154' : '#75f091', text: `Cost ${czKosten} in your Creation Zone (printed ${window.cardCostText ? window.cardCostText(czCard) : czCard.cost}).` });
                   // ★ 28.8.: Abwurf-Prompt DIREKT IN DER ZONE, nach dem
                   // Muster des Handabwurfs — statt einer zweiten
                   // Galerie. Waehlbar ist nur, was der Server
                   // freigegeben hat; die gerade aufloesende Karte ist
                   // dort nicht dabei.
+                  // ★ 12.11.: Hand-Auswahl-Prompts (`pickHandCard`/`handPick`) bieten Vorratskarten ueber `creationEligibleIndices` an — gleiche Hervorhebung wie in der Hand.
+                  const czEp = gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+                  const czWaehlbarPick = !!czEp && (czEp.type === 'pickHandCard' || czEp.type === 'handPick')
+                    && (czEp.creationEligibleIndices || []).includes(item.origIdx);
+                  const czPickGewaehlt = !!czEp && czEp.type === 'handPick' && handPickSelectedCz.has(item.origIdx);
+                  const czPickVoll = czWaehlbarPick && czEp.type === 'handPick' && !czPickGewaehlt
+                    && handPickSelected.size + handPickSelectedCz.size >= (czEp.maxSelect || 3);
                   const czPrompt = gameState.effectPrompt?.type === 'creationDiscard'
                     && gameState.effectPrompt?.ownerIdx === myIdx;
                   const czWaehlbar = czPrompt
@@ -60848,6 +61360,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return (
                     <div key={'cz' + item.origIdx}
                       className={'creation-slot' + (item.isDragged ? ' hand-dragging' : '')
+                        + (czPickGewaehlt ? ' hand-pick-selected' : '')
+                        + (czEp && czEp.type === 'handPick' && czEp.highlightStyle === 'strong' ? ' hand-pick-stark' + (!czWaehlbarPick ? ' hand-card-dimmed' : '') : '')
+                        + (czWaehlbarPick && !czPickGewaehlt && !czPickVoll ? (czEp.highlightStyle === 'urgent' ? ' hand-pick-eligible hand-pick-eligible-urgent' : ' hand-pick-eligible') : '')
+                        + (czPickVoll ? ' hand-card-dimmed' : '')
                         + (czPrompt
                             ? (czWaehlbar ? ' hand-discard-target' : ' hand-card-dimmed')
                             : (czDimmed ? ' hand-card-dimmed' : ''))}
@@ -60868,7 +61384,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onHandMouseDown(e, item.origIdx, true);
                       }}
                       onTouchStart={(e) => { if (!czPrompt) onHandMouseDown(e, item.origIdx, true); }}>
-                      <BoardCard cardName={cardName} skins={gameSkins} />
+                      <BoardCard cardName={cardName} skins={gameSkins} rarity={me.rarity?.creationZone?.[item.origIdx] || undefined}
+                        handLevel={czLevel} handCost={czKosten} handNotes={czNotes} />
                     </div>
                   );
                 })}
@@ -60902,7 +61419,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Floating draw animation cards (outside game-layout to avoid overflow clip) */}
       {!isSpectator && drawAnimCards.map(anim => (
         <DrawAnimCard key={anim.id} cardName={anim.cardName} origIdx={anim.origIdx}
-          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} />
+          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} rarity={me.rarity?.hand?.[anim.origIdx] || undefined} />
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
@@ -60982,25 +61499,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
             startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
             delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
-            startW={anim.startW} startH={anim.startH} endW={anim.endW} />
+            startW={anim.startW} startH={anim.startH} endW={anim.endW} rarity={anim.rarity} owner={anim.owner} />
         ))}
       </div>
       {discardAnims.filter(a => !a.welt).map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
           delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
-          startW={anim.startW} startH={anim.startH} endW={anim.endW} />
+          startW={anim.startW} startH={anim.startH} endW={anim.endW} rarity={anim.rarity} owner={anim.owner} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
       {handDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${handDrag.mouseX - (handDrag.griffX ?? 32)}px, ${handDrag.mouseY - (handDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={handDrag.cardName} />
+          <BoardCard cardName={handDrag.cardName} rarity={me.rarity?.[handDrag.fromCreation ? 'creationZone' : 'hand']?.[handDrag.idx] || undefined} />
         </div>
       )}
       {playDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - (playDrag.griffX ?? 32)}px, ${playDrag.mouseY - (playDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={playDrag.cardName} />
+          <BoardCard cardName={playDrag.cardName} rarity={me.rarity?.[playDrag.fromCreation ? 'creationZone' : 'hand']?.[playDrag.idx] || undefined} />
         </div>
       )}
       {/* Stufen-Hinweis beim Ziehen einer Karte mit heldenabhängiger Stufe (You are the Chosen One!!!): die Stufe, die sie für den Helden unter dem Zeiger hätte. Auf Wurzelebene (über
@@ -61012,7 +61529,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
       {abilityDrag && (
         <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${abilityDrag.mouseX - (abilityDrag.griffX ?? 32)}px, ${abilityDrag.mouseY - (abilityDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
-          <BoardCard cardName={abilityDrag.cardName} />
+          <BoardCard cardName={abilityDrag.cardName} rarity={me.rarity?.[abilityDrag.fromCreation ? 'creationZone' : 'hand']?.[abilityDrag.idx] || undefined} />
         </div>
       )}
 
@@ -61220,7 +61737,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             '--ramAngle': (r.angle || 0) + 'deg',
             animationDuration: r.dur + 'ms',
           }}>
-            <BoardCard cardName={r.cardName} noTooltip />
+            <BoardCard cardName={r.cardName} rarity={r.rarity} noTooltip />
             {r.trailType === 'fire' ? (
               /* Auspuff-Fahne am Heck. Die Karte ist um `--ramAngle`
                  gedreht (Oberkante zeigt zum Ziel), „unten" ist also
@@ -61392,7 +61909,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Card transfer animations (Dark Gear creature steal, etc.) */}
       {claimHolds.map(h => (
         <div key={h.id} className="transfer-anim-card claim-hold-card" style={{ left: h.x, top: h.y }}>
-          <BoardCard cardName={h.cardName} noTooltip />
+          <BoardCard cardName={h.cardName} rarity={ppRarityLookup(h.cardName)} noTooltip />
         </div>
       ))}
       {transferAnims.map(t => (
@@ -61402,7 +61919,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           '--transferDy': (t.tgtY - t.srcY) + 'px',
           animationDuration: t.dur + 'ms',
         }}>
-          <BoardCard cardName={t.cardName} noTooltip />
+          <BoardCard cardName={t.cardName} rarity={ppRarityLookup(t.cardName)} noTooltip />
         </div>
       ))}
 
@@ -61609,19 +62126,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const traeger = hoverName ? CARDS_BY_NAME[hoverName] : null;
         const card = (hoverIdentity && CARDS_BY_NAME[hoverIdentity]) || traeger;
         if (!card) return null;
-        const imgUrl = cardImageUrl(card.name);
-        const foilType = card.foil || null;
+        const rar = ppRarityOf(card, hoveredPileCard && hoveredPileCard.rarity);
+        const imgUrl = ppRarityUrl(cardImageUrl(card.name), rar);
         const shownLevel = hoverEffLvl != null ? hoverEffLvl : card.level;
         return (
           <div className="board-tooltip">
             {imgUrl && (
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-                <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                  border: foilType === 'diamond_rare' ? '2px solid rgba(104,198,253,.6)' : foilType === 'secret_rare' ? '2px solid rgba(250,213,74,.5)' : 'none' }} />
-                {/* ★ v1203: Dieses Vorschaubild rechnete `isFoil` aus und
-                    zeichnete die Schicht dann NIE — dritte Stelle derselben
-                    Bauart. Jetzt haengt auch sie an CardFoil. */}
-                <CardFoil card={card} />
+                <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block' }} />
+                <CardFoil card={card} rarity={rar} animated />
               </div>
             )}
             <div style={{ padding: '10px 12px' }}>
@@ -62088,6 +62601,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Klicken darf nur der Besitzer in seinem Zug — der Server
           // prüft beides noch einmal, aber ein Angebot, das nicht
           // klickbar sein darf, gehört gar nicht erst gezeigt.
+          rarities={pileViewer.ownerIdx != null && pileViewer.pile
+            ? (gameState.players?.[pileViewer.ownerIdx]?.rarity?.[pileViewer.pile === 'discard' ? 'discardPile' : 'deletedPile'] || null)
+            : (pileViewer.rarities || null)}
           onActivate={pileViewer.ownerIdx === myIdx && pileViewer.isDiscard
             ? (eintrag) => {
               socket.emit('activate_discard_effect', {
@@ -62101,7 +62617,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           {/* `showCardLeft`: zweites Kartenbild LINKS neben dem Text. Fuer
               Abfragen, in denen zwei Karten eine Rolle spielen — Bubbles
               zeigt links die betroffene Kreatur, rechts sich selbst. */}
@@ -62122,11 +62638,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
+            <div className="fcp-text" style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
             {/* `warning`: Zusatzzeile in Warnfarbe unter der Nachricht —
                 fuer Folgen, die der Spieler nicht uebersehen soll. */}
             {ep.warning && (
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
+              <div className="fcp-text" style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
             )}
             {/* `equalButtons` (Als Vorgabe 5.10.): bei einer Wahl zwischen ZWEI gleichwertigen Wegen
                 („Zusatzaktion" / „normale Aktion") sind die Knoepfe gleich breit, unabhaengig von der
@@ -62175,10 +62691,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Player Picker ── */}
       {isMyEffectPrompt && ep.type === 'playerPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+        // ★ X2: `fcp-begrenzt` wie Auswahl/Ja-Nein (Text und Spielerliste scrollen getrennt, Titel und „Abbrechen" bleiben stehen) — bei vielen Mitspielern wurde die Liste höher als der Bildschirm.
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
-          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {ep.description && <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(Array.isArray(ep.allowedPlayers) && ep.allowedPlayers.length ? ep.allowedPlayers : gameState.players.map((_, i) => i))
               // `opponentFirst`: die Gegner zuerst, man selbst zuletzt (Divine Gift of Fire)
               .slice().sort((a, b) => (ep.opponentFirst ? (a === myIdx) - (b === myIdx) : 0))
@@ -62210,21 +62727,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </button>
               );
             })}
-            {ep.cancellable !== false && (
-              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
-            )}
           </div>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 14 }}
+              onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
+          )}
         </DraggablePanel>
       )}
 
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+        <DraggablePanel className="first-choice-panel fcp-begrenzt animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
           <TriggerCardSlot name={ep.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
-          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          {ep.description && <div className="fcp-text" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           {ep.renderAs === 'slider' ? (
             // Slider-Variante fuer freie Betraege (Logan's Invest
             // Counters). Eine Dropdown-Liste mit 40 Eintraegen ist zum
@@ -62240,7 +62757,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // don't need to lift state; the initial value is the first option.
             <OptionPickerDropdown ep={ep} respondToPrompt={respondToPrompt} />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            // ★ X2: Antwortliste (`fcp-liste`) und „Abbrechen" getrennt: Passen Titel + Text + Optionen + Abbrechen nicht in den Bildschirm, scrollt NUR die Liste (und der Text, siehe
+            // style.css bei `.fcp-begrenzt`); „Abbrechen" und der Titel bleiben sichtbar.
+            <>
+              <div className="fcp-liste" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(ep.options || []).map(opt => {
                 // Resolve a tooltip card: explicit `opt.tooltipCardName` wins,
                 // else auto-detect any CARDS_BY_NAME key mentioned in the
@@ -62263,11 +62783,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </button>
                 );
               })}
+              </div>
               {ep.cancellable !== false && (
-                <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 12 }}
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
-            </div>
+            </>
           )}
           </div>
           {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
@@ -62831,7 +63352,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return `To spend the Action, ${satz}.`;
           })()}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
           </div>
           {/* Bild des Helden, dem die Aktion gehoert — gleiche Bauform
               wie in confirm/optionPicker, samt Tooltip beim Ueberfahren. */}
@@ -62860,7 +63381,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>}
         </DraggablePanel>
       )}
 
@@ -62874,7 +63395,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Play an Artifact with a set Cost from your hand without paying its Cost.</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Click a highlighted Artifact in your hand.</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>Cancel (Esc)</button>
+            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>{ppCancelEsc()}</button>
         </DraggablePanel>
       )}
 
@@ -63041,6 +63562,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               Choose an action:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(p.summonEligible || []).length > 0 && (
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
                 onClick={() => {
                   const { cardName: cn, handIndex: hi, fromCreation: fc, card: c, summonEligible } = p;
@@ -63060,6 +63582,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>
                 🐾 Summon
               </button>
+              )}
+              {/* ★ 11.11.: Ascended-Karte mit Abwurf-Handeffekt (Stormkissed Waflav) — Aufstieg ODER Handeffekt (Discard). Nur angeboten, wenn der Aufstieg jetzt moeglich ist. */}
+              {(p.ascendEligible || []).length > 0 && (
+              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
+                onClick={() => {
+                  const { cardName: cn, handIndex: hi, fromCreation: fc, card: c, ascendEligible } = p;
+                  setSummonOrRevealPick(null);
+                  aufstiegStarten({ cardName: cn, handIndex: hi, fromCreation: fc, card: c, eligible: ascendEligible });
+                }}>
+                ✨ Ascend
+              </button>
+              )}
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#fad54a', color: '#fad54a', textAlign: 'left' }}
                 onClick={() => {
                   const { cardName: cn, handIndex: hi, fromCreation: fc } = p;
@@ -63108,7 +63642,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>{ep.instruction || 'Click a card in your hand to discard it.'}</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || ppCancelEsc()}</button>
           {ep.altLabel && (
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, marginLeft: 8, borderColor: '#f87420', color: '#f87420' }}
               onClick={() => respondToPrompt({ alt: true })}>{ep.altLabel}</button>
@@ -63119,27 +63653,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Hand Pick Prompt (Shard of Chaos) ── */}
       {isMyEffectPrompt && ep.type === 'handPick' && (() => {
         const minSel = ep.minSelect ?? 1;
-        const canConfirm = handPickSelected.size >= minSel;
+        const handPickGesamt = handPickSelected.size + handPickSelectedCz.size;
+        const canConfirm = handPickGesamt >= minSel;
         // When `nameLockOnFirstSelect` is set, the confirm label
         // suffixes the current selection count (e.g. "Discard 3").
         // Heinz uses this — the count can vary 1..maxSelect on the
         // fly as the player toggles copies.
         const baseLabel = ep.confirmLabel || 'Confirm';
         const dynamicLabel = ep.nameLockOnFirstSelect
-          ? `${baseLabel} ${handPickSelected.size}`
+          ? `${baseLabel} ${handPickGesamt}`
           : baseLabel;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(184,102,255,.85)' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#b866ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
             <div style={{ fontSize: 11, color: '#b866ff', opacity: .8, marginBottom: 8 }}>
-              Selected: {handPickSelected.size}/{ep.maxSelect || 3} (min {minSel})
+              Selected: {handPickGesamt}/{ep.maxSelect || 3} (min {minSel})
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#b866ff' : '#535353', color: canConfirm ? '#b866ff' : '#535353' }}
                 disabled={!canConfirm}
                 onClick={() => {
-                  const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
+                  const selected = [
+                    ...[...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] })),
+                    // Vorratskarten (Extra-Hand): gleicher Eintrag, zusaetzlich `fromCreation: true`
+                    ...[...handPickSelectedCz].map(idx => ({ handIndex: idx, cardName: (me.creationZone || [])[idx], fromCreation: true })),
+                  ];
                   respondToPrompt({ selectedCards: selected });
                 }}>{dynamicLabel}</button>
               {ep.cancellable !== false && (
@@ -63175,7 +63714,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }}>{ep.confirmLabel || '🫳 Steal!'}</button>
               {cancellable && (
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                  onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
               )}
             </div>
           </DraggablePanel>
@@ -63194,7 +63733,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={() => respondToPrompt({ finished: true })}>Done</button>
             )}
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-              onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+              onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
           </div>
         </DraggablePanel>
       )}
@@ -63211,9 +63750,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel zielwahl className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#66ffa2' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#66ffa2', marginBottom: 4, textShadow: '0 0 8px rgba(102,255,162,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          {/* ★ X2: `.attach-pick-kartenzeile` (style.css): auf niedrigen Fenstern (Handy quer) entfällt die Karte — das Fenster war mit ihr 327 px hoch (Bildschirm 320 px); die Beschreibung nennt die Fähigkeit ("Attach Fighting to …"), wie bei den übrigen Zielwahl-Fenstern, bei denen die Vorschau dort entfällt. */}
           {ep.cardName && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
+            <div className="attach-pick-kartenzeile" style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <BoardCard cardName={ep.cardName} rarity={ppRarityLookup(ep.cardName, myIdx)} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(102,255,162,.55)' }} />
             </div>
           )}
           <div style={{
@@ -63225,7 +63765,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {ep.cancellable !== false && (
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+                onClick={() => respondToPrompt({ cancelled: true })}>{ppCancelEsc()}</button>
             </div>
           )}
         </DraggablePanel>
@@ -63247,7 +63787,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
                     borderRadius: 8,
                   }}>
-                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
+                    <div className="pp-aufdeck-karte" style={{ width: 220, height: 308 }}><BoardCard cardName={cn} rarity={ppRarityLookup(cn)} style={{ width: '100%', height: '100%', borderRadius: 8 }} /></div>
                   </div>
                 ))}
               </div>
@@ -63359,6 +63899,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hpLine}
                 {levelLine}
               </>
+            );
+          })()}
+          {(() => {
+            // ★ Warntext-UX (Spielgestalter-Entscheidung 17.11.2026: „Der soll nur erscheinen, wenn ein immunes Ziel angewählt wird, also zwischen ‚Ziel gewählt' und ‚Confirm target'"):
+            // der Server liefert den Hinweis AM Ziel (`validTargets[].hinweis`, englischer Satz mit Zielname; `hinweisArt` 'warnung' = die Wahl verpufft, 'info' = Wirkung anders als
+            // erwartet, aber nicht nutzlos). Gezeigt wird er nur für die aktuell angewählten, noch unbestätigten Ziele — Auswahl wechseln/aufheben lässt ihn verschwinden, nach „Confirm" ist
+            // die Zielwahl weg. Der Client rechnet keine Regeln, er zeigt das Feld.
+            const hinweise = [];
+            for (const id of potionSelection) {
+              const t = (pt.validTargets || []).find(x => x.id === id);
+              if (t && typeof t.hinweis === 'string' && t.hinweis) hinweise.push({ id, text: t.hinweis, art: t.hinweisArt === 'info' ? 'info' : 'warnung' });
+            }
+            if (hinweise.length === 0) return null;
+            return (
+              <div className="panel-zielwahl-hinweise" role="status">
+                {hinweise.map(h => <div key={h.id} className={'panel-zielwahl-hinweis panel-zielwahl-hinweis-' + h.art}>{h.text}</div>)}
+              </div>
             );
           })()}
           <div className="panel-zielwahl-knoepfe" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -63617,7 +64174,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               260×364 auf dem Desktop, auf Telefonen relativ zur
               Bildschirmhoehe — die Animation waechst noch auf das
               2,1-Fache, auf 390 px Hoehe war das eine Wand. */}
-          <BoardCard cardName={cardShowcase.cardName} noTooltip
+          <BoardCard cardName={cardShowcase.cardName} rarity={ppRarityLookup(cardShowcase.cardName)} noTooltip
             style={{ width: 'var(--showcase-w)', height: 'var(--showcase-h)', filter: 'drop-shadow(0 0 40px rgba(0,0,0,.9))' }} />
         </div>
       )}

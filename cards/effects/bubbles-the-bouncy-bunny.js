@@ -181,6 +181,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „cannot be reacted to" (Surefire Shot, Midnight Assault: `engine._reaktionGesperrt`) — keine Umleitung angeboten.
+      if (engine._reaktionGesperrt(pi)) return;
 
       const hero = ctx.attachedHero;
       const heroIdx = ctx.cardHeroIdx;
@@ -190,6 +192,8 @@ module.exports = {
       // Gesperrter Held leistet nichts — allgemeine CC-Regel.
       const st = hero.statuses || {};
       if (st.frozen || st.stunned || st.negated) return;
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — trifft derselbe Mehrziel-Schlag (Fireball auf Kreatur UND Bubbles, Flaechenschlag) Bubbles ohnehin selbst, wird nichts auf sie umgeleitet.
+      if (engine.schlagTrifftZiel(hero)) return;
 
       for (const entry of (ctx.entries || [])) {
         if (!isRedirectable(entry)) continue;

@@ -14,7 +14,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { AttachmentBuilder } = require('discord.js');
 const renderer = require('../lib/card-renderer');
-const { findBugfixes, readNotes, readSkips, applySkips, normName } = require('../lib/bugfix');
+const { findBugfixes, readNotes, applyCommitSkips, normName } = require('../lib/bugfix');
 
 const MAX_CARDS_POSTED = 40;
 const NEW_CARD_TAGLINE = '**New card beep-boop:**';
@@ -184,9 +184,10 @@ module.exports = function register(ctx) {
   // Anzeigenamen der Felder in cards.json, die sich ändern können
   const FIELD_LABELS = { effect: 'effect text', hp: 'HP', atk: 'ATK', cost: 'cost', costLabel: 'cost', level: 'level', cardType: 'type', subtype: 'subtype',
     archetype: 'archetype', startingAbility1: 'starting ability', startingAbility2: 'starting ability', spellSchool1: 'school', spellSchool2: 'school',
-    banned: 'ban status', foil: 'rarity' };
-  // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus
-  const IGNORED_FIELDS = new Set(['skilltestLegal', 'setID']);
+    banned: 'ban status' };
+  // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus.
+  // `foil`: das alte Feld ist mit dem Rarity-System aus cards.json verschwunden (Rarities stehen nicht mehr auf der Karte) — sein Wegfall ist keine Änderung.
+  const IGNORED_FIELDS = new Set(['skilltestLegal', 'setID', 'foil']);
 
   /**
    * Karten, die in BEIDEN Ständen vorkommen, deren Eintrag sich aber verändert hat. Neue Karten (nur im neuen Stand) gehören in den
@@ -268,10 +269,10 @@ module.exports = function register(ctx) {
     let found;
     try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced: new Set([...balanced, ...neu]) }); }
     catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
-    const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>`
-    // `Bugfix-Skip: <Karte oder _baustein>`: reine Anpassung an eine NEUE Karte, kein Fehler → nicht im Bugfix-Kanal (hat Vorrang vor einer Note)
-    const skips = await readSkips({ git, last, head });
-    found = applySkips(found, skips);
+    const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>` (ohne Notes, die ihr eigener Commit per Skip abmeldet)
+    // `Bugfix-Skip: <Karte oder _baustein>`: reine Anpassung an eine NEUE Karte, kein Fehler → die Änderung DIESES Commits erscheint nicht im Bugfix-Kanal. Ändert ein anderer Commit
+    // desselben Zeitraums das Ziel ohne Skip, wird es trotzdem gemeldet (Skip und Note gelten je Commit, siehe lib/bugfix.js).
+    try { found = await applyCommitSkips({ git, last, head, found }); } catch (e) { console.error('[feeds] Bugfix-Skip:', e.message); }   // Verlauf nicht lesbar: im Zweifel melden
 
     const byNorm = new Map(renderer.allCards().map(c => [normName(c.name), c]));
     const noteOfCard = c => notes.get(normName(c.name));
@@ -292,7 +293,7 @@ module.exports = function register(ctx) {
     // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
     for (const [key, text] of notes) {
       const c = byNorm.get(key);
-      if (!c || neu.has(c.name) || skips.has(key)) continue;       // neue, noch nicht live gegangene Karte bzw. `Bugfix-Skip`: keine Bugfix-Meldung
+      if (!c || neu.has(c.name)) continue;                          // neue, noch nicht live gegangene Karte: keine Bugfix-Meldung (Notes mit eigenem `Bugfix-Skip` liefert readNotes schon nicht mehr)
       const it = items.get(c.name) || { card: c, note: '' };
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);

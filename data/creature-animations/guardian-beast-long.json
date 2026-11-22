@@ -1,0 +1,15 @@
+{
+  "creature": "Guardian Beast Long",
+  "sheet": "guardian-beast-long.png",
+  "frameWidth": 38,
+  "frameHeight": 67,
+  "frames": 48,
+  "frameMs": 64,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 4,
+  "padLeft": 6,
+  "padRight": 4,
+  "padBottom": 3,
+  "faceX": 19.0
+}

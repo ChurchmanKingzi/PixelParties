@@ -37,6 +37,7 @@ const RESOLVING = '_nimbleMonkeeResolving';
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // v345: OHNE dieses Flag bietet die Engine den Effekt gar nicht an —
   // `creatureEffectScriptAllows` steigt bei `!script.creatureEffect`
@@ -53,7 +54,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
-      if (ctx.card?.zone !== 'hand') return;      // nur die Handkopie reagiert
+      if (ctx.card?.zone !== 'hand' && ctx.card?.zone !== 'creationZone') return;      // nur die Handkopie reagiert (Hand oder Crestinas Vorrat)
 
       const betrag = monkeeGoldTrigger(ctx, pi);
       if (!betrag) return;
@@ -67,7 +68,7 @@ module.exports = {
       // Listener und wuerden sonst nacheinander fragen, obwohl nur eine
       // Beschwoerung erlaubt ist.
       if (gs[RESOLVING]?.[pi]) return;
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
       if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       // Kontrolle statt Seite (Styx 28.9.): auch ueber uebernommene Helden.
@@ -85,8 +86,7 @@ module.exports = {
       });
       if (!bestaetigt || bestaetigt.cancelled) return;
 
-      const handIdx = (ps.hand || []).indexOf(CARD_NAME);
-      if (handIdx < 0) return;                    // zwischenzeitlich weg
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;                    // zwischenzeitlich weg
 
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
@@ -122,9 +122,9 @@ module.exports = {
             && z.owner === (wahl.owner ?? pi));   // Kontrolle statt Seite (Styx 28.9.)
           if (gewaehlt) ziel = gewaehlt;
         }
-        const i = (ps.hand || []).indexOf(CARD_NAME);
-        if (i < 0) return;
-        engine.takeFromPileSync(ps, 'hand', i);
+        const q = engine._rxQuelleFuer(ps, CARD_NAME);
+        if (!q) return;
+        engine.rxNimm(ps, q);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(

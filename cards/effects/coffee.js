@@ -42,13 +42,15 @@ module.exports = {
     const negKeys = getCleansableStatuses();
     const currentTurn = gs.turn || 0;
     const helden = engine?.heroesControlledBy
-      ? engine.heroesControlledBy(pi).map(e => e.hero)
-      : (gs.players[pi].heroes || []);
-    for (const hero of helden) {
+      ? engine.heroesControlledBy(pi)
+      : (gs.players[pi].heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx, hero } of helden) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (!hero.statuses) continue;
       const hasOld = negKeys.some(k => hero.statuses[k] && hero.statuses[k].appliedTurn < currentTurn);
       if (hasOld) return true;
+      // 18.11.2026: auch ein RUHENDES Status-Anhaengsel (`attach:`-Eintrag), das nicht in diesem Zug gelegt wurde
+      if (engine && getEligibleStatuses(hero, currentTurn, engine, physOwner, heroIdx).some(e => String(e.key).startsWith('attach:'))) return true;
     }
     return false;
   },

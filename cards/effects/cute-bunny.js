@@ -79,6 +79,7 @@ module.exports = {
   // 'hand' — listens for the batch-end hook to offer the hand-summon.
   // 'support' — same hook fires the draw-1 effect once Bunny is on field.
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   hooks: {
     onForcedDiscardBatchEnd: async (ctx) => {
@@ -109,13 +110,13 @@ module.exports = {
       }
 
       // ── Effect 1: while in hand, may summon from hand ────────────
-      if (zone !== 'hand') return;
+      if (zone !== 'hand' && zone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
 
       // Bunny must still be in our hand (i.e., we weren't one of the
       // discarded cards). The activeIn filter usually catches this —
       // a discarded Bunny's instance has zone='discard' and wouldn't
       // pass the listener filter — but defend against race conditions.
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       const hosts = getHostHeroes(engine, pi);
       if (hosts.length === 0) return;
@@ -163,12 +164,12 @@ module.exports = {
       // Pop one Bunny copy from hand & untrack the listener instance
       // so we don't leave an orphan in the hand zone after summoning
       // a fresh tracked instance into support.
-      const handIdx = ps.hand.indexOf(CARD_NAME);
-      if (handIdx < 0) return;
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;
+      engine.rxNimm(ps, q);
 
       const oldInst = ctx.card;
-      if (oldInst && oldInst.zone === 'hand') {
+      if (!q.ausVorrat && oldInst && oldInst.zone === 'hand') {   // (die Vorrats-Instanz raeumt `rxNimm` ab)
         engine._untrackCard(oldInst.id);
       }
 

@@ -76,17 +76,19 @@ const MAX_SPELL_LEVEL = 1;
  * Handplaetzen, und zwei Kopien derselben Karte koennen dank
  * Handplatz-Rabatten unterschiedliche effektive Stufen haben.
  */
-function eligibleHandIndices(engine, ps, pi) {
+function eligibleHandIndices(engine, ps, pi, vorrat = false) {
   const cardDB = engine._getCardDB();
   const out = [];
-  for (let i = 0; i < (ps.hand || []).length; i++) {
-    const name = ps.hand[i];
+  // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): `vorrat` = dieselbe Pruefung fuer die Plaetze in Crestinas Vorrat (Stufe dort ohne Handplatz-Rabatt).
+  const liste = vorrat ? (engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : []) : (ps.hand || []);
+  for (let i = 0; i < liste.length; i++) {
+    const name = liste[i];
     const cd = cardDB[name];
     if (!cd) continue;
     if (!hasCardType(cd, 'Spell')) continue;
     if ((cd.subtype || '').toLowerCase() !== 'normal') continue;
     if (!hasSpellSchool(cd, SCHOOL)) continue;
-    if (engine.effectiveCardLevel(cd, pi, { handIdx: i }) > MAX_SPELL_LEVEL) continue;
+    if (engine.effectiveCardLevel(cd, pi, vorrat ? {} : { handIdx: i }) > MAX_SPELL_LEVEL) continue;
     // Die Schulhuerde faellt (der Wizard castet), die EIGENE
     // Spielbedingung des Spells nicht. Defensiv gekapselt — eine
     // fehlerhafte Bedingung darf den Waehler nicht zerreissen.
@@ -112,7 +114,10 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    return eligibleHandIndices(engine, ps, ctx.cardOwner).length > 0;
+    // Spielgestalter-Entscheidung 17.11.2026 (G-01): "as an additional Action" ist eine Aktion — unter der Aktionssperre (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar.
+    if (engine.areActionsBlocked(ctx.cardOwner)) return false;
+    return eligibleHandIndices(engine, ps, ctx.cardOwner).length > 0
+      || eligibleHandIndices(engine, ps, ctx.cardOwner, true).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -124,6 +129,7 @@ module.exports = {
     const heroIdx = wizInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (engine.areActionsBlocked(pi)) return false;   // zweite Absicherung (Sperre nach dem Angebot gesetzt): Einmal-Stempel bleibt frei
     // Styx 28.9.: Wirtsheld = Held der Spalte auf der BRETTSEITE der
     // Kreatur (seitenfremd beschworen: liegt auf B, gehoert A). Wirkt fuer
     // `pi`; die fluechtige Spell-Instanz traegt die Brettseite als
@@ -132,7 +138,8 @@ module.exports = {
     const castingHero = gs.players[feld]?.heroes?.[heroIdx] || null;
 
     const eligibleIdx = eligibleHandIndices(engine, ps, pi);
-    if (eligibleIdx.length === 0) return false;
+    const eligibleVorrat = eligibleHandIndices(engine, ps, pi, true);
+    if (eligibleIdx.length === 0 && eligibleVorrat.length === 0) return false;
 
     // ── Schritt 1: Auswahl auf der Hand ──
     // `handPick` statt `cardGallery` — Hausregel fuer jede Auswahl aus
@@ -143,6 +150,7 @@ module.exports = {
       title: CARD_NAME,
       description: 'Choose a Lv1-or-lower Normal Magic Arts Spell for Skeleton Wizard to cast.',
       eligibleIndices: eligibleIdx,
+      creationEligibleIndices: eligibleVorrat,
       minSelect: 1,
       maxSelect: 1,
       cancellable: true,
@@ -164,15 +172,17 @@ module.exports = {
     const pick = result.selectedCards[0];
     const handIndex = pick.handIndex;
     const spellName = pick.cardName;
+    const ausVorrat = !!pick.fromCreation;
 
     // Defensiv: die Auswahl gegen den echten Handstand nachpruefen.
-    if (typeof handIndex !== 'number' || ps.hand[handIndex] !== spellName) return false;
+    if (typeof handIndex !== 'number') return false;
+    if (ausVorrat ? (!eligibleVorrat.includes(handIndex) || (ps.creationZone || [])[handIndex] !== spellName) : ps.hand[handIndex] !== spellName) return false;
     const cardDB = engine._getCardDB();
     const cd = cardDB[spellName];
     if (!cd || !hasCardType(cd, 'Spell')) return false;
     if ((cd.subtype || '').toLowerCase() !== 'normal') return false;
     if (!hasSpellSchool(cd, SCHOOL)) return false;
-    if (engine.effectiveCardLevel(cd, pi, { handIdx: handIndex }) > MAX_SPELL_LEVEL) return false;
+    if (engine.effectiveCardLevel(cd, pi, ausVorrat ? {} : { handIdx: handIndex }) > MAX_SPELL_LEVEL) return false;
 
     // ── Schritt 2: Zaubernden-Identitaet setzen ──
     // Animationen an den Support-Platz des Wizards verankern.
@@ -238,7 +248,11 @@ module.exports = {
     let castError = null;
     try {
       const script = loadCardEffect(spellName);
-      if (typeof script?.hooks?.onPlay === 'function') {
+      // ★ Spielgestalter-Entscheidung 17.11.2026 („performs" = „plays", `engine.performKettenfenster`): der performte Spell öffnet dasselbe Kettenfenster wie ein normal gespielter (Silence, The Master's
+      // Plan [aus der Hand], …). Wirker ist die KREATUR (`trotzStatus`: kein Helden-Wirker — Ghostly Warning/Celia lesen das wie beim normalen Kreaturenzauber). Negiert: der Rumpf läuft nie; der Spell
+      // gilt als gespielt und geht (wie sonst) in die Ablage.
+      const _pk = await engine.performKettenfenster({ cardName: spellName, pi, heroIdx, heroOwner: feld, ausHand: true, trotzStatus: true });
+      if (!_pk.negated && typeof script?.hooks?.onPlay === 'function') {
         await script.hooks.onPlay(spellCtx);
       }
     } catch (err) {
@@ -266,19 +280,24 @@ module.exports = {
     // ── Schritt 3: verbindlich. Spell wandert Hand → Discard. ──
     // Index neu suchen: nachgelagerte Effekte koennen die Hand
     // verschoben haben.
-    const finalIdx = ps.hand.indexOf(spellName);
+    const finalIdx = ausVorrat ? (ps.creationZone || []).indexOf(spellName) : ps.hand.indexOf(spellName);
     if (finalIdx >= 0) {
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: spellName,
-        from: 'hand', to: 'discard',
+        from: ausVorrat ? 'creation' : 'hand', to: 'discard',
         fromHandIdx: finalIdx,
         // 'sole' statt true: `true` ueberspringt Spell/Attack bewusst,
         // weil dort sonst `afterSpellResolved` doppelt zaehlt. Der
         // Direktaufruf oben feuert diesen Hook aber gerade NICHT.
         asPlay: 'sole',
       });
-      engine.takeFromPileSync(ps, 'hand', finalIdx);
-      engine.handKartenBesitzerPs(ps, spellName).discardPile.push(spellName);   // W3/W5a: Stapel des permanenten Besitzers
+      if (ausVorrat) {
+        engine.rxNimm(ps, { liste: ps.creationZone, ausVorrat: true, idx: finalIdx });
+        ps.discardPile.push(spellName);
+      } else {
+        engine.takeFromPileSync(ps, 'hand', finalIdx);
+        engine.handKartenBesitzerPs(ps, spellName).discardPile.push(spellName);   // W3/W5a: Stapel des permanenten Besitzers
+      }
     }
 
     engine.log('skeleton_wizard_cast', { player: ps.username, spell: spellName });

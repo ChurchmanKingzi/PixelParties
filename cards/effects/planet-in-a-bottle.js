@@ -38,6 +38,7 @@
 // ───────────────────────────────────────────────────────────────────
 
 const { isTutorableArea } = require('./_area-shared');
+const { ablageAusgangGesperrt, deckAusgangGesperrt } = require('./_pfad-shared');
 
 /**
  * Waehlbare Area — Regel und Begruendung stehen in `_area-shared.js`,
@@ -83,8 +84,10 @@ function buildAreaGallery(ps, cardDB, engine, pi) {
   };
 
   checkSrc(ps.hand,        'hand');
-  checkSrc(ps.mainDeck,    'deck');
-  checkSrc(ps.discardPile, 'discard');
+  // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): „from your deck, hand or discard pile" — Deck unter Knight of Kings [B] und Ablage unter der
+  // Stab-Sperre (Staff of the Teleporter) / Knight of Kings [B] sind als Quelle zu (früher angeboten, die Entnahme scheiterte danach und der Trank war verbraucht).
+  if (!(engine && deckAusgangGesperrt(engine, pi)))    checkSrc(ps.mainDeck,    'deck');
+  if (!(engine && ablageAusgangGesperrt(engine, pi)))  checkSrc(ps.discardPile, 'discard');
 
   gallery.sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
   return gallery;

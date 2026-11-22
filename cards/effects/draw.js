@@ -134,8 +134,12 @@ module.exports = {
       const _gegnerHand = (gs.players[oppIdx]?.hand || []).length;
       // ★ W74c: Reihenfolge wie bei jedem fremden Zwangsabwurf — ERST das Ambush-Fenster, DANN Boris (`fremdAbwurfEntfaellt`); vorher fragte Boris zuerst
       // und das Fenster ging erst beim Abwurf jeder einzelnen Karte auf.
+      const _negiertVorher = engine.handInteraktionenNegiert();
       const gegnerBoris = gs.firstTurnProtectedPlayer !== oppIdx && _gegnerHand > 0
         && await engine.fremdAbwurfEntfaellt(oppIdx, _gegnerHand, { source: CARD_NAME, sourceOwner: pi });
+      // ★ Spielgestalter-Entscheidung 17.11.2026 (Ambush the Scout, wie Champion): Ambush negiert die Seite des Ambush-Spielers — er wirft nichts ab und zieht deshalb auch nichts. Der Wirker wirft ab und zieht wie gedruckt.
+      // (Boris' Verzicht bleibt wie bisher: wer verzichtet, behaelt seine Hand und zieht trotzdem.)
+      const gegnerAmbush = engine.handInteraktionenNegiert() > _negiertVorher;
       const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx || gegnerBoris;
 
       // ── Both players discard their entire hands, card by card, in
@@ -150,14 +154,15 @@ module.exports = {
       await engine.actionDrawCardsAnimated(pi, youDraw);
       // Boris verzichtet nur aufs ABWERFEN — gezogen wird trotzdem.
       const _gegnerGeschuetzt = gs.firstTurnProtectedPlayer === oppIdx;
-      if (!_gegnerGeschuetzt) await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
+      if (!_gegnerGeschuetzt && !gegnerAmbush) await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
 
       engine.log('draw_card', {
         player: gs.players[pi]?.username,
         decayLevel: dm,
         myDiscarded, oppDiscarded,
-        youDraw, oppDraw: _gegnerGeschuetzt ? 0 : oppDraw,
+        youDraw, oppDraw: (_gegnerGeschuetzt || gegnerAmbush) ? 0 : oppDraw,
         ...(_gegnerGeschuetzt ? { oppShielded: true } : {}),
+        ...(gegnerAmbush ? { oppAmbushNegated: true } : {}),
       });
       engine.sync();
     },

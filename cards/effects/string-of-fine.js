@@ -12,6 +12,9 @@
 const CARD_NAME = 'String of Fine';
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: „Choose a target you control".
+  requiresTarget: true,
+
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -19,6 +22,8 @@ module.exports = {
   spellVisual: { impact: { type: 'johanna_cleanse' }, impactMs: 260 },
 
   playableFromCoolnessStack: true,
+  // Spielgestalter-Entscheidung 18.11.2026: das Spielen vom Stapel ist eine Zusatzaktion — die Aktionssperre (Overflowing Chalice, Kent: `areActionsBlocked`) sperrt es (`actionPlayTopOfCoolnessStack`).
+  stackPlayIstZusatzaktion: true,
   // Hand-grey: Stack-only. Plays from hand do nothing.
   neverPlayable: true,
 

@@ -25,6 +25,7 @@ const CARD_NAME = 'Chaorc Corpse Cannibal';
 
 module.exports = {
   activeIn: ['hand', 'support'],
+  reactFromCreation: true,   // 11.11.: Hook-Trigger aus der Hand gilt auch aus Crestinas Vorrat (Extra-Hand)
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
   // Gratis-Summon + Gratis-Draw bei Opfern; Opfer-Trigger können außerhalb des Plans feuern (Karten-Hooks, Gegner-Interaktion).
@@ -68,7 +69,7 @@ module.exports = {
 
     // ── Same-slot resummon — hand copy, reacts after the destroy. ──
     onCreatureDeath: async (ctx) => {
-      if (ctx.cardZone !== 'hand') return;
+      if (ctx.cardZone !== 'hand' && ctx.cardZone !== 'creationZone') return;   // Hand oder Crestinas Vorrat
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
@@ -82,7 +83,7 @@ module.exports = {
       if ((inst.controller ?? inst.owner) !== pi) return;
 
       const ps = gs.players[pi];
-      if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
+      if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return;
 
       // The freed slot must be available AND its Hero must actually be
       // able to summon Corpse Cannibal — the SAME gate as a normal summon
@@ -121,7 +122,7 @@ module.exports = {
       if (!confirmed) return;
 
       // Re-validate post-prompt (board can shift across the await).
-      if (!(ps.hand || []).includes(CARD_NAME)) return;
+      if (!engine._rxQuelleFuer(ps, CARD_NAME)) return;
       if (((fps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
@@ -134,14 +135,16 @@ module.exports = {
       // and the destination Support slot, and hides the landing slot for
       // ~700ms so the Creature only "appears" once the flight lands
       // (same path the Deepsea bounce-place swap uses).
-      const handIdx = ps.hand.indexOf(CARD_NAME);
+      const q = engine._rxQuelleFuer(ps, CARD_NAME);
+      if (!q) return;
+      const handIdx = q.idx;
       engine._broadcastEvent('play_pile_transfer', {
-        owner: pi, cardName: CARD_NAME, from: 'hand', to: 'support',
+        owner: pi, cardName: CARD_NAME, from: q.ausVorrat ? 'creation' : 'hand', to: 'support',
         fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
         ...(feld !== pi ? { toOwner: feld } : {}),
       });
 
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      engine.rxNimm(ps, q);
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -150,7 +153,7 @@ module.exports = {
       // Untrack the listener's own hand instance so summoning a fresh
       // tracked instance below doesn't leave an orphan in the hand zone
       // (Cute Bunny pattern).
-      if (ctx.card?.zone === 'hand') engine._untrackCard(ctx.card.id);
+      if (!q.ausVorrat && ctx.card?.zone === 'hand') engine._untrackCard(ctx.card.id);   // (Vorrats-Instanz raeumt `rxNimm` ab)
 
       // summonCreatureWithHooks places the card and emits the
       // `summon_effect` shine/particles on the destination slot.

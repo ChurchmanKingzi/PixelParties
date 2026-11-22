@@ -97,6 +97,9 @@ async function recycleUndGold(ctx, maxPicks, titelZusatz) {
 }
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT (Off Duty …), landet sie nie — „only summon 1 per game" ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ gs, pi }) => { if (gs.players[pi]) gs.players[pi]._marketeerSummoned = true; },
+
   // Mischt aus der Ablage ins eigene Deck zurueck. Distracting Crystal
   // sperrt genau das, und Hatusbal liest es mit — ohne diese Marke
   // waere die Karte fuer beide unsichtbar.

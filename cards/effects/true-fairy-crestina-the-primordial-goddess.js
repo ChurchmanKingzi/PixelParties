@@ -197,6 +197,9 @@ module.exports = {
      * Gilt fuer JEDEN eigenen Ascended Hero, nicht nur fuer Crestina
      * selbst — der Text sagt „an Ascended Hero you control".
      */
+    /** True Damage (Rockfall, Pressure Projectile, Acid Vial): dieselbe Funktion — Angebot ja, Wirkung nein. */
+    beforeTrueDamage: async (ctx) => (ctx._engine._reaktionGesperrt?.(ctx.cardController ?? ctx.cardOwner) ? undefined : module.exports.hooks.beforeDamage(ctx)),   // „cannot be reacted to" (Surefire Shot): kein Angebot
+
     beforeDamage: async (ctx) => {
       if (ctx.cancelled) return;
       const engine = ctx._engine;
@@ -226,10 +229,9 @@ module.exports = {
       const zielSeite = engine._findHeroOwner(ziel);
       if (zielSeite < 0 || engine.heroSideOf(zielSeite, ziel) !== pi) return;
 
-      // Durchschlagender Schaden laesst sich nicht negieren — bail
-      // VOR der Abfrage, sonst zahlt der Spieler eine Karte umsonst
-      // (Lehre aus Idej Projection).
-      if (ctx.cannotBeNegated || ctx.cannotBeReduced) return;
+      // ★ Spielgestalter-Entscheidung 16.11.2026: „Nutzlose" Aktivierungen sind erlaubt. Auch durchschlagender Schaden (`cannotBeNegated`, True Damage) bekommt das Angebot (Hinweis in der
+      // Frage, die CPU waehlt es nicht): die Karte wird geloescht und das Einmal-Limit verbraucht, der Schaden geht durch (die Engine nimmt das Abbrechen zurueck, `piercing_override`).
+      const unnegierbar = !!ctx.cannotBeNegated;
       if (engine._wouldHeroDamageBeVoided?.(ctx.target, ctx.source, ctx.type)) return;
 
       const vorrat = ps.creationZone || [];
@@ -238,7 +240,10 @@ module.exports = {
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `Delete a card from your Creation Zone to negate the damage to ${ziel.name}?`,
+        message: unnegierbar
+          ? `${engine._nutzlosHinweis({ cannotBeNegated: true, cannotBeReduced: ctx.cannotBeReduced }, 'damage')} Delete a card from your Creation Zone to negate the damage to ${ziel.name} anyway?`
+          : `Delete a card from your Creation Zone to negate the damage to ${ziel.name}?`,
+        ...(unnegierbar ? { _nutzlos: true } : {}),
         showCard: ctx.source?.name || CARD_NAME,
         confirmLabel: '✨ Negate!',
         cancelLabel: 'Take the damage',

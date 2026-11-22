@@ -1,0 +1,15 @@
+{
+  "creature": "Mountain Boars",
+  "sheet": "mountain-boars.png",
+  "frameWidth": 38,
+  "frameHeight": 25,
+  "frames": 48,
+  "frameMs": 64,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3,
+  "padLeft": 4,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 19.0
+}

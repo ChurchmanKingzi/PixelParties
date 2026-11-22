@@ -1,0 +1,4 @@
+{
+  "hinweis": "Decks, die die Datensammlung (scripts/train-all-decks.js, scripts/train-iterative.js) mit dem alten Evaluator statt mit dem Wertnetz spielen. Namensteile wie bei --only, z. B. [\"Lightning Caller\"]. Leer = alle Decks mit Netz. Globaler Rückweg: --net 0 oder PP_TRAIN_NET=0.",
+  "decks": []
+}

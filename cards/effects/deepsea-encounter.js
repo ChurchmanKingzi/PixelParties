@@ -98,7 +98,8 @@ module.exports = {
     // level ≤ bouncedLevel + 1.
     const ps = gs.players[pi];
     if (!ps) return false;
-    const handNames = new Set(ps.hand || []);
+    // ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): auch Kreaturen in Crestinas Vorrat (Extra-Hand) kommen als Ersatz in Frage.
+    const handNames = new Set([...(ps.hand || []), ...(engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : [])]);
     for (const tgt of ownCreatureTargets) {
       const bouncedName = tgt.cardName;
       const bouncedLevel = cardDB[bouncedName]?.level || 0;
@@ -142,7 +143,7 @@ module.exports = {
     // Build replacement list.
     const seen = new Set();
     const replacements = [];
-    for (const n of (ps.hand || [])) {
+    for (const n of [...(ps.hand || []), ...(engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : [])]) {
       if (seen.has(baseCardName(n))) continue;
       if (n === bouncedName) continue;
       if (n === CARD_NAME) continue;
@@ -174,9 +175,9 @@ module.exports = {
     });
     if (!picked?.cardName) return null;
     const newName = picked.cardName;
-    const handIdx = ps.hand.indexOf(newName);
-    if (handIdx < 0) return null;
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    const quelle = engine._rxQuelleFuer(ps, newName);   // Hand zuerst, dann nutzbarer Vorrat
+    if (!quelle) return null;
+    engine.rxNimm(ps, quelle);
 
     if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
       engine.handZugangRueckgabe(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });   // W64c: unverrichtet zurück — Herkunft einer gestohlenen Handkarte bleibt

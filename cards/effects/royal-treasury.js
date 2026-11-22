@@ -11,7 +11,11 @@
 //    Anti-Magic, Zone, Instanz, `_spellPlacedOnBoard`). Danach liegt die
 //    Karte in der Support Zone des Wirts (`ctx.attachedHero`).
 //  · Hook `afterResourceGain` NACH der Buchung (Monkee-Muster): nur
-//    eigener Gewinn, kein Rundeneinkommen (`_isResourceGain`), Betrag > 0,
+//    eigener Gewinn, kein Rundeneinkommen (`_isResourceGain`; dessen Zuschlaege —
+//    Semi, Wealth — kommen als eigenes Ereignis ohne dieses Flag an, Spielgestalter-
+//    Entscheidung 17.11.2026; ein Wealth-Stapel ist dabei EIN Ereignis — Lv3 gibt
+//    „12 additional Gold" einmal, nicht dreimal 4, Spielgestalter-Entscheidung
+//    18.11.2026), Betrag > 0,
 //    und NICHT der eigene Bonus (Marker `gs._royalTreasuryGain`) — „through
 //    ANOTHER effect". Die Goldquelle wird nicht verbraucht (Monkees
 //    duerfen weiter darauf reagieren; der Bonus ist eine eigene Quelle).
@@ -29,6 +33,9 @@ const MAX_USES_PER_TURN = 3;
 const BONUS = { 1: 4, 2: 6, 3: 8 };
 
 module.exports = {
+  // Blinded (Spielgestalter-Entscheidung 16.11.2026): Zielwahl-Karte — ein geblendeter Held darf nur EIGENE Ziele waehlen (Picker-Filter der Engine); spielbar, wenn es einen legalen eigenen Kandidaten gibt. Hier: der Anhaengsel-Zauber waehlt den Wirt unter den eigenen Helden (wie die uebrigen Anhaengsel-Zauber).
+  requiresTarget: true,
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.

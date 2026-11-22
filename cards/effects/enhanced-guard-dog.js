@@ -94,7 +94,7 @@ module.exports = {
    */
   destroyReactionCondition(gs, pi, engine) {
     const ps = gs.players[pi];
-    if (!ps || !(ps.hand || []).includes(CARD_NAME)) return false;
+    if (!ps || !engine._rxQuelleFuer(ps, CARD_NAME)) return false;   // Hand ODER Crestinas Vorrat (Extra-Hand)
     return summonableZones(engine, pi).length > 0;
   },
 
@@ -126,7 +126,7 @@ module.exports = {
     // Nach dem Prompt neu pruefen — waehrend der Spieler ueberlegt, kann
     // sich das Brett geaendert haben (Kettenreaktionen). Gleiche
     // Vorsicht wie bei Doomed Town Guard.
-    if (!(ps.hand || []).includes(CARD_NAME)) return false;
+    if (!engine._rxQuelleFuer(ps, CARD_NAME)) return false;
     zones = summonableZones(engine, pi);
     if (zones.length === 0) return false;
 
@@ -154,11 +154,15 @@ module.exports = {
       source: `egd:${gs.turn}:${opfer}`,
     });
 
-    const handIdx = ps.hand.indexOf(CARD_NAME);
-    engine.takeFromPileSync(ps, 'hand', handIdx);
+    // Quelle: Hand (wie bisher) oder Crestinas Vorrat — die Karte verlaesst DIE Liste, in der sie liegt.
+    const q = engine._rxQuelleFuer(ps, CARD_NAME);
+    if (!q) return false;
+    const handIdx = q.idx;
+    if (q.ausVorrat) engine._rxAbgang(ps, q);
+    else engine.takeFromPileSync(ps, 'hand', handIdx);
     const res = await engine.summonCreatureWithHooks(
       CARD_NAME, feld, dest.heroIdx, dest.slotIdx,
-      { source: CARD_NAME, fromHandIdx: handIdx, summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
+      { source: CARD_NAME, ...(q.ausVorrat ? {} : { fromHandIdx: handIdx }), summonWindow: true, ...(feld !== pi ? { controller: pi } : {}) },
     );
     if (res?.negated) return false;   // Off Duty & co.: Karte ist schon geroutet, der Schutz greift nicht
     if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395

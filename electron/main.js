@@ -7,7 +7,7 @@
 // Nothing here touches the Node/Express server code.
 
 const {
-  app, BrowserWindow, Menu, shell, screen, powerSaveBlocker, dialog, ipcMain,
+  app, BrowserWindow, Menu, shell, screen, powerSaveBlocker, dialog, ipcMain, net,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -20,12 +20,12 @@ const crypto = require('crypto');
 //
 //   - For LOCAL TESTING: run your server (`node server.js` in the project
 //     root) and set this to the localhost URL (or flip USE_PRODUCTION to false).
-//   - For the PRODUCTION/Steam build: USE_PRODUCTION = true loads Render.
+//   - For the PRODUCTION build (itch.io / Steam): USE_PRODUCTION = true loads the live server.
 //
 // Override at runtime any time with:  PIXEL_PARTIES_URL=http://localhost:3000 npm start
 // ---------------------------------------------------------------------------
 const LOCAL_URL = 'http://localhost:3000';
-const PRODUCTION_URL = 'https://pixelparties.onrender.com';
+const PRODUCTION_URL = 'https://pixelpartiestcg.com';
 const USE_PRODUCTION = true;
 
 const TARGET_URL =
@@ -33,6 +33,11 @@ const TARGET_URL =
   (USE_PRODUCTION ? PRODUCTION_URL : LOCAL_URL);
 
 const IS_DEV = !app.isPackaged;
+
+// Standard: direkt ins Spiel (der Splash-Bildschirm überbrückt die Ladezeit). Die eigene Startseite (launcher.html) ist nur noch optional:
+// `npm start -- --launcher` oder PP_LAUNCHER=1 (im gepackten Client nicht enthalten, siehe electron/package.json → files).
+const SKIP_LAUNCHER = !(process.argv.includes('--launcher') || process.env.PP_LAUNCHER === '1');
+const LAUNCHER_FILE = path.join(__dirname, 'launcher.html');
 
 // ===========================================================================
 // Google sign-in (desktop) — Authorization Code + PKCE flow.
@@ -357,7 +362,7 @@ function revealMainWindow() {
 // ===========================================================================
 // Main window.
 // ===========================================================================
-function createWindow() {
+function createWindow(withLauncher = false) {
   const savedState = loadWindowState();
   const bounds = getStartBounds(savedState);
 
@@ -374,6 +379,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required', // Startseiten-Musik ohne vorherigen Klick
     },
   });
 
@@ -383,7 +389,7 @@ function createWindow() {
   savedZoomFactor = savedState.zoomFactor > 0 ? savedState.zoomFactor : 1;
   retryCount = 0;
 
-  loadGame();
+  if (withLauncher) loadLauncher(); else loadGame();
 
   // After every load, verify we actually landed on the game — not an
   // interstitial like Render's "spinning up" holding page — before swapping the
@@ -469,7 +475,7 @@ function createWindow() {
       items.push({ role: 'copy' });
       items.push({ type: 'separator' });
     }
-    items.push({ label: 'Reload', click: () => { retryCount = 0; loadGame(); } });
+    items.push({ label: 'Reload', click: () => { retryCount = 0; if (mainWindow.webContents.getURL().startsWith('file:')) loadLauncher(); else loadGame(); } });
     if (IS_DEV) {
       items.push({ type: 'separator' });
       items.push({ label: 'Inspect Element', click: () => mainWindow.webContents.inspectElement(params.x, params.y) });
@@ -498,6 +504,75 @@ function createWindow() {
 function loadGame() {
   if (mainWindow) mainWindow.loadURL(TARGET_URL);
 }
+
+function loadLauncher() {
+  if (mainWindow) { clearTimeout(retryTimer); playToken++; mainWindow.loadFile(LAUNCHER_FILE); }
+}
+
+// ===========================================================================
+// Startseite — Brücke zu launcher.html (nur von dieser file://-Seite aus erlaubt).
+// ===========================================================================
+let playToken = 0;
+
+function fromLauncher(e) {
+  try { return new URL(e.senderFrame.url).protocol === 'file:' && e.senderFrame.url.endsWith('launcher.html'); } catch { return false; }
+}
+
+function readLauncherConfig() {
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'launcher-config.json'), 'utf8')); } catch { /* optional */ }
+  return { links: {}, ...cfg };
+}
+
+// Fragt die Spielseite ab: 'ok' (Spiel antwortet), 'wake' (Server schläft/Zwischenseite), 'bad' (kein Netz).
+async function probeServer() {
+  const t0 = Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await net.fetch(TARGET_URL, { signal: ctrl.signal, cache: 'no-store' });
+    const text = (await r.text()).slice(0, 200000);
+    const ok = r.ok && (text.includes('boot-splash') || text.includes('CARDS_LOADED'));
+    return { state: ok ? 'ok' : 'wake', ms: Date.now() - t0 };
+  } catch (err) {
+    return { state: ctrl.signal.aborted ? 'wake' : 'bad' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+ipcMain.handle('pp-launcher:config', (e) => {
+  if (!fromLauncher(e)) return null;
+  const c = readLauncherConfig();
+  return { version: app.getVersion(), serverUrl: TARGET_URL, links: c.links };
+});
+ipcMain.handle('pp-launcher:status', (e) => (fromLauncher(e) ? probeServer() : { state: 'bad' }));
+
+// PLAY: erst warten, bis der Server das Spiel wirklich ausliefert (schlafender Server
+// wird so geweckt, die Startseite bleibt sichtbar), dann laden.
+ipcMain.on('pp-launcher:play', async (e) => {
+  if (!fromLauncher(e)) return;
+  const token = ++playToken;
+  const sender = e.sender;
+  for (let i = 0; i < 40; i++) {
+    const r = await probeServer();
+    if (token !== playToken || !mainWindow || mainWindow.isDestroyed()) return;
+    if (r.state === 'ok') { retryCount = 0; loadGame(); return; }
+    await new Promise((res) => setTimeout(res, 2500));
+    if (token !== playToken) return;
+  }
+  if (!sender.isDestroyed()) sender.send('pp-launcher:play-failed');
+});
+
+ipcMain.on('pp-launcher:open-external', (e, url) => {
+  if (!fromLauncher(e)) return;
+  const c = readLauncherConfig();
+  if (Object.values(c.links || {}).includes(url) && /^https:\/\//.test(url)) shell.openExternal(url);
+});
+ipcMain.on('pp-launcher:fullscreen', (e) => {
+  if (fromLauncher(e) && mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
+});
+ipcMain.on('pp-launcher:quit', (e) => { if (fromLauncher(e)) app.quit(); });
 
 function isGameUrl(url) {
   try {
@@ -602,7 +677,8 @@ function buildMenu() {
     {
       label: 'Game',
       submenu: [
-        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => loadGame() },
+        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => { if (mainWindow && mainWindow.webContents.getURL().startsWith('file:')) loadLauncher(); else loadGame(); } },
+        ...(SKIP_LAUNCHER ? [] : [{ label: 'Back to start page', accelerator: 'CmdOrCtrl+H', click: () => loadLauncher() }]),
         { type: 'separator' },
         { role: 'quit' },
       ],
@@ -624,14 +700,14 @@ function buildMenu() {
 
 function start() {
   buildMenu();
-  createSplash();
-  createWindow();
+  if (SKIP_LAUNCHER) createSplash();
+  createWindow(!SKIP_LAUNCHER);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainRevealed = false;
-      createSplash();
-      createWindow();
+      if (SKIP_LAUNCHER) createSplash();
+      createWindow(!SKIP_LAUNCHER);
     }
   });
 }

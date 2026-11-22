@@ -43,10 +43,11 @@ const CARD_NAME      = 'Bomblebee Cluster';
 const ANIM_TYPE      = 'bomblebee_cluster';
 const MAX_RESUMMONS  = 2;
 
-function bomblebeeNamesInHand(ps, excludeNames) {
+// ★ 12.11. (Al: „Crestina-Karten werden immer behandelt wie echte Handkarten“): Bomblebees in Crestinas Vorrat (Extra-Hand) zaehlen mit (`vorrat` = nutzbare Vorratsliste).
+function bomblebeeNamesInHand(ps, excludeNames, vorrat = []) {
   const seen = new Set();
   const out = [];
-  for (const cn of (ps.hand || [])) {
+  for (const cn of [...(ps.hand || []), ...vorrat]) {
     if (seen.has(cn)) continue;
     if (!BOMBLEBEE_NAMES.has(cn)) continue;
     if (excludeNames.has(cn)) continue;
@@ -119,7 +120,7 @@ module.exports = {
     for (let i = 0; i < MAX_RESUMMONS; i++) {
       // Welle 12 (Al): bei negierten ABILITIES des Wirts (harte Form) nur Stufe-0-Bomblebees („Summoning Magic weg").
       const blanked = engine.heroAbilityLevelsBlanked(feld, hostHeroIdx);
-      const candidates = bomblebeeNamesInHand(ps, usedNames)
+      const candidates = bomblebeeNamesInHand(ps, usedNames, engine.isCreationZoneUsable(pi) ? (ps.creationZone || []) : [])
         .filter(n => !blanked || require('./_summon-eligibility').beschwoerStufeOk(engine, feld, hostHeroIdx, engine._getCardDB()[n]))
         // W16c (A05-05): "Summon ..." (nicht "place") - die Stufe des Helden gilt weiter (Al, Q25); nur die AKTION entfaellt.
         .filter(n => { const cd = engine._getCardDB()[n]; return !cd || engine.heroMeetsLevelReq(feld, hostHeroIdx, cd, { levelSourcePi: pi }); });
@@ -151,15 +152,15 @@ module.exports = {
       if (!candidates.includes(result.cardName)) break;
 
       const chosenName = result.cardName;
-      const handIdx = ps.hand.indexOf(chosenName);
-      if (handIdx < 0) break;
+      const quelle = engine._rxQuelleFuer(ps, chosenName);   // Hand zuerst, dann nutzbarer Vorrat
+      if (!quelle) break;
       const slot = zoneFuer(chosenName).slotIdx;
 
       // Remove from hand, then summon via summonCreatureWithHooks so the
       // chosen Bomblebee gets its onPlay / onCardEnterZone hooks. The
       // host's `summonLocked` flag isn't set yet (we apply it after the
       // loop), so the engine doesn't reject these summons.
-      engine.takeFromPileSync(ps, 'hand', handIdx);
+      engine.rxNimm(ps, quelle);
       engine.notePlayedFromHand(pi);
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 

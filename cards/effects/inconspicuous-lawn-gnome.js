@@ -91,7 +91,9 @@ module.exports = {
   },
 
   /** Welle 12 (Al, Rueckfrage 14): diese Kopie hat ihre Stufe in DIESEM Zug schon geaendert (Hand -> Brett -> Hand mitgerechnet). */
-  canHandActivateAt(gs, pi, handIndex) {
+  canHandActivateAt(gs, pi, handIndex, engine, ausVorrat) {
+    // Crestinas Vorrat (11.11.): eigener Index-Raum — die Sperre steht dort an der Instanz, nicht im Handindex-Feld.
+    if (ausVorrat) return engine?._findHandInstanceAt?.(pi, handIndex, true)?.counters?._stufeGeaendertZug !== (gs.turn || 1);
     return gs.players[pi]?._handStufenWechsel?.[handIndex] !== (gs.turn || 1);
   },
 
@@ -111,9 +113,10 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const handIndex = ctx.handIndex;
-    const inst = engine._findHandInstanceAt?.(pi, handIndex);
+    const inst = engine._findHandInstanceAt?.(pi, handIndex, !!ctx.fromCreation);
     if (!inst) return false;
-    if (engine.gs.players[pi]?._handStufenWechsel?.[handIndex] === (engine.gs.turn || 1)) return false;   // Welle 12: schon geaendert (Brett -> Hand)
+    if (!ctx.fromCreation && engine.gs.players[pi]?._handStufenWechsel?.[handIndex] === (engine.gs.turn || 1)) return false;   // Welle 12: schon geaendert (Brett -> Hand)
+    if (ctx.fromCreation && inst.counters?._stufeGeaendertZug === (engine.gs.turn || 1)) return false;                      // Vorrat: Sperre an der Instanz
 
     const cd = engine._getCardDB()[CARD_NAME];
     const aktuell = typeof inst.counters?.levelSet === 'number'
@@ -134,10 +137,11 @@ module.exports = {
     inst.counters.levelSet = stufe;
     // Q79: die Nutzung dieses Zuges folgt der Kopie aufs Brett (Handindex-Feld, s. Kopf).
     const ps = engine.gs.players[pi];
-    if (ps && handIndex >= 0 && inst.zone === 'hand') {   // nicht fuer Crestinas Vorrat (anderer Index-Raum)
+    if (ps && handIndex >= 0 && inst.zone === 'hand') {   // Handindex-Feld nur fuer die Hand (anderer Index-Raum im Vorrat)
       if (!ps._handStufenWechsel) ps._handStufenWechsel = {};
       ps._handStufenWechsel[handIndex] = engine.gs.turn || 1;
     }
+    if (ctx.fromCreation) inst.counters._stufeGeaendertZug = engine.gs.turn || 1;   // Crestinas Vorrat: einmal je Zug an der Instanz
     engine.log('gnome_level', {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'hand',
     });

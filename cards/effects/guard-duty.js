@@ -23,7 +23,7 @@ const CARD_NAME = 'Guard Duty';
 
 /**
  * Darf `p` seine Ablage jetzt ins eigene Deck zurückmischen? Zurückmisch-Sperre (Hatusbal; Distracting Crystal in `p`s Hand) UND die
- * Ablage-Ausgangssperren (Knight of Kings [B], Stab-Sperre, Freikauf des Eye of Ren) — die Karte schob die Ablage sonst an allen vorbei.
+ * Ablage-Ausgangssperren (Knight of Kings [B], Stab-Sperre, nicht bezahlte Sperre des Eye of Ren) — die Karte schob die Ablage sonst an allen vorbei.
  * Ist es gesperrt, entfällt NUR dieser Teil (wie bei Meditation); der Teil des Gegners bleibt davon unberührt.
  */
 async function ablageMischenErlaubt(engine, p) {
@@ -32,8 +32,8 @@ async function ablageMischenErlaubt(engine, p) {
 }
 
 module.exports = {
-  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
-  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  // ★ FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328) oder wird sie NEGIERT (Kette), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`;
+  // Spielgestalter-Entscheidung 16.11.2026: ein Einmal-Limit ist mit dem Beginn der Aktivierung verbraucht).
   onFizzledPlay: ({ gs, pi }) => { if (!gs[ONCE_PER_GAME_KEY]) gs[ONCE_PER_GAME_KEY] = {}; gs[ONCE_PER_GAME_KEY][pi] = true; },
 
   inherentAction: true, // Free additional Action — no main-action cost.
@@ -43,8 +43,8 @@ module.exports = {
 
   // Als Ruling (Al 26.10.): „Die Karte soll nur spielbar sein, wenn der Discard Pile auch ins eigene Deck gemischt werden darf. Sperre beim Gegner ist
   // egal." — unspielbar (ausgegraut, nichts verbraucht), solange die EIGENE Ablage nicht ins eigene Deck zurück darf: Zurückmisch-Sperre (Hatusbal,
-  // Distracting Crystal), Stapel-Ausgang (Knight of Kings [B]) oder harte Stab-Ablagesperre (der freikaufbare Eye of Ren zählt NICHT, wie bei
-  // Meditation). Eine Sperre beim Gegner lässt nur DESSEN Teil entfallen (`onPlay`), die Karte bleibt spielbar.
+  // Distracting Crystal), Stapel-Ausgang (Knight of Kings [B]) oder harte Ablage-Ausgangssperre (Stab-Sperre, nicht bezahlte Sperre des Eye of Ren —
+  // Spielgestalter-Entscheidung 18.11.2026: beide hart, kein Freikauf). Eine Sperre beim Gegner lässt nur DESSEN Teil entfallen (`onPlay`), die Karte bleibt spielbar.
   spellPlayCondition(gs, pi, engine) {
     if (gs[ONCE_PER_GAME_KEY]?.[pi]) return false;
     const eng = engine || gs._engineRef;

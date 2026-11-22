@@ -27,6 +27,7 @@
 // ═══════════════════════════════════════════
 
 const { selbstsenkungZaehlt } = require('./_hooks');
+const { waehlePfad } = require('./_pfad-shared');
 const { gegnerZiele } = require('./_frost-shared');
 
 const CARD_NAME = 'Embodiment of Biseria';
@@ -78,7 +79,7 @@ module.exports = {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
     if (evalOpts?.pileSide) return 0;                                   // Deck / Ablage / Gelöscht: gedruckte Stufe
     // Wird eine Karte AUF DEM BRETT geprüft (Instanz kommt mit), gilt die Senkung nicht — nur „in your hand".
-    if (evalOpts?.inst && evalOpts.inst.zone !== 'hand') return 0;
+    if (evalOpts?.inst && !['hand', 'creationZone'].includes(evalOpts.inst.zone)) return 0;   // Hand oder Crestinas Vorrat
     if (!selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;
     const deckel = Math.max(0, (Number(cardData.level) || 0) - 1);      // Mindeststufe 1
     return Math.min(brettStufen(engine), deckel);
@@ -119,24 +120,21 @@ module.exports = {
 
     // ── ODER: Schaden oder Frost (Frost nur, wenn der Gegner eine Kreatur kontrolliert) ──
     const feinde = gegnerKreaturen(engine, oi);
-    let modus = 'damage';
-    if (feinde.length > 0) {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: 'Choose which effect to use this turn.',
-        showCard: CARD_NAME,
-        gerrymanderEligible: true,
-        casterIdx: pi,                                                   // für die CPU-Wahl (cpuResponse kennt den Fragenden nicht)
-        options: [
-          { id: 'damage', label: `🧊 Deal ${DAMAGE} damage`, description: 'Choose a target. A giant fist of ice smashes it.', color: '#4fa3e6' },
-          { id: 'freeze', label: '❄️ Freeze all enemy Creatures', description: `Every Creature your opponent controls is Frozen for ${FREEZE_TURNS} turn.`, color: '#9ad8ff' },
-        ],
-        cancellable: true,
-      });
-      if (!wahl || wahl.cancelled || !wahl.optionId) return false;
-      modus = wahl.optionId === 'freeze' ? 'freeze' : 'damage';
-    }
+    // Spielgestalter-Entscheidung 18.11.2026 (allgemeine Regel, `_pfad-shared.js`): unter der Schadenssperre (`damageLocked`, Flame Avalanche & Co.) ist der Schadensweg zu — bleibt „Freeze" (nur mit
+    // gegnerischer Kreatur), wird er automatisch genommen. Ohne Schadenssperre unverändert: ohne Gegner-Kreatur nur Schaden (kein Menü), sonst die Wahl.
+    const wahl = await waehlePfad(engine, pi, [
+      { id: 'damage', label: `🧊 Deal ${DAMAGE} damage`, description: 'Choose a target. A giant fist of ice smashes it.', color: '#4fa3e6', offen: !ps.damageLocked },
+      { id: 'freeze', label: '❄️ Freeze all enemy Creatures', description: `Every Creature your opponent controls is Frozen for ${FREEZE_TURNS} turn.`, color: '#9ad8ff', offen: feinde.length > 0 },
+    ], {
+      title: CARD_NAME,
+      description: 'Choose which effect to use this turn.',
+      showCard: CARD_NAME,
+      gerrymanderEligible: true,
+      casterIdx: pi,                                                   // für die CPU-Wahl (cpuResponse kennt den Fragenden nicht)
+      cancellable: true,
+    });
+    if (wahl.abgebrochen) return false;
+    const modus = wahl.keiner ? 'damage' : wahl.id;                    // beide zu (Schadenssperre ohne Gegner-Kreatur): wie bisher Schaden (die Engine verhindert ihn)
 
     // ── Schaden ──
     if (modus === 'damage') {

@@ -17,6 +17,11 @@
 //  Der Hook ruft deshalb nur den Primitiv auf und verlässt sich auf dessen Klammer; es gibt hier keine eigene Rechnung, die davon
 //  abweichen könnte.
 //
+//  ── GOLD-GEWINN-SPERRE DES DIEBES ───────────────────────────────────────
+//  Spielgestalter-Entscheidung 16.11.2026 (wie Thieving): ist der Gewinn der Mimic-Besitzerin gesperrt (Golden Arrow, Tuscan Aristocrat),
+//  VERLIERT der Gegner die 10 Gold trotzdem (`verlustBleibtBeiSperre`, gleiche Klammer auf sein Gold) — sie bekommt nichts. Der
+//  Erstzug-Schutz des Gegners lässt den Diebstahl weiter fizzeln (er verliert nichts, `gibtEtwasZuHolen` = false, kein Biss).
+//
 //  ── „AT THE BEGINNING OF EACH OF YOUR TURNS" ────────────────────────────
 //  `onTurnStart` mit `isMyTurn` (Kontrolleur, nicht Besitzer: eine übernommene Mimic raubt für ihren neuen Herrn). Jede Mimic stiehlt
 //  für sich — zwei Mimics holen 20. Gefroren/betäubt/negiert: die allgemeine Kreatur-Sperre der Engine greift (der Hook feuert dann
@@ -68,8 +73,8 @@ module.exports = {
       }
 
       // Die Klammer auf das tatsächliche Gold des Gegners sitzt im Primitiv (nie unter 0, nie umgekehrt).
-      const res = await engine.actionStealGold(pi, STEAL, { sourceName: CARD_NAME });
-      if (res?.stolen > 0) await engine._delay(NACH_MS);
+      const res = await engine.actionStealGold(pi, STEAL, { sourceName: CARD_NAME, verlustBleibtBeiSperre: true });
+      if (res?.stolen > 0 || res?.lost > 0) await engine._delay(NACH_MS);
     },
   },
 };

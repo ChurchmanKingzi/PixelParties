@@ -7,6 +7,14 @@
 //  (W49a, Al 22.10.2026: 150 statt 100; die Zahl lebt in der
 //  Engine-Konstante `EMPOWERED_STRIKE_BONUS`.)
 //
+//  ★ Spielgestalter-Entscheidung 17.11.2026 („Der Schaden soll durchgehen! Gilt allgemein für jede Immunität, selber Scope wie Acid Vial"):
+//  „cannot be reduced or negated" gilt für den GANZEN Schaden dieses Treffers (Basis + 150) und schlägt jede Schadens-Immunität/-Senkung durch —
+//  Petrifier/Baihu-Versteinerung („becomes 0"), Storm Piano/Cheat Chair (`damage_proof`), Succubus-/Lyta-Kontrolle, Carris, Multiplikator-Buffs,
+//  Hook-Schilde, Defending the Gate/Resilient Monkee/Guardian bei Kreaturen. „Unaffected by …"-Effekt-Immunitäten (Cardinal Beasts, Charme Lv 3,
+//  Escape Device, Erstrunden-Schutz) bleiben. Der Elixir wird normal verbraucht, „exactly 1 target" bleibt Bedingung. Umsetzung in der Engine:
+//  `_empoweredStrikeHeld` (Bedingungen), Stempel am Treffer VOR der Hook-Runde (`_actionDealDamageImpl`, `_processCreatureDamageBatchKern`),
+//  `_quelleDurchschlaegtHeldenSchutz` (Helden-Schutzformen), Rider `_applyEmpoweredStrikeIfApplicable` (+150, Verbrauch).
+//
 //  The "fire on first attack damage" behaviour
 //  itself lives in engine
 //  `_applyEmpoweredStrikeIfApplicable`, called

@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════
 const { isTutorableArea } = require('./_area-shared');
+const { deckAusgangGesperrt } = require('./_pfad-shared');
 //  CARD EFFECT: "Cooldin, King of Coolness"
 //  Hero — Activated effect, once per turn.
 //
@@ -96,8 +97,14 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     if (!ok) return false;
   }
 
-  const handIndex = ps.hand.lastIndexOf(cardName);
+  let handIndex = ps.hand.lastIndexOf(cardName);
+  let vorratQ = null;   // ★ 12.11. (Vorgabe: Effekte, die Karten aus der Hand BENUTZEN, greifen auch auf Crestinas Extra-Hand zu): Hand + Vorrat.
+  if (handIndex < 0 && !fromDeck) {
+    const q = engine._rxQuelleFuer(ps, cardName);
+    if (q && q.ausVorrat) { vorratQ = q; handIndex = q.idx; }
+  }
   if (handIndex < 0) return false;
+  const areaNehmen = () => (vorratQ ? engine.rxNimm(ps, vorratQ) : engine.takeFromPileSync(ps, 'hand', handIndex));
 
   // Real card type — Area Attacks (Blood Rock) must chain as 'Attack'
   // so reaction cards that gate on Spell-vs-Attack and the chain UI
@@ -118,8 +125,8 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // ★ v1328: gefizzelt (Cooldin waehrend der Kette handlungsunfaehig) —
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
-    engine.takeFromPileSync(ps, 'hand', handIndex);
-    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
+    areaNehmen();
+    (vorratQ ? ps : engine.handKartenBesitzerPs(ps, cardName)).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
   }
@@ -136,12 +143,12 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // typunabhängig, hier nötig, weil Areas als Spell-Kartentyp geführt
   // werden und die einfache Fenster-Regel Spells überspringt.
   engine._broadcastEvent('play_pile_transfer', {
-    owner: pi, cardName, from: 'hand', to: 'area',
+    owner: pi, cardName, from: vorratQ ? 'creation' : 'hand', to: 'area',
     asPlay: 'sole', fromHandIdx: handIndex,
   });
-  engine.takeFromPileSync(ps, 'hand', handIndex);
+  areaNehmen();
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
-  { const _hk = fromDeck ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
+  { const _hk = (fromDeck || vorratQ) ? pi : engine._consumeHandCardOrigin(pi, cardName); if (_hk !== pi) inst.originalOwner = _hk; }   // W63c: gestohlene Handkarte — die Area gehoert ihrem Besitzer
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
   // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
   // Befund 18.9. zu „Dive Down").
@@ -212,6 +219,10 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
+    // Spielgestalter-Entscheidung 18.11.2026: "Aktionssperre sperrt Cooldin" — die Area wird "as an additional Action" gespielt, und eine Zusatzaktion ist eine Aktion: unter der Aktionssperre
+    // (Overflowing Chalice, Kents Negativ-Gold-Sperre: `areActionsBlocked`) nicht wirkbar. Das Ruling vom 16.8. ("Terraform ist kein Aktions-Effekt": der Heldeneffekt kostet selbst keine Aktion)
+    // bleibt unberuehrt — gesperrt ist das Spielen der Area.
+    if (engine.areActionsBlocked(pi)) return false;
     // Can only cast an Area if the caster's own Area zone is empty
     // (generic Area rule, enforced by validateActionPlay). We enforce it
     // here too so Cooldin's button grays out when the zone is occupied.
@@ -221,9 +232,10 @@ module.exports = {
     if (engine.areaSpielGesperrt(pi)) return false;
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
+    const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
     if (fromHand.length > 0) return true;
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    // Spielgestalter-Entscheidung 18.11.2026 (ein gesperrter Weg ist nicht wählbar, `_pfad-shared.js`): unter Knight of Kings [B] darf nichts das Deck verlassen — die Quelle „Deck" ist dann zu (früher angeboten, die Entnahme scheiterte danach).
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     return fromDeck.length > 0;
   },
 
@@ -234,10 +246,11 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (engine.areActionsBlocked(pi)) return false;   // zweite Absicherung (Sperre nach dem Angebot gesetzt): Einmal-Stempel bleibt frei (siehe `canActivateHeroEffect`)
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
+    const fromHand = collectAreasFromSource(engine.handUndVorratListe(pi), cardDB, 'hand', engine, pi);
+    const fromDeck = deckAusgangGesperrt(engine, pi) ? [] : collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);   // Knight of Kings [B]: Quelle Deck zu
     const all = [...fromHand, ...fromDeck];
     if (all.length === 0) return false;
 

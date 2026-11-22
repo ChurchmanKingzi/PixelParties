@@ -32,12 +32,13 @@
 //   • Once-per-game: `oncePerGame: true` + `oncePerGameKey: 'Tharxian Horse'`.
 //     ★ Z7c (Als Entscheidung, Welle 3): die Grenze gilt für die
 //     AKTIVIERUNG, nicht fürs verdeckte Setzen. Beliebig viele Kopien
-//     dürfen (auch an mehreren Helden) verdeckt liegen; erst die nicht
-//     negierte Aktivierung (`_activateSurprise`) stempelt
-//     `_oncePerGameUsed`, danach lösen weitere Kopien nicht mehr aus
-//     (`_canHeroActivateSurprise`) und bleiben verdeckt liegen. Eine
-//     komplett negierte Aktivierung (Boots of Hermes) lässt die Grenze
-//     unverbraucht (Z7b).
+//     dürfen (auch an mehreren Helden) verdeckt liegen; erst die
+//     Aktivierung (`_activateSurprise`) stempelt `_oncePerGameUsed`,
+//     danach lösen weitere Kopien nicht mehr aus
+//     (`_canHeroActivateSurprise`) und bleiben verdeckt liegen. Die
+//     Grenze ist mit dem Beginn der Aktivierung verbraucht — auch wenn
+//     sie danach negiert wird (Boots of Hermes; Spielgestalter-
+//     Entscheidung 16.11.2026).
 //   • Telekinesis disallowed (no real triggering effect to negate, no
 //     attacker to damage). Same gate Frost Rune / Magic Mirror use.
 // ═══════════════════════════════════════════
@@ -136,8 +137,8 @@ function eligibleDiscardCreatures(engine, pi) {
 }
 
 module.exports = {
-  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
-  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  // „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; nur Hammer Throws Item Lock liest es noch —
+  // Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
   negatesWholeCard: true,
 
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,

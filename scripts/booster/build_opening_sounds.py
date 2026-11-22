@@ -2,7 +2,7 @@
 """Klänge der Booster-Öffnungsanimation, synthetisiert (numpy) und als .ogg in public/sounds/ abgelegt (Format wie die übrigen
 Spiel-Sounds: Vorbis, mono, 22,05 kHz). Zeitpunkte je Bild stehen in opening.json (`sounds`), erzeugt von build_opening.py.
 
-Aufruf:  python3 scripts/booster/build_opening_sounds.py [--out DIR]
+Aufruf:  python3 scripts/booster/build_opening_sounds.py [--out DIR] [Klangname ...]
 Ablage:  public/sounds/ (Wiedergabe im Spiel) und eine Kopie in data/shop/Boosterpacks/opening/sounds/ (zusammen mit Packs und Animation)
 Dateien (booster_*.ogg):
   slide      Pack gleitet ein und setzt auf          buildup  Spannungsaufbau (1,4 s) bis zum Blitz: Crescendo, schneller werdender Herzschlag
@@ -10,6 +10,7 @@ Dateien (booster_*.ogg):
   burst      Blitz: Knall, Luftstoß, Funkelkaskade   glitter  Glitzer-Nachklang
   card_whoosh  Karte fliegt                           card_land  Karte landet (Tonhöhe wird zur Laufzeit je Karte gesteigert)
   ready      Glockenakkord, wenn alle neun liegen
+  umpf       Sub-Bass-Schlag (Tonhöhensturz ~120 -> 44 Hz, Anschlagsknack, kurzer Nachhall, ~0,4 s) im Moment, in dem das Pack aufgeht (Blitz, Bild T_FLASH)
 """
 import os, shutil, subprocess, sys, wave
 import numpy as np
@@ -208,13 +209,37 @@ def s_ready():
     return reverb(out + hiss)[:n] * np.minimum((d - T(d)) * 6, 1)
 
 
+def s_umpf():
+    """„Umpf“: der Schlag, wenn das Pack aufgeht. Sinus mit Tonhöhensturz (120 -> 44 Hz, exponentiell in ~0,11 s) und schneller Hüllkurve, darüber
+    ein kurzer Anschlagsknack (tiefpassgefiltertes Rauschen + Klick) und ein kleiner Raum-Nachhall nur im Bassbereich. Sanfte Sättigung (tanh) erzeugt
+    Obertöne bei 90-250 Hz, damit der Schlag auch auf kleinen Lautsprechern ankommt. Eigener Zufallszähler: unabhängig von der Reihenfolge der anderen Klänge."""
+    rng = np.random.RandomState(4711)
+    d = 0.42; n = int(SR * d); t = T(d)
+    f = 44 + (120 - 44) * np.exp(-t / 0.035)                       # Sturz auf 44 Hz, dort bleibt der Ton stehen
+    body = osc(f) * (0.35 * np.exp(-t / 0.20) + 0.65 * np.exp(-t / 0.07)) * np.minimum(t * 700, 1)
+    sub = osc(f * 0.5 + 22) * 0.18 * np.exp(-t / 0.12) * np.minimum(t * 500, 1)   # leichte Unteroktave für Wucht
+    punch = osc(2 * f) * 0.42 * np.exp(-t / 0.065) * np.minimum(t * 600, 1)         # Oktave darüber (88-240 Hz): trägt auf kleinen Lautsprechern
+    knock_n = lp_var(rng.uniform(-1, 1, n), 1400) * np.exp(-t * 170)
+    click = hp_var(rng.uniform(-1, 1, n), 900) * np.exp(-t * 420) * 0.55
+    thump = knock_n * 0.9 + click
+    dry = body + sub + punch + thump
+    sat = np.tanh(dry * 2.4) / np.tanh(2.4)                          # sanfte Sättigung
+    wet = np.zeros(n)
+    low = lp_var(sat, 320)
+    for dly, g in ((0.037, 0.34), (0.071, 0.22), (0.113, 0.13)):
+        i = int(dly * SR)
+        wet[i:] += low[:n - i] * g
+    out = sat + wet
+    return out * np.minimum((d - t) * 40, 1)                         # letzte 25 ms ausblenden
+
+
 SOUNDS = {
     'slide': s_slide, 'buildup': s_buildup, 'rip': s_rip, 'strip': s_strip, 'burst': s_burst, 'glitter': s_glitter,
-    'card_whoosh': s_card_whoosh, 'card_land': s_card_land, 'ready': s_ready,
+    'card_whoosh': s_card_whoosh, 'card_land': s_card_land, 'ready': s_ready, 'umpf': s_umpf,
 }
 
 
-def to_ogg(x, path, peak=0.85):
+def to_ogg(x, path, peak=0.85):   # peak: Spitzenpegel linear (0,85 = -1,4 dBFS; der Umpf nimmt 0,673, das nach der Begrenzung unten -2 dBFS ergibt)
     x = np.nan_to_num(x)
     x = x / max(np.abs(x).max(), 1e-6) * peak
     x = np.tanh(x * 1.15) / np.tanh(1.15)                      # sanfte Begrenzung
@@ -235,10 +260,13 @@ def main(argv):
     # Kopie bei den Boosterpacks (data/shop/Boosterpacks/opening/sounds), damit Packs, Animation und Klänge zusammenliegen
     pack_dir = os.path.join(ROOT, 'data', 'shop', 'Boosterpacks', 'opening', 'sounds')
     os.makedirs(pack_dir, exist_ok=True)
+    only = set(args)   # Namen als Argumente: nur diese Klänge neu bauen (z. B. `umpf`)
     for name, fn in SOUNDS.items():
+        if only and name not in only:
+            continue
         p = os.path.join(out, 'booster_%s.ogg' % name)
         x = fn()
-        to_ogg(x, p)
+        to_ogg(x, p, peak=0.673 if name == 'umpf' else 0.85)
         shutil.copyfile(p, os.path.join(pack_dir, os.path.basename(p)))
         print('ok', name, '%.2f s' % (len(x) / SR), os.path.getsize(p) // 1024, 'KB')
 

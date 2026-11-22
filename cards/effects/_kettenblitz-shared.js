@@ -53,6 +53,7 @@ async function kettenblitz(engine, cfg) {
   });
 
   let treffer = 0;
+  const getroffen = [];   // Ids der bisher getroffenen Ziele (nach Umleitung) — für `_bereitsGewaehlt`
   try {
     let vorher = cfg.start || null;
     for (let step = 0; step < ziele.length; step++) {
@@ -63,12 +64,16 @@ async function kettenblitz(engine, cfg) {
       }
       // 2) Umleitung — der Treffer gilt als Wahl dieses Ziels.
       let tgt = ziele[step];
-      const neu = await engine.trefferAlsWahl(tgt, alle, quelleMitArt, { title: quelle.name });
+      // ★ Spielgestalter-Entscheidung 17.11.2026: kein Doppeltreffer — die übrigen Glieder der Kette (schon getroffen oder noch dran) und die bisher wirklich getroffenen Ziele sind für Umleiter
+      // dieses Treffers keine Ausweichziele (`config._bereitsGewaehlt`, siehe `applyRedirectWindows`).
+      const belegt = ziele.filter((z, k) => k !== step && z && z.id).map(z => z.id).concat(getroffen);
+      const neu = await engine.trefferAlsWahl(tgt, alle, quelleMitArt, { title: quelle.name, _bereitsGewaehlt: belegt });
       if (!neu) {
         engine.log('chain_lightning_interrupted', { player: gs.players[pi]?.username, afterStep: step, source: quelle.name });
         break;
       }
       tgt = neu;
+      if (tgt && tgt.id) getroffen.push(tgt.id);
       const dmg = schaden[step];
       const tgtZoneSlot = tgt.type === 'hero' ? -1 : tgt.slotIdx;
 

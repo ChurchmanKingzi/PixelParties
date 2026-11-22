@@ -29,6 +29,7 @@
   // der IntersectionObserver meldet ihn nie als sichtbar, und die Karte würde nie gezeichnet).
   const PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1050"/>');
   const MAX_CACHE = 400;
+  const RARITY_IDS = new Set(['common', 'uncommon', 'rare', 'prismatic', 'super', 'storm', 'spectral', 'umbra', 'stained']);
 
   // Dateinamen verlieren Satzzeichen („Hello, World“ -> „Hello World.png“): gleiche Regel wie card-images.js
   const strippedKey = n => String(n || '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
@@ -44,6 +45,29 @@
   let failed = false;
   let cardByStem = null, skinByStem = null, cardsByName = null;
 
+  // Karten-/Skin-Zuordnung aufbauen (auch beim Sprachwechsel neu: die Kartenobjekte tragen die uebersetzten Texte)
+  async function indexCards(cards) {
+    // erst in lokalen Tabellen aufbauen und am Ende in einem Zug austauschen (laufende Auftraege sehen nie einen halben Stand)
+    const nByName = Object.create(null), nByStem = Object.create(null), nSkin = Object.create(null), nBase = Object.create(null);
+    for (const c of cards) {
+      nByName[c.name] = c;
+      // Farbvarianten „Name [B]“ / „Name [W]“ liegen als „Name.png“ / „Name.1.png“ auf der Platte
+      const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
+      nByStem[strippedKey(m ? (m[2] === 'B' ? m[1] : m[1] + '.1') : c.name)] = c.name;
+    }
+    const art = await CardRender.loadArtIndex();
+    for (const k of [...Object.keys(art.a), ...Object.keys(art.b)]) {
+      if (k.startsWith('skin/')) nSkin[strippedKey(k.slice(5))] = k.slice(5);
+    }
+    // Skin -> Basiskarte (data/skins.json: Held -> [Skins]); Held-Namen dürfen ohne Satzzeichen stehen
+    const skins = await fetch('/data/skins.json').then(r => r.json());
+    for (const [hero, list] of Object.entries(skins)) {
+      const base = nByName[hero] || nByName[nByStem[strippedKey(hero)]];
+      if (base) for (const s of list) nBase[s] = base;
+    }
+    cardsByName = nByName; cardByStem = nByStem; skinByStem = nSkin; window.__cardShimSkinBase = nBase;
+  }
+
   function boot() {
     if (ready) return ready;
     ready = (async () => {
@@ -55,27 +79,9 @@
         CardRender.loadMeta('/data/card-render.json'),
         CardRender.loadArtIndex(),
       ]);
+      if (window.PP_I18N && window.PP_I18N.get() !== 'en') { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }   // Sprache: eigene Kartenkopie uebersetzen (Name/Effekt/Boni)
       await CardRender.openCache(version);     // ohne Version oder ohne IndexedDB: false, dann wird wie bisher jedes Mal gezeichnet
-      cardsByName = Object.create(null);
-      cardByStem = Object.create(null);
-      for (const c of cards) {
-        cardsByName[c.name] = c;
-        // Farbvarianten „Name [B]“ / „Name [W]“ liegen als „Name.png“ / „Name.1.png“ auf der Platte
-        const m = /^(.*?)\s*\[(B|W)\]$/.exec(c.name);
-        cardByStem[strippedKey(m ? (m[2] === 'B' ? m[1] : m[1] + '.1') : c.name)] = c.name;
-      }
-      skinByStem = Object.create(null);
-      const art = await CardRender.loadArtIndex();
-      for (const k of [...Object.keys(art.a), ...Object.keys(art.b)]) {
-        if (k.startsWith('skin/')) skinByStem[strippedKey(k.slice(5))] = k.slice(5);
-      }
-      // Skin -> Basiskarte (data/skins.json: Held -> [Skins]); Held-Namen dürfen ohne Satzzeichen stehen
-      const skins = await fetch('/data/skins.json').then(r => r.json());
-      window.__cardShimSkinBase = Object.create(null);
-      for (const [hero, list] of Object.entries(skins)) {
-        const base = cardsByName[hero] || cardsByName[cardByStem[strippedKey(hero)]];
-        if (base) for (const s of list) window.__cardShimSkinBase[s] = base;
-      }
+      await indexCards(cards);
     })().catch(err => { failed = true; console.warn('[card-image-shim] Renderer nicht verfügbar, nutze PNG-Dateien:', err && err.message); });
     return ready;
   }
@@ -95,34 +101,41 @@
     const ohne = qm ? ['atk', 'hp'].filter(k => qm[1].split(',').includes(k)).join(',') : '';
     const zahl = name => { const m = new RegExp('(?:^|&)' + name + '=(\\d{1,3})(?:&|$)').exec(query); return m ? parseInt(m[1], 10) : null; };
     const lv = zahl('lv'), kost = zahl('kost'), stufe = zahl('stufe'), rahmen = zahl('rahmen');   // rahmen = Rang-Rahmen (Duplikate), 1 … 8
+    // `?rar=<Rarity-ID>`: Basiskarte der Seltenheit (Stempel, Rahmen, Namensfarbe; Common = Standard und ohne Parameter), siehe rarities.js / CardRender.rarityBase
+    const rm = /(?:^|&)rar=([a-z]{3,12})(?:&|$)/.exec(query), rar = rm && RARITY_IDS.has(rm[1]) && rm[1] !== 'common' ? rm[1] : '';
+    // `&stempel=1`: die Basiskarte behaelt ihren gedruckten Rarity-Stempel (nur fuer Bilder OHNE Rarity-Ebene, z. B. der Kartenwurf). Mit `?rar=` allein
+    // fehlt der Stempel auf der Karte — die Rarity-Ebene (rarity-fx.js) malt ihn selbst; zwei Zeichen uebereinander gaebe Geisterbilder.
+    const stempel = !!rar && /(?:^|&)stempel=1(?:&|$)/.test(query);
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
-    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen });
+    const sfx = variantKey({ ohne, lv, kost, stufe, rahmen, rar, stempel });
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, id: 'skin:' + file + sfx };
+      return { kind: 'skin', stem: file, ohne, lv, kost, stufe, rahmen, rar, stempel, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, id: 'card:' + stem + sfx };
+    return { kind: 'card', stem, ohne, lv, kost, stufe, rahmen, rar, stempel, id: 'card:' + stem + sfx };
   }
   /** Die Variante als Anhang der Karten-ID: `|o=hp,atk|l=2|k=3` (leer ohne Variante). */
   function variantKey(v) {
-    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '');
+    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '') + (v.stufe != null ? '|s=' + v.stufe : '') + (v.rahmen != null ? '|r=' + v.rahmen : '') + (v.rar ? '|q=' + v.rar : '') + (v.stempel ? '|t=1' : '');
   }
   /** Karten-ID (`card:Stem` / `skin:Stem`, optional mit Variante) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
   function fromId(id) {
     const teile = id.split('|');
-    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, rahmen: null, id };
+    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, stufe: null, rahmen: null, rar: '', id };
     for (const t of teile.slice(1)) {
       if (t.startsWith('o=')) m.ohne = t.slice(2);
       else if (t.startsWith('l=')) m.lv = parseInt(t.slice(2), 10);
       else if (t.startsWith('k=')) m.kost = parseInt(t.slice(2), 10);
       else if (t.startsWith('s=')) m.stufe = parseInt(t.slice(2), 10);
       else if (t.startsWith('r=')) m.rahmen = parseInt(t.slice(2), 10);
+      else if (t.startsWith('q=')) m.rar = t.slice(2);
+      else if (t === 't=1') m.stempel = true;
     }
     return m;
   }
@@ -170,10 +183,18 @@
       if (m.lv != null) opts.lv = m.lv;
       if (m.kost != null) opts.kost = m.kost;
       if (m.stufe != null) opts.stufe = m.stufe;
+      if (m.rar) { opts.rarity = m.rar; if (!m.stempel) opts.noStamp = true; }
       let cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
       // Rang-Rahmen (Duplikate): fest in die Karte einbacken (public/rank-frames.js); ohne den Generator bleibt die Karte rahmenlos
-      if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) cv = window.ppRankFrames.bake(cv, cv.width, cv.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
+      if (m.rahmen && window.ppRankFrames && window.ppRankFrames.rankOf(m.rahmen) != null) {
+        const un = cv;                                   // ungerahmte Karte: nur die Stat-Zahlen (mit Umrandung) kommen von hier wieder ÜBER den Rahmen
+        cv = window.ppRankFrames.bake(un, un.width, un.height, window.ppRankFrames.rankOf(m.rahmen), 'card');
+        try {
+          const layer = CardRender.statsLayer ? await CardRender.statsLayer(r.card, Object.keys(opts).length ? opts : null, un) : null;
+          if (layer) cv.getContext('2d').drawImage(layer, 0, 0);
+        } catch (e) { /* ohne Zahlen-Ebene bleibt die Karte gerahmt */ }
+      }
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
       CardRender.cachePut(key, blob, blob.size);          // fuer den naechsten Besuch (ohne zu warten)
@@ -316,6 +337,25 @@
     return nativeRemoveAttr.call(this, name);
   };
 
+  // ── Sprachwechsel ohne Neuladen ──
+  // Kartendaten in der neuen Sprache holen, Dauer-Cache (je Sprache eine Datenbank) umstellen, alle Blob-Bilder verwerfen und jedes
+  // Kartenbild der Seite neu anfordern. Die alten Bilder bleiben stehen, bis die neuen fertig sind (gleiche Karte: kein Aufblitzen).
+  window.__cardShimLang = async function () {
+    if (!ready) return;                                   // noch nie gestartet: der erste Start liest die Sprache selbst
+    await ready;
+    const alt = [...cache.values()];
+    cache.clear(); inflight.clear(); pinned.clear(); keepPinned.clear(); fromStore.clear(); warming.clear();
+    const [cards, version] = await Promise.all([
+      fetch('/data/cards.json').then(r => r.json()),
+      fetch('/api/render-version', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.v) || null).catch(() => null),
+    ]);
+    if (window.PP_I18N && window.PP_I18N.get() !== 'en') { await window.PP_I18N.load(); window.PP_I18N.apply(cards); }
+    await CardRender.openCache(version);
+    await indexCards(cards);
+    setTimeout(() => alt.forEach(u => URL.revokeObjectURL(u)), 10000);
+    for (const img of document.querySelectorAll('img')) if (img.__cardOrig != null) handle(img, img.__cardOrig);
+  };
+
   // Per `innerHTML` / `insertAdjacentHTML` erzeugte <img> setzen ihre Quelle im HTML-Parser und umgehen die
   // Überschreibungen oben. Sobald so ein Bild in die Seite kommt, übernehmen wir es nachträglich; die schon
   // angestoßene Anfrage wird durch die neue Quelle verworfen.
@@ -344,7 +384,7 @@
   // Hintergrund bereitgelegt (Blob-URL im Speicher + dekodiert) — der Wechsel ist dann ein Cache-Treffer. Als Handkarte ohne Stufe zählt das
   // schon im Voraus: bis sie auf dem Brett liegt, sind alle drei Varianten fertig.
   function waermeStufen(m) {
-    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null) return;
+    if (m.kind !== 'card' || m.ohne || m.lv != null || m.kost != null || m.rar) return;
     const r = resolve(m);
     const c = r && r.card;
     if (!c || c.cardType !== 'Ability' || !/^\s*1\)/m.test(c.effect || '') || !/^\s*2\)/m.test(c.effect || '') || !/^\s*3\)/m.test(c.effect || '')) return;

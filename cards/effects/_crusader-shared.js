@@ -161,7 +161,8 @@ async function zugEndeKreislauf(ctx, selbstName) {
 
   const ausDeck = [...new Set((ps.mainDeck || []).filter(
     n => istCrusaderArtefakt(n) && n !== selbstName))];
-  const ausHand = [...new Set((ps.hand || []).filter(
+  // ★ 12.11. (Al: „Effekte, die Karten aus der Hand benutzen, auch aus der Extra-Hand“): Hand + Crestinas Vorrat.
+  const ausHand = [...new Set(engine.handUndVorratListe(pi).filter(
     n => istCrusaderArtefakt(n) && n !== selbstName))];
   if (ausDeck.length === 0 && ausHand.length === 0) return;
 
@@ -195,9 +196,9 @@ async function zugEndeKreislauf(ctx, selbstName) {
     const _taken_di = await engine.takeFromPile(ps, 'deck', gewaehlt.name, { source: '_crusader-shared', shuffle: true });   // v820: Stapel-Schicht
     if (!_taken_di) return;
   } else {
-    const hi = (ps.hand || []).indexOf(gewaehlt.name);
-    if (hi < 0) return;
-    engine.takeFromPileSync(ps, 'hand', hi);
+    const crusaderQuelle = engine._rxQuelleFuer(ps, gewaehlt.name);   // Hand oder Crestinas Vorrat
+    if (!crusaderQuelle) return;
+    engine.rxNimm(ps, crusaderQuelle);
   }
 
   engine._broadcastEvent('card_reveal', { cardName: gewaehlt.name });

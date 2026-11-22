@@ -11,12 +11,15 @@
 //  this card in your hand. Once per turn.
 // ═══════════════════════════════════════════
 
-const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
+const { canPlayMagicGem, maybeKeepGemInHand, stempelGem } = require('./_magic-gem-shared');
 
 const CARD_NAME = 'Magic Cobalt';
 const HEAL_AMOUNT = 50;
 
 module.exports = {
+  // Spielgestalter-Entscheidung 16.11.2026: wird die gespielte Karte in der Kette NEGIERT, läuft ihr `resolve` nie — das „1 pro Zug"-Limit ist trotzdem verbraucht (Engine: `_noteFizzledPlay`).
+  onFizzledPlay: ({ engine, pi }) => { stempelGem(engine, pi, CARD_NAME); },
+
   isTargetingArtifact: true,
   activeIn: ['hand'],
 
@@ -61,8 +64,10 @@ module.exports = {
     const hi = parseInt(m[2]);
 
     const hero = engine.gs.players[tpi]?.heroes?.[hi];
-    if (!hero?.name || hero.hp <= 0) return { keepInHand: false };
-    if (engine.heroSideOf(tpi, hero) !== pi) return { keepInHand: false };   // W16e: nur ein Held, den ICH kontrolliere
+    // Fizzle (CARD_API Z7b): ist das Ziel beim Auflösen nicht mehr legal (tot / nicht mehr unter meiner Kontrolle), war die Karte trotzdem gespielt —
+    // Einmal-Stempel und Behalten-Angebot wie bei jedem anderen Verpuffen (Sapphire ohne Zauber, Amethyst ohne Abilities); nur der Abbruch durch den Spieler stempelt nie.
+    if (!hero?.name || hero.hp <= 0) return await maybeKeepGemInHand(engine, pi, CARD_NAME);
+    if (engine.heroSideOf(tpi, hero) !== pi) return await maybeKeepGemInHand(engine, pi, CARD_NAME);   // W16e: nur ein Held, den ICH kontrolliere
 
     // Heal sparkle on the target hero — same animation Cure / Charme /
     // Ballad Harpyformer / Deepsea Succubus use for any "this card heals

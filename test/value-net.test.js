@@ -201,3 +201,17 @@ test('Greedy-Beobachtung: zählt, wie oft die Netz-Köpfe denselben Zug wie der 
   const e2 = {}; L.probeDone(e2, [{ ev: 1, logit: 1, head: 1 }]);
   assert.equal(e2._greedyProbe, undefined);
 });
+
+test('ausgelieferte Gewichte (data/cpu-value) laden, passen zum Vokabular und rechnen endlich', () => {
+  const net = ValueNet.load();                                  // Standardordner = data/cpu-value
+  const vocab = V.loadVocab();
+  const kopf = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'cpu-value', 'net.json'), { encoding: 'utf-8' }));
+  assert.ok(vocab.names.length >= kopf.vocabSize, 'Das Vokabular wächst nur anhängend: es darf nie kürzer sein als das, womit das Netz trainiert wurde');
+  const cards = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'cards.json'), { encoding: 'utf-8' }));
+  const fehlt = (Array.isArray(cards) ? cards : Object.values(cards)).filter(c => c && c.name && !vocab.idOfName.has(c.name)).map(c => c.name);
+  // Neue Karten ohne Vokabel laufen als „unbekannt" durch das Netz (siehe Plan); sie sollen aber bewusst sein, nicht still entstehen.
+  assert.ok(fehlt.length < 40, `${fehlt.length} Karten ohne Vokabel: ${fehlt.slice(0, 5).join(', ')} — Vokabular anhängend erweitern und Netz neu trainieren`);
+  const r = net.predict(featFromFixture(fixture.examples[0]));
+  for (const k of ['logit', 'logitCal', 'ev', 'rem']) assert.ok(Number.isFinite(r[k]), k);
+  assert.ok(net.kappa && net.kappa.std > 0 && net.calib, 'Kalibrierung und κ stehen in net.json');
+});

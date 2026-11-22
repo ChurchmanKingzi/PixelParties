@@ -1,0 +1,15 @@
+{
+  "creature": "Bomblebee",
+  "sheet": "bomblebee.png",
+  "frameWidth": 80,
+  "frameHeight": 60,
+  "frames": 48,
+  "frameMs": 60,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 5,
+  "padLeft": 7,
+  "padRight": 7,
+  "padBottom": 10,
+  "faceX": 40.0
+}

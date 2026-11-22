@@ -55,8 +55,8 @@ function availableTributes(engine, pi, targetedHeroes) {
 }
 
 module.exports = {
-  // ★ Z7b: „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf → ihre Einmal-Stempel werden zurückgegeben
-  // (Engine: `_merkeGanzeNegation`). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
+  // „Negate that Spell/Attack/effect" = die gewirkte Karte löst NIE auf (`negatesWholeCard`, Engine: `_merkeGanzeNegation`; nur Hammer Throws Item Lock liest es noch —
+  // Einmal-Stempel bleiben verbraucht, Spielgestalter-Entscheidung 16.11.2026). Teil-Negierungen („… on that Hero", Schaden) tragen das Flag nicht.
   negatesWholeCard: true,
 
   isPostTargetReaction: true,

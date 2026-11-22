@@ -19,6 +19,11 @@
 //  Die Artefakt-Wahl IST der Treffer des Trägers: die Zielwahl trägt `hitsBearer: true`, damit Umleiter wissen, dass mit dem Artefakt sein Held getroffen wird. Redirecting Aura am
 //  Träger lenkt deshalb auf ein Artefakt eines ANDEREN eigenen Helden um (die Zielliste = Artefakte an lebenden Helden erzwingt „ein anderer Held mit Equip"); dann trifft Overheat
 //  dieses Artefakt und seinen Träger. Alle übrigen Umleiter/Negierer des Zielwahl-Fensters (Anti-Magnet, Challenge, Surprises …) gelten wie bei jeder Zielwahl.
+//  ★ Spielgestalter-Entscheidung 17.11.2026 (ANG-11/ANG-15): Overheat wählt ein ARTEFAKT, und das ist regeltechnisch kein „target" (Ziele sind nur Helden und Kreaturen). Daraus folgt:
+//    • Bartas/Grisgar („exactly 1 target" → Zweitwurf) lösen hier ABSICHTLICH nicht aus — es wurde kein Ziel gewählt. Keine Änderung, nur festgehalten.
+//    • Der Träger-Schaden öffnet dennoch die Fenster eines Spell-TREFFERS vollständig: Surprises (Frost Rune, Booby Trap …, Schritt „Treffer-Fenster des Trägers"), die Hand-/Brett-Reaktionen des Post-Target-
+//      Hubs (Anti Magic Shield, Test Flight, Unreasonable Anger, Barrier of Faith, Divine Gift of Rain, Future Tech Escape Device, Castling …; Auslegung `nurTreffer`: Reaktionen auf eine WAHL
+//      bleiben zu) und die Pre-Schadens-Fenster im Schadenspfad (Spectral Armor, Bamboo Shield …).
 //  Der Schaden selbst ist ein Einzelziel-Treffer (`festesZiel`): Schutz der Bauart „solange es andere Ziele gibt" (Submerged, Dive Down) greift nicht, die Quelle kann nur diesen
 //  Helden treffen.
 //
@@ -117,6 +122,13 @@ module.exports = {
         hitsBearer: true,       // die Wahl des Artefakts trifft seinen Träger (Redirecting Aura: Umleitung nur auf ein Artefakt eines anderen Helden)
         cancellable: true,
       });
+      // ── In der Zielwahl NEGIERT (Frost Rune, Magic Mirror …) oder der Wirker dort besiegt (Booby Trap): der Zauber tut nichts — das Artefakt bleibt ausgerüstet, kein Schaden.
+      // Beides geprüft (Negations-Marke UND Wirkerzustand), damit es nicht davon abhängt, welches Fenster die Marke setzt. Kein Abbruch (`_spellCancelled`): die Karte ist verbraucht.
+      if (gs._spellNegatedByEffect || hero.hp <= 0) {
+        engine.log('overheat_negated', { player: ps.username });
+        engine.sync();
+        return;
+      }
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       // Nach der Abfrage neu einsammeln — das Brett kann sich bewegt haben (Umleitung auf ein anderes Artefakt eingeschlossen).
       const treffer = id && ausruestung(engine).map(i => artefaktZiel(engine, i)).find(z => z.id === id);
@@ -127,6 +139,41 @@ module.exports = {
       const tHeroIdx = treffer.heroIdx;
       const tHero = gs.players[tSeite]?.heroes?.[tHeroIdx];
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: heroSeite };
+
+      // ── Treffer-Fenster des Trägers VOR der Ablage ──
+      // „Die Artefakt-Wahl IST der Treffer des Trägers": Surprises, die den Zauber abwehren (Frost Rune, Booby Trap …), öffneten sonst erst beim Schaden in Schritt 3 — da wäre das Artefakt
+      // schon in der Ablage, obwohl der Zauber negiert wurde. Wie `actionDealDamage` (Heldenfenster), nur früher; der Träger ist danach vorgemerkt, der Schaden fragt nicht noch einmal.
+      const quelleFenster = engine._rewriteSourceForCreatureCaster ? engine._rewriteSourceForCreatureCaster(ctx.card) : ctx.card;
+      if (tHero?.name && tHero.hp > 0 && (gs.players[tSeite]?.surpriseZones?.[tHeroIdx] || []).length > 0 && !engine.hasEffectImmunity(tSeite, tHeroIdx, ctx.card)) {
+        const sr = await engine._checkSurpriseWindow(
+          [{ type: 'hero', owner: tSeite, heroIdx: tHeroIdx, cardName: tHero.name }], quelleFenster, { damageType: 'destruction_spell' });
+        if (sr?.effectNegated) {
+          if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
+          engine.log('overheat_negated', { player: ps.username, artifact: treffer.cardName });
+          engine.sync();
+          return;
+        }
+        if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+        gs._surpriseCheckedHeroes.add(`${tSeite}-${tHeroIdx}`);
+      }
+      if (gs._spellNegatedByEffect || hero.hp <= 0) { engine.sync(); return; }   // negiert oder der Wirker fiel dabei (Booby Trap): nichts passiert
+
+      // ── Treffer-Fenster der Hand-/Brett-Reaktionen (Post-Target-Hub) VOR der Ablage ──
+      // ★ Spielgestalter-Entscheidung 17.11.2026: „Pre-Schadens-Fenster SOLLTEN beim Overheat-Schaden aufgehen." Der Träger wird von einem SPELL getroffen: alle Reaktionen, deren Kartentext auf diese Lage
+      // passt („is hit by an opponent's Spell": Anti Magic Shield; „would be hit": Test Flight; „is hit": Unreasonable Anger; „would be affected": Barrier of Faith, Divine Gift of Rain, Future Tech Escape
+      // Device, Castling; „would take damage": Spectral Armor, Bamboo Shield …), bekommen ihr Fenster — wie bei jeder Zielwahl, nur mit dem Träger statt einer Wahl. Das Artefakt wird NICHT als Ziel
+      // gewählt (Ziele sind nur Helden und Kreaturen): Reaktionen, die auf eine WAHL warten („is chosen": Invisibility Cloak, Chaorc Interception, Dream Dust, Switcheroo, Cool Tech Jetpack …), bleiben
+      // zu (`nurTreffer`, gleiche Auslegung wie beim Flächenschlag). Negiert eine Reaktion den Zauber (Anti Magic Shield), bleibt das Artefakt ausgerüstet und es fällt kein Schaden.
+      if (tHero?.name && tHero.hp > 0 && !engine.hasEffectImmunity(tSeite, tHeroIdx, ctx.card)) {
+        const pt = await engine.preDamageMultiTargetWindow(quelleFenster,
+          [{ type: 'hero', owner: tSeite, heroIdx: tHeroIdx, cardName: tHero.name }], { damageType: 'destruction_spell', nurTreffer: true });
+        if (pt?.effectNegated || gs._spellNegatedByEffect) {
+          engine.log('overheat_negated', { player: ps.username, artifact: treffer.cardName });
+          engine.sync();
+          return;
+        }
+        if (hero.hp <= 0) { engine.sync(); return; }
+      }
 
       // ── Bild: das Artefakt glüht und platzt ──
       engine._broadcastEvent('play_zone_animation', {

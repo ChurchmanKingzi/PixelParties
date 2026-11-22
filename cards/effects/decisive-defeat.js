@@ -28,6 +28,11 @@
 //  offensichtlich auf einen GEGNERISCHEN Helden, verboten ist die
 //  eigene Seite aber nicht.
 //
+//  ── STATUS-IMMUNITAET (Spielgestalter-Entscheidung 17.11.2026, JOH-01) ──
+//  Wie bei Stowaway: die Negierung gilt genau dann, wenn der Wirt im Moment NICHT status-immun ist (Johanna, Light Ball, `negative_status_immune` …).
+//  Unter Immunität liegt die Karte wirkungslos am Helden; endet sie, setzt die Negierung ein, kommt sie später dazu, ruht sie wieder
+//  (Vertrag `statusFolgtImmunitaet`, `_attachment-shared.js`).
+//
 //  ── AUSWAEHLBAR IN JEDER HEIL-KARTE (v1093, Als Vorgabe 14.9.) ────
 //  Die Karte taucht in den Auswahllisten von Juice, Beer und Cure als
 //  „Negated (Decisive Defeat)" auf — ueber den Schluessel
@@ -78,6 +83,8 @@ module.exports = {
   // (Als Vorgabe 14.9.).
   negativeStatusLabel: 'Negated (Decisive Defeat)',
   negativeStatusIcon: '🚫',
+  // Spielgestalter-Entscheidung 17.11.2026 (JOH-01): die Negierung folgt fortlaufend der Status-Immunität des Wirts.
+  statusFolgtImmunitaet: { status: 'negated' },
 
   spellPlayCondition(gs, pi, engine) {
     return attachmentHostsFor(gs, pi, engine, hostOpts(gs, pi)).length > 0;
@@ -116,7 +123,8 @@ module.exports = {
       // ★ Den Status anlegen — das ist die eigentliche Wirkung.
       const wirt = gs.players[res.host.owner]?.heroes?.[res.host.heroIdx];
       // W12 (Al, Q114): Karian wird NIE durch Negation am Handeln gehindert — bei ihr wird der Status nicht angelegt.
-      if (wirt?.name && !engine.heroIgnoresHaltStatuses?.(res.host.owner, res.host.heroIdx)) {
+      // 17.11.2026: unter Status-Immunität des Wirts ruht die Karte (der Eintritts-Haken hat sie markiert) — der Abgleich legt die Negierung an, sobald die Immunität endet.
+      if (wirt?.name && !engine.heroIgnoresHaltStatuses?.(res.host.owner, res.host.heroIdx) && !res.inst?.counters?._statusRuht) {
         if (!wirt.statuses) wirt.statuses = {};
         const altNeg = wirt.statuses.negated;   // W24a (N1-09): Eintrag-Hand-Over — fremde Negierung (oder die schon vom Eintritts-Hook darunter gelegte) bleibt erhalten
         const fremdeNegierung = altNeg ? (altNeg._fromAttachment ? altNeg._fremd : altNeg) : null;

@@ -206,6 +206,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
     source: { name: CARD_NAME_ARG, owner: pi, heroIdx },
     _skipReactionCheck: true,
   });
+  engine.opferExtraLebenVormerken(occ, { heroIdx, zoneSlot: slotIdx });   // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life des Geopferten
   engine._untrackCard(occ.id);
 
   // (7) Guardian's own on-summon lifecycle.
@@ -283,6 +284,7 @@ async function paySacrificeSwap(engine, pi, req, CARD_NAME_ARG) {
     source: { name: CARD_NAME_ARG, owner: pi, heroIdx },
     _skipReactionCheck: true,
   });
+  engine.opferExtraLebenVormerken(occ, { heroIdx, zoneSlot: slotIdx });   // Spielgestalter-Entscheidung 16.11.2026 („Opfern gilt als defeat"): Extra Life des Geopferten
   engine._untrackCard(occ.id);
   return { heroIdx, slotIdx, heroOwner, occName };
 }
@@ -419,6 +421,7 @@ async function sacrificeSelf(engine, inst, pi) {
   } else {
     await engine.actionDestroyCard(
       { name: inst.name, owner: pi, heroIdx: inst.heroIdx }, inst,
+      { einaescherung: true },   // Opfer: verbrennt (Client: app-fx-66)
     );
   }
 }
