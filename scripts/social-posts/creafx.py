@@ -1,4 +1,4 @@
-"""Crestina-Show: die Schöpfungsgöttin des Kosmos. Sie hat die Fairies erschaffen (Luna, Tempeste, Maya, Jenny), ihr oberstes Gebot ist „Habt Freude am Leben“. Im Spiel verzichtet sie in der Resource Phase
+"""Crestina-Show: die Schöpfungsgöttin des Kosmos. Sie hat die Fairies erschaffen (Luna, Tempeste, Maya, Thalia, Jenny), ihr oberstes Gebot ist „Habt Freude am Leben“. Im Spiel verzichtet sie in der Resource Phase
 aufs Ziehen und lässt 3 verschiedene Karten von außerhalb des Spiels materialisieren: der Gegner wählt eine für ihre Hand, die anderen zwei werden aus dem Spiel entfernt, ihre Namen sind gesperrt.
 Die Fairy-Sprites sind die echten Held-Sprites; Kartenzug (Zug), Schockringe und Funken sind Nachbauten der echten Spiel-Animationen (gamefx.py). Gleiche Schnittstelle wie WebShow."""
 import math
@@ -37,7 +37,8 @@ class CreaShow(CaptionMixin):
     EW, EH = 150, 210
     HERO = (540, 700)
     # Fairies: (Schlüssel, Name, x, Standlinie y, Auftritt)
-    FAIRIES = [('luna', 'LUNA', 115, 740, 1.0), ('tempeste', 'TEMPESTE', 965, 960, 2.0), ('maya', 'MAYA', 115, 1000, 3.0), ('jenny', 'JENNY', 965, 1430, 4.0)]
+    FAIRIES = [('luna', 'LUNA', 115, 740, 1.0), ('tempeste', 'TEMPESTE', 965, 960, 1.8), ('maya', 'MAYA', 115, 1000, 2.6), ('thalia', 'THALIA', 145, 1420, 3.4), ('jenny', 'JENNY', 965, 1430, 4.2)]
+    FMS = {'thalia': 80}                                                              # Bildzeit der Sheets (Standard 90 ms)
     FPX = 6
     # Runden: Resource Phase, drei Karten (Index in c1…c6), Auswahl des Gegners
     TURNS = [dict(T0=11.8, cards=[0, 1, 2], pick=1, mat=[12.4, 12.8, 13.2], hover=14.4, t_pick=16.4, t_fly=17.0, t_gone=17.6, t_lock=18.0),
@@ -189,7 +190,7 @@ class CreaShow(CaptionMixin):
             self._beam(canvas, m, x, foot, foot - 420, tau, 4, 50 + j)
             if tau < 0.35:
                 continue
-            idx = int(t * self.fps) // self.per
+            idx = int(t * 1000.0 / self.FMS.get(key, 90))
             im, pad, cxf, ft = self.actor_fn(key, idx)
             bob = int(round(6 * math.sin(t * 2.2 + j) / U)) * U
             x0 = int(round((x - cxf * px - pad) / U) * U)

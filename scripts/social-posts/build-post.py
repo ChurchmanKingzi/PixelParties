@@ -745,7 +745,7 @@ def main():
             wind = armsfx.ArmsShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
         elif creashow_on:
             import creafx
-            FSL = {'luna': 'luna-the-flame-fairy', 'tempeste': 'tempeste-the-weather-fairy', 'maya': 'maya-the-nature-fairy', 'jenny': 'jenny-the-class-fairy'}
+            FSL = {'luna': 'luna-the-flame-fairy', 'tempeste': 'tempeste-the-weather-fairy', 'maya': 'maya-the-nature-fairy', 'thalia': 'thalia-the-fun-fairy', 'jenny': 'jenny-the-class-fairy'}
             fspr = {}
             for k_, sl_ in FSL.items():
                 fspr[k_] = Sprite(sl_)

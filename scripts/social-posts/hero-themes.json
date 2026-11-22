@@ -1492,7 +1492,7 @@
   "px": 16,
   "creashow": true,
   "opener": "wind",
-  "showLoops": 9,
+  "showLoops": 6,
   "music": "scripts/social-posts/music/bgm_crestina.ogg",
   "musicHit": 7.14,
   "particles": [
