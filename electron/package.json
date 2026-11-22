@@ -11,7 +11,8 @@
     "build": "electron-builder",
     "build:dir": "electron-builder --dir",
     "dist:win-dir": "electron-builder --win --dir",
-    "dist:linux-dir": "electron-builder --linux --dir"
+    "dist:linux-dir": "electron-builder --linux --dir",
+    "dist:win-portable": "electron-builder --win portable"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -38,13 +39,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "build/icon.png",
-      "extraFiles": [
-        {
-          "from": "itch/windows.itch.toml",
-          "to": ".itch.toml"
-        }
-      ]
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -68,6 +63,11 @@
         }
       ]
     },
-    "publish": null
+    "publish": null,
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "de"
+    ]
   }
 }
