@@ -27082,3 +27082,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-pick-prev { padding: 22px; overflow: visible; }
 .wh-pick-grid { grid-template-columns: repeat(auto-fit, minmax(390px, 1fr)); }
 .wh-board-wrap { padding: 16px 0 18px; }
+
+/* Glücksrad: Inhalt (Board, Ergebnis) liegt über Antonias Sprite (fest, z-index 500), nicht dahinter */
+.shop-content-wheel { position: relative; z-index: 600; }
