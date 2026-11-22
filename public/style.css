@@ -27056,3 +27056,9 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .bp-pk-head-golden { box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a; }
 .bp-pk-head-umbra { box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #b278ed; }
 .shop-tab-off { opacity: .45; cursor: not-allowed; }
+
+/* Ticket-Zettel einheitlich groß */
+.wh-ticket-row { display: grid; grid-template-columns: repeat(auto-fill, 330px); gap: 12px; }
+.wh-ticket { width: 330px; box-sizing: border-box; justify-content: flex-start; }
+.wh-ticket-txt { flex: 1; min-width: 0; }
+.wh-ticket-use { margin-left: auto; }
