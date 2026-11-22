@@ -263,7 +263,7 @@ function PpProfileCosmetics() {
           <div className="pp-cosm-box" onClick={e => e.stopPropagation()}>
             <h3>{ppEmT('Choose an emote for key {0}').replace('{0}', slotIdx + 1)}</h3>
             <div className="pp-cosm-grid">
-              {data.emotes.map(e => {
+              {data.emotes.filter(e => owned.has(e.id)).map(e => {   // nur freigeschaltete Emotes
                 const has = owned.has(e.id), here = slots[slotIdx] === e.id, other = slots.includes(e.id) && !here;
                 return (
                   <button key={e.id} className={'pp-cosm-cell' + (has ? '' : ' pp-cosm-off') + (here ? ' pp-cosm-here' : '')} disabled={!has} onClick={() => chooseEmote(slotIdx, e.id)}
