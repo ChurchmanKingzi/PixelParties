@@ -9,13 +9,14 @@
 //    GET  /api/profile/cosmetics    → { emotes: { all, owned, slots, max }, titles: { all, owned, equipped } }
 //    POST /api/profile/emote-slots  { slots: [id, …] } (≤ 3, nur eigene, ohne Doppelte)  → { slots }
 //    POST /api/profile/title        { id | null }  → { title }
-//    Socket 'emote' { roomId, id } → alle im Raum bekommen 'emote' { username, seat, id }   (nur Spieler, nur eigene Emotes, höchstens eines je 1,2 s)
+//    Socket 'emote' { roomId, id } → alle im Raum bekommen 'emote' { username, seat, id }   (nur Spieler, nur eigene Emotes; dasselbe Emote höchstens alle 1,2 s, ein anderes überschreibt das aktive sofort)
 // ═══════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
 
 const MAX_SLOTS = 3;
-const EMOTE_COOLDOWN_MS = 1200;
+const EMOTE_COOLDOWN_MS = 1200;      // dasselbe Emote erneut: erst nach dieser Zeit (kein Spam)
+const EMOTE_SWITCH_MS = 150;         // ein ANDERES Emote überschreibt das aktive sofort (nur ein Mindestabstand gegen Flut)
 
 let _man = null, _titles = null;
 function emoteManifest() {
@@ -115,10 +116,10 @@ module.exports = function create(d) {
 
   /** Socket-Handler 'emote': `ctx` = { socket, io, rooms, getUser(), sendTo(room, event, payload) }. */
   function onEmote(ctx) {
-    let last = 0;
+    let last = 0, lastId = null;
     return async ({ roomId, id }) => {
       const user = ctx.getUser(); if (!user) return;
-      const now = Date.now(); if (now - last < EMOTE_COOLDOWN_MS) return; last = now;
+      const now = Date.now(); if (now - last < (id === lastId ? EMOTE_COOLDOWN_MS : EMOTE_SWITCH_MS)) return; last = now; lastId = id;
       const room = ctx.rooms.get(roomId); if (!room) return;
       const seat = (room.gameState ? room.gameState.players : room.players || []).findIndex(p => p && p.userId === user.userId);
       if (seat < 0 || typeof id !== 'string') return;

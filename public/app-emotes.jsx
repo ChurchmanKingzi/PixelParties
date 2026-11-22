@@ -34,14 +34,24 @@ const ppEmName = (e) => (e ? (ppEmLang() === 'de' ? (e.de || e.en) : e.en) : '')
 const ppEmUrl = (id) => PP_EM_DIR + encodeURIComponent(id) + '.png';
 const ppEmT = (s) => (window.ppT ? window.ppT(s) : s);
 
-// ── Emote-Bild: ganzzahliger Faktor, passend in eine Kantenlänge `box` (CSS-Pixel) ─────────────────────────
+// ── Emote-Bild, genormt: jedes Emote steht in einem quadratischen Feld `box` (CSS-Pixel); der ganzzahlige Faktor wird so gewählt, dass die lange Seite
+//    der Feldgröße möglichst nahe kommt (die Vorlagen haben 6 bis 56 Pixel Kantenlänge – ohne Normung wären sie sehr verschieden groß) ───────────────
+function ppEmScale(e, box) {
+  const m = Math.max(e.w, e.h);
+  let k = Math.max(1, Math.round(box / m));
+  if (k > 1 && k * m > box * 1.12) k--;
+  return k;
+}
 function PpEmote({ id, box, className, title }) {
   usePpEmData();
-  const e = ppEmData.eById[id];
-  if (!e) return <span className={'pp-emote pp-emote-missing ' + (className || '')} style={{ width: box, height: box }} />;
-  const k = Math.max(1, Math.floor((box || 64) / Math.max(e.w, e.h)));
-  return <img className={'pp-emote ' + (className || '')} src={ppEmUrl(id)} alt={ppEmName(e)} title={title === undefined ? ppEmName(e) : title} draggable={false} data-pp-px="aus"
-              style={{ width: e.w * k, height: e.h * k }} />;
+  const e = ppEmData.eById[id], B = box || 64;
+  if (!e) return <span className={'pp-emote-box pp-emote-missing ' + (className || '')} style={{ width: B, height: B }} />;
+  const k = ppEmScale(e, B);
+  return (
+    <span className={'pp-emote-box ' + (className || '')} style={{ width: B, height: B }}>
+      <img className="pp-emote" src={ppEmUrl(id)} alt={ppEmName(e)} title={title === undefined ? ppEmName(e) : title} draggable={false} data-pp-px="aus" style={{ width: e.w * k, height: e.h * k }} />
+    </span>
+  );
 }
 window.PpEmote = PpEmote; window.ppEmName = ppEmName; window.ppEmUrl = ppEmUrl;
 
@@ -72,7 +82,8 @@ window.PpTitle = PpTitle; window.PpTitled = PpTitled; window.ppTitleInfo = ppTit
 // ═══════════════════════════════════════════════════════════════════════════
 //  Duell: Emotes senden und anzeigen
 // ═══════════════════════════════════════════════════════════════════════════
-const PP_EM_COOLDOWN = 1200;
+const PP_EM_COOLDOWN = 1200;       // dasselbe Emote erneut
+const PP_EM_SWITCH = 150;          // anderes Emote überschreibt das aktive sofort
 const PP_EM_SHOW_MS = 2700;
 const ppEmEditable = (t) => !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable));
 const ppEmMuted = () => { try { return localStorage.getItem('ppMuteEmotes') === '1'; } catch (e) { return false; } };
@@ -110,14 +121,14 @@ function PpEmoteLayer() {
     const own = user && Array.isArray(user.emoteSlots) ? user.emoteSlots : data.defaults;
     return (own || []).filter(id => data.eById[id]).slice(0, 3);
   }, [user && user.emoteSlots, data.ready]);   // eslint-disable-line
-  const lastRef = useRef(0), hoverRef = useRef(-1), slotsRef = useRef(slots), roomRef = useRef(roomId);
+  const lastRef = useRef(0), lastIdRef = useRef(null), hoverRef = useRef(-1), slotsRef = useRef(slots), roomRef = useRef(roomId);
   slotsRef.current = slots; roomRef.current = roomId;
 
   const send = useCallback((id) => {
     if (!id || !roomRef.current || !ppEmBoardUp()) return;   // nur mit Brett auf dem Bildschirm
     const now = Date.now();
-    if (now - lastRef.current < PP_EM_COOLDOWN) return;
-    lastRef.current = now; setCool(true); setTimeout(() => setCool(false), PP_EM_COOLDOWN);
+    if (now - lastRef.current < (id === lastIdRef.current ? PP_EM_COOLDOWN : PP_EM_SWITCH)) return;
+    lastRef.current = now; lastIdRef.current = id; setCool(true); setTimeout(() => setCool(false), PP_EM_COOLDOWN);
     try { socket.emit('emote', { roomId: roomRef.current, id }); } catch (e) { /* ohne */ }
   }, []);
 
