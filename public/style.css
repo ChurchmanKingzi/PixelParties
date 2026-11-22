@@ -27062,3 +27062,5 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-ticket { width: 330px; box-sizing: border-box; justify-content: flex-start; }
 .wh-ticket-txt { flex: 1; min-width: 0; }
 .wh-ticket-use { margin-left: auto; }
+
+.pp-emote-box { display: grid; place-items: center; flex: none; }
