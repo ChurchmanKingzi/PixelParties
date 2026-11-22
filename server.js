@@ -14128,7 +14128,7 @@ function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CU
 /**
  * Draft-Rarities: JEDE Karte des Cubes bekommt serverseitig eine Rarity aus RARITIES.DRAFT_TABLE (Umbra/Stained/Storm nur mit Motiv-Maske,
  * sonst wird neu gewuerfelt). Karten sind im Draft einmalig, darum genuegt eine Abbildung Name → Rarity; Common steht nicht darin.
- * Die Rarities sind TEMPORAER: sie leben nur im Draft-Deck, nie in der Sammlung (Ausnahme: der Siegbonus, cubeAwardWinnerBonus).
+ * Die Rarities sind im Draft TEMPORAER; nach dem Turnier behaelt jeder Spieler alle Rarity-Karten seines Decks in der Sammlung (cubeAwardDeckRarities).
  */
 function cubeRollDraftRarities(cubeCards) {
   const out = {};
@@ -15356,11 +15356,9 @@ async function cubeFinalizeTournament(room, io) {
         if (player.socketId) io.to(player.socketId).emit('cube_sc_award', { amount: scAward, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] SC error:', err.message); }
     }
-    // Draft-Sieg-Bonus: EINE Kopie der hoechsten Rarity aus dem eigenen Draft-Deck wandert dauerhaft in die Sammlung (samt Popup).
-    if (s.placement === 1) {
-      try { await cubeAwardWinnerBonus(room, s.seat, io); }
-      catch (err) { console.error('[cubeFinalize] Rarity-Bonus error:', err.message); }
-    }
+    // Draft-Belohnung: ALLE Karten mit Rarity aus dem eigenen Draft-Deck wandern dauerhaft in die Sammlung (jeder Spieler, jede Platzierung; samt Popups).
+    try { await cubeAwardDeckRarities(room, s.seat, io, s.placement); }
+    catch (err) { console.error('[cubeFinalize] Rarity-Belohnung error:', err.message); }
     // Ranked-Elo (nur Ranked-Draft): einfacher K-Faktor nach Platzierung auf die NORMALE `elo`
     // (keine eigene Draft-Wertung); ein Turnier zaehlt als ein Ranked-Spiel (`ranked_games`, Bestenliste).
     // Higher placement = bigger gain; lowest = biggest loss.
@@ -15393,29 +15391,30 @@ async function cubeFinalizeTournament(room, io) {
 }
 
 /**
- * Draft-Sieg-Bonus (Rarity-System): der Sieger bekommt EINE zufaellige Karte mit der hoechsten Rarity aus seinem Draft-Deck
- * (Main, Potion, Side, Helden samt Faehigkeiten) als dauerhafte Kopie (Karte, Rarity) in seine Sammlung. Hat sein Deck nur Common,
- * gibt es nichts. Der Client bekommt `rarity_bonus` { card, rarity, source: 'draft', placement } fuer das Popup (Vorbild: `skin_unlocked`).
- * @returns {Promise<{card:string, rarity:string}|null>}
+ * Draft-Belohnung (Rarity-System): JEDER Mensch am Tisch behaelt ALLE Karten mit Rarity (alles ueber Common) aus seinem Draft-Deck (Main, Potion, Side,
+ * Helden samt Faehigkeiten) als dauerhafte Kopien (Karte, Rarity) in seiner Sammlung — unabhaengig von der Platzierung. Besteht das Deck nur aus Common,
+ * gibt es nichts. Der Client bekommt je Karte (hoechste Rarity zuerst) `rarity_bonus` { card, rarity, source: 'draft', placement } fuer das Popup (Vorbild: `skin_unlocked`).
+ * @returns {Promise<Array<{card:string, rarity:string}>>}
  */
-async function cubeAwardWinnerBonus(room, seat, io) {
+async function cubeAwardDeckRarities(room, seat, io, placement) {
   const cd = room.cubeDraft;
   const player = room.players[seat];
   const deck = cd?.builtDecks?.[seat];
-  if (!player || !deck || !player.userId || player.isBot) return null;
+  if (!player || !deck || !player.userId || player.isBot) return [];
   const copies = RARITIES.deckCopies(
     { mainDeck: deck.mainDeck || [], potionDeck: deck.potionDeck || [], sideDeck: deck.sideDeck || [], heroes: deck.heroes || [] },
     cubeDeckRarities(deck, cd.draftRarities));
-  let best = 0;
-  for (const c of copies) best = Math.max(best, RARITIES.rank(c.rarity));
-  if (best <= 0) return null;
-  const top = [...new Set(copies.filter(c => RARITIES.rank(c.rarity) === best).map(c => c.name))];
-  const card = top[Math.floor(Math.random() * top.length)];
-  const rarity = RARITIES.ORDER[best];
-  await addRarityCopies(player.userId, [{ name: card, rarity }]);
-  if (player.socketId) io.to(player.socketId).emit('rarity_bonus', { card, rarity, source: 'draft', placement: 1 });
-  console.log(`[cube_tournament] room ${room.id} winner ${player.username} bonus: ${card} (${rarity})`);
-  return { card, rarity };
+  const kept = copies.filter(c => RARITIES.rank(c.rarity) > 0).map(c => ({ name: c.name, rarity: c.rarity }));
+  if (!kept.length) return [];
+  await addRarityCopies(player.userId, kept);
+  // Popups: je (Karte, Rarity) eins, die seltensten zuerst
+  const seen = new Set(), list = [];
+  for (const c of kept.slice().sort((a, b) => RARITIES.rank(b.rarity) - RARITIES.rank(a.rarity) || a.name.localeCompare(b.name))) {
+    const k = c.name + '|' + c.rarity; if (seen.has(k)) continue; seen.add(k); list.push({ card: c.name, rarity: c.rarity });
+  }
+  if (player.socketId) for (const it of list) io.to(player.socketId).emit('rarity_bonus', { ...it, source: 'draft', placement: placement || 0 });
+  console.log(`[cube_tournament] room ${room.id} ${player.username} keeps ${kept.length} rarity card(s)`);
+  return list;
 }
 
 /** Auto-build a legal-ish deck from a player's drafted pool. Used by
