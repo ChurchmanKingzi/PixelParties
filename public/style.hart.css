@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN 1705eb674b5a171c — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN 5d214ecf209feeaa — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26830,3 +26830,6 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-pick-prev { padding: 22px; overflow: visible; }
 .wh-pick-grid { grid-template-columns: repeat(auto-fit, minmax(390px, 1fr)); }
 .wh-board-wrap { padding: 16px 0 18px; }
+
+/* Glücksrad: Inhalt (Board, Ergebnis) liegt über Antonias Sprite (fest, z-index 500), nicht dahinter */
+.shop-content-wheel { position: relative; z-index: 600; }

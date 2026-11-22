@@ -5364,7 +5364,7 @@ function ShopScreen() {
           </button>
         ))}
       </div>
-      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '')}>
+      <div className={'shop-content animate-in' + ((tab === 'skins' || tab === 'avatars' || tab === 'sleeves') ? ' shop-content-gacha' : '') + (tab === 'wheel' ? ' shop-content-wheel' : '')}>
         {tab === 'skins' && renderGachaPage('skin')}
         {tab === 'avatars' && renderGachaPage('avatar')}
         {tab === 'sleeves' && renderGachaPage('sleeve')}
