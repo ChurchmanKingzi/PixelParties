@@ -258,7 +258,8 @@ function WhTip({ tip }) {
       ) : (
         <div className="wh-tip-art">{tip.art && tip.art.startsWith('emote:') ? <PpEmote id={tip.art.slice(6)} box={240} title="" /> : tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
       )}
-      {!tip.titleId && <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>}
+      {/* Skins: das Kartenbild trägt den Namen schon selbst – kein goldener Name darüber */}
+      {!tip.titleId && !(typeof tip.art === 'string' && tip.art.startsWith('/cards/skins/')) && <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>}
       <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (tip.sub || f.sub || '')}</div>
       {f.desc && <div className="wh-tip-desc">{whT(f.desc)}</div>}
       {tip.pct != null && <div className="wh-tip-pct">{whT('Chance per dart') + ': ' + whPct(tip.pct)}</div>}
