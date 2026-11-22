@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Cecilia, the Harrowing Crusader"
-//  Hero (400 HP / 80 ATK, Archetyp "Bad") — zwei Effekte:
+//  Hero (400 HP / 80 ATK, ohne Archetyp) — zwei Effekte:
 //
 //  1) DECKBAU: "When you play this Hero, you may play up to 5 copies
 //     of any Attacks, Spells and Artifacts in your deck."

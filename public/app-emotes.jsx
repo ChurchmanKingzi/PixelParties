@@ -73,9 +73,11 @@ function PpTitled({ name, title }) {
   usePpEmData();
   const i = ppTitleInfo(title);
   if (!i) return <React.Fragment>{name}</React.Fragment>;
+  // Nachgestellte Titel ohne Artikel/„of“ („Trainer of Heroes“, „Control Menace“) hängen mit Komma am Namen: „Anna, Control Menace“ – „Anna the Smug“ bleibt ohne
+  const comma = i.pos === 'after' && !/^(the|of|der|die|das|des|von|vom|zur|zum)\s/i.test(i.text);
   return i.pos === 'before'
     ? <React.Fragment><PpTitle id={title} /> {name}</React.Fragment>
-    : <React.Fragment>{name} <PpTitle id={title} /></React.Fragment>;
+    : <React.Fragment>{name}{comma ? ',' : ''} <PpTitle id={title} /></React.Fragment>;
 }
 window.PpTitle = PpTitle; window.PpTitled = PpTitled; window.ppTitleInfo = ppTitleInfo;
 

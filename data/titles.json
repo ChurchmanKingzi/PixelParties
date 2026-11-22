@@ -1,123 +1,112 @@
 {
  "titles": [
   {
-   "id": "archmage",
+   "id": "antonia-s-apprentice",
    "en": {
-    "t": "Archmage",
+    "t": "Antonia's Apprentice",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Antonias Lehrling",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "control-menace",
+   "en": {
+    "t": "Control Menace",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Kontroll-Schreck",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "final-boss-of-aggro",
+   "en": {
+    "t": "Final Boss of Aggro",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Endboss der Aggro-Decks",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "creature-spammer-extraordinaire",
+   "en": {
+    "t": "Creature Spammer Extraordinaire",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Kreaturen-Spammer par excellence",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "combo-connoisseur",
+   "en": {
+    "t": "Combo Connoisseur",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Kombo-Kenner",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "spell-slinger",
+   "en": {
+    "t": "Spell Slinger",
     "pos": "before"
    },
    "de": {
-    "t": "Erzmagier",
+    "t": "Zauberschleuderer",
     "pos": "before"
    }
   },
   {
-   "id": "captain",
+   "id": "potion-hoarder",
    "en": {
-    "t": "Captain",
+    "t": "Potion Hoarder",
     "pos": "before"
    },
    "de": {
-    "t": "Kapitän",
+    "t": "Trank-Hamsterer",
     "pos": "before"
    }
   },
   {
-   "id": "professor",
+   "id": "artifact-hoarder",
    "en": {
-    "t": "Professor",
+    "t": "Artifact Hoarder",
     "pos": "before"
    },
    "de": {
-    "t": "Professor",
+    "t": "Artefakt-Hamsterer",
     "pos": "before"
    }
   },
   {
-   "id": "baron",
+   "id": "master-of-surprises",
    "en": {
-    "t": "Baron",
-    "pos": "before"
+    "t": "Master of Surprises",
+    "pos": "after"
    },
    "de": {
-    "t": "Baron",
-    "pos": "before"
+    "t": "Meister der Überraschungen",
+    "pos": "after"
    }
   },
   {
-   "id": "lord",
+   "id": "smug-coin-tycoon",
    "en": {
-    "t": "Lord",
+    "t": "Smug Coin Tycoon",
     "pos": "before"
    },
    "de": {
-    "t": "Lord",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "sir",
-   "en": {
-    "t": "Sir",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Sir",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "doctor",
-   "en": {
-    "t": "Dr.",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Dr.",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "grandmaster",
-   "en": {
-    "t": "Grandmaster",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Großmeister",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "smug-master",
-   "en": {
-    "t": "Smug Master",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Smug-Meister",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "dart-master",
-   "en": {
-    "t": "Dart Master",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Dartmeister",
-    "pos": "before"
-   }
-  },
-  {
-   "id": "card-shark",
-   "en": {
-    "t": "Card Shark",
-    "pos": "before"
-   },
-   "de": {
-    "t": "Kartenhai",
+    "t": "Smug-Coin-Tycoon",
     "pos": "before"
    }
   },
@@ -133,134 +122,2576 @@
    }
   },
   {
-   "id": "umbra-touched",
+   "id": "dart-master",
    "en": {
-    "t": "Umbra-Touched",
+    "t": "Dart Master",
     "pos": "before"
    },
    "de": {
-    "t": "Umbra-Erwählter",
+    "t": "Dartmeister",
     "pos": "before"
    }
   },
   {
-   "id": "the-smug",
+   "id": "wheel-whisperer",
    "en": {
-    "t": "the Smug",
+    "t": "Wheel Whisperer",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Glücksrad-Flüsterer",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "umbra-hunter",
+   "en": {
+    "t": "Umbra Hunter",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Umbra-Jäger",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "mulligan-survivor",
+   "en": {
+    "t": "Mulligan Survivor",
     "pos": "after"
    },
    "de": {
-    "t": "der Smugge",
+    "t": "Mulligan-Überlebender",
     "pos": "after"
    }
   },
   {
-   "id": "the-lucky",
+   "id": "monia-s-biggest-fan",
    "en": {
-    "t": "the Lucky",
+    "t": "Monia's Biggest Fan",
     "pos": "after"
    },
    "de": {
-    "t": "der Glückliche",
+    "t": "Monias größter Fan",
     "pos": "after"
    }
   },
   {
-   "id": "the-bold",
+   "id": "the-raccoon-s-best-customer",
    "en": {
-    "t": "the Bold",
+    "t": "the Raccoon's Best Customer",
     "pos": "after"
    },
    "de": {
-    "t": "der Kühne",
+    "t": "bester Kunde des Waschbären",
     "pos": "after"
    }
   },
   {
-   "id": "the-unbeaten",
+   "id": "the-ascended",
    "en": {
-    "t": "the Unbeaten",
+    "t": "the Ascended",
     "pos": "after"
    },
    "de": {
-    "t": "der Ungeschlagene",
+    "t": "der Aufgestiegene",
     "pos": "after"
    }
   },
   {
-   "id": "the-collector",
+   "id": "hero-collector",
    "en": {
-    "t": "the Collector",
+    "t": "Hero Collector",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Helden-Sammler",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "tutorial-graduate",
+   "en": {
+    "t": "Tutorial Graduate",
     "pos": "after"
    },
    "de": {
-    "t": "der Sammler",
+    "t": "Tutorial-Absolvent",
     "pos": "after"
    }
   },
   {
-   "id": "the-gilded",
+   "id": "sleeve-collector",
    "en": {
-    "t": "the Gilded",
+    "t": "Sleeve Collector",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Sleeve-Sammler",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "skin-collector",
+   "en": {
+    "t": "Skin Collector",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Skin-Sammler",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "deck-tinkerer",
+   "en": {
+    "t": "Deck Tinkerer",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Deck-Tüftler",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "draw-go-menace",
+   "en": {
+    "t": "Draw-Go Menace",
     "pos": "after"
    },
    "de": {
-    "t": "der Vergoldete",
+    "t": "Draw-Go-Schreck",
     "pos": "after"
    }
   },
   {
-   "id": "the-wise",
+   "id": "board-wipe-enthusiast",
    "en": {
-    "t": "the Wise",
+    "t": "Board Wipe Enthusiast",
     "pos": "after"
    },
    "de": {
-    "t": "der Weise",
+    "t": "Brett-Räumer aus Leidenschaft",
     "pos": "after"
    }
   },
   {
-   "id": "the-unyielding",
+   "id": "unlucky-dart-thrower",
    "en": {
-    "t": "the Unyielding",
+    "t": "Unlucky Dart Thrower",
     "pos": "after"
    },
    "de": {
-    "t": "der Unbeugsame",
+    "t": "unglücklicher Dartwerfer",
     "pos": "after"
    }
   },
   {
-   "id": "the-swift",
+   "id": "the-continent-corruptor",
    "en": {
-    "t": "the Swift",
+    "t": "the Continent Corruptor",
     "pos": "after"
    },
    "de": {
-    "t": "der Flinke",
+    "t": "der Kontinentverderber",
     "pos": "after"
    }
   },
   {
-   "id": "the-terrible",
+   "id": "the-shapeshifter",
    "en": {
-    "t": "the Terrible",
+    "t": "the Shapeshifter",
     "pos": "after"
    },
    "de": {
-    "t": "der Schreckliche",
+    "t": "der Gestaltwandler",
     "pos": "after"
    }
   },
   {
-   "id": "of-the-cork-board",
+   "id": "the-throne-robber",
    "en": {
-    "t": "of the Cork Board",
+    "t": "the Throne Robber",
     "pos": "after"
    },
    "de": {
-    "t": "von der Korkwand",
+    "t": "der Thronräuber",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "trainer-of-heroes",
+   "en": {
+    "t": "Trainer of Heroes",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Trainer der Helden",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-puppeteer-girl",
+   "en": {
+    "t": "the Puppeteer Girl",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Puppenspieler-Mädchen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-transfer-student",
+   "en": {
+    "t": "the Transfer Student",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Austauschschülerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-queen-of-spiders",
+   "en": {
+    "t": "the Queen of Spiders",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Spinnenkönigin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-human-weapon",
+   "en": {
+    "t": "the Human Weapon",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die menschliche Waffe",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-eye-of-the-cosmos",
+   "en": {
+    "t": "the Eye of the Cosmos",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Auge des Kosmos",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-maximum-lotl",
+   "en": {
+    "t": "the Maximum Lotl",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Maximal-Lotl",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "inheritor-of-the-barbarian-sword",
+   "en": {
+    "t": "Inheritor of the Barbarian Sword",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Erbe des Barbarenschwerts",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-king-of-blackport",
+   "en": {
+    "t": "the King of Blackport",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der König von Blackport",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-sapling-sacrificer",
+   "en": {
+    "t": "the Sapling Sacrificer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Setzling-Opferbringer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "speaker-of-desires",
+   "en": {
+    "t": "Speaker of Desires",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Sprecherin der Begierden",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-demon-general",
+   "en": {
+    "t": "the Demon General",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Dämonengeneral",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "bad-birthday-girl",
+   "en": {
+    "t": "Bad Birthday Girl",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Böses Geburtstagskind",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-desert-digger",
+   "en": {
+    "t": "the Desert Digger",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wüstengräber",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-monster-tamer",
+   "en": {
+    "t": "the Monster Tamer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Monsterzähmer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-butterfly-witch",
+   "en": {
+    "t": "the Butterfly Witch",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Schmetterlingshexe",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-eternal-butterfly",
+   "en": {
+    "t": "the Eternal Butterfly",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der ewige Schmetterling",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-angry-auctioneer",
+   "en": {
+    "t": "the Angry Auctioneer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der wütende Auktionator",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "scourge-of-the-pixel-seas",
+   "en": {
+    "t": "Scourge of the Pixel Seas",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Geißel der Pixelmeere",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-maniacal-botanist",
+   "en": {
+    "t": "the Maniacal Botanist",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die wahnsinnige Botanikerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "bomb-berserker",
+   "en": {
+    "t": "Bomb Berserker",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Bomben-Berserker",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-guardian-of-blackport",
+   "en": {
+    "t": "the Guardian of Blackport",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wächter von Blackport",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "bow-sniper",
+   "en": {
+    "t": "Bow Sniper",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Bogenscharfschütze",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-catapulting-turtle",
+   "en": {
+    "t": "the Catapulting Turtle",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die katapultierende Schildkröte",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-frozen-guardian-of-the-north",
+   "en": {
+    "t": "the Frozen Guardian of the North",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der gefrorene Wächter des Nordens",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-chaorc-war-chief",
+   "en": {
+    "t": "the Chaorc War Chief",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Chaork-Kriegshäuptling",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "card-game-player",
+   "en": {
+    "t": "Card Game Player",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Kartenspielerin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-time-keeper",
+   "en": {
+    "t": "the Time Keeper",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Zeitwächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-harrowing-crusader",
+   "en": {
+    "t": "the Harrowing Crusader",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die grausige Kreuzritterin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-eye-of-the-storm",
+   "en": {
+    "t": "the Eye of the Storm",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Auge des Sturms",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-stormbringer",
+   "en": {
+    "t": "the Stormbringer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Sturmbringer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cracked-keeper",
+   "en": {
+    "t": "the Cracked Keeper",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der gesprungene Hüter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-crazy-veteran",
+   "en": {
+    "t": "the Crazy Veteran",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der verrückte Veteran",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-storyteller",
+   "en": {
+    "t": "the Storyteller",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Geschichtenerzähler",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-clueless-voyager",
+   "en": {
+    "t": "the Clueless Voyager",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der ahnungslose Seefahrer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "cool-birthday-girl",
+   "en": {
+    "t": "Cool Birthday Girl",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Cooles Geburtstagskind",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cool-rescuer",
+   "en": {
+    "t": "Cool Rescuer",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Coole Retterin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "king-of-coolness",
+   "en": {
+    "t": "King of Coolness",
+    "pos": "after"
+   },
+   "de": {
+    "t": "König der Coolness",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "supreme-lord-of-edges",
+   "en": {
+    "t": "Supreme Lord of Edges",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der oberste Edgelord",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "cute-angel",
+   "en": {
+    "t": "Cute Angel",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süßer Engel",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-annoyance",
+   "en": {
+    "t": "Cute Annoyance",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süße Nervensäge",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-ditz",
+   "en": {
+    "t": "Cute Ditz",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süßes Dummchen",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-meanie",
+   "en": {
+    "t": "Cute Meanie",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süße Zicke",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-nerd",
+   "en": {
+    "t": "Cute Nerd",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süße Streberin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-princess",
+   "en": {
+    "t": "Cute Princess",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süße Prinzessin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "cute-starlet",
+   "en": {
+    "t": "Cute Starlet",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Süßes Sternchen",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "conqueror-of-the-treasure-cave",
+   "en": {
+    "t": "Conqueror of the Treasure Cave",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Eroberer der Schatzhöhle",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-prophet-of-apocalypse",
+   "en": {
+    "t": "the Prophet of Apocalypse",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Prophet der Apokalypse",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-wanderer-of-hell",
+   "en": {
+    "t": "the Wanderer of Hell",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wanderer der Hölle",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-blood-crazy-groundskeeper",
+   "en": {
+    "t": "the Blood-Crazy Groundskeeper",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der blutrünstige Hausmeister",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "deep-drowned",
+   "en": {
+    "t": "Deep-Drowned",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Tiefenertrunkener",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-masked-butcher",
+   "en": {
+    "t": "the Masked Butcher",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der maskierte Schlächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bulwark-of-peace",
+   "en": {
+    "t": "the Bulwark of Peace",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Bollwerk des Friedens",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-keeper-of-peace",
+   "en": {
+    "t": "the Keeper of Peace",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Hüter des Friedens",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-gold-seeker",
+   "en": {
+    "t": "the Gold Seeker",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Goldsucher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-rocky-rebel",
+   "en": {
+    "t": "the Rocky Rebel",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Rockende Rebellin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-seller-of-secrets",
+   "en": {
+    "t": "the Seller of Secrets",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Händlerin der Geheimnisse",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-creation-fairy",
+   "en": {
+    "t": "the Creation Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Schöpfungsfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-fortress-breaker",
+   "en": {
+    "t": "the Fortress Breaker",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Festungsbrecher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-liberated-fairy",
+   "en": {
+    "t": "the Liberated Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die befreite Fee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-ship-slave",
+   "en": {
+    "t": "the Ship Slave",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Schiffssklavin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-mercenary-mage",
+   "en": {
+    "t": "the Mercenary Mage",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Söldnermagier",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-empty-vessel-of-a-forgotten-sorceress",
+   "en": {
+    "t": "the Empty Vessel of a Forgotten Sorceress",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das leere Gefäß einer vergessenen Zauberin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-princess-of-blackport",
+   "en": {
+    "t": "the Princess of Blackport",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Prinzessin von Blackport",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "flamebathed",
+   "en": {
+    "t": "Flamebathed",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Flammengebadeter",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "beauty-of-coolness",
+   "en": {
+    "t": "Beauty of Coolness",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Schönheit der Coolness",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-misled-avenger",
+   "en": {
+    "t": "the Misled Avenger",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der irregeleitete Rächer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "future-tech-gunslinger",
+   "en": {
+    "t": "Future Tech Gunslinger",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Zukunftstech-Revolverheldin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-boarding-broad",
+   "en": {
+    "t": "the Boarding Broad",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Enterbraut",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-pirate-zombie",
+   "en": {
+    "t": "the Pirate Zombie",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Piratenzombie",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-great-reformer",
+   "en": {
+    "t": "the Great Reformer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der große Reformer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-mad-tyrant-king",
+   "en": {
+    "t": "the Mad Tyrant King",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der irre Tyrannenkönig",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-worm-feeder",
+   "en": {
+    "t": "the Worm Feeder",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wurmfütterer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-undead-martial-artist",
+   "en": {
+    "t": "the Undead Martial Artist",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der untote Kampfkünstler",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "chief-of-goblin",
+   "en": {
+    "t": "Chief of Goblin",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Häuptling der Goblins",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-frostbringer",
+   "en": {
+    "t": "the Frostbringer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Frostbringer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "grand-inquisitor",
+   "en": {
+    "t": "Grand Inquisitor",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Großinquisitor",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "great-detective",
+   "en": {
+    "t": "Great Detective",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Großer Detektiv",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "emissary-of-the-demon-lord",
+   "en": {
+    "t": "Emissary of the Demon Lord",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Gesandter des Dämonenlords",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-king-of-dwarfs",
+   "en": {
+    "t": "the King of Dwarfs",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der König der Zwerge",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-leader-of-tusca",
+   "en": {
+    "t": "the Leader of Tusca",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Anführer von Tusca",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-mage-slayer",
+   "en": {
+    "t": "the Mage Slayer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Magierschlächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bound-specter",
+   "en": {
+    "t": "the Bound Specter",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das gebundene Gespenst",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-monster-slayer",
+   "en": {
+    "t": "the Monster Slayer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Monstertöter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-foxdemon",
+   "en": {
+    "t": "the Foxdemon",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Fuchsdämon",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-adept-of-destruction",
+   "en": {
+    "t": "the Adept of Destruction",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Adeptin der Zerstörung",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "idej-lord",
+   "en": {
+    "t": "Idej Lord",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Idej-Fürst",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "investor-of-evil",
+   "en": {
+    "t": "Investor of Evil",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Investor des Bösen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-crooked-killer",
+   "en": {
+    "t": "the Crooked Killer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der krumme Killer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-pillaging-knight",
+   "en": {
+    "t": "the Pillaging Knight",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der plündernde Ritter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-class-fairy",
+   "en": {
+    "t": "the Class Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Klassenfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "crusader-of-light",
+   "en": {
+    "t": "Crusader of Light",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Kreuzritterin des Lichts",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-tactical-genius",
+   "en": {
+    "t": "the Tactical Genius",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das taktische Genie",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-king-of-kings-b",
+   "en": {
+    "t": "the King of Kings [B]",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der König der Könige [B]",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-king-of-kings-w",
+   "en": {
+    "t": "the King of Kings [W]",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der König der Könige [W]",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "seer-of-everything",
+   "en": {
+    "t": "Seer of Everything",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Seher von Allem",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-storming-rebel",
+   "en": {
+    "t": "the Storming Rebel",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die stürmische Rebellin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-indebted-apprentice",
+   "en": {
+    "t": "the Indebted Apprentice",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der verschuldete Lehrling",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-reality-breaker",
+   "en": {
+    "t": "the Reality Breaker",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Realitätsbrecher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cursed-thief",
+   "en": {
+    "t": "the Cursed Thief",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die verfluchte Diebin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-shark-researcher",
+   "en": {
+    "t": "the Shark Researcher",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Haiforscher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cult-leader",
+   "en": {
+    "t": "the Cult Leader",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Kultführer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "master-of-super-killing",
+   "en": {
+    "t": "Master of Super-Killing",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Meister des Super-Tötens",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-silent-observer",
+   "en": {
+    "t": "the Silent Observer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der stille Beobachter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-stargazer",
+   "en": {
+    "t": "the Stargazer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Sterngucker",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-smartass",
+   "en": {
+    "t": "the Smartass",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Besserwisser",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-deceptive-sapling",
+   "en": {
+    "t": "the Deceptive Sapling",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der trügerische Sprössling",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "defender-of-deri",
+   "en": {
+    "t": "Defender of Deri",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Verteidigerin von Deri",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "master-of-deri-s-relic",
+   "en": {
+    "t": "Master of Deri's Relic",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Meisterin von Deris Relikt",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "legendary-explorer",
+   "en": {
+    "t": "Legendary Explorer",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Legendärer Entdecker",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-forgetful-fixer",
+   "en": {
+    "t": "the Forgetful Fixer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die vergessliche Problemlöserin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-charming-infiltrator",
+   "en": {
+    "t": "the Charming Infiltrator",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die charmante Infiltratorin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-amazon-princess",
+   "en": {
+    "t": "the Amazon Princess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Amazonenprinzessin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-reaper-of-the-light",
+   "en": {
+    "t": "the Reaper of the Light",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Schnitterin des Lichts",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-unseen-saboteur",
+   "en": {
+    "t": "the Unseen Saboteur",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der ungesehene Saboteur",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "mender-of-the-shattered-trident",
+   "en": {
+    "t": "Mender of the Shattered Trident",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Reparateur des zerschmetterten Dreizacks",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-shard-knight",
+   "en": {
+    "t": "the Shard Knight",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Splitterritter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "trickstar-of-coolness",
+   "en": {
+    "t": "Trickstar of Coolness",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Trickstar der Coolness",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-rotten-mastermind",
+   "en": {
+    "t": "the Rotten Mastermind",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der verdorbene Drahtzieher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-flame-dancer",
+   "en": {
+    "t": "the Flame Dancer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Flammentänzerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-flame-fairy",
+   "en": {
+    "t": "the Flame Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Flammenfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-forsaken-seafarer",
+   "en": {
+    "t": "the Forsaken Seafarer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der verdammte Seefahrer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-great-equalizer",
+   "en": {
+    "t": "the Great Equalizer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die große Gleichmacherin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cute-magical-girl",
+   "en": {
+    "t": "the Cute Magical Girl",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Süße Zaubermädchen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-vengeful-guardian",
+   "en": {
+    "t": "the Vengeful Guardian",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der rachsüchtige Wächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cocky-caretaker",
+   "en": {
+    "t": "the Cocky Caretaker",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die freche Tierpflegerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-nature-fairy",
+   "en": {
+    "t": "the Nature Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Naturfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-swamp-witch",
+   "en": {
+    "t": "the Swamp Witch",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Sumpfhexe",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-fallen-cute-angel",
+   "en": {
+    "t": "the Fallen Cute Angel",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der gefallene Süße Engel",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-cutest-being-in-the-sky",
+   "en": {
+    "t": "the Cutest Being in the Sky",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das süßeste Wesen am Himmel",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-foretold-rescuer-of-coolness",
+   "en": {
+    "t": "the Foretold Rescuer of Coolness",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die vorhergesagte Retterin der Coolness",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-booty-raider",
+   "en": {
+    "t": "the Booty Raider",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Beuteräuber",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-barrier-priestess",
+   "en": {
+    "t": "the Barrier Priestess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Barrierepriesterin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-mastermind",
+   "en": {
+    "t": "the Mastermind",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Drahtzieher",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-hidden-alchemist",
+   "en": {
+    "t": "the Hidden Alchemist",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der verborgene Alchemist",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-blitz-blade",
+   "en": {
+    "t": "the Blitz Blade",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Blitzklinge",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-herald-of-chess",
+   "en": {
+    "t": "the Herald of Chess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Herold des Schachs",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "wanderer-of-worlds",
+   "en": {
+    "t": "Wanderer of Worlds",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Wanderer der Welten",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-faceless-illusionist",
+   "en": {
+    "t": "the Faceless Illusionist",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der gesichtslose Illusionist",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-loyal-guard-dog",
+   "en": {
+    "t": "the Loyal Guard Dog",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Treue Wachhund",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-ninja-of-revenge",
+   "en": {
+    "t": "the Ninja of Revenge",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Rache-Ninja",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-plague-bringer",
+   "en": {
+    "t": "the Plague Bringer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Seuchenbringer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-protagonist",
+   "en": {
+    "t": "the Protagonist",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Protagonist",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-lone-living-being",
+   "en": {
+    "t": "the Lone Living Being",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das einsame lebende Wesen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-singing-ship",
+   "en": {
+    "t": "the Singing Ship",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das singende Schiff",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-skill-devourer",
+   "en": {
+    "t": "the Skill Devourer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Fertigkeitenfresserin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "receiver-of-sacrifices",
+   "en": {
+    "t": "Receiver of Sacrifices",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Empfänger der Opfer",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-poison-princess",
+   "en": {
+    "t": "the Poison Princess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Giftprinzessin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-loan-shark",
+   "en": {
+    "t": "the Loan Shark",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Kredithai",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-chief-tormentor",
+   "en": {
+    "t": "the Chief Tormentor",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Oberfolterin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "rescued-damsel",
+   "en": {
+    "t": "Rescued Damsel",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Gerettetes Fräulein",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-living-skeleton",
+   "en": {
+    "t": "the Living Skeleton",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das lebende Skelett",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-trigger-happy-undertaker",
+   "en": {
+    "t": "the Trigger Happy Undertaker",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der übereifrige Bestatter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "master-of-the-ultimate-gun",
+   "en": {
+    "t": "Master of the Ultimate Gun",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Meisterin der ultimativen Knarre",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-troll-guard",
+   "en": {
+    "t": "the Troll Guard",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Trollwächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-psychic-witch",
+   "en": {
+    "t": "the Psychic Witch",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Psycho-Hexe",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-snaka-adventurer",
+   "en": {
+    "t": "the Snaka Adventurer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Snaka-Abenteurerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-plant-princess",
+   "en": {
+    "t": "the Plant Princess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Pflanzenprinzessin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "dread-of-the-desert",
+   "en": {
+    "t": "Dread of the Desert",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Schrecken der Wüste",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-adept-of-necromancy",
+   "en": {
+    "t": "the Adept of Necromancy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Adept der Nekromantie",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-blood-moon-projection",
+   "en": {
+    "t": "the Blood Moon Projection",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Blutmond-Projektion",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-king-of-thieves",
+   "en": {
+    "t": "the King of Thieves",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der König der Diebe",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "silent-water",
+   "en": {
+    "t": "Silent Water",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Stilles Wasser",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-deepsea-demon",
+   "en": {
+    "t": "the Deepsea Demon",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Tiefseedämon",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-thunder-djinn",
+   "en": {
+    "t": "the Thunder Djinn",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Donner-Dschinn",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-warden-of-blood-rock",
+   "en": {
+    "t": "the Warden of Blood Rock",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wärter von Blood Rock",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-buffoon-of-the-treasure-cave",
+   "en": {
+    "t": "the Buffoon of the Treasure Cave",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Depp der Schatzhöhle",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bumbling-buffoon",
+   "en": {
+    "t": "the Bumbling Buffoon",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der tollpatschige Depp",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-calm-cat",
+   "en": {
+    "t": "the Calm Cat",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der ruhige Kater",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "stormkissed",
+   "en": {
+    "t": "Stormkissed",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Sturmgeküsster",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-gate-to-the-spirit-world",
+   "en": {
+    "t": "the Gate to the Spirit World",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das Tor zur Geisterwelt",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-opened-gate",
+   "en": {
+    "t": "the Opened Gate",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das geöffnete Tor",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "swampborne",
+   "en": {
+    "t": "Swampborne",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Sumpfgeborener",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "absorber-of-the-mountain-s-heart",
+   "en": {
+    "t": "Absorber of the Mountain's Heart",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Absorber des Herzens des Berges",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-sun-fencer",
+   "en": {
+    "t": "the Sun Fencer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Sonnenfechter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-traveler",
+   "en": {
+    "t": "the Traveler",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Reisende",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-angry-hot-blood",
+   "en": {
+    "t": "the Angry Hot-Blood",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der zornige Hitzkopf",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-convergence-fairy",
+   "en": {
+    "t": "the Convergence Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Konvergenzfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-rain-singer",
+   "en": {
+    "t": "the Rain Singer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Regensängerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-weather-fairy",
+   "en": {
+    "t": "the Weather Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Wetterfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-embodiment-of-gods",
+   "en": {
+    "t": "the Embodiment of Gods",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Verkörperung der Götter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-deepsea-vampire",
+   "en": {
+    "t": "the Deepsea Vampire",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Tiefsee-Vampir",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-never-losing-general",
+   "en": {
+    "t": "the Never-Losing General",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der niemals verlierende General",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-archmage",
+   "en": {
+    "t": "the Archmage",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Erzmagier",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-court-scribe",
+   "en": {
+    "t": "the Court Scribe",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Hofschreiber",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "strength-of-coolness",
+   "en": {
+    "t": "Strength of Coolness",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Stärke der Coolness",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "thunderstruck",
+   "en": {
+    "t": "Thunderstruck",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Donnergeschlagener",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "timeless-king",
+   "en": {
+    "t": "Timeless King",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Zeitloser König",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "master-of-all-weapons",
+   "en": {
+    "t": "Master of all Weapons",
+    "pos": "after"
+   },
+   "de": {
+    "t": "Meister aller Waffen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "treasure-huntress",
+   "en": {
+    "t": "Treasure Huntress",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Schatzjägerin",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-puppet-mistress",
+   "en": {
+    "t": "the Puppet Mistress",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Puppenmeisterin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-puppet-master",
+   "en": {
+    "t": "the Puppet Master",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Puppenmeister",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-primordial-goddess",
+   "en": {
+    "t": "the Primordial Goddess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Urgöttin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-shadow-slayer",
+   "en": {
+    "t": "the Shadow Slayer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Schattentöter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-lunatic-princess",
+   "en": {
+    "t": "the Lunatic Princess",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Lunatic-Prinzessin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-knowledge-keeper",
+   "en": {
+    "t": "the Knowledge Keeper",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Wissenshüter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-dark-goblin-necromancer",
+   "en": {
+    "t": "the Dark Goblin Necromancer",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der dunkle Goblin-Nekromant",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bounty-huntress",
+   "en": {
+    "t": "the Bounty Huntress",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Kopfgeldjägerin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-eternal-empress",
+   "en": {
+    "t": "the Eternal Empress",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die ewige Kaiserin",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "visionary-genius",
+   "en": {
+    "t": "Visionary Genius",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Visionäres Genie",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-iron-chancellor",
+   "en": {
+    "t": "the Iron Chancellor",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Eiserne Kanzler",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-metamorphing-monstrosity",
+   "en": {
+    "t": "the Metamorphing Monstrosity",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die gestaltwandelnde Monstrosität",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "wall-breaker-general",
+   "en": {
+    "t": "Wall Breaker General",
+    "pos": "before"
+   },
+   "de": {
+    "t": "Mauerbrecher-General",
+    "pos": "before"
+   }
+  },
+  {
+   "id": "the-valiant-leprechaun",
+   "en": {
+    "t": "the Valiant Leprechaun",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der tapfere Leprechaun",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-animated-armor",
+   "en": {
+    "t": "the Animated Armor",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die belebte Rüstung",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-scholar-on-the-run",
+   "en": {
+    "t": "the Scholar on the Run",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Gelehrte auf der Flucht",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-spice-rajah",
+   "en": {
+    "t": "the Spice Rajah",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Gewürz-Radscha",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-serpent-warlord",
+   "en": {
+    "t": "the Serpent Warlord",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Schlangenkriegsherr",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-lucky-thief",
+   "en": {
+    "t": "the Lucky Thief",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der glückliche Dieb",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bamboo-guardian",
+   "en": {
+    "t": "the Bamboo Guardian",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Bambuswächter",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-fun-fairy",
+   "en": {
+    "t": "the Fun Fairy",
+    "pos": "after"
+   },
+   "de": {
+    "t": "die Spaßfee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-dragoneer-champion",
+   "en": {
+    "t": "the Dragoneer Champion",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Dragoneer-Champion",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-bouncy-bunny",
+   "en": {
+    "t": "the Bouncy Bunny",
+    "pos": "after"
+   },
+   "de": {
+    "t": "das hüpfende Häschen",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-investment-monkee",
+   "en": {
+    "t": "the Investment Monkee",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Investment-Monkee",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-heavenly-emperor",
+   "en": {
+    "t": "the Heavenly Emperor",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der himmlische Kaiser",
+    "pos": "after"
+   }
+  },
+  {
+   "id": "the-master-of-hell",
+   "en": {
+    "t": "the Master of Hell",
+    "pos": "after"
+   },
+   "de": {
+    "t": "der Meister der Hölle",
     "pos": "after"
    }
   }
