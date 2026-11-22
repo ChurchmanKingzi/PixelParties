@@ -197,8 +197,8 @@ class FireShow(CaptionMixin):
     DMG = 90                                                                          # 60 Burn + 30 Poison
     CAPTIONS = [
         (0.2, 3.0, '*Luna Pele*, High Priestess of the *Flame Fairy*.'),
-        (3.2, 8.2, 'Whenever a target is *Poisoned*, it is also *Burned* - for the rest of the game.'),
-        (8.4, 13.4, 'And each *Burn* draws her a card - up to *4 times* a turn.'),
+        (3.2, 8.2, 'Whenever a target is *Poisoned*, it is also *Burned*.'),
+        (8.4, 13.4, 'And each time a target is *Burned*, she *draws a card*.'),
         (13.6, 18.4, 'Burn damage ticks every turn - an *enabler* AND a *payoff*.'),
         (18.6, 22.6, 'She dances for *Luna* - and the *pillars* obey.'),
         (22.8, 25.7, 'Burn decks, *meet your priestess*.'),
@@ -480,9 +480,6 @@ class FireShow(CaptionMixin):
         self.draw_text(canvas, 'DRAWS', 3, (125, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         hot = any(0 <= t - x < 0.45 and int(t * 15) % 2 == 0 for x in self.t_draw)
         self.draw_text(canvas, str(n), 9, (105, 140), color=(255, 255, 255) if hot else GOLD, outline=None, shadow=(60, 30, 0))
-        self.draw_text(canvas, '/4', 5, (175, 154), color=(200, 160, 120), outline=None, shadow=(40, 20, 10))
-        if n >= 4 and t < self.t_draw[3] + 2.2 and int(t * 6) % 2 == 0:
-            self.draw_text(canvas, 'MAX', 4, (125, 215), color=GOLD_HL, outline=(20, 10, 30), shadow=None)
         self.draw_text(canvas, 'BURNED', 3, (940, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         self.draw_text(canvas, str(self.n_burned(t)), 9, (950, 140), color=FIRE_T, outline=None, shadow=(80, 20, 0))
         if self.t_win <= t < self.t_win + 2.8 and int(t * 6) % 2 == 0:
@@ -555,7 +552,6 @@ class FireShow(CaptionMixin):
             add(tb, 'burn')
         for ts, tl in zip(self.t_draw_start, self.t_draw):
             add(ts, 'whoosh'); add(tl, 'draw')
-        add(self.t_draw[3] + 0.05, 'max')
         for tt in self.TT:
             add(tt, 'tick')
         add(self.TT[0] + 0.1, 'melt')
