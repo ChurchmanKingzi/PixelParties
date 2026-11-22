@@ -1487,5 +1487,30 @@
    ]
   ],
   "musicHit": 77.75
+ },
+ "Fairy Queen Crestina, the Creation Fairy": {
+  "px": 16,
+  "creashow": true,
+  "opener": "wind",
+  "showLoops": 9,
+  "music": "scripts/social-posts/music/bgm_crestina.ogg",
+  "musicHit": 7.14,
+  "particles": [
+   [
+    "spark",
+    "crystalpink",
+    10
+   ],
+   [
+    "mote",
+    "pinkwing",
+    12
+   ],
+   [
+    "orb",
+    "goldwing",
+    5
+   ]
+  ]
  }
 }
