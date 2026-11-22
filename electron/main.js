@@ -521,7 +521,7 @@ function fromLauncher(e) {
 function readLauncherConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'launcher-config.json'), 'utf8')); } catch { /* optional */ }
-  return { links: {}, news: [], ...cfg };
+  return { links: {}, ...cfg };
 }
 
 // Fragt die Spielseite ab: 'ok' (Spiel antwortet), 'wake' (Server schläft/Zwischenseite), 'bad' (kein Netz).
@@ -544,7 +544,7 @@ async function probeServer() {
 ipcMain.handle('pp-launcher:config', (e) => {
   if (!fromLauncher(e)) return null;
   const c = readLauncherConfig();
-  return { version: app.getVersion(), serverUrl: TARGET_URL, links: c.links, news: c.news };
+  return { version: app.getVersion(), serverUrl: TARGET_URL, links: c.links };
 });
 ipcMain.handle('pp-launcher:status', (e) => (fromLauncher(e) ? probeServer() : { state: 'bad' }));
 

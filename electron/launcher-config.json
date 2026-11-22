@@ -3,23 +3,5 @@
     "discord": "https://discord.gg/K8PFRjr",
     "website": "https://pixelpartiestcg.com",
     "itch": ""
-  },
-  "news": [
-    {
-      "tag": "NEW",
-      "text": "Spin the Wheel in the shop: darts, golden packs, skins, emotes and titles!"
-    },
-    {
-      "tag": "NEW",
-      "text": "Draft mode: keep your high-rarity copies of every card you drafted."
-    },
-    {
-      "tag": "TIP",
-      "text": "Press 1-3 or the middle mouse button in a duel to send an emote."
-    },
-    {
-      "tag": "CHAT",
-      "text": "Join the Discord for duels, deck help and patch notes."
-    }
-  ]
+  }
 }
