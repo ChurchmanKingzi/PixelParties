@@ -388,7 +388,7 @@ class ArmsShow(CaptionMixin):
         for i, T in enumerate(self.T_ACT):
             if T - 0.5 <= t < self.imp[i] + 0.9:
                 hp = self.hp[i] if t < self.imp[i] else 0
-                self.draw_text(canvas, 'ENEMY HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+                self.draw_text(canvas, 'OPPONENT HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
                 self.draw_text(canvas, str(hp), 9, (955, 140), color=(255, 110, 110) if hp == 0 else (255, 255, 255), outline=None, shadow=(70, 10, 10))
         for i, imp in enumerate(self.imp):
             tau = t - imp

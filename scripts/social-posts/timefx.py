@@ -321,7 +321,7 @@ class TimeShow(CaptionMixin):
         if t >= self.ROUNDS[0]['T']:
             self.draw_text(canvas, 'LEVELS', 3, (125, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
             self.draw_text(canvas, '%d/6' % tot, 9, (125, 140), color=GOLD if tot < 6 else (180, 255, 190), outline=None, shadow=(60, 30, 0))
-        self.draw_text(canvas, 'ENEMY HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'OPPONENT HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         self.draw_text(canvas, str(self.hp(t)), 8, (950, 140), color=(255, 255, 255), outline=None, shadow=(70, 10, 10))
         for x in self.hp_hits:
             tau = t - x

@@ -27,6 +27,7 @@ def ease_out(x):
 
 
 class CreaShow(CaptionMixin):
+    CAP_SCALE = 5
     CW, CH = 180, 252
     SMALL = (120, 168)
     SLOT_X = [330, 540, 750]
@@ -47,8 +48,8 @@ class CreaShow(CaptionMixin):
         (0.2, 3.0, '*Fairy Queen Crestina*, the Creation Fairy.'),
         (3.2, 7.2, 'Goddess of the cosmos - she *created* the *Fairies*.'),
         (7.4, 11.4, 'Her one commandment - *enjoy life*!'),
-        (11.6, 16.6, 'In her Resource Phase she may *skip her draw* - and *create* 3 cards from *outside the game*.'),
-        (16.8, 21.6, 'The enemy picks *1 of 3* - the other two *vanish*, and their *names are locked*.'),
+        (11.6, 16.6, 'She may *skip her draw* to *create* 3 cards from *outside the game*.'),
+        (16.8, 21.6, 'The opponent picks *1 of 3* - the other two *vanish*.'),
         (21.8, 25.7, 'Any card at all - the *Creation Fairy* provides.'),
     ]
     SND = {
@@ -200,7 +201,7 @@ class CreaShow(CaptionMixin):
                 im = self._dissolve(im, 1.0 - u, ('fa', key, idx % 48, int(u * 16)))
             canvas.paste(im, (x0, y0), im)
             if tau > 0.8:
-                self.draw_text(canvas, name, 2, (x, foot + 24), color=CREAM, outline=None, shadow=(60, 20, 80))
+                self.draw_text(canvas, name, 3, (max(110, min(950, x)), foot + 28), color=CREAM, outline=None, shadow=(60, 20, 80))
         # Herzen beim Gebot „Habt Freude am Leben“
         if 7.4 <= t < 11.8:
             for j, (key, name, x, foot, t0) in enumerate(self.FAIRIES):
@@ -245,19 +246,19 @@ class CreaShow(CaptionMixin):
         for k in range(self.hand_n(t)):
             canvas.paste(small, (int(self.HAND[0] - small.width / 2 + 7 * (k % 8)), int(self.HAND[1] - small.height / 2 - 9 * (k % 8))), small)
         resource_on = any(T['T0'] <= t < T['T0'] + 1.8 for T in self.TURNS)
-        self.draw_text(canvas, 'HAND', 2, (self.HAND[0] + 10, self.HAND[1] - 112), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'HAND', 3, (self.HAND[0] + 10, self.HAND[1] - 118), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         if resource_on:
-            self.draw_text(canvas, 'NO DRAW', 2, (self.DECK[0], self.DECK[1] - 112), color=(255, 90, 100), outline=None, shadow=(20, 10, 30))
+            self.draw_text(canvas, 'NO DRAW', 3, (self.DECK[0], self.DECK[1] - 118), color=(255, 90, 100), outline=None, shadow=(20, 10, 30))
             self.pix_rect(d, self.DECK[0] - 64, self.DECK[1] - 6, self.DECK[0] + 64, self.DECK[1] + 6, (255, 90, 100))
         else:
-            self.draw_text(canvas, 'DECK', 2, (self.DECK[0], self.DECK[1] - 112), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+            self.draw_text(canvas, 'DECK', 3, (self.DECK[0], self.DECK[1] - 118), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         for ti, T in enumerate(self.TURNS):
             if T['T0'] <= t < T['T0'] + 1.8:
                 if int(t * 6) % 2 == 0 or t >= T['T0'] + 0.5:
-                    self.draw_text(canvas, 'RESOURCE PHASE', 3, (540, 1572), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+                    self.draw_text(canvas, 'RESOURCE PHASE', 4, (540, 1580), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
             if T['mat'][0] <= t < T['t_gone'] + 0.9 and not (t >= T['t_gone'] + 0.9):
                 if t < T['t_pick']:
-                    self.draw_text(canvas, 'FROM OUTSIDE THE GAME', 2, (540, 1574), color=LILAC, outline=None, shadow=(20, 10, 40))
+                    self.draw_text(canvas, 'FROM OUTSIDE THE GAME', 3, (540, 1612), color=LILAC, outline=None, shadow=(20, 10, 40))
             # Karten materialisieren
             for k in range(3):
                 x = self.SLOT_X[k]
@@ -298,7 +299,7 @@ class CreaShow(CaptionMixin):
                 if t >= tm + 0.75 and t < T['t_pick']:
                     pass
                 if (not chosen) and T['t_gone'] <= t < T['t_gone'] + 0.9 and int(t * 12) % 2 == 0:
-                    self.draw_text(canvas, 'REMOVED', 2, (x, self.SLOT_Y - 146), color=(255, 120, 150), outline=None, shadow=(20, 10, 30))
+                    self.draw_text(canvas, 'REMOVED', 3, (x, self.SLOT_Y - 150), color=(255, 120, 150), outline=None, shadow=(20, 10, 30))
             # Auswahl des Gegners: Rahmen springt von Karte zu Karte, rastet auf der gewählten ein
             if T['hover'] <= t < T['t_fly'] + 0.05:
                 if t < T['t_pick']:
@@ -315,9 +316,9 @@ class CreaShow(CaptionMixin):
                         self.pix_rect(d, x - self.CW / 2 - 8, self.SLOT_Y - self.CH / 2 - 8, x - self.CW / 2 - 3, self.SLOT_Y + self.CH / 2 + 8, col)
                         self.pix_rect(d, x + self.CW / 2 + 3, self.SLOT_Y - self.CH / 2 - 8, x + self.CW / 2 + 8, self.SLOT_Y + self.CH / 2 + 8, col)
                 if t >= T['t_pick']:
-                    self.draw_text(canvas, 'CHOSEN', 3, (self.SLOT_X[T['pick']], self.SLOT_Y - 146), color=GOLD_HL, outline=None, shadow=(60, 30, 0))
+                    self.draw_text(canvas, 'CHOSEN', 4, (self.SLOT_X[T['pick']], self.SLOT_Y - 150), color=GOLD_HL, outline=None, shadow=(60, 30, 0))
                 else:
-                    self.draw_text(canvas, 'CHOOSING...', 2, (self.EN[0], self.EN[1] + 124), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
+                    self.draw_text(canvas, 'CHOOSING...', 3, (self.EN[0] - 10, self.EN[1] + 128), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
         # Ring um die Heldin bei jeder Landung
         for T in self.TURNS:
             tau = t - T['t_lock']
@@ -333,14 +334,14 @@ class CreaShow(CaptionMixin):
         if t < self.TURNS[0]['T0']:
             return
         self._card_at(canvas, self.enemy, *self.EN)
-        self.draw_text(canvas, 'ENEMY', 2, (self.EN[0], self.EN[1] - 118), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'OPPONENT', 3, (self.EN[0], self.EN[1] - 122), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
 
     # ───────── Zähler ─────────
     def _draw_hud(self, canvas, d, t):
-        self.draw_text(canvas, 'LOCKED NAMES', 3, (210, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'LOCKED NAMES', 4, (235, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         hot = any(0 <= t - T['t_lock'] < 0.5 and int(t * 15) % 2 == 0 for T in self.TURNS)
         self.draw_text(canvas, str(self.locked(t)), 9, (125, 140), color=(255, 255, 255) if hot else LILAC, outline=None, shadow=(50, 20, 90))
-        self.draw_text(canvas, 'HAND', 3, (950, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'HAND', 4, (945, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         hot2 = any(0 <= t - T['land'] < 0.5 and int(t * 15) % 2 == 0 for T in self.TURNS)
         self.draw_text(canvas, str(self.hand_n(t)), 9, (950, 140), color=(255, 255, 255) if hot2 else GOLD, outline=None, shadow=(60, 30, 0))
 

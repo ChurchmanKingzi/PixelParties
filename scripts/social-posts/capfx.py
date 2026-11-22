@@ -7,6 +7,7 @@ GOLD_HL = (255, 244, 170)
 
 
 class CaptionMixin:
+    CAP_SCALE = 4                                                                     # Schriftgröße der Untertitel (Pixel je Schriftpixel); einzelne Shows setzen mehr
     CPS = 25.0                                                                        # Standard: langsam tippen (Wort für Wort, mitlesbar) – Fenster müssen dazu passen: Länge / 25 s
     CAP_Y = 1150
 
@@ -19,7 +20,7 @@ class CaptionMixin:
         key = ('cap', idx)
         if key in self._cache:
             return self._cache[key]
-        scale, maxw = 4, 880
+        scale, maxw = self.CAP_SCALE, 880
         text = self.CAPTIONS[idx][2]
         space = self._tw('A A', scale) - self._tw('AA', scale)
         words, gold = [], False

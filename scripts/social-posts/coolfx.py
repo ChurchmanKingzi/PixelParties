@@ -423,7 +423,7 @@ class CoolShow(CaptionMixin):
         self.draw_text(canvas, str(a), 9, (125, 140), color=col, outline=None, shadow=(60, 30, 0))
         if self.T_ACT[0] - 0.5 <= t < self.imp[3] + 0.9:
             hp = self.hp(t)
-            self.draw_text(canvas, 'ENEMY HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
+            self.draw_text(canvas, 'OPPONENT HP', 3, (955, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
             self.draw_text(canvas, str(hp), 9, (955, 140), color=(255, 110, 110) if hp <= 20 else (255, 255, 255), outline=None, shadow=(70, 10, 10))
         for i, imp in enumerate(self.imp):
             tau = t - imp

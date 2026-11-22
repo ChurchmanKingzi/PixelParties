@@ -48,10 +48,10 @@ class PlanShow(CaptionMixin):
     CAPTIONS = [
         (0.2, 3.0, '*Natas*, the Master of Hell, pulls the strings.'),
         (3.2, 7.8, 'Each turn he *skips his draw* - and adds *The Master\'s Plan* to his hand.'),
-        (8.0, 13.0, 'An *omni-negate* - whatever the enemy plays from hand is *negated*.'),
+        (8.0, 13.0, 'An *omni-negate* - whatever the opponent plays from hand is *negated*.'),
         (13.2, 18.0, 'Each negation inflicts *2 stacks of Poison* - on any target he likes.'),
         (18.2, 22.4, 'One of the Archmage\'s *five students* - and the *darkest* curser of all.'),
-        (22.6, 25.7, 'The enemy will not last *another turn*.'),
+        (22.6, 25.7, 'The opponent will not last *another turn*.'),
     ]
     SND = {
         'turn':   [('turn_start', -10)],
@@ -348,7 +348,7 @@ class PlanShow(CaptionMixin):
                 self._crumble(canvas, 'plan', self.L2[0], self.L2[1], t - t_plan_end, False)
             # Beschriftung
             if t_el <= t < t_rs:
-                self.draw_text(canvas, 'ENEMY PLAYS', 2, (self.L1[0], self.L1[1] - 150), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
+                self.draw_text(canvas, 'OPPONENT PLAYS', 2, (self.L1[0], self.L1[1] - 150), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
             if t_rs <= t < t_rs + 1.2:
                 tau = t - t_rs
                 if int(t * 12) % 2 == 0:
@@ -424,7 +424,7 @@ class PlanShow(CaptionMixin):
             if 0 <= t - tt < 0.4:
                 dx = 8 if int(t * 30) % 2 else -8
         self._card_at(canvas, self.peter, self.EN[0] + dx, self.EN[1])
-        self.draw_text(canvas, 'ENEMY', 2, (self.EN[0], self.EN[1] - 118), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
+        self.draw_text(canvas, 'OPPONENT', 2, (self.EN[0], self.EN[1] - 118), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
         hp = self.hp(t)
         hit = any(0 <= t - tt - 0.5 < 0.5 and int(t * 15) % 2 == 0 for tt in self.T_TICK)
         self.draw_text(canvas, '%d HP' % hp, 3, (self.EN[0], self.EN[1] + 122), color=(255, 255, 255) if hit else GOLD, outline=None, shadow=(60, 30, 0))

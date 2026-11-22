@@ -34,7 +34,7 @@ class ThiefShow(CaptionMixin):
     GOLD0 = 40
     CAPTIONS = [
         (0.2, 2.6, '*Key*, the Cursed Thief, is on the prowl...'),
-        (2.8, 6.8, 'Enemy plays an *Artifact*? She pays its *cost*, negates it - and steals it into her own hand!'),
+        (2.8, 6.8, 'Opponent plays an *Artifact*? She pays its *cost*, negates it - and steals it into her own hand!'),
         (7.0, 11.0, 'Once per turn - and the owner *pays nothing* at all.'),
         (11.2, 15.0, 'But some things are *cursed*... and *Key* grabs them anyway!'),
         (15.2, 19.0, 'Powers she does not understand - she takes them all the same.'),
