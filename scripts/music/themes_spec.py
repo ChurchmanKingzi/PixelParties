@@ -77,6 +77,8 @@ HERO_TITLES = {
     'kyli': ('Kyli, the Deceptive Sapling', 'Field Trip to the Old Tree'),
     'kazena': ('Kazena, the Storming Rebel', 'Where the Wind Goes'),
     'natas': ('Natas, the Master of Hell', 'Hospitality of the Pit'),
+    # Crestina: Fairy Queen Crestina und True Fairy Crestina teilen sich den Slug 'crestina' (Namensregel).
+    'crestina': ('Fairy Queen Crestina, the Creation Fairy', 'Let There Be Fun'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
