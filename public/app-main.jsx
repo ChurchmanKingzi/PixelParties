@@ -3173,7 +3173,7 @@ function OpponentUnlockPopup() {
     const onSkinUnlocked = (data) => {
       if (data && data.skinName) setQueue(q => [...q, { kind: 'skin', id: 'skin:' + data.skinName + ':' + (data.dupes || 0), skinName: data.skinName, heroName: data.heroName, rankUp: data.isNew === false, dupes: data.dupes || 0 }]);
     };
-    // Cube-Draft gewonnen: EINE Kopie der hoechsten Rarity aus dem Draft-Deck ist jetzt dauerhaft in der Sammlung (Server: `rarity_bonus`
+    // Cube-Draft beendet: jede Rarity-Karte aus dem eigenen Draft-Deck ist jetzt dauerhaft in der Sammlung, ein Popup je Karte (Server: `rarity_bonus`
     // { card, rarity, source: 'draft', placement }) — derselbe Popup-Rahmen, mit der Karte in ihrer Rarity.
     const onRarityBonus = (data) => {
       if (data && data.card) setQueue(q => [...q, { kind: 'rarity', id: 'rarity:' + data.card + ':' + data.rarity + ':' + Date.now(), card: data.card, rarity: data.rarity }]);
@@ -3290,7 +3290,7 @@ function OpponentUnlockPopup() {
           <div className="orbit-font pp-unlock-titel" style={{
             fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd966',
             marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
-          }}>{current.kind === 'rarity' ? '✦ DRAFT WINNER BONUS ✦' : current.kind === 'skin' ? (current.rankUp ? '✦ SKIN RANK UP ✦' : '✦ NEW SKIN UNLOCKED ✦') : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
+          }}>{current.kind === 'rarity' ? '✦ DRAFT REWARD ✦' : current.kind === 'skin' ? (current.rankUp ? '✦ SKIN RANK UP ✦' : '✦ NEW SKIN UNLOCKED ✦') : '✦ NEW OPPONENT UNLOCKED ✦'}</div>
 
           {/* Hero portrait in a gold frame */}
           <div className="pp-unlock-bild" style={{
