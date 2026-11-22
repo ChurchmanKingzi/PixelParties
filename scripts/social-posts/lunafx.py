@@ -325,6 +325,7 @@ class FireShow(CaptionMixin):
                 cx, cy = self._ci(x, y + 8 * math.sin(t * 0.9 + k + r))
                 for i in range(ln):
                     g.put(cx + i, cy, cols[(k + r) % 3], 0.18 + 0.22 * depth)
+        self._bg_pillars(canvas, t)
         for k in range(16):                                                           # Glut steigt auf
             u = ((t * 0.3 + k * 0.121) % 1.0)
             x = 60 + ((k * 197) % 960)
@@ -332,6 +333,22 @@ class FireShow(CaptionMixin):
             cx, cy = self._ci(x + 14 * math.sin(t * 2 + k), y)
             if int(t * 8 + k) % 3:
                 g.put(cx, cy, (255, 170, 60) if k % 2 else (255, 100, 40), 0.85 * (1 - u))
+
+    # ───────── Hintergrund: Feuersäulen als Dauer-Spektakel (gleiche Säulen wie bei den Bränden, nur riesig und ständig neu) ─────────
+    BG_PILLARS = [(55, 40, 1.25, 0.00), (150, 34, 1.15, 0.45), (235, 28, 1.35, 0.90),
+                  (1025, 40, 1.30, 0.30), (930, 34, 1.20, 0.75), (845, 28, 1.10, 0.15)]       # (x, Höhe in Zellen, Periode s, Phase s)
+
+    def _bg_pillars(self, canvas, t):
+        m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
+        gp = self.gp
+        for j, (x, chc, per, ph) in enumerate(self.BG_PILLARS):
+            tt = t + ph * per
+            cyc, tau = int(tt // per), tt % per
+            key = ('bgp', j, cyc % 5)
+            if key not in self._cache:
+                cwc = 14.0
+                self._cache[key] = Saeule((x - self.ox) / gp, (1590 - self.oy) / gp - chc * 0.45, cwc, float(chc), salt=300 + j * 11 + (cyc % 5), mul=3.0)
+            self._cache[key].draw(m, tau)
 
     # ───────── Ziele, Zähler ─────────
     def _small(self):
