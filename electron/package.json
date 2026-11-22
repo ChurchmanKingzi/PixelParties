@@ -47,7 +47,7 @@
       "perMachine": false
     },
     "portable": {
-      "artifactName": "PixelParties-portable.exe"
+      "artifactName": "PixelPartiesClient.exe"
     },
     "linux": {
       "target": [
