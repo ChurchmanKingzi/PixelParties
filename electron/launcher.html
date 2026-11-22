@@ -37,17 +37,13 @@
   .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
   .center { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * .8); }
 
-  /* PLAY: Pixelart-Taste, zur Laufzeit Zelle für Zelle gemalt (Skript unten: gefasste Goldplatte mit Kanten, Nieten, Rubin-Fassung, glänzende Blauplatte mit Dither).
-     Die Leinwand ist die Taste; die Schrift liegt als Text darüber. */
+  /* PLAY: Pixelart-Band im Stil des Banners, zur Laufzeit Zelle für Zelle gemalt (Skript unten). Die Leinwand ist die Taste; die Schrift liegt als Text darüber. */
   .playwrap { position: relative; margin: calc(var(--u) * .2) 0; animation: bobp 1.2s steps(1) infinite; }
   @keyframes bobp { 0% { transform: translateY(0); } 50% { transform: translateY(calc(var(--px) * -1)); } }
   #play { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; position: relative; display: block; font-family: inherit; }
   #playcv { display: block; }
   #play:active { transform: translateY(calc(var(--px) * 2)); }
-  .pl { position: absolute; display: flex; align-items: center; justify-content: center; padding-top: calc(var(--px) * 1); font-size: calc(var(--u) * 3.9); letter-spacing: .28em; text-indent: .28em; color: #ffffff; pointer-events: none;
-    text-shadow: calc(var(--px) * -1) calc(var(--px) * -1) 0 #08060c, 0 calc(var(--px) * -1) 0 #08060c, var(--px) calc(var(--px) * -1) 0 #08060c, calc(var(--px) * -1) 0 0 #08060c, var(--px) 0 0 #08060c,
-      calc(var(--px) * -1) var(--px) 0 #08060c, 0 var(--px) 0 #08060c, var(--px) var(--px) 0 #08060c, 0 calc(var(--px) * 2) 0 #08060c, var(--px) calc(var(--px) * 2) 0 #08060c, calc(var(--px) * -1) calc(var(--px) * 2) 0 #08060c,
-      0 calc(var(--px) * 3) 0 #08060c; }
+  .pl { position: absolute; display: flex; align-items: center; justify-content: center; padding-top: calc(var(--px) * 1); font-size: calc(var(--u) * 3.9); letter-spacing: .28em; text-indent: .28em; color: #ffffff; pointer-events: none; /* Textschatten: aus dem Skript (Zelle = 0,6 px) */ }
 
   /* Discord-Knopf oben rechts (wie im Hauptmenü: Discord-Blau, Pixel-Logo) */
   #discord { z-index: 5; position: fixed; right: calc(var(--u) * 1.4); top: calc(var(--u) * 1.3); appearance: none; border: 0; cursor: pointer; background: #3866f0; padding: calc(var(--px) * 4) calc(var(--px) * 6);
@@ -182,46 +178,69 @@
   };
   for (const el of document.querySelectorAll('[data-sprite]')) el.innerHTML = sprite(el.getAttribute('data-sprite'));
 
-  // ── PLAY-Taste: wie das Banner ein schlichtes Band — gemalt Zelle für Zelle (Zelle = --px): schwarzer Rand, blaue Fassung, weiße Fläche mit Dither nach Eisblau,
-  //    Schwalbenschwanz-Enden dahinter. Farben exakt die des Banners (assets/logo.png). Hover: mehr Blau in der Fläche. ──
+  // ── PLAY-Taste im Stil des Banners (assets/logo.png): gebogenes Band (Bogen in Stufen), 2 Zellen schwarzer Rand, mittelblaue Fassung, weiße Fläche mit feinem
+  //    Schachbrett-Dither nach Eisblau, Schwalbenschwanz-Enden mit Falte, Schrift mit 2-Zellen-Rand und blauem Schlagschatten. Zelle = 0,6 × --px (wie das Banner, das
+  //    verkleinert ebenfalls feiner als die Kulisse gerastert ist). Gemalt zur Laufzeit; Hover = mehr Blau in der Fläche. ──
   const playCv = $('playcv'), playBtn = $('play'), playTxt = playBtn.querySelector('.pl');
   const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const K = { out: rgb('#08060c'), w: rgb('#ffffff'), ice: rgb('#b3d8f9'), lt: rgb('#66b6ff'), md: rgb('#4e77ca'), dk: rgb('#02398c') };
   const BAY = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  const chk = (x, y) => (x + y) & 1;                       // feines Schachbrett (1 Zelle)
   let pa = null, hov = false;
   const buildPlay = () => {
     const css = (n, d) => parseInt(getComputedStyle(document.documentElement).getPropertyValue(n), 10) || d;
-    const px = css('--px', 3), u = css('--u', 16);
-    const bw = Math.round(u * 19 / px), bh = Math.round(u * 5.6 / px), tw = Math.round(bh * 0.7), th = Math.round(bh * 0.72), drop = Math.round(bh * 0.14);
-    const Ml = tw + 3, Mr = tw + 3, Mt = 3, Mb = drop + 3, W = bw + Ml + Mr, H = bh + Mt + Mb, half = bh / 2;
-    playCv.width = W; playCv.height = H; playCv.style.width = W * px + 'px'; playCv.style.height = H * px + 'px';
-    Object.assign(playTxt.style, { left: Ml * px + 'px', right: Mr * px + 'px', top: Mt * px + 'px', bottom: Mb * px + 'px' });
+    const px = css('--px', 3), u = css('--u', 16), cs = Math.max(1, Math.round(px * 0.6));
+    const bw = Math.round(u * 19 / cs), bh = Math.round(u * 5.4 / cs), A = Math.max(3, Math.round(bw * 0.04));
+    const tw = Math.round(bh * 0.5), th = Math.round(bh * 0.78), Ml = tw + 4, Mr = tw + 4, Mt = 3;
+    const ty0 = Mt + A + Math.round(bh * 0.14), W = bw + Ml + Mr, H = Mt + A + bh + 4;
+    playCv.width = W; playCv.height = H; playCv.style.width = W * cs + 'px'; playCv.style.height = H * cs + 'px';
+    Object.assign(playTxt.style, { left: Ml * cs + 'px', right: Mr * cs + 'px', top: Mt * cs + 'px', bottom: (H - Mt - bh) * cs + 'px' });
+    // Schrift: Rand 2 Zellen schwarz, darunter/rechts blauer Schlagschatten (Offsets 0..4 → liegt außerhalb des Rands sichtbar)
+    const sh = []; const o = (dx, dy, c) => sh.push(dx * cs + 'px ' + dy * cs + 'px 0 ' + c);
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx || dy) o(dx, dy, '#08060c');
+    for (let dy = 0; dy <= 4; dy++) for (let dx = 0; dx <= 4; dx++) if (dx > 2 || dy > 2) o(dx, dy, '#4e77ca');
+    playTxt.style.textShadow = sh.join(',');
     const base = new Uint8ClampedArray(W * H * 4), pt = new Float32Array(W * H).fill(-1);
     const put = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = 255; pt[y * W + x] = -1; };
-    // Enden (hinter dem Band): Rechteck mit V-Kerbe außen, Falte (dunkel, Dither) zum Band hin
-    const ty0 = Mt + Math.round((bh - th) / 2) + drop, nd = Math.round(th * 0.42), mid = ty0 + (th - 1) / 2;
-    for (const side of [-1, 1]) for (let e = 0; e < tw + 3; e++) for (let k = 0; k < th; k++) {
-      const x = side < 0 ? Ml - tw - 1 + e : Ml + bw + tw - 1 - e, y = ty0 + k;
-      if (Math.abs(y - mid) <= nd - e - 1) continue;                                      // V-Kerbe
-      const fold = tw + 2 - e;                                                           // Abstand zum Band
-      let c = k === 0 ? K.lt : k === th - 1 ? K.dk : K.md;
-      if (fold < 5 && (fold < 2 || BAY[y & 3][x & 3] / 16 < (5 - fold) / 5)) c = K.dk;
+    // ── Enden: Maske (Rechteck mit V-Kerbe), dann Rand / Fassung / Fläche mit Dither und Falte zum Band ──
+    const mid = ty0 + (th - 1) / 2, nd = Math.round(th * 0.4), tm = new Uint8Array(W * H);
+    for (const side of [-1, 1]) for (let e = 0; e < tw + 4; e++) for (let k = 0; k < th; k++) {
+      const x = side < 0 ? Ml - tw + e : Ml + bw + tw - 1 - e, y = ty0 + k;
+      if (Math.abs(y - mid) <= nd - e - 1) continue;
+      tm[y * W + x] = 1;
+    }
+    const inM = (m, x, y) => x >= 0 && y >= 0 && x < W && y < H && m[y * W + x] === 1;
+    const d0 = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (tm[y * W + x] && !(inM(tm, x - 1, y) && inM(tm, x + 1, y) && inM(tm, x, y - 1) && inM(tm, x, y + 1))) d0[y * W + x] = 1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!tm[y * W + x]) continue;
+      const d1 = !d0[y * W + x] && (inM(d0, x - 1, y) || inM(d0, x + 1, y) || inM(d0, x, y - 1) || inM(d0, x, y + 1));
+      let c;
+      if (d0[y * W + x]) c = K.out;
+      else if (d1) c = (y - ty0) < th / 2 ? K.lt : K.md;
+      else {
+        const fy = (y - ty0) / th, fold = Math.min(Math.abs(x - Ml), Math.abs(x - (Ml + bw - 1)));
+        const b = BAY[y & 3][x & 3] / 16;
+        c = fy < 0.45 ? (b < (0.45 - fy) * 1.6 ? K.ice : K.lt) : (b < (fy - 0.45) * 1.5 ? K.md : K.lt);
+        if (fold < 9 && chk(x, y) === 0 && b < (9 - fold) / 9) c = K.md;
+      }
       put(x, y, c);
     }
-    // Band
-    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
-      const dx = Math.min(x, bw - 1 - x), dy = Math.min(y, bh - 1 - y);
-      if (dx + dy < 2 && dx === 0 && dy === 0) continue;                                   // Ecke leicht gekappt
-      const depth = Math.min(dx, dy), lit = dy <= dx ? y < half : x < bw / 2;
-      let c;
-      if (depth === 0) c = K.out;
-      else if (depth === 1) c = lit ? K.lt : K.md;
-      else if (depth === 2) c = lit ? K.md : K.dk;
-      else if (depth === 3) c = K.out;
-      else { pt[(y + Mt) * W + x + Ml] = Math.max(0, (y - bh * 0.42) / (bh * 0.55)); continue; }
-      put(x + Ml, y + Mt, c);
+    // ── Band: Bogen (Mitte höher, Ränder um A tiefer, in ganzzahligen Stufen), gleichbleibende Dicke ──
+    for (let x = 0; x < bw; x++) {
+      const t = (x - (bw - 1) / 2) / ((bw - 1) / 2), yt = Mt + Math.round(A * t * t), yb = yt + bh - 1;
+      for (let y = yt; y <= yb; y++) {
+        const dx = Math.min(x, bw - 1 - x), dy = Math.min(y - yt, yb - y), depth = Math.min(dx, dy), lit = dy <= dx ? (y - yt) <= (yb - y) : x < bw / 2;
+        if (depth === 0 && dx === 0 && dy === 0) continue;
+        let c;
+        if (depth === 0) c = K.out;
+        else if (depth === 1) c = lit ? K.lt : K.md;
+        else if (depth <= 3) c = lit ? K.md : (chk(x, y) ? K.dk : K.md);
+        else { pt[(y) * W + x + Ml] = (y - yt) / bh; continue; }
+        put(x + Ml, y, c);
+      }
     }
-    // Rand um die Enden (Band hat seinen eigenen)
+    // ── Rand um alles (1 Zelle; zusammen mit dem inneren Rand 2 Zellen) ──
     const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && base[(y * W + x) * 4 + 3] > 0;
     const edge = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -236,8 +255,11 @@
     const { W, H, base, pt, img, ctx } = pa, d = img.data; d.set(base);
     const ramp = [K.w, K.ice, K.lt];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const t = pt[y * W + x]; if (t < 0) continue;
-      const idx = Math.max(0, Math.min(2, Math.floor((t + (hov ? 0.45 : 0)) * 2.2 + BAY[y & 3][x & 3] / 16 * 0.95)));
+      const f = pt[y * W + x]; if (f < 0) continue;
+      // oben wenig Eisblau (Lichtkante), Mitte weiß, unten zunehmend Eisblau, ganz unten Hellblau — als Schachbrett/Bayer-Dither
+      let v = f < 0.16 ? (0.16 - f) * 2.2 : f < 0.52 ? 0 : (f - 0.52) * 2.5;
+      if (hov) v += 0.4;
+      const idx = Math.max(0, Math.min(2, Math.floor(v * 2 + BAY[y & 3][x & 3] / 16 * 0.95)));
       const c = ramp[idx], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
