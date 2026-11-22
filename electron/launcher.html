@@ -37,39 +37,22 @@
   .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
   .center { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * .8); }
 
-  /* PLAY: goldene Taste mit abgestuften Ecken, blauem blinkendem Rahmen, Dither-Bändern (Schachbrett) oben/unten, geprägter Schrift, Rubinen an den Seiten,
-     marschierenden Pfeilen, Glitzersternen und einem hellen Streifen, der in Pixelstufen darüberläuft. Alles Sprites/harte Kanten, keine Verläufe. */
-  .playwrap { animation: bobp 1.2s steps(1) infinite; position: relative; margin: calc(var(--u) * .5) 0 calc(var(--u) * .2);
-    filter: drop-shadow(var(--px) 0 0 #08060c) drop-shadow(calc(var(--px) * -1) 0 0 #08060c) drop-shadow(0 var(--px) 0 #08060c) drop-shadow(0 calc(var(--px) * -1) 0 #08060c) drop-shadow(0 calc(var(--px) * 2) 0 #08060c); }
-  #play { --n: calc(var(--px) * 3); appearance: none; cursor: pointer; font-family: inherit; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 7);
-    color: #ffffff; background-color: #fad54a; font-size: calc(var(--u) * 3.1); letter-spacing: .26em; padding: calc(var(--u) * 1) calc(var(--u) * 2.6);
-    border: calc(var(--px) * 2) solid #66b6ff; animation: ring .7s steps(1) infinite;
-    text-shadow: calc(var(--px) * -1) calc(var(--px) * -1) 0 #08060c, 0 calc(var(--px) * -1) 0 #08060c, var(--px) calc(var(--px) * -1) 0 #08060c, calc(var(--px) * -1) 0 0 #08060c, var(--px) 0 0 #08060c,
-      calc(var(--px) * -1) var(--px) 0 #08060c, 0 var(--px) 0 #08060c, var(--px) var(--px) 0 #08060c, 0 calc(var(--px) * 2) 0 #08060c, var(--px) calc(var(--px) * 2) 0 #08060c, calc(var(--px) * -1) calc(var(--px) * 2) 0 #08060c, 0 calc(var(--px) * 3) 0 #08060c;
-    background-image: conic-gradient(#c68206 25%, transparent 0 50%, #c68206 0 75%, transparent 0); background-size: calc(var(--px) * 2) calc(var(--px) * 4); background-repeat: repeat-x; background-position: 0 calc(100% - var(--px) * 5);
-    box-shadow: inset 0 calc(var(--px) * 2) 0 #f7f7ad, inset 0 calc(var(--px) * -3) 0 #c68206, inset calc(var(--px) * 2) 0 0 #f7f7ad, inset calc(var(--px) * -2) 0 0 #c68206,
-      inset 0 0 0 calc(var(--px) * 4) #fad54a, inset 0 0 0 calc(var(--px) * 5) #c68206;
-    clip-path: polygon(0 var(--n), var(--px) var(--n), var(--px) var(--px), var(--n) var(--px), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--px), calc(100% - var(--px)) var(--px), calc(100% - var(--px)) var(--n), 100% var(--n),
-      100% calc(100% - var(--n)), calc(100% - var(--px)) calc(100% - var(--n)), calc(100% - var(--px)) calc(100% - var(--px)), calc(100% - var(--n)) calc(100% - var(--px)), calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--px)), var(--px) calc(100% - var(--px)), var(--px) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
+  /* PLAY: Pixelart-Taste, zur Laufzeit Zelle für Zelle gemalt (Skript unten: gefasste Goldplatte mit Kanten, Nieten, Rubin-Fassung, glänzende Blauplatte mit Dither).
+     Die Leinwand ist die Taste; die Schrift liegt als Text darüber. */
+  .playwrap { position: relative; margin: calc(var(--u) * .2) 0; animation: bobp 1.2s steps(1) infinite; }
   @keyframes bobp { 0% { transform: translateY(0); } 50% { transform: translateY(calc(var(--px) * -1)); } }
-  @keyframes ring { 0%, 49% { border-color: #66b6ff; } 50%, 100% { border-color: #b3d8f9; } }
-  #play::before { content: ''; position: absolute; left: calc(var(--px) * 5); right: calc(var(--px) * 5); top: calc(var(--px) * 5); height: calc(var(--px) * 4);
-    background: conic-gradient(#ffffff 25%, transparent 0 50%, #ffffff 0 75%, transparent 0) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2); }
-  #play::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--px) * 5); background: #ffffff; transform: translateX(-300%); animation: shine 3.4s steps(26) infinite; }
-  @keyframes shine { 0%, 50% { transform: translateX(-300%); } 100% { transform: translateX(var(--shine-end, 1500%)); } }
-  #play:hover { background-color: #f7f7ad; animation-duration: .35s; }
-  #play:active { transform: translateY(var(--px)); }
-  .pl { position: relative; padding-top: calc(var(--px) * 1); }
-  .chev { display: flex; gap: var(--px); } .chev svg { display: block; } .chev.r { transform: scaleX(-1); }
-  .chev svg:nth-child(1) { animation: mk 0.9s steps(1) infinite; } .chev svg:nth-child(2) { animation: mk 0.9s steps(1) infinite; animation-delay: -.45s; }
-  @keyframes mk { 0% { visibility: visible; } 50% { visibility: hidden; } }
-  #play:hover .chev svg { animation-duration: .45s; }
-  .gem { position: absolute; top: 50%; margin-top: calc(var(--px) * -6); } .gem svg { display: block; }
-  .gem.l { left: calc(var(--px) * -9); } .gem.r { right: calc(var(--px) * -9); }
+  #play { appearance: none; border: 0; padding: 0; background: none; cursor: pointer; position: relative; display: block; font-family: inherit; }
+  #playcv { display: block; }
+  #play:active { transform: translateY(calc(var(--px) * 2)); }
+  .pl { position: absolute; display: flex; align-items: center; justify-content: center; padding-top: calc(var(--px) * 1); font-size: calc(var(--u) * 3.9); letter-spacing: .28em; text-indent: .28em; color: #fad54a; pointer-events: none;
+    text-shadow: calc(var(--px) * -1) calc(var(--px) * -1) 0 #08060c, 0 calc(var(--px) * -1) 0 #08060c, var(--px) calc(var(--px) * -1) 0 #08060c, calc(var(--px) * -1) 0 0 #08060c, var(--px) 0 0 #08060c,
+      calc(var(--px) * -1) var(--px) 0 #08060c, 0 var(--px) 0 #08060c, var(--px) var(--px) 0 #08060c, 0 calc(var(--px) * 2) 0 #08060c, var(--px) calc(var(--px) * 2) 0 #08060c, calc(var(--px) * -1) calc(var(--px) * 2) 0 #08060c,
+      0 calc(var(--px) * 3) 0 #c68206; }
+  #play:hover .pl { color: #f7f7ad; }
   .spk { position: absolute; animation: tw 2.1s steps(1) infinite; } .spk svg { display: block; }
   @keyframes tw { 0% { visibility: visible; } 45% { visibility: hidden; } 55% { visibility: visible; } 70% { visibility: hidden; } }
-  .spk.a { left: calc(var(--px) * -14); top: calc(var(--px) * -13); } .spk.b { right: calc(var(--px) * -12); top: calc(var(--px) * -16); animation-delay: -.7s; }
-  .spk.c { right: calc(var(--px) * -13); bottom: calc(var(--px) * 2); animation-delay: -1.3s; } .spk.d { left: calc(var(--px) * -13); bottom: calc(var(--px) * -2); animation-delay: -.3s; }
+  .spk.a { left: calc(var(--px) * 4); top: calc(var(--px) * 6); } .spk.b { right: calc(var(--px) * 4); top: calc(var(--px) * 2); animation-delay: -.7s; }
+  .spk.c { right: calc(var(--px) * 10); bottom: calc(var(--px) * -1); animation-delay: -1.3s; } .spk.d { left: calc(var(--px) * 10); bottom: calc(var(--px) * -2); animation-delay: -.3s; }
 
   /* Discord-Knopf oben rechts (wie im Hauptmenü: Discord-Blau, Pixel-Logo) */
   #discord { z-index: 5; position: fixed; right: calc(var(--u) * 1.4); top: calc(var(--u) * 1.3); appearance: none; border: 0; cursor: pointer; background: #3866f0; padding: calc(var(--px) * 4) calc(var(--px) * 6);
@@ -135,8 +118,7 @@
     </div></div>
     <div class="center">
       <div class="playwrap">
-        <button id="play"><span class="chev l" data-sprite="chev"></span><span class="pl">PLAY</span><span class="chev r" data-sprite="chev"></span></button>
-        <span class="gem l" data-sprite="gem"></span><span class="gem r" data-sprite="gem"></span>
+        <button id="play"><canvas id="playcv"></canvas><span class="pl">PLAY</span></button>
         <span class="spk a" data-sprite="star"></span><span class="spk b" data-sprite="star"></span><span class="spk c" data-sprite="star"></span><span class="spk d" data-sprite="star"></span>
       </div>
       <div class="row">
@@ -194,7 +176,7 @@
 
   // ── Sprites (wie PIXEL_ICONS des Spiels): Zeilen aus Zeichen → SVG mit scharfen Kanten, Zelle = --px ──
   const SPR = {
-    discord: { c: { '#': '#ffffff' }, z: 1, r: ['...##..........##...', '..#####......#####..', '..################..', '.##################.', '.##################.', '.######.####.######.', '######...##...######', '######...##...######', '######...##...######', '#######.####.#######', '####################', '.##################.', '.#######....#######.', '..####........####..', '...##..........##...'] },
+    discord: { c: { '#': '#ffffff' }, z: 2, r: ['...##..........##...', '..#####......#####..', '..################..', '.##################.', '.##################.', '.######.####.######.', '######...##...######', '######...##...######', '######...##...######', '#######.####.#######', '####################', '.##################.', '.#######....#######.', '..####........####..', '...##..........##...'] },
     chev: { c: { '#': '#12101f' }, z: 2, n: 2, r: ['##.....', '###....', '.###...', '..###..', '...###.', '..###..', '.###...', '###....', '##.....'] },
     gem: { c: { o: '#08060c', r: '#fe5154', '+': '#ffffff' }, z: 2, r: ['..ooo..', '.orrro.', 'orr+rro', 'orrrrro', '.orrro.', '..ooo..'] },
     star: { c: { '#': '#ffffff', o: '#fad54a' }, z: 2, r: ['...#...', '...#...', '..#o#..', '###o###', '..#o#..', '...#...', '...#...'] },
@@ -206,6 +188,107 @@
     return one.repeat(d.n || 1);
   };
   for (const el of document.querySelectorAll('[data-sprite]')) el.innerHTML = sprite(el.getAttribute('data-sprite'));
+
+  // ── PLAY-Taste: Zelle für Zelle gemalt (Zelle = --px) ──
+  const playCv = $('playcv'), playBtn = $('play'), playTxt = playBtn.querySelector('.pl');
+  const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const C = { out: rgb('#08060c'), gL: rgb('#f7f7ad'), g: rgb('#fad54a'), gD: rgb('#c68206'), gDD: rgb('#8b5b04'),
+    pl: ['#b3d8f9', '#6d9bf8', '#3866f0', '#0351c9', '#02398c'].map(rgb),
+    em: ['#ffffff', '#b3f9cf', '#66ffa2', '#2ca058', '#1a4128'].map(rgb),
+    rub: [rgb('#ffffff'), rgb('#ec7f79'), rgb('#fe5154'), rgb('#a60f39'), rgb('#55011a')] };
+  const BAY = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  let pa = null;
+  const buildPlay = () => {
+    const px = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--px'), 10) || 3;
+    const u = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--u'), 10) || 16;
+    const bw = Math.round(u * 26 / px), bh = Math.round(u * 6.6 / px), Ml = 24, Mr = 24, Mt = 12, Mb = 6;
+    const W = bw + Ml + Mr, H = bh + Mt + Mb, cham = Math.round(bh * 0.4), half = bh / 2;
+    playCv.width = W; playCv.height = H; playCv.style.width = W * px + 'px'; playCv.style.height = H * px + 'px';
+    Object.assign(playTxt.style, { left: Ml * px + 'px', right: Mr * px + 'px', top: Mt * px + 'px', bottom: Mb * px + 'px' });
+    const base = new Uint8ClampedArray(W * H * 4), plate = new Int16Array(W * H).fill(-1);
+    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = 255; plate[y * W + x] = -1; };
+    // Platte + Fassung
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const dx = Math.min(x, bw - 1 - x), dy = Math.min(y, bh - 1 - y), dg = dx + dy - cham;
+      if (dg < 0) continue;
+      const dd = Math.floor(dg * 0.7071), depth = Math.min(dx, dy, dd);
+      // Kante, die die Tiefe bestimmt → hell (oben/links), dunkel (unten/rechts), mittel (Schrägen oben rechts/unten links)
+      let tone = 0;
+      if (depth === dy && dy <= dx) tone = y < half ? 1 : -1;
+      else if (depth === dx) tone = x < bw / 2 ? 1 : -1;
+      else tone = (x < bw / 2) === (y < half) ? (x < bw / 2 ? 1 : -1) : 0;
+      let c;
+      if (depth === 0) c = C.out;
+      else if (depth <= 5) {
+        c = tone > 0 ? [C.gL, C.gL, C.g, C.g, C.gD][depth - 1] : tone < 0 ? [C.g, C.gD, C.gD, C.gD, C.gDD][depth - 1] : [C.g, C.g, C.g, C.g, C.gD][depth - 1];
+        if (depth === 3 && ((x + y) & 3) === 0) c = tone > 0 ? C.gD : C.gDD;            // eingravierte Punktreihe
+      }
+      else if (depth === 6) c = C.out;
+      else if (depth === 7) c = tone > 0 ? C.pl[4] : tone < 0 ? C.pl[0] : C.pl[3];
+      else {
+        const t = y / bh, tt = t < 0.46 ? t * 0.55 : 0.28 + (t - 0.46) * 1.33;       // glänzende obere Hälfte, harter Glanzrand
+        const idx = Math.max(0, Math.min(4, Math.floor(tt * 4 + BAY[y & 3][x & 3] / 16 * 0.95)));
+        c = C.pl[idx]; plate[(y + Mt) * W + x + Ml] = idx;
+      }
+      put(x + Ml, y + Mt, c);
+    }
+    // Nieten (2x2)
+    for (const fx of [0.13, 0.27, 0.73, 0.87]) for (const top of [true, false]) {
+      const x = Ml + Math.round(bw * fx), y = top ? Mt + 2 : Mt + bh - 4;
+      put(x, y, C.gL); put(x + 1, y, C.gD); put(x, y + 1, C.gD); put(x + 1, y + 1, C.gDD);
+    }
+    // Flügelklingen an beiden Spitzen: je eine gerade und zwei schräge, verjüngt, mit Rand und Kantenlicht
+    const fin = (x0, y0, dir, slope, len, th0) => {
+      for (let pass = 0; pass < 2; pass++) for (let t = 0; t <= len; t++) {
+        const th = Math.max(2, Math.round(th0 * (1 - 0.7 * t / len))), cy = Math.round(y0 + slope * t), cx = x0 + dir * t, e = pass === 0 ? 1 : 0;
+        const top = cy - Math.floor(th / 2), bot = top + th - 1;
+        for (let yy = top - e; yy <= bot + e; yy++) put(cx, yy, pass === 0 ? C.out : (yy === top ? C.gL : yy === bot ? C.gD : C.g));
+        if (pass === 0) put(cx - dir * 0, top - e, C.out);
+      }
+    };
+    const ty = Mt + Math.round(half);
+    for (const [x0, dir] of [[Ml + 3, -1], [Ml + bw - 4, 1]]) {
+      fin(x0, ty, dir, 0, 19, 11); fin(x0, ty - 4, dir, -0.45, 16, 8); fin(x0, ty + 4, dir, 0.45, 16, 8);
+      fin(x0 - dir * 2, ty - 7, dir, -0.95, 11, 6); fin(x0 - dir * 2, ty + 7, dir, 0.95, 11, 6);
+    }
+    // Edelsteine: Kreis(R) → Fassung, innen Facetten
+    const gem = (cx, cy, R, rub = C.rub) => {
+      for (let gy = -R - 1; gy <= R + 1; gy++) for (let gx = -R - 1; gx <= R + 1; gx++) {
+        const d = Math.sqrt(gx * gx + gy * gy);
+        if (d > R + 1) continue;
+        let c;
+        if (d > R) c = C.out;
+        else if (d > R - 2) c = (gx + gy < 0) ? C.gL : (gx + gy > R * 0.6 ? C.gDD : C.g);
+        else if (d > R - 3) c = C.out;
+        else { const v = (-gx - gy) / (R - 3 || 1); c = v > 0.75 ? rub[1] : v > 0.1 ? rub[2] : v > -0.6 ? rub[3] : rub[4]; if (gx < 0 && gy < 0 && gx + gy > -(R - 1) && gx + gy < -1 && gx >= -2 && gy >= -2) c = rub[0]; }
+        put(cx + gx, cy + gy, c);
+      }
+    };
+    gem(Ml + Math.round(bw / 2), Mt + 1, 9);
+    for (const fx of [0.3, 0.7]) gem(Ml + Math.round(bw * fx), Mt + 2, 5, C.em);
+    gem(Ml + 6, Mt + Math.round(half), 5); gem(Ml + bw - 7, Mt + Math.round(half), 5);
+    pa = { W, H, base, plate, Ml, Mt, bw, bh, ctx: playCv.getContext('2d'), img: new ImageData(W, H), cx: Ml + Math.round(bw / 2), cy: Mt + 1 };
+  };
+  const frameT0 = performance.now(); let hov = false, shineT = 0;
+  playBtn.addEventListener('mouseenter', () => { hov = true; }); playBtn.addEventListener('mouseleave', () => { hov = false; });
+  const drawPlay = () => {
+    if (!pa) return;
+    const { W, H, base, plate, img, ctx } = pa, d = img.data; d.set(base);
+    const t = (performance.now() - frameT0) / 1000, tot = W + H + 50, ph = ((t * (hov ? 70 : 38)) % (tot + (hov ? 20 : 60))) - 20;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const k = plate[y * W + x]; if (k < 0) continue;
+      let idx = k;
+      const e = (x + y * 0.8) - ph; if (e > 0 && e < 7) idx = Math.max(0, idx - (e < 3 ? 3 : 2));
+      else if (hov) idx = Math.max(0, idx - 1);
+      const c = C.pl[idx], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+    }
+    // Funkeln im Rubin: Kreuz aus weißen Punkten, wechselnd
+    const f = Math.floor(t * (hov ? 4 : 1.6)) % 4;
+    if (f === 0) for (const [dx, dy] of [[-3, -3], [-3, -2], [-2, -3], [-4, -3], [-3, -4], [-2, -2]]) { const i = ((pa.cy + dy) * W + pa.cx + dx) * 4; d[i] = d[i + 1] = d[i + 2] = 255; }
+    ctx.putImageData(img, 0, 0);
+  };
+  const rebuild = () => { buildPlay(); drawPlay(); };
+  addEventListener('resize', rebuild); rebuild(); setInterval(drawPlay, 66);
 
   // ── Inhalt ──
   let cfg = { links: {} };
@@ -223,7 +306,7 @@
   const poll = async () => {
     let r; try { r = await L.status(); } catch { r = { state: 'bad' }; }
     st.className = 'status ' + (r.state === 'ok' ? 'ok' : r.state === 'wake' ? 'wake' : 'bad');
-    $('stxt').textContent = r.state === 'ok' ? 'Server online' + (r.ms ? ' · ' + r.ms + ' ms' : '') : r.state === 'wake' ? 'Waking up the server…' : 'Server not reachable';
+    $('stxt').textContent = r.state === 'ok' ? 'Server online' : r.state === 'wake' ? 'Waking up the server…' : 'Server not reachable';
     setTimeout(poll, r.state === 'ok' ? 20000 : 4000);
   };
   poll();
