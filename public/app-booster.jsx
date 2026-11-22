@@ -1276,6 +1276,7 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
   const where = useMemo(() => { const w = []; packs.forEach((p, pi) => (p.cards || []).forEach((c, i) => w.push([pi, i]))); return w; }, [packs]);   // Karte g → [Pack, Platz im Pack]
   const pack = ((boosters && boosters.packs) || []).find(p => p.id === first.packId) || { id: first.packId, name: first.packId, variants: [] };
   const variant = (pack.variants || []).find(v => v.id === first.variantId) || (pack.variants || [])[0] || null;
+  const special = variant && variant.special ? variant.special : '';   // 'golden' | 'umbra': eigene Auftritts-Animation (Glücksrad)
 
   const [phase, setPhase] = useState('load');         // 'load' | 'play' | 'cards'
   const [err, setErr] = useState('');
@@ -1327,6 +1328,7 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
     return { Z, S, stage, left, top, slots: op ? op.cardSlots : cards.map(() => [0, 0]), cw: size[0] * Z, ch: size[1] * Z };
   }, [vp.w, vp.h, op, S]);
   const bgeom = useMemo(() => bpBlockGeom(Zc), [Zc]);
+  const geomRef = useRef(geom); geomRef.current = geom;
 
   // Laden: opening.json, Schichten des Packs, Packbild (+ Reißmasken); dann die Animation starten
   useEffect(() => {
@@ -1369,7 +1371,7 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
       x.putImageData(id, 0, 0);
       return c;
     })();
-    let raf = 0, dead = false, lastF = -1, nextSound = 0, t0 = performance.now(), arrived = phase === 'cards';
+    let raf = 0, dead = false, lastF = -1, nextSound = 0, t0 = performance.now(), arrived = phase === 'cards', specialDone = phase === 'cards';
     if (arrived) { t0 = performance.now() - (ready + 2) * (1000 / o.fps); nextSound = o.sounds.length; }
     const draw = (f) => {
       const col = f % o.columns, row = Math.floor(f / o.columns);
@@ -1403,6 +1405,13 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
         nextSound = o.sounds.length; bpPlay('booster_ready', { volume: 0.85 });
       }
       while (nextSound < o.sounds.length && o.sounds[nextSound].f <= f) { const s = o.sounds[nextSound++]; bpPlay(s.name, { volume: s.volume, rate: s.rate }); }
+      // Gold-/Umbra-Pack: beim Aufplatzen ein eigener Auftritt (großer Effekt der Rarity über dem Pack, zusätzliche Klänge)
+      if (special && !specialDone && f >= 44 && fx.current) {
+        specialDone = true;
+        const gm = geomRef.current, cwP = 192 * Z / S, chP = 320 * Z / S;
+        fx.current.spawn(special === 'umbra' ? 'umbra' : 'storm', (gm.left + (PX + 96) * Z) / S, (gm.top + (PY + 160) * Z) / S, cwP, chP, 1);
+        if (special === 'umbra') { bpPlay('pull_shatter', { volume: 1 }); bpPlay('ascension', { volume: 1 }); } else { bpPlay('pull_sparkle', { volume: 1 }); bpPlay('ascension', { volume: 0.8 }); bpPlay('gold_gain', { volume: 0.8 }); }
+      }
       if (!arrived && f >= ready) { arrived = true; setPhase('cards'); }
       if (arrived && multiRef.current) { draw(Math.min(f, loopB)); return; }   // mehrere Packs: die Bühne wird ausgeblendet (die Blöcke übernehmen), nicht weiter malen
       const fd = f > loopB ? loopA + ((f - loopA) % (loopB - loopA + 1)) : f;
@@ -1611,6 +1620,7 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
   const tree = (
     <div className={'bp-open' + (multi ? ' bp-open-multi' : '')} data-pp-px="aus">
       <div className="bp-world" ref={worldRef}>
+        {special && phase === 'play' && <div className={'bp-special bp-special-' + special}>{special === 'umbra' ? 'UMBRA PACK!' : 'GOLDEN PACK!'}</div>}
         <canvas ref={stageRef} className="bp-stage" width={geom.stage[0]} height={geom.stage[1]}
           style={{ left: geom.left, top: geom.top, width: stageW, height: stageH, visibility: phase === 'load' || cardsView ? 'hidden' : 'visible' }} />
         {phase === 'cards' && !multi && cards.map((c, i) => cardEl(i, c, geom, null))}
@@ -1623,11 +1633,13 @@ function BoosterOpening({ packs: packsProp, pending, boosters, sc, onSc, onClaim
           <div className="bp-scroll" ref={scrollRef} onScroll={onScrollArea} tabIndex={0} role="region" aria-label="Opened packs">
             <div className="bp-scroll-in" ref={scrollInRef}>
               {packs.map((p, pi) => {
-                const g0 = where.findIndex(w => w[0] === pi), sd = soldArr[pi], sc2 = sd >= 0 && p.cards[sd] ? sellTable[p.cards[sd].rarity] || 0 : 0;
+                const pkPack = ((boosters && boosters.packs) || []).find(x => x.id === p.packId), pv = pkPack && (pkPack.variants || []).find(v => v.id === p.variantId), g0 = where.findIndex(w => w[0] === pi), sd = soldArr[pi], sc2 = sd >= 0 && p.cards[sd] ? sellTable[p.cards[sd].rarity] || 0 : 0;
                 return (
                   <section className="bp-pk" key={p.id} style={{ width: bgeom.gw, '--bpz': Zc }} aria-label={'Pack ' + (pi + 1) + ' of ' + n}>
-                    <header className="bp-pk-head" style={{ height: bgeom.hd }}>
+                    <header className={'bp-pk-head' + (pv && pv.special ? ' bp-pk-head-' + pv.special : '')} style={{ height: bgeom.hd }}>
+                      {pv && <img className="bp-pk-thumb" src={bpAsset(pv.base)} alt="" draggable={false} />}
                       <span className="bp-pk-no">PACK {pi + 1} / {n}</span>
+                      {pv && pv.special && <span className={'bp-pk-tag bp-pk-tag-' + pv.special}>{pv.special === 'umbra' ? 'UMBRA PACK' : 'GOLDEN PACK'}</span>}
                       {sd >= 0 && <span className="bp-pk-sold">SOLD BACK +{sc2}<img src="/data/sc.png" className="bp-coin" alt="" /></span>}
                     </header>
                     <div className="bp-pk-grid" style={{ width: bgeom.gw, height: bgeom.gh }}>

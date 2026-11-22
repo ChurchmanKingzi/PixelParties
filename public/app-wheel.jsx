@@ -45,7 +45,7 @@ const WH_RCOL = {
 
 // ── Klänge ──────────────────────────────────────────────────────────────────
 const WH_SOUNDS = ['projectile', 'placement', 'heavy_impact', 'pull_note', 'pull_sparkle', 'gold_gain', 'ascension', 'pull_shatter', 'elem_lightning', 'booster_burst',
-  'ui_click', 'critical_strike', 'booster_ready', 'victory', 'shop_purchase'];
+  'ui_click', 'critical_strike', 'booster_ready', 'victory', 'shop_purchase', 'pull_swell', 'pull_reveal'];
 let _whWarm = false;
 function whWarm() {
   if (_whWarm || !window.playSFX) return; _whWarm = true;
@@ -69,11 +69,34 @@ const WH_ICONS = {
   scroll: ['KKKKKKK.', 'KLLLLLLK', '.KLKKLLK', '.KLLLLLK', '.KLKKKLK', '.KLLLLLK', 'KKLLLLKK', '..KKKKK.'],
   x: ['........', '.R....R.', '..R..R..', '...RR...', '...RR...', '..R..R..', '.R....R.', '........'],
 };
-function WhIcon({ name, px }) {
-  const g = WH_ICONS[name]; if (!g) return null;
+function WhIcon({ name, px, grid, pal }) {
+  const g = grid || WH_ICONS[name]; if (!g) return null;
+  const P = pal ? { ...WH_PAL, ...pal } : WH_PAL;
   const rects = [];
-  g.forEach((row, y) => { let x = 0; while (x < row.length) { const c = row[x]; if (c === '.') { x++; continue; } let e = x; while (e < row.length && row[e] === c) e++; rects.push(<rect key={x + ':' + y} x={x} y={y} width={e - x} height={1} fill={WH_PAL[c]} />); x = e; } });
+  g.forEach((row, y) => { let x = 0; while (x < row.length) { const c = row[x]; if (c === '.') { x++; continue; } let e = x; while (e < row.length && row[e] === c) e++; rects.push(<rect key={x + ':' + y} x={x} y={y} width={e - x} height={1} fill={P[c]} />); x = e; } });
   return <svg className="wh-icon" width={g[0].length * px} height={g.length * px} viewBox={'0 0 ' + g[0].length + ' ' + g.length} shapeRendering="crispEdges" aria-hidden="true">{rects}</svg>;
+}
+
+// Ticket-Sprite (20 × 11 Zellen): goldenes Billett, links die Farbe der Ausgangs-Rarity, rechts die der neuen, in der Mitte ein Stern, Perforation dazwischen
+function whTicketGrid() {
+  const W = 20, H = 11, g = Array.from({ length: H }, () => Array(W).fill('.'));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const corner = (y === 0 || y === H - 1) && (x === 0 || x === W - 1);
+    if (corner) continue;
+    g[y][x] = (y === 0 || y === H - 1 || x === 0 || x === W - 1) ? 'K' : 'Y';
+  }
+  for (let y = 2; y <= 8; y++) { for (let x = 2; x <= 5; x++) g[y][x] = 'A'; for (let x = 14; x <= 17; x++) g[y][x] = 'B'; }
+  for (let y = 1; y <= 9; y++) { g[y][6] = y % 2 ? 'O' : 'Y'; g[y][13] = y % 2 ? 'O' : 'Y'; }
+  const star = ['..W..', '.WWW.', 'WWWWW', '.WWW.', '.W.W.'];
+  star.forEach((row, j) => [...row].forEach((c, i) => { if (c === 'W') g[3 + j][7 + i] = 'W'; }));
+  for (let x = 1; x < W - 1; x++) if (g[9][x] === 'Y') g[9][x] = 'O';   // Schattenkante unten
+  return g.map(r => r.join(''));
+}
+const WH_TICKET_GRID = whTicketGrid();
+/** Ticket von `from` auf die nächsthöhere Rarity (Farben der beiden Hälften). */
+function WhTicket({ from, px }) {
+  const next = window.PpRarities.ORDER[window.PpRarities.rank(from) + 1];
+  return <WhIcon grid={WH_TICKET_GRID} px={px} pal={{ A: WH_RCOL[from] || '#a5b0c0', B: WH_RCOL[next] || '#ffffff' }} />;
 }
 
 // ── Felder: Anzeige je Preisart ─────────────────────────────────────────────
@@ -217,20 +240,25 @@ function WhBigCard({ name, rarity }) {
   );
 }
 function WhTip({ tip }) {
+  const ref = useRef(null);
+  const [h, setH] = useState(0);
+  useLayoutEffect(() => { if (ref.current) { const nh = ref.current.offsetHeight; if (nh !== h) setH(nh); } });
   if (!tip) return null;
-  // Höhe grob schätzen (große Karte 5:7 + Text) und so setzen, dass der Tooltip neben dem Zeiger sitzt und im Fenster bleibt
-  const Wd = 300, Ht = tip.card ? Wd * 1.4 + 120 : 290;
+  const Wd = 300, Ht = h || (tip.card ? Wd * 1.4 + 120 : 440);
   let x = tip.x + 24; if (x + Wd > window.innerWidth - 8) x = tip.x - Wd - 24;
   const y = Math.max(8, Math.min(window.innerHeight - Ht - 8, tip.y - Ht * 0.35));
   const f = tip.info;
+  const isTicket = f.cls === 'ticket' && tip.ticketFrom;
   return (
-    <div className="wh-tip" style={{ left: Math.max(8, x), top: y, '--whc': f.rarColor || '#fad54a' }}>
+    <div className="wh-tip" ref={ref} style={{ left: Math.max(8, x), top: y, '--whc': f.rarColor || '#fad54a' }}>
       {tip.card ? <WhBigCard name={tip.card.name} rarity={tip.card.rarity} /> : tip.titleId ? (
-        <div className="wh-tip-art wh-tip-title">{window.PpTitled && <window.PpTitled name={whT('Your name')} title={tip.titleId} />}</div>
+        <div className="wh-tip-art wh-tip-title">{window.PpTitle && <window.PpTitle id={tip.titleId} />}</div>
+      ) : isTicket ? (
+        <div className="wh-tip-art"><WhTicket from={tip.ticketFrom} px={12} /></div>
       ) : (
         <div className="wh-tip-art">{tip.art && tip.art.startsWith('emote:') ? <PpEmote id={tip.art.slice(6)} box={240} title="" /> : tip.art ? <img src={tip.art} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={10} />}</div>
       )}
-      <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>
+      {!tip.titleId && <div className="wh-tip-name">{tip.card && tip.card.name ? whCardName(tip.card.name) : (tip.name || f.label)}</div>}
       <div className="wh-tip-sub">{tip.card ? whT(whRarityLabel(tip.card.rarity)) + (tip.sample ? ' · ' + whT('example') : '') : (tip.sub || f.sub || '')}</div>
       {f.desc && <div className="wh-tip-desc">{whT(f.desc)}</div>}
       {tip.pct != null && <div className="wh-tip-pct">{whT('Chance per dart') + ': ' + whPct(tip.pct)}</div>}
@@ -538,6 +566,7 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
     const cs = (kind === 'avatar' || kind === 'sleeve' || kind === 'skin' || kind === 'emote') && art && art.cos ? art.cos[kind] : null;
     const tsamp = kind === 'title' && art && art.cos && art.cos.title ? art.cos.title.id : null;
     onTip({ x: e.clientX, y: e.clientY, info: { ...f, rarColor: f.rar ? WH_RCOL[f.rar] : null }, pct: table[kind], card: sample ? { name: sample, rarity: kind.slice(5) } : null, sample: !!sample,
+      ...(kind.startsWith('ticket:') ? { ticketFrom: kind.slice(7) } : {}),
       art: whArtFor(kind, art, seed), ...(cs ? { name: cs.name, sub: whT('example') } : {}), ...(tsamp ? { titleId: tsamp, sub: whT('example') } : {}), ...(extra || {}) });
   };
   const stageStyle = { width: sz(WH_BW), '--whs': S + 'px', transform: shake[0] || shake[1] ? 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' : undefined, height: play ? sz(WH_BH + WH_GAP + WH_BARH) : sz(WH_BH) };
@@ -550,14 +579,15 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
           const clip = whClip(f.shape, r.w - 2, r.h - 2, S);
           const lblFs = Math.min(2.8, (r.w - 4) / (Math.max(...f.label.split(' ').map(w => w.length)) * 1.0));
           const showLbl = lblFs >= 1.5 && r.h >= 7;
-          const showIcon = !artUrl && f.icon && r.w >= 9 && r.h >= (showLbl ? 13 : 9), px = Math.max(1, Math.min(4, Math.floor(Math.min(r.w - 4, r.h - (showLbl ? 8 : 4)) / 9)));
+          const isTk = k.startsWith('ticket:');
+          const showIcon = !artUrl && f.icon && (isTk ? (r.w >= 22 && r.h >= 15) : (r.w >= 9 && r.h >= (showLbl ? 13 : 9))), px = Math.max(1, Math.min(4, Math.floor(Math.min(r.w - 4, r.h - (showLbl ? 8 : 4)) / 9)));
           return (
             <div key={k} ref={el => { fieldRefs.current[k] = el; }} className={'wh-note wh-n-' + f.cls + ' wh-sh-' + f.shape} style={{ left: sz(r.x + 1), top: sz(r.y + 1), width: sz(r.w - 2), height: sz(r.h - 2), ...(rar ? { '--whc': rar } : {}) }}
                  onMouseEnter={(e) => showTip(e, k)} onMouseMove={(e) => showTip(e, k)} onMouseLeave={() => onTip && onTip(null)}>
               <div className="wh-body" style={clip ? { clipPath: clip } : undefined}>
                 {artUrl && artUrl.startsWith('emote:') ? <div className="wh-art wh-art-emote"><PpEmote id={artUrl.slice(6)} box={Math.max(8, Math.min(r.w - 4, r.h - 8)) * S} title="" /></div> : artUrl && <img className={'wh-art wh-art-' + f.cls} src={artUrl} alt="" draggable={false} data-pp-px="aus" />}
                 {(f.cls === 'golden' || f.cls === 'jackpot') && !artUrl && <span className="wh-dither" />}
-                {showIcon && <WhIcon name={f.icon} px={px} />}
+                {showIcon && (k.startsWith('ticket:') ? <WhTicket from={k.slice(7)} px={Math.max(1, Math.min(4, Math.floor((r.w - 4) / 20), Math.floor((r.h - (showLbl ? 9 : 4)) / 11)))} /> : <WhIcon name={f.icon} px={px} />)}
                 {showLbl && <span className="wh-lbl" style={{ fontSize: 'calc(var(--whs) * ' + lblFs.toFixed(2) + ')' }}>{f.label}</span>}
                 {showLbl && f.sub && r.h >= 12 && r.w >= 16 && <span className="wh-sub">{f.sub}</span>}
                 {k === 'title' && art && art.cos && art.cos.title && r.h >= 12 && r.w >= 16 && window.ppTitleInfo && <span className="wh-sub wh-titlesample">{(window.ppTitleInfo(art.cos.title.id) || {}).text}</span>}
@@ -586,10 +616,11 @@ function WhBoard({ rarity, boardData, play, small, art, onTip, claimed }) {
             const extra = isCard ? { card: { name: p.name, rarity: p.rarity }, sample: false, pct: null } : { pct: null, art: img, name: text, sub: p && p.id !== undefined && p.isNew !== undefined ? (p.isNew ? whT('New!') : whFrameName(p.dupes)) : undefined };
             if (sl.kind === 'emote' && p) extra.art = 'emote:' + p.id; if (sl.kind === 'title' && p) { extra.titleId = p.id; extra.sub = whT('New!'); }
             return (
-              <div key={sl.key} className={'wh-slot wh-slot-' + f.cls} data-slot={sl.key} style={{ '--whc': f.rar ? WH_RCOL[f.rar] : (isCard ? WH_RCOL[p.rarity] : WH_FCOL[f.cls]) }}
+              <div key={sl.key} className={'wh-slot wh-slot-' + f.cls + (sl.kind === 'emote' ? ' wh-slot-emote' : '') + (sl.kind === 'title' ? ' wh-slot-title' : '')} data-slot={sl.key} style={{ '--whc': f.rar ? WH_RCOL[f.rar] : (isCard ? WH_RCOL[p.rarity] : WH_FCOL[f.cls]) }}
                    onMouseEnter={(e) => showTip(e, sl.kind, extra)} onMouseMove={(e) => showTip(e, sl.kind, extra)} onMouseLeave={() => onTip && onTip(null)}>
-                {sl.kind === 'emote' && p && p.id ? <PpEmote id={p.id} box={9 * S} title="" /> : img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
-                <span className="wh-slot-lbl">{text}</span>
+                {sl.kind === 'emote' || sl.kind === 'title' ? <span className="wh-slot-tag">{sl.kind === 'emote' ? 'EMOTE' : 'TITLE'}</span> : null}
+                {sl.kind === 'title' && p && p.id && window.PpTitle ? <div className="wh-slot-titlebody"><window.PpTitle id={p.id} /></div> : sl.kind.startsWith('ticket:') ? <WhTicket from={sl.kind.slice(7)} px={Math.max(1, Math.floor(S * 0.5))} /> : sl.kind === 'emote' && p && p.id ? <PpEmote id={p.id} box={9 * S} title="" /> : img ? <img src={img} alt="" draggable={false} data-pp-px="aus" /> : <WhIcon name={f.icon || 'x'} px={3} />}
+                {sl.kind !== 'title' && <span className="wh-slot-lbl">{sl.kind.startsWith('ticket:') ? f.sub : text}</span>}
                 <b key={sl.n} className="wh-slot-n">{'×' + sl.n}</b>
               </div>
             );
@@ -626,12 +657,17 @@ function WhRarityPick({ state, onPick, onTicket }) {
       {tix.length > 0 && (
         <div className="wh-tickets">
           <h3>Your tickets</h3>
-          <p className="wh-hint">A ticket upgrades one free card to the next rarity.</p>
+          <p className="wh-hint">A ticket upgrades one free card to the next rarity. Click a ticket to choose the card.</p>
           <div className="wh-ticket-row">
             {tix.map(r => {
               const f = whFieldInfo('ticket:' + r);
-              return <button key={r} className="wh-ticket" style={{ '--whc': WH_RCOL[f.rar] }} onClick={() => onTicket(r)}>
-                <span className="wh-ticket-n">{'×' + state.tickets[r]}</span><span>{f.sub}</span><span className="wh-ticket-use">Use</span></button>;
+              return (
+                <button key={r} className="wh-ticket" style={{ '--whc': WH_RCOL[f.rar] }} onClick={() => onTicket(r)}>
+                  <WhTicket from={r} px={5} />
+                  <span className="wh-ticket-txt"><span className="wh-ticket-n">{'×' + state.tickets[r]}</span><span>{f.sub}</span></span>
+                  <span className="wh-ticket-use">Use</span>
+                </button>
+              );
             })}
           </div>
         </div>
@@ -644,16 +680,16 @@ function WhRarityPick({ state, onPick, onTicket }) {
 //  Schritt 2: Galerie (jede Kopie ein Bild; markieren/abwählen). Beide Leisten bleiben beim Scrollen oben angepinnt.
 //  Leistung: Kacheln sind React.memo (nur die geklickte zeichnet neu), ein Klick-Handler am Container (Ereignis-Delegation).
 // ═══════════════════════════════════════════════════════════════════════════
-const WhTile = React.memo(function WhTile({ k, name, rarity, locked, selected }) {
+const WhTile = React.memo(function WhTile({ k, name, rarity, locked, selected, noUp }) {
   return (
     <button className={'wh-tile' + (selected ? ' wh-tile-sel' : '') + (locked ? ' wh-tile-lock' : '')} data-k={k} data-locked={locked ? '1' : ''}>
       <img src={bpCardUrl(name, rarity)} alt={name} loading="lazy" decoding="async" draggable={false} />
       {selected && <span className="wh-tick">✓</span>}
-      {locked && <span className="wh-lock">DECK</span>}
+      {locked && <span className="wh-lock">{noUp ? 'N/A' : 'DECK'}</span>}
     </button>
   );
 });
-function WhGallery({ rarity, mode, onBack, onGo, notify }) {
+function WhGallery({ rarity, mode, tickets, onBack, onGo, notify }) {
   const [cards, setCards] = useState(null);
   const [sel, setSel] = useState(() => new Set());     // Schlüssel "<Name>#<k>"
   const [typeF, setTypeF] = useState(''), [subF, setSubF] = useState(''), [q, setQ] = useState('');
@@ -666,7 +702,7 @@ function WhGallery({ rarity, mode, onBack, onGo, notify }) {
   const CB = window.CARDS_BY_NAME || {};
   const tiles = useMemo(() => {
     const out = [];
-    for (const c of cards || []) for (let k = 0; k < c.total; k++) out.push({ key: c.name + '#' + k, name: c.name, locked: k >= c.free, ql: (c.name + ' ' + whCardName(c.name)).toLowerCase(), type: (CB[c.name] || {}).cardType, sub: (CB[c.name] || {}).subtype });
+    for (const c of cards || []) for (let k = 0; k < c.total; k++) out.push({ key: c.name + '#' + k, name: c.name, locked: k >= c.free || (single && c.up === false), noUp: single && c.up === false && k < c.free, ql: (c.name + ' ' + whCardName(c.name)).toLowerCase(), type: (CB[c.name] || {}).cardType, sub: (CB[c.name] || {}).subtype });
     out.sort((a, b) => whCardName(a.name).localeCompare(whCardName(b.name)) || (a.locked - b.locked) || a.key.localeCompare(b.key));
     return out;
   }, [cards]);   // eslint-disable-line
@@ -707,9 +743,11 @@ function WhGallery({ rarity, mode, onBack, onGo, notify }) {
       <div className="wh-sticky">
         <div className="wh-bar">
           <button className="btn" onClick={onBack}>← Back</button>
-          <h3 className="wh-title" style={{ color: WH_RCOL[rarity] }}>{whRarityLabel(rarity)}</h3>
+          {single ? <WhTicket from={rarity} px={3} /> : null}
+          <h3 className="wh-title" style={{ color: WH_RCOL[rarity] }}>{single ? whFieldInfo('ticket:' + rarity).sub : whRarityLabel(rarity)}</h3>
           <div style={{ flex: 1 }} />
-          <span className="wh-selcount">{window.ppT('Selected: {0}').replace('{0}', sel.size)}</span>
+          {single && <span className="wh-selcount">{window.ppT('Tickets: {0}').replace('{0}', tickets || 0)}</span>}
+          {single ? <span className="wh-hint">{sel.size ? whT('Ready: press Upgrade!') : whT('Click the card to upgrade.')}</span> : <span className="wh-selcount">{window.ppT('Selected: {0}').replace('{0}', sel.size)}</span>}
           <button className="btn btn-primary wh-go" disabled={sel.size < 1} onClick={go}>{single ? 'Upgrade!' : 'Go!'}</button>
         </div>
         <div className="wh-filters">
@@ -729,7 +767,7 @@ function WhGallery({ rarity, mode, onBack, onGo, notify }) {
       </div>
       {cards === null ? <div className="wh-hint">Loading…</div> : (
         <div className="wh-tiles" onClick={onGridClick}>
-          {shown.map(t => <WhTile key={t.key} k={t.key} name={t.name} rarity={rarity} locked={t.locked} selected={sel.has(t.key)} />)}
+          {shown.map(t => <WhTile key={t.key} k={t.key} name={t.name} rarity={rarity} locked={t.locked} noUp={t.noUp} selected={sel.has(t.key)} />)}
           {!shown.length && <div className="wh-hint">No cards match.</div>}
         </div>
       )}
@@ -809,7 +847,7 @@ function WhBoardPick({ rarity, stakeN, state, art, onBack, onThrow, busy }) {
 //  Schritt 4: Wurf + Ergebnis
 // ═══════════════════════════════════════════════════════════════════════════
 function whSc(k) { return window.PpWheel.SC_AMOUNT[k] || 0; }
-function WhResult({ result, claimed, onAgain, onMore, onPacks, onTip }) {
+function WhResult({ result, claimed, locked, onAgain, onMore, onPacks, onTip }) {
   const cos = [], packs = [];
   let sc = 0, nothing = 0, spins = 0, cardsN = 0; const tix = {};
   for (const a of result.arrows) {
@@ -862,14 +900,15 @@ function WhResult({ result, claimed, onAgain, onMore, onPacks, onTip }) {
         </div>
       )}
       <div className="wh-confirm">
-        <button className="btn btn-primary wh-go" onClick={onMore}>Throw more!</button>
-        <button className="btn" onClick={onAgain}>Back to rarities</button>
+        <button className="btn btn-primary wh-go" disabled={locked} onClick={onMore}>Throw more!</button>
+        <button className="btn" disabled={locked} onClick={onAgain}>Back to rarities</button>
+        {locked && <span className="wh-hint">{whT('Open your packs first.')}</span>}
       </div>
     </div>
   );
 }
 
-function WhPlay({ rarity, board, result, art, claimed, onAgain, onMore, onPacks, onTip }) {
+function WhPlay({ rarity, board, result, art, claimed, locked, onAgain, onMore, onPacks, onTip }) {
   const [finished, setFinished] = useState(false);
   const skipRef = useRef(null);
   const play = useMemo(() => {
@@ -886,25 +925,91 @@ function WhPlay({ rarity, board, result, art, claimed, onAgain, onMore, onPacks,
         {!finished && <button className="btn" onClick={() => skipRef.current && skipRef.current()}>Skip</button>}
       </div>
       <div className="wh-board-wrap"><WhBoard rarity={rarity} boardData={board} play={play} art={art} onTip={onTip} claimed={claimed} /></div>
-      {finished && <WhResult result={result} claimed={claimed} onAgain={onAgain} onMore={onMore} onPacks={onPacks} onTip={onTip} />}
+      {finished && <WhResult result={result} claimed={claimed} locked={locked} onAgain={onAgain} onMore={onMore} onPacks={onPacks} onTip={onTip} />}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Ticket eingelöst: Karte vorher → nachher (groß, mit den Effekten der neuen Rarity)
+//  Ticket eingelöst: Vollbild-Animation (Leinwand 30 Hz, Rasterzelle 4): das Ticket schlägt in die Karte ein, die Karte lädt sich in der Farbe der neuen
+//  Rarity auf (Strahlen, Funken, Zittern), Schachbrett-Blitz, dann erscheint die neue Karte groß mit ihren Effekten. Danach „Nice!“.
 // ═══════════════════════════════════════════════════════════════════════════
 function WhUpgrade({ up, onClose }) {
+  const bgRef = useRef(null), fgRef = useRef(null), cardsRef = useRef(null);
+  const [stage, setStage] = useState(0);              // 0 Anflug · 1 Aufladen · 2 neue Karte
+  const [ready, setReady] = useState(false);
+  const [shake, setShake] = useState([0, 0]);
+  const col = WH_RCOL[up.to] || '#fad54a';
+  useEffect(() => {
+    whWarm();
+    const bg = bgRef.current, fg = fgRef.current; if (!bg || !fg) return undefined;
+    const S = 4, CW = Math.ceil(window.innerWidth / S), CH = Math.ceil(window.innerHeight / S);
+    bg.width = fg.width = CW * S; bg.height = fg.height = CH * S;
+    const b = bg.getContext('2d'), f = fg.getContext('2d'); b.imageSmoothingEnabled = f.imageSmoothingEnabled = false;
+    const cx = Math.floor(CW / 2), cy = Math.floor(CH / 2) - 4;
+    const rnd = whRng(Date.now() & 0xffffff);
+    const cell = (c, x, y, color) => { c.fillStyle = color; c.fillRect(Math.round(x) * S, Math.round(y) * S, S, S); };
+    const stars = Array.from({ length: 160 }, () => ({ x: Math.floor(rnd() * CW), y: Math.floor(rnd() * CH), p: Math.floor(rnd() * 20) }));
+    const parts = []; let frame = 0, raf = 0, done = false, flash = 0, shakeT = 0, popped = false;
+    const rings = [];
+    const addParts = (n, fromCard) => { for (let i = 0; i < n && parts.length < 320; i++) { const a = rnd() * Math.PI * 2, r = fromCard ? 16 + rnd() * 14 : 2; parts.push({ x: cx + Math.cos(a) * r * 1.1, y: cy + Math.sin(a) * r * 1.5, vx: (rnd() - 0.5) * 0.5, vy: -(0.5 + rnd() * 1.1), life: 22 + Math.floor(rnd() * 22), c: i % 3 === 0 ? '#ffffff' : (i % 3 === 1 ? col : '#fad54a') }); } };
+    const T_HIT = 14, T_FLASH = 48;
+    const tick = () => {
+      if (done) return;
+      // Hintergrund: dunkel, Sternenfeld (flackernd), ab dem Aufladen Strahlen
+      b.fillStyle = '#08060c'; b.fillRect(0, 0, bg.width, bg.height);
+      for (const st of stars) if (((frame + st.p) >> 3) & 1) cell(b, st.x, st.y, (st.x + st.y) % 5 === 0 ? '#ffffff' : '#7e7d9b');
+      if (frame >= T_HIT) {
+        const t = frame - T_HIT, L = Math.min(Math.hypot(CW, CH) / 2 + 8, t * 3.2), ph = frame * 0.035;
+        for (let k = 0; k < 28; k++) {
+          const a = k * Math.PI * 2 / 28 + ph * (k % 2 ? 1 : -1), dx = Math.cos(a), dy = Math.sin(a), c = k % 2 ? col : '#ffffff';
+          for (let r = 10; r < L; r += 1) if ((r + k + (frame >> 1)) % 4) { cell(b, cx + dx * r * 1.0, cy + dy * r * 0.9, c); if (k % 2 === 0) cell(b, cx + dx * r * 1.0 + 1, cy + dy * r * 0.9, c); }
+        }
+      }
+      // Vordergrund: Ticket, Funken, Ringe, Blitz
+      f.clearRect(0, 0, fg.width, fg.height);
+      if (frame < T_HIT) {
+        const p = frame / T_HIT, e = p * p, x = Math.round(cx - 70 + 70 * e), y = Math.round(cy - 60 + 60 * e);
+        WH_TICKET_GRID.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '.') return; const pc = { K: '#12101f', Y: '#fad54a', O: '#c68206', W: '#ffffff', A: WH_RCOL[up.from], B: col }[ch]; f.fillStyle = pc; f.fillRect((x - 20 + i * 2) * S, (y - 11 + j * 2) * S, S * 2, S * 2); }));
+        // Schweif
+        for (let k = 1; k <= 6; k++) if ((k + frame) % 2) { cell(f, x - 22 - k * 4, y - 12 - k * 3, '#ffffff'); cell(f, x - 20 - k * 4, y - 6 - k * 3, col); }
+      }
+      if (frame === T_HIT) { whPlay('heavy_impact', { volume: 1 }); whPlay('critical_strike', { volume: 0.7 }); rings.push({ r: 2, max: 30, c: '#ffffff', t: 0 }); shakeT = 10; flash = 2; addParts(40, true); setStage(1); setTimeout(() => whPlay('pull_swell', { volume: 0.8 }), 120); }
+      if (frame > T_HIT && frame < T_FLASH && frame % 2 === 0) addParts(5, true);
+      if (frame > T_HIT && frame < T_FLASH) shakeT = Math.max(shakeT, 2);
+      if (frame === T_FLASH - 6) whPlay('ascension', { volume: 0.9 });
+      if (frame === T_FLASH) { flash = 4; shakeT = 14; rings.push({ r: 2, max: 46, c: col, t: 0 }, { r: 8, max: 54, c: '#ffffff', t: 0 }); addParts(120, true); setStage(2); whPlay('pull_sparkle', { volume: 0.9 }); whPlay('pull_reveal', { volume: 0.8 }); whPlay('heavy_impact', { volume: 0.8 }); }
+      if (frame === T_FLASH + 14 && !popped) { popped = true; whPlay('victory', { volume: 0.55 }); }
+      if (frame === T_FLASH + 16) setReady(true);
+      if (frame > T_FLASH && frame % 3 === 0) addParts(3, true);
+      for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.x += q.vx; q.y += q.vy; q.vy += 0.03; q.life--; if (q.life <= 0) { parts.splice(i, 1); continue; } cell(f, q.x, q.y, q.life % 3 === 0 ? '#ffffff' : q.c); cell(f, q.x + 1, q.y, q.c); }
+      for (let i = rings.length - 1; i >= 0; i--) {
+        const r = rings[i]; r.r += 1.6; r.t++; if (r.r > r.max) { rings.splice(i, 1); continue; }
+        const R = Math.round(r.r);
+        for (let a = 0; a < 64; a++) { const ang = a * Math.PI * 2 / 64; if (((a + r.t) & 1) === 0) cell(f, cx + Math.cos(ang) * R * 1.0, cy + Math.sin(ang) * R * 0.85, r.c); }
+      }
+      if (flash > 0) { f.fillStyle = '#ffffff'; for (let y = 0; y < CH; y++) for (let x = (y + frame) & 1; x < CW; x += (flash > 2 ? 1 : 2)) f.fillRect(x * S, y * S, S, S); flash--; }
+      if (shakeT > 0) { shakeT--; setShake([Math.round((rnd() - 0.5) * 6) * S / 2, Math.round((rnd() - 0.5) * 6) * S / 2]); if (shakeT === 0) setShake([0, 0]); }
+      frame++;
+      raf = whRaf(tick);
+    };
+    raf = whRaf(tick);
+    return () => { done = true; try { window.cancelAnimationFrame(raf); } catch (e) { /* ohne */ } };
+  }, []);   // eslint-disable-line
   return (
-    <div className="wh-up" onClick={onClose}>
-      <div className="wh-up-title">UPGRADE!</div>
-      <div className="wh-up-cards">
-        <div className="wh-up-card wh-up-from"><div className="bp-sc-face"><img src={bpCardUrl(up.name, up.from)} alt="" draggable={false} /></div><span style={{ color: WH_RCOL[up.from] }}>{whT(whRarityLabel(up.from))}</span></div>
-        <WhIcon name="ticket" px={8} />
-        <div className="wh-up-card wh-up-to"><WhBigCard name={up.name} rarity={up.to} /><span style={{ color: WH_RCOL[up.to] }}>{whT(whRarityLabel(up.to))}</span></div>
+    <div className="wh-up" style={shake[0] || shake[1] ? { transform: 'translate(' + shake[0] + 'px,' + shake[1] + 'px)' } : undefined} onClick={() => { if (ready) onClose(); }}>
+      <canvas ref={bgRef} className="wh-up-cv wh-up-bg" />
+      <div className="wh-up-center" ref={cardsRef}>
+        {stage < 2 ? (
+          <div className={'wh-up-card wh-up-from' + (stage === 1 ? ' wh-up-charge' : '')}><div className="bp-sc-face"><img src={bpCardUrl(up.name, up.from)} alt="" draggable={false} /></div></div>
+        ) : (
+          <div className="wh-up-card wh-up-to wh-up-pop"><WhBigCard name={up.name} rarity={up.to} /></div>
+        )}
+        {stage === 2 && <div className="wh-up-title" style={{ color: col }}>UPGRADE!</div>}
+        {stage === 2 && <div className="wh-up-name">{whCardName(up.name)}<span style={{ color: WH_RCOL[up.from] }}>{' ' + whT(whRarityLabel(up.from))}</span>{' → '}<span style={{ color: col }}>{whT(whRarityLabel(up.to))}</span></div>}
+        {ready && <button className="btn btn-primary wh-go wh-up-ok" onClick={onClose}>{up.left > 0 ? window.ppT('Next ticket ({0} left)').replace('{0}', up.left) : 'Nice!'}</button>}
       </div>
-      <div className="wh-up-name">{whCardName(up.name)}</div>
-      <button className="btn btn-primary wh-go" onClick={onClose}>Nice!</button>
+      <canvas ref={fgRef} className="wh-up-cv wh-up-fg" />
     </div>
   );
 }
@@ -912,7 +1017,7 @@ function WhUpgrade({ up, onClose }) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  Reiter
 // ═══════════════════════════════════════════════════════════════════════════
-function WheelShop({ sc, onSc, notify, onPacks }) {
+function WheelShop({ sc, onSc, notify, onPacks, onLock }) {
   const [state, setState] = useState(null);
   const [view, setView] = useState('rarity');          // rarity | gallery | board | play
   const [rarity, setRarity] = useState(null);
@@ -921,7 +1026,8 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
   const [busy, setBusy] = useState(false);
   const [played, setPlayed] = useState(null);          // { id, board, result }
   const [packArt, setPackArt] = useState({ packs: [], golden: [], umbra: [] });
-  const [upgrade, setUpgrade] = useState(null);       // { name, from, to } nach einem Ticket
+  const [upgrade, setUpgrade] = useState(null);       // { name, from, to, left } nach einem Ticket
+  const [galleryKey, setGalleryKey] = useState(0);
   const [pools, setPools] = useState(null);
   const [cos, setCos] = useState({});                // zufällige Beispiele (Avatar/Sleeve/Skin), neu gewürfelt beim Betreten des Boards
   const [tip, setTip] = useState(null);
@@ -935,6 +1041,10 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
       setPackArt(o);
     } });
   }, []);   // eslint-disable-line
+  // Ergebnis-Menü sperren, solange gewonnene Packs ungeöffnet sind (Rad-Knöpfe, andere Shop-Reiter, Shop verlassen)
+  const packsOpen = !!(played && !played.claimed && (played.result.arrows || []).some(a => a.kind === 'booster' || a.kind === 'golden' || a.kind === 'jackpot'));
+  useEffect(() => { if (onLock) onLock(packsOpen); }, [packsOpen]);   // eslint-disable-line
+  useEffect(() => () => { if (onLock) onLock(false); }, []);   // eslint-disable-line
   if (!state) return <div className="wh-hint" style={{ padding: 40 }}>Loading…</div>;
   const art = { samples: state.samples || {}, packs: packArt.packs, golden: packArt.golden, umbra: packArt.umbra, cos };
 
@@ -967,18 +1077,17 @@ function WheelShop({ sc, onSc, notify, onPacks }) {
     const name = Object.keys(cards)[0];
     const r = await window.ppWheelApi.ticket(rarity, name);
     if (!r.ok) { notify((r.data && r.data.error) || whT('Ticket failed'), 'error'); return; }
-    whPlay('ascension', { volume: 0.7 }); whPlay('pull_sparkle', { volume: 0.7 });
-    setUpgrade({ name, from: rarity, to: r.data.to });
+    setUpgrade({ name, from: rarity, to: r.data.to, left: (r.data.tickets || {})[rarity] || 0 });
   };
 
   return (
     <div className="wh-root">
       {view === 'rarity' && <WhRarityPick state={state} onPick={(r) => { setRarity(r); setMode('throw'); setView('gallery'); }} onTicket={(r) => { setRarity(r); setMode('ticket'); setView('gallery'); }} />}
-      {view === 'gallery' && <WhGallery key={rarity + mode} rarity={rarity} mode={mode} notify={notify} onBack={toRarities}
+      {view === 'gallery' && <WhGallery key={rarity + mode + galleryKey} rarity={rarity} mode={mode} tickets={(state.tickets || {})[rarity]} notify={notify} onBack={toRarities}
         onGo={(cards, n) => { if (mode === 'ticket') useTicket(cards); else { setStake({ cards, n }); setCos(whRollCos(pools)); setView('board'); } }} />}
       {view === 'board' && stake && <WhBoardPick rarity={rarity} stakeN={stake.n} state={state} art={art} busy={busy} onBack={() => setView('gallery')} onThrow={throwIt} />}
-      {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} claimed={played.claimed} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
-      {upgrade && <WhUpgrade up={upgrade} onClose={() => { setUpgrade(null); toRarities(); }} />}
+      {view === 'play' && played && <WhPlay key={played.id} rarity={rarity} board={played.board} result={played.result} art={art} claimed={played.claimed} locked={packsOpen} onAgain={toRarities} onMore={toMore} onPacks={openPacks} onTip={setTip} />}
+      {upgrade && <WhUpgrade up={upgrade} onClose={() => { const left = upgrade.left; setUpgrade(null); if (left > 0) { setGalleryKey(k => k + 1); load(); } else toRarities(); }} />}
       <WhTip tip={tip} />
     </div>
   );
