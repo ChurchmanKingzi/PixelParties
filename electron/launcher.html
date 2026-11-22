@@ -84,18 +84,18 @@
 <body>
 <div id="art">
   <img class="bg" src="assets/scene/background.png" alt="">
-  <!-- Rabbit, Explosion und Golem bilden EINE starre Laserkette: die Laserstücke sind vorgeschnitten und müssen an ihren senkrechten Schnittkanten exakt
-       aufeinandertreffen — alle drei teilen denselben Grundversatz (bx -86), nur die winzige Kettenbewegung unterscheidet sie. Nie einzeln verschieben!
-       Reihenfolge hinten → vorn. Der Explosionskern liegt ÜBER Golem und Rabbit: nur so verschwinden die senkrechten Schnittkanten der Laserstücke unter seinen Spitzen
-       (liegt er darunter, steht die Kante als Stufe im Strahl). Die Figur unten links (blonde) liegt über allen anderen linken Figuren -->
+  <!-- Laserkette: Rabbit, Explosion und Golem tragen vorgeschnittene Laserstücke (senkrechte Schnittkanten), die nur in EINER Lage nahtlos aufeinandertreffen:
+       Rabbit und Explosion mit gleichem Versatz, der Golem exakt +111 px (5,781 vw, wie in der Titelkulisse) rechts davon — dort ist der Strahl des Golems
+       (y 339–410) genauso dick wie die Spitze der Explosion. Alle drei teilen den Grundversatz E (-70) und laufen im selben Takt; nie einzeln verschieben!
+       Reihenfolge wie in der Titelkulisse (hinten → vorn); der Ninja (unten links) liegt zuoberst, über Blonde und Engel. -->
   <img class="f" style="--bx:120px;--by:40px;--mx:9px;--my:-15px;--d:2.1s;--n:12" src="assets/scene/hammer.png" alt="">
-  <img class="f" style="--bx:-86px;--by:3px;--mx:-9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/golem.png" alt="">
+  <img class="f core" style="--bx:-70px;--my:4px;--sc:1.021;--d:2.4s;--n:8" src="assets/scene/explosion.png" alt="">
+  <img class="f" style="--bx:41px;--by:3px;--mx:-9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/golem.png" alt="">
   <img class="f" style="--bx:40px;--by:161px;--mx:-11px;--my:-15px;--d:3s;--n:12;--z:-1s" src="assets/scene/horned.png" alt="">
-  <img class="f" style="--bx:-30px;--by:215px;--mx:8px;--my:-14px;--d:2.75s;--n:12;--z:-1.2s" src="assets/scene/ninja.png" alt="">
   <img class="f" style="--bx:-100px;--by:60px;--my:-12px;--d:2.5s;--n:10" src="assets/scene/angel.png" alt="">
-  <img class="f" style="--bx:-86px;--mx:9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/rabbit.png" alt="">
-  <img class="f core" style="--bx:-86px;--my:4px;--sc:1.021;--d:2.4s;--n:8" src="assets/scene/explosion.png" alt="">
-  <img class="f" style="--bx:-86px;--mx:4px;--my:-9px;--d:3.25s;--n:10;--z:-.7s" src="assets/scene/blonde.png" alt="">
+  <img class="f" style="--bx:-70px;--mx:4px;--my:-9px;--d:3.25s;--n:10;--z:-.7s" src="assets/scene/blonde.png" alt="">
+  <img class="f" style="--bx:-70px;--mx:9px;--my:4px;--d:2.4s;--n:8" src="assets/scene/rabbit.png" alt="">
+  <img class="f" style="--bx:-30px;--by:215px;--mx:8px;--my:-14px;--d:2.75s;--n:12;--z:-1.2s" src="assets/scene/ninja.png" alt="">
   <img class="f" style="--mx:36px;--my:-14px;--d:7s;--n:16" src="assets/scene/cat_mid.png" alt="">
   <img class="f" style="--mx:36px;--my:-14px;--d:9s;--n:18;--z:-3s" src="assets/scene/cat_top.png" alt="">
   <img class="f" style="--mx:36px;--my:-14px;--d:7s;--n:16;--z:-2s" src="assets/scene/cat_bottom.png" alt="">
