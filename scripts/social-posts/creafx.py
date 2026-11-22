@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 import gamefx
+from lunafx import flamme
 from capfx import CaptionMixin, GOLD, GOLD_HL
 
 PINK = (255, 150, 210)
@@ -34,13 +35,13 @@ class CreaShow(CaptionMixin):
     SLOT_Y = 1752
     HAND = (110, 1752)
     DECK = (975, 1752)
-    EN = (925, 500)
-    EW, EH = 150, 210
     HERO = (540, 700)
     # Fairies: (Schlüssel, Name, x, Standlinie y, Auftritt)
-    FAIRIES = [('luna', 'LUNA', 115, 740, 1.0), ('tempeste', 'TEMPESTE', 965, 960, 1.8), ('maya', 'MAYA', 115, 1000, 2.6), ('thalia', 'THALIA', 145, 1420, 3.4), ('jenny', 'JENNY', 965, 1430, 4.2)]
+    FAIRIES = [('luna', 'LUNA', 115, 740, 1.0), ('tempeste', 'TEMPESTE', 965, 740, 1.8), ('maya', 'MAYA', 115, 1000, 2.6), ('thalia', 'THALIA', 540, 212, 3.4), ('jenny', 'JENNY', 965, 1000, 4.2)]
     FMS = {'thalia': 80}                                                              # Bildzeit der Sheets (Standard 90 ms)
+    FPXS = {'thalia': 4}                                                              # Pixelgröße je Fairy (Standard FPX)
     FPX = 6
+    HEIGHT = {'luna': 35, 'tempeste': 37, 'maya': 29, 'thalia': 39, 'jenny': 34}              # Sprite-Höhe in Pixeln
     # Runden: Resource Phase, drei Karten (Index in c1…c6), Auswahl des Gegners
     TURNS = [dict(T0=11.8, cards=[0, 1, 2], pick=1, mat=[12.4, 12.8, 13.2], hover=14.4, t_pick=16.4, t_fly=17.0, t_gone=17.6, t_lock=18.0),
              dict(T0=19.0, cards=[3, 4, 5], pick=1, mat=[19.4, 19.7, 20.0], hover=20.5, t_pick=21.6, t_fly=22.0, t_gone=22.6, t_lock=23.0)]
@@ -76,7 +77,6 @@ class CreaShow(CaptionMixin):
         ld = lambda n: Image.open('%s/%s.png' % (base, n)).convert('RGBA')
         self.faces = [ld('c%d' % (i + 1)).resize((self.CW, self.CH), Image.BOX) for i in range(6)]
         self.smalls = [ld('c%d' % (i + 1)).resize(self.SMALL, Image.BOX) for i in range(6)]
-        self.enemy = ld('enemy').resize((self.EW, self.EH), Image.BOX)
         self.back = None
         for t in self.TURNS:
             t['land'] = t['t_fly'] + 0.5
@@ -182,11 +182,11 @@ class CreaShow(CaptionMixin):
     # ───────── Fairies ─────────
     def _draw_fairies(self, canvas, d, t):
         m = gamefx.Cells(canvas, self.ox, self.oy, self.gp)
-        px = self.FPX
         U = self.U
         for j, (key, name, x, foot, t0) in enumerate(self.FAIRIES):
             if t < t0:
                 continue
+            px = self.FPXS.get(key, self.FPX)
             tau = t - t0
             self._beam(canvas, m, x, foot, foot - 420, tau, 4, 50 + j)
             if tau < 0.35:
@@ -200,6 +200,8 @@ class CreaShow(CaptionMixin):
             if u < 1:
                 im = self._dissolve(im, 1.0 - u, ('fa', key, idx % 48, int(u * 16)))
             canvas.paste(im, (x0, y0), im)
+            if tau > 0.6:
+                self._fairy_fx(d, key, x, foot, t - t0 - 0.6)
             if tau > 0.8:
                 self.draw_text(canvas, name, 3, (max(110, min(950, x)), foot + 28), color=CREAM, outline=None, shadow=(60, 20, 80))
         # Herzen beim Gebot „Habt Freude am Leben“
@@ -210,13 +212,99 @@ class CreaShow(CaptionMixin):
                     u = (t - ts) / 1.4
                     if 0 <= u < 1:
                         hx = x + 40 * math.sin(u * 5 + j + k) + (k % 2) * 36 - 18
-                        hy = foot - 230 - 170 * u
+                        hy = foot - self.HEIGHT[key] * self.FPXS.get(key, self.FPX) - 20 - 150 * u
                         if u > 0.7 and int(t * 20) % 2:
                             continue
                         for jj, row in enumerate(HEART):
                             for ii, ch in enumerate(row):
                                 if ch == 'r':
                                     self.pix_rect(d, hx + (ii - 3) * 6, hy + (jj - 3) * 6, hx + (ii - 3) * 6 + 5, hy + (jj - 3) * 6 + 5, PINK if (ii + jj) % 3 else (255, 220, 240))
+
+
+    # ───────── Attribute der Fairies als Partikel (Zelle = Pixel des jeweiligen Sprites) ─────────
+    class _Cells:
+        """Malt Zellen der Kantenlänge px direkt auf die Leinwand; Deckung < 1 als Bayer-Dither (kein Alpha)."""
+
+        def __init__(self, d, px):
+            self.d, self.px = d, px
+
+        def put(self, x, y, c, a=1.0):
+            X, Y = int(round(x)), int(round(y))
+            if a <= 0 or (a < 1 and gamefx.bayer(X, Y) >= a):
+                return
+            p = self.px
+            self.d.rectangle([X * p, Y * p, (X + 1) * p - 1, (Y + 1) * p - 1], fill=tuple(c) + (255,))
+
+    NOTE = ['..XXX', '..X..', '..X..', '..X..', 'XXX..', 'XXX..']
+    LEAF = [['.G.', 'GGG', '.G.'], ['GG.', '.GG', '..G'], ['.G.', '.G.', 'GGG']]
+
+    def _fairy_fx(self, d, key, x, foot, tau):
+        px = self.FPXS.get(key, self.FPX)
+        c = self._Cells(d, px)
+        cx, fy = x / float(px), foot / float(px)
+        t = tau
+        if key == 'luna':                                                             # Flammen
+            for k, (dx, dy, B, Hh) in enumerate([(-13, -2, 6, 14), (13, -5, 6, 15), (-12, -16, 5, 12), (12, -20, 5, 11), (-6, -30, 5, 11), (7, -33, 5, 10), (0, 3, 5, 9)]):
+                h = Hh * (0.8 + 0.4 * math.sin(t * 9 + k * 1.7))
+                flamme(c, cx + dx, fy + dy, B, h, 1.0, k * 1.3)
+            for k in range(14):
+                u = (t * 0.9 + k * 0.071) % 1.0
+                col = [(255, 150, 40), (255, 220, 100), (255, 90, 40)][k % 3]
+                ex, ey = cx + (gamefx.H(7, k) - 0.5) * 36, fy - 4 - u * 46
+                c.put(ex, ey, col, 1 - u); c.put(ex + 1, ey, col, 1 - u)
+        elif key == 'tempeste':                                                       # Regentropfen
+            for k in range(34):
+                sx = cx + (gamefx.H(11, k) - 0.5) * 44
+                u = (t * 0.95 + gamefx.H(12, k)) % 1.0
+                y = fy - 56 + u * 56
+                col = (130, 200, 255) if k % 2 else (210, 240, 255)
+                for q in range(3):
+                    c.put(sx, y + q, col, 1.0)
+                if u > 0.9:                                                           # Aufprall: kleine Spritzer
+                    c.put(sx - 1, fy, col, 1.0); c.put(sx + 1, fy, col, 1.0); c.put(sx - 2, fy - 1, col, 1.0); c.put(sx + 2, fy - 1, col, 1.0)
+        elif key == 'maya':                                                           # Blätter
+            for k in range(14):
+                a = t * 1.3 + k * 0.45
+                r = 16 + 5 * math.sin(t * 0.9 + k)
+                lx = cx + math.cos(a) * r
+                ly = fy - 16 + math.sin(a) * r * 0.5 - ((t * 2.5 + k * 3) % 20) + 10
+                shape = self.LEAF[int(t * 5 + k) % 3]
+                col = (120, 205, 80) if k % 2 else (50, 140, 60)
+                for jj, row in enumerate(shape):
+                    for ii, ch in enumerate(row):
+                        if ch == 'G':
+                            for (qa, qb) in ((0, 0), (1, 0), (0, 1), (1, 1)):         # Blatt doppelt so groß
+                                c.put(lx + ii * 2 + qa - 2, ly + jj * 2 + qb - 2, col, 1.0)
+        elif key == 'thalia':                                                         # Feuerwerk
+            for b, (bx, per, ph) in enumerate([(-34, 1.5, 0.0), (34, 1.5, 0.5), (0, 1.5, 1.0)]):
+                tt = (t + ph) % per
+                cyc = int((t + ph) // per)
+                col = [(255, 120, 190), (255, 230, 90), (110, 220, 255), (170, 255, 140)][(cyc + b) % 4]
+                top = fy - 20 - (b % 2) * 8
+                if tt < 0.3:                                                          # Rakete
+                    u = tt / 0.3
+                    yy = fy - 4 - u * (fy - 4 - top)
+                    for q in range(4):
+                        c.put(cx + bx, yy + q, (255, 255, 255) if q == 0 else col, 1.0 - q * 0.22)
+                elif tt < 1.1:
+                    u = (tt - 0.3) / 0.8
+                    for k in range(18):
+                        ang = k * 2 * math.pi / 18 + (cyc % 3) * 0.2
+                        r = 2 + u * 15
+                        px_, py_ = cx + bx + math.cos(ang) * r, top + math.sin(ang) * r + u * 4
+                        cc = col if k % 2 else (255, 255, 255)
+                        c.put(px_, py_, cc, 1 - u * 0.8); c.put(px_ + 1, py_, cc, 1 - u * 0.8)
+        elif key == 'jenny':                                                          # Musiknoten
+            for k in range(6):
+                u = (t * 0.4 + k * 0.17) % 1.0
+                nx = cx + (k - 2.5) * 6 + 4 * math.sin(t * 3 + k)
+                ny = fy - 22 - u * 36
+                col = [(255, 150, 210), (255, 230, 120), (130, 220, 255), (190, 160, 255), (255, 255, 255), (170, 255, 140)][k]
+                for jj, row in enumerate(self.NOTE):
+                    for ii, ch in enumerate(row):
+                        if ch == 'X':
+                            for (qa, qb) in ((0, 0), (1, 0), (0, 1), (1, 1)):         # Noten doppelt so groß
+                                c.put(nx + ii * 2 + qa - 4, ny + jj * 2 + qb - 6, col, 1 - u * 0.6)
 
     # ───────── Runden: Materialisieren, Wahl des Gegners ─────────
     def _small(self):
@@ -318,7 +406,7 @@ class CreaShow(CaptionMixin):
                 if t >= T['t_pick']:
                     self.draw_text(canvas, 'CHOSEN', 4, (self.SLOT_X[T['pick']], self.SLOT_Y - 150), color=GOLD_HL, outline=None, shadow=(60, 30, 0))
                 else:
-                    self.draw_text(canvas, 'CHOOSING...', 3, (self.EN[0] - 10, self.EN[1] + 128), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
+                    self.draw_text(canvas, 'OPPONENT CHOOSES...', 4, (540, 1580), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
         # Ring um die Heldin bei jeder Landung
         for T in self.TURNS:
             tau = t - T['t_lock']
@@ -328,13 +416,6 @@ class CreaShow(CaptionMixin):
                     r = gamefx.rd(gamefx.ease(max(0.0, tau - 0.08 * i) / 0.8) * 17)
                     if r > 0:
                         gr.ring(c[0], c[1], max(0, r - 2), r, col, 1.0)
-
-    # ───────── Gegner ─────────
-    def _draw_enemy(self, canvas, d, t):
-        if t < self.TURNS[0]['T0']:
-            return
-        self._card_at(canvas, self.enemy, *self.EN)
-        self.draw_text(canvas, 'OPPONENT', 3, (self.EN[0], self.EN[1] - 122), color=(255, 140, 140), outline=None, shadow=(20, 10, 30))
 
     # ───────── Zähler ─────────
     def _draw_hud(self, canvas, d, t):
@@ -350,7 +431,6 @@ class CreaShow(CaptionMixin):
         d = ImageDraw.Draw(canvas)
         self._draw_fairies(canvas, d, t)
         d = ImageDraw.Draw(canvas)
-        self._draw_enemy(canvas, d, t)
         self._draw_turns(canvas, ImageDraw.Draw(canvas), t)
         self._draw_hud(canvas, ImageDraw.Draw(canvas), t)
         self._draw_caption(canvas, ImageDraw.Draw(canvas), t)

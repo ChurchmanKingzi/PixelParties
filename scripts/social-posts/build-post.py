@@ -749,7 +749,7 @@ def main():
             fspr = {}
             for k_, sl_ in FSL.items():
                 fspr[k_] = Sprite(sl_)
-                fspr[k_].px = creafx.CreaShow.FPX
+                fspr[k_].px = creafx.CreaShow.FPXS.get(k_, creafx.CreaShow.FPX)
             _fc = {}
             def fairy_fn(key_, idx_):
                 s_ = fspr[key_]
