@@ -379,6 +379,7 @@ function createWindow(withLauncher = false) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required', // Startseiten-Musik ohne vorherigen Klick
     },
   });
 

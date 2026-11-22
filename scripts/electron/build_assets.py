@@ -7,6 +7,7 @@ Ausgabe (electron/assets/):
   vignette.png    Dither-Rand (nur harte Alpha-Werte 0/255, Bayer 4x4) – dunkelt Ränder und Unterkante der Kulisse für die Bedienung
   scene/*.png     Ebenen der Titelkulisse (data/animated_screen/layers2) für die animierte Startseite
   fonts/PixelIntv.otf  Pixelschrift des Spiels
+  music/title.ogg  Titelmusik (= public/music/bgm_login.ogg)
 Alles Selbstgezeichnete rastet auf die Spiel-Palette (data/palette.json). Keine Weichzeichnung.
 """
 import os, shutil, sys
@@ -52,5 +53,7 @@ Image.fromarray(v, 'RGBA').save(os.path.join(OUT, 'vignette.png'))
 # ── Kulisse + Schrift ──
 for f in ('background', 'angel', 'blonde', 'golem', 'horned', 'ninja', 'rabbit', 'explosion', 'hammer', 'cat_bottom', 'cat_mid', 'cat_top'):
     shutil.copy(os.path.join(ROOT, 'data', 'animated_screen', 'layers2', f + '.png'), os.path.join(OUT, 'scene', f + '.png'))
+os.makedirs(os.path.join(OUT, 'music'), exist_ok=True)
+shutil.copy(os.path.join(ROOT, 'public', 'music', 'bgm_login.ogg'), os.path.join(OUT, 'music', 'title.ogg'))  # dieselbe Musik wie der Login-Bildschirm des Spiels
 shutil.copy(os.path.join(ROOT, 'data', 'Pixel Intv.otf'), os.path.join(OUT, 'fonts', 'PixelIntv.otf'))
 print('ok')

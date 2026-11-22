@@ -37,8 +37,6 @@
   .ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: calc(var(--u) * 1.4) calc(var(--u) * 2) calc(var(--u) * 1.4); }
   #logo { width: min(62vw, calc(var(--u) * 58)); margin-top: calc(var(--u) * .6); animation: bob 2.4s steps(4) infinite alternate; filter: drop-shadow(0 calc(var(--px) * 2) 0 #08060c); }
   @keyframes bob { from { transform: translateY(0); } to { transform: translateY(calc(var(--px) * -2)); } }
-  .tag { margin-top: calc(var(--u) * .9); font-size: calc(var(--u) * .95); letter-spacing: .16em; color: #ffffff; background: #12101f; padding: calc(var(--u) * .4) calc(var(--u) * 1.1); text-align: center;
-    box-shadow: 0 0 0 var(--px) #08060c, 0 0 0 calc(var(--px) * 2) #fad54a; }
   .mid { flex: 1; }
   .bottom { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: calc(var(--u) * 1.4); }
   .col { display: flex; flex-direction: column; gap: calc(var(--u) * .7); }
@@ -105,7 +103,6 @@
 <div class="ui">
   <div style="display:flex;flex-direction:column;align-items:center">
     <img id="logo" src="assets/logo.png" alt="Pixel Parties">
-    <div class="tag">COLLECT · BUILD · DUEL</div>
   </div>
   <div class="mid"></div>
   <div class="bottom">
@@ -118,7 +115,8 @@
       <div class="row">
         <button class="btn" id="b-discord" hidden>DISCORD</button>
         <button class="btn" id="b-itch" hidden>ITCH.IO</button>
-        <button class="btn" id="b-web" hidden>WEBSITE</button>
+        <button class="btn" id="b-web" hidden>IN BROWSER</button>
+        <button class="btn" id="b-music">MUSIC: ON</button>
         <button class="btn" id="b-full">FULLSCREEN</button>
         <button class="btn" id="b-quit">QUIT</button>
       </div>
@@ -129,6 +127,7 @@
   </div>
 </div>
 
+<audio id="bgm" src="assets/music/title.ogg" loop preload="auto"></audio>
 <div id="go"><div class="t">CONNECTING</div><div class="bar"><i></i></div><div class="s" id="gos">Entering the Pixel Parties…</div></div>
 
 <script>
@@ -190,6 +189,19 @@
     setTimeout(poll, r.state === 'ok' ? 20000 : 4000);
   };
   poll();
+
+  // ── Musik (Titelmusik des Spiels); Wahl „aus“ bleibt gespeichert ──
+  const bgm = $('bgm'); bgm.volume = 0.55;
+  let muted = false; try { muted = localStorage.getItem('ppLauncherMuted') === '1'; } catch {}
+  const showMusic = () => { $('b-music').textContent = muted ? 'MUSIC: OFF' : 'MUSIC: ON'; };
+  const startMusic = () => { if (!muted) bgm.play().catch(() => {}); };
+  showMusic(); startMusic();
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (bgm.paused) startMusic(); }, { once: false });
+  $('b-music').onclick = () => {
+    muted = !muted; try { localStorage.setItem('ppLauncherMuted', muted ? '1' : '0'); } catch {}
+    if (muted) bgm.pause(); else startMusic();
+    showMusic();
+  };
 
   // ── Knöpfe ──
   let going = false;
