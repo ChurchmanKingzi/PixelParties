@@ -499,8 +499,6 @@ class FireShow(CaptionMixin):
         self.draw_text(canvas, str(n), 9, (105, 140), color=(255, 255, 255) if hot else GOLD, outline=None, shadow=(60, 30, 0))
         self.draw_text(canvas, 'BURNED', 3, (940, 74), color=(255, 255, 255), outline=None, shadow=(20, 10, 30))
         self.draw_text(canvas, str(self.n_burned(t)), 9, (950, 140), color=FIRE_T, outline=None, shadow=(80, 20, 0))
-        if self.t_win <= t < self.t_win + 2.8 and int(t * 6) % 2 == 0:
-            self.draw_text(canvas, 'BURN ENGINE', 6, (540, 1000), color=GOLD_HL, outline=(20, 10, 30), shadow=None)
 
     def draw_front(self, canvas, f):
         t = f / float(self.fps)
@@ -572,8 +570,4 @@ class FireShow(CaptionMixin):
         for tt in self.TT:
             add(tt, 'tick')
         add(self.TT[0] + 0.1, 'melt')
-        a, b = self.t_win, self.t_win + 2.8
-        for k in range(int(math.floor(a * 6)), int(math.ceil(b * 6)) + 1):
-            if k % 2 == 0 and max(a, k / 6.0) < b:
-                add(max(a, k / 6.0), 'ping')
         return sorted(ev)
