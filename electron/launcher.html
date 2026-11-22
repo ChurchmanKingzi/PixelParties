@@ -47,12 +47,7 @@
   .pl { position: absolute; display: flex; align-items: center; justify-content: center; padding-top: calc(var(--px) * 1); font-size: calc(var(--u) * 3.9); letter-spacing: .28em; text-indent: .28em; color: #ffffff; pointer-events: none;
     text-shadow: calc(var(--px) * -1) calc(var(--px) * -1) 0 #08060c, 0 calc(var(--px) * -1) 0 #08060c, var(--px) calc(var(--px) * -1) 0 #08060c, calc(var(--px) * -1) 0 0 #08060c, var(--px) 0 0 #08060c,
       calc(var(--px) * -1) var(--px) 0 #08060c, 0 var(--px) 0 #08060c, var(--px) var(--px) 0 #08060c, 0 calc(var(--px) * 2) 0 #08060c, var(--px) calc(var(--px) * 2) 0 #08060c, calc(var(--px) * -1) calc(var(--px) * 2) 0 #08060c,
-      0 calc(var(--px) * 3) 0 #4e77ca; }
-  #play:hover .pl { color: #b3d8f9; }
-  .spk { position: absolute; animation: tw 2.1s steps(1) infinite; } .spk svg { display: block; }
-  @keyframes tw { 0% { visibility: visible; } 45% { visibility: hidden; } 55% { visibility: visible; } 70% { visibility: hidden; } }
-  .spk.a { left: calc(var(--px) * 4); top: calc(var(--px) * 6); } .spk.b { right: calc(var(--px) * 4); top: calc(var(--px) * 2); animation-delay: -.7s; }
-  .spk.c { right: calc(var(--px) * 10); bottom: calc(var(--px) * -1); animation-delay: -1.3s; } .spk.d { left: calc(var(--px) * 10); bottom: calc(var(--px) * -2); animation-delay: -.3s; }
+      0 calc(var(--px) * 3) 0 #08060c; }
 
   /* Discord-Knopf oben rechts (wie im Hauptmenü: Discord-Blau, Pixel-Logo) */
   #discord { z-index: 5; position: fixed; right: calc(var(--u) * 1.4); top: calc(var(--u) * 1.3); appearance: none; border: 0; cursor: pointer; background: #3866f0; padding: calc(var(--px) * 4) calc(var(--px) * 6);
@@ -119,7 +114,6 @@
     <div class="center">
       <div class="playwrap">
         <button id="play"><canvas id="playcv"></canvas><span class="pl">PLAY</span></button>
-        <span class="spk a" data-sprite="star"></span><span class="spk b" data-sprite="star"></span><span class="spk c" data-sprite="star"></span><span class="spk d" data-sprite="star"></span>
       </div>
       <div class="row">
         <button class="btn" id="b-web" hidden>IN BROWSER</button>
@@ -179,7 +173,6 @@
     discord: { c: { '#': '#ffffff' }, z: 2, r: ['...##..........##...', '..#####......#####..', '..################..', '.##################.', '.##################.', '.######.####.######.', '######...##...######', '######...##...######', '######...##...######', '#######.####.#######', '####################', '.##################.', '.#######....#######.', '..####........####..', '...##..........##...'] },
     chev: { c: { '#': '#12101f' }, z: 2, n: 2, r: ['##.....', '###....', '.###...', '..###..', '...###.', '..###..', '.###...', '###....', '##.....'] },
     gem: { c: { o: '#08060c', r: '#fe5154', '+': '#ffffff' }, z: 2, r: ['..ooo..', '.orrro.', 'orr+rro', 'orrrrro', '.orrro.', '..ooo..'] },
-    star: { c: { '#': '#ffffff', o: '#66b6ff' }, z: 2, r: ['...#...', '...#...', '..#o#..', '###o###', '..#o#..', '...#...', '...#...'] },
   };
   const sprite = (k, cell) => {
     const d = SPR[k], w = d.r[0].length, h = d.r.length, paths = {};
@@ -189,117 +182,69 @@
   };
   for (const el of document.querySelectorAll('[data-sprite]')) el.innerHTML = sprite(el.getAttribute('data-sprite'));
 
-  // ── PLAY-Taste: Zelle für Zelle gemalt (Zelle = --px) ──
+  // ── PLAY-Taste: wie das Banner ein schlichtes Band — gemalt Zelle für Zelle (Zelle = --px): schwarzer Rand, blaue Fassung, weiße Fläche mit Dither nach Eisblau,
+  //    Schwalbenschwanz-Enden dahinter. Farben exakt die des Banners (assets/logo.png). Hover: mehr Blau in der Fläche. ──
   const playCv = $('playcv'), playBtn = $('play'), playTxt = playBtn.querySelector('.pl');
   const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-  const C = { out: rgb('#08060c'), gL: rgb('#ffffff'), g: rgb('#b3d8f9'), gD: rgb('#66b6ff'), gDD: rgb('#4e77ca'),     // Fassung in den Farben des Banners (assets/logo.png)
-    pl: ['#b3d8f9', '#66b6ff', '#4e77ca', '#4e77ca', '#02398c'].map(rgb),
-    em: ['#ffffff', '#b3d8f9', '#66b6ff', '#4e77ca', '#02398c'].map(rgb),
-    rub: ['#ffffff', '#b3d8f9', '#66b6ff', '#4e77ca', '#02398c'].map(rgb) };
+  const K = { out: rgb('#08060c'), w: rgb('#ffffff'), ice: rgb('#b3d8f9'), lt: rgb('#66b6ff'), md: rgb('#4e77ca'), dk: rgb('#02398c') };
   const BAY = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
-  let pa = null;
+  let pa = null, hov = false;
   const buildPlay = () => {
-    const px = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--px'), 10) || 3;
-    const u = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--u'), 10) || 16;
-    const bw = Math.round(u * 26 / px), bh = Math.round(u * 6.6 / px), Ml = 24, Mr = 24, Mt = 12, Mb = 6;
-    const W = bw + Ml + Mr, H = bh + Mt + Mb, cham = Math.round(bh * 0.4), half = bh / 2;
+    const css = (n, d) => parseInt(getComputedStyle(document.documentElement).getPropertyValue(n), 10) || d;
+    const px = css('--px', 3), u = css('--u', 16);
+    const bw = Math.round(u * 19 / px), bh = Math.round(u * 5.6 / px), tw = Math.round(bh * 0.7), th = Math.round(bh * 0.72), drop = Math.round(bh * 0.14);
+    const Ml = tw + 3, Mr = tw + 3, Mt = 3, Mb = drop + 3, W = bw + Ml + Mr, H = bh + Mt + Mb, half = bh / 2;
     playCv.width = W; playCv.height = H; playCv.style.width = W * px + 'px'; playCv.style.height = H * px + 'px';
     Object.assign(playTxt.style, { left: Ml * px + 'px', right: Mr * px + 'px', top: Mt * px + 'px', bottom: Mb * px + 'px' });
-    const base = new Uint8ClampedArray(W * H * 4), plate = new Int16Array(W * H).fill(-1);
-    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = 255; plate[y * W + x] = -1; };
-    // Platte + Fassung
+    const base = new Uint8ClampedArray(W * H * 4), pt = new Float32Array(W * H).fill(-1);
+    const put = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = 255; pt[y * W + x] = -1; };
+    // Enden (hinter dem Band): Rechteck mit V-Kerbe außen, Falte (dunkel, Dither) zum Band hin
+    const ty0 = Mt + Math.round((bh - th) / 2) + drop, nd = Math.round(th * 0.42), mid = ty0 + (th - 1) / 2;
+    for (const side of [-1, 1]) for (let e = 0; e < tw + 3; e++) for (let k = 0; k < th; k++) {
+      const x = side < 0 ? Ml - tw - 1 + e : Ml + bw + tw - 1 - e, y = ty0 + k;
+      if (Math.abs(y - mid) <= nd - e - 1) continue;                                      // V-Kerbe
+      const fold = tw + 2 - e;                                                           // Abstand zum Band
+      let c = k === 0 ? K.lt : k === th - 1 ? K.dk : K.md;
+      if (fold < 5 && (fold < 2 || BAY[y & 3][x & 3] / 16 < (5 - fold) / 5)) c = K.dk;
+      put(x, y, c);
+    }
+    // Band
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
-      const dx = Math.min(x, bw - 1 - x), dy = Math.min(y, bh - 1 - y), dg = dx + dy - cham;
-      if (dg < 0) continue;
-      const dd = Math.floor(dg * 0.7071), depth = Math.min(dx, dy, dd);
-      // Kante, die die Tiefe bestimmt → hell (oben/links), dunkel (unten/rechts), mittel (Schrägen oben rechts/unten links)
-      let tone = 0;
-      if (depth === dy && dy <= dx) tone = y < half ? 1 : -1;
-      else if (depth === dx) tone = x < bw / 2 ? 1 : -1;
-      else tone = (x < bw / 2) === (y < half) ? (x < bw / 2 ? 1 : -1) : 0;
+      const dx = Math.min(x, bw - 1 - x), dy = Math.min(y, bh - 1 - y);
+      if (dx + dy < 2 && dx === 0 && dy === 0) continue;                                   // Ecke leicht gekappt
+      const depth = Math.min(dx, dy), lit = dy <= dx ? y < half : x < bw / 2;
       let c;
-      if (depth === 0) c = C.out;
-      else if (depth <= 5) {
-        c = tone > 0 ? [C.gL, C.gL, C.g, C.g, C.gD][depth - 1] : tone < 0 ? [C.g, C.gD, C.gD, C.gD, C.gDD][depth - 1] : [C.g, C.g, C.g, C.g, C.gD][depth - 1];
-        if (depth === 3 && ((x + y) & 3) === 0) c = tone > 0 ? C.gD : C.gDD;            // eingravierte Punktreihe
-      }
-      else if (depth === 6) c = C.out;
-      else if (depth === 7) c = tone > 0 ? C.pl[4] : tone < 0 ? C.pl[0] : C.pl[3];
-      else {
-        const t = y / bh, tt = t < 0.46 ? t * 0.55 : 0.28 + (t - 0.46) * 1.33;       // glänzende obere Hälfte, harter Glanzrand
-        const idx = Math.max(0, Math.min(4, Math.floor(tt * 4 + BAY[y & 3][x & 3] / 16 * 0.95)));
-        c = C.pl[idx]; plate[(y + Mt) * W + x + Ml] = idx;
-      }
+      if (depth === 0) c = K.out;
+      else if (depth === 1) c = lit ? K.lt : K.md;
+      else if (depth === 2) c = lit ? K.md : K.dk;
+      else if (depth === 3) c = K.out;
+      else { pt[(y + Mt) * W + x + Ml] = Math.max(0, (y - bh * 0.42) / (bh * 0.55)); continue; }
       put(x + Ml, y + Mt, c);
     }
-    // Nieten (2x2)
-    for (const fx of [0.13, 0.27, 0.73, 0.87]) for (const top of [true, false]) {
-      const x = Ml + Math.round(bw * fx), y = top ? Mt + 2 : Mt + bh - 4;
-      put(x, y, C.gL); put(x + 1, y, C.gD); put(x, y + 1, C.gD); put(x + 1, y + 1, C.gDD);
-    }
-    // Flügelklingen an beiden Spitzen: je eine gerade und zwei schräge, verjüngt, mit Rand und Kantenlicht
-    const fin = (x0, y0, dir, slope, len, th0) => {
-      for (let t = 0; t <= len; t++) {
-        const th = Math.max(2, Math.round(th0 * (1 - 0.7 * t / len))), cy = Math.round(y0 + slope * t), cx = x0 + dir * t;
-        const top = cy - Math.floor(th / 2), bot = top + th - 1;
-        for (let yy = top; yy <= bot; yy++) put(cx, yy, yy === top ? C.gL : yy === bot ? C.gD : C.g);
-      }
-    };
-    const ty = Mt + Math.round(half);
-    for (const [x0, dir] of [[Ml + 3, -1], [Ml + bw - 4, 1]]) {
-      fin(x0, ty, dir, 0, 19, 11); fin(x0, ty - 4, dir, -0.45, 16, 8); fin(x0, ty + 4, dir, 0.45, 16, 8);
-      fin(x0 - dir * 2, ty - 7, dir, -0.95, 11, 6); fin(x0 - dir * 2, ty + 7, dir, 0.95, 11, 6);
-    }
-    // Edelsteine: Kreis(R) → Fassung, innen Facetten
-    const gem = (cx, cy, R, rub = C.rub) => {
-      for (let gy = -R - 1; gy <= R + 1; gy++) for (let gx = -R - 1; gx <= R + 1; gx++) {
-        const d = Math.sqrt(gx * gx + gy * gy);
-        if (d > R + 1) continue;
-        let c;
-        if (d > R) c = C.out;
-        else if (d > R - 2) c = (gx + gy < 0) ? C.gL : (gx + gy > R * 0.6 ? C.gDD : C.g);
-        else if (d > R - 3) c = C.out;
-        else { const v = (-gx - gy) / (R - 3 || 1); c = v > 0.75 ? rub[1] : v > 0.1 ? rub[2] : v > -0.6 ? rub[3] : rub[4]; if (gx < 0 && gy < 0 && gx + gy > -(R - 1) && gx + gy < -1 && gx >= -2 && gy >= -2) c = rub[0]; }
-        put(cx + gx, cy + gy, c);
-      }
-    };
-    gem(Ml + Math.round(bw / 2), Mt + 1, 9);
-    for (const fx of [0.3, 0.7]) gem(Ml + Math.round(bw * fx), Mt + 2, 5, C.em);
-    gem(Ml + 6, Mt + Math.round(half), 5); gem(Ml + bw - 7, Mt + Math.round(half), 5);
-    // Rand um ALLES, was an leere Zellen grenzt (Flügel, Fassungen, Spitzen); vorhandene Ränder bleiben einfach
+    // Rand um die Enden (Band hat seinen eigenen)
     const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && base[(y * W + x) * 4 + 3] > 0;
     const edge = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (solid(x, y)) continue;
-      for (let dy = -1; dy <= 1 && edge.indexOf(y * W + x) < 0; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (!solid(x + dx, y + dy)) continue;
-        const i = ((y + dy) * W + x + dx) * 4;
-        if (!(base[i] === C.out[0] && base[i + 1] === C.out[1] && base[i + 2] === C.out[2])) { edge.push(y * W + x); break; }
-      }
+      for (let dy = -1; dy <= 1; dy++) { let hit = false; for (let dx = -1; dx <= 1; dx++) if (solid(x + dx, y + dy)) { hit = true; break; } if (hit) { edge.push(y * W + x); break; } }
     }
-    for (const k of edge) put(k % W, Math.floor(k / W), C.out);
-    pa = { W, H, base, plate, Ml, Mt, bw, bh, ctx: playCv.getContext('2d'), img: new ImageData(W, H), cx: Ml + Math.round(bw / 2), cy: Mt + 1 };
+    for (const k of edge) put(k % W, Math.floor(k / W), K.out);
+    pa = { W, H, base, pt, img: new ImageData(W, H), ctx: playCv.getContext('2d') };
   };
-  const frameT0 = performance.now(); let hov = false, shineT = 0;
-  playBtn.addEventListener('mouseenter', () => { hov = true; }); playBtn.addEventListener('mouseleave', () => { hov = false; });
   const drawPlay = () => {
     if (!pa) return;
-    const { W, H, base, plate, img, ctx } = pa, d = img.data; d.set(base);
-    const t = (performance.now() - frameT0) / 1000, tot = W + H + 50, ph = ((t * (hov ? 70 : 38)) % (tot + (hov ? 20 : 60))) - 20;
+    const { W, H, base, pt, img, ctx } = pa, d = img.data; d.set(base);
+    const ramp = [K.w, K.ice, K.lt];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const k = plate[y * W + x]; if (k < 0) continue;
-      let idx = k;
-      const e = (x + y * 0.8) - ph; if (e > 0 && e < 7) idx = Math.max(0, idx - (e < 3 ? 3 : 2));
-      else if (hov) idx = Math.max(0, idx - 1);
-      const c = C.pl[idx], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+      const t = pt[y * W + x]; if (t < 0) continue;
+      const idx = Math.max(0, Math.min(2, Math.floor((t + (hov ? 0.45 : 0)) * 2.2 + BAY[y & 3][x & 3] / 16 * 0.95)));
+      const c = ramp[idx], i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
     }
-    // Funkeln im Rubin: Kreuz aus weißen Punkten, wechselnd
-    const f = Math.floor(t * (hov ? 4 : 1.6)) % 4;
-    if (f === 0) for (const [dx, dy] of [[-3, -3], [-3, -2], [-2, -3], [-4, -3], [-3, -4], [-2, -2]]) { const i = ((pa.cy + dy) * W + pa.cx + dx) * 4; d[i] = d[i + 1] = d[i + 2] = 255; }
     ctx.putImageData(img, 0, 0);
   };
+  playBtn.addEventListener('mouseenter', () => { hov = true; drawPlay(); }); playBtn.addEventListener('mouseleave', () => { hov = false; drawPlay(); });
   const rebuild = () => { buildPlay(); drawPlay(); };
-  addEventListener('resize', rebuild); rebuild(); setInterval(drawPlay, 66);
+  addEventListener('resize', rebuild); rebuild();
 
   // ── Inhalt ──
   let cfg = { links: {} };
