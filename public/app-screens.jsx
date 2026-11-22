@@ -4556,6 +4556,7 @@ function ShopScreen() {
   // Boosterpacks (app-booster.jsx): Katalog aus GET /api/boosters, offenes (gekauftes, noch nicht eingefordertes) Pack aus GET /api/boosters/pending
   const [boosters, setBoosters] = useState(null);      // { price, packs: [{ id, name, tagline, variants }] }
   const wheelClaimRef = useRef(null);
+  const [wheelLock, setWheelLock] = useState(false);   // Glücksrad-Ergebnis mit ungeöffneten Packs: Shop kann nicht verlassen/gewechselt werden
   const [pendingPacks, setPendingPacks] = useState(null); // [{ id, packId, variantId, cards: [{ name, rarity }], sold }] (alle offenen Packs, Kaufreihenfolge) | null
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -5348,7 +5349,7 @@ function ShopScreen() {
       )}
       {randomReveal && <ShopPullReveal reveal={randomReveal} fast={fastPull} onToggleFast={() => setFastPull(v => !v)} onClose={() => { flushPull(); setRandomReveal(null); }} />}
       <div className="top-bar">
-        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" disabled={wheelLock} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
         <div className="badge" style={{ background: 'rgba(250,213,74,.12)', color: '#fad54a', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
@@ -5358,7 +5359,7 @@ function ShopScreen() {
       </div>
       <div className="shop-tabs">
         {tabs.map(t => (
-          <button key={t.id} className={'shop-tab' + (tab === t.id ? ' shop-tab-active' : '')} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={'shop-tab' + (tab === t.id ? ' shop-tab-active' : '') + (wheelLock && tab !== t.id ? ' shop-tab-off' : '')} disabled={wheelLock && tab !== t.id} onClick={() => { if (!wheelLock) setTab(t.id); }}>
             {t.label} <span className="shop-tab-count">{t.count}</span>
           </button>
         ))}
@@ -5369,7 +5370,7 @@ function ShopScreen() {
         {tab === 'sleeves' && renderGachaPage('sleeve')}
         {tab === 'boosters' && window.BoosterShop && <window.BoosterShop boosters={boosters} sc={user.sc || 0} busy={buying || !!pendingPacks} onBuy={buyBooster}
           onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} />}
-        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list, cb) => { wheelClaimRef.current = cb || null; setPendingPacks(list); }} />}
+        {tab === 'wheel' && window.WheelShop && <window.WheelShop sc={user.sc || 0} onSc={(n) => setUser(u => ({ ...u, sc: n }))} notify={notify} onPacks={(list, cb) => { wheelClaimRef.current = cb || null; setPendingPacks(list); }} onLock={setWheelLock} />}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
         {tab === 'structures' && renderStructureDecks()}
       </div>

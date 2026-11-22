@@ -168,7 +168,9 @@ module.exports = function registerWheel(d) {
       const cards = [];
       for (const name of Object.keys(owned)) {
         const total = owned[name][rarity] || 0;
-        if (total > 0) cards.push({ name, total, free: (free[name] && free[name][rarity]) || 0 });
+        // `up`: ein Ticket kann diese Karte aufwerten (Umbra/Stained/Storm setzen ein Motiv voraus)
+        const next = RARITIES.ORDER[RARITIES.rank(rarity) + 1];
+        if (total > 0) cards.push({ name, total, free: (free[name] && free[name][rarity]) || 0, up: !!next && (!RARITIES.NEEDS_MASK[next] || cardHasMask(name)) });
       }
       cards.sort((a, b) => a.name.localeCompare(b.name));
       res.json({ rarity, cards });
@@ -212,11 +214,9 @@ module.exports = function registerWheel(d) {
         const tix = {};
         const existing = await tx.all('SELECT COUNT(*) AS n FROM pending_booster WHERE user_id = ?', [userId]);
         let seq = Number(existing[0] && existing[0].n) || 0;
-        const addPack = async (packId, cards, special) => {
-          const id = uuidv4();
-          await tx.run("INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq, source) VALUES (?, ?, ?, ?, ?, ?, 'wheel')", [id, userId, packId, randomVariant(packId, special), JSON.stringify(cards), seq++]);
-          packRows.push(id);
-        };
+        // Packs erst sammeln und nach Wert sortiert einfügen: das wertvollste (Jackpot → Golden → normal) liegt oben, die Öffnung zeigt es als erstes
+        const packQueue = [], PACK_RANK = { umbra: 0, golden: 1 };
+        const addPack = (packId, cards, special) => { packQueue.push({ packId, cards, special }); };
         for (const a of throwRes.arrows) {
           const k = a.kind;
           if (k.startsWith('card:')) {
@@ -228,13 +228,13 @@ module.exports = function registerWheel(d) {
             sc += W.SC_AMOUNT[k]; a.prize = { amount: W.SC_AMOUNT[k] };
           } else if (k === 'booster') {
             const packId = randomPackId(rand);
-            await addPack(packId, RARITIES.rollPack(packPool(packId), { rand, hasMask: cardHasMask })); a.prize = { packId };
+            addPack(packId, RARITIES.rollPack(packPool(packId), { rand, hasMask: cardHasMask })); a.prize = { packId };
           } else if (k === 'golden') {
             const packId = randomPackId(rand);
-            await addPack(packId, rollGolden(rand), 'golden'); a.prize = { packId };
+            addPack(packId, rollGolden(rand), 'golden'); a.prize = { packId };
           } else if (k === 'jackpot') {
             const packId = randomPackId(rand);
-            await addPack(packId, rollJackpot(rand), 'umbra'); a.prize = { packId };
+            addPack(packId, rollJackpot(rand), 'umbra'); a.prize = { packId };
           } else if (k === 'emote' || k === 'title') {
             const id = k === 'emote' ? await d.emotesTitles.grantRandomEmote(tx, userId, rand) : await d.emotesTitles.grantRandomTitle(tx, userId, rand);
             if (id) a.prize = { kind: k, id, isNew: true };
@@ -244,6 +244,12 @@ module.exports = function registerWheel(d) {
             if (got) a.prize = got;
             else { sc += 25; a.prize = { maxed: true, amount: 25 }; }   // alles auf Maximum: 25 SC statt nichts
           }
+        }
+        packQueue.sort((a, b) => (PACK_RANK[a.special] ?? 2) - (PACK_RANK[b.special] ?? 2));
+        for (const pk of packQueue) {
+          const id = uuidv4();
+          await tx.run("INSERT INTO pending_booster (id, user_id, pack_id, variant_id, cards_json, seq, source) VALUES (?, ?, ?, ?, ?, ?, 'wheel')", [id, userId, pk.packId, randomVariant(pk.packId, pk.special), JSON.stringify(pk.cards), seq++]);
+          packRows.push(id);
         }
         await addRarityCopies(userId, gainCards, tx);
         for (const r of Object.keys(tix)) {

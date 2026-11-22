@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN aa9fbc19a734bcfa — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN a4538b96e4fb7905 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -26706,16 +26706,24 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .wh-debug-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .wh-chip { font-size: 12px; padding: 4px 8px; }
 .wh-chip-on { background: #fad54a; color: #12101f; }
-.wh-up { position: fixed; inset: 0; z-index: 100001; background: #12101f; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; cursor: pointer; }
-.wh-up-title { font-family: var(--font-display), sans-serif; font-size: 44px; color: #fad54a; animation: whBlink .6s steps(1) infinite; }
-.wh-up-cards { display: flex; align-items: center; gap: 32px; }
-.wh-up-card { display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: var(--font-display), sans-serif; font-size: 20px; }
-.wh-up-from { width: 200px; }
+.wh-up { position: fixed; inset: 0; z-index: 100001; background: #08060c; overflow: hidden; cursor: pointer; }
+.wh-up-cv { position: absolute; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; }
+.wh-up-bg { z-index: 1; }
+.wh-up-fg { z-index: 3; }
+.wh-up-center { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; pointer-events: none; }
+.wh-up-center .wh-up-ok { pointer-events: auto; }
+.wh-up-card { display: flex; flex-direction: column; align-items: center; }
+.wh-up-from { width: 260px; }
 .wh-up-from .bp-sc-face { width: 100%; }
 .wh-up-from .bp-sc-face img { image-rendering: pixelated; }
-.wh-up-to { width: 300px; }
+.wh-up-charge { animation: whUpJolt .12s steps(1) infinite; }
+@keyframes whUpJolt { 0% { transform: translate(-4px, 0); } 25% { transform: translate(4px, -4px); } 50% { transform: translate(0, 4px); } 75% { transform: translate(-4px, 4px); } }
+.wh-up-to { width: 360px; }
 .wh-up-to .wh-bigface { width: 100%; }
-.wh-up-name { font-family: var(--font-display), sans-serif; font-size: 22px; color: #ffffff; }
+.wh-up-pop { animation: whUpPop .3s steps(1) 1; }
+@keyframes whUpPop { 0% { transform: scale(.4); } 25% { transform: scale(1.3); } 50% { transform: scale(.9); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.wh-up-title { font-family: var(--font-display), sans-serif; font-size: 46px; text-shadow: 3px 3px 0 #12101f, -3px -3px 0 #12101f, 3px -3px 0 #12101f, -3px 3px 0 #12101f; animation: whBlink .5s steps(1) infinite; }
+.wh-up-name { font-family: var(--font-display), sans-serif; font-size: 22px; color: #ffffff; text-shadow: 2px 2px 0 #12101f; }
 
 /* ═══════════════ Emotes und Titel (public/app-emotes.jsx) ═══════════════ */
 .pp-title { display: inline-block; font-family: var(--font-display), serif; font-style: italic; letter-spacing: 1px; color: #fad54a; white-space: nowrap; vertical-align: middle; font-size: .82em;
@@ -26770,3 +26778,29 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 .game-hand-name { white-space: normal; line-height: 1.15; }
 .game-hand-name .pp-title { display: block; font-size: .6em; line-height: 1.25; margin: 0 0 1px; }
 .game-hand-name .pp-orn { width: 14px; height: 8px; margin: 0 3px; }
+
+/* Ticket-Zettel, Emote-/Titel-Rahmen in der Preis-Leiste */
+.wh-ticket { padding: 8px 14px; gap: 14px; }
+.wh-ticket-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 13px; }
+.wh-slot-emote { background: #12101f; box-shadow: 0 0 0 calc(var(--whs) * .6) #ffffff, 0 0 0 calc(var(--whs) * 1.4) #a159e9; }
+.wh-slot-title { background: #12101f; box-shadow: 0 0 0 calc(var(--whs) * .6) #fad54a, 0 0 0 calc(var(--whs) * 1.4) #8b5b04; }
+.wh-slot-tag { position: absolute; left: 0; top: 0; z-index: 2; background: #a159e9; color: #ffffff; font-size: calc(var(--whs) * 1.6); padding: 0 calc(var(--whs) * .6); font-family: var(--font-display), sans-serif; }
+.wh-slot-title .wh-slot-tag { background: #fad54a; color: #12101f; }
+.wh-slot-titlebody { display: grid; place-items: center; flex: 1; text-align: center; font-size: calc(var(--whs) * 2.4); padding: 0 calc(var(--whs) * .6); }
+.wh-slot-titlebody .pp-title { white-space: normal; font-size: 1em; }
+.wh-slot-titlebody .pp-orn { display: none; }
+.wh-slot-ticket { background: #12101f; }
+
+/* Gold-/Umbra-Pack aus dem Glücksrad: Banner beim Aufreißen, Kopfzeile mit Cover und Tag */
+.bp-special { position: fixed; left: 50%; top: 9%; z-index: 40; transform: translateX(-50%); padding: 10px 26px; font-family: var(--font-display), sans-serif; font-size: 34px; white-space: nowrap; pointer-events: none; animation: bpSpecialBlink .5s steps(1) infinite; }
+.bp-special-golden { background: #fad54a; color: #4a2a10; box-shadow: 0 0 0 4px #4a2a10, 0 0 0 8px #fff196, 8px 8px 0 8px #12101f; }
+.bp-special-umbra { background: #58238c; color: #d6b3f9; box-shadow: 0 0 0 4px #12101f, 0 0 0 8px #b278ed, 8px 8px 0 8px #08060c; }
+@keyframes bpSpecialBlink { 0% { visibility: visible; } 60% { visibility: hidden; } 100% { visibility: visible; } }
+.bp-pk-thumb { height: calc(100% - 4px); width: auto; image-rendering: pixelated; flex: none; margin-right: 6px; }
+.bp-pk-tag { padding: 0 8px; font-family: var(--font-display), sans-serif; font-size: 12px; animation: bpTagFlash .8s steps(1) infinite; }
+@keyframes bpTagFlash { 50% { background: #ffffff; color: #12101f; } }
+.bp-pk-tag-golden { background: #fad54a; color: #4a2a10; }
+.bp-pk-tag-umbra { background: #58238c; color: #d6b3f9; }
+.bp-pk-head-golden { box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #fad54a; }
+.bp-pk-head-umbra { box-shadow: 0 0 0 2px #08060c, 0 0 0 4px #b278ed; }
+.shop-tab-off { opacity: .45; cursor: not-allowed; }
