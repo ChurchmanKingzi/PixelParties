@@ -1,0 +1,47 @@
+# Baut den Desktop-Client (Electron) und lädt ihn per butler auf itch.io hoch.
+# Einrichtung: Repo-Einstellungen → Secrets: BUTLER_API_KEY (itch.io → Settings → API keys),
+# Variable ITCH_TARGET = "<itch-nutzername>/<spiel-slug>". Optional: GOOGLE_DESKTOP_CLIENT_ID / _SECRET.
+name: itch-client
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Auf itch.io hochladen?'
+        type: boolean
+        default: true
+  push:
+    tags: ['client-v*']
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, channel: windows, script: dist:win-dir, out: electron/dist/win-unpacked }
+          - { os: ubuntu-latest, channel: linux, script: dist:linux-dir, out: electron/dist/linux-unpacked }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Google-Desktop-Zugang (optional)
+        env: { ID: '${{ secrets.GOOGLE_DESKTOP_CLIENT_ID }}', SECRET: '${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}' }
+        run: |
+          if [ -n "$ID" ]; then node -e "require('fs').writeFileSync('electron/desktop-secrets.json', JSON.stringify({GOOGLE_DESKTOP_CLIENT_ID: process.env.ID, GOOGLE_DESKTOP_CLIENT_SECRET: process.env.SECRET}))"; fi
+      - run: npm ci
+        working-directory: electron
+      - run: npm run ${{ matrix.script }}
+        working-directory: electron
+      - uses: actions/upload-artifact@v4
+        with: { name: 'pixel-parties-${{ matrix.channel }}', path: '${{ matrix.out }}' }
+      - name: butler push
+        if: ${{ vars.ITCH_TARGET != '' && (github.event_name == 'push' || inputs.push) }}
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          TARGET: ${{ vars.ITCH_TARGET }}
+        run: |
+          curl -fsSL -o butler.zip "https://broth.itch.zone/butler/${{ matrix.os == 'windows-latest' && 'windows-amd64' || 'linux-amd64' }}/LATEST/archive/default"
+          unzip -q butler.zip -d butler-bin && chmod +x butler-bin/butler* || true
+          VER=$(node -p "require('./electron/package.json').version")
+          ./butler-bin/butler push "${{ matrix.out }}" "$TARGET:${{ matrix.channel }}" --userversion "$VER"
