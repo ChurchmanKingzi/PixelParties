@@ -33,7 +33,7 @@ def motif(name, tonic_midi):
     """Leitmotiv als Liste (Tonhöhe MIDI, Dauer)."""
     return [(tonic_midi + off, d) for off, d in LEITMOTIVE[name]]
 
-QUAL = {'M': (0, 4, 7), 'm': (0, 3, 7), '7': (0, 4, 7, 10), 'sus': (0, 5, 7)}
+QUAL = {'M': (0, 4, 7), 'm': (0, 3, 7), '7': (0, 4, 7, 10), 'sus': (0, 5, 7), 'M7': (0, 4, 7, 11), 'm7': (0, 3, 7, 10)}
 
 def make_tones(chord_table):
     def tones(ch, oct_, shift=0):
