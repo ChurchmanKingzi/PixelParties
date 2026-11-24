@@ -1,4 +1,4 @@
-/* PP-HART-GEBACKEN f2499a671d00c821 — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
+/* PP-HART-GEBACKEN c8c9e1c00f7ca7be — ERZEUGT von scripts/hart/build-css.js aus style.css (pixel-hart.js vorab angewandt) — nicht von Hand ändern. */
 .pp-hart-gebacken { --pp-hart: 1; }
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
@@ -18663,6 +18663,14 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   padding: 2px 6px; border-radius: 3px; opacity: 0; transition: opacity .15s; pointer-events: none;
 }
 .cmp-actor-click:hover .cmp-actor-label { opacity: 1; }
+.cmp-actor-alert { animation: cmp-actor-hop .7s steps(1) infinite; }
+@keyframes cmp-actor-hop { 50% { transform: translateY(-6px); } }
+.cmp-actor-bang {
+  position: absolute; left: 50%; top: -34px; transform: translateX(-50%); min-width: 22px; text-align: center;
+  font-family: 'Pixel Intv', monospace; font-size: 16px; line-height: 22px; color: #08060c;
+  background: var(--accent); border: 2px solid #08060c; box-shadow: 2px 2px 0 #08060c; pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) { .cmp-actor-alert { animation: none; } }
 
 /* ── Klickflaechen ohne Bild ─────────────────────────────────────── */
 .cmp-hotspot {
@@ -18794,6 +18802,14 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
   color: var(--text2); font-size: 14px; cursor: pointer; padding: 2px 6px;
 }
 .cmp-log-btn:hover { color: var(--accent); }
+.cmp-back-btn {
+  position: absolute; right: 42px; top: 8px; background: transparent; border: none;
+  color: var(--text2); font-size: 14px; cursor: pointer; padding: 2px 6px;
+}
+.cmp-back-btn:hover:not(:disabled) { color: var(--accent); }
+.cmp-back-btn:disabled { opacity: .35; cursor: default; }
+.cmp-review-tag { font-family: 'Pixel Intv', monospace; font-size: 10px; letter-spacing: 1px; color: var(--text2); margin-bottom: 6px; }
+.cmp-review-bar { display: flex; gap: 10px; margin-top: 12px; }
 
 /* ── Auswahl ─────────────────────────────────────────────────────── */
 .cmp-choice-overlay {

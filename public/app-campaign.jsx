@@ -530,7 +530,8 @@ function CampaignStage({ stage, metrics, hotspots, onHotspot, showHotspots, fx }
                 + (a.entering ? ' cmp-actor-in' : '')
                 + (a.exiting ? ' cmp-actor-out' : '')
                 + (a.dim ? ' cmp-actor-dim' : '')
-                + (a.clickable ? ' cmp-actor-click' : '')}
+                + (a.clickable ? ' cmp-actor-click' : '')
+                + (a.alert ? ' cmp-actor-alert' : '')}
               style={{
                 left: 'calc(' + (a.x != null ? a.x : 50) + '% - ' + (px / 2) + 'px)',
                 top: 'calc(' + (a.y != null ? a.y : 100) + '% - ' + py + 'px)',
@@ -543,6 +544,7 @@ function CampaignStage({ stage, metrics, hotspots, onHotspot, showHotspots, fx }
               <img src={url} alt={a.label || ''} draggable={false}
                 style={{ width: '100%', height: '100%', transform: a.flip ? 'scaleX(-1)' : undefined }} />
               {a.clickable && a.label && <span className="cmp-actor-label">{a.label}</span>}
+              {a.alert && <span className="cmp-actor-bang" aria-hidden="true">!</span>}
             </div>
           );
         })}
@@ -587,7 +589,7 @@ function CampaignClock({ day, minutes, bump }) {
 // mit Portrait links ODER rechts, Erzählerzeilen ohne Sprecher,
 // Auswahlen, Verlauf und Zeilenweiser Steuerung durch den Szenen-
 // Interpreter statt einer festen Seitenliste.
-function CampaignDialogue({ line, onAdvance, metrics, unit, onLog }) {
+function CampaignDialogue({ line, onAdvance, metrics, unit, onLog, onBack, canBack }) {
   const [chars, setChars] = useState(0);
   const [pSize, setPSize] = useState(null);
   const [done, setDone] = useState(false);
@@ -740,6 +742,7 @@ function CampaignDialogue({ line, onAdvance, metrics, unit, onLog }) {
           {render ? render(parsedRef.current.segments, chars) : (parsedRef.current.plainText || '').slice(0, chars)}
           {done && <span className="cmp-advance">▼</span>}
         </div>
+        <button className="cmp-back-btn" disabled={!canBack} onClick={(e) => { e.stopPropagation(); onBack && onBack(); }} title="Read the previous textbox again">◀</button>
         <button className="cmp-log-btn" onClick={(e) => { e.stopPropagation(); onLog && onLog(); }} title="History">☰</button>
       </div>
       {portrait && side === 'right' && (
@@ -747,6 +750,46 @@ function CampaignDialogue({ line, onAdvance, metrics, unit, onLog }) {
           <img src={portrait} alt={line.speaker || ''} draggable={false} style={portraitStyle} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  RÜCKBLICK
+// ═══════════════════════════════════════════
+// Zeigt eine frühere Textbox nochmal an (Details nachlesen). Ersetzt die
+// Dialogbox, solange er offen ist; "Return" (oder Weiterblättern bis zur
+// aktuellen Zeile) führt zurück. Die Szene läuft währenddessen nicht weiter.
+function CampaignReview({ lines, index, onMove, onClose }) {
+  const last = lines.length - 1;
+  const l = lines[index] || {};
+  const prev = () => { cmpSfx('advance', { dedupe: 80, volume: 0.3 }); onMove(Math.max(0, index - 1)); };
+  const next = () => { cmpSfx('advance', { dedupe: 80, volume: 0.3 }); if (index + 1 >= last) onClose(); else onMove(index + 1); };
+  const prevRef = useRef(prev), nextRef = useRef(next);
+  prevRef.current = prev; nextRef.current = next;
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = e.key;
+      if (k === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); prevRef.current(); }
+      else if (k === 'ArrowRight' || k === ' ' || k === 'Enter') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); if (!e.repeat) nextRef.current(); }
+      else if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); onClose(); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+  const parse = window.parseInlineMarkdown, render = window.renderMarkdownSlice;
+  const parsed = parse ? parse(l.text || '') : { segments: [{ text: l.text || '' }], plainText: l.text || '' };
+  return (
+    <div className="cmp-dialogue cmp-dialogue-review" onClick={() => next()}>
+      <div className="cmp-dialogue-box">
+        {l.speaker && <div className="cmp-speaker">{l.speaker}</div>}
+        <div className="cmp-review-tag">EARLIER TEXT · {last - index} BACK</div>
+        <div className="cmp-dialogue-text">{render ? render(parsed.segments, parsed.plainText.length) : parsed.plainText}</div>
+        <div className="cmp-review-bar">
+          <button className="btn" disabled={index <= 0} onClick={(e) => { e.stopPropagation(); prev(); }}>◀ Earlier</button>
+          <button className="btn" onClick={(e) => { e.stopPropagation(); next(); }}>{index + 1 >= last ? 'Return ▼' : 'Later ▶'}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1004,6 +1047,7 @@ function cmpTravelCost(world, state, targetId) {
 window.CampaignStage = CampaignStage;
 window.CampaignClock = CampaignClock;
 window.CampaignDialogue = CampaignDialogue;
+window.CampaignReview = CampaignReview;
 window.CampaignChoice = CampaignChoice;
 window.CampaignPlaces = CampaignPlaces;
 window.cmpLoadStory = cmpLoadStory;
@@ -1572,12 +1616,14 @@ function CampaignScreen() {
   const [stage, setStage] = useState({ bg: null, actors: [] });
   const stageRef = useRef(stage);
   const [line, setLine] = useState(null);
+  useEffect(() => { setReview(null); }, [line]);   // neue Zeile: Rückblick schließen
   const [choice, setChoice] = useState(null);
   const [fx, setFx] = useState(null);
   const [busy, setBusy] = useState(false);        // Szene läuft -> keine Erkundung
   const [placesOpen, setPlacesOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [review, setReview] = useState(null);       // Rückblick auf eine frühere Textbox (Index im Verlauf) oder null
   const [deckOpen, setDeckOpen] = useState(false);
   const [devOpen, setDevOpen] = useState(false);
   const [showHotspots, setShowHotspots] = useState(false);
@@ -2195,6 +2241,9 @@ function CampaignScreen() {
       x: o.x != null ? o.x : 50, y: o.y != null ? o.y : 100,
       h: o.h || null, flip: !!o.flip, unit,
       clickable: true, label: o.label || null, hotspot: o,
+      // `alert` (Bedingung oder true): hier läuft gerade eine Szene, in die man eingreifen kann.
+      // Die Figur hüpft und trägt ein Ausrufezeichen.
+      alert: o.alert != null && cmpCond(state, o.alert),
     }))),
   };
 
@@ -2257,13 +2306,20 @@ function CampaignScreen() {
         />
       )}
 
-      <CampaignDialogue
-        line={line}
-        metrics={metrics}
-        unit={(world.assets && world.assets.avatarUnit) || 10}
-        onAdvance={() => { const w = waiterRef.current; waiterRef.current = null; if (w) w(); }}
-        onLog={() => { cmpSfx('open', { volume: 0.5 }); setLogOpen(true); }}
-      />
+      {review === null || !line ? (
+        <CampaignDialogue
+          line={line}
+          metrics={metrics}
+          unit={(world.assets && world.assets.avatarUnit) || 10}
+          onAdvance={() => { const w = waiterRef.current; waiterRef.current = null; if (w) w(); }}
+          onLog={() => { cmpSfx('open', { volume: 0.5 }); setLogOpen(true); }}
+          onBack={() => { cmpSfx('open', { volume: 0.4 }); setReview(Math.max(0, logRef.current.length - 2)); }}
+          canBack={logRef.current.length >= 2}
+        />
+      ) : (
+        <CampaignReview lines={logRef.current} index={Math.min(review, Math.max(0, logRef.current.length - 2))}
+          onMove={setReview} onClose={() => setReview(null)} />
+      )}
 
       <CampaignChoice
         choice={choice}
