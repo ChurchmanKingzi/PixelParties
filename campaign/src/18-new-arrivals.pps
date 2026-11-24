@@ -35,6 +35,10 @@
         @aff branden +1 | Asked his age
         @flag branden_said_champion
     @meet branden
+    @if follow_nathan
+      [nathan=happy] "He's TEN! He has a LIFEBUOY! I want to be him when I'm ten, and I'm already past ten, so I'd like to be him NOW."
+      @if follow_baylee
+        [baylee] "No."
     @add ferry_talked +1
     [branden] "Everyone else on this boat is *old*. You're old. You're, what, seventeen? That's *ancient*. I'm the youngest here, so technically I've got the best seat in the house, and I'm not giving it up."
     @time 6
@@ -174,6 +178,10 @@
         [freddie?] "Turn round if you like. I don't mind either way." A pause. "You've gone red. That's sweet. Five brothers, Rowan. There is nothing you could be embarrassed about in front of me that I haven't seen on a sleeping bag. Winifred Camara. Freddie."
         @aff freddie +3 | Helped without making it weird
     @meet freddie
+    @if follow_nathan
+      [nathan=happy] "She's HANGING OFF THE BOAT!"
+      @if follow_baylee
+        [baylee] "She's fine."
     @add ferry_talked +1
     [freddie] "I only enrolled to be near the sea. The cards are a lovely bonus. I'm going to swim round this whole island before the end of the week, and then the other way. You in? I mean it. I'll hold the towel."
     @time 8

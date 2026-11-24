@@ -318,12 +318,87 @@
 @scene bungalow_seven_first bg=commons_room
   @goto commons_room 3
   Bungalow 7 is the last one on the row, a narrow box of weathered boards on stilts, with a single step and a teal door that squeaks. You push it open.
-  One long plank room with three iron beds, three footlockers, teal shutters on the window, a surfboard nobody owns leaning in the corner, and a ceiling fan that ticks on every fourth turn. Baylee's bed, reinforced with a door laid under the mattress, is made with military corners. Nathan's is an explosion of socks, booster wrappers and a poster of the War Counselors. Your corner has the window on the sea, a wobbly desk and one bare bulb.
-  [nathan] "I took the bed by the door! I'm the first line of defence! Also I snore! So you know!"
+  A long plank room that smells of paint and old salt. Three iron beds stand in a row against the back wall, each with a footlocker at its head: one under a blue blanket, one under a red, one under a teal. There is a curtained window at the left end of the wall, and another above a wobbly desk and chair in the right-hand corner, and between them a faded tournament poster with a golden cup on it. A plant by the door. A low bookshelf. A teal rug. A ceiling fan that ticks on every fourth turn.
+  Nobody's things are in it yet. Not a sock.
+  [nathan=happy] "OKAY! Three beds! Three of us! Nobody's touched anything! This is the fairest moment in the history of the room!"
+  He turns on the spot with his arms wide, like a man who has just been handed a country.
+  [baylee] "The middle one will hold me." He sets his hat on the red blanket. The bed gives a worried creak. "If somebody else wants the corners."
+  [nathan=grin] "The corners are the BEST. The left one has the sea in its window, I can see it from here, I can *smell* it. The right one has the desk. The desk has a window too, but it looks at the neighbours' wall."
+  [nathan=laughing] "DIBS ON THE SEA! Left window! Dibs!"
+  @choice The sea bed, or the desk?
+    > "Take the sea, Nathan. I'd rather have the desk, I need a table to lay out my deck."
+      [nathan=happy] "REALLY? You're giving me the SEA? Baylee, he's giving me the sea!"
+      [baylee] "I heard."
+      [nathan=laughing] "Best roommate in the history of the room! The room has no history! You're the FIRST best roommate!"
+      @set bed_rowan=right
+      @aff nathan +1 | Gave him the sea bed
+    > "I'd like the sea too. Let's duel for it: the winner gets the left bed, the loser gets the desk."
+      [nathan=happy] "A DUEL FOR A BED! Baylee! Baylee, we're doing a duel for a BED! That's the best thing that's ever happened to me!"
+      [baylee] "Be quick. I'd like my dinner."
+      You sit on the teal blanket with the duffel for a table. Nathan drops cross-legged on the rug opposite, with his deck box in both hands, and the room goes very quiet in the way rooms go quiet round two people who care about the answer.
+      @duel bed_duel deck=nathan name="Nathan Whisper"
+        @win
+          [nathan=laughing] "You BEAT the War Counselors! On the FIRST DAY! In my OWN ROOM!" A short, very honest pause. "…Fine. FINE. It's a good window. You earned it."
+          [nathan=happy] "I'll take the desk! I'll be the *scholar* of the family! I'll be very scholarly at it!"
+          @set bed_rowan=left
+          @aff nathan +2 | Beat him fairly
+        @lose
+          [nathan=laughing] "THE SEA IS MINE! I'm going to say that again! THE SEA IS MINE!" He drops onto the blue blanket with his arms spread. "The desk is a very good desk, Rowan. It has a window on a wall. Walls are underrated."
+          @set bed_rowan=right
+          @aff nathan +1 | Played for the bed
+    > "I don't mind. I'll take whatever is left."
+      [nathan=happy] "THE SEA! Baylee, I got the sea!"
+      [baylee] "You did."
+      @set bed_rowan=right
+  @if var:bed_rowan=left
+    You drop your duffel on the blue blanket. The mattress gives a small, sullen creak. The sea hushes at the window just above the headboard.
+  @else
+    You drop your duffel on the teal blanket. The mattress gives a small, sullen creak. The desk is a few steps away, with the window over it, which does indeed look at the neighbours' wall.
+  [nathan] "Also I snore! So you know!"
   [baylee] "He does."
   [nathan] "I DO! My mom says it's like living next to a chainsaw. A friendly chainsaw!"
-  You put your duffel down on your bed. The mattress gives a small, sullen creak. The sea hushes at the window.
-  There is a footlocker. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet.
+  There is a footlocker at the head of your bed. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet.
   ~ I live here now. This is where I live.
+  Nathan turns to his corner and tips an entire duffel out onto his blanket. Baylee unpacks exactly four things, a folded blanket, a framed photograph, a tin of liniment and a coiled lasso, and sets each of them on his footlocker like a very small altar. Neither of them is going anywhere. Neither of them, you notice, is in a hurry to follow you either.
   @flag unpacked_started
+  @unfollow nathan baylee
   @time 15
+
+# Nathan und Baylee bleiben im Bungalow und sind ansprechbar.
+@scene bungalow_nathan
+  @if not nathan_room_talked
+    Nathan has tipped the whole contents of his duffel onto his blanket and is sorting it, with enormous seriousness, into piles. The piles do not seem to have a system.
+    [nathan=happy] "Rowan! I'm making a BASE! Everything has a place! The socks go over there! The… other socks go over there!"
+    @flag nathan_room_talked
+  @else
+    [nathan=grin] "Hey! Come to admire the base?"
+  @choice
+    > "Can I ask you something, Nathan?" @if not chat_nathan_done
+      @scene chat_nathan
+    > "Talk me through your deck, if you've got a minute." @if not shop_nathan_done
+      @scene shop_nathan
+    > "How are you finding it so far?" @if not nathan_room_feel
+      [nathan=happy] "Loud! It's LOUD! The sea's loud, the geckos are loud, Baylee's *breathing* is loud, and I'm — I'm the loudest. It's like coming home, except nobody's yelled at me yet."
+      [nathan=grin] "Don't tell Baylee about the breathing."
+      @flag nathan_room_feel
+    > "Carry on. I'll leave you to the base."
+  @time 4
+
+@scene bungalow_baylee
+  @if not baylee_room_talked
+    The four things on Baylee's footlocker have not moved by a hair. He is sitting on the edge of the red bed with his hat in his hands, looking at the tournament poster as if it were a person he had been introduced to.
+    [baylee] "…Rowan." A small nod. "It's a good room."
+    @flag baylee_room_talked
+  @else
+    [baylee] "Mm."
+  @choice
+    > "Can I ask you a few things, Baylee?" @if not chat_baylee_done
+      @scene chat_baylee
+    > "Do you want to talk about your deck?" @if not deck_known_baylee
+      @scene deck_baylee
+    > "Is it all right, sharing with Nathan? He's a lot." @if not baylee_room_feel
+      [baylee] "He talks. I listen. It evens out." A very long pause, with a gull in it. "He's a good one. He just doesn't know where the volume knob is."
+      @flag baylee_room_feel
+    > "Carry on. I'll leave you in peace."
+  @time 4
+

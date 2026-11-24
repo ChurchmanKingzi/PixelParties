@@ -171,7 +171,12 @@
   @else
     You can make out the shape of the bay now, the pier, a line of low roofs. A white building on the hill catches the sun like a dropped coin.
   ~ In two weeks I will be on a real table in front of real people. I will be fine. I will be fine.
-  Somewhere behind you Nathan is telling somebody about the plate.
+  @if not follow_nathan
+    Somewhere behind you Nathan is telling somebody about the plate.
+  @else
+    [nathan=happy] "Look at it! It's got a MOUNTAIN! Baylee, we're going to live on a MOUNTAIN!"
+    @if follow_baylee
+      [baylee] "It has smoke on it."
   @if not found_rail_coins
     Down by the foot of the rail, between two planks beside the lifebuoy, something small and gold winks at you. Two Smug Coins, wedged tight, that somebody lost their nerve over. You prise them out with a thumbnail.
     @coins 2
@@ -185,18 +190,32 @@
   You count seven white, twelve blue, eighteen grey. That makes thirty-seven, and the one without a collar at all is the thirty-eighth.
   Rank, printed on every shoulder. You wonder how long it takes for people to stop reading it.
   @flag counted_collars
+  @if follow_nathan
+    [nathan=happy] "Grey is the BEST colour, I decided. It goes with EVERYTHING."
+    @if follow_baylee
+      [baylee] "The white-and-gold ones have a tower."
+      [nathan=grin] "I HEARD about the tower! I heard it has a fountain!"
   @time 5
 
 @scene deck_lighthouse
   You borrow the captain's trick of squinting at the horizon, and there it is: a white pencil stroke on the cliff south of the bay. The lighthouse.
   Beyond it, as the ferry swings its nose, you catch a second tower on the cliff and a thin white line of beach with a row of tiny roofs along it. The Commons, if the rumours are true. They look like a row of sugar cubes.
   @flag saw_commons_roofs
+  @if follow_nathan
+    [baylee] "That is a long way up."
+    @if follow_baylee
+      [nathan=happy] "Can we climb it? Are there stairs? Rowan, I am going to climb it."
   @time 5
 
 @scene deck_seasick
   You have not been seasick for the whole crossing. This seems a waste of an opportunity.
   You try it anyway, leaning over the leeward rail with a look of great suffering. A gull lands on the rail and stares at you with open scorn.
   ~ Not even the birds are fooled.
+  @if follow_nathan
+    [nathan=happy] "Are you actually seasick? Baylee, he's seasick, get a bucket!"
+    @if follow_baylee
+      [baylee] "He is not."
+      [nathan=laughing] "He's doing a very GOOD seasick!"
   @time 5
 
 # ───────────────────────────── DECK: FIGUREN ─────────────────────────────
@@ -343,6 +362,10 @@
     He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning like the sun just rose.
     [ed] "Ed Venture. Lazy V Ranch, up on the high plains. Bungalow five, supposedly. They put the Commons on a beach. A BEACH."
     @meet ed
+    @if follow_nathan
+      [nathan=happy] "He's hanging by ONE HAND! Rowan, that's a ranch thing, right? Is that a ranch thing?"
+      @if follow_baylee
+        [baylee] "It's a fence thing."
     @add ferry_talked +1
     @note ed | Grew up on a ranch. Hangs off things. Wants to go everywhere that has a fence round it.
     [ed] "Do you know how long it's been since I saw water I couldn't walk across? This is the best thing that ever happened to me. Don't tell my mum, she'll think I've become soft."
@@ -418,6 +441,10 @@
         She hesitates, plainly deciding whether this is a trick.
         [georgie?] "Georgie." A pause. "Santa. Georgie Santa. Sorry."
     @meet georgie
+    @if follow_nathan
+      [nathan=grin] "Is that a DRAGON? On her ARM? Baylee, she's got a dragon on her arm!"
+      @if follow_baylee
+        [baylee] "It's a plush."
     @add ferry_talked +1
     @note georgie | Very small, very shy. Holds her deck box in both hands.
     The girl with the camera lowers it, and gives you a look of frank assessment, as though weighing you for a composition.
@@ -505,6 +532,10 @@
         She lowers the camera.
         [pippa?] "Pippa Lund. Photographer, by default."
     @meet pippa
+    @if follow_nathan
+      [nathan=happy] "Take MY picture! Take Baylee's! He's got a very big face for it!"
+      @if follow_baylee
+        [baylee] "…No."
     @add ferry_talked +1
     @note pippa | The photographer. Shoots on film.
     @choice
@@ -577,6 +608,10 @@
         [mikoto?] "Oh — yes. No. A bit. I'm — thank you for asking, nobody asks."
         [mikoto?] "It's a very big boat. And a very big sea. And I've made a list of everything that could happen, and so far, three of the things have."
     @meet mikoto
+    @if follow_nathan
+      [nathan=laughing] "He apologised to a GULL!"
+      @if follow_baylee
+        [baylee] "I would have too. It was a big gull."
     @add ferry_talked +1
     @note mikoto | Laughs when frightened. Keeps lists. Gives everyone a nickname.
     @if ship_knows_wildcard

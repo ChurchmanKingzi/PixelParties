@@ -169,6 +169,10 @@
   Underneath, in a smaller and much more recent hand, somebody has scratched with a key: *(he doesn't have to play you though)*. On the bench behind it, four matched cases wait beside a neat card: STAKES: THE LOSER CARRIES THE WINNER'S LUGGAGE UP THE HILL.
   ~ The plate says who keeps the seat. It says nothing about who gets to sit down opposite.
   @flag read_plate
+  @if follow_nathan
+    [nathan=happy] "WINNER STAYS. That's the best rule I've ever read! Why don't we have that rule everywhere?"
+    @if follow_baylee
+      [baylee] "Because you would never leave the table."
   @time 2
 
 @scene lounge_watch
@@ -196,6 +200,10 @@
     > "Not especially. Nothing happened."
       [gideon?] "A pity. It is the whole of the art."
   @flag saw_counter
+  @if follow_nathan
+    [nathan=happy] "GO ON, DECKHAND! GO ON!"
+    @if follow_baylee
+      [baylee] "He's drinking tea, Nathan. He lost."
   @time 25
 
 @scene lounge_galley
@@ -211,6 +219,10 @@
       @flag had_roll
     > Leave it.
       Eight Smug Coins' worth of will power. You move off.
+  @if follow_nathan
+    [nathan=happy] "A ROLL! Rowan, do you have three coins? I have… a button."
+    @if follow_baylee
+      [baylee] "No."
   @time 3
 
 @scene lounge_benches
@@ -219,6 +231,10 @@
   ~ Somebody on this ship is missing this very badly.
   @item "Teobalt's stapler"
   @flag found_stapler
+  @if follow_nathan
+    [nathan=grin] "What are you looking for? Is it a sock? I lost a sock!"
+    @if follow_baylee
+      [baylee] "You lost four."
   @time 6
 
 @scene lounge_binder
@@ -227,6 +243,10 @@
   You find, tucked into the back pocket, a small notebook. On the first page: a column of initials and numbers. G.P. 3–0. Then, next to it, in smaller letters: *never first. counters. 3 for 3.*
   You close it. It is not yours, and you have a conscience, or at least a very strict aunt.
   @flag saw_counter
+  @if follow_nathan
+    [nathan=happy] "Is that Tomi's binder? You can't touch it, it's CURSED, it takes your coins!"
+    @if follow_baylee
+      [baylee] "That is a rumour."
   @time 5
 
 # ───────────────────────────── GIDEON ─────────────────────────────
@@ -248,6 +268,10 @@
         [gideon?] "Quick." The thinnest approval.
     [gideon?] "Gideon Pryce. I would offer to shake hands, but you will understand that I never do before a game."
     @meet gideon
+    @if follow_nathan
+      [nathan=grin] "That's the glove guy! Don't look at him! He'll know!"
+      @if follow_baylee
+        [baylee] "Quiet, Nathan. He's counting."
     @add ferry_talked +1
   @else
     [gideon] "Vance."
@@ -502,6 +526,10 @@
       [tomi?] "Hey. New face. You're the jacketless one, am I right? That makes you the ink name."
     [tomi?] "Tomás Reyes. Tomi. I run the book."
     @meet tomi
+    @if follow_nathan
+      [nathan=happy] "He's got a BINDER! Baylee! BINDER!"
+      @if follow_baylee
+        [baylee] "He's also got a book on us."
     @add ferry_talked +1
     @note tomi | Runs the betting book on the ship. Everything has a friend price.
     @choice
@@ -599,6 +627,10 @@
     [magnus?] "Two years, Vance. Two years at number six, looking at your avatar in fifth. The Qualifier published your handle with your name, so I have known this face for three weeks, and your avatar for two years."
     [magnus?] "You don't even remember the series, do you?"
     @meet magnus
+    @if follow_nathan
+      [nathan=grin] "A TABLET! At a CARD GAME!"
+      @if follow_baylee
+        [baylee] "It's for the ladder."
     @add ferry_talked +1
     @note magnus | Ranked just below you on the online ladder for two years. Keeps a file.
     @choice
@@ -672,6 +704,10 @@
         [noor?] "It is a very good one. I find that it repays attention."
     [noor?] "Noor Al-Sayed."
     @meet noor
+    @if follow_nathan
+      [nathan=happy] "Is that the REAL rulebook? The really big one?"
+      @if follow_baylee
+        [baylee] "She has read all of it."
     @add ferry_talked +1
     @note noor | Knows the Academy Charter by heart. Reading article seven for the third time.
     @if ship_knows_wildcard
@@ -739,6 +775,10 @@
     A longer pause.
     [livvie?] "Yesterday counts."
     @meet livvie
+    @if follow_nathan
+      [nathan=grin] "Rowan, is that girl counting US?"
+      @if follow_baylee
+        [baylee] "Everyone is counted."
     @add ferry_talked +1
     @note livvie | Trades, runs lists. Insists that she has eaten.
     Her stomach growls again.

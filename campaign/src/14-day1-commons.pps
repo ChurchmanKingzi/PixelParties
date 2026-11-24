@@ -25,6 +25,8 @@
 @place commons_room
   travel 1
   travelFrom commons_beach=1 commons_kitchen=2
+  object nathan sprite=nathan x=22 y=96 h=64 label="Nathan" scene=bungalow_nathan when day=1 and time<18:00 and flag_prologue_done
+  object baylee sprite=baylee x=52 y=96 h=78 label="Baylee" scene=bungalow_baylee when day=1 and time<18:00 and flag_prologue_done
   action unpack "Unpack your duffel" scene=room_unpack when day=1 and not unpacked_done
   action goldfish "Goldfish an opening hand on the bed" scene=room_goldfish when day=1
   action letter "Open Aunt Dee's letter" scene=room_letter when day=1 and unpacked_done and not read_letter
@@ -349,6 +351,7 @@
   @rel fiona leona
   @rel sammy tobias
   @rel sammy dmitri
+  @note sammy | The Academy lists him as Samuel Counts. He goes by Sammy, and flinches at the full name.
   @rel tobias dmitri
   @rel maisie freddie
   @rel fiona freddie
@@ -446,14 +449,14 @@
   @goto commons_room 2
   The row at night is a string of yellow windows. The surf breathes. The geckos chirp under the eaves. Every paving stone rocks a different note under your feet.
   Back in bungalow 7, the ceiling fan ticks on every fourth turn. Three beds. Three footlockers. One bare bulb that is, at last, switched off.
-  In the dark, a voice from the bed by the door says, quite quietly for him:
+  In the dark, a voice from the bed at the other end of the room says, quite quietly for him:
   [nathan] "Rowan. You awake?"
   [rowan] "…Yeah."
   [nathan] "Can I ask you something?"
   [rowan] "Sure."
   A long, comfortable pause, full of surf.
   [nathan] "Were you scared? Today? When the little domes thing happened. I was in the back. I couldn't tell."
-  You look at the ceiling. The fan ticks. From the other bed, the very large, very gentle shape of Baylee has gone entirely still, which means, you have already learned, that he is listening.
+  You look at the ceiling. The fan ticks. From the middle bed, the very large, very gentle shape of Baylee has gone entirely still, which means, you have already learned, that he is listening.
   @choice
     > "They did, honestly. My hands shook the whole time."
       [nathan] "…Huh." A pause. "I would've said they didn't. I was watching. Honest."
@@ -479,7 +482,7 @@
   [nathan] "'Night, Wildcard."
   [baylee] "Night."
   [rowan] "…Night."
-  Within three minutes, the bed by the door begins to snore.
+  Within three minutes, the bed at the other end of the room begins to snore.
   It is a tremendous snore. It is the snore of a chainsaw, a friendly chainsaw, at a very great distance, in a room designed for the purpose. You lie awake and listen to it for a very long time, and discover, somewhere around the fortieth minute, that you are smiling at the ceiling.
   ~ Day one. I'm still here. I didn't throw up.
   ~ Tomorrow the ranking starts for real. Tonight it is just a bed, and a ceiling, and a friendly chainsaw.

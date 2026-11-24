@@ -416,7 +416,7 @@ const io = {
   applyReward: async (r) => { mutate(s => { if (r.coins) s.coins = Math.max(0, s.coins + r.coins); for (const f of r.flags || []) s.flags[f] = true; }); },
   duel: (step) => new Promise(res => {
     $('spk').hidden = false; $('spk').textContent = 'DUEL'; $('txt').className = '';
-    $('txt').innerHTML = 'Duel vs. <strong>' + esc(step.opponentName || step.opponent) + '</strong>' + (step.ante ? ' (ante)' : '') + '. <span class="note">Preview build: the real game plays this out. Pick the result to test the branches.</span>';
+    $('txt').innerHTML = 'Duel vs. <strong>' + esc(met(step.opponent) ? (S.names && S.names[step.opponent]) || step.opponentName || step.opponent : aliasName(step.opponent)) + '</strong>' + (step.ante ? ' (ante)' : '') + '. <span class="note">Preview build: the real game plays this out. Pick the result to test the branches.</span>';
     const box = $('choices'); box.innerHTML = '';
     [['I win', true], ['I lose', false]].forEach(([t, v]) => { const b = document.createElement('button'); b.textContent = t; b.onclick = (e) => { e.stopPropagation(); sfx(v ? 'victory' : 'debuff', .5); box.innerHTML = ''; res(v); }; box.appendChild(b); });
     $('more').hidden = true;
@@ -714,13 +714,25 @@ const enginePatch = (src) => {
   const b = "if (sheet.ppNative) { const w = sheet.width, h = sheet.height, nx = Math.round(wx - w / 2 - cam.x), ny = Math.round(wy - h + 1 - cam.y) + (frame ? 1 : 0); if (face < 0) { g.save(); g.translate(nx + w, ny); g.scale(-1, 1); g.drawImage(sheet, 0, 0); g.restore(); } else g.drawImage(sheet, nx, ny); return; }\n      " + a;
   return src.replace(a, b);
 };
+// Kartenkorrekturen: Dialog und Karte müssen zusammenpassen (Salon mit gepolsterten blauen Bänken statt roter Theatersitze).
+const worldPatch = (D) => {
+  const idx = (n) => D.names.indexOf(n);
+  const lounge = D.maps && D.maps['ferry__0'];
+  if (lounge && idx('i_seats') >= 0 && idx('i_sofa_blue') >= 0) {
+    for (const o of lounge.objs) if (o[0] === idx('i_seats')) o[0] = idx('i_sofa_blue');
+    for (const pl of lounge.places || []) if (pl.id === 'ferry_lounge') pl.text = 'A long saloon so full of sun that you stop on the bottom stair. Padded blue benches run along the walls, duffel bags piled on every seat, and at the far end a galley hatch with a steel urn and the only real card table on the ship.';
+  }
+  return D;
+};
 for (const f of list) {
   let src = null;
   if (/^(music|sounds)\//.test(f)) src = path.join(REPO, 'public', f); else if (/^assets\/sprites\//.test(f)) src = path.join(ROOT, f.replace('assets/', '')); else if (ASSETS) src = path.join(ASSETS, f);
   if (!src) continue;
   if (!fs.existsSync(src)) { console.log('  fehlt: ' + f); continue; }
   const dst = path.join(out, f); fs.mkdirSync(path.dirname(dst), { recursive: true });
-  if (f === 'engine.js') fs.writeFileSync(dst, enginePatch(fs.readFileSync(src, 'utf8'))); else fs.copyFileSync(src, dst);
+  if (f === 'engine.js') fs.writeFileSync(dst, enginePatch(fs.readFileSync(src, 'utf8')));
+  else if (f === 'assets/map/world.json') fs.writeFileSync(dst, JSON.stringify(worldPatch(JSON.parse(fs.readFileSync(src, 'utf8')))));
+  else fs.copyFileSync(src, dst);
   n++;
 }
 console.log('preview: ' + (html.length / 1024).toFixed(0) + ' KB -> campaign/dist/preview/index.html · Assets kopiert: ' + n + '/' + list.length);

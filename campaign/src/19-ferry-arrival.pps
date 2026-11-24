@@ -23,7 +23,7 @@
   People abandon whatever they were doing. Bags are shouldered. Somebody calls "Island!" and somebody else, from the stern, calls "We KNOW."
   The captain's voice comes on the loudspeaker, unhurried and warm.
   [?Loudspeaker] "Fifteen minutes, folks. Mind your luggage and your elbows. The ladies and gentlemen who are going to want a last look, the rail is wide enough for all of you. The gentleman with the lifebuoy knows who he is."
-  You are standing at the rail with your hands on the wet iron, and you are, for the first time in two hours, entirely alone.
+  You are standing at the rail with your hands on the wet iron, and you are, for the first time since the harbour, entirely alone.
   The island has stopped being a picture. It has trees on it now.
   A grey cone of volcano, a thread of smoke leaning off its top. Jungle pouring down the flanks to a ribbon of pale sand, and, on the sand, tiny and perfect, a long wooden pier with a blue arch at its end. A little red cable car crawls along a wire over the canopy like a bead on a string. The sea around it is so clear that you can see, where the ship's shadow falls, a line where the green turns to blue.
   ~ That's it. That's where I live now.
@@ -48,25 +48,25 @@
   @else
     The pier is a clear line now, with a speck on it that is waving. You have about five minutes.
   @choice Where do you go?
-    > Join the crowd at the bow rail. @if not arr_bow
+    > Join the crowd at the bow rail. @if not arr_bow @who nathan baylee ed mikoto
       @scene arrival_bow
       @flag arr_bow
       @add arrival_visits +1
       @time 4
       @jump top
-    > Go to the foot of the saloon stairs, where the table crowd is standing. @if lounge_seen and not arr_stairs
+    > Go to the foot of the saloon stairs, where the table crowd is standing. @if lounge_seen and not arr_stairs @who gideon inya tomi noor livvie
       @scene arrival_stairs
       @flag arr_stairs
       @add arrival_visits +1
       @time 4
       @jump top
-    > Go aft, to the stern rail. @if not arr_stern
+    > Go aft, to the stern rail. @if not arr_stern @who jessica ashton sunny freddie marit victoria
       @scene arrival_stern
       @flag arr_stern
       @add arrival_visits +1
       @time 4
       @jump top
-    > Go to the middle of the deck, where somebody is organising a photograph. @if not arr_mid
+    > Go to the middle of the deck, where somebody is organising a photograph. @if not arr_mid @who georgie pippa branden rana teobalt
       @scene arrival_mid
       @flag arr_mid
       @add arrival_visits +1

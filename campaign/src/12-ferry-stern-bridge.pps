@@ -59,6 +59,12 @@
     ~ Somebody on this ship is going to be very unhappy about this.
     @item "Pippa's lens cap"
     @flag found_lenscap
+  @if follow_nathan
+    [nathan=happy] "Look at the GULLS. That one is staring at me. Baylee, it's staring at me!"
+    @if follow_baylee
+      [baylee] "It wants your sandwich."
+      [nathan=grin] "I haven't GOT a sandwich!"
+      [baylee] "It doesn't know that."
   @time 8
 
 @scene stern_cage
@@ -67,6 +73,10 @@
   At the bottom of the pile, sagging, you find your own duffel. The label says, in Aunt Dee's handwriting: ROWAN — CALL HER WHEN YOU LAND.
   ~ I will. I will call her the minute I know what to say.
   @flag found_duffel
+  @if follow_nathan
+    [nathan=happy] "Which one is ours? Is it that one? Baylee, is that our one?"
+    @if follow_baylee
+      [baylee] "No."
   @time 5
 
 @scene ferry_jessica
@@ -85,6 +95,11 @@
         [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my hand off these."
         A tilt of the head at the caskets.
         @meet jessica
+        @if follow_nathan
+          [nathan=happy] "Rowan, she's like a museum. A walking, talking, very expensive museum. I'm scared of her and I want her to like me."
+          @if follow_baylee
+            [baylee] "Then be quiet."
+            [nathan=grin] "I AM being quiet! This is my quiet!"
         @flag jessica_plain
       > "Those caskets look like they hold either jewels or a very elegant corpse." @hint Line
         [jessica?] "How lovely."
@@ -92,6 +107,11 @@
         [jessica?] "Those are my jewels. Not the corpses you were about to suggest."
         [jessica?] "Jessica Montclair."
         @meet jessica
+        @if follow_nathan
+          [nathan=happy] "Rowan, she's like a museum. A walking, talking, very expensive museum. I'm scared of her and I want her to like me."
+          @if follow_baylee
+            [baylee] "Then be quiet."
+            [nathan=grin] "I AM being quiet! This is my quiet!"
         @aff jessica +1 | Made a joke
       > "Forgive me, but the sea has never looked less beautiful than it does next to you." @hint Cheesy
         [jessica?] "Ah."
@@ -99,6 +119,11 @@
         [jessica?] "I have been addressed that way four times this morning. By the same boy. You are, I think, an imitation, and I am not sure how I feel about that."
         [jessica?] "Jessica Montclair."
         @meet jessica
+        @if follow_nathan
+          [nathan=happy] "Rowan, she's like a museum. A walking, talking, very expensive museum. I'm scared of her and I want her to like me."
+          @if follow_baylee
+            [baylee] "Then be quiet."
+            [nathan=grin] "I AM being quiet! This is my quiet!"
         @aff jessica -2 | Used a line
     @add ferry_talked +1
     @note jessica | Gracious and formal. Travels with three caskets of jewellery.
@@ -149,6 +174,10 @@
     He swings round, seeing you for the first time, with the dazzling, wounded ease of a man who has not noticed he is wounded.
     [ashton?] "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does."
     @meet ashton
+    @if follow_nathan
+      [nathan=happy] "Rowan! He's got a ROSE! A real one! And he took the thorns off himself, I SAW!"
+      @if follow_baylee
+        [baylee] "That's a skill."
     @add ferry_talked +1
     @note ashton | Wealthy. Gives roses to every woman and talks like a novel.
     [ashton] "Vance, isn't it. The Wildcard. I can add up, old thing: a rain jacket, no collar, and a name in ink on the list at the wheelhouse door."
@@ -231,6 +260,10 @@
         @aff victoria -1 | Hurried her
         @flag victoria_hurried
     @meet victoria
+    @if follow_nathan
+      [nathan=happy] "Is it going to rain? Is that why the umbrella? Baylee, check the sky!"
+      @if follow_baylee
+        [baylee] "She is already under an awning."
     @add ferry_talked +1
     @time 8
   @else
@@ -262,6 +295,10 @@
     @add ferry_talked +1
     [sunny?] "Sunny Aldane. Sports scholarship. I'm the lifeguard, as of — what — Monday. Everything on the island's going to fall in the water, and I'm the one who fishes it out. It's literally the job."
     @meet sunny
+    @if follow_nathan
+      [nathan=happy] "Is she a lifeguard? Could she save me? I'm not drowning, I'd just like to know!"
+      @if follow_baylee
+        [baylee] "Nathan."
     @note sunny | Lifeguard on a sports scholarship. Says what she thinks the moment she thinks it.
     [sunny] "I like you. There, said it."
     She says it so simply, with so little fuss, that you have no idea where to put your hands.
@@ -325,6 +362,11 @@
     [marit?!] "A **HUMAN!** An *AUDIENCE!* The gods are *generous* this morning! **BEHOLD!**"
     [marit?!] "Marit Solberg! Commentary track! Theatre kid **EXTRAORDINAIRE!** Flame-adjacent in every conceivable respect! And *you* — you are the **BROODING STRANGER** without a jacket!"
     @meet marit
+    @if follow_nathan
+      [nathan=laughing] "THAT. Is the BEST person I have EVER heard!"
+      @if follow_baylee
+        [baylee] "She's loud."
+        [nathan=happy] "She's *magnificent*."
     @add ferry_talked +1
     [rowan] "I'm Rowan Vance, and I'm not brooding. I'm just underdressed."
     [marit!] "**UNDERDRESSED!** Rowan Vance — brooding, underdressed and *brand new!* I have decided, here and now, upon this very bollard, that we are having an **ARC!**"
@@ -388,6 +430,10 @@
     The lounge door lets out a ripple of noise, and then another. Whatever was going to happen at the table has happened.
   @else
     A small dot with a deck box stands at the end of a table. The deck has gone quiet, in the way decks do before something happens.
+  @if follow_nathan
+    [nathan=happy] "I can see the WHOLE SHIP from here! I'm the king of the ship!"
+    @if follow_baylee
+      [baylee] "You are on a stair."
   @time 4
 
 @scene bridge_plate
@@ -399,6 +445,11 @@
 @scene bridge_chart
   The chart is pinned flat by a chipped mug that says WORLD'S OKAYEST CAPTAIN. It shows the island as a rough, blunt oval with a volcano at the centre, the pier on the south coast, a bay with the town on its western curve, and a dotted line round the north shore labelled, in a very old hand, DO NOT.
   Somebody has drawn a small boat on the south side, dead on the pier, and written: *tie up 10.40*.
+  @if follow_nathan
+    [nathan=happy] "That's US! That little dot is US!"
+    @if follow_baylee
+      [baylee] "That is a pin."
+      [nathan=grin] "It's a very GOOD pin!"
   @time 3
 
 @scene bridge_binoculars
@@ -406,6 +457,10 @@
   Through the lenses the island becomes sharp and brilliant: the black rim of the crater, the green flanks, a white tower on the south cliff that must be the lighthouse. And, clear as a sketch, a long curve of pale beach with a row of tiny roofs along it. Seven of them. You count.
   ~ Bungalow row. Seven roofs. Mine's the last one, probably. Late admission, last bungalow.
   @flag saw_commons_roofs
+  @if follow_nathan
+    [nathan=happy] "Me next! Me next!"
+    @if follow_baylee
+      [baylee] "Let him have his go, Nathan."
   @time 5
 
 @scene bridge_list
@@ -414,6 +469,10 @@
   *Vance, R. — Wildcard.*
   ~ Everyone who reads this list knows who the Wildcard is.
   @flag read_passenger_list
+  @if follow_nathan
+    [nathan=happy] "That's the list! The one with the ink name! That's YOU!"
+    @if follow_baylee
+      [baylee] "We know."
   @time 3
 
 @scene ferry_abel
@@ -424,6 +483,10 @@
     He does not turn round.
     [abel?] "Captain Abel Stroud. Welcome to the Second Chance."
     @meet abel
+    @if follow_baylee
+      [baylee] "Captain." He touches the brim of his own straw hat, and Captain Stroud, without turning round, touches the brim of his bowler. Something has been settled.
+      @if follow_nathan
+        [nathan=laughing] "They did a HAT THING! Rowan! They did a hat thing!"
     @add ferry_talked +1
     @note abel | The ferry captain. Counts every student on and off.
     [abel] "If you are going to be sick, do it leeward. That's the side that isn't me."
@@ -479,6 +542,10 @@
         After a while, grudgingly, to the planks:
         [rana?] "…Rana. Since you're not going away."
         @meet rana
+        @if follow_nathan
+          [nathan=happy] "Hi! I'm Nathan! I like your hair! The bows! They're very RED!"
+          @if follow_baylee
+            [baylee] "Nathan. She's reading."
         @note rana | Sits apart. Says she is on a different list with a different collar.
         @aff rana +2 | Didn't push
       > "I'm Rowan. I don't mean to bother you. What's your name?"
@@ -488,6 +555,10 @@
         [rowan] "I just wanted to know who I'd be sharing the stairs with."
         [rana?] "…You're not sharing them. I was here first."
         @meet rana
+        @if follow_nathan
+          [nathan=happy] "Hi! I'm Nathan! I like your hair! The bows! They're very RED!"
+          @if follow_baylee
+            [baylee] "Nathan. She's reading."
         @note rana | Scowls. Keeps everyone at a distance.
         @aff rana +1 | Asked plainly
       > "Why are you sitting all the way out here by yourself?"
@@ -495,6 +566,10 @@
         [rana?] "Why do you care."
         [rana?] "…Rana. Now go away."
         @meet rana
+        @if follow_nathan
+          [nathan=happy] "Hi! I'm Nathan! I like your hair! The bows! They're very RED!"
+          @if follow_baylee
+            [baylee] "Nathan. She's reading."
         @aff rana -2 | Pushed
         @flag rana_pressed
     @add ferry_talked +1
@@ -527,6 +602,10 @@
     [teobalt?] "That is, I'm afraid, not an order."
     [teobalt?] "Teobalt Fullington. I have drawn up a list."
     @meet teobalt
+    @if follow_nathan
+      [nathan=happy] "Is that a CLIPBOARD? Baylee, he's got a clipboard! I've always wanted to meet a person with a clipboard!"
+      @if follow_baylee
+        [baylee] "I've met several."
     @add ferry_talked +1
     @note teobalt | Keeps lists and a clipboard. Worried about the unloading order.
     @choice
