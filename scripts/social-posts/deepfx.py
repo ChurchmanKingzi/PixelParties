@@ -43,9 +43,14 @@ class DeepShow(CaptionMixin):
     OW, OH = 150, 210
     HP0 = 450
     # Erstes Auftauchen: (Zeit, Slot, Karte)
-    INIT = [(1.0, 0, 0), (1.4, 1, 1), (1.8, 2, 2)]
+    CREATURES = ['zombie', 'skeleton', 'stein', 'mummy', 'werewolf', 'siren']
+    CARD_OF = {k: i for i, k in enumerate(CREATURES)}                                 # Kartenbild je Wesen (für den Flug auf die Hand)
+    CPX = 5                                                                           # Pixelgröße der Kreatur-Sprites
+    SLOTW, SLOTH, SLOT_FOOT = 320, 320, 1868
+    INIT = [(1.0, 0, 'zombie'), (1.4, 1, 'skeleton'), (1.8, 2, 'stein')]
     # Morphs: (Zeit, Slot, von, nach) - das alte Wesen geht auf die Hand, Siphem bekommt 1 Counter
-    MORPH = [(8.0, 0, 0, 3), (9.2, 1, 1, 4), (10.4, 2, 2, 5), (11.6, 0, 3, 0), (15.4, 1, 4, 1), (16.6, 2, 5, 2), (17.8, 0, 0, 3)]
+    MORPH = [(8.0, 0, 'zombie', 'mummy'), (9.2, 1, 'skeleton', 'werewolf'), (10.4, 2, 'stein', 'siren'), (11.6, 0, 'mummy', 'zombie'),
+             (15.4, 1, 'werewolf', 'skeleton'), (16.6, 2, 'siren', 'stein'), (17.8, 0, 'zombie', 'mummy')]
     FIRE = [(14.0, 4, 200), (19.2, 3, 150)]                                           # (Start, verbrauchte Counter, Schaden)
     VANISH = [3.6, 4.8, 6.0]                                                          # Strandgänger verschwinden
     BEACH = [('kit', 400), ('codumbus', 540), ('kent', 680)]
@@ -77,6 +82,7 @@ class DeepShow(CaptionMixin):
         self.draw_text = geom['draw_text']
         self.actor_fn = geom['actor_fn']
         self.per = geom['per']
+        self.fms, self.fn = geom['frame_ms'], geom['frame_n']
         self._cache = {}
         base = geom['assets_dir']
         ld = lambda n: Image.open('%s/%s.png' % (base, n)).convert('RGBA')
@@ -121,27 +127,40 @@ class DeepShow(CaptionMixin):
             self._cache[k] = Image.fromarray(a, 'RGBA')
         return self._cache[k]
 
-    def _morph(self, a_i, b_i, u, key):
-        """Das eine Wesen verläuft ins andere: Bayer-Mischung, dazu waagerechte Streifen, die seitlich verrutschen (Glitch)."""
+    def _sprite_img(self, key, t):
+        """Animiertes Kreatur-Sprite (Umriss wie bei den Helden), Füße unten mittig auf einer festen Fläche SLOTW × SLOTH."""
+        idx = int(t * 1000.0 / self.fms[key]) % self.fn[key]
+        k = ('sp', key, idx)
+        if k not in self._cache:
+            im, pad, cxf, foot = self.actor_fn(key, idx)
+            c = Image.new('RGBA', (self.SLOTW, self.SLOTH), (0, 0, 0, 0))
+            px = self.CPX
+            x0 = int(round((self.SLOTW / 2 - cxf * px - pad) / self.U) * self.U)
+            y0 = int(round((self.SLOTH - 8 - foot * px - pad) / self.U) * self.U)
+            c.paste(im, (x0, y0), im)
+            self._cache[k] = c
+        return self._cache[k], idx
+
+    def _morph(self, a_k, b_k, u, t):
+        """Das eine Wesen verläuft ins andere (beide animiert): Bayer-Mischung, dazu waagerechte Streifen, die seitlich verrutschen (Glitch), Farbversatz."""
         q = int(u * 14)
-        k = ('mo', a_i, b_i, q)
+        A, ia = self._sprite_img(a_k, t)
+        B, ib = self._sprite_img(b_k, t)
+        k = ('mo', a_k, b_k, q, ia, ib)
         if k not in self._cache:
             U = self.U
-            A, B = np.asarray(self.faces[a_i]), np.asarray(self.faces[b_i])
-            h, w = A.shape[:2]
+            a_, b_ = np.asarray(A), np.asarray(B)
+            h, w = a_.shape[:2]
             yy, xx = np.mgrid[0:h, 0:w]
             thr = np.array(gamefx.BAY8)[((yy // U) % 8), ((xx // U) % 8)] / 64.0
             uu = q / 14.0
-            out = np.where((thr < uu)[..., None], B, A).copy()
+            out = np.where((thr < uu)[..., None], b_, a_).copy()
             amp = math.sin(math.pi * uu)
             band = 14
             for by in range(0, h, band):
-                sh = int(round((gamefx.H(a_i * 7 + b_i, by + q) - 0.5) * 2 * 36 * amp / U)) * U
+                sh = int(round((gamefx.H(len(a_k) * 7 + len(b_k), by + q) - 0.5) * 2 * 26 * amp / U)) * U
                 if sh:
                     out[by:by + band] = np.roll(out[by:by + band], sh, axis=1)
-            if 0.2 < uu < 0.8:                                                        # Farbversatz
-                out[..., 0] = np.roll(out[..., 0], U, axis=1)
-                out[..., 2] = np.roll(out[..., 2], -U, axis=1)
             self._cache[k] = Image.fromarray(out, 'RGBA')
         return self._cache[k]
 
@@ -332,22 +351,30 @@ class DeepShow(CaptionMixin):
             st = self._slot_card(k, t)
             if st is None:
                 continue
+            ox0, oy0 = int(round((x - self.SLOTW / 2) / U) * U), self.SLOT_FOOT - self.SLOTH
+            # Tintenlache unter den Füßen
+            cxs, cys = self._ci(x, self.SLOT_FOOT - 6)
+            for j in range(-3, 4):
+                for i in range(-12, 13):
+                    if (i / 12.0) ** 2 + (j / 3.0) ** 2 <= 1:
+                        g.put(cxs + i, cys + j, INK if (i + j) % 2 else (14, 60, 72), 0.9)
             if st[0] == 'card':
-                ci, t0 = st[1], st[2]
-                im = self.faces[ci]
-                # erstes Auftauchen: Dither-Einblendung mit Tintenring
+                key, t0 = st[1], st[2]
+                im, _ = self._sprite_img(key, t)
+                name = key
                 for (ti, sl, c0) in self.INIT:
-                    if sl == k and 0 <= t - ti < 0.7:
-                        im = self._dissolve(self.faces[c0], 1.0 - (t - ti) / 0.7, ('init', c0, int((t - ti) * 16)))
-                        cxs, cys = self._ci(x, self.SLOT_Y)
+                    if sl == k and 0 <= t - ti < 0.7:                                  # erstes Auftauchen: Dither-Einblendung mit Tintenring
+                        im = self._dissolve(im, 1.0 - (t - ti) / 0.7, ('init', c0, int(t * 1000.0 / self.fms[c0]) % self.fn[c0], int((t - ti) * 16)))
                         for i, col in enumerate([(120, 220, 215), TEAL, TEAL_D]):
                             r = gamefx.rd(gamefx.ease(max(0.0, t - ti - 0.07 * i) / 0.7) * 11)
                             if r > 0:
                                 g.ring(cxs, cys, max(0, r - 1), r, col, 1.0)
-                self._card_at(canvas, im, x, self.SLOT_Y)
             else:
                 _, a, b, u = st
-                self._card_at(canvas, self._morph(a, b, u, k), x, self.SLOT_Y)
+                im = self._morph(a, b, u, t)
+                name = a if u < 0.5 else b
+            canvas.paste(im, (ox0, oy0), im)
+            self.draw_text(canvas, name.upper(), 3, (x, 1640), color=(190, 245, 240), outline=None, shadow=(6, 24, 32))
         # alte Wesen fliegen auf die Hand
         for i, (tm, sl, a, b) in enumerate(self.MORPH):
             ts = tm + self.MORPH_T * 0.5
@@ -361,7 +388,7 @@ class DeepShow(CaptionMixin):
                 z.draw(m, dt)
                 if dt < z.dauer:
                     px, py = z.pos(dt)
-                    self._card_at(canvas, self.smalls[a], px * gp + self.ox, py * gp + self.oy)
+                    self._card_at(canvas, self.smalls[self.CARD_OF[a]], px * gp + self.ox, py * gp + self.oy)
         # Gegner (Heragas)
         if t >= 12.6:
             u = min(1.0, (t - 12.6) / 0.6)

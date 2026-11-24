@@ -292,9 +292,9 @@ def body_mask(frame):
 
 
 class Sprite:
-    def __init__(self, hero_dir_slug, px=SPRITE_PX):
+    def __init__(self, hero_dir_slug, px=SPRITE_PX, base=None):
         self.px = px                       # px je Sprite-Pixel (gerade, damit die halben Pixel der Outline aufgehen)
-        base = ROOT / 'data' / 'hero-animations'
+        base = base or ROOT / 'data' / 'hero-animations'          # base: z. B. data/creature-animations für Kreaturen
         self.meta = json.loads((base / (hero_dir_slug + '.json')).read_text(encoding='utf-8'))
         self.sheet = Image.open(base / self.meta['sheet']).convert('RGBA')
         self.fw, self.fh, self.n = self.meta['frameWidth'], self.meta['frameHeight'], self.meta['frames']
@@ -751,6 +751,9 @@ def main():
             for k_, sl_ in BSL.items():
                 bspr[k_] = Sprite(sl_)
                 bspr[k_].px = deepfx.DeepShow.BPX
+            for k_ in deepfx.DeepShow.CREATURES:                              # Kreaturen: animierte Sprites aus data/creature-animations
+                bspr[k_] = Sprite('deepsea-' + k_, base=ROOT / 'data' / 'creature-animations')
+                bspr[k_].px = deepfx.DeepShow.CPX
             _bc = {}
             def beach_fn(key_, idx_):
                 s_ = bspr[key_]
@@ -764,7 +767,8 @@ def main():
                 im_, pad_ = _bc[ck_]
                 return im_, pad_, s_.center_x, s_.foot
             dg_ = dict(logo_rect=wgeom['logo_rect'], logo_img=logo, badge_rect=badge_rect, badge_img=badge_img, plate_rect=(plate_x, plate_y, plate.width, plate.height),
-                       grid=(sx, sy, spr.px), draw_text=draw_text, assets_dir=str(HERE / 'assets' / 'siphem'), cardback_path=str(ROOT / 'public' / 'cardback.png'), per=per, actor_fn=beach_fn)
+                       grid=(sx, sy, spr.px), draw_text=draw_text, assets_dir=str(HERE / 'assets' / 'siphem'), cardback_path=str(ROOT / 'public' / 'cardback.png'), per=per, actor_fn=beach_fn,
+                       frame_ms={k_: bspr[k_].meta['frameMs'] for k_ in bspr}, frame_n={k_: bspr[k_].n for k_ in bspr})
             wind = deepfx.DeepShow(W, H, U, float(fps), loop, dg_, loop * WIND_LOOPS / float(fps))
         elif creashow_on:
             import creafx
