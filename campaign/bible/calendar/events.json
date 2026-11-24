@@ -65,7 +65,7 @@
    "nathan",
    "baylee"
   ],
-  "gm": "Okonkwo's short, formidable speech from the main steps; Octavia reads the lists in rank order — Spectral, Rare, then the Commons. Rowan, having qualified two weeks after admissions closed, is read out last of all: the Commons, bungalow 7, with N. Whisper and B. Halvorsen. Red Competitive Play jacket issued from a crate, with the plain grey collar of the Commons. Mama Odalys collects 'her' eighteen first-years and marches them down to the cove. First sight of the bungalow row and of the room. If the player sulks about the Commons, let Odalys feed him.",
+  "gm": "Vicar's short, formidable speech from the main steps; Octavia reads the lists in rank order — Spectral, Rare, then the Commons. Rowan, having qualified two weeks after admissions closed, is read out last of all: the Commons, bungalow 7, with N. Whisper and B. Halvorsen. Red Competitive Play jacket issued from a crate, with the plain grey collar of the Commons. Mama Odalys collects 'her' eighteen first-years and marches them down to the cove. First sight of the bungalow row and of the room. If the player sulks about the Commons, let Odalys feed him.",
   "kind": "school"
  },
  {
@@ -864,7 +864,7 @@
    "bex",
    "nathan"
   ],
-  "gm": "Okonkwo, calm and exact: a meteorite, no danger, the site is closed for everyone's safety, lessons continue. Blum is asked to say something reassuring about meteorites and cheerfully gives the odds, which are terrible. In the stands '{H}' asks Rowan, interested, why everyone is sitting in rows facing one person. Students laugh. It is a good question.",
+  "gm": "Vicar, calm and exact: a meteorite, no danger, the site is closed for everyone's safety, lessons continue. Blum is asked to say something reassuring about meteorites and cheerfully gives the odds, which are terrible. In the stands '{H}' asks Rowan, interested, why everyone is sitting in rows facing one person. Students laugh. It is a good question.",
   "kind": "school",
   "hostWho": "add"
  },
@@ -1439,7 +1439,7 @@
    "pilar",
    "imara"
   ],
-  "gm": "Lucian Marrow lands (canon): grey suit, perfect teeth, soft voice, a smile for everyone, two aides and crates marked as laboratory glass. Okonkwo meets him herself. On the Quad he personally announces this year's Design Contest and its prize. He takes the tower's best suite, visits Ashdown in the afternoon, funds 'safety research' on the north slope under Santángel's name, and by evening his people have relieved the staff rota at the crater. He looks through grey collars. Chuck's workshop door is bolted all day. Within days he has found the council: a word about 'modern governance' for Sebastian, ready-made press lines for Pilar's bulletin, and a pleasant request to Imara for the council's copy of the accounts 'for audit'.",
+  "gm": "Lucian Marrow lands (canon): grey suit, perfect teeth, soft voice, a smile for everyone, two aides and crates marked as laboratory glass. Vicar meets him herself. On the Quad he personally announces this year's Design Contest and its prize. He takes the tower's best suite, visits Ashdown in the afternoon, funds 'safety research' on the north slope under Santángel's name, and by evening his people have relieved the staff rota at the crater. He looks through grey collars. Chuck's workshop door is bolted all day. Within days he has found the council: a word about 'modern governance' for Sebastian, ready-made press lines for Pilar's bulletin, and a pleasant request to Imara for the council's copy of the accounts 'for audit'.",
   "kind": "school"
  },
  {
@@ -2072,7 +2072,7 @@
    "rana",
    "okonkwo"
   ],
-  "gm": "The glass cases again. Rowan's letters appear by themselves; on two F he is summoned for a probation hearing (a real scene with Okonkwo). {H=baylee?'Baylee'|Baylee} has scraped his C in Lore if anyone helped him read. The last week of term is light: classes are reviews, and everybody is talking about Friday.",
+  "gm": "The glass cases again. Rowan's letters appear by themselves; on two F he is summoned for a probation hearing (a real scene with Vicar). {H=baylee?'Baylee'|Baylee} has scraped his C in Lore if anyone helped him read. The last week of term is light: classes are reviews, and everybody is talking about Friday.",
   "kind": "school",
   "hostWho": "add"
  },
@@ -2251,7 +2251,7 @@
    "nathan",
    "gideon"
   ],
-  "gm": "Canon, Day 106. Okonkwo's assembly is shorter and harder than in September: the curfew stays, Ward B is 'stable', the Interschool Cup WILL be hosted in March. Stage D begins: the Guest has learned the word 'champion' and wants to 'play the best to learn the most'. If unexposed, {H} {H=@near?is back on the steps of bungalow 7|is back in bungalow 7}, ladder top 10, gentle as ever. If exposed, {H}'s bed is stripped and nobody says {H:his} name, and Gideon Pryce has come back from the break very polite, very still, taking the stairs. Marrow has wintered on the island.",
+  "gm": "Canon, Day 106. Vicar's assembly is shorter and harder than in September: the curfew stays, Ward B is 'stable', the Interschool Cup WILL be hosted in March. Stage D begins: the Guest has learned the word 'champion' and wants to 'play the best to learn the most'. If unexposed, {H} {H=@near?is back on the steps of bungalow 7|is back in bungalow 7}, ladder top 10, gentle as ever. If exposed, {H}'s bed is stripped and nobody says {H:his} name, and Gideon Pryce has come back from the break very polite, very still, taking the stairs. Marrow has wintered on the island.",
   "kind": "school",
   "hostWho": "add"
  },

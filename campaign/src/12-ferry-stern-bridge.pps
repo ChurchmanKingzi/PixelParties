@@ -16,7 +16,7 @@
   object victoria_m sprite=victoria x=56 y=88 h=60 label="Victoria" scene=ferry_victoria when day=1 and time<10:40 and met:victoria
   object sunny sprite=sunny x=80 y=100 h=68 label="Girl on the rail" scene=ferry_sunny when day=1 and time<10:40 and not met:sunny
   object sunny_m sprite=sunny x=80 y=100 h=68 label="Sunny" scene=ferry_sunny when day=1 and time<10:40 and met:sunny
-  object freddie sprite=freddie x=104 y=98 h=56 label="Girl in a swimming cap" scene=ferry_freddie when day=1 and time<10:40 and not met:freddie
+  object freddie sprite=freddie x=104 y=98 h=56 label="Girl with goggles on her head" scene=ferry_freddie when day=1 and time<10:40 and not met:freddie
   object freddie_m sprite=freddie x=104 y=98 h=56 label="Freddie" scene=ferry_freddie when day=1 and time<10:40 and met:freddie
   object marit sprite=marit x=92 y=94 h=64 label="Girl on a bollard" scene=ferry_marit when day=1 and time<10:40 and not met:marit
   object marit_m sprite=marit x=92 y=94 h=64 label="Marit" scene=ferry_marit when day=1 and time<10:40 and met:marit
@@ -71,9 +71,9 @@
 
 @scene ferry_jessica
   @if not met:jessica
-    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest.
+    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one ringed hand resting on the smallest.
     Long golden curls under a small gold coronet set with a red stone and a blue one, blue eyes, a small beauty mark under the left.
-    A small silver swallow brooch pinned at the collar, chosen fresh this morning and worn as if it were nothing.
+    A fine gold chain at her throat with a small swallow charm on it, chosen fresh this morning and worn as if it were nothing. Rings on three fingers, each of them a different stone.
     A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
     She has, you notice, a very particular way of sitting: perfectly upright, perfectly still, her ankles crossed, as though a portrait were being painted and the artist had warned her not to blink.
     She is not looking at you. She has, however, noticed you crossing the deck.
@@ -82,10 +82,9 @@
         [jessica?] "Hello."
         She looks up. A small, real smile, like a candle catching.
         [jessica?] "That's the first time this morning anyone has crossed the deck to say that and nothing else."
-        [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my gloves off for these."
+        [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my hand off these."
         A tilt of the head at the caskets.
         @meet jessica
-        @aff jessica +4 | Said hello plainly
         @flag jessica_plain
       > "Those caskets look like they hold either jewels or a very elegant corpse." @hint Line
         [jessica?] "How lovely."
@@ -129,7 +128,6 @@
         > "Would you like a game after all? I'll understand if the answer is still no." @hint She declined earlier
           [jessica] "On a boat? With my caskets in the way?" A gracious headshake. "After we dock. If you remember to ask me then."
           @flag jessica_game_after_docks
-          @aff jessica +1 | Asked politely
         > "May I ask you a few things, if you've the patience?" @if not chat_jessica_done
           @scene chat_jessica
         > Excuse yourself.
@@ -143,7 +141,7 @@
 
 @scene ferry_ashton
   @if not met:ashton
-    A tall, slim boy with violet hair swept up into one smooth dome stands very nobly at the rail, holding a single rose by the stem. A little silver knife is folded in his other hand.
+    A tall, slim boy with violet hair swept up into one smooth dome stands very nobly at the rail, holding a single rose by the stem. His other hand is turning a thorn between finger and thumb.
     He is trying one line after another. Not one of them is working.
     [ashton?] "A rose for the lady, and my condolences to every man she met before me."
     The lady in question, thirty feet away, is looking at the sea.
@@ -156,7 +154,7 @@
     [ashton] "Vance, isn't it. The Wildcard. I can add up, old thing: a rain jacket, no collar, and a name in ink on the list at the wheelhouse door."
     [rowan] "That's — fair. I'm Rowan, and apparently I'm easy to work out."
     [ashton] "Not at all. You have a very quiet face. It's the jacket that gives you away."
-    He sets the little silver knife against the stem of the rose and, with three exact movements, removes a thorn you could not see.
+    He sets a thumbnail against the stem of the rose and, with three exact movements, removes a thorn you could not see.
     [ashton] "I do this for every rose. It is a courtesy. One should not give a lady a thing that could hurt her without asking."
     [rowan] "That's — actually quite nice."
     [ashton] "Don't say it as if it were a surprise, old thing. I am a *very* nice person. It is simply a long way down."
@@ -189,7 +187,6 @@
       @aff ashton +1 | Brought news
     > "Would you fancy a casual game, Ashton? No stake, just something to do while the lady makes up her mind." @if not flag_ashton_game
       [ashton] "For no stake. Lazily. Is she watching?" He glances at Jessica, who is not. "She is. Very well."
-      @scene deck_ashton
       @duel ferry_ashton deck=ashton name="Ashton Beaumont-Lyle"
         @win
           [ashton] "Poisoned the field and still lost. How instructive. Naturally." A beat. "…What was the question?"
@@ -242,7 +239,6 @@
       > "Would you play a game with me at some point? I'd like to see how you play." @if not victoria_game_after_docks @hint After docks
         [victoria] "I do not play in a crowd. After we dock. At a table." A faint, almost-smile. "I should like it very much."
         @flag victoria_game_after_docks
-        @aff victoria +1 | Asked politely
       > "May I ask you a few things? One at a time." @if not chat_victoria_done
         @scene chat_victoria
       > Let her be.
@@ -294,7 +290,6 @@
       [sunny] "Right. Ten push-ups for the loser. On the planks."
       @choice
         > "You're on. Ten push-ups for the loser, on the planks."
-          @scene deck_sunny
           @duel ferry_sunny deck=sunny name="Sunny Aldane"
             @win
               [sunny] "No dramas!" She is already face-down on the planks, counting aloud, loudly, with great goodwill. "Seven! Eight! Nine — I'm lying, that was six. TEN!" She bounces up. "Good game, Wildcard!"
@@ -312,7 +307,6 @@
           [sunny] "Chicken." Affectionately. "Come find me on land."
     @else
       [sunny] "Hey, Wildcard! Still alive?"
-      @aff sunny +1 | Chatted
       @time 5
       @if not chat_sunny_done
         @choice
@@ -325,7 +319,7 @@
 
 @scene ferry_marit
   @if not met:marit
-    A girl in a flame-orange bow tie is standing on a mooring bollard, reciting to the gulls.
+    A girl with two tall flame-shaped tufts of hair, each one tied up with an orange bow, is standing on a mooring bollard, reciting to the gulls.
     "…and in that hour, when the sea went grey as a forgotten promise —" She has long flame-orange hair that flares up into two tall, flame-shaped tufts, one on each side of her head, and a scarf the colour of embers wound twice round her throat. She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter.
     She sees you. The recital stops.
     [marit?!] "A **HUMAN!** An *AUDIENCE!* The gods are *generous* this morning! **BEHOLD!**"
@@ -354,7 +348,6 @@
           A small crowd gathers around the bollard in the time it takes to shuffle. Six people, then eight. The deckhand with the tea, two girls from the lounge, a boy with a clipboard. Your hands begin to shake the moment you pick up the deck.
           ~ Everyone's watching. Not me, exactly. The game. But close enough.
           [marit!] "From the ashes of my frankly terrible opening hand — she **RETURNS!** *(I had no idea that would work.)*"
-          @scene deck_marit
           @duel ferry_marit deck=marit name="Marit Solberg"
             @win
               [marit!] "**ALAS!** *DEFEAT!* And what a defeat, ladies and gentlemen, what a — no. No, it's a good one." She drops, for exactly one sentence, into an ordinary voice. "Rowan Vance, you have a very quiet kind of thunder."
@@ -371,7 +364,6 @@
           [marit!] "Later! The **SEQUEL!** The sequel is *always* better!"
     @else
       [marit!] "Rowan! **PROTAGONIST!** Have you seen the island? It has a **MOUNTAIN!** I have already written a monologue!"
-      @aff marit +1 | Chatted
       @time 5
       @if not chat_marit_done
         @choice
@@ -466,7 +458,7 @@
 @scene ferry_rana
   @if not met:rana
     On the top step of the iron stair a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship.
-    Rose-brown hair gathered in two fat puffs tied with dark-red ribbons, under a pale fringe. Black nail polish, chipped from biting. A plain grey collar studded with tiny silver studs.
+    Blonde hair in two long braids that hang down in front of her shoulders, each one tied off with a large red bow. Black nail polish, chipped from biting. A plain grey collar studded with tiny silver studs.
     She is watching the planks.
     She knows you are there. You can tell from the set of her shoulders, which have gone, very slightly, a little straighter, in the manner of an animal that has heard a twig.
     She does not look up.
@@ -533,7 +525,7 @@
     [rowan] "I — no, I'm sorry. I came aboard late and I don't know anything about the unloading. I'm Rowan."
     [teobalt?] "No. Nobody does. I have asked the captain, and he says it comes off in the order it comes off."
     [teobalt?] "That is, I'm afraid, not an order."
-    [teobalt?] "Teobalt Ferrant. I have drawn up a list."
+    [teobalt?] "Teobalt Fullington. I have drawn up a list."
     @meet teobalt
     @add ferry_talked +1
     @note teobalt | Keeps lists and a clipboard. Worried about the unloading order.
@@ -566,7 +558,6 @@
         A faint, regretful smile.
         [teobalt] "It is an excellent offer. I accept it for Thursday."
         @flag teobalt_thursday
-        @aff teobalt +1 | Asked politely
       > "Sorry to bother you."
         [teobalt] "It is no bother. It is, at worst, an interruption. And I like those, in moderation."
     @time 6

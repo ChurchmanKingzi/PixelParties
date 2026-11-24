@@ -87,7 +87,6 @@
       @time 20
     > "Who is on the row? I'd like to know whose bungalow is whose."
       [odalys] "Nineteen. Six bungalows' worth. Every one of them mine." A heavy, fond pause. "Do not let the loud one tell you he is the most trouble. He is the most noise. It is different."
-      @aff odalys +1 | Chatted
   @time 8
 
 @scene room_unpack
@@ -152,7 +151,6 @@
       @flag hedda_leaflet_read
     > "Maybe after dinner. I'd like to read it properly, and I don't want to rush it."
       [hedda] "After dinner. Fine. I'll hold my fire."
-      @aff hedda +1 | Polite
     > "Is the sausage a witness, or a defendant?" @hint Risky
       The megaphone comes up. You are very glad it is not switched on.
       [hedda] "Jokes about veganism! The OLDEST evasion in the book!"
@@ -244,7 +242,7 @@
   A young woman in a pencil skirt, with a sleek black bob, red-framed glasses and a slim black brace on her right wrist stands at the judge's chair. A small, neat girl with black braids stands behind a table at the side with a stamp the size of her fist and the expression of someone who has never once misfiled anything.
   [hana] "Mr Vance. I am Ms Kirishima, Rules and Judging. This is a placement duel. It is not an examination. It is a measurement. Please be precise with your terminology and do not narrate your emotions."
   [hana] "Your opponent."
-  A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Rose-brown hair in two fat puffs tied with dark-red ribbons. Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention.
+  A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Blonde hair in two long hanging braids, each tied off with a large red bow. Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention.
   [hana] "Rana Marika. Repeating year. Please be seated."
   @if met:rana
     She glances at you. A very flat flicker of recognition goes across her face, followed by an even flatter one of dread.
@@ -484,7 +482,7 @@
   Within three minutes, the bed by the door begins to snore.
   It is a tremendous snore. It is the snore of a chainsaw, a friendly chainsaw, at a very great distance, in a room designed for the purpose. You lie awake and listen to it for a very long time, and discover, somewhere around the fortieth minute, that you are smiling at the ceiling.
   ~ Day one. I'm still here. I didn't throw up.
-  ~ Tomorrow I'll find out what the colours mean.
+  ~ Tomorrow the ranking starts for real. Tonight it is just a bed, and a ceiling, and a friendly chainsaw.
   @flag day1_complete
   @time 60
 

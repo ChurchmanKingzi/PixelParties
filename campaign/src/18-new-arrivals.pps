@@ -12,25 +12,28 @@
 @scene ferry_branden
   @if not met:branden
     Somebody has taken the lifebuoy off the rail and is rolling it down the deck like a hoop. The somebody is perhaps ten years old. The first thing you notice is the hair, a flame-orange mop that stands up in spikes as if it is in the middle of a shout. The second is the jacket, three sizes too big, its sleeves flapping past his hands like flags. The third is the grin, which has already decided to regret nothing.
-    [branden?] "You! Jacketless! Be my timekeeper! I get this thing to the funnel without a crewman catching me and you owe me a Smug Coin. I get caught and you owe me a Smug Coin anyway, for witnessing."
+    [branden?] "You! Jacketless! Be my timekeeper! If I get this thing to the funnel before a crewman catches me, you owe me one Smug Coin. If I get caught, you don't, but I'll still say it was a *very* good attempt."
     @choice
-      > "That's the ship's lifebuoy. Somebody might need it."
+      > "That's the ship's lifebuoy. Somebody might need it. I'm Rowan, by the way."
         [branden?] "Nobody's drowning. Technically. I checked the whole deck."
         [branden?] "Branden Sunflower. National champion. Under tens. Two years running. And you're the boring one who's about to tell on me."
         [rowan] "I haven't told anyone."
         [branden?] "*Yet!*"
-        @aff branden -1 | Pointed at the lifebuoy
         @flag branden_scolded
-      > "All right. I'll time you. Go."
+        @flag branden_said_champion
+      > "All right. Rowan, timekeeper. I'll time you. Go."
         [branden?] "A SPORT! Okay! On three! One! Two — "
         He is off along the deck with the buoy bowling ahead of him. Half a dozen heads turn. From somewhere above the lounge stairs a voice that can only belong to a captain shouts "WHO HAS MY LIFEBUOY?" and the sprinter takes a corner so fast that he skids.
         [branden?] "Eleven seconds! Pay up!" Breathless, magnificent, unashamed. "Branden Sunflower! Remember it! You timed the best!"
+        You fish a Smug Coin out of the pouch and put it in his hand. He bites it, looks wounded when it does not give, and pockets it with great dignity.
+        @coins -1
         @aff branden +3 | Timed his run
         @flag branden_prank_buddy
-      > "How old are you, exactly?"
+      > "How old are you, exactly? I'm Rowan, and I'm trying to work out who's in charge here."
         [branden?] "TEN. Ten and three quarters. Technically eleven in spirit."
         [branden?] "Branden Sunflower. National champion. Under tens. Two years running. You can write it down, but I won't wait."
         @aff branden +1 | Asked his age
+        @flag branden_said_champion
     @meet branden
     @add ferry_talked +1
     [branden] "Everyone else on this boat is *old*. You're old. You're, what, seventeen? That's *ancient*. I'm the youngest here, so technically I've got the best seat in the house, and I'm not giving it up."
@@ -40,7 +43,6 @@
     @choice
       > "Do you want a game, Branden?" @if not flag_branden_game and not branden_scolded
         [branden] "A GAME! Finally somebody brave!" He abandons the bucket without a backward glance.
-        @scene deck_branden
         @duel ferry_branden deck=branden name="Branden Sunflower"
           @win
             [branden] "That doesn't count. That was a trial run. You got lucky, that's — hang on — what do you mean, *good game*?"
@@ -77,7 +79,7 @@
       @flag deck_skipped_branden
       @end
   Rowan has put his head on one side. His voice comes out low and quick.
-  [rowan] "…Luna Pele. Poison burns for the rest of the game. Every burn, a card, up to four a turn. Ida for Destruction that can't be blocked. Fire Bolts. Fireball on two. Heat Wave lights the whole board, then Heart of the Mountain draws one per burning target. Flame Avalanche to finish." A pause. "All spells. No board. When the burn runs out there's nothing."
+  [rowan] "…Luna Pele. Poison burns for the rest of the game. Every burn, a card, up to four a turn. Tazune to shrug off the first two hits of his own fire every turn. Fire Bolts. Fireball on two. Heat Wave lights the whole board, then Heart of the Mountain draws one per burning target. Flame Avalanche to finish." A pause. "All spells. No board. When the burn runs out there's nothing."
   [branden] "There's *always* something!" Offended, but a little too quick. "There's — Fiery Slime! There's an egg!"
   [rowan] "There's an egg."
   [branden] "…It's a *very* good egg."
@@ -102,10 +104,10 @@
   @label top
   @if chat_branden_1 and chat_branden_2 and chat_branden_3
     @flag chat_branden_done
-    [branden] "That's enough questions. You're welcome. I'll take that Smug Coin now." A beat. "…I'll take it *later*."
+    [branden] "That's enough questions. You're welcome. Go and be ancient somewhere else."
     @end
   @choice
-    > "Tell me about being national champion." @if not chat_branden_1
+    > "Tell me about being national champion." @if not chat_branden_1 and branden_said_champion
       [branden] "Two years running. Under tens. The final was in a *school gym*, the other kid cried, I did a lap of honour, they let me keep the trophy for a week."
       [branden] "I do not *give* the trophy back. They keep sending letters. I have a drawer for the letters."
       [rowan] "Do you read them?"
@@ -125,14 +127,13 @@
       @note branden | Pranks: the bucket, and every shoe in the school gym on the roof.
       @time 2
       @jump top
-    > "Aren't you supposed to be in bed at some point? Isn't there a curfew?" @if not chat_branden_3
-      [branden] "A *what*?" Suspicious delight. "Is that a kind of cheese?"
-      [branden] "No. Okay. I know what a curfew is. It's an idea that other people have about me. I've decided it doesn't apply."
-      [rowan] "Who decides that?"
-      [branden] "*Me!* National champion!" A very small, very brief flash of something different. "…The other kids on the ship get a lot of rules. I just like it when nobody can find me."
-      @aff branden +1 | Asked about the rules
+    > "What are you hoping to find on the island?" @if not chat_branden_3
+      [branden] "A volcano. They have a *volcano*. I'm going to find out if you can toast a marshmallow on it, and then I'm going to find out if you can toast a *person* on it, and then I'm going to be told no."
+      [rowan] "Probably in that order."
+      [branden] "In that order! You're good at this!" A very small, very brief flash of something different. "…At home nobody wanted to find things out with me. They said I was too much. This is the first place that's got a *volcano*."
+      @aff branden +1 | Asked what he wants
       @flag chat_branden_3
-      @note branden | Ignores curfews: 'an idea other people have about me.'
+      @note branden | Wants to find out whether you can toast a marshmallow on the volcano. At home nobody wanted to explore with him.
       @time 2
       @jump top
     > "Have you met Georgie? The girl with the dark-blue feather?" @if met:georgie and not chat_branden_4
@@ -140,7 +141,6 @@
       [rowan] "She seemed a bit nervous."
       [branden] "That's because she's seen the competition." A beat, and then, a little less loudly: "…She asked if she could sit on the rope. Nobody asks that. I was going to say yes if she'd asked me. I was going to charge her a Smug Coin."
       [branden] "…It's *annoying*. She used to be the youngest. Now it's me. And everyone's still looking at her *first*."
-      @aff branden +2 | Listened
       @flag chat_branden_4
       @note branden | Is jealous that Georgie used to be the youngest.
       @rel branden georgie
@@ -157,7 +157,7 @@
 
 @scene ferry_freddie
   @if not met:freddie
-    At the stern rail a girl in a pale-aqua swimming cap and a red jacket worn open over a swimsuit is hanging over the wake by her waist, peering at the water through a diver's mask, with her bare feet hooked round the lowest bar. A frond of seaweed is stuck to her cap. She is, with great concentration, talking to the sea.
+    At the stern rail a girl with a mop of wet red hair, a pair of diving goggles pushed up on her forehead and a red jacket worn open over a swimsuit is hanging over the wake by her waist, peering at the water with her bare eyes, with her bare feet hooked round the lowest bar. A frond of green algae is plastered in her hair. She is, with great concentration, talking to the sea.
     [freddie?] "Come on — come ON — I saw you, you big brown — that's a ray. That's a *ray*. Hey! Jacketless! Is that a ray?"
     @choice
       > "I can't see anything. I think that's the shadow of a cloud."
@@ -182,7 +182,6 @@
     @choice
       > "Fancy a game, Freddie?" @if not flag_freddie_game
         [freddie] "A game! Brilliant. I get to show off Mizune."
-        @scene deck_freddie
         @duel ferry_freddie deck=freddie name="Freddie Camara"
           @win
             [freddie] "Oh, you beat me! Good. That's fair, I never got to the Aquatics. Does that count as a loss?" She does not seem to mind in the least. "It was lovely to look at, anyway."
@@ -205,7 +204,7 @@
   @if deck_known_freddie
     @end
   @choice
-    > "A swimming cap, a diver's mask, seaweed on your head. I'm guessing the deck is the sea. Aquatic?" @hint From her gear
+    > "Diving goggles on your forehead, algae in your hair, wet from head to foot. I'm guessing the deck is the sea. Aquatic?" @hint From her gear
       [freddie] "AQUATIC!" She slaps the rail so hard that a gull relocates. "He's *seen* me! Aquatic! Silent Water Mizune! She's the best-looking hero in the whole game, and everything else follows!"
       @aff freddie +3 | Read her from her gear
     > "What do you play, Freddie?"

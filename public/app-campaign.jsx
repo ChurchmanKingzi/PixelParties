@@ -1164,7 +1164,7 @@ function cmpMakeRunner(io) {
       await io.say({
         speaker: step.say, text: step.text || step.think || '',
         think: !!step.think, side: step.side, speed: step.speed,
-        portrait: step.portrait, color: step.color, name: step.name,
+        portrait: step.portrait, color: step.color, name: step.name, alias: step.alias,
       });
     }
     if (step.wait) await io.sleep(step.wait);

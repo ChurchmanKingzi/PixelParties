@@ -73,7 +73,6 @@
       [baylee] "Seemed wrong to waste it on staying home."
       [rowan] "I hope it does matter."
       [baylee] "Me too." Plainly. "Working on it."
-      @aff baylee +2 | Listened
       @flag chat_baylee_2
       @note baylee | His father put the farm money by for something that mattered.
       @time 2
@@ -202,7 +201,6 @@
       [rowan] "That's not a competition."
       [georgie] "It feels like one." A very small, very brave pause. "Is it bad that I want to win?"
       [rowan] "I don't think so."
-      @aff georgie +2 | Listened
       @flag chat_georgie_4
       @time 2
       @jump top
@@ -535,7 +533,6 @@
       [magnus] "Because for two years I have been *second*, Vance." He says it very quietly. "It is a rank nobody mentions. Nobody writes an article about the one below. Nobody makes a handle for the one below."
       [rowan] "I never knew you were there."
       [magnus] "I know. That is what I find so difficult."
-      @aff magnus +1 | Heard him out
       @flag chat_magnus_3
       @note magnus | Was ranked second for two years and nobody ever mentioned it.
       @time 2

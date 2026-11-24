@@ -98,7 +98,6 @@
     [nathan] "Rowan. Can I say a thing? Before everybody comes. It's — I'm glad you took my hand. This morning. When I stuck it out. Everybody else has been running away from me since the harbour, and I was getting really loud about it, so nobody would notice."
     [rowan] "Nathan, you were extremely loud."
     [nathan=happy] "It WORKED! You noticed!"
-    @aff nathan +2 | Told him he was glad
   @elif aff:nathan>=11
     [nathan=happy] "Big day, Wildcard! Big day! Do you know what they do on the first night? I read about it. There's a feast and a speech, and somebody gets thrown in the sea. I'm hoping it's not me. I'm hoping it's Baylee."
     [baylee] "I'd float."
@@ -117,7 +116,6 @@
     [rowan] "How can you tell?"
     [baylee] "It's the one that looks like it's trying not to be noticed."
     @note baylee | Notices things and says very little. Likes quiet company.
-    @aff baylee +2 | Gave you the good spot
   @else
     [baylee] "Morning, Rowan. Almost afternoon." A pause. "Almost there."
   @if met:ed
@@ -140,7 +138,6 @@
     [mikoto] "Oh — oh, Rowan, hello. Sorry. Look, there's — I think I have to sit down. Everything is — everything is so much larger than the pictures." He laughs, high and brief, and presses a hand over his mouth. "Sorry. I'm looking. I'm looking at it."
     [rowan] "You can hold the rail if you need to."
     [mikoto] "Thank you." A quick, startled glance behind the lenses. "That's — very nice. That's nicer than 'calm down'."
-    @aff mikoto +1 | Offered him the rail
   @else
     A thin boy in round glasses is next to the gull-feeding rail, holding on with both hands and breathing very carefully.
     [mikoto?] "Sorry. Sorry! I'm — it's just a very big volcano. I'm making a list. I'm — oh, you're looking at me. Mikoto. Yamaguchi. I'm Mikoto, I'm having a very good time, it just doesn't look like it."
@@ -285,7 +282,7 @@
       [marit] "I'm really glad you came to find me. I wasn't going to say that, there's a whole speech. It's got a pause in it. But you're here, and — it'd be silly not to say it."
       @aff marit +2 | Dropped the act for him
   @else
-    A girl in a flame-orange bow tie is standing on a mooring bollard with her arms flung out, reciting at the island.
+    A girl with two tall tufts of flame-orange hair, each tied up with an orange bow, is standing on a mooring bollard with her arms flung out, reciting at the island.
     [marit?!] "**ACT ONE, SCENE LAST!** The voyage ends! The island RISES! And there — look! — a **STRANGER** on the stern deck, in a rain jacket, who has no idea what comes *next!*"
     [marit?!] "Marit Solberg! Theatre kid **EXTRAORDINAIRE!** We have not met, and I already love you, I have *decided* you are the lead!"
     @meet marit
@@ -303,7 +300,7 @@
     [sunny?] "Sunny Aldane. Lifeguard. Sports scholarship. I've been looking forward to a swim for two *days*, which I understand is not long, but it is to *me!*"
     @meet sunny
     @note sunny | Lifeguard on a sports scholarship. Says exactly what she thinks.
-  A girl in a pale-aqua swimming cap, with a red jacket worn open over a swimsuit, is climbing the stern rail.
+  A girl with wet red hair and diving goggles pushed up on her forehead, a red jacket worn open over a swimsuit, is climbing the stern rail.
   @if met:freddie
     [freddie] "Rowan! Jacketless! Hold this!" She hands you the jacket without looking round, which is, you realise, an instruction. "I've been timing it! Four hundred metres to the pier, a bit of a current, I can do it in eight minutes, easily. Eight and a half if the shark's about."
     [sunny] "Freddie. FREDDIE. Get down."
@@ -344,13 +341,13 @@
       @aff freddie +2 | Held the mask, not the argument
       @flag freddie_talked_down
   @if met:jessica
-    [jessica] "Rowan." She is the only person on the stern who is not in motion. She stands a little apart, with one gloved hand on the smallest of her caskets, and a bright lapis shawl over her shoulders that she did not have an hour ago. "I wished to say, before we land, that it was a pleasure to have been crossed to."
+    [jessica] "Rowan." She is the only person on the stern who is not in motion. She stands a little apart, with one ringed hand on the smallest of her caskets, and the gold chain at her throat catching the morning light. "I wished to say, before we land, that it was a pleasure to have been crossed to."
     [rowan] "The pleasure was mine, Jessica."
     [jessica] "I shall hold you to that." A small, genuine smile. "In writing, if necessary."
     @aff jessica +1 | Answered in kind
   @else
-    A girl in a lapis shawl is standing a little apart from the commotion with one gloved hand on a small leather casket. She has a silver swallow brooch at her throat and a look of patient serenity, like a lamp that has not yet been told it is the only light in the room.
-    [jessica?] "You are watching the water. So am I. It is a pleasant thing to share." She does not turn her head. "Jessica Montclair. I should offer my hand, but it is gloved, and the casket does not like to be left."
+    A girl with a gold chain at her throat is standing a little apart from the commotion with one ringed hand on a small leather casket. A small swallow charm hangs from the chain and a look of patient serenity, like a lamp that has not yet been told it is the only light in the room.
+    [jessica?] "You are watching the water. So am I. It is a pleasant thing to share." She does not turn her head. "Jessica Montclair. I should offer my hand, but it is busy, and the casket does not like to be left."
     @meet jessica
     @note jessica | Formal, gracious. Travels with three caskets of jewellery.
   @if met:ashton
@@ -358,7 +355,7 @@
     [rowan] "You're not."
     [ashton] "I am, old thing! I'm ten per cent less ignored than I was at breakfast."
   @else
-    A tall boy with violet hair swept into a smooth dome is standing at the rail with a single red rose, and a very small silver knife folded in his other hand. His whole attention is directed at the girl in the lapis shawl.
+    A tall boy with violet hair swept into a smooth dome is standing at the rail with a single red rose, and the thorn of it pinched between finger and thumb of his other hand. His whole attention is directed at the girl with the gold chain.
     [ashton?] "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does." He does not look round. "I'm told you are the entrant in ink. I have prepared a speech for the lady. It has four paragraphs and a joke about gulls."
     @meet ashton
     @note ashton | Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes.
@@ -426,7 +423,7 @@
     @meet branden
     @note branden | Ten, loud, and a national champion. Pranks everyone.
   @if met:rana
-    On the top step of the iron stair to the wheelhouse, a girl with two fat puffs of rose-brown hair is sitting, knees drawn up, with her back to the crowd and her eyes on the island.
+    On the top step of the iron stair to the wheelhouse, a girl with two long blonde braids, each one tied off with a big red bow, is sitting, knees drawn up, with her back to the crowd and her eyes on the island.
     @if aff:rana>=11
       [rana] "…Hey."
       [rowan] "Hey."
@@ -440,7 +437,7 @@
       [rowan] "Just standing."
       [rana] "Fine." A pause. "Don't talk."
   @else
-    On the top step of the iron stair to the wheelhouse a girl is sitting with her knees drawn up and her back to the crowd. Her hair is gathered in two fat rose-brown puffs, and her eyes are on the island.
+    On the top step of the iron stair to the wheelhouse a girl is sitting with her knees drawn up and her back to the crowd. Her hair hangs in two long blonde braids with big red bows, and her eyes are on the island.
     [rana?] "…No."
     [rowan] "I haven't said anything."
     [rana?] "Rana. That's all you get."
@@ -457,7 +454,7 @@
       [teobalt] "I have drawn up an unloading order. You are somewhere in the middle. I am sorry. It is nothing personal. It is alphabetical."
   @else
     A boy in a long red coat buttoned to the collar is standing perfectly straight beside the stair with a clipboard at chest height, counting heads aloud, under his breath, to the nearest crate.
-    [teobalt?] "Forty-one. Forty-two. Excuse me — you are in the way of the count. Not unkindly. It is a *fact*. Teobalt Ferrant. I am making a list of the order in which we leave."
+    [teobalt?] "Twenty-four. Twenty-five. Excuse me — you are in the way of the count. Not unkindly. It is a *fact*. Teobalt Fullington. I am making a list of the order in which we leave."
     @meet teobalt
     @note teobalt | Makes lists. Organises everything.
     [rowan] "Rowan. How am I doing?"
@@ -540,9 +537,7 @@
     [baylee] "I'll be on the gangway."
     [branden] "…I'll be the *second* one off."
   The engine falls from a thrum to a murmur. The pier swings round, huge and brown, and all at once you can see individual planks, each with its own bleach of salt, and each stained in its own particular way by forty years of boots.
-  @if arr_bow
-    ~ I did that. I did all of that. I talked to people today.
-  @else
+  @if not arr_bow
     ~ I haven't talked to half of them. I'll have to.
   ~ Whatever I do on the island, I'll start it here.
   A long, deep note from below, like a cello being played by a mountain. A ripple through the soles of your feet. The ship shudders once, very gently, and then stops.

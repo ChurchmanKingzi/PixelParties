@@ -59,7 +59,6 @@
     @enter inya
     @if ferry_inya_won
       [inya] "Hey. Hey, Wildcard." She goes by with her chin high and her deck box under her arm. Behind her, ten paces back, Gideon is carrying her rucksack with a face like a man being photographed with a tax inspector. "Watch this."
-      @aff inya +1 | Shared the walk off the ship
     @elif ferry_inya_lost
       [inya] "I'm fine." She does not look back. "Don't say anything. I'll see you on the sand."
     @else
@@ -95,7 +94,7 @@
   @if freddie_jumped
     @enter freddie
     @enter sunny
-    At the far side of the pier a dripping figure in a pale-aqua swimming cap is hauling herself up a ladder, grinning, with a towel-wrapped lifeguard hauling after her and shouting something about "a *week* of nothing but breaststroke."
+    At the far side of the pier a dripping figure with red hair, a stripe of green algae and a pair of diving goggles shoved up on her forehead is hauling herself up a ladder, grinning, with a towel-wrapped lifeguard hauling after her and shouting something about "a *week* of nothing but breaststroke."
     [freddie] "ROWAN! JACKETLESS! IT WAS EIGHT AND A HALF MINUTES! I TOLD YOU!"
     [sunny] "Seven and a half, you absolute liar."
     @exit freddie
@@ -194,7 +193,7 @@
   In front of the tower, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds.
   [okonkwo] "Good morning."
   A hundred new heartbeats, all in tempo.
-  [okonkwo] "I am Dr Marguerite Okonkwo. I am Chancellor of Pixel Academy, and I have been for a very long time."
+  [okonkwo] "I am Dr Marguerite Vicar. I am Chancellor of Pixel Academy, and I have been for a very long time."
   [okonkwo] "You have been admitted to this school out of two thousand, one hundred and fourteen applicants. That is not a boast. It is a statistic, and I distrust everything else I might say about it."
   [okonkwo] "Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well."
   A ripple of nervous laughter, instantly suppressed.
@@ -210,7 +209,7 @@
   @if met:gideon
     From somewhere to your left, a thin, courteous voice murmurs, "Here." You do not turn round.
   The names go on. Each one is a small door closing behind a face in the crowd, and each face crosses the grass to join an older student in a white-and-gold collar and vanishes up the hill.
-  [octavia] "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Ferrant, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
+  [octavia] "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Fullington, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
   @if met:sunny
     @fullname sunny
   It is a long list. You start counting, and stop, and start again, because it is easier than thinking about what it means that your name has not been read.
@@ -221,7 +220,8 @@
   [octavia] "Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana."
   [octavia] "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred."
   [octavia] "Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor."
-  [octavia] "Bungalow six: Counts, Sammy. Crowe, Tobias. Volkov, Dmitri."
+  [octavia] "Bungalow six: Counts, Samuel. Crowe, Tobias. Volkov, Dmitri."
+  Out at the edge of the lawn, a boy in a long black coat flinches at "Samuel" as if it were a draught.
   @if met:livvie
     @fullname livvie
   @if met:tomi
@@ -326,6 +326,4 @@
   There is a footlocker. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet.
   ~ I live here now. This is where I live.
   @flag unpacked_started
-  @aff nathan +1 | Roommate
-  @aff baylee +1 | Roommate
   @time 15

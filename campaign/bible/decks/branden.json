@@ -3,13 +3,17 @@
  "owner": "branden",
  "heroes": [
   "Luna Pele, the Flame Dancer",
-  "Ida, the Adept of Destruction",
+  "Tazune, the Angry Hot-Blood",
   "Luna, the Flame Fairy"
  ],
  "main": [
   [
-   8,
+   7,
    "Destruction Magic"
+  ],
+  [
+   1,
+   "Adventurousness"
   ],
   [
    3,
@@ -108,7 +112,6 @@
  ],
  "types": {
   "Luna Pele, the Flame Dancer": "Hero",
-  "Ida, the Adept of Destruction": "Hero",
   "Luna, the Flame Fairy": "Hero",
   "Destruction Magic": "Ability",
   "Singing": "Ability",
@@ -133,7 +136,9 @@
   "Golden Ankh": "Artifact",
   "Fire Bomb": "Potion",
   "Elixir of Quickness": "Potion",
-  "Bottled Flame": "Potion"
+  "Bottled Flame": "Potion",
+  "Tazune, the Angry Hot-Blood": "Hero",
+  "Adventurousness": "Ability"
  },
  "gist": {
   "Luna Pele, the Flame Dancer": "The main hero: whenever anything is Poisoned it is Burned for the rest of the game, and every time a target is Burned (up to four times a turn) Branden draws a card.",
@@ -141,9 +146,10 @@
   "Heat Wave": "Burns every target on the board except the caster for the rest of the game.",
   "Heart of the Mountain": "Draws a card for every Burned target on the board, up to four.",
   "Flame Avalanche": "150 damage to everything the opponent controls, and nothing else can hurt them that turn.",
-  "Arcane Lamp": "Burns one of the opponent's targets: the cheapest way to start a fire."
+  "Arcane Lamp": "Burns one of the opponent's targets: the cheapest way to start a fire.",
+  "Tazune, the Angry Hot-Blood": "The first two times every turn Tazune would take damage from Branden's own cards, including recoil, it is reduced to nothing: Branden can burn himself without a care."
  },
- "plan": "Branden burns everything. Luna Pele turns every Burned target into a card, Ida makes the Destruction Spells unblockable, and Heat Wave lights the entire board so that Heart of the Mountain can draw four. The deck is fast, loud and made of spells, and has almost no board: the heroes are small, the creatures are eggs and slimes, and when the burn runs out Branden has nothing at all to fall back on except more complaints.",
+ "plan": "Branden burns everything. Luna Pele turns every Burned target into a card, Tazune shrugs off the first two hits of Branden's own fire each turn, and Heat Wave lights the entire board so that Heart of the Mountain can draw four. The deck is fast, loud and made of spells, and has almost no board: the heroes are small, the creatures are eggs and slimes, and when the burn runs out Branden has nothing at all to fall back on except more complaints.",
  "looks": {
   "early": "Fire Bolts, a Fireball on two heroes and Branden announcing the score.",
   "mid": "Heat Wave on the board, Luna Pele drawing a card for every burning target, Heart of the Mountain finishing the hand.",

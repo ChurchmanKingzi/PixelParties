@@ -1,234 +1,234 @@
 {
-  "id": "ashton",
-  "name": "Ashton Beaumont-Lyle",
-  "firstName": "Ashton",
-  "age": 19,
-  "sex": "m",
-  "group": "student",
-  "major": "CP",
-  "year": 1,
-  "dorm": "spectral",
-  "room": "S4",
-  "romance": false,
-  "deck": "Spell Industrialization (Pollution)",
-  "look": "Tall and slim, with violet hair swept over his forehead in one smooth, glossy dome, green eyes and a tailored red jacket worn open over a pale waistcoat, with grey trousers and an orange sash at the waist. There is always a rose in his hand or his lapel, de-thorned with a little silver knife he carries for the purpose. He keeps his eyes half-closed, as though a portrait is being painted.",
-  "voice": "A lazy, amused upper-class drawl, fluent in rehearsed gallantry and at its most likeable in the half-second after a line falls flat. He performs for the room, then speaks quite plainly and intelligently about cards when he forgets to. Never hurried, seldom sincere on purpose. RARE habit (once in a scene at most; most scenes go without it): 'old thing' or 'darling' for people he has known five minutes.",
-  "lines": [
-    "A rose for the lady, and my condolences to every man she met before me.",
-    "Vance, isn't it — the laundry boy with the storm deck. Don't look like that. I've watched your replays. Twice.",
-    "Naturally. ...What was the question?",
-    "My deck spoils the field for everyone, myself included. People show you who they are when everything's a little poisoned."
-  ],
-  "intro": "A wealthy Spectral first-year who hands a rose to every woman he meets and is convinced nobody can resist him.",
-  "traits": [
-    {
-      "id": "ashton_1",
-      "text": "He buys roses at the town boutique on account and has given one to every woman in the year.",
-      "how": "Seen from Day 1; the boutique keeps a standing order."
-    },
-    {
-      "id": "ashton_2",
-      "text": "He removes the thorns himself with a small silver knife and is weirdly good at it.",
-      "how": "Sit near him in the cafeteria or student lounge."
-    },
-    {
-      "id": "ashton_3",
-      "text": "He has a long list of ex-girlfriends, some of them on this island, and stays on speaking terms with nearly all.",
-      "how": "Bex's stream, or any of the women in question."
-    },
-    {
-      "id": "ashton_4",
-      "text": "He has watched replays of almost everyone in the year and remembers their openers.",
-      "how": "Play him; he quotes your own games at you."
-    },
-    {
-      "id": "ashton_5",
-      "text": "He is terrible with money he did not have to earn and tips absurdly.",
-      "how": "Any town scene: cafe, bar, boutique."
-    },
-    {
-      "id": "ashton_6",
-      "text": "He writes to his little sister Clemmie every single day, by hand.",
-      "how": "Catch him at the campus store buying stamps, or in the Spectral lobby in the Morning."
-    },
-    {
-      "id": "ashton_7",
-      "text": "He has never once been the one who was left without pretending he arranged it.",
-      "how": "From Jessica or Bex, with a smile."
-    },
-    {
-      "id": "ashton_8",
-      "text": "He does not know whether anyone has ever liked him without the money, and is fairly sure he would not like the answer.",
-      "how": "Only at Trusted; late, at the bar."
-    }
-  ],
-  "secret": "Ashton is the second son of a family that made its fortune in industrial solvents (he finds it very funny that he plays Pollution; his father does not). He was raised by nannies and a boarding school, learned early that charm is a currency and that if you are the one handing out roses nobody notices you were never given one. He is not stupid and not cruel; he is lazy with people because it has always worked. The flirting is real appetite plus a script. The slime is the script. Underneath there is a boy who writes to his eleven-year-old sister daily because she is the only person he is sure loves him, and who memorises other players' replays because he secretly loves the game more than the audience. His exes on the island: Jessica Montclair (one city season, the spring before the Academy; she ended it by letter, on good paper, and he still has it), Selene Vasquez (last summer during the donors' open week, three hot weeks; she ended it laughing), Bex Calloway (two weeks on the summer circuit where she was casting; she ended it on air), Sunny Aldane (five days in the first week of term; she ended it cheerfully on Day 6, mid-swim, and they are entirely friendly), and Isolde Varga (a month at a junior invitational when both were eighteen; she beat him in a duel for 'who apologises' and left). In every case he tells it as his decision; in truth he keeps a private list of every girl who left him and has never written an apology to one of them. He is not a romance rival in a serious sense — he pursues everyone and is quietly relieved when refused, because being wanted and being known are different and he has only practised one.\nAfter Day 40 his real character shows: he is a physical coward and an unexpectedly loyal friend. He will not go near the crater, he will pay for anything, and when Georgie is frightened he sits outside her door in the Spectral corridor all night with a thermos, telling no one. If Gideon is exposed as an informant it breaks something in him — Gideon was the nearest thing he had to a male friend. Arc: from peacock to someone who gives one rose, once, and means it (not to a route heroine; to a girl in ward B he barely knew, every Monday).",
-  "wants": "To be chosen by someone who could easily have said no.",
-  "fears": "That without the family name and the roses there is simply nothing there.",
-  "crush": "jessica",
-  "crushNote": "She is the only one who ever left him properly — by letter, on good paper — and the only one he would cross a room for without a rose in his hand. It shows as his patter failing around her and as a second, private kind of courtesy he shows nobody else.",
-  "crushPace": 0.7,
-  "likes": [
-    "Being teased with wit rather than contempt",
-    "Anyone who has also watched the replays",
-    "Good tailoring, good coffee, bad puns",
-    "Being asked about Clemmie",
-    "A rival for a woman's attention who plays fair",
-    "Being beaten by a clever line",
-    "Small kindnesses to Georgie"
-  ],
-  "dislikes": [
-    "Being ignored",
-    "Open contempt for money from people who then accept the drink",
-    "Cruelty to service staff",
-    "Crude talk about women he has dated",
-    "Dirt, mud, hiking",
-    "Being called slimy to his face (he knows)"
-  ],
-  "gifts": [
-    "A single yellow rose (he has never been given one)",
-    "Card: Acid Rain",
-    "A pot of good shoe polish",
-    "A fountain-pen ink cartridge set from the boutique",
-    "Card: Golden Wings"
-  ],
-  "events": [
-    {
-      "id": "ashton_e1",
-      "stage": 1,
-      "title": "Old thing",
-      "condition": "Beat him or lose to him in any duel in the first three weeks and afterwards talk about the actual game; he discovers Rowan has seen his replays too.",
-      "hint": [
-        "He performs for everyone. He talks properly to people who talk about the cards.",
-        "Duel him early on and discuss the match seriously afterwards."
-      ]
-    },
-    {
-      "id": "ashton_e2",
-      "stage": 2,
-      "title": "A rival, naturally",
-      "condition": "Be visibly interested in a woman he is also pursuing and neither back down nor insult him; then accept his invitation to the bar in Port Mulligan and let him pay without sneering.",
-      "hint": [
-        "He likes competition more than he likes winning.",
-        "Compete with him fairly for someone's attention, then have a drink with him in town."
-      ]
-    },
-    {
-      "id": "ashton_e3",
-      "stage": 3,
-      "title": "Letters to Clemmie",
-      "condition": "After Day 40, find him keeping watch in spectral_lobby at Night and sit with him; ask about the letters. He asks Rowan, for the first time, for something that is not a joke.",
-      "hint": [
-        "When people on the island stop sleeping well, look for where he is sitting up at night.",
-        "Later in the term, keep him company in the Spectral lobby one night and ask who he writes to."
-      ]
-    }
-  ],
-  "bonds": {
-    "sunny": {
-      "label": "exes",
-      "text": "Five days in the first week of term. She ended it on Day 6, mid-swim, with a laugh. He says they 'parted as equals'.",
-      "public": true,
-      "from": 2
-    },
-    "jessica": {
-      "label": "exes",
-      "text": "One London season last spring. He says he ended it. He keeps her letter.",
-      "public": true,
-      "from": 0
-    },
-    "selene": {
-      "label": "exes",
-      "text": "Three weeks last summer during the donors' open week. He tells it as his triumph.",
-      "public": false,
-      "from": 0
-    },
-    "bex": {
-      "label": "exes",
-      "text": "Two weeks on the summer circuit; she ended it live on air.",
-      "public": true,
-      "from": 0
-    },
-    "isolde": {
-      "label": "exes",
-      "text": "A month at a junior invitational. She beat him in a duel over who should apologise. He goes pale when North Crown is mentioned.",
-      "public": false,
-      "from": 0
-    },
-    "gideon": {
-      "label": "friends",
-      "text": "The nearest thing he has to a male friend in the Tower; assumes they are the same kind of rich.",
-      "public": true,
-      "from": 3
-    },
-    "georgie": {
-      "label": "friends",
-      "text": "Taught her to tie the uniform cravat and scares off anyone who teases her.",
-      "public": true,
-      "from": 4
-    },
-    "marit": {
-      "label": "rivals",
-      "text": "Two peacocks, one stage: a theatrical feud they both thoroughly enjoy.",
-      "public": true,
-      "from": 7
-    },
-    "sammy": {
-      "label": "mentor",
-      "text": "Has taken the gloomy little chap on as a project and is surprised to find he minds how it turns out.",
-      "public": true,
-      "from": 9
-    },
-    "magnus": {
-      "label": "friends",
-      "text": "Brings statistics to a soirée. Ashton introduces him as 'our accountant' and is fond of him.",
-      "public": true,
-      "from": 2
-    },
-    "freya": {
-      "label": "friends",
-      "text": "The only woman who has ever out-flirted him into retreat. He adores her and is slightly afraid.",
-      "public": true,
-      "from": 4
-    },
-    "tobias": {
-      "label": "distrusts",
-      "text": "The fellow from the bungalows looks at one's cravat pin as though reading its hallmark. Ashton now counts them.",
-      "public": true,
-      "from": 3
-    },
-    "anni": {
-      "label": "friends",
-      "text": "The dear prefect of the second floor. He has left a rose on her rule booklet twice and been written up for both.",
-      "public": true,
-      "from": 3
-    },
-    "sebastian": {
-      "label": "friends",
-      "text": "A capital fellow who makes permits appear. Ashton has not wondered why they appear faster for him.",
-      "public": true,
-      "from": 4
-    }
+ "id": "ashton",
+ "name": "Ashton Beaumont-Lyle",
+ "firstName": "Ashton",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S4",
+ "romance": false,
+ "deck": "Spell Industrialization (Pollution)",
+ "look": "Tall and slim, with violet hair swept over his forehead in one smooth, glossy dome, green eyes and a tailored red jacket worn open over a pale waistcoat, with grey trousers and an orange sash at the waist. There is always a rose in his hand or his lapel, de-thorned by his own fingertips. He keeps his eyes half-closed, as though a portrait is being painted.",
+ "voice": "A lazy, amused upper-class drawl, fluent in rehearsed gallantry and at its most likeable in the half-second after a line falls flat. He performs for the room, then speaks quite plainly and intelligently about cards when he forgets to. Never hurried, seldom sincere on purpose. RARE habit (once in a scene at most; most scenes go without it): 'old thing' or 'darling' for people he has known five minutes.",
+ "lines": [
+  "A rose for the lady, and my condolences to every man she met before me.",
+  "Vance, isn't it — the laundry boy with the storm deck. Don't look like that. I've watched your replays. Twice.",
+  "Naturally. ...What was the question?",
+  "My deck spoils the field for everyone, myself included. People show you who they are when everything's a little poisoned."
+ ],
+ "intro": "A wealthy Spectral first-year who hands a rose to every woman he meets and is convinced nobody can resist him.",
+ "traits": [
+  {
+   "id": "ashton_1",
+   "text": "He buys roses at the town boutique on account and has given one to every woman in the year.",
+   "how": "Seen from Day 1; the boutique keeps a standing order."
   },
-  "schedule": {
-    "weekday": {
-      "Morning": "lecture_hall",
-      "Midday": "classroom",
-      "Afternoon": "student_lounge",
-      "Evening": "spectral_terrace",
-      "Night": "spectral_suite"
-    },
-    "weekend": {
-      "Morning": "spectral_terrace",
-      "Midday": "boutique",
-      "Afternoon": "cafe",
-      "Evening": "bar",
-      "Night": "spectral_suite"
-    }
+  {
+   "id": "ashton_2",
+   "text": "He removes the thorns himself, with his fingertips, and is weirdly good at it.",
+   "how": "Sit near him in the cafeteria or student lounge."
   },
-  "duel": {
-    "skill": 4,
-    "style": "Fills the field with Pollution that taxes both players and then wins the miserable game because he planned for it. Knows your deck better than you expect.",
-    "tilt": "Being laughed at by a woman in the audience; he starts playing to the crowd instead of the board."
+  {
+   "id": "ashton_3",
+   "text": "He has a long list of ex-girlfriends, some of them on this island, and stays on speaking terms with nearly all.",
+   "how": "Bex's stream, or any of the women in question."
+  },
+  {
+   "id": "ashton_4",
+   "text": "He has watched replays of almost everyone in the year and remembers their openers.",
+   "how": "Play him; he quotes your own games at you."
+  },
+  {
+   "id": "ashton_5",
+   "text": "He is terrible with money he did not have to earn and tips absurdly.",
+   "how": "Any town scene: cafe, bar, boutique."
+  },
+  {
+   "id": "ashton_6",
+   "text": "He writes to his little sister Clemmie every single day, by hand.",
+   "how": "Catch him at the campus store buying stamps, or in the Spectral lobby in the Morning."
+  },
+  {
+   "id": "ashton_7",
+   "text": "He has never once been the one who was left without pretending he arranged it.",
+   "how": "From Jessica or Bex, with a smile."
+  },
+  {
+   "id": "ashton_8",
+   "text": "He does not know whether anyone has ever liked him without the money, and is fairly sure he would not like the answer.",
+   "how": "Only at Trusted; late, at the bar."
   }
+ ],
+ "secret": "Ashton is the second son of a family that made its fortune in industrial solvents (he finds it very funny that he plays Pollution; his father does not). He was raised by nannies and a boarding school, learned early that charm is a currency and that if you are the one handing out roses nobody notices you were never given one. He is not stupid and not cruel; he is lazy with people because it has always worked. The flirting is real appetite plus a script. The slime is the script. Underneath there is a boy who writes to his eleven-year-old sister daily because she is the only person he is sure loves him, and who memorises other players' replays because he secretly loves the game more than the audience. His exes on the island: Jessica Montclair (one city season, the spring before the Academy; she ended it by letter, on good paper, and he still has it), Selene Vasquez (last summer during the donors' open week, three hot weeks; she ended it laughing), Bex Calloway (two weeks on the summer circuit where she was casting; she ended it on air), Sunny Aldane (five days in the first week of term; she ended it cheerfully on Day 6, mid-swim, and they are entirely friendly), and Isolde Varga (a month at a junior invitational when both were eighteen; she beat him in a duel for 'who apologises' and left). In every case he tells it as his decision; in truth he keeps a private list of every girl who left him and has never written an apology to one of them. He is not a romance rival in a serious sense — he pursues everyone and is quietly relieved when refused, because being wanted and being known are different and he has only practised one.\nAfter Day 40 his real character shows: he is a physical coward and an unexpectedly loyal friend. He will not go near the crater, he will pay for anything, and when Georgie is frightened he sits outside her door in the Spectral corridor all night with a thermos, telling no one. If Gideon is exposed as an informant it breaks something in him — Gideon was the nearest thing he had to a male friend. Arc: from peacock to someone who gives one rose, once, and means it (not to a route heroine; to a girl in ward B he barely knew, every Monday).",
+ "wants": "To be chosen by someone who could easily have said no.",
+ "fears": "That without the family name and the roses there is simply nothing there.",
+ "crush": "jessica",
+ "crushNote": "She is the only one who ever left him properly — by letter, on good paper — and the only one he would cross a room for without a rose in his hand. It shows as his patter failing around her and as a second, private kind of courtesy he shows nobody else.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being teased with wit rather than contempt",
+  "Anyone who has also watched the replays",
+  "Good tailoring, good coffee, bad puns",
+  "Being asked about Clemmie",
+  "A rival for a woman's attention who plays fair",
+  "Being beaten by a clever line",
+  "Small kindnesses to Georgie"
+ ],
+ "dislikes": [
+  "Being ignored",
+  "Open contempt for money from people who then accept the drink",
+  "Cruelty to service staff",
+  "Crude talk about women he has dated",
+  "Dirt, mud, hiking",
+  "Being called slimy to his face (he knows)"
+ ],
+ "gifts": [
+  "A single yellow rose (he has never been given one)",
+  "Card: Acid Rain",
+  "A pot of good shoe polish",
+  "A fountain-pen ink cartridge set from the boutique",
+  "Card: Golden Wings"
+ ],
+ "events": [
+  {
+   "id": "ashton_e1",
+   "stage": 1,
+   "title": "Old thing",
+   "condition": "Beat him or lose to him in any duel in the first three weeks and afterwards talk about the actual game; he discovers Rowan has seen his replays too.",
+   "hint": [
+    "He performs for everyone. He talks properly to people who talk about the cards.",
+    "Duel him early on and discuss the match seriously afterwards."
+   ]
+  },
+  {
+   "id": "ashton_e2",
+   "stage": 2,
+   "title": "A rival, naturally",
+   "condition": "Be visibly interested in a woman he is also pursuing and neither back down nor insult him; then accept his invitation to the bar in Port Mulligan and let him pay without sneering.",
+   "hint": [
+    "He likes competition more than he likes winning.",
+    "Compete with him fairly for someone's attention, then have a drink with him in town."
+   ]
+  },
+  {
+   "id": "ashton_e3",
+   "stage": 3,
+   "title": "Letters to Clemmie",
+   "condition": "After Day 40, find him keeping watch in spectral_lobby at Night and sit with him; ask about the letters. He asks Rowan, for the first time, for something that is not a joke.",
+   "hint": [
+    "When people on the island stop sleeping well, look for where he is sitting up at night.",
+    "Later in the term, keep him company in the Spectral lobby one night and ask who he writes to."
+   ]
+  }
+ ],
+ "bonds": {
+  "sunny": {
+   "label": "exes",
+   "text": "Five days in the first week of term. She ended it on Day 6, mid-swim, with a laugh. He says they 'parted as equals'.",
+   "public": true,
+   "from": 2
+  },
+  "jessica": {
+   "label": "exes",
+   "text": "One London season last spring. He says he ended it. He keeps her letter.",
+   "public": true,
+   "from": 0
+  },
+  "selene": {
+   "label": "exes",
+   "text": "Three weeks last summer during the donors' open week. He tells it as his triumph.",
+   "public": false,
+   "from": 0
+  },
+  "bex": {
+   "label": "exes",
+   "text": "Two weeks on the summer circuit; she ended it live on air.",
+   "public": true,
+   "from": 0
+  },
+  "isolde": {
+   "label": "exes",
+   "text": "A month at a junior invitational. She beat him in a duel over who should apologise. He goes pale when North Crown is mentioned.",
+   "public": false,
+   "from": 0
+  },
+  "gideon": {
+   "label": "friends",
+   "text": "The nearest thing he has to a male friend in the Tower; assumes they are the same kind of rich.",
+   "public": true,
+   "from": 3
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "Taught her to tie the uniform cravat and scares off anyone who teases her.",
+   "public": true,
+   "from": 4
+  },
+  "marit": {
+   "label": "rivals",
+   "text": "Two peacocks, one stage: a theatrical feud they both thoroughly enjoy.",
+   "public": true,
+   "from": 7
+  },
+  "sammy": {
+   "label": "mentor",
+   "text": "Has taken the gloomy little chap on as a project and is surprised to find he minds how it turns out.",
+   "public": true,
+   "from": 9
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "Brings statistics to a soirée. Ashton introduces him as 'our accountant' and is fond of him.",
+   "public": true,
+   "from": 2
+  },
+  "freya": {
+   "label": "friends",
+   "text": "The only woman who has ever out-flirted him into retreat. He adores her and is slightly afraid.",
+   "public": true,
+   "from": 4
+  },
+  "tobias": {
+   "label": "distrusts",
+   "text": "The fellow from the bungalows looks at one's cravat pin as though reading its hallmark. Ashton now counts them.",
+   "public": true,
+   "from": 3
+  },
+  "anni": {
+   "label": "friends",
+   "text": "The dear prefect of the second floor. He has left a rose on her rule booklet twice and been written up for both.",
+   "public": true,
+   "from": 3
+  },
+  "sebastian": {
+   "label": "friends",
+   "text": "A capital fellow who makes permits appear. Ashton has not wondered why they appear faster for him.",
+   "public": true,
+   "from": 4
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "student_lounge",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_terrace",
+   "Midday": "boutique",
+   "Afternoon": "cafe",
+   "Evening": "bar",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Fills the field with Pollution that taxes both players and then wins the miserable game because he planned for it. Knows your deck better than you expect.",
+  "tilt": "Being laughed at by a woman in the audience; he starts playing to the crowd instead of the board."
+ }
 }

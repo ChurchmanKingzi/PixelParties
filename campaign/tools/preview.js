@@ -189,9 +189,11 @@ function renderTop(){
   $('clock').textContent = 'Day ' + S.day + ' · ' + WEEK[(S.day-1)%7] + ' · ' + cmpFmtTime(S.minutes) + ' · ' + S.coins + ' SC';
   $('where').textContent = loc.name || S.location;
 }
+const PN = () => (S && S.vars && S.vars.pn) || 'Rowan';
+function sub(s){ if (s == null) return s; const n = PN(); if (n === 'Rowan') return s; const rr = n.slice(0, 3); return String(s).replace(/Row-Row/g, rr + '-' + rr).replace(/\bRowan\b/g, n); }
 const castName = (id) => { const c = W.cast[id]; return c ? c.name : id; };
 // Was Rowan über den Namen weiß: 'Olivia "Livvie" Thana' erscheint als 'Livvie Thana', bis der volle Name gefallen ist (@fullname).
-function shownName(id){ const p = DATA.people[id]; let n = p ? p.name : castName(id); if (!S.flags['fullname_' + id]) n = n.replace(/^(\S+)\s+"([^"]+)"\s+/, '$2 '); return n; }
+function shownName(id){ if (S.names && S.names[id]) return S.names[id]; const p = DATA.people[id]; return (p && p.first) || castName(id); }
 const knowsRel = (a, b) => !!(S.flags['rel_' + a + '_' + b] || S.flags['rel_' + b + '_' + a]);
 const met = (id) => !!S.flags['met_' + id];
 const following = () => Object.keys(DATA.followers).filter(id => S.flags['follow_' + id]);
@@ -249,13 +251,23 @@ function headCanvas(id, size){
 }
 
 // ───────── Gesprächsansicht: nur die aktiven Figuren, groß ─────────
-function layout(n){ if (n <= 1) return [50]; if (n === 2) return [30, 70]; if (n === 3) return [20, 50, 80]; if (n === 4) return [14, 38, 62, 86]; const a = []; for (let i = 0; i < n; i++) a.push(10 + 80 * i / (n - 1)); return a; }
+let lastSpoke = {};
+function layout(n){ if (n <= 1) return [50]; if (n === 2) return [30, 70]; return [20, 50, 80]; }
 // Grundhöhe 82 % der früheren (damit Große hineinpassen); Faktoren je Figur: Baylee ist einen Kopf größer als alle, Inya und Georgie sind klein.
 const HEIGHT = { inya: .86, tomi: .92 };   // nur für die alten Porträts; die Pixel-Sprites haben ihre Größe selbst
 function actorHeight(n){ return n <= 2 ? 90 : n === 3 ? 82 : 72; }
 const PXH = 32, PXW = 21;   // höchster und breitester Sprite der Reihe, bestimmt die gemeinsame Pixelgröße
-function pxScale(n){ const st = $('stage'), H = st.clientHeight || 540, Wd = st.clientWidth || 976; const frac = n <= 2 ? 0.9 : n === 3 ? 0.84 : 0.76; return Math.max(2, Math.min(Math.floor(H * frac / PXH), Math.floor(Wd / Math.max(2, n) / PXW))); }
-function addActor(id){ if (!id || id === 'rowan' || actors.includes(id)) return; actors.push(id); loadFig(id); renderConv(); }
+function pxScale(n){ const st = $('stage'), H = st.clientHeight || 540, Wd = st.clientWidth || 976; const frac = n <= 2 ? 0.9 : 0.84; return Math.max(2, Math.min(Math.floor(H * frac / PXH), Math.floor(Wd / Math.max(2, n) / PXW))); }
+function addActor(id){
+  if (!id || id === 'rowan') return;
+  if (!actors.includes(id)) {
+    while (actors.length >= 3) { let ev = null, best = Infinity; for (const a of actors) { const k = lastSpoke[a] || 0; if (k < best) { best = k; ev = a; } } actors = actors.filter(a => a !== ev); }
+    actors.push(id); loadFig(id);
+  }
+  lastSpoke[id] = hist.length;
+  renderConv();
+}
+function expireActors(cur){ const n = actors.length; actors = actors.filter(a => a === cur || (hist.length - (lastSpoke[a] || 0)) <= 8); return actors.length !== n; }
 function renderConv(){
   const box = $('cactors'); box.innerHTML = '';
   const xs = layout(actors.length), h = actorHeight(actors.length);
@@ -263,13 +275,15 @@ function renderConv(){
     const el = document.createElement('div'); el.className = 'ca' + (speakerId && speakerId !== id ? ' dim' : '') + (speakerId === id ? ' talk' : '');
     el.style.left = xs[i] + '%';
     const r = figs.get(id);
-    if (r && r.ok && r.px) { const S = pxScale(actors.length); el.classList.add('px'); el.style.width = (r.px.width * S) + 'px'; el.style.height = (r.px.height * S) + 'px'; el.style.setProperty('--bob', S + 'px'); const cv = document.createElement('canvas'); cv.width = r.px.width; cv.height = r.px.height; cv.getContext('2d').drawImage(r.px, 0, 0); el.appendChild(cv); }
-    else if (r && r.ok) { el.style.height = Math.min(98, h * (HEIGHT[id] || 1)) + '%'; const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320; cv.getContext('2d').drawImage(r.big, 0, 0); el.appendChild(cv); } else { el.style.height = h + '%'; el.classList.add('ghost'); loadFig(id); }
+    if (r && r.ok && r.px) { const S0 = pxScale(actors.length), S = S0 + (speakerId === id ? 1 : 0); el.classList.add('px'); el.style.width = (r.px.width * S) + 'px'; el.style.height = (r.px.height * S) + 'px'; el.style.setProperty('--bob', S0 + 'px'); const cv = document.createElement('canvas'); cv.width = r.px.width; cv.height = r.px.height; cv.getContext('2d').drawImage(r.px, 0, 0); el.appendChild(cv); }
+    else if (r && r.ok) { el.style.height = Math.min(98, h * (HEIGHT[id] || 1) * (speakerId === id ? 1.08 : 1)) + '%'; const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320; cv.getContext('2d').drawImage(r.big, 0, 0); el.appendChild(cv); } else { el.style.height = h + '%'; el.classList.add('ghost'); loadFig(id); }
     box.appendChild(el);
   });
 }
 const pretty = (n) => String(n || '').replace(/_/g, ' ').replace(/\b[a-z]/g, c => c.toUpperCase());
-function setBg(name){ $('conv').style.backgroundImage = name ? 'url("assets/bg/' + name + '.png")' : 'none'; $('bglabel').textContent = pretty(name); }
+let curBg = null;
+function sceneBg(name){ if ((name || null) !== curBg) { actors = []; speakerId = null; renderConv(); } setBg(name); }
+function setBg(name){ curBg = name || null; $('conv').style.backgroundImage = name ? 'url("assets/bg/' + name + '.png")' : 'none'; $('bglabel').textContent = pretty(name); }
 
 // ───────── Text: Typewriter, Auszeichnung, Verlauf ─────────
 function parseInline(raw){
@@ -332,22 +346,24 @@ function say(l){
   return new Promise(res => {
     affNow = {};
     $('choices').innerHTML = '';
-    const name = l.name || (l.speaker ? castName(l.speaker) : (l.think ? 'Rowan' : null));
+    const name = sub(l.name || (l.speaker ? ((l.alias && !met(l.speaker)) ? l.alias : shownName(l.speaker)) : (l.think ? 'Rowan' : null)));
     speakerId = l.speaker && l.speaker !== 'rowan' ? l.speaker : ((l.speaker === 'rowan' || l.think) ? '__rowan' : null);
-    if (speakerId && speakerId !== '__rowan') addActor(speakerId);
+    if (speakerId && speakerId !== '__rowan') { addActor(speakerId); markSeen(speakerId); }
+    expireActors(speakerId);
     renderConv();
-    hist.push({ name, text: l.text, think: !!l.think, shake: !!l.shake }); if (hist.length > 300) hist.shift();
+    hist.push({ name, text: sub(l.text), think: !!l.think, shake: !!l.shake }); if (hist.length > 300) hist.shift();
     review = null;
     waiter = () => { $('more').hidden = true; res(); };
     updateReview();
   });
 }
+function markSeen(id){ if (!DATA.people[id]) return; if (!S.seen) S.seen = {}; if (!S.seen[id]) { S.seen[id] = 1; save(); } }
 function choose(c){
   return new Promise(res => {
     const box = $('choices'); box.innerHTML = ''; review = null; speakerId = null; renderConv(); affNow = {};
     clearInterval(typeTimer); typingDone = true;
-    if (c.prompt) { $('spk').hidden = true; $('txt').className = ''; $('txt').innerHTML = '<span id="prompt">' + renderSegs(parseInline(c.prompt), 9999) + '</span>'; }
-    c.options.forEach((o, i) => { const b = document.createElement('button'); b.innerHTML = renderSegs(parseInline(o.text), 9999) + (o.hint ? '<small>' + esc(o.hint) + '</small>' : ''); b.onclick = (e) => { e.stopPropagation(); unlockAudio(); sfx('ui_click', .4); box.innerHTML = ''; res(i); }; box.appendChild(b); });
+    if (c.prompt) { $('spk').hidden = true; $('txt').className = ''; $('txt').innerHTML = '<span id="prompt">' + renderSegs(parseInline(sub(c.prompt)), 9999) + '</span>'; }
+    c.options.forEach((o, i) => { const b = document.createElement('button'); const who = (o.who || []).filter(met).map(w => shownName(w).split(' ')[0]); b.innerHTML = renderSegs(parseInline(sub(o.text)), 9999) + ((o.hint || who.length) ? '<small>' + esc((who.length ? 'with ' + who.join(', ') : '') + (who.length && o.hint ? ' · ' : '') + (o.hint || '')) + '</small>' : ''); b.onclick = (e) => { e.stopPropagation(); unlockAudio(); sfx('ui_click', .4); box.innerHTML = ''; res(i); }; box.appendChild(b); });
     $('more').hidden = true; $('choices').hidden = false; $('bPresent').hidden = true; $('review').hidden = true; $('bBack').disabled = hist.length < 1;
   });
 }
@@ -355,6 +371,7 @@ function addTime(m){ if (!m) return; mutate(s => { s.minutes += m; while (s.minu
 
 // ───────── Popups: kennengelernt, Zuneigung, Deck ─────────
 function toast(kind, head, sub, id){
+  head = sub_(head); sub = sub_(sub);
   const t = document.createElement('div'); t.className = 'toast ' + kind;
   if (id) t.appendChild(headCanvas(id, 64));
   const d = document.createElement('div'); d.innerHTML = '<b>' + head + '</b>' + (sub ? '<small>' + sub + '</small>' : ''); t.appendChild(d);
@@ -364,10 +381,11 @@ function toast(kind, head, sub, id){
 // Pro Textbox und Figur höchstens EIN Zuneigungs-Popup: weitere Änderungen derselben Figur seit dem letzten Text werden zusammengelegt.
 let affNow = {};
 function affHtml(nm, n, why){ return esc(nm) + ' <span class="' + (n >= 0 ? 'up' : 'dn') + '">' + (n > 0 ? '▲ +' : n < 0 ? '▼ ' : '● ') + n + '</span>'; }
+const sub_ = (s) => (typeof s === 'string' ? sub(s) : s);
 const aliasName = (id) => DATA.alias[id] || castName(id);
 function popup(p){
   const nm = (p.type === 'aff' && !met(p.id)) ? aliasName(p.id) : shownName(p.id);
-  if (p.type === 'met') { sfx('reveal', .5); toast('', 'New acquaintance', esc(nm), p.id); }
+  if (p.type === 'met') { sfx('reveal', .5); toast('', 'New acquaintance', esc(p.name || nm), p.id); }
   else if (p.type === 'aff') {
     const prev = affNow[p.id];
     if (prev && prev.el.isConnected) {
@@ -389,9 +407,9 @@ function stageOf(id, v){ const list = DATA.stages.friend; for (const s of list) 
 
 const io = {
   state: () => S, mutate, sleep, say, choose, addTime, popup,
-  setBg(n){ setBg(n); },
+  setBg(n){ sceneBg(n); },
   clearActors(){ actors = []; renderConv(); },
-  enter(id){ addActor((W.cast[id] && W.cast[id].sprite) || id); },
+  enter(id){ const sp = (W.cast[id] && W.cast[id].sprite) || id; addActor(sp); markSeen(sp); },
   exit(id){ actors = actors.filter(a => a !== id); renderConv(); },
   move(){}, face(){}, dim(){}, music(n){ if (MUSIC[n]) { musicOverride = true; setMusic(n); } },
   fx: async (name, ms) => { const f = $('fade'); if (name === 'fadeout') { f.classList.add('on'); await sleep(Math.min(ms || 400, 900)); } else if (name === 'fadein') { f.classList.remove('on'); await sleep(Math.min(ms || 400, 900)); } else if (name === 'flash' || name === 'shake') { await sleep(150); } }, revealCards: async () => {},
@@ -418,7 +436,7 @@ async function playScene(id, nested){
   if (!sc) { console.error('Scene missing', id); return null; }
   if (sc.once && S.scenesDone[id]) return null;
   if (!cmpCond(S, sc.when)) return null;
-  if (sc.background !== undefined) setBg(sc.background);
+  if (sc.background !== undefined) sceneBg(sc.background);
   if (sc.music !== undefined) io.music(sc.music);
   let res = null;
   try { res = await runner.runSteps(sc.steps || []); } catch (e) { console.error('Scene ' + id, e); await say({ text: '[Error in scene ' + id + ': ' + e.message + ']' }); }
@@ -453,7 +471,7 @@ async function afterScene(){
 async function conversation(fn, preset, keepLoc){
   if (busy) return; busy = true; updateBar();
   const pos = CMAP && view === 'map' ? { map: CMAP.A.id, x: CMAP.P.x, y: CMAP.P.y } : null;
-  await fade(async () => { actors = []; (preset || []).forEach(id => { actors.push(id); loadFig(id); }); speakerId = null; setBg((W.locations[S.location] || {}).background); setView('conv'); renderConv(); $('choices').innerHTML = ''; });
+  await fade(async () => { actors = []; lastSpoke = {}; (preset || []).forEach(id => { actors.push(id); lastSpoke[id] = hist.length; loadFig(id); }); speakerId = null; setBg((W.locations[S.location] || {}).background); setView('conv'); renderConv(); $('choices').innerHTML = ''; });
   try { await fn(); await afterScene(); } catch (e) { console.error(e); }
   await fade(async () => { actors = []; speakerId = null; $('choices').innerHTML = ''; setView('map'); syncMap(pos, keepLoc); });
   busy = false; locationMusic(); refresh();
@@ -470,25 +488,25 @@ async function talkTo(o){
       const arr = arriveScene(); if (arr) { await playScene(arr, true); alone = !!(STORY.scenes[arr] && STORY.scenes[arr].alone); }
     }
     if (!alone && o.scene && cmpCond(S, o.when)) await playScene(o.scene, true);
-  }, [sprite].concat(followerIds().filter(x => x !== sprite)), o.at || S.location);
+  }, [sprite], o.at || S.location);
 }
 async function talkFollower(id){
   if (busy) return; const sc = DATA.followers[id]; if (!sc) return;
-  await conversation(async () => { await playScene(sc, true); }, [id].concat(followerIds().filter(x => x !== id)), S.location);
+  await conversation(async () => { await playScene(sc, true); }, [id], S.location);
 }
-async function runAction(a){ if (busy || !a.scene) return; await conversation(async () => { await playScene(a.scene, true); }, followerIds(), S.location); }
+async function runAction(a){ if (busy || !a.scene) return; await conversation(async () => { await playScene(a.scene, true); }, [], S.location); }
 async function travel(id, cost, fromScene){
   const loc = W.locations[id]; if (!loc) return;
   const c = cost != null ? cost : cmpTravelCost(W, S, id);
   mutate(s => { s.location = id; s.visited[id] = (s.visited[id] || 0) + 1; if (s.known.indexOf(id) < 0) s.known.push(id); });
-  addTime(c); setBg(loc.background); musicOverride = false; if (!fromScene) locationMusic();
+  addTime(c); sceneBg(loc.background); musicOverride = false; if (!fromScene) locationMusic();
 }
 async function goPlace(id){
   if (busy) return;
   const info = placeInfo(id); if (!info || !info.ok || id === S.location) return;
-  await conversation(async () => { await travel(id, undefined, true); const sc = arriveScene(); if (sc) await playScene(sc, true); }, followerIds());
+  await conversation(async () => { await travel(id, undefined, true); const sc = arriveScene(); if (sc) await playScene(sc, true); }, []);
 }
-async function wait15(){ if (busy) return; addTime(15); if (hasPending()) await conversation(async () => {}, followerIds(), S.location); else refresh(); }
+async function wait15(){ if (busy) return; addTime(15); if (hasPending()) await conversation(async () => {}, [], S.location); else refresh(); }
 async function oneHour(){ if (busy) return; addTime(60); if (hasPending()) await conversation(async () => {}, [], S.location); else refresh(); }
 
 // ───────── Karte (CalderaMap aus dem alten Artefakt) ─────────
@@ -581,27 +599,27 @@ function openPanel(tab){
   draw(tab || 'people');
 }
 function peoplePanel(sel, draw){
-  const body = $('pbody'); const ids = Object.keys(DATA.people).filter(met);
+  const body = $('pbody'); const ids = Object.keys(DATA.people).filter(id => met(id) || (S.seen && S.seen[id]));
   if (sel && DATA.people[sel]) {
     const p = DATA.people[sel], v = affection(sel), st = stageOf(sel, v);
-    let h = '<p><button id="pback">◀ All people</button></p><div class="det"><div class="pcard" id="pic"></div><b style="font-family:var(--title);font-size:22px;color:var(--gold)">' + esc(shownName(sel)) + '</b>';
+    let h = '<p><button id="pback">◀ All people</button></p><div class="det"><div class="pcard" id="pic"></div><b style="font-family:var(--title);font-size:22px;color:var(--gold)">' + esc(met(sel) ? shownName(sel) : aliasName(sel)) + '</b>' + (met(sel) ? '' : '<div class="note">You have not been introduced.</div>');
     const nts = (S.notes && S.notes[sel]) || [];
-    h += '<div class="hh">WHAT YOU KNOW</div>' + (nts.length ? nts.map(x => '<div>· ' + esc(x) + '</div>').join('') : '<div class="note">Only that you have met.</div>');
-    h += '<div class="hh">HOW YOU STAND</div><div>' + esc(st.name) + ' · ' + v + '/' + st.cap + '</div><div class="bar"><i style="width:' + v + '%"></i></div>';
+    h += '<div class="hh">WHAT YOU KNOW</div>' + (nts.length ? nts.map(x => '<div>· ' + esc(sub(x)) + '</div>').join('') : '<div class="note">' + (met(sel) ? 'Only that you have met.' : 'Nothing yet.') + '</div>');
+    if (met(sel)) h += '<div class="hh">HOW YOU STAND</div><div>' + esc(st.name) + ' · ' + v + '/' + st.cap + '</div><div class="bar"><i style="width:' + v + '%"></i></div>';
     const log = (S.affLog || []).filter(a => a.id === sel).slice(-6).reverse();
     if (log.length) h += '<div class="note">' + log.map(a => (a.n > 0 ? '▲ +' : '▼ ') + a.n + ' ' + esc(a.why || '')).join(' · ') + '</div>';
-    h += '<div class="hh">DECK</div>';
-    if (S.flags['deck_known_' + sel] && p.deck) h += '<div><b>' + esc(p.deck.name) + '</b></div><div class="note">Heroes: ' + esc(p.deck.heroes.join(', ')) + '</div>' + p.deck.key.map(k => '<div class="eff"><b>' + esc(k[0]) + '</b>: ' + esc(k[1]) + '</div>').join('');
-    else h += '<div class="note">You do not know what ' + esc(shownName(sel).split(' ')[0]) + ' plays yet. Ask, or guess from the clues.</div>';
+    if (met(sel)) h += '<div class="hh">DECK</div>';
+    if (met(sel) && S.flags['deck_known_' + sel] && p.deck) h += '<div><b>' + esc(p.deck.name) + '</b></div><div class="note">Heroes: ' + esc(p.deck.heroes.join(', ')) + '</div>' + p.deck.key.map(k => '<div class="eff"><b>' + esc(k[0]) + '</b>: ' + esc(k[1]) + '</div>').join('');
+    else if (met(sel)) h += '<div class="note">You do not know what ' + esc(shownName(sel).split(' ')[0]) + ' plays yet. Ask, or guess from the clues.</div>';
     const bonds = p.bonds.filter(b => knowsRel(sel, b.w) && DATA.people[b.w]);
-    h += '<div class="hh">RELATIONSHIPS YOU KNOW OF</div>' + (bonds.length ? bonds.map(b => '<div>' + esc(shownName(b.w)) + ' — ' + esc(b.label) + '</div>').join('') : '<div class="note">Nothing yet.</div>');
+    if (met(sel)) h += '<div class="hh">RELATIONSHIPS YOU KNOW OF</div>' + (bonds.length ? bonds.map(b => '<div>' + esc(met(b.w) ? shownName(b.w) : aliasName(b.w)) + ' — ' + esc(b.label) + '</div>').join('') : '<div class="note">Nothing yet.</div>');
     h += '</div>'; body.innerHTML = h;
     $('pic').appendChild(headCanvas(sel, 48)); $('pback').onclick = () => draw('people');
     return;
   }
   if (!ids.length) { body.innerHTML = '<div class="note">You have not met anyone yet.</div>'; return; }
   const g = document.createElement('div'); g.className = 'pgrid';
-  ids.forEach(id => { const p = DATA.people[id], v = affection(id), st = stageOf(id, v); const b = document.createElement('button'); b.className = 'pcard'; b.appendChild(headCanvas(id, 48)); const d = document.createElement('div'); d.style.minWidth = 0; d.innerHTML = '<b>' + esc(shownName(id).split(' ')[0]) + '</b><small>' + esc(st.name) + ' · ' + v + '</small><div class="bar"><i style="width:' + v + '%"></i></div>' + (S.flags['deck_known_' + id] && p.deck ? '<small>' + esc(p.deck.name) + '</small>' : ''); b.appendChild(d); b.onclick = () => draw('people', id); g.appendChild(b); });
+  ids.forEach(id => { const p = DATA.people[id], v = affection(id), st = stageOf(id, v); const b = document.createElement('button'); b.className = 'pcard'; b.appendChild(headCanvas(id, 48)); const d = document.createElement('div'); d.style.minWidth = 0; d.innerHTML = met(id) ? ('<b>' + esc(shownName(id).split(' ')[0]) + '</b><small>' + esc(st.name) + ' · ' + v + '</small><div class="bar"><i style="width:' + v + '%"></i></div>' + (S.flags['deck_known_' + id] && p.deck ? '<small>' + esc(p.deck.name) + '</small>' : '')) : ('<b>' + esc(aliasName(id)) + '</b><small>not introduced</small>'); b.appendChild(d); b.onclick = () => draw('people', id); g.appendChild(b); });
   body.innerHTML = ''; body.appendChild(g);
 }
 function deckPanel(coll){
@@ -629,15 +647,25 @@ $('box').addEventListener('click', () => advance());
 $('bBack').onclick = (e) => { e.stopPropagation(); back(); };
 $('bPresent').onclick = (e) => { e.stopPropagation(); toPresent(); };
 $('bPeople').onclick = () => openPanel('people'); $('bDeck').onclick = () => openPanel('deck'); $('bColl').onclick = () => openPanel('coll');
-$('bLog').onclick = () => showPanel('Log (last 60 lines)', '<pre>' + esc(hist.slice(-60).map(h => (h.name ? h.name + ': ' : '') + h.text).join('\n')) + '</pre>');
+$('bLog').onclick = () => { showPanel('Log (last 60 lines)', '<pre>' + esc(hist.slice(-60).map(h => (h.name ? h.name + ': ' : '') + h.text).join('\n')) + '</pre>'); const b = $('pbody'); if (b) b.scrollTop = b.scrollHeight; const o = $('overlay'); if (o && o.firstChild) o.firstChild.scrollTop = o.firstChild.scrollHeight; };
 $('bDebug').onclick = () => showPanel('Flags and variables', '<pre>' + esc(Object.keys(S.flags).sort().join(', ') + '\n\n' + JSON.stringify(S.vars)) + '</pre>');
 $('bTime').onclick = () => oneHour();
 $('bSnd').onclick = () => { unlockAudio(); toggleSound(); };
 $('bReset').onclick = () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };
+function askName(){
+  return new Promise(res => {
+    const o = $('overlay'); o.hidden = false;
+    o.innerHTML = '<div><h2>Your name</h2><p>The student on the ferry is called <b>Rowan</b>. Enter a different name if you like (up to 14 characters).</p><p><input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="font:inherit;font-size:22px;padding:6px 10px;background:#1b1626;color:#f3e9c8;border:2px solid #c8a85a;width:60%"></p><p><button id="pnOk">Start</button></p></div>';
+    const go = () => { let v = ($('pnIn').value || '').replace(/[<>&]/g, '').trim().slice(0, 14) || 'Rowan'; S.vars = S.vars || {}; S.vars.pn = v; S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; res(); };
+    $('pnOk').onclick = go; $('pnIn').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    setTimeout(() => { try { $('pnIn').focus(); $('pnIn').select(); } catch (e) {} }, 50);
+  });
+}
 (async () => {
   S = load() || newState(); renderTop(); $('bSnd').textContent = audioOn ? '♪ On' : '♪ Off';
   setBg((W.locations[S.location] || {}).background); setView('conv'); await initMap();
   setMusic((W.locations[S.location] || {}).music || 'ship');
+  if (!S.flags.pn_set && !(new URLSearchParams(location.search).has('nopn'))) await askName();
   await conversation(async () => { const sc = arriveScene(); if (sc) await playScene(sc, true); }, []);
 })();
 `;

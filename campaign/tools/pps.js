@@ -22,7 +22,7 @@
 //   @time n  @clock HH:MM  @wake HH:MM (nächster Tag)  @goto place [Minuten]  @scene id  @end  @gameover "Text"
 //   @label x  @jump x  @pickhost
 //   @if <Bed.> / @elif <Bed.> / @else   (Block durch Einrückung)
-//   @choice [Frage]                      darunter  `> Text [@if Bed.] [@hint Wort]`  + eingerückter Block
+//   @choice [Frage]                      darunter  `> Text [@if Bed.] [@who id id] [@hint Wort]`  + eingerückter Block  (@who: zeigt, wen davon Rowan schon kennt)
 //   @duel id deck=slug name="Name" [ante] [mustwin]   darunter @win / @lose / @reward coins=n cards=a,b flags=x,y
 //
 // BEDINGUNGEN (and / or / not / Klammern):
@@ -164,13 +164,13 @@ function compileScene(head, nodes, env) {
   const err = (n, msg) => { throw new Error(`${n.file}:${n.line}: ${msg}`); };
 
   function emitSay(n, node) {
-    let text = node.text, speaker = null, name = null, mood = null, think = false;
+    let text = node.text, speaker = null, name = null, mood = null, think = false, alias = null;
     let m;
     let shake = false;
     if ((m = text.match(/^\[([?]?)([A-Za-z0-9_ .'-]+?)(\?)?(?:=(\w+))?(!)?\]\s*(.*)$/s))) {
       const rawId = m[2]; text = m[6];
       if (m[1]) name = rawId; else { speaker = rawId; ctx.cast.add(rawId); }
-      if (m[3] === '?') name = env.alias(rawId);
+      if (m[3] === '?') alias = env.alias(rawId);
       if (m[4]) mood = m[4];
       if (m[5]) shake = true;
     } else if (text.startsWith('[')) { err(node, 'Zeile beginnt mit [ und ist keine gültige Sprecherzeile: ' + text.slice(0, 50)); }
@@ -178,13 +178,13 @@ function compileScene(head, nodes, env) {
     text = stripQ(text);
     if (text.length > 480) env.warn(`${node.file}:${node.line}: Zeile hat ${text.length} Zeichen (lang für eine Dialogbox)`);
     const base = {};
-    if (speaker && !name) base.say = speaker; else if (name) { base.say = speaker || undefined; base.name = name; }
+    if (speaker && alias && !name) { base.say = speaker; base.alias = alias; } else if (speaker && !name) base.say = speaker; else if (name) { base.say = speaker || undefined; base.name = name; }
     if (think) base.think = text; else base.text = text;
     if (mood) base.mood = mood;
     if (shake) base.shake = true;
     env.words += text.split(/\s+/).length;
-    if (speaker && !name) named.add(speaker);
-    if (env.nameRe) for (const [id, re] of env.nameRe) if (!named.has(id) && re.test(text)) named.add(id);
+    if (speaker && !name && !alias) { named.add(speaker); named.add(speaker + ':first'); }
+    if (env.nameTok) for (const [id, nt] of env.nameTok) for (const [k, re] of Object.entries(nt.kinds)) if (re.test(text)) { named.add(id); named.add(id + ':' + k); }
     if (hostTokens(text)) {
       if (!head.host) err(node, 'Platzhalter {H} nur in Szenen mit Kopfwort `host`');
       if (think) base.think = undefined;
@@ -196,7 +196,7 @@ function compileScene(head, nodes, env) {
     } else if ((speaker || name) && !think) {
       for (const part of splitBeats(text)) {
         const st = Object.assign({}, base);
-        if (part.beat) { delete st.say; delete st.name; delete st.mood; delete st.shake; st.text = part.t; }
+        if (part.beat) { delete st.say; delete st.name; delete st.alias; delete st.mood; delete st.shake; st.text = part.t; }
         else st.text = part.t;
         steps.push(st);
       }
@@ -249,11 +249,16 @@ function compileScene(head, nodes, env) {
         if (n) steps.push({ run: raw(`(s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: ${JSON.stringify(id)}, n: ${n}, why: ${JSON.stringify(why ? why.trim() : '')} }); }`) });
         break; }
       case 'meet': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('met_' + id);
-        if (env.nameRe && env.nameRe.has(id) && !named.has(id)) env.warn(`${node.file}:${node.line}: @meet ${id}: der Name fiel in dieser Szene noch nicht (Popup zeigt ihn vorweg)`);
-        steps.push({ run: raw(`(s,io)=>{ if (io && io.popup && !s.flags[${JSON.stringify('met_' + id)}]) io.popup({ type: 'met', id: ${JSON.stringify(id)} }); }`) });
+        const nt = env.nameTok && env.nameTok.get(id);
+        if (nt && !named.has(id)) env.warn(`${node.file}:${node.line}: @meet ${id}: der Name fiel in dieser Szene noch nicht (Popup zeigt ihn vorweg)`);
+        // Anzeigename = nur, was Rowan wirklich gehört hat (Vorname/Spitzname, Nachname nur wenn er fiel)
+        let disp = id;
+        if (nt && nt.title) disp = nt.title;
+        else if (nt) { const P = []; if (named.has(id + ':given')) P.push(nt.parts.given); else if (named.has(id + ':nick') || named.has(id + ':first')) P.push(nt.parts.nick || nt.parts.first); if (named.has(id + ':last') && nt.parts.last) P.push(nt.parts.last); disp = P.filter(Boolean).join(' ') || nt.parts.first || id; }
+        steps.push({ run: raw(`(s,io)=>{ s.names = s.names || {}; if (!s.names[${JSON.stringify(id)}]) s.names[${JSON.stringify(id)}] = ${JSON.stringify(disp)}; if (io && io.popup && !s.flags[${JSON.stringify('met_' + id)}]) io.popup({ type: 'met', id: ${JSON.stringify(id)}, name: ${JSON.stringify(disp)} }); }`) });
         steps.push({ flag: 'met_' + id }); } break;
       case 'rel': { const [a, b] = rest.split(/\s+/); ctx.cast.add(a); ctx.cast.add(b); ctx.sets.add('rel_' + a + '_' + b); steps.push({ flag: 'rel_' + a + '_' + b }); break; }
-      case 'fullname': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('fullname_' + id); steps.push({ flag: 'fullname_' + id }); } break;
+      case 'fullname': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('fullname_' + id); const nt = env.nameTok && env.nameTok.get(id); steps.push({ run: raw(`(s)=>{ s.names = s.names || {}; s.names[${JSON.stringify(id)}] = ${JSON.stringify(nt ? nt.full : id)}; }`) }); steps.push({ flag: 'fullname_' + id }); } break;
       case 'note': { const [id, ...tx] = rest.split(/\s+/); const text = stripQ(tx.join(' ').replace(/^\|\s*/, '')); ctx.cast.add(id);
         steps.push({ run: raw(`(s)=>{ s.notes = s.notes || {}; const a = (s.notes[${JSON.stringify(id)}] = s.notes[${JSON.stringify(id)}] || []); if (a.indexOf(${JSON.stringify(text)}) < 0) a.push(${JSON.stringify(text)}); }`) }); break; }
       case 'follow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('follow_' + id); steps.push({ flag: 'follow_' + id }); } break;
@@ -313,17 +318,18 @@ function compileScene(head, nodes, env) {
           const prompt = stripQ(t.slice(7).trim()) || undefined; const end = uid('choiceend');
           const opts = (n.body || []).map(o => {
             if (!/^>\s/.test(o.text)) err(o, 'unter @choice nur Zeilen mit "> "');
-            let tx = o.text.slice(2).trim(), when = null, hint = null, m;
+            let tx = o.text.slice(2).trim(), when = null, hint = null, who = null, m;
             if ((m = tx.match(/\s@hint\s+(.+)$/))) { hint = m[1].trim(); tx = tx.slice(0, m.index); }
+            if ((m = tx.match(/\s@who\s+(.+)$/))) { who = m[1].trim().split(/\s+/); who.forEach(w => ctx.cast.add(w)); tx = tx.slice(0, m.index); }
             if ((m = tx.match(/\s@if\s+(.+)$/))) { when = m[1].trim(); tx = tx.slice(0, m.index); }
             // Format der Antwortoptionen: entweder ausschließlich wörtliche Rede ("…") oder eine beschreibende Anweisung ohne Anführungszeichen.
             const quoted = /^".*"$/s.test(tx.trim()) && !tx.trim().slice(1, -1).includes('"');
             if (!quoted && tx.includes('"')) err(o, 'Antwortoption mischt Rede und Beschreibung: entweder komplett "in Anführungszeichen" oder ohne Anführungszeichen formulieren: ' + tx.slice(0, 60));
             if (quoted && /\s@hint|\s@if/.test(stripQ(tx))) err(o, 'Antwortoption: Marker gehören hinter das schließende Anführungszeichen');
-            return { o, text: stripQ(tx), when, hint, quoted, label: uid('opt') };
+            return { o, text: stripQ(tx), when, hint, who, quoted, label: uid('opt') };
           });
           if (!opts.length) err(n, '@choice ohne Optionen');
-          steps.push({ prompt, choice: opts.map(o => ({ text: o.text, goto: o.label, when: o.when ? condToJs(o.when, ctx) : undefined, hint: o.hint || undefined })) });
+          steps.push({ prompt, choice: opts.map(o => ({ text: o.text, goto: o.label, when: o.when ? condToJs(o.when, ctx) : undefined, hint: o.hint || undefined, who: o.who || undefined })) });
           steps.push({ jump: end });
           const cbefore = new Set(named), cends = [];
           for (const o of opts) {

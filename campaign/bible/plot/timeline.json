@@ -1737,7 +1737,7 @@
   "slot": "Midday",
   "place": "chancellor_office",
   "title": "The board vote",
-  "gm": "The board wanted the student council's endorsement read into the record: if Octavia would not deliver it, Sebastian moved it from the floor of the last session (he can be stopped by a quorum call, by Noor on procedure, or by being shown what he is endorsing). Dr. Okonkwo is relieved. Santángel is acting chancellor and cannot meet anyone's eye. The north slope and ruin precinct pass to Living Light Ltd.; fences go up.",
+  "gm": "The board wanted the student council's endorsement read into the record: if Octavia would not deliver it, Sebastian moved it from the floor of the last session (he can be stopped by a quorum call, by Noor on procedure, or by being shown what he is endorsing). Dr. Vicar is relieved. Santángel is acting chancellor and cannot meet anyone's eye. The north slope and ruin precinct pass to Living Light Ltd.; fences go up.",
   "when": {
    "notFlags": [
     "marrow_exposed"

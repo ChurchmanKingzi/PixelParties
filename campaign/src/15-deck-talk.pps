@@ -159,11 +159,14 @@
   @if deck_known_inya
     @end
   @choice
-    > "Bunny hairclip, a bunny charm on the deck box. I'm going to guess bunnies." @hint From her look
+    > "Bunny hairclip, a bunny charm on the deck box. I'm going to guess bunnies." @if not inya_said_bunnies @hint From her look
       [inya] "It is *not* a pile." Instantly. "Hop and Pop. It's a deck. There's a plan."
       @aff inya +2 | Spotted the bunnies
-    > "What do you play, Inya? I won't say a word about bunnies."
+    > "What do you play, Inya? I won't say a word about bunnies." @if not inya_said_bunnies
       [inya] "Hop and Pop. Bunnies." A narrow look. "You promised."
+      @aff inya +1 | Asked about her deck
+    > "You said bunnies. What's the plan?" @if inya_said_bunnies
+      [inya] "Hop and Pop. It's a deck." A narrow look. "There's a plan. Don't say 'pile'."
       @aff inya +1 | Asked about her deck
     > Let the cards wait for now.
       @flag deck_skipped_inya
@@ -220,7 +223,6 @@
   @choice
     > "Would you tell me what you play, Noor?"
       [noor] "To be precise —" She closes the book on her pencil. "Countdown. The Doom Clock. Twenty counters end the game for whoever places the last one." A pause. "It is entirely transparent. It seems only fair to give notice."
-      @aff noor +2 | Asked politely
     > Let the cards wait for now.
       @flag deck_skipped_noor
       @end
@@ -340,7 +342,7 @@
   @if deck_known_marit
     @end
   @choice
-    > "Hair like two flames, an ember bow tie, a scarf the colour of coals, and you stepped onto a bollard like it was a stage. Let me guess: Phoenix." @hint From her look
+    > "Hair like two flames, two orange bows in it, a scarf the colour of coals, and you stepped onto a bollard like it was a stage. Let me guess: Phoenix." @hint From her look
       [marit!] "**OH!** *Oh!* He is **GOOD!** Ladies and gentlemen, the stranger has **SEEN** me!"
       [marit!] "**PHOENIX ENCORE!** The *rise!* The *fall!* The **RISE AGAIN!**"
       @aff marit +3 | Read her from her look

@@ -87,7 +87,7 @@
    "dur": 15,
    "place": "lecture_hall",
    "title": "Orientation 1: the Chancellor's welcome, the Charter signed",
-   "gm": "Two hundred seats; the 36 first-years fill the front rows more or less by collar, upper-years usher. Chancellor Okonkwo [okonkwo] speaks from the pit, short and formidable: what the Academy is (four years, three majors, one Ladder), what it expects (attendance, honesty at the table), where the island ends for students (Umbra House on the north ridge is closed — keep off; the wild island only in daylight and never alone), and that nobody here is owed a place. Then the Academy Charter goes along the rows on a clipboard and every first-year signs (nobody reads it; Noor reads all of it and signs last). Rowan only listens: play the WHOLE address in ONE long answer with real speech, ending when the clipboard reaches him. @clock 15.",
+   "gm": "Two hundred seats; the 36 first-years fill the front rows more or less by collar, upper-years usher. Chancellor Vicar [okonkwo] speaks from the pit, short and formidable: what the Academy is (four years, three majors, one Ladder), what it expects (attendance, honesty at the table), where the island ends for students (Umbra House on the north ridge is closed — keep off; the wild island only in daylight and never alone), and that nobody here is owed a place. Then the Academy Charter goes along the rows on a clipboard and every first-year signs (nobody reads it; Noor reads all of it and signs last). Rowan only listens: play the WHOLE address in ONE long answer with real speech, ending when the clipboard reaches him. @clock 15.",
    "ev": "orientation"
   },
   {
@@ -1578,7 +1578,7 @@
    "dur": 20,
    "place": "great_arena",
    "title": "The Chancellor's address",
-   "gm": "Chancellor Okonkwo [okonkwo], calm and exact, without notes: on Friday night a meteorite struck the uninhabited north slope. Nobody was hurt. There is no danger. The site is closed for everyone's safety while the ground is surveyed; lessons, the Ladder and the term continue as planned. Rowan only listens: play the WHOLE address in ONE long answer with real speech. Midway '{H}' [{H:id}] leans over and asks {H:him}, interested, why everyone is sitting in rows facing one person. Students nearby laugh. It is a good question. @clock 15.",
+   "gm": "Chancellor Vicar [okonkwo], calm and exact, without notes: on Friday night a meteorite struck the uninhabited north slope. Nobody was hurt. There is no danger. The site is closed for everyone's safety while the ground is surveyed; lessons, the Ladder and the term continue as planned. Rowan only listens: play the WHOLE address in ONE long answer with real speech. Midway '{H}' [{H:id}] leans over and asks {H:him}, interested, why everyone is sitting in rows facing one person. Students nearby laugh. It is a good question. @clock 15.",
    "ev": "assembly_event"
   },
   {
@@ -3318,7 +3318,7 @@
    "place": "quad",
    "ev": "curfew_begins",
    "title": "The Chancellor's order is read on the Quad",
-   "gm": "Before the Morning class, the whole school on the Quad. Chancellor Okonkwo [okonkwo] reads the order herself from the main steps, Coach Rox [rox] and Ms Kirishima [hana] beside her: from today all students in their own dorms from nightfall to dawn; no hiking after the Afternoon bell; town by sign-out at the gate only, back by the end of the evening; evening clubs move to the Afternoon; dinner is earlier. A first formal warning, then probation. Rowan only listens: ONE long answer with her real words. @clock 15–20."
+   "gm": "Before the Morning class, the whole school on the Quad. Chancellor Vicar [okonkwo] reads the order herself from the main steps, Coach Rox [rox] and Ms Kirishima [hana] beside her: from today all students in their own dorms from nightfall to dawn; no hiking after the Afternoon bell; town by sign-out at the gate only, back by the end of the evening; evening clubs move to the Afternoon; dinner is earlier. A first formal warning, then probation. Rowan only listens: ONE long answer with her real words. @clock 15–20."
   },
   {
    "id": "e67_plain",
@@ -4350,7 +4350,7 @@
    "place": "chancellor_office",
    "ev": "final_grades_1",
    "title": "Probation hearings in the Chancellor's office",
-   "gm": "ONLY if Rowan has two F (otherwise this passes unseen behind a closed door: say nothing). A bench in the corridor, names called one at a time. His hearing is a real scene with Chancellor Okonkwo [okonkwo]: his record on the desk, what probation means next term, and one direct question about what he intends to do. She is hard and not unkind. @clock 20–30."
+   "gm": "ONLY if Rowan has two F (otherwise this passes unseen behind a closed door: say nothing). A bench in the corridor, names called one at a time. His hearing is a real scene with Chancellor Vicar [okonkwo]: his record on the desk, what probation means next term, and one direct question about what he intends to do. She is hard and not unkind. @clock 20–30."
   }
  ],
  "100": [
@@ -4501,7 +4501,7 @@
    "place": "gala_ballroom",
    "ev": "winter_gala",
    "title": "The Chancellor's toast",
-   "gm": "Everyone standing at their places. Among the round tables stand chairs with name cards and nobody in them, for those in the wards. Chancellor Okonkwo [okonkwo] speaks for two minutes and raises her glass 'to those who cannot be with us'; it is brittle, and the room answers too quietly. Marrow [marrow] at the top table drinks to it pleasantly. ONE answer with her real words. @clock 10."
+   "gm": "Everyone standing at their places. Among the round tables stand chairs with name cards and nobody in them, for those in the wards. Chancellor Vicar [okonkwo] speaks for two minutes and raises her glass 'to those who cannot be with us'; it is brittle, and the room answers too quietly. Marrow [marrow] at the top table drinks to it pleasantly. ONE answer with her real words. @clock 10."
   },
   {
    "id": "e103_dinner",
@@ -4651,7 +4651,7 @@
    "place": "great_arena",
    "ev": "term2_begins",
    "title": "Opening assembly in the Great Arena",
-   "gm": "The whole school in the lower stands; empty rows show. Chancellor Okonkwo [okonkwo] is shorter and harder than in September: the curfew stays; Ward B is 'stable'; the Interschool Cup WILL be hosted in March. Santángel [santangel], Coach Rox [rox], Lilia [lilia] with the team and Octavia [octavia] with the council sit behind her. Marrow, who has wintered on the island, is in the box. Rowan only listens: ONE long answer with her real words. @clock 20–30."
+   "gm": "The whole school in the lower stands; empty rows show. Chancellor Vicar [okonkwo] is shorter and harder than in September: the curfew stays; Ward B is 'stable'; the Interschool Cup WILL be hosted in March. Santángel [santangel], Coach Rox [rox], Lilia [lilia] with the team and Octavia [octavia] with the council sit behind her. Marrow, who has wintered on the island, is in the box. Rowan only listens: ONE long answer with her real words. @clock 20–30."
   },
   {
    "id": "e106_class",
@@ -5582,7 +5582,7 @@
    "place": "commons_kitchen",
    "ev": "bday_rana",
    "title": "After the cake",
-   "gm": "Staying: washing-up, the porch, an ordinary good evening; let it be short. LEAVING: Noor [noor] comes down the boardwalk at half past seven with the regulation marked in pencil: a formal hearing before the Chancellor on a student's behalf may be requested by her friends, and the office receives petitioners until the night bell. If Rowan and the others go (@place chancellor_office), Dr Okonkwo [okonkwo] hears them for fifteen minutes; what they can show decides it (plot file: rana_hearing_won), never mere pleading. If nobody goes, the evening ends on the porch and the boat is in the morning. @clock by what happens."
+   "gm": "Staying: washing-up, the porch, an ordinary good evening; let it be short. LEAVING: Noor [noor] comes down the boardwalk at half past seven with the regulation marked in pencil: a formal hearing before the Chancellor on a student's behalf may be requested by her friends, and the office receives petitioners until the night bell. If Rowan and the others go (@place chancellor_office), Dr Vicar [okonkwo] hears them for fifteen minutes; what they can show decides it (plot file: rana_hearing_won), never mere pleading. If nobody goes, the evening ends on the porch and the boat is in the morning. @clock by what happens."
   }
  ],
  "128": [

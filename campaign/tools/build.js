@@ -48,7 +48,20 @@ for (const id of castIds) {
   for (const src of [castData[id].name, castData[id].firstName, names[id]]) for (const w of String(src || '').replace(/["“”]/g, ' ').split(/\s+/)) { const x = w.replace(/[(),]/g, ''); if (x.length >= 2 && !TITLES.has(x) && /^[A-ZÀ-Ý]/.test(x)) toks.add(x); }
   if (toks.size) nameRe.set(id, new RegExp('(?:^|[^A-Za-z])(' + [...toks].map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![A-Za-z])'));
 }
+// Namensbestandteile je Figur: was Rowan wirklich gehört hat, bestimmt, wie sie im Popup und im Personenbuch heißen.
+const nameTok = new Map();
+for (const id of castIds) {
+  const c = castData[id], raw = String(names[id] || c.name || '');
+  let bible = String(c.name || ''); { const enr = bible.match(/enrolled as ([A-Za-z]+ [A-Za-z]+)/); if (enr) bible = enr[1]; }
+  const words = bible.replace(/"/g, ' ').split(/\s+/).filter(Boolean);
+  const nick = (bible.match(/"([^"]+)"/) || [])[1] || null;
+  const parts = { given: words[0] || null, nick, first: c.firstName || words[0] || null, last: words.length > 1 ? words[words.length - 1] : null };
+  const kinds = {};
+  for (const [k, v] of Object.entries(parts)) if (v && v.length >= 2) kinds[k] = new RegExp('(?:^|[^A-Za-z])' + v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![A-Za-z])');
+  nameTok.set(id, { parts, kinds, full: bible || raw, title: /^(Captain|Mama|Chancellor|Ms\.|Prof\.|Dr\.|Coach|Nurse|Madame|Mr\.|Dr) /.test(raw) ? raw : null });
+}
 const env = {
+  nameTok,
   nameRe,
   pool: pool.pool, pron: pool.pronouns, words: 0, decks: new Set(), warn,
   alias: (id) => aliases[id] || '???',
