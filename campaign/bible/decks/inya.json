@@ -120,9 +120,9 @@
   "Winged Haressassin": "Creature L0"
  },
  "gist": {
-  "Bubbles, the Bouncy Bunny": "A very tough hero who can take any damage aimed at Inya's creatures herself. If she goes down that way, Inya refills her hand.",
+  "Bubbles, the Bouncy Bunny": "A very tough hero who can take any damage aimed at Inya's creatures himself. If he goes down that way, Inya refills her hand.",
   "Bunny Bombs": "A tiny creature that collects a Bomb Counter at the end of every turn (both players'). When it dies it blasts every target on the board, harder for each counter. If that blast would end the game in a draw, its controller loses.",
-  "Haressassin": "Fragile creature that shoots one target hard every turn, starting the turn after it arrives.",
+  "Haressassin": "Fragile creature that strikes one target hard every turn, starting the turn after it arrives.",
   "Winged Haressassin": "Once per turn Inya may discard a card to pull a hit aimed at one of her other targets onto this creature; if it dies that way it strikes back hard at any target.",
   "Cute Bunny": "Hops onto the board for free whenever Inya discards two cards at once, and draws her a card each time that happens.",
   "Cute Annoyance Mini": "Discards a card to fetch a Cute creature, a second card to summon it at once. Her discard outlet.",
@@ -135,9 +135,9 @@
   "Teal Fishing Rod": "Returns a small creature (Bunny Bombs, Cute Bunny) from the discard pile to the board.",
   "Deepsea Idol": "Reaction that cancels a sweep hitting two or more of her creatures.",
   "Thicket": "Makes one creature untargetable for a turn.",
-  "Heal": "Patches Bubbles up after she has soaked a turn of damage."
+  "Heal": "Patches Bubbles up after he has soaked a turn of damage."
  },
- "plan": "Inya goes wide with cheap creatures and lets Haressassins shoot while Bubbles absorbs whatever is thrown at them. In the back a Bunny Bombs ticks; Inya decides when it goes off, because Bubbles can keep it alive, and a late blast flattens a board she is happy to trade away. Deepsea Idol and Thicket protect the shooters, Heal keeps Bubbles standing. The deck is fast but thin: every point Bubbles soaks is real, and once she falls the creatures die to a breeze and the bomb is as dangerous to Inya as to you.",
+ "plan": "Inya goes wide with cheap creatures and lets Haressassins strike while Bubbles absorbs whatever is thrown at them. In the back a Bunny Bombs ticks; Inya decides when it goes off, because Bubbles can keep it alive, and a late blast flattens a board she is happy to trade away. Deepsea Idol and Thicket protect the strikers, Heal keeps Bubbles standing. The deck is fast but thin: every point Bubbles soaks is real, and once he falls the creatures die to a breeze and the bomb is as dangerous to Inya as to you.",
  "looks": {
   "early": "A Town Guard and a Harpyformer Choir out for free, Bunny Bombs set down with its first counter, Bubbles untouched.",
   "mid": "Several Haressassins spread across the heroes, the bomb ticking in the back row, Bubbles visibly chewed up from catching hits meant for them.",
@@ -148,7 +148,7 @@
    "best": "DISRUPT",
    "good": "SETUP",
    "trap": "RUSH",
-   "tell": "A fresh Haressassin has just landed and cannot shoot until next turn; the Bunny Bombs has barely a counter on it.",
+   "tell": "A fresh Haressassin has just landed and cannot strike until next turn; the Bunny Bombs has barely a counter on it.",
    "why": "Freezing or stealing the first Haressassin (Snow Cannon, Dark Gear) or setting the bomb off yourself with The Yeeting while it has a counter or two (The Yeeting counts as a kill, and so early the blast only hurts her own small creatures) costs her the tempo the whole deck lives on; racing into Bubbles, the fattest hero in the room, does not."
   },
   "midgame": {
@@ -156,7 +156,7 @@
    "good": "DISRUPT",
    "trap": "SETUP",
    "tell": "She is wide with fragile creatures and Bubbles already looks worn from soaking; the bomb still has only a few counters.",
-   "why": "A sweep now (Flame Avalanche) forces Bubbles to either eat a whole board's worth of damage or let the Haressassins die, and a bomb popped early is harmless; waiting just adds counters and shots."
+   "why": "A sweep now (Flame Avalanche) forces Bubbles to either eat a whole board's worth of damage or let the Haressassins die, and a bomb popped early is harmless; waiting just adds counters and strikes."
   },
   "crisis": {
    "best": "RUSH",
@@ -254,7 +254,7 @@
      },
      {
       "stance": "BALANCE",
-      "text": "Freeze one shooter and hit Bubbles"
+      "text": "Freeze one striker and hit Bubbles"
      },
      {
       "stance": "RUSH",
@@ -299,7 +299,7 @@
     ]
    },
    {
-    "board": "Bubbles is one good hit from falling, and if she drops from soaked damage Inya redraws a full hand.",
+    "board": "Bubbles is one good hit from falling, and if he drops from soaked damage Inya redraws a full hand.",
     "options": [
      {
       "stance": "RUSH",

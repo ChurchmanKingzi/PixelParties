@@ -1,263 +1,263 @@
 {
- "id": "marit",
- "name": "Marit Solberg",
- "firstName": "Marit",
- "age": 19,
- "sex": "f",
- "group": "student",
- "major": "CM",
- "year": 1,
- "dorm": "rare",
- "room": "R201",
- "romance": true,
- "deck": "Phoenix Encore (Cute, Cute Phoenix)",
- "look": "Long flame-orange ombré hair that stands up at the crown like a fire catching, pinned with little enamel flame clips, a flame-orange bow tie at her throat — or her flame-pattern scarf, depending on the day — gold eyes and hands that are never at rest. She enters rooms rather than walking into them. Her black Auxiliary jacket, blue Rare collar turned up, has been altered with flame-patterned cuffs and a red lining she flashes on dramatic turns.",
- "voice": "Projected to the back row: she announces rather than says, narrates herself with relish and has a Norwegian lilt and a stage vocabulary. Every so often she drops into a quick, wry, ordinary aside — and that quieter voice is the real one. Generous to other performers, merciless to dullness. RARE habit (once in a scene at most; most scenes go without it): a theatrical exclamation ('Behold!', 'Alas!') to launch a turn.",
- "lines": [
-  "From the ashes of my frankly terrible opening hand — she RETURNS! (I had no idea that would work.)",
-  "Rowan Vance. Storm-bringer. Brooding stranger from the rainy west. I have decided we are having an arc.",
-  "Tell my roommate she may look at my scarf. Look. Not touch.",
-  "I'm not 'too much'. I'm the correct amount for a larger room."
- ],
- "intro": "An Auxiliary first-year on the commentary track and full-time theatre kid who announces every move like a stage entrance — and somehow gets the whole room to play along.",
- "traits": [
-  {
-   "id": "marit_1",
-   "text": "She narrates her own duels aloud, with voices for each creature.",
-   "how": "Play her or stand within fifty metres of her match."
+  "id": "marit",
+  "name": "Marit Solberg",
+  "firstName": "Marit",
+  "age": 19,
+  "sex": "f",
+  "group": "student",
+  "major": "CM",
+  "year": 1,
+  "dorm": "rare",
+  "room": "R201",
+  "romance": true,
+  "deck": "Phoenix Encore (Cute, Cute Phoenix)",
+  "look": "Long flame-orange hair that flares up into two tall flame-shaped tufts, one on each side of her head, like a fire catching, a flame-orange bow tie at her throat — or her flame-pattern scarf, depending on the day — gold eyes and hands that are never at rest. She enters rooms rather than walking into them. Her black Auxiliary jacket, blue Rare collar turned up, has been altered with flame-patterned cuffs and a red lining she flashes on dramatic turns.",
+  "voice": "Projected to the back row: she announces rather than says, narrates herself with relish and has a northern lilt and a stage vocabulary. Every so often she drops into a quick, wry, ordinary aside — and that quieter voice is the real one. Generous to other performers, merciless to dullness. RARE habit (once in a scene at most; most scenes go without it): a theatrical exclamation ('Behold!', 'Alas!') to launch a turn.",
+  "lines": [
+    "From the ashes of my frankly terrible opening hand — she RETURNS! (I had no idea that would work.)",
+    "Rowan Vance. Storm-bringer. Brooding stranger from the rainy west. I have decided we are having an arc.",
+    "Tell my roommate she may look at my scarf. Look. Not touch.",
+    "I'm not 'too much'. I'm the correct amount for a larger room."
+  ],
+  "intro": "An Auxiliary first-year on the commentary track and full-time theatre kid who announces every move like a stage entrance — and somehow gets the whole room to play along.",
+  "traits": [
+    {
+      "id": "marit_1",
+      "text": "She narrates her own duels aloud, with voices for each creature.",
+      "how": "Play her or stand within fifty metres of her match."
+    },
+    {
+      "id": "marit_2",
+      "text": "She has already founded a drama society and cast people who did not audition.",
+      "how": "She recruits Rowan as 'Second Storm Cloud' within the first two weeks."
+    },
+    {
+      "id": "marit_3",
+      "text": "She is from a town of four hundred people in the polar north and was every part in every school play.",
+      "how": "Ask where she learned to project like that."
+    },
+    {
+      "id": "marit_4",
+      "text": "She wears the flame scarf every day and has seven identical ones.",
+      "how": "Her roommate Eloise reveals the drawer."
+    },
+    {
+      "id": "marit_5",
+      "text": "Her win condition takes the whole game to arrive and she has never once switched to something faster.",
+      "how": "Ask why she plays Cute Phoenix."
+    },
+    {
+      "id": "marit_6",
+      "text": "She keeps a notebook of other people's best lines and credits them when she reuses them.",
+      "how": "Say something good near her."
+    },
+    {
+      "id": "marit_7",
+      "text": "Winter darkness back home lasts two months, and she taught herself to be loud to get through it.",
+      "how": "A quiet moment at the theatre once she is Close."
+    },
+    {
+      "id": "marit_8",
+      "text": "Offstage and alone, she is very quiet and a little afraid that nobody would recognise her like that.",
+      "how": "Find her at the empty theatre at Night."
+    },
+    {
+      "id": "marit_9",
+      "text": "Her older brother Jonas used to be the audience for everything; she still looks for his seat.",
+      "how": "Dating stage; she keeps the third row, left, empty."
+    }
+  ],
+  "secret": "Marit grew up in Skjervøy-adjacent nowhere, two months of polar night a year, with a fisherman father who does not talk and a brother, Jonas, six years older, who was her entire audience: he clapped for every living-room play. Jonas drowned off a trawler when she was fifteen. She did not get quieter; she got louder, deliberately, as a decision, because the house had gone silent and somebody had to fill it. The persona is not fake — she genuinely adores spectacle and is very good at it — but it is load-bearing. Her wound: she believes that if she stops performing, the silence gets in. Her contradiction: the most extroverted person on the island has never let anyone see her on an ordinary Tuesday. The Cute Phoenix is not a joke to her; a thing that comes back is the only win condition she believes in. Private joke: she keeps seat C-3 in the theatre empty at every rehearsal and tells people it is 'reserved for the critics'.\nShe flirts first, fast and as a production — declarations, nicknames, a staged 'arc' — and is completely thrown when someone answers the quiet voice instead of the loud one. Her route is about being allowed an interval.\nDark turn: she adores the Night of Masks (Day 54) and organises half of it; '{H}' is fascinated by her that night ('you are several people; how?') and she, flattered, nearly accepts a 'game for your faces' — a real danger point Rowan can interrupt. After the third Hollowing she does the bravest thing she knows: she keeps the drama society going under curfew, in the theatre, with the doors locked, because frightened people need somewhere to be loud. If someone she loves is Hollowed she stops performing entirely for a while, and that silence should frighten everyone who knows her.",
+  "wants": "A full house, and one person who will also sit with her when the house is empty.",
+  "fears": "Silence — the kind that came into the house after Jonas.",
+  "crush": "ashton",
+  "crushNote": "Her declared nemesis is the only other person on the island who commits to a bit as completely as she does. It shows as an ever more elaborate public feud, a death scene written for him with suspicious care, and a real silence when he once forgot to turn up.",
+  "crushPace": 1.1,
+  "likes": [
+    "Playing along with a bit, fully",
+    "Being given a good line (and credit)",
+    "Grand gestures, however cheap",
+    "Being asked what she is like when nobody is watching — gently",
+    "Turning up to her rehearsals",
+    "People who are kind to the shy ones in her cast",
+    "Storms, bonfires, fireworks",
+    "Applause"
+  ],
+  "dislikes": [
+    "'Calm down' and 'you're too much'",
+    "Being upstaged meanly",
+    "Cynicism about things people love",
+    "Being ignored",
+    "Dead silences at a meal",
+    "Anyone mocking a nervous performer",
+    "Promises to come that are not kept"
+  ],
+  "gifts": [
+    "Card: Duigno, the Flaming Phoenix",
+    "A hand-painted flame clip",
+    "Card: Cute Starlet Megu",
+    "A script you wrote her (any length)",
+    "Stage make-up from the boutique",
+    "Card: Luna Pele, the Flame Dancer"
+  ],
+  "flirt": {
+    "pace": "fast",
+    "initiates": true,
+    "style": "Theatrical declaration.",
+    "text": "Marit flirts at once, publicly and at volume: she assigns Rowan a role in her story ('brooding stranger'), composes nicknames, 'swoons', proposes a dramatic rivalry or a doomed romance by day three. It is a real invitation wrapped in a bit, so that a refusal can be laughed off. She wants a scene partner: play along, raise the stakes, give her a line back. What actually wins her, though, is noticing the aside voice — answering the quiet joke, staying after rehearsal to stack chairs, asking a real question and waiting through the deflection. She kisses first and stages it; the second kiss, unstaged, is the one that matters."
   },
-  {
-   "id": "marit_2",
-   "text": "She has already founded a drama society and cast people who did not audition.",
-   "how": "She recruits Rowan as 'Second Storm Cloud' within the first two weeks."
+  "intimacy": "Quick to touch — an arm thrown round shoulders, a head in a lap during notes, a stage kiss that turns out not to be — and openly delighted by physical affection. She likes warmth, light and play: candles she insists are 'footlights', a costume rail raided for robes, being chased laughing across the empty stage. She is loud in most things and unexpectedly hushed in this; what she wants most is to be held afterwards in a quiet she is not afraid of. Let scenes run warm and funny, with her narrating until she forgets to, and fade when the narration stops.",
+  "events": [
+    {
+      "id": "marit_e1",
+      "stage": 1,
+      "title": "Second Storm Cloud",
+      "condition": "Accept the part she assigns you in the first two weeks and actually turn up to one rehearsal at theatre; or play a duel against her and answer her narration in kind.",
+      "hint": [
+        "She is casting. Refusing politely is allowed. Accepting is more interesting.",
+        "Play along with her theatrics — join a rehearsal or match her drama in a duel."
+      ]
+    },
+    {
+      "id": "marit_e2",
+      "stage": 2,
+      "title": "The aside",
+      "condition": "Stay after a rehearsal to help strike the set, and when she drops into her quiet voice, answer that voice — ask one real question (about home, about the scarf) and wait through the joke she makes first.",
+      "hint": [
+        "She has two voices. Most people only answer the loud one.",
+        "Help her clean up after rehearsal and talk to her when the performance drops."
+      ]
+    },
+    {
+      "id": "marit_e3",
+      "stage": 3,
+      "title": "Several people",
+      "condition": "At the Night of Masks (Day 54) at festival_grounds, be her partner for the pageant she organised and get her away from the 'game' a certain masked student proposes; she kisses Rowan on the theatre steps.",
+      "hint": [
+        "On the festival night she will be at the centre of everything. Be near the centre.",
+        "Go to the Night of Masks with her and stay close all evening."
+      ]
+    },
+    {
+      "id": "marit_e4",
+      "stage": 4,
+      "title": "Seat C-3",
+      "condition": "Find her alone at theatre at Night after Day 67 (curfew) and ask who the empty seat is for; hear about Jonas without trying to fix it. She asks him to stay.",
+      "hint": [
+        "There is a seat she keeps empty. The reason is not a joke.",
+        "Visit her alone in the theatre one night and ask about the seat nobody sits in."
+      ]
+    },
+    {
+      "id": "marit_e5",
+      "stage": 5,
+      "title": "Interval",
+      "condition": "In Term 2, be with her through a stretch where she does not perform at all (after a Hollowing close to her, or Lantern Night, Day 139) and do not ask her to be 'herself' again; when she returns to the stage for the Founder's Festival she plays to seat C-3 with Rowan in it.",
+      "hint": [
+        "One day the loudest person on the island will go quiet. Do not try to turn the sound back on.",
+        "Stay with her through a silent period without pushing, and take the seat she offers you."
+      ]
+    }
+  ],
+  "bonds": {
+    "ashton": {
+      "label": "rivals",
+      "text": "Her declared nemesis. She has written him a death scene.",
+      "public": true,
+      "from": 7
+    },
+    "jessica": {
+      "label": "friends",
+      "text": "The only person who can out-entrance her by standing still.",
+      "public": true,
+      "from": 5
+    },
+    "pippa": {
+      "label": "friends",
+      "text": "Her official photographer and long-suffering audience from across the landing.",
+      "public": true,
+      "from": 3
+    },
+    "bex": {
+      "label": "teammates",
+      "text": "Guest co-host on the Top Deck; they talk over each other beautifully.",
+      "public": true,
+      "from": 14
+    },
+    "vivienne": {
+      "label": "protégé",
+      "text": "Idolises her; cannot understand why she gets the hardest notes in the class.",
+      "public": true,
+      "from": 4
+    },
+    "felix": {
+      "label": "friends",
+      "text": "He paints her backdrops and she gives him the run of the theatre.",
+      "public": true,
+      "from": 9
+    },
+    "noor": {
+      "label": "friends",
+      "text": "Has decided the quiet judge is her 'stern confidante' and will not be told otherwise.",
+      "public": true,
+      "from": 6
+    },
+    "eloise": {
+      "label": "roommates",
+      "text": "Rare Hall 201. Her roommate paints all night, forgets to eat and keeps the window open in a gale; Marit has cast her as 'the tragic artist' and brings her soup.",
+      "public": true,
+      "from": 1
+    },
+    "sammy": {
+      "label": "friends",
+      "text": "Her Dark Stranger: perfect costume, no projection whatever. She is working on it.",
+      "public": true,
+      "from": 10
+    },
+    "victoria": {
+      "label": "friends",
+      "text": "Has made her 'the Lady in the Tower' in the revue: one line, no lights, no surprises, and Marit rehearsed it with her forty times.",
+      "public": true,
+      "from": 5
+    },
+    "fiona": {
+      "label": "rivals",
+      "text": "'The Raven' has presence without projection, which Marit considers cheating. She has written her a part.",
+      "public": true,
+      "from": 5
+    },
+    "cas": {
+      "label": "friends",
+      "text": "Her Herald: the only cast member who knows everybody's lines. She has not noticed whom he says them to.",
+      "public": true,
+      "from": 5
+    },
+    "pilar": {
+      "label": "friends",
+      "text": "The council's events secretary gave the Phoenix Revue a stage, a budget and a list of things she is not to set alight.",
+      "public": true,
+      "from": 10
+    }
   },
-  {
-   "id": "marit_3",
-   "text": "She is from a town of four hundred people above the Arctic Circle and was every part in every school play.",
-   "how": "Ask where she learned to project like that."
+  "schedule": {
+    "weekday": {
+      "Morning": "broadcast_studio",
+      "Midday": "classroom",
+      "Afternoon": "theatre",
+      "Evening": "rare_common_room",
+      "Night": "rare_room"
+    },
+    "weekend": {
+      "Morning": "theatre",
+      "Midday": "main_street",
+      "Afternoon": "theatre",
+      "Evening": "bonfire_pit",
+      "Night": "rare_room"
+    }
   },
-  {
-   "id": "marit_4",
-   "text": "She wears the flame scarf every day and has seven identical ones.",
-   "how": "Her roommate Eloise reveals the drawer."
-  },
-  {
-   "id": "marit_5",
-   "text": "Her win condition takes the whole game to arrive and she has never once switched to something faster.",
-   "how": "Ask why she plays Cute Phoenix."
-  },
-  {
-   "id": "marit_6",
-   "text": "She keeps a notebook of other people's best lines and credits them when she reuses them.",
-   "how": "Say something good near her."
-  },
-  {
-   "id": "marit_7",
-   "text": "Winter darkness back home lasts two months, and she taught herself to be loud to get through it.",
-   "how": "A quiet moment at the theatre once she is Close."
-  },
-  {
-   "id": "marit_8",
-   "text": "Offstage and alone, she is very quiet and a little afraid that nobody would recognise her like that.",
-   "how": "Find her at the empty theatre at Night."
-  },
-  {
-   "id": "marit_9",
-   "text": "Her older brother Jonas used to be the audience for everything; she still looks for his seat.",
-   "how": "Dating stage; she keeps the third row, left, empty."
+  "duel": {
+    "skill": 3,
+    "style": "Floods the table with small Cute creatures and narrates their deaths; everything is fuel for Cute Phoenix, which she is always, somehow, one turn from. Loses a lot, comes back absurdly often.",
+    "tilt": "An opponent who will not react — stone-faced, silent players drain her and she starts forcing the Phoenix early."
   }
- ],
- "secret": "Marit grew up in Skjervøy-adjacent nowhere, two months of polar night a year, with a fisherman father who does not talk and a brother, Jonas, six years older, who was her entire audience: he clapped for every living-room play. Jonas drowned off a trawler when she was fifteen. She did not get quieter; she got louder, deliberately, as a decision, because the house had gone silent and somebody had to fill it. The persona is not fake — she genuinely adores spectacle and is very good at it — but it is load-bearing. Her wound: she believes that if she stops performing, the silence gets in. Her contradiction: the most extroverted person on the island has never let anyone see her on an ordinary Tuesday. The Cute Phoenix is not a joke to her; a thing that comes back is the only win condition she believes in. Private joke: she keeps seat C-3 in the theatre empty at every rehearsal and tells people it is 'reserved for the critics'.\nShe flirts first, fast and as a production — declarations, nicknames, a staged 'arc' — and is completely thrown when someone answers the quiet voice instead of the loud one. Her route is about being allowed an interval.\nDark turn: she adores the Night of Masks (Day 54) and organises half of it; '{H}' is fascinated by her that night ('you are several people; how?') and she, flattered, nearly accepts a 'game for your faces' — a real danger point Rowan can interrupt. After the third Hollowing she does the bravest thing she knows: she keeps the drama society going under curfew, in the theatre, with the doors locked, because frightened people need somewhere to be loud. If someone she loves is Hollowed she stops performing entirely for a while, and that silence should frighten everyone who knows her.",
- "wants": "A full house, and one person who will also sit with her when the house is empty.",
- "fears": "Silence — the kind that came into the house after Jonas.",
- "crush": "ashton",
- "crushNote": "Her declared nemesis is the only other person on the island who commits to a bit as completely as she does. It shows as an ever more elaborate public feud, a death scene written for him with suspicious care, and a real silence when he once forgot to turn up.",
- "crushPace": 1.1,
- "likes": [
-  "Playing along with a bit, fully",
-  "Being given a good line (and credit)",
-  "Grand gestures, however cheap",
-  "Being asked what she is like when nobody is watching — gently",
-  "Turning up to her rehearsals",
-  "People who are kind to the shy ones in her cast",
-  "Storms, bonfires, fireworks",
-  "Applause"
- ],
- "dislikes": [
-  "'Calm down' and 'you're too much'",
-  "Being upstaged meanly",
-  "Cynicism about things people love",
-  "Being ignored",
-  "Dead silences at a meal",
-  "Anyone mocking a nervous performer",
-  "Promises to come that are not kept"
- ],
- "gifts": [
-  "Card: Duigno, the Flaming Phoenix",
-  "A hand-painted flame clip",
-  "Card: Cute Starlet Megu",
-  "A script you wrote her (any length)",
-  "Stage make-up from the boutique",
-  "Card: Luna Pele, the Flame Dancer"
- ],
- "flirt": {
-  "pace": "fast",
-  "initiates": true,
-  "style": "Theatrical declaration.",
-  "text": "Marit flirts at once, publicly and at volume: she assigns Rowan a role in her story ('brooding stranger'), composes nicknames, 'swoons', proposes a dramatic rivalry or a doomed romance by day three. It is a real invitation wrapped in a bit, so that a refusal can be laughed off. She wants a scene partner: play along, raise the stakes, give her a line back. What actually wins her, though, is noticing the aside voice — answering the quiet joke, staying after rehearsal to stack chairs, asking a real question and waiting through the deflection. She kisses first and stages it; the second kiss, unstaged, is the one that matters."
- },
- "intimacy": "Quick to touch — an arm thrown round shoulders, a head in a lap during notes, a stage kiss that turns out not to be — and openly delighted by physical affection. She likes warmth, light and play: candles she insists are 'footlights', a costume rail raided for robes, being chased laughing across the empty stage. She is loud in most things and unexpectedly hushed in this; what she wants most is to be held afterwards in a quiet she is not afraid of. Let scenes run warm and funny, with her narrating until she forgets to, and fade when the narration stops.",
- "events": [
-  {
-   "id": "marit_e1",
-   "stage": 1,
-   "title": "Second Storm Cloud",
-   "condition": "Accept the part she assigns you in the first two weeks and actually turn up to one rehearsal at theatre; or play a duel against her and answer her narration in kind.",
-   "hint": [
-    "She is casting. Refusing politely is allowed. Accepting is more interesting.",
-    "Play along with her theatrics — join a rehearsal or match her drama in a duel."
-   ]
-  },
-  {
-   "id": "marit_e2",
-   "stage": 2,
-   "title": "The aside",
-   "condition": "Stay after a rehearsal to help strike the set, and when she drops into her quiet voice, answer that voice — ask one real question (about home, about the scarf) and wait through the joke she makes first.",
-   "hint": [
-    "She has two voices. Most people only answer the loud one.",
-    "Help her clean up after rehearsal and talk to her when the performance drops."
-   ]
-  },
-  {
-   "id": "marit_e3",
-   "stage": 3,
-   "title": "Several people",
-   "condition": "At the Night of Masks (Day 54) at festival_grounds, be her partner for the pageant she organised and get her away from the 'game' a certain masked student proposes; she kisses Rowan on the theatre steps.",
-   "hint": [
-    "On the festival night she will be at the centre of everything. Be near the centre.",
-    "Go to the Night of Masks with her and stay close all evening."
-   ]
-  },
-  {
-   "id": "marit_e4",
-   "stage": 4,
-   "title": "Seat C-3",
-   "condition": "Find her alone at theatre at Night after Day 67 (curfew) and ask who the empty seat is for; hear about Jonas without trying to fix it. She asks him to stay.",
-   "hint": [
-    "There is a seat she keeps empty. The reason is not a joke.",
-    "Visit her alone in the theatre one night and ask about the seat nobody sits in."
-   ]
-  },
-  {
-   "id": "marit_e5",
-   "stage": 5,
-   "title": "Interval",
-   "condition": "In Term 2, be with her through a stretch where she does not perform at all (after a Hollowing close to her, or Lantern Night, Day 139) and do not ask her to be 'herself' again; when she returns to the stage for the Founder's Festival she plays to seat C-3 with Rowan in it.",
-   "hint": [
-    "One day the loudest person on the island will go quiet. Do not try to turn the sound back on.",
-    "Stay with her through a silent period without pushing, and take the seat she offers you."
-   ]
-  }
- ],
- "bonds": {
-  "ashton": {
-   "label": "rivals",
-   "text": "Her declared nemesis. She has written him a death scene.",
-   "public": true,
-   "from": 7
-  },
-  "jessica": {
-   "label": "friends",
-   "text": "The only person who can out-entrance her by standing still.",
-   "public": true,
-   "from": 5
-  },
-  "pippa": {
-   "label": "friends",
-   "text": "Her official photographer and long-suffering audience from across the landing.",
-   "public": true,
-   "from": 3
-  },
-  "bex": {
-   "label": "teammates",
-   "text": "Guest co-host on the Top Deck; they talk over each other beautifully.",
-   "public": true,
-   "from": 14
-  },
-  "vivienne": {
-   "label": "protégé",
-   "text": "Idolises her; cannot understand why she gets the hardest notes in the class.",
-   "public": true,
-   "from": 4
-  },
-  "felix": {
-   "label": "friends",
-   "text": "He paints her backdrops and she gives him the run of the theatre.",
-   "public": true,
-   "from": 9
-  },
-  "noor": {
-   "label": "friends",
-   "text": "Has decided the quiet judge is her 'stern confidante' and will not be told otherwise.",
-   "public": true,
-   "from": 6
-  },
-  "eloise": {
-   "label": "roommates",
-   "text": "Rare Hall 201. Her roommate paints all night, forgets to eat and keeps the window open in a gale; Marit has cast her as 'the tragic artist' and brings her soup.",
-   "public": true,
-   "from": 1
-  },
-  "sammy": {
-   "label": "friends",
-   "text": "Her Dark Stranger: perfect costume, no projection whatever. She is working on it.",
-   "public": true,
-   "from": 10
-  },
-  "victoria": {
-   "label": "friends",
-   "text": "Has made her 'the Lady in the Tower' in the revue: one line, no lights, no surprises, and Marit rehearsed it with her forty times.",
-   "public": true,
-   "from": 5
-  },
-  "fiona": {
-   "label": "rivals",
-   "text": "'The Raven' has presence without projection, which Marit considers cheating. She has written her a part.",
-   "public": true,
-   "from": 5
-  },
-  "cas": {
-   "label": "friends",
-   "text": "Her Herald: the only cast member who knows everybody's lines. She has not noticed whom he says them to.",
-   "public": true,
-   "from": 5
-  },
-  "pilar": {
-   "label": "friends",
-   "text": "The council's events secretary gave the Phoenix Revue a stage, a budget and a list of things she is not to set alight.",
-   "public": true,
-   "from": 10
-  }
- },
- "schedule": {
-  "weekday": {
-   "Morning": "broadcast_studio",
-   "Midday": "classroom",
-   "Afternoon": "theatre",
-   "Evening": "rare_common_room",
-   "Night": "rare_room"
-  },
-  "weekend": {
-   "Morning": "theatre",
-   "Midday": "main_street",
-   "Afternoon": "theatre",
-   "Evening": "bonfire_pit",
-   "Night": "rare_room"
-  }
- },
- "duel": {
-  "skill": 3,
-  "style": "Floods the table with small Cute creatures and narrates their deaths; everything is fuel for Cute Phoenix, which she is always, somehow, one turn from. Loses a lot, comes back absurdly often.",
-  "tilt": "An opponent who will not react — stone-faced, silent players drain her and she starts forcing the Phoenix early."
- }
 }

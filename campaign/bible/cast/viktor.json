@@ -1,199 +1,199 @@
 {
- "id": "viktor",
- "name": "Viktor Hale",
- "firstName": "Viktor",
- "age": 21,
- "sex": "m",
- "group": "student",
- "major": "CP",
- "year": 1,
- "dorm": "commons",
- "room": "B5",
- "romance": false,
- "deck": "Shifting Sandlands (explorer pile)",
- "look": "Lean and tanned, with spiky dark-blond hair, a pair of orange-lensed goggles pushed up into it, three days of stubble and a thick cream roll-neck under a red Academy jacket he wears like something borrowed. A coil of rope and a brass compass hang at his belt, and his boots are always wet. He looks at the horizon, not at whoever is talking.",
- "voice": "Sparse and low, faintly Danish, with long pauses; he tends to answer the question before last. He describes everything in terms of ground and direction and deflects anything personal with a fact about terrain. Dry, sudden humour. RARE habit (once in a scene at most; most scenes go without it): 'Mm.' as a complete answer.",
- "lines": [
-  "Class. Yes. I was going to go to that.",
-  "The path past the waterfall isn't on the school map. Somebody took it off — you can see where the ink is newer.",
-  "This one was in a tin under the boathouse. I don't know what it does yet. I play what I find.",
-  "Everyone here is looking for a rank. I'm looking for a door."
- ],
- "intro": "A Commons first-year who is older than the rest, skips most classes and seems far more interested in the island than in the card game.",
- "traits": [
-  {
-   "id": "viktor_1",
-   "text": "He is almost never in bungalow 5; his bed is made and unslept in, with a rope coiled on it.",
-   "how": "Ask his roommates Tomi or Ed where he is."
+  "id": "viktor",
+  "name": "Viktor Hale",
+  "firstName": "Viktor",
+  "age": 21,
+  "sex": "m",
+  "group": "student",
+  "major": "CP",
+  "year": 1,
+  "dorm": "commons",
+  "room": "B5",
+  "romance": false,
+  "deck": "Shifting Sandlands (explorer pile)",
+  "look": "Lean and tanned, with dark-brown hair under a wide-brimmed grey-brown hat with a pale-blue feather in the band, one blue eye and one amber, three days of stubble and a grey scarf with a red Academy jacket he wears like something borrowed. A coil of rope and a brass compass hang at his belt, and his boots are always wet. He looks at the horizon, not at whoever is talking.",
+  "voice": "Sparse and low, faintly northern, with long pauses; he tends to answer the question before last. He describes everything in terms of ground and direction and deflects anything personal with a fact about terrain. Dry, sudden humour. RARE habit (once in a scene at most; most scenes go without it): 'Mm.' as a complete answer.",
+  "lines": [
+    "Class. Yes. I was going to go to that.",
+    "The path past the waterfall isn't on the school map. Somebody took it off — you can see where the ink is newer.",
+    "This one was in a tin under the boathouse. I don't know what it does yet. I play what I find.",
+    "Everyone here is looking for a rank. I'm looking for a door."
+  ],
+  "intro": "A Commons first-year who is older than the rest, skips most classes and seems far more interested in the island than in the card game.",
+  "traits": [
+    {
+      "id": "viktor_1",
+      "text": "He is almost never in bungalow 5; his bed is made and unslept in, with a rope coiled on it.",
+      "how": "Ask his roommates Tomi or Ed where he is."
+    },
+    {
+      "id": "viktor_2",
+      "text": "He is drawing his own map of the island and it is better than the official one.",
+      "how": "See it spread on the Commons kitchen table, or meet him on a trail."
+    },
+    {
+      "id": "viktor_3",
+      "text": "He plays a pile of cards he has found, traded or dug up, and remembers where each came from.",
+      "how": "Play him; every card has a location."
+    },
+    {
+      "id": "viktor_4",
+      "text": "He has worked on survey crews in Greenland and Jordan and can sleep anywhere.",
+      "how": "Meet him at the campsite or on the jungle trail."
+    },
+    {
+      "id": "viktor_5",
+      "text": "He is failing two courses and does not appear to mind.",
+      "how": "Grade lists after midterms; Teobalt worries aloud."
+    },
+    {
+      "id": "viktor_6",
+      "text": "The field jacket and the compass belonged to someone else, and he checks the compass when he is thinking.",
+      "how": "Ask about the jacket; he says 'It was my father's' and nothing more."
+    },
+    {
+      "id": "viktor_7",
+      "text": "He carries an old leather notebook he reads far more often than he writes in.",
+      "how": "Walk with him more than once."
+    },
+    {
+      "id": "viktor_8",
+      "text": "He came to the island to find out what happened to someone, and the card game is his cover.",
+      "how": "Only at Friend or higher, away from campus."
+    }
+  ],
+  "secret": "What Viktor knows, exactly. He is the only child of Professor Aleksander Hale and Dr Birgit Lund-Hale (a glaciologist; divorced; she raised him in Aarhus and on field stations). He was twelve when his father 'died in a cave collapse during an authorised survey' on Caldera Key. The Academy paid a settlement; his mother signed; no body. Three years ago a parcel reached him with no return address (it was sent by Imogen Ashdown, who cannot admit it): his father's field jacket, compass and field journal. At the back the binding thread hangs loose: twelve leaves have been removed along the gutter — not ripped; taken out carefully (by his father, the night before, though Viktor does not know that; they are rolled inside the hollow brass base of the oil lamp in the housemaster's study, Umbra House room 9). From the journal he knows: there is a pre-contact culture his father called 'the tile-makers'; there is a sealed RUIN GATE on the volcano's flank; his father was housemaster of something called Umbra House; the phrase 'the contest binds — both ways?' underlined twice; and the last surviving line: 'Tomorrow, with the Key. Imogen will hold the line. If I am right, they are not pictures.' He does NOT know that his father was recorded, that he is alive in any sense, what the Vault is, or anything about Visitors. He believes his father died in there and that the school lied about how. He enrolled on a first-year visa as cover (he really did qualify — he is a competent, indifferent player), under his own name, on the theory that anyone who flinches at 'Hale' is worth watching. Ashdown flinched. So did Silas. So did the Chancellor.\nWound: he was twelve and was told a story, and has been the adult in every room since. He is angrier than he looks. Contradiction: he trusts terrain completely and people not at all, and is lonelier than anyone in the Commons. Private habit: he reads his father's handwriting aloud, quietly, to practise a formal accent — that is where the faint stiffness under his native one comes from. On the island he dreams every night of his father's voice, counting; once it remarked that he had grown. He has told no one, and the dream is real.\nThe bang interests him only as a new hole in the map; he is already out on the north slope that night and reaches the crater on the first morning, Day 27 — where he meets '{H}' walking out of it. {H} walked oddly, {H:his} eyes did not water in the smoke, and {H:he} greeted Viktor by his full name. Viktor has told nobody. He is in the wild more than anyone and finds things first: the boot prints that go in uneven and come out perfectly spaced, the torch still lit at the rim, the dead-silent bird zone, the cracked crust on Day 60. He keeps his maps in the left pannier of his pack (Gideon has reported this). He has already been into Umbra House through a loose scullery shutter and searched room 9 twice without finding anything. He needs three things he cannot get alone: the key to room 9 (Silas), a first-print card (Chuck, the Archive, Ashdown's, or one of the loose ones), and somebody he trusts to hold the rope. Arc: from using the school as cover to having people here; and, in the finale, the choice of whether someone plays for his father's release. If Rowan has not befriended him he goes on alone, into the lava tubes and toward the Vault in Term 2, and in the bad ending he is recorded as his father was.",
+  "wants": "To know what really happened to his father, and to be able to stop looking.",
+  "fears": "That the answer is ordinary — and equally, that it is not.",
+  "crush": "saoirse",
+  "crushNote": "She has a boat, no curiosity and never once asked him to explain himself; he trusts her, which for him is rarer than liking. It shows as him turning up at the boathouse with no errand, mending her nets, and staying for the fire.",
+  "crushPace": 0.8,
+  "likes": [
+    "Being asked to show a route rather than explain himself",
+    "People who can keep quiet on a trail",
+    "Practical competence: knots, first aid, reading weather",
+    "Old maps, old tins, found cards",
+    "Straight answers",
+    "Being trusted with a secret, and one in return",
+    "Strong coffee from a camp stove"
+  ],
+  "dislikes": [
+    "Official explanations",
+    "Being asked about his grades",
+    "Questions about his father before he is ready",
+    "Staff who change the subject",
+    "Being followed",
+    "Waste of daylight"
+  ],
+  "gifts": [
+    "Card: Treasure Hunter's Backpack",
+    "A waterproof map case",
+    "Card: Codumbus, the Clueless Voyager",
+    "Dry socks",
+    "A found card with a note of where you found it",
+    "Card: Tarleinn the Traveler"
+  ],
+  "events": [
+    {
+      "id": "viktor_e1",
+      "stage": 1,
+      "title": "Newer ink",
+      "condition": "Meet him off campus (jungle_trail, waterfall or campsite) and walk a route with him without complaining or prying; or bring him a location he has not got on his map.",
+      "hint": [
+        "He is easier to talk to where there are no walls.",
+        "Go hiking with him, keep up, and do not ask personal questions yet."
+      ]
+    },
+    {
+      "id": "viktor_e2",
+      "stage": 2,
+      "title": "It was my father's",
+      "condition": "Hold the rope for him at rope_bridge (the gorge, from Day 8) or on any later night expedition to ruins_field or the crater rim, asking no questions, and cover for one of his absences; he tells Rowan whose jacket it is and shows the journal's cover.",
+      "hint": [
+        "He needs a second pair of hands for something. He chooses carefully who to ask.",
+        "Help him on an expedition well beyond the campus paths, and he will tell you why he is really here."
+      ]
+    },
+    {
+      "id": "viktor_e3",
+      "stage": 3,
+      "title": "Room nine",
+      "condition": "Help him get what he cannot get alone — persuade Silas, or go with him into umbra_house at Night to umbra_room9 — and when he finds what is hidden there, let him read it first.",
+      "hint": [
+        "There is a door he has been circling since he arrived. He should not open it by himself.",
+        "Help him get into the sealed dormitory on the ridge and stand by while he finds what he came for."
+      ]
+    }
+  ],
+  "bonds": {
+    "tomi": {
+      "label": "roommates",
+      "text": "The trader asks no questions and tells the row he is a treasure hunter, which is convenient cover.",
+      "public": true,
+      "from": 1
+    },
+    "saoirse": {
+      "label": "friends",
+      "text": "She has a boat and no curiosity. He trusts her more than anyone on campus.",
+      "public": false,
+      "from": 15
+    },
+    "ashdown": {
+      "label": "distrusts",
+      "text": "She flinched at his surname on the first day and has avoided him since.",
+      "public": false,
+      "from": 1
+    },
+    "silas": {
+      "label": "distrusts",
+      "text": "The old man with the keys knows something and looks away.",
+      "public": false,
+      "from": 3
+    },
+    "josie": {
+      "label": "friends",
+      "text": "The bartender pours him doubles and does not ask what he is looking for.",
+      "public": false,
+      "from": 6
+    },
+    "okonkwo": {
+      "label": "distrusts",
+      "text": "Her office sent the letter that said 'cave collapse'.",
+      "public": false,
+      "from": 1
+    },
+    "ed": {
+      "label": "roommates",
+      "text": "Bungalow 5. The boy in the hat follows him into the jungle like a happy dog; telling him to stop has only taught him to go ahead. Viktor has started carrying a second water bottle.",
+      "public": true,
+      "from": 1
+    },
+    "leona": {
+      "label": "friends",
+      "text": "She looks for records the way he looks for paths. He has shown her one trail and asked nothing.",
+      "public": false,
+      "from": 30
+    }
   },
-  {
-   "id": "viktor_2",
-   "text": "He is drawing his own map of the island and it is better than the official one.",
-   "how": "See it spread on the Commons kitchen table, or meet him on a trail."
+  "schedule": {
+    "weekday": {
+      "Morning": "jungle_trail",
+      "Midday": "ruins_field",
+      "Afternoon": "cliff_path",
+      "Evening": "commons_kitchen",
+      "Night": "campsite"
+    },
+    "weekend": {
+      "Morning": "waterfall",
+      "Midday": "north_shore",
+      "Afternoon": "bar",
+      "Evening": "campsite",
+      "Night": "old_observatory"
+    }
   },
-  {
-   "id": "viktor_3",
-   "text": "He plays a pile of cards he has found, traded or dug up, and remembers where each came from.",
-   "how": "Play him; every card has a location."
-  },
-  {
-   "id": "viktor_4",
-   "text": "He has worked on survey crews in Greenland and Jordan and can sleep anywhere.",
-   "how": "Meet him at the campsite or on the jungle trail."
-  },
-  {
-   "id": "viktor_5",
-   "text": "He is failing two courses and does not appear to mind.",
-   "how": "Grade lists after midterms; Teobalt worries aloud."
-  },
-  {
-   "id": "viktor_6",
-   "text": "The field jacket and the compass belonged to someone else, and he checks the compass when he is thinking.",
-   "how": "Ask about the jacket; he says 'It was my father's' and nothing more."
-  },
-  {
-   "id": "viktor_7",
-   "text": "He carries an old leather notebook he reads far more often than he writes in.",
-   "how": "Walk with him more than once."
-  },
-  {
-   "id": "viktor_8",
-   "text": "He came to the island to find out what happened to someone, and the card game is his cover.",
-   "how": "Only at Friend or higher, away from campus."
+  "duel": {
+    "skill": 3,
+    "style": "An unsleeved pile of Sandlands terrain and oddities; inconsistent, occasionally brilliant, full of cards nobody has read in years. He plays as though mildly curious how it will come out.",
+    "tilt": "He does not care enough to tilt — except when an opponent's card is something he has only seen drawn in a certain notebook; then he stops playing and stares."
   }
- ],
- "secret": "What Viktor knows, exactly. He is the only child of Professor Aleksander Hale and Dr Birgit Lund-Hale (a glaciologist; divorced; she raised him in Aarhus and on field stations). He was twelve when his father 'died in a cave collapse during an authorised survey' on Caldera Key. The Academy paid a settlement; his mother signed; no body. Three years ago a parcel reached him with no return address (it was sent by Imogen Ashdown, who cannot admit it): his father's field jacket, compass and field journal. At the back the binding thread hangs loose: twelve leaves have been removed along the gutter — not ripped; taken out carefully (by his father, the night before, though Viktor does not know that; they are rolled inside the hollow brass base of the oil lamp in the housemaster's study, Umbra House room 9). From the journal he knows: there is a pre-contact culture his father called 'the tile-makers'; there is a sealed RUIN GATE on the volcano's flank; his father was housemaster of something called Umbra House; the phrase 'the contest binds — both ways?' underlined twice; and the last surviving line: 'Tomorrow, with the Key. Imogen will hold the line. If I am right, they are not pictures.' He does NOT know that his father was recorded, that he is alive in any sense, what the Vault is, or anything about Visitors. He believes his father died in there and that the school lied about how. He enrolled on a first-year visa as cover (he really did qualify — he is a competent, indifferent player), under his own name, on the theory that anyone who flinches at 'Hale' is worth watching. Ashdown flinched. So did Silas. So did the Chancellor.\nWound: he was twelve and was told a story, and has been the adult in every room since. He is angrier than he looks. Contradiction: he trusts terrain completely and people not at all, and is lonelier than anyone in the Commons. Private habit: he reads his father's handwriting aloud, quietly, to practise his English accent — that is where the faint Britishness under the Danish comes from. On the island he dreams every night of his father's voice, counting; once it remarked that he had grown. He has told no one, and the dream is real.\nThe bang interests him only as a new hole in the map; he is already out on the north slope that night and reaches the crater on the first morning, Day 27 — where he meets '{H}' walking out of it. {H} walked oddly, {H:his} eyes did not water in the smoke, and {H:he} greeted Viktor by his full name. Viktor has told nobody. He is in the wild more than anyone and finds things first: the boot prints that go in uneven and come out perfectly spaced, the torch still lit at the rim, the dead-silent bird zone, the cracked crust on Day 60. He keeps his maps in the left pannier of his pack (Gideon has reported this). He has already been into Umbra House through a loose scullery shutter and searched room 9 twice without finding anything. He needs three things he cannot get alone: the key to room 9 (Silas), a first-print card (Chuck, the Archive, Ashdown's, or one of the loose ones), and somebody he trusts to hold the rope. Arc: from using the school as cover to having people here; and, in the finale, the choice of whether someone plays for his father's release. If Rowan has not befriended him he goes on alone, into the lava tubes and toward the Vault in Term 2, and in the bad ending he is recorded as his father was.",
- "wants": "To know what really happened to his father, and to be able to stop looking.",
- "fears": "That the answer is ordinary — and equally, that it is not.",
- "crush": "saoirse",
- "crushNote": "She has a boat, no curiosity and never once asked him to explain himself; he trusts her, which for him is rarer than liking. It shows as him turning up at the boathouse with no errand, mending her nets, and staying for the fire.",
- "crushPace": 0.8,
- "likes": [
-  "Being asked to show a route rather than explain himself",
-  "People who can keep quiet on a trail",
-  "Practical competence: knots, first aid, reading weather",
-  "Old maps, old tins, found cards",
-  "Straight answers",
-  "Being trusted with a secret, and one in return",
-  "Strong coffee from a camp stove"
- ],
- "dislikes": [
-  "Official explanations",
-  "Being asked about his grades",
-  "Questions about his father before he is ready",
-  "Staff who change the subject",
-  "Being followed",
-  "Waste of daylight"
- ],
- "gifts": [
-  "Card: Treasure Hunter's Backpack",
-  "A waterproof map case",
-  "Card: Codumbus, the Clueless Voyager",
-  "Dry socks",
-  "A found card with a note of where you found it",
-  "Card: Tarleinn the Traveler"
- ],
- "events": [
-  {
-   "id": "viktor_e1",
-   "stage": 1,
-   "title": "Newer ink",
-   "condition": "Meet him off campus (jungle_trail, waterfall or campsite) and walk a route with him without complaining or prying; or bring him a location he has not got on his map.",
-   "hint": [
-    "He is easier to talk to where there are no walls.",
-    "Go hiking with him, keep up, and do not ask personal questions yet."
-   ]
-  },
-  {
-   "id": "viktor_e2",
-   "stage": 2,
-   "title": "It was my father's",
-   "condition": "Hold the rope for him at rope_bridge (the gorge, from Day 8) or on any later night expedition to ruins_field or the crater rim, asking no questions, and cover for one of his absences; he tells Rowan whose jacket it is and shows the journal's cover.",
-   "hint": [
-    "He needs a second pair of hands for something. He chooses carefully who to ask.",
-    "Help him on an expedition well beyond the campus paths, and he will tell you why he is really here."
-   ]
-  },
-  {
-   "id": "viktor_e3",
-   "stage": 3,
-   "title": "Room nine",
-   "condition": "Help him get what he cannot get alone — persuade Silas, or go with him into umbra_house at Night to umbra_room9 — and when he finds what is hidden there, let him read it first.",
-   "hint": [
-    "There is a door he has been circling since he arrived. He should not open it by himself.",
-    "Help him get into the sealed dormitory on the ridge and stand by while he finds what he came for."
-   ]
-  }
- ],
- "bonds": {
-  "tomi": {
-   "label": "roommates",
-   "text": "The trader asks no questions and tells the row he is a treasure hunter, which is convenient cover.",
-   "public": true,
-   "from": 1
-  },
-  "saoirse": {
-   "label": "friends",
-   "text": "She has a boat and no curiosity. He trusts her more than anyone on campus.",
-   "public": false,
-   "from": 15
-  },
-  "ashdown": {
-   "label": "distrusts",
-   "text": "She flinched at his surname on the first day and has avoided him since.",
-   "public": false,
-   "from": 1
-  },
-  "silas": {
-   "label": "distrusts",
-   "text": "The old man with the keys knows something and looks away.",
-   "public": false,
-   "from": 3
-  },
-  "josie": {
-   "label": "friends",
-   "text": "The bartender pours him doubles and does not ask what he is looking for.",
-   "public": false,
-   "from": 6
-  },
-  "okonkwo": {
-   "label": "distrusts",
-   "text": "Her office sent the letter that said 'cave collapse'.",
-   "public": false,
-   "from": 1
-  },
-  "ed": {
-   "label": "roommates",
-   "text": "Bungalow 5. The boy in the hat follows him into the jungle like a happy dog; telling him to stop has only taught him to go ahead. Viktor has started carrying a second water bottle.",
-   "public": true,
-   "from": 1
-  },
-  "leona": {
-   "label": "friends",
-   "text": "She looks for records the way he looks for paths. He has shown her one trail and asked nothing.",
-   "public": false,
-   "from": 30
-  }
- },
- "schedule": {
-  "weekday": {
-   "Morning": "jungle_trail",
-   "Midday": "ruins_field",
-   "Afternoon": "cliff_path",
-   "Evening": "commons_kitchen",
-   "Night": "campsite"
-  },
-  "weekend": {
-   "Morning": "waterfall",
-   "Midday": "north_shore",
-   "Afternoon": "bar",
-   "Evening": "campsite",
-   "Night": "old_observatory"
-  }
- },
- "duel": {
-  "skill": 3,
-  "style": "An unsleeved pile of Sandlands terrain and oddities; inconsistent, occasionally brilliant, full of cards nobody has read in years. He plays as though mildly curious how it will come out.",
-  "tilt": "He does not care enough to tilt — except when an opponent's card is something he has only seen drawn in a certain notebook; then he stops playing and stares."
- }
 }

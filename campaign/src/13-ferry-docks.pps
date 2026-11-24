@@ -20,7 +20,8 @@
   The horn sounds again, once, short. The engine note drops, steps down through three tones and fades to a thrum, and then there is a bump so gentle you would hardly feel it if you were not holding a rail.
   Ten-forty, on the nose.
   The gangway comes down with a rattle. The decks empty at once, the way a bath empties: a few big gulps, a swirl, and then the whole crowd is flowing down the plank in two columns, duffels bumping, deck boxes clutched, voices rising.
-  A long timber jetty on barnacled piles stretches ahead of you, five minutes below a gate you cannot yet see. At its head stands a painted arch. Sun-faded letters read WELCOME, DUELISTS. Under it, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders.
+  A long timber pier on barnacled piles stretches ahead of you towards a pale beach and a wall of jungle. At its head stands a blue arch with gold lettering and a little golden gem on top: WELCOME, DUELISTS.
+  Palms lean over the sand behind it, the volcano trails its thread of smoke above the trees, and a small red cable car creaks along a wire over the canopy. Under the arch, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders.
   "Spectral! Spectral first-years, this way, mind the step!"
   "Rare! Rare Hall over here, blue collars!"
   "Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!"
@@ -29,6 +30,9 @@
   [?Cati] "Got it! Got it, Captain! You've got the aim of a retired postman!"
   [abel] "I AM a retired postman!"
   ~ Everyone on this island seems to have been doing this a very long time.
+  Halfway down the pier a pale boy in white gloves holds out a thick fold of mainland notes to a deckhand who has offered to take a case. The deckhand looks at the money the way a person looks at a leaf.
+  [?Deckhand] "Smug Coins only, sir. Mainland paper's no good past the arch."
+  The pale boy looks at the notes. For a moment the most self-possessed person on the ship has nothing at all to say.
   @if has_snapper
     Behind you, Captain Stroud comes down the gangway with a small crate of fish under one arm, and a face that is trying very hard to look like nobody's business.
   @flag arrived_dock
@@ -104,7 +108,7 @@
 
 @scene dock_to_quad
   @goto main_gate 8
-  The avenue climbs from the pier through an avenue of tall, unfamiliar trees, their trunks painted white to head height so the dusk, when it falls, will not eat them. At its top a main gate stands open: two stone posts, a wrought-iron arch, and beyond it, the edge of the Academy.
+  The road climbs from the pier between tall palms. At its top the main gate stands open: two pillars of dark brick with lamps on top, a brass plaque set into the left-hand one, and an iron arch fanned out above the gates like a hand of cards, each card holding a coloured gem. Beyond it a sandy path runs between more palms to a white building with a red roof.
   People flow through it in knots. Nobody speaks very loudly. It is the kind of silence that comes over a crowd entering a church or an exam hall, only here it is not reverence but plain, shared, delighted terror.
   @scene quad_address
 
@@ -113,10 +117,11 @@
   @if ferry_table_lost
     You come up through the rear colonnade at a stagger, soaked in sweat, arms trembling, just as a tall woman on the steps is finishing her first sentence. Nobody turns round. You slide into the back of the crowd like a coat onto a hook.
   The Quad opens before you like a held breath.
-  A wide lawn framed by white colonnades and red-tiled roofs, cut by gravel paths that meet at a fountain: a bronze man with a moustache, flinging a spray of bronze cards from which the water jumps. Students lie on blankets with playmats, argue over rulings, trade out of binders. Under the clock tower arcade, a tall split-flap display clatters as a rank changes: the ladder board, 144 names long.
+  A wide green lawn with palms leaning over it, framed on one side by white arcades under red-tiled roofs. At the far end a clock tower with a blue roof stands guard, and at its foot a tall split-flap display clatters as a rank changes: the ladder board, 144 names long.
+  To the right, where a sandy path bends round the grass, a fountain: a bronze figure flinging a spray of bronze cards from which the water jumps. Above the roofs the volcano trails its thread of smoke. Students lie on blankets with playmats, argue over rulings, trade out of binders.
   ~ There I am. Somewhere on the bottom of that board, in about an hour.
-  The thirty-six new faces collect on the gravel at the foot of the main steps, in uneasy clumps, each according to its collar, the way oil gathers on water.
-  On the steps, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds.
+  The thirty-eight new faces collect on the lawn at the foot of the clock tower, in uneasy clumps, each according to its collar, the way oil gathers on water.
+  In front of the tower, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds.
   [okonkwo] "Good morning."
   A hundred new heartbeats, all in tempo.
   [okonkwo] "I am Dr Marguerite Okonkwo. I am Chancellor of Pixel Academy, and I have been for a very long time."
@@ -127,18 +132,22 @@
   [okonkwo] "For today, you will be assigned a dormitory. The lists will be read in rank order. Do not take your assignment as a verdict. It is merely an arrangement. Verdicts, on this island, are earned at the table."
   [okonkwo] "Miss Sterling."
   She steps aside. The woman who takes her place is taller, silver-blonde in a flawless chignon, with a dark council sash worn over a gold jacket like a rank. She opens a leather folio with the air of someone opening a ledger.
-  [octavia] "Spectral Tower." A single, crisp, unhurried syllable at a time. "Santa, Georgie. Montclair, Jessica. Brandt, Anneliese. Beaumont-Lyle, Ashton. Pryce, Gideon. Prospero, Magnus."
+  [octavia] "Spectral Tower." A single, crisp, unhurried syllable at a time. "Santa, Georgie. Montclair, Jessica. Brandt, Anneliese. Beaumont-Lyle, Ashton. Pryce, Gideon. Prospero, Magnus. Sunflower, Branden."
+  @if met:branden
+    From somewhere near knee height a high voice shouts "HERE!" and then, a moment later, "AND ALSO I'M HERE!" Several people in the crowd, you notice, look for the lifebuoy.
+  @else
+    From somewhere near knee height a high voice shouts "HERE!" and then, a moment later, "AND ALSO I'M HERE!"
   @if met:gideon
     From somewhere to your left, a thin, courteous voice murmurs, "Here." You do not turn round.
-  The names go on. Each one is a small door closing behind a face in the crowd, and each face crosses the gravel to join an older student in a white-and-gold collar and vanishes up the hill.
+  The names go on. Each one is a small door closing behind a face in the crowd, and each face crosses the grass to join an older student in a white-and-gold collar and vanishes up the hill.
   [octavia] "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Ferrant, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
   It is a long list. You start counting, and stop, and start again, because it is easier than thinking about what it means that your name has not been read.
-  The Spectral cluster is gone. The Rare cluster is gone. The lawn has a hole in it where thirty-six people used to be, and the remainder are all clutching their bags a little tighter.
+  The Spectral cluster is gone. The Rare cluster is gone. The lawn has a hole in it where thirty-eight people used to be, and the remainder are all clutching their bags a little tighter.
   [octavia] "The Commons."
   The word lands with a small, flat, administrative thud.
   [octavia] "Bungalows one through eight. Bungalow two: Nordlicht, Freya. Njord, Hedda. Hollis, Beatrix."
   [octavia] "Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana."
-  [octavia] "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona."
+  [octavia] "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred."
   [octavia] "Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor."
   [octavia] "Bungalow six: Counts, Sammy. Crowe, Tobias. Volkov, Dmitri."
   A pause. She turns a page.
@@ -157,7 +166,7 @@
   @scene quad_jacket
 
 @scene quad_jacket
-  The crowd breaks up. A young woman with a clipboard of her own, black-haired and brisk, points you towards a large wooden crate set at the foot of the steps, from which a jacket is being issued with grim ceremony to each of the Commons. A senior in a gold jacket is reading names off a list and pulling out jackets by size.
+  The crowd breaks up. A young woman with a clipboard of her own, black-haired and brisk, points you towards a large wooden crate set at the foot of the tower, from which a jacket is being issued with grim ceremony to each of the Commons. A senior in a gold jacket is reading names off a list and pulling out jackets by size.
   [?Upper-year] "Vance. Medium. Hold your arms out."
   The jacket is red, stiff and smells of new fabric. It has a plain grey collar. The sleeves are exactly the right length, which feels like a small personal insult.
   A shadow falls across the crate.
@@ -181,9 +190,9 @@
 # ───────────────────────────── DIE NEUEN BUNGALOWS ─────────────────────────────
 
 @scene commons_march
-  A large woman in a flowered apron, with grey-black hair under a red kerchief and gold hoops swinging from her ears, has planted herself at the foot of the steps and is calling out, over the din, in a voice that arrives a full room before she does:
-  [odalys?] "COMMONS! Commons, over here! Eighteen of you, I counted, don't make me count again! Every one of you has a stomach, and I have a stove!"
-  There is a wooden spoon in her apron string like a sidearm. She raises it. Eighteen new first-years drift towards her as if drawn by gravity.
+  A large woman in a flowered apron, with grey-black hair under a red kerchief and gold hoops swinging from her ears, has planted herself at the foot of the tower and is calling out, over the din, in a voice that arrives a full room before she does:
+  [odalys?] "COMMONS! Commons, over here! Nineteen of you, I counted, don't make me count again! Every one of you has a stomach, and I have a stove!"
+  There is a wooden spoon in her apron string like a sidearm. She raises it. Nineteen new first-years drift towards her as if drawn by gravity.
   [odalys?] "I am Mama Odalys! Mrs Fuentes to the staff, Mama to everyone with sense! I run the kitchen, I run the row, and I run you! Rules!"
   [odalys] "One! Nobody eats alone! Two! Nobody skips breakfast! Three! Lights out means quiet! Four! If you are sad, tell somebody! If you cannot tell somebody, tell me! If you cannot tell me, tell the spoon! Come!"
   @meet odalys
@@ -209,8 +218,8 @@
 
 @scene commons_arrival bg=commons_beach
   The path drops through a stand of wind-bent palms and ends, abruptly, on sand.
-  A crooked row of eight weathered bungalows stands on stilts along the curve of a cove, paint flaking in coral, mint and sun-bleached blue, joined by a boardwalk of mismatched planks. Laundry flaps on lines strung between the palms. A hand-painted sign above the first step says THE COMMONS — EVERYBODY STARTS SOMEWHERE.
-  Hammocks, surfboards, a ping-pong table with a duel mat taped across it. Geckos on the eaves. The surf breathing, in and out. It is the most beautiful place you have ever seen, and it has a washing line.
+  A crooked row of weathered bungalows stands on stilts along the curve of a cove, shingle roofs dark with age, walls in salmon-pink, mint and sun-bleached blue, joined by a path of mismatched paving stones, pink, teal and brown, some replaced, some missing. Laundry flaps on lines strung between the palms. A hand-painted sign on two posts says THE COMMONS — EVERYBODY STARTS SOMEWHERE.
+  A red hammock, surfboards leaning on the porch rails, a small blue folding table with a duel mat taped across it. Geckos on the eaves. The surf breathing, in and out. It is the most beautiful place you have ever seen, and it has a washing line.
   ~ Well. It's not the ferry.
   [odalys] "Number one is my kitchen! Number eight is the laundry!" A sweep of the spoon. "Your numbers are on the doors! Dinner is at six! Go!"
   @if ferry_table_won
@@ -229,8 +238,8 @@
 
 @scene bungalow_seven_first bg=commons_room
   @goto commons_room 3
-  Bungalow 7 is the last one on the row, a narrow box of weathered boards on stilts, with a single step and a screen door that squeaks. You push it open.
-  One long plank room with three iron beds, three footlockers and a ceiling fan that ticks on every fourth turn. Baylee's bed, reinforced with a door laid under the mattress, is made with military corners. Nathan's is an explosion of socks, booster wrappers and a poster of the War Counselors. Your corner has the window on the sea, a wobbly desk and one bare bulb.
+  Bungalow 7 is the last one on the row, a narrow box of weathered boards on stilts, with a single step and a teal door that squeaks. You push it open.
+  One long plank room with three iron beds, three footlockers, teal shutters on the window, a surfboard nobody owns leaning in the corner, and a ceiling fan that ticks on every fourth turn. Baylee's bed, reinforced with a door laid under the mattress, is made with military corners. Nathan's is an explosion of socks, booster wrappers and a poster of the War Counselors. Your corner has the window on the sea, a wobbly desk and one bare bulb.
   [nathan] "I took the bed by the door! I'm the first line of defence! Also I snore! So you know!"
   [baylee] "He does."
   [nathan] "I DO! My mom says it's like living next to a chainsaw. A friendly chainsaw!"

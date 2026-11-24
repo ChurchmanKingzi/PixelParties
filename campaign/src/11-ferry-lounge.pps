@@ -20,7 +20,7 @@
   onArrive lounge_first
   object gideon sprite=gideon x=50 y=92 h=62 label="Boy in white gloves" scene=ferry_gideon alert="not table_resolved" when day=1 and time<10:40 and not met:gideon
   object gideon_m sprite=gideon x=50 y=92 h=62 label="Gideon" scene=ferry_gideon alert="not table_resolved" when day=1 and time<10:40 and met:gideon
-  object inya sprite=inya x=64 y=96 h=40 label="Mint-haired girl" scene=ferry_inya alert="not table_resolved" when day=1 and time<10:40 and not met:inya
+  object inya sprite=inya x=64 y=96 h=40 label="Girl with the bunny clip" scene=ferry_inya alert="not table_resolved" when day=1 and time<10:40 and not met:inya
   object inya_m sprite=inya x=64 y=96 h=40 label="Inya" scene=ferry_inya alert="not table_resolved" when day=1 and time<10:40 and met:inya
   object tomi sprite=tomi x=22 y=98 h=50 label="Boy in a yellow bandana" scene=ferry_tomi when day=1 and time<10:40 and not met:tomi
   object tomi_m sprite=tomi x=22 y=98 h=50 label="Tomi" scene=ferry_tomi when day=1 and time<10:40 and met:tomi
@@ -34,6 +34,7 @@
   action watch "Watch a game at the table" scene=lounge_watch when day=1 and time<10:40 and not saw_counter and not table_resolved
   action galley "Go to the galley hatch" scene=lounge_galley when day=1 and time<10:40
   action binder "Look through a trade binder" scene=lounge_binder when day=1 and time<10:40
+  action benches "Look under the benches" scene=lounge_benches when day=1 and time<10:40 and not found_stapler
 
 @event inya_finds_rowan scene=inya_finds_rowan day=1 from=09:30 when not table_resolved and not inya_engaged and (at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge)
 @event table_default scene=table_default day=1 from=10:05 when not table_resolved and (at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge)
@@ -41,10 +42,11 @@
 # ───────────────────────────── ERSTER EINTRITT ─────────────────────────────
 
 @scene lounge_first once alone bg=ferry_lounge
-  The iron steps give onto a low saloon that smells of coffee, wet wool and diesel. The windows are fogged with salt. Rows of cracked red benches run fore and aft, and duffel bags fill every aisle.
-  The engine is louder down here. You can feel it in the soles of your feet.
-  At the forward end a hatch sells coffee and cinnamon rolls. In the middle of the room stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to the edge. People are standing round it two deep.
-  At the table sits a pale boy in white cotton gloves, squaring his deck against the felt. He does it twice, as if it might have changed. His gloves lie folded beside it. He has not looked up since you came in.
+  The iron steps give onto a long saloon so full of sun that you stop on the bottom stair. The windows are huge and rounded and spotless, a row of clean panes with nothing in them but sea. Padded blue benches run along the wall beneath them, and duffel bags are piled on every seat.
+  It smells of coffee and warm wool. The engine is a hum you feel in the soles of your feet.
+  At the far end a steel urn steams on the counter of a galley hatch, with a hand-lettered sign for coffee and cinnamon rolls. Beside it, under a round porthole that frames the island like a postcard, stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to the edge, a ring of blue stools. People are standing round it two deep.
+  At the table sits a pale boy with a starched white-and-gold collar, squaring his deck against the felt. He does it twice, as if it might have changed. A pair of white cotton gloves lies folded beside it. He has not looked up since you came in.
+  On the bench behind him stand four matched leather cases with brass corners, strapped shut, and a card propped against them in a very neat hand: THE STAKES AT THIS TABLE: THE LOSER CARRIES THE WINNER'S LUGGAGE UP THE HILL.
   At the far end of the table stands a small girl with mint-green hair in two low tails, held with a bunny-shaped clip. She is holding a deck box in both hands, a tiny bunny charm dangling from its clasp, and the box is shaking slightly, the way a leaf shakes.
   [inya?] "The plate says winner stays."
   [gideon?] "It does."
@@ -60,9 +62,9 @@
   The pale boy's grey eyes travel round the saloon with the unhurried interest of a man choosing a book. They stop at the stairs, where a stranger in a rain jacket is standing among the jackets, and do not move on.
   [gideon?] "Then let us make it simple. There is, aboard, exactly one first-year who does not wear a collar at all. The Academy could not decide what to make of him. One name in ink at the bottom of a typed list: the Wildcard."
   Every head turns the same way. Yours is not an exception.
-  [gideon?] "Beat him, in front of this table, and I will concede that you are worth my time. Then we shall play, for four cases. Until then, the table is closed."
+  [gideon?] "Beat him, in front of this table, and I will concede that you are worth my time. Then we shall play, for the usual stake: the loser carries the winner's luggage up the hill. Mine is those four cases, Vance. Yours, I gather, is one duffel. I shall try to be a gentle winner. Until then, the table is closed."
   On the nearest bench a boy in a yellow bandana turns the lid of his binder towards the room and takes the pencil from behind his ear.
-  [tomi?] "Ladies and gentlemen, a new line! Even money, ten credits a head, on whether the Wildcard sits down! And a young lady with a bunny clip wants to know whose side she's on!"
+  [tomi?] "Ladies and gentlemen, a new line! Even money, ten Smug Coins a head, on whether the Wildcard sits down! And a young lady with a bunny clip wants to know whose side she's on!"
   The small girl turns and looks you up and down. It does not take long.
   [inya?] "Him?" Dubious. Sharp. "The one in the rain jacket?"
   You have been looking for a way to be unnoticed on this ship for two hours. It has just been taken from you in front of fifty people.
@@ -84,6 +86,8 @@
     > "All right. If she's willing, I'll play her. That's easy enough."
       [gideon?] "How obliging." The thinnest possible smile. "Miss?"
       [inya?] "…Fine." A beat. "I'll play you. But I'm not doing it because he said so. I'm doing it because I want to see if you're any good."
+      [inya?] "Inya Bell. Remember it."
+      [gideon?] "Gideon Pryce. I shall remember hers, Vance, as well as yours."
       @meet gideon
       @meet inya
       @aff inya +2 | Took her up on it
@@ -107,7 +111,7 @@
 @scene lounge_plate
   The brass plate is screwed to the edge of the table and polished by a thousand sleeves. It reads, in small engraved capitals:
   WINNER STAYS
-  Underneath, in a smaller and much more recent hand, somebody has scratched with a key: *(he doesn't have to play you though)*.
+  Underneath, in a smaller and much more recent hand, somebody has scratched with a key: *(he doesn't have to play you though)*. On the bench behind it, four matched cases wait beside a neat card: STAKES: THE LOSER CARRIES THE WINNER'S LUGGAGE UP THE HILL.
   ~ The plate says who keeps the seat. It says nothing about who gets to sit down opposite.
   @flag read_plate
   @time 2
@@ -142,21 +146,29 @@
 @scene lounge_galley
   A galley hatch with a hand-lettered sign: COFFEE 2 · CINNAMON ROLL 3. A cheerful woman in an apron is working it with the weary patience of someone who has watched four hundred first-years pretend not to be hungry.
   @choice
-    > Buy a coffee. (2 cr) @if coins>=2
+    > Buy a coffee. (2 Smug Coins) @if coins>=2
       @coins -2
       The coffee is dreadful, scalding and the best thing that has happened to you since breakfast. You wrap both hands round the cup.
       @flag had_coffee
-    > Buy a cinnamon roll. (3 cr) @if coins>=3
+    > Buy a cinnamon roll. (3 Smug Coins) @if coins>=3
       @coins -3
       The roll is soft, warm, and slightly flattened where somebody stacked something on it. You eat it in four bites and feel almost optimistic.
       @flag had_roll
     > Leave it.
-      Eight credits' worth of will power. You move off.
+      Eight Smug Coins' worth of will power. You move off.
   @time 3
+
+@scene lounge_benches
+  The padded benches run the whole length of the saloon, and every one of them has a duffel on it and a gap beneath. You get down on one knee and work your way along.
+  A tin whistle. A sock. Eleven pretzel crumbs, arranged almost artistically. And, behind the third duffel, a heavy teal stapler with TEOBALT F. stencilled neatly on its base, and below that, in smaller letters, IF FOUND, PLEASE STAPLE NOTHING.
+  ~ Somebody on this ship is missing this very badly.
+  @item "Teobalt's stapler"
+  @flag found_stapler
+  @time 6
 
 @scene lounge_binder
   On the bench by the galley lies a trade binder, left open on its back, unattended. Someone has written TRADES — ASK TOMI in marker on the cover.
-  You page through it. Every sleeve holds a card, every card has a price in pencil, and every price has been crossed out and rewritten at least once. The cheapest is a common at one credit. The most expensive is a rare at fourteen, and it has a sleeve of its own.
+  You page through it. Every sleeve holds a card, every card has a price in pencil, and every price has been crossed out and rewritten at least once. The cheapest is a common at one Smug Coin. The most expensive is a rare at fourteen, and it has a sleeve of its own.
   You find, tucked into the back pocket, a small notebook. On the first page: a column of initials and numbers. G.P. 3–0. Then, next to it, in smaller letters: *never first. counters. 3 for 3.*
   You close it. It is not yours, and you have a conscience, or at least a very strict aunt.
   @flag saw_counter
@@ -365,10 +377,10 @@
         [inya] "I lost." Flatly. "I attacked first and he — I'm going to carry four cases up the avenue."
         [inya] "Don't say anything nice about it. I'll cry, and I don't have time."
       @choice
-        > "Tell me about the rabbits, properly this time." @if not chat_inya_done
+        > "Can I ask you something, Inya?" @if not chat_inya_done
           @scene chat_inya
         > "Do you want a game? Loser buys the rolls."
-          [inya] "Six credits. Loser pays." The amber eyes light up with pure, undiluted competition. "Yes. On a bench. Right now."
+          [inya] "Six Smug Coins. Loser pays." The amber eyes light up with pure, undiluted competition. "Yes. On a bench. Right now."
           @scene inya_rematch
         > "Another time. I'm glad I met you."
           [inya] "Another time. Don't forget."
@@ -429,17 +441,18 @@
         [tomi] "Even money that you don't throw up on the first duel. I've got ten on you. Friend price."
         @aff tomi +1 | Played along
     [tomi] "You need sleeves. Friend price. Everybody's a friend, the price is the price."
+    [tomi] "Smug Coins only, by the way. Mainland money is wallpaper out here."
   @else
     [tomi] "Wildcard! Business?"
   @choice
     > "What's the book on the table?" @if not table_resolved
-      [tomi] "Gideon three and oh. The girl's the longshot, and she's getting longer. Ten-credit limit, even money. You in?"
+      [tomi] "Gideon three and oh. The girl's the longshot, and she's getting longer. Ten-coin limit, even money. You in?"
       @choice
-        > Put ten credits on Gideon. @if coins>=10 and not bet_gideon and not bet_inya
+        > Put ten Smug Coins on Gideon. @if coins>=10 and not bet_gideon and not bet_inya
           @coins -10
           @flag bet_gideon
           [tomi] "Smart. Boring, but smart." He writes it in the lid of the binder, a neat little line of numbers.
-        > Put ten credits on whoever beats Gideon. @if coins>=10 and not bet_gideon and not bet_inya
+        > Put ten Smug Coins on whoever beats Gideon. @if coins>=10 and not bet_gideon and not bet_inya
           @coins -10
           @flag bet_inya
           [tomi] "Heart over head. I respect that. I'll be sad to take it."
@@ -448,9 +461,9 @@
       @aff tomi +1 | Did business
     > "Do you keep notes on the games?" @if not saw_counter
       [tomi] "Course I do. Information is inventory."
-      [tomi] "Three credits and I'll tell you what I've got on Pryce. Friend price."
+      [tomi] "Three Smug Coins and I'll tell you what I've got on Pryce. Friend price."
       @choice
-        > Pay him three credits. @if coins>=3
+        > Pay him three Smug Coins. @if coins>=3
           @coins -3
           [tomi] "Never attacks first. Sets Guardians and waits. Counter-swing, every game, three for three. If you want to beat him you've got to out-wait him. Which nobody's done, because nobody can stand it."
           @flag saw_counter
@@ -491,7 +504,7 @@
       > "Hello. I'm Rowan. You've been looking at me since I came down the stairs. Do we know each other?"
         [magnus?] "You're slow." He does not look up. "Number six isn't a slow place. Number six has patience."
         @jump magnus_game
-      > "Best_Tarleinn_NA?" @hint Say the handle
+      > "Best_Tarleinn?" @hint Say the handle
         His head comes up so fast the stylus drops out of his mouth.
         [magnus?] "Finally."
         @flag handle_said
@@ -598,7 +611,7 @@
 
 @scene ferry_livvie
   @if not met:livvie
-    At the galley end of the saloon, a very pale, thin girl with an ash-blonde bob is adding a column on a clipboard. Her cardigan has been mended at both elbows in slightly different wool. The galley hatch is six feet away, selling cinnamon rolls. She has not bought one.
+    At the galley end of the saloon, a very pale, thin girl with a glossy violet-black bob and two bright cyan hair clips is adding a column on a clipboard. Her red jacket has been mended at both elbows in slightly different wool. The galley hatch is six feet away, selling cinnamon rolls. She has not bought one.
     [livvie?] "Quick thing — are you using that rare?"
     [rowan] "What rare? I'm Rowan, and I'm — I don't have one on me."
     [livvie?] "Oh. Sorry." Eyes down, a small sideways look to see if it landed. "I wasn't looking at your pockets. Professionally speaking, I was."
@@ -616,7 +629,7 @@
         @aff livvie +4 | Bought her lunch
         @flag livvie_fed
       > "Do you play, Livvie? What do you run?"
-        [livvie] "Crystal Gifts. For five credits a side. Or not at all."
+        [livvie] "Crystal Gifts. For five Smug Coins a side. Or not at all."
         @aff livvie +1 | Asked about cards
         @scene mutter_livvie
       > Nod, and move on without pushing.
@@ -625,7 +638,7 @@
     @if not flag_livvie_played
       [livvie] "Five a side?"
       @choice
-        > Play for five credits. @if coins>=5
+        > Play for five Smug Coins. @if coins>=5
           [livvie] "Five. Thank you."
           @scene deck_livvie
           @duel ferry_livvie deck=livvie name="Livvie Thana"
@@ -686,9 +699,9 @@
       Inya stares at the board for a long, unmoving time. It is not defeat. It is something more private.
       [inya] "Rude." Barely above a whisper. "Accurate, but rude."
       [gideon] "A pity." He rises, retrieving his gloves one finger at a time, and his voice does not change at all. "A win over the Wildcard would have been something. A loss to him is not a win over anybody. The table remains closed, Miss Bell."
-      [inya] "That's — that's not what you said."
-      [gideon] "It is exactly what I said. I did not say you must lose."
-      The ripple round the benches is not laughter this time. It is closer to a groan.
+      [inya] "…I know what you said." Flat, fast, very quiet. "Beat him. And I didn't."
+      [gideon] "Exactly so. I am glad that we understand each other."
+      The ripple round the benches is not laughter this time. It is closer to a wince.
       @flag rowan_beat_inya
       @aff inya -1 | Beat her
       @choice What do you do?
@@ -907,12 +920,12 @@
   @duel ferry_inya deck=inya name="Inya Bell"
     @win
       [inya] "Rude." Instantly. Four seconds of furious sulking pass across her face. Then, very fast: "Rematch. Not now. Later. On a real table. You owe me a real table."
-      [inya] "You pay for the rolls. Six credits."
+      [inya] "You pay for the rolls. Six Smug Coins."
       @coins -6
       @aff inya +3 | Fair fight
     @lose
       [inya] "HA." She slaps the table. Then, remembering herself: "Good game. Accurate. Your storm was wrong for my bunnies and I told you so."
-      [inya] "I'll take the rolls. Six credits. You said."
+      [inya] "I'll take the rolls. Six Smug Coins. You said."
       @coins -6
       @aff inya +4 | Won fairly
   @scene post_inya
@@ -922,12 +935,12 @@
 @scene table_payout
   @if bet_gideon and (ferry_table_lost or ferry_inya_lost)
     @coins 20
-    Tomi finds you in the crowd afterwards and presses twenty credits into your palm. "Gideon came in. As written. You were good for ten, wasn't it?"
+    Tomi finds you in the crowd afterwards and presses twenty Smug Coins into your palm. "Gideon came in. As written. You were good for ten, wasn't it?"
   @elif bet_inya and (ferry_inya_won or ferry_table_won)
     @coins 20
-    Tomi finds you in the crowd afterwards and presses twenty credits into your palm. "Against Gideon came in. You and four other optimists. I'm a poorer man, but a happier one."
+    Tomi finds you in the crowd afterwards and presses twenty Smug Coins into your palm. "Against Gideon came in. You and four other optimists. I'm a poorer man, but a happier one."
   @elif (bet_gideon or bet_inya) and (ferry_table_settled or ferry_table_denied)
     @coins 10
-    Tomi finds you afterwards and presses your ten credits back into your hand. "No result, no money. All bets void."
+    Tomi finds you afterwards and presses your ten Smug Coins back into your hand. "No result, no money. All bets void."
   @elif bet_gideon or bet_inya
     Tomi, passing, taps the lid of his binder, shrugs sympathetically, and does not stop walking.

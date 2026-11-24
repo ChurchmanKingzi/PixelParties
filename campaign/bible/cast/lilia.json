@@ -1,204 +1,204 @@
 {
- "id": "lilia",
- "name": "Lilia Mann",
- "firstName": "Lilia",
- "age": 22,
- "sex": "f",
- "group": "student",
- "major": "CP",
- "year": 4,
- "dorm": "spectral",
- "room": "Spectral Tower, upper floors",
- "romance": false,
- "deck": "Cool Gang (Thorad)",
- "look": "Tall and athletic, with a short platinum-blonde undercut and ice-blue eyes that settle on a person and stay there. She wears the red Competitive Play jacket open, its white Spectral collar edged in thin gold, the captain's armband pushed up over the sleeve, and a calm half-smile that never tips into smugness. She moves like someone who has never needed to hurry.",
- "voice": "Low, level and economical. She says exactly what she means and then stops, which unsettles people more than volume would; she asks one precise question in place of small talk and listens to the whole answer. Kind without softness, never raised. RARE habit (once in a scene at most; most scenes go without it): a quiet 'Good.' when someone surprises her.",
- "lines": [
-  "You saw the line on turn four and didn't take it. Why? I'm not criticising. I want to know what you were afraid of.",
-  "Oh. Good. Do that again.",
-  "Willas is on the team because I trust him with my back. If you'd like the seat, come and take it from him at a table. Don't take it in a hallway.",
-  "I've won everything here twice. I'd trade all of it for one game I didn't know the end of."
- ],
- "intro": "Battle Team captain, fourth-year, ladder rank one by a distance nobody bothers to measure — and surprisingly easy to talk to.",
- "traits": [
-  {
-   "id": "lilia_1",
-   "text": "The Academy's team has not lost internationally in three years, and everyone agrees she is the reason.",
-   "how": "Common knowledge from Day 1; Bex's stream says it weekly."
+  "id": "lilia",
+  "name": "Lilia Mann",
+  "firstName": "Lilia",
+  "age": 22,
+  "sex": "f",
+  "group": "student",
+  "major": "CP",
+  "year": 4,
+  "dorm": "spectral",
+  "room": "Spectral Tower, upper floors",
+  "romance": false,
+  "deck": "Cool Gang (Thorad)",
+  "look": "Tall and athletic, with long dark-blue hair falling straight to her waist under a thin gold-and-blue circlet, and pale eyes that settle on a person and stay there. She wears the red Competitive Play jacket open over a blue tie, its white Spectral collar edged in thin gold, the captain's armband pushed up over the sleeve, and a calm half-smile that never tips into smugness. She moves like someone who has never needed to hurry.",
+  "voice": "Low, level and economical. She says exactly what she means and then stops, which unsettles people more than volume would; she asks one precise question in place of small talk and listens to the whole answer. Kind without softness, never raised. RARE habit (once in a scene at most; most scenes go without it): a quiet 'Good.' when someone surprises her.",
+  "lines": [
+    "You saw the line on turn four and didn't take it. Why? I'm not criticising. I want to know what you were afraid of.",
+    "Oh. Good. Do that again.",
+    "Willas is on the team because I trust him with my back. If you'd like the seat, come and take it from him at a table. Don't take it in a hallway.",
+    "I've won everything here twice. I'd trade all of it for one game I didn't know the end of."
+  ],
+  "intro": "Battle Team captain, fourth-year, ladder rank one by a distance nobody bothers to measure — and surprisingly easy to talk to.",
+  "traits": [
+    {
+      "id": "lilia_1",
+      "text": "The Academy's team has not lost internationally in three years, and everyone agrees she is the reason.",
+      "how": "Common knowledge from Day 1; Bex's stream says it weekly."
+    },
+    {
+      "id": "lilia_2",
+      "text": "She runs the cliff path every morning before breakfast, in any weather, alone.",
+      "how": "Be on the cliff path in a Morning slot."
+    },
+    {
+      "id": "lilia_3",
+      "text": "She watches first-year matches from the back row and takes notes on a single index card.",
+      "how": "Play at the trial dome or in the Freshman Cup; she is there."
+    },
+    {
+      "id": "lilia_4",
+      "text": "She grew up above her parents' bakery in Bremen and still wakes at four without an alarm.",
+      "how": "Ask why she is always up so early."
+    },
+    {
+      "id": "lilia_5",
+      "text": "She has not played all-out against anyone in almost two years; she says it would be impolite.",
+      "how": "Saoirse, Dom or Willas tells you, or she does after a good match."
+    },
+    {
+      "id": "lilia_6",
+      "text": "She keeps the first deck she ever built, forty mismatched commons, in the bottom of her bag.",
+      "how": "Earn Friend; she shows it when asked how she started."
+    },
+    {
+      "id": "lilia_7",
+      "text": "She has turned down three pro contracts because none of them would sign Willas too.",
+      "how": "From Rox or Dom, or from Lilia herself if Trusted."
+    },
+    {
+      "id": "lilia_8",
+      "text": "She is afraid that she stopped loving the game some time ago and only noticed recently.",
+      "how": "Only at Trusted, late at night on the Spectral terrace."
+    }
+  ],
+  "secret": "Lilia's wound is not a tragedy; it is an absence. She has been the best in every room since she was fifteen, and winning stopped teaching her anything about three years ago. She plays at seventy per cent and still wins, and has begun to suspect there is nothing behind the door she has been knocking on. Graduation is a deadline: before she leaves she wants one person who can beat her when she holds nothing back, so that she knows the game is bigger than she is. She scouts every intake for that person, patiently, kindly, and with a hunger she does not show. The contradiction: she is the most generous teacher on the island and she is using everyone she teaches as an audition. Willas is the one part of her life that is not about being best — he was kind to her in first year when she was an awkward baker's daughter with a strange accent and no friends, and he has never once asked her to make him better. She would burn the team down for him and nobody understands that this is not weakness. Her captain's card, a first-print Thorad that Chuck gave her when she took the armband, is warm in the hand and raises real dust when it is played; she thinks of it as a nice old card. Private joke: they call the captain's armband 'the napkin', because he once used it as one.\nThe dark turn: she is the first strong player to notice that '{H:full}' is suddenly interesting, somewhere around Day 45, and she is pleased — which is the terrible part. She does not connect {H:him} to the Hollowings until Stage C, and even then a part of her thinks: finally. On Day 150 Willas takes the Guest's challenge in her place without telling her and is Hollowed. She breaks for about a week (does not leave the suite; Saoirse feeds her) and then goes cold: precise, sleepless, and heading for Day 180 at the Ruin Gate with 'everything' as ante. She does not want saving. She can be persuaded only by a rival she respects standing in the way with a better plan — that is what Rowan is for. If Rowan has earned Trusted she will play second chair to him, and it is the hardest thing she ever does.",
+  "wants": "One opponent who can beat her at her best before she graduates.",
+  "fears": "That there is nobody, and that she has given her life to a game she has already finished.",
+  "crush": "willas",
+  "crushNote": "Already hers: the one part of her life that is not about being the best. It shows in small domestic things — his jacket on her chair, tea she did not ask for — and in a calm that leaves her face the moment he is threatened.",
+  "crushPace": 1,
+  "likes": [
+    "Being challenged directly and without excuses",
+    "Players who can explain their own mistakes",
+    "Rematches asked for the same day",
+    "Respect shown to Willas",
+    "Early mornings, plain bread, black coffee",
+    "Honest answers to her one precise question",
+    "People who look after Georgie"
+  ],
+  "dislikes": [
+    "Flattery, and any attempt to flirt with her",
+    "Sneering at Willas's place on the team",
+    "Excuses about luck",
+    "Players who quit when behind",
+    "Being treated as a trophy rather than an opponent",
+    "Wasted talent"
+  ],
+  "gifts": [
+    "Card: Coffee",
+    "A loaf of dark rye from the town cafe",
+    "A recorded match of yours with your own annotations",
+    "Card: Wowkyrie, Bringer of Coolness",
+    "A blank pack of index cards"
+  ],
+  "events": [
+    {
+      "id": "lilia_e1",
+      "stage": 1,
+      "title": "The index card",
+      "condition": "Play any watched duel at trial_dome or in the Freshman Cup and afterwards answer her question about your worst decision honestly, without blaming luck or nerves.",
+      "hint": [
+        "The captain watches the first-years. She asks each of them one thing.",
+        "When she asks about your mistake after a match, tell the truth about it."
+      ]
+    },
+    {
+      "id": "lilia_e2",
+      "stage": 2,
+      "title": "Seventy per cent",
+      "condition": "Reach ladder top 100 or survive the Day 33 open tryouts to the final table; then ask her for a game at duel_terraces and finish it (losing is expected) without conceding early.",
+      "hint": [
+        "She only plays people who have shown they keep going.",
+        "Climb the ladder or go deep at team tryouts, then ask her for a duel and play it to the last turn."
+      ]
+    },
+    {
+      "id": "lilia_e3",
+      "stage": 3,
+      "title": "All-out",
+      "condition": "After Day 106, having been honest with her about what '{H}' is and having never belittled Willas, challenge her to a full-strength game on spectral_terrace at Night; take at least one decision point from her. She then names Rowan as someone she will listen to.",
+      "hint": [
+        "There is a game she has been waiting years to play. It cannot be asked for lightly.",
+        "In the second term, be completely honest with her and then ask her to play you without holding back."
+      ]
+    }
+  ],
+  "bonds": {
+    "willas": {
+      "label": "dating",
+      "text": "Her 'floor': the one part of her life that is not about being the best. Together since first year.",
+      "public": true,
+      "from": 0
+    },
+    "dom": {
+      "label": "teammates",
+      "text": "Her vice-captain; one chess move a day on the lobby board, in its second year.",
+      "public": true,
+      "from": 0
+    },
+    "saoirse": {
+      "label": "best friends",
+      "text": "The only person who has never wanted anything from her.",
+      "public": true,
+      "from": 0
+    },
+    "rox": {
+      "label": "protégé",
+      "text": "Trusts Rox with the team's bodies and nerves, and keeps the line-up for herself.",
+      "public": true,
+      "from": 0
+    },
+    "octavia": {
+      "label": "friends",
+      "text": "First-year roommates; an old, cool, entirely reliable friendship between two people at the top of different ladders.",
+      "public": true,
+      "from": 0
+    },
+    "georgie": {
+      "label": "mentor",
+      "text": "Watches over her from a distance and wonders what she will be in five years.",
+      "public": true,
+      "from": 12
+    },
+    "isolde": {
+      "label": "rivals",
+      "text": "The nearest thing to a real opponent she has had; three matches, three wins, all of them close enough to enjoy.",
+      "public": true,
+      "from": 0
+    },
+    "kenji": {
+      "label": "teammates",
+      "text": "Her most reliable starter; she wishes he would sleep.",
+      "public": true,
+      "from": 0
+    },
+    "priya": {
+      "label": "teammates",
+      "text": "Her first reserve, whose seat-challenge she has declined three times.",
+      "public": true,
+      "from": 0
+    }
   },
-  {
-   "id": "lilia_2",
-   "text": "She runs the cliff path every morning before breakfast, in any weather, alone.",
-   "how": "Be on the cliff path in a Morning slot."
+  "schedule": {
+    "weekday": {
+      "Morning": "cliff_path",
+      "Midday": "great_arena",
+      "Afternoon": "gym",
+      "Evening": "spectral_terrace",
+      "Night": "spectral_suite"
+    },
+    "weekend": {
+      "Morning": "cliff_path",
+      "Midday": "boathouse",
+      "Afternoon": "duel_terraces",
+      "Evening": "spectral_terrace",
+      "Night": "spectral_suite"
+    }
   },
-  {
-   "id": "lilia_3",
-   "text": "She watches first-year matches from the back row and takes notes on a single index card.",
-   "how": "Play at the trial dome or in the Freshman Cup; she is there."
-  },
-  {
-   "id": "lilia_4",
-   "text": "She grew up above her parents' bakery in Bremen and still wakes at four without an alarm.",
-   "how": "Ask why she is always up so early."
-  },
-  {
-   "id": "lilia_5",
-   "text": "She has not played all-out against anyone in almost two years; she says it would be impolite.",
-   "how": "Saoirse, Dom or Willas tells you, or she does after a good match."
-  },
-  {
-   "id": "lilia_6",
-   "text": "She keeps the first deck she ever built, forty mismatched commons, in the bottom of her bag.",
-   "how": "Earn Friend; she shows it when asked how she started."
-  },
-  {
-   "id": "lilia_7",
-   "text": "She has turned down three pro contracts because none of them would sign Willas too.",
-   "how": "From Rox or Dom, or from Lilia herself if Trusted."
-  },
-  {
-   "id": "lilia_8",
-   "text": "She is afraid that she stopped loving the game some time ago and only noticed recently.",
-   "how": "Only at Trusted, late at night on the Spectral terrace."
+  "duel": {
+    "skill": 10,
+    "style": "Cool Gang played as a metronome: every turn slightly better than yours, Thorad growing in the middle of the table until the game is simply over. She adapts her stance to yours within one decision point and has no known bad matchup.",
+    "tilt": "Almost nothing at the table. Away from it: any threat to Willas makes her play faster and colder, which is the only time she has ever misjudged a risk."
   }
- ],
- "secret": "Lilia's wound is not a tragedy; it is an absence. She has been the best in every room since she was fifteen, and winning stopped teaching her anything about three years ago. She plays at seventy per cent and still wins, and has begun to suspect there is nothing behind the door she has been knocking on. Graduation is a deadline: before she leaves she wants one person who can beat her when she holds nothing back, so that she knows the game is bigger than she is. She scouts every intake for that person, patiently, kindly, and with a hunger she does not show. The contradiction: she is the most generous teacher on the island and she is using everyone she teaches as an audition. Willas is the one part of her life that is not about being best — he was kind to her in first year when she was an awkward baker's daughter with a strange accent and no friends, and he has never once asked her to make him better. She would burn the team down for him and nobody understands that this is not weakness. Her captain's card, a first-print Thorad that Chuck gave her when she took the armband, is warm in the hand and raises real dust when it is played; she thinks of it as a nice old card. Private joke: they call the captain's armband 'the napkin', because he once used it as one.\nThe dark turn: she is the first strong player to notice that '{H:full}' is suddenly interesting, somewhere around Day 45, and she is pleased — which is the terrible part. She does not connect {H:him} to the Hollowings until Stage C, and even then a part of her thinks: finally. On Day 150 Willas takes the Guest's challenge in her place without telling her and is Hollowed. She breaks for about a week (does not leave the suite; Saoirse feeds her) and then goes cold: precise, sleepless, and heading for Day 180 at the Ruin Gate with 'everything' as ante. She does not want saving. She can be persuaded only by a rival she respects standing in the way with a better plan — that is what Rowan is for. If Rowan has earned Trusted she will play second chair to him, and it is the hardest thing she ever does.",
- "wants": "One opponent who can beat her at her best before she graduates.",
- "fears": "That there is nobody, and that she has given her life to a game she has already finished.",
- "crush": "willas",
- "crushNote": "Already hers: the one part of her life that is not about being the best. It shows in small domestic things — his jacket on her chair, tea she did not ask for — and in a calm that leaves her face the moment he is threatened.",
- "crushPace": 1,
- "likes": [
-  "Being challenged directly and without excuses",
-  "Players who can explain their own mistakes",
-  "Rematches asked for the same day",
-  "Respect shown to Willas",
-  "Early mornings, plain bread, black coffee",
-  "Honest answers to her one precise question",
-  "People who look after Georgie"
- ],
- "dislikes": [
-  "Flattery, and any attempt to flirt with her",
-  "Sneering at Willas's place on the team",
-  "Excuses about luck",
-  "Players who quit when behind",
-  "Being treated as a trophy rather than an opponent",
-  "Wasted talent"
- ],
- "gifts": [
-  "Card: Coffee",
-  "A loaf of dark rye from the town cafe",
-  "A recorded match of yours with your own annotations",
-  "Card: Wowkyrie, Bringer of Coolness",
-  "A blank pack of index cards"
- ],
- "events": [
-  {
-   "id": "lilia_e1",
-   "stage": 1,
-   "title": "The index card",
-   "condition": "Play any watched duel at trial_dome or in the Freshman Cup and afterwards answer her question about your worst decision honestly, without blaming luck or nerves.",
-   "hint": [
-    "The captain watches the first-years. She asks each of them one thing.",
-    "When she asks about your mistake after a match, tell the truth about it."
-   ]
-  },
-  {
-   "id": "lilia_e2",
-   "stage": 2,
-   "title": "Seventy per cent",
-   "condition": "Reach ladder top 100 or survive the Day 33 open tryouts to the final table; then ask her for a game at duel_terraces and finish it (losing is expected) without conceding early.",
-   "hint": [
-    "She only plays people who have shown they keep going.",
-    "Climb the ladder or go deep at team tryouts, then ask her for a duel and play it to the last turn."
-   ]
-  },
-  {
-   "id": "lilia_e3",
-   "stage": 3,
-   "title": "All-out",
-   "condition": "After Day 106, having been honest with her about what '{H}' is and having never belittled Willas, challenge her to a full-strength game on spectral_terrace at Night; take at least one decision point from her. She then names Rowan as someone she will listen to.",
-   "hint": [
-    "There is a game she has been waiting years to play. It cannot be asked for lightly.",
-    "In the second term, be completely honest with her and then ask her to play you without holding back."
-   ]
-  }
- ],
- "bonds": {
-  "willas": {
-   "label": "dating",
-   "text": "Her 'floor': the one part of her life that is not about being the best. Together since first year.",
-   "public": true,
-   "from": 0
-  },
-  "dom": {
-   "label": "teammates",
-   "text": "Her vice-captain; one chess move a day on the lobby board, in its second year.",
-   "public": true,
-   "from": 0
-  },
-  "saoirse": {
-   "label": "best friends",
-   "text": "The only person who has never wanted anything from her.",
-   "public": true,
-   "from": 0
-  },
-  "rox": {
-   "label": "protégé",
-   "text": "Trusts Rox with the team's bodies and nerves, and keeps the line-up for herself.",
-   "public": true,
-   "from": 0
-  },
-  "octavia": {
-   "label": "friends",
-   "text": "First-year roommates; an old, cool, entirely reliable friendship between two people at the top of different ladders.",
-   "public": true,
-   "from": 0
-  },
-  "georgie": {
-   "label": "mentor",
-   "text": "Watches over her from a distance and wonders what she will be in five years.",
-   "public": true,
-   "from": 12
-  },
-  "isolde": {
-   "label": "rivals",
-   "text": "The nearest thing to a real opponent she has had; three matches, three wins, all of them close enough to enjoy.",
-   "public": true,
-   "from": 0
-  },
-  "kenji": {
-   "label": "teammates",
-   "text": "Her most reliable starter; she wishes he would sleep.",
-   "public": true,
-   "from": 0
-  },
-  "priya": {
-   "label": "teammates",
-   "text": "Her first reserve, whose seat-challenge she has declined three times.",
-   "public": true,
-   "from": 0
-  }
- },
- "schedule": {
-  "weekday": {
-   "Morning": "cliff_path",
-   "Midday": "great_arena",
-   "Afternoon": "gym",
-   "Evening": "spectral_terrace",
-   "Night": "spectral_suite"
-  },
-  "weekend": {
-   "Morning": "cliff_path",
-   "Midday": "boathouse",
-   "Afternoon": "duel_terraces",
-   "Evening": "spectral_terrace",
-   "Night": "spectral_suite"
-  }
- },
- "duel": {
-  "skill": 10,
-  "style": "Cool Gang played as a metronome: every turn slightly better than yours, Thorad growing in the middle of the table until the game is simply over. She adapts her stance to yours within one decision point and has no known bad matchup.",
-  "tilt": "Almost nothing at the table. Away from it: any threat to Willas makes her play faster and colder, which is the only time she has ever misjudged a risk."
- }
 }

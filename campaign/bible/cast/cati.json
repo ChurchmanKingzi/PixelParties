@@ -12,7 +12,7 @@
  "romance": true,
  "deck": "Signed For (Paraseed parcels and poison that end up on your side of the table — Bloom, the Maniacal Botanist; Pes'zet, the Plague Bringer; Klaus, the Cult Leader)",
  "look": "Medium height (about 5'5\") and sturdily built, with strong forearms and a sailor's planted stance, sun-browned olive skin freckled across the nose, and thick dark-brown curls to the shoulder, half of them twisted up and skewered with a blue wax pencil. Grey-green eyes that crinkle before she speaks, a chipped upper canine that shows when she grins, a small silver anchor stud in the left ear only. She wears the red Competitive Play jacket open, sleeves shoved above the elbow, with the plain grey Commons collar, over a blue-and-white striped sailor's jersey; a broad canvas mail satchel is slung across her body, its flap stencilled CALDERA KEY POST, with a loop of parcel string tied to the strap. A rubber-banded bundle of letters in her left hand, purple ink-pad smudges on the heel of her right. She leans in doorways on one hip and grins as if she has already read your postcard.",
- "voice": "Quick, warm and salty, Azorean Portuguese under good English, the odd 'pá'; she teases first and asks afterwards, and laughs at her own jokes before the end. News comes out of her as a question. Quiet and practical when something is truly wrong, flat when asked about home, unreasonable about football. She never repeats what was inside a letter. RARE habit (once in a scene at most; most scenes go without it): reading a postcard aloud to its owner.",
+ "voice": "Quick, warm and salty, a salty island accent under good English, the odd 'pá'; she teases first and asks afterwards, and laughs at her own jokes before the end. News comes out of her as a question. Quiet and practical when something is truly wrong, flat when asked about home, unreasonable about football. She never repeats what was inside a letter. RARE habit (once in a scene at most; most scenes go without it): reading a postcard aloud to its owner.",
  "lines": [
   "Postcard for the Wildcard. Your aunt says eat something. I agree with your aunt.",
   "On Faial you paint your boat's name on the harbour wall or the sea keeps you.",
@@ -24,7 +24,7 @@
   "Nothing in my pigeonhole again. Fine. Less to carry.",
   "You shuffle like you're apologising to the cards. Stop that. It's sweet, but stop."
  ],
- "intro": "The campus post: a salty, quick-laughing second-year from the Azores who runs the mail window behind the Campus Store, meets every ferry with a satchel, and knows who got a parcel before they do.",
+ "intro": "The campus post: a salty, quick-laughing second-year from the Outer Isles who runs the mail window behind the Campus Store, meets every ferry with a satchel, and knows who got a parcel before they do.",
  "traits": [
   {
    "id": "cati_1",
@@ -48,7 +48,7 @@
   },
   {
    "id": "cati_5",
-   "text": "She grew up in Horta, on Faial in the Azores, where her family keeps the ferry-ticket kiosk on the quay.",
+   "text": "She grew up in Horta Cove, on the Far Isle, where her family keeps the ferry-ticket kiosk on the quay.",
    "how": "Ask why she is the only student who enjoys the crossing."
   },
   {

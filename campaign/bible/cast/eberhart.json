@@ -12,14 +12,14 @@
  "romance": false,
  "deck": "Iron Parade (Fighting, Toras)",
  "look": "Tall and bullish, with cropped ash-blond hair, a heavy brow and an old straight duelling scar across the left cheek. His red jacket is buttoned to the throat, blue collar squared, shoes polished. He stands at something like parade rest and looks at people as though assessing their guard, which he is.",
- "voice": "Sparse, formal and level, in careful English with German word order showing under strain. He answers what was asked and nothing more, then waits. It reads as hostility and is only economy; when a subject is training, technique or a well-played game, he becomes exact and almost generous. RARE habit (once in a scene at most; most scenes go without it): a short, correct bow of the head in place of hello, thank you or goodbye.",
+ "voice": "Sparse, formal and level, in careful English with old-fashioned word order showing under strain. He answers what was asked and nothing more, then waits. It reads as hostility and is only economy; when a subject is training, technique or a well-played game, he becomes exact and almost generous. RARE habit (once in a scene at most; most scenes go without it): a short, correct bow of the head in place of hello, thank you or goodbye.",
  "lines": [
   "No. Thank you. I train at five.",
   "Your third turn was honest. The fourth was afraid. Do the third one again.",
   "It is not a game to me. This is not an insult to those for whom it is.",
   "Yamaguchi has a name for me. I have asked him not to. He continues."
  ],
- "intro": "A tall, silent German first-year from Rare Hall with a scar on his cheek and his jacket buttoned to the throat, who treats every duel as a bout and every invitation as an interruption.",
+ "intro": "A tall, silent first-year from an old family from Rare Hall with a scar on his cheek and his jacket buttoned to the throat, who treats every duel as a bout and every invitation as an interruption.",
  "traits": [
   {
    "id": "eberhart_1",
@@ -94,7 +94,7 @@
   "Card: Toras, Master of all Weapons",
   "Shoe polish and a good brush",
   "Card: Weapon Storm",
-  "A pocket edition of German poems from the pawn shop",
+  "A pocket edition of old poems from the pawn shop",
   "Tinned fish, 'for the cat that is not mine'"
  ],
  "events": [
@@ -162,7 +162,7 @@
   },
   "baylee": {
    "label": "friends",
-   "text": "The big American also rises early and also does not talk. They have carried a great many boxes together.",
+   "text": "The big farm kid also rises early and also does not talk. They have carried a great many boxes together.",
    "public": true,
    "from": 12
   },

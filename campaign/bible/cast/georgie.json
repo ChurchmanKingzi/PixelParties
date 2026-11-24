@@ -11,7 +11,7 @@
  "room": "S1",
  "romance": false,
  "deck": "Hatchery (Drago: dragons and eggs)",
- "look": "Small for fourteen, with black hair that stands up in a wild, tousled mane on top and falls in two long straight strands past her shoulders, a single violet ornamental feather pinned into it, dark red eyes, and a uniform one size too big, cuffs turned back twice. A worn green dragon plush hangs from her backpack by one wing. She watches her shoes when she walks and the whole table when she plays — and now and then, mostly over dragons, something small and fierce flashes up in her before she remembers to be shy again.",
+ "look": "Small for fourteen, with black hair that stands up in a wild, tousled mane on top and falls in two long straight strands past her shoulders, a single dark-blue ornamental feather pinned into it, dark eyes, and a uniform one size too big, cuffs turned back twice. A worn green dragon plush hangs from her backpack by one wing. She watches her shoes when she walks and the whole table when she plays — and now and then, mostly over dragons, something small and fierce flashes up in her before she remembers to be shy again.",
  "voice": "Away from a table: very quiet, hesitant, sentences that trail off, a child being careful not to be a nuisance. At a table the hesitation vanishes and she speaks in clipped, exact game language, with no idea that it is frightening. Polite always; she asks before sitting down. RARE habit (once in a scene at most; most scenes go without it): 'sorry' after winning.",
  "lines": [
   "Is this seat — I can sit somewhere else. It's fine.",
@@ -38,7 +38,7 @@
   },
   {
    "id": "georgie_4",
-   "text": "She does her ordinary school lessons by correspondence in the evenings and is behind in French.",
+   "text": "She does her ordinary school lessons by correspondence in the evenings and is behind in languages.",
    "how": "Find her at the library or Spectral lobby with a workbook."
   },
   {
@@ -70,7 +70,7 @@
  "crushPace": null,
  "likes": [
   "Being talked to normally, not as a celebrity or a baby",
-  "Help with French homework",
+  "Help with language homework",
   "Quiet places",
   "People who are polite to Ember",
   "Being asked to explain a line of play",
@@ -87,10 +87,10 @@
  ],
  "gifts": [
   "Card: Shimmering Dragonegg",
-  "A French-English pocket dictionary",
+  "A pocket dictionary",
   "A sewing kit to mend Ember's wing",
   "Card: Dragsparov, the King of Dragons",
-  "A tin of Swedish ginger biscuits from the town cafe",
+  "A tin of ginger biscuits from the town cafe",
   "Glow-in-the-dark star stickers"
  ],
  "events": [
@@ -108,7 +108,7 @@
    "id": "georgie_e2",
    "stage": 2,
    "title": "Ember's opinion",
-   "condition": "Help her with something that is not cards (French workbook at library, or walking her back to spectral_lobby before dark at least twice) and ask her to explain one of your lost games; she starts rating your plays in the plush's voice.",
+   "condition": "Help her with something that is not cards (language workbook at library, or walking her back to spectral_lobby before dark at least twice) and ask her to explain one of your lost games; she starts rating your plays in the plush's voice.",
    "hint": [
     "She is good at one thing and thinks that is all she is. Ask her for help, and give some.",
     "Help her with schoolwork or walk her home, and let her teach you something."

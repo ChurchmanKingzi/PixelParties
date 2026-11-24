@@ -17,7 +17,7 @@
     @end
   @choice
     > "Where are you from, Nathan?" @if not chat_nathan_1
-      [nathan=happy] "Bayonne, New Jersey! Four brothers, one bathroom, a dinner table the size of a postage stamp! You had to be louder than the food to get heard. That's not a personality, that's a survival adaptation."
+      [nathan=happy] "Brinehaven! Four brothers, one bathroom, a dinner table the size of a postage stamp! You had to be louder than the food to get heard. That's not a personality, that's a survival adaptation."
       [rowan] "That explains the volume."
       [nathan=laughing] "It explains EVERYTHING!"
       @aff nathan +1 | Asked about home
@@ -54,7 +54,7 @@
       @flag chat_baylee_1
       @time 2
       @jump top
-    > "It's a long way from Minnesota to here. What brought you?" @if not chat_baylee_2
+    > "It's a long way from the farm to here. What brought you?" @if not chat_baylee_2
       [baylee] "Farm money. Dad put it by. Said it ought to go on something that mattered."
       [baylee] "Seemed wrong to waste it on staying home."
       [rowan] "I hope it does matter."
@@ -125,7 +125,7 @@
     @end
   @choice
     > "That feather is lovely. Is there a story to it?" @if not chat_georgie_1
-      [georgie] "Oh — thank you." She touches it, as if to make sure it is still there. "I found it on the steps outside the hall in Lyon. The day of my first big final. Nobody else wanted it, and I thought somebody should."
+      [georgie] "Oh — thank you." She touches it, as if to make sure it is still there. "I found it on the steps outside the hall where I played my first big final. Nobody else wanted it, and I thought somebody should."
       [rowan] "Did the final go well?"
       [georgie] "…It went fine." Barely a whisper, and then, braver: "It went very well. Sorry. That sounded like boasting."
       [rowan] "It sounded like a feather story."
@@ -143,12 +143,22 @@
       @time 2
       @jump top
     > "What do you do when you aren't playing?" @if not chat_georgie_3
-      [georgie] "Draw dragons. Eat pudding." She brightens, very slightly. "And French. Maman says it's good for me. It isn't. The verbs are horrible."
+      [georgie] "Draw dragons. Eat pudding." She brightens, very slightly. "And languages. Mother says it's good for me. It isn't. The verbs are horrible."
       [rowan] "Mine's worse. I took it for one term."
       [georgie] "Then we could be bad at it together." The second the words leave her she goes red. "If — if you wanted. It's fine if not."
       [rowan] "I'd like that."
-      @aff georgie +2 | Offered to be bad at French with her
+      @aff georgie +2 | Offered to be bad at verbs with her
       @flag chat_georgie_3
+      @time 2
+      @jump top
+    > "Have you met the boy with the lifebuoy? Branden?" @if met:branden and not chat_georgie_4
+      [georgie] "…Yes." Barely audible. "He said I'm technically retired."
+      [georgie] "I used to be the youngest. It was — I liked it. People were gentle about it. He's *louder*, and he's ten, and he is already better at being young than I ever was."
+      [rowan] "That's not a competition."
+      [georgie] "It feels like one." A very small, very brave pause. "Is it bad that I want to win?"
+      [rowan] "I don't think so."
+      @aff georgie +2 | Listened
+      @flag chat_georgie_4
       @time 2
       @jump top
     > Steer the talk to cards. @if not deck_known_georgie
@@ -180,7 +190,7 @@
       @flag chat_pippa_2
       @time 2
       @jump top
-    > "The girl with the violet feather — you were photographing her. Do you know her?" @if not chat_pippa_2 and met:georgie
+    > "The girl with the dark-blue feather — you were photographing her. Do you know her?" @if not chat_pippa_2 and met:georgie
       [pippa] "Georgie. I met her ten minutes before you did. She's fourteen — did you know? Fourteen! National under-sixteens champion, and she asked me whether she was *allowed* to sit on the rope."
       [pippa] "I've decided I'm her older sister. It's not up for discussion."
       @aff pippa +2 | Cared about Georgie
@@ -296,11 +306,11 @@
     @end
   @choice
     > "Tell me about the rabbits. Properly. I won't call them bunnies." @if not chat_inya_1
-      [inya] "…Rabbits." The amber eyes light up all at once, like a switch. "Nine, at home. Two lops, five Dutch, a Netherland Dwarf who's a menace, and Colonel."
+      [inya] "…Rabbits." The amber eyes light up all at once, like a switch. "Nine, at home. Two lops, five spotted ones, a dwarf who's a menace, and Colonel."
       [rowan] "Colonel?"
-      [inya] "Flemish Giant. Fifteen pounds. He isn't a rabbit, he's a *statement*. He sits on my feet when I study." A breath. "I can list every breed by ear length. Do you want to hear it?"
+      [inya] "A Giant. Fifteen pounds. He isn't a rabbit, he's a *statement*. He sits on my feet when I study." A breath. "I can list every breed by ear length. Do you want to hear it?"
       [rowan] "Not all of it. Maybe the top three."
-      [inya] "Flemish, French Lop, English Lop." Very fast. "Ears, in that order. You listened. That's — fine."
+      [inya] "Giant, Great Lop, Common Lop." Very fast. "Ears, in that order. You listened. That's — fine."
       @aff inya +2 | Asked about the rabbits
       @flag chat_inya_1
       @time 2
@@ -332,11 +342,11 @@
   @label top
   @if chat_tomi_1 and chat_tomi_2 and chat_tomi_3
     @flag chat_tomi_done
-    [tomi] "That's the whole sales pitch and the family history. Free, because I like you. The next one costs a credit." A grin. "Friend price."
+    [tomi] "That's the whole sales pitch and the family history. Free, because I like you. The next one costs a Smug Coin." A grin. "Friend price."
     @end
   @choice
     > "Where did you learn to trade?" @if not chat_tomi_1
-      [tomi] "My uncle's stall at a flea market in Queens. Age eight. First rule: never lie about the condition. Second rule: never lie about the price."
+      [tomi] "My uncle's stall at a flea market on the east docks. Age eight. First rule: never lie about the condition. Second rule: never lie about the price."
       [tomi] "Third rule: lie about nothing, and look like you're lying about everything. That's the whole job."
       [rowan] "Does the third rule work?"
       [tomi] "It's why they come back to check." Delighted. "Information's inventory."
@@ -458,7 +468,7 @@
     @end
   @choice
     > "How long have you been trading, Livvie?" @if not chat_livvie_1
-      [livvie] "Since I could count. There was a card shop in my town that gave you store credit for working the till, so I worked the till." Eyes down, a small sideways look. "I know the price of every card in the Commons binder. To the credit."
+      [livvie] "Since I could count. There was a card shop in my town that gave you a shelf of free cards for working the till, so I worked the till." Eyes down, a small sideways look. "I know the price of every card in the Commons binder. To the coin."
       [rowan] "That's impressive."
       [livvie] "It's *arithmetic*. But — thank you."
       @aff livvie +2 | Asked about her work
@@ -466,17 +476,17 @@
       @time 2
       @jump top
     > "What's on that clipboard? Is it a list, or something you're making?" @if not chat_livvie_2
-      [livvie] "…Both." She holds it a half-inch closer to her chest, then, after a pause, turns it round. A tidy column of credits, and in the margin, in very small letters, a drawing of a card. "Spare Change. A common. It costs nothing and pays one credit when it dies."
+      [livvie] "…Both." She holds it a half-inch closer to her chest, then, after a pause, turns it round. A tidy column of Smug Coins, and in the margin, in very small letters, a drawing of a card. "Spare Change. A common. It costs nothing and pays one Smug Coin when it dies."
       [rowan] "That's good. That's really good."
       [livvie] "It's a *common*." But the corner of her mouth moves. "I do them on the backs of receipts. It's cheaper than paper."
       @aff livvie +3 | Praised her design
       @flag chat_livvie_2
       @time 2
       @jump top
-    > "I've got a hundred and forty credits and no idea what a week costs. Any advice?" @if not chat_livvie_3
+    > "I've got a hundred and forty Smug Coins and no idea what a week costs. Any advice?" @if not chat_livvie_3
       [livvie] "Quick thing — ninety if you eat the Commons breakfast, a hundred and ten if you don't, plus sleeves, plus whatever Tomi's selling you as a necessity." Fast, exact, almost relaxed. "Don't buy sleeves from Tomi. Buy them from me. I'm cheaper and I don't call it 'friend price'."
       [rowan] "I'll remember that."
-      [livvie] "Good. Don't make it a favour. Pay me a credit and it's a transaction." A very small, very real smile. "Transactions I can do."
+      [livvie] "Good. Don't make it a favour. Pay me a Smug Coin and it's a transaction." A very small, very real smile. "Transactions I can do."
       @aff livvie +2 | Asked for advice
       @flag chat_livvie_3
       @time 2
@@ -506,7 +516,7 @@
       @time 2
       @jump top
     > "What's it like, travelling with three caskets?" @if not chat_jessica_2
-      [jessica] "Ruinous. The leather is Italian, and the porters are not." A very small, dry smile. "I should say I could manage with one. But I find I cannot decide which one."
+      [jessica] "Ruinous. The leather is the very best, and the porters are not." A very small, dry smile. "I should say I could manage with one. But I find I cannot decide which one."
       [rowan] "Is that a joke?"
       [jessica] "A very small one. I am practising them. It is said to be good for a person."
       @aff jessica +1 | Made her smile
@@ -646,6 +656,13 @@
       @flag chat_sunny_3
       @time 2
       @jump top
+    > "Have you met Freddie? The other swimmer?" @if met:freddie and not chat_sunny_4
+      [sunny] "Freddie! Oh, we're racing at dawn tomorrow." A gleam. "She thinks I haven't seen her breaststroke. I've seen it. I'm going to let her win. The first time."
+      [sunny] "Then I'll take every single one after."
+      @aff sunny +1 | Mentioned Freddie
+      @flag chat_sunny_4
+      @time 2
+      @jump top
     > Steer the talk to cards. @if not deck_known_sunny
       @scene deck_sunny
       @jump top
@@ -663,7 +680,7 @@
     > "How long have you been doing this, Marit?" @if not chat_marit_1
       [marit!] "**DOING?** *Doing?* Darling. I have been **every part** in **every school play** in a town of four hundred souls! I was the **Wicked Stepmother!** The **Fairy Godmother!** Both **Ugly Sisters!** And the *Pumpkin!*"
       [rowan] "All in one production?"
-      [marit!] "In *separate* productions, thank you, I have *standards!*" Then, quieter, ordinary, a plain aside: "Four hundred people, above the Arctic Circle. It gets very dark there. You learn to make your own light."
+      [marit!] "In *separate* productions, thank you, I have *standards!*" Then, quieter, ordinary, a plain aside: "Four hundred people, right at the top of the map. It gets very dark there. You learn to make your own light."
       @aff marit +2 | Asked about her past
       @flag chat_marit_1
       @time 2
@@ -738,7 +755,7 @@
       @time 2
       @jump top
     > "Why do you make lists?" @if not chat_teobalt_2
-      [teobalt] "Because things go wrong in an *order*." He pushes his glasses up with one finger. "If you know the order, you can stand in front of it."
+      [teobalt] "Because things go wrong in an *order*." He straightens his collar by a quarter of an inch. "If you know the order, you can stand in front of it."
       [rowan] "And if you don't?"
       [teobalt] "Then you make a list of what you don't know. It is surprisingly effective."
       @aff teobalt +2 | Asked why

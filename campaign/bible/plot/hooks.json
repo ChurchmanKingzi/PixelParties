@@ -619,7 +619,7 @@
    "who": [
     "marrow"
    ],
-   "how": "A man in a grey suit holds the café door for you and says, softly, 'Best_Tarleinn_NA. I've watched your replays. Let me buy the ladder's most patient player a coffee.' He already knows how you take it."
+   "how": "A man in a grey suit holds the café door for you and says, softly, 'Best_Tarleinn. I've watched your replays. Let me buy the ladder's most patient player a coffee.' He already knows how you take it."
   },
   "deadline": 64,
   "ifIgnored": "He takes it as an answer. Day 70: Rowan's stipend is 'delayed by an audit' for one week (−120 cr). Marrow's attention moves to Livvie (Day 63) and Octavia.",
@@ -1087,7 +1087,7 @@
    "who": [
     "magnus"
    ],
-   "how": "A wiry boy with slicked ginger hair holds a tablet up beside your face, comparing. \"Best_Tarleinn_NA. Two years. Two years you've been exactly one line above me.\" He turns the screen: the placement list, his name two places over yours. \"Not any more. I'm Prospero. You've never heard of me, have you. That's the worst part.\""
+   "how": "A wiry boy with slicked ginger hair holds a tablet up beside your face, comparing. \"Best_Tarleinn. Two years. Two years you've been exactly one line above me.\" He turns the screen: the placement list, his name two places over yours. \"Not any more. I'm Prospero. You've never heard of me, have you. That's the worst part.\""
   },
   "deadline": null,
   "ifIgnored": "Nothing stops it. He measures the year in the gap between two names and will challenge whenever it changes (see q_magnus_number_two).",

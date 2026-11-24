@@ -12,7 +12,7 @@
  "romance": false,
  "deck": "Dream Journal (Dream Landers)",
  "look": "A gold Game Design jacket, blue Rare collar, worn open over a blue jumper with a white scarf looped round his neck, shoulder-length locs held off his face by an orange headband, and a sketchbook that is never far away. There is always a streak of some improbable colour on his jaw. He has a slow smile and looks at people a beat longer than is usual, as though colouring them in.",
- "voice": "Slow, warm and visual, Lagos-London, with long comfortable pauses; he speaks in images, teases gently and takes teasing well. He looks at people a beat longer than is usual and is entirely at ease being looked at back. RARE habit (once in a scene at most; most scenes go without it): asking for the colour of something instead of its meaning.",
+ "voice": "Slow, warm and visual, harbour-city, with long comfortable pauses; he speaks in images, teases gently and takes teasing well. He looks at people a beat longer than is usual and is entirely at ease being looked at back. RARE habit (once in a scene at most; most scenes go without it): asking for the colour of something instead of its meaning.",
  "lines": [
   "Tell me what you dreamed. Not what it meant. What colour the floor was.",
   "Teobalt came upstairs and alphabetised my paints. By hue, within brand. I'm deciding whether it's a war crime or love.",
@@ -48,7 +48,7 @@
   },
   {
    "id": "felix_6",
-   "text": "He grew up in Lagos and Peckham; his mother paints signs and taught him lettering before reading.",
+   "text": "He grew up in two harbour towns; his mother paints signs and taught him lettering before reading.",
    "how": "Ask about the lettering on his sketches."
   },
   {

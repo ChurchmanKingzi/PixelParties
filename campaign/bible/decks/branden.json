@@ -1,0 +1,154 @@
+{
+ "name": "Hot Stuff",
+ "owner": "branden",
+ "heroes": [
+  "Luna Pele, the Flame Dancer",
+  "Ida, the Adept of Destruction",
+  "Luna, the Flame Fairy"
+ ],
+ "main": [
+  [
+   8,
+   "Destruction Magic"
+  ],
+  [
+   3,
+   "Singing"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   4,
+   "Fire Bolts"
+  ],
+  [
+   4,
+   "Fireball"
+  ],
+  [
+   3,
+   "Flame Avalanche"
+  ],
+  [
+   3,
+   "Heat Wave"
+  ],
+  [
+   2,
+   "Dance of the Flame Pillars"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   2,
+   "Firewall"
+  ],
+  [
+   2,
+   "Fireshield"
+  ],
+  [
+   3,
+   "Heart of the Mountain"
+  ],
+  [
+   3,
+   "Arcane Lamp"
+  ],
+  [
+   3,
+   "Flame Arrow"
+  ],
+  [
+   2,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   3,
+   "Fiery Slime"
+  ],
+  [
+   2,
+   "Flaming Dragonegg"
+  ],
+  [
+   2,
+   "Luna Kiai"
+  ],
+  [
+   2,
+   "Glasowt"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   1,
+   "Golden Ankh"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Fire Bomb"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   1,
+   "Bottled Flame"
+  ]
+ ],
+ "types": {
+  "Luna Pele, the Flame Dancer": "Hero",
+  "Ida, the Adept of Destruction": "Hero",
+  "Luna, the Flame Fairy": "Hero",
+  "Destruction Magic": "Ability",
+  "Singing": "Ability",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Fire Bolts": "Spell (Destruction Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Flame Avalanche": "Spell (Destruction Magic)",
+  "Heat Wave": "Spell (Destruction Magic)",
+  "Dance of the Flame Pillars": "Spell (Destruction Magic)",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Firewall": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic)",
+  "Heart of the Mountain": "Artifact",
+  "Arcane Lamp": "Artifact",
+  "Flame Arrow": "Artifact",
+  "Sacred Hammer of the Volcano": "Artifact",
+  "Fiery Slime": "Creature L0",
+  "Flaming Dragonegg": "Creature L0",
+  "Luna Kiai": "Creature L1",
+  "Glasowt": "Creature L1",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Fire Bomb": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Bottled Flame": "Potion"
+ },
+ "gist": {
+  "Luna Pele, the Flame Dancer": "The main hero: whenever anything is Poisoned it is Burned for the rest of the game, and every time a target is Burned (up to four times a turn) Branden draws a card.",
+  "Fireball": "Two targets, 150 damage each: the simple, loud answer to everything.",
+  "Heat Wave": "Burns every target on the board except the caster for the rest of the game.",
+  "Heart of the Mountain": "Draws a card for every Burned target on the board, up to four.",
+  "Flame Avalanche": "150 damage to everything the opponent controls, and nothing else can hurt them that turn.",
+  "Arcane Lamp": "Burns one of the opponent's targets: the cheapest way to start a fire."
+ },
+ "plan": "Branden burns everything. Luna Pele turns every Burned target into a card, Ida makes the Destruction Spells unblockable, and Heat Wave lights the entire board so that Heart of the Mountain can draw four. The deck is fast, loud and made of spells, and has almost no board: the heroes are small, the creatures are eggs and slimes, and when the burn runs out Branden has nothing at all to fall back on except more complaints.",
+ "looks": {
+  "early": "Fire Bolts, a Fireball on two heroes and Branden announcing the score.",
+  "mid": "Heat Wave on the board, Luna Pele drawing a card for every burning target, Heart of the Mountain finishing the hand.",
+  "late": "Everything on the table burning and Branden still talking."
+ },
+ "profile": {},
+ "situations": {}
+}

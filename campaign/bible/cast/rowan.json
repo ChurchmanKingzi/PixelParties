@@ -14,7 +14,7 @@
  "look": "Lean, a little underfed-looking, dark hair that never quite dries flat, grey-green eyes that watch hands instead of faces. His red Competitive Play jacket, with the plain grey collar of the Commons, is second-hand and one size long in the sleeve; his phone has a crack running corner to corner across the screen.",
  "voice": "The player writes every word Rowan says. The game master only ever describes what others notice about him: he is dry, he observes before he speaks, and his hands give him away at a table.",
  "lines": [],
- "intro": "The Wildcard kid: got in through the online qualifier two weeks after admissions closed, known on the ladder as Best_Tarleinn_NA.",
+ "intro": "The Wildcard kid: got in through the online qualifier two weeks after admissions closed, known on the ladder as Best_Tarleinn.",
  "traits": [
   {
    "id": "rowan_1",
@@ -28,7 +28,7 @@
   },
   {
    "id": "rowan_3",
-   "text": "Top ten of his age bracket in North America online, and has never once played on a physical table in front of people.",
+   "text": "Top ten of his age bracket online, and has never once played on a physical table in front of people.",
    "how": "Known from the start."
   }
  ],

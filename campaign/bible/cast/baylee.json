@@ -1,241 +1,241 @@
 {
- "id": "baylee",
- "name": "Baylee Halvorsen",
- "firstName": "Baylee",
- "age": 20,
- "sex": "m",
- "group": "student",
- "major": "CP",
- "year": 1,
- "dorm": "commons",
- "room": "B7",
- "romance": false,
- "deck": "Big Stomp! (Gigantisaurs)",
- "look": "A giant: six foot seven, broad as a barn door, with a blond buzz cut, a permanent sunburn across nose and neck, and enormous hands that hold cards like postage stamps. His eyes are a soft, slightly worried blue. He ducks through every doorway, including the ones he fits.",
- "voice": "Very few words, slowly, in long Minnesota vowels. He thinks for several seconds before he answers and the answer is usually worth the wait; he never interrupts and never raises his voice. When he does talk at length it is about animals, weather or dinosaurs, and then he is unexpectedly precise. RARE habit (once in a scene at most; most scenes go without it): apologising when somebody else has bumped into him.",
- "lines": [
-  "Yup.",
-  "Was that your foot? Didn't feel it. Sorry.",
-  "Had a heifer like Nathan once. Loud. Walked into the same fence every morning. Good animal, though.",
-  "The big ones take a long time to come down. Gives a fella time to think."
- ],
- "intro": "Your other roommate: an enormous, sunburnt, gentle farm boy from Minnesota who says about nine words a day.",
- "traits": [
-  {
-   "id": "baylee_1",
-   "text": "He gets up at half past four every morning because he never learned how not to.",
-   "how": "Share a room with him; unavoidable."
+  "id": "baylee",
+  "name": "Baylee Halvorsen",
+  "firstName": "Baylee",
+  "age": 20,
+  "sex": "m",
+  "group": "student",
+  "major": "CP",
+  "year": 1,
+  "dorm": "commons",
+  "room": "B7",
+  "romance": false,
+  "deck": "Big Stomp! (Gigantisaurs)",
+  "look": "A giant: six foot seven, broad as a barn door, in a straw hat as wide as a cartwheel with his jacket slung over one shoulder, a permanent sunburn across nose and neck, and enormous hands that hold cards like postage stamps. His eyes are a soft, slightly worried amber-brown. He ducks through every doorway, including the ones he fits.",
+  "voice": "Very few words, slowly, in long the northern plains vowels. He thinks for several seconds before he answers and the answer is usually worth the wait; he never interrupts and never raises his voice. When he does talk at length it is about animals, weather or dinosaurs, and then he is unexpectedly precise. RARE habit (once in a scene at most; most scenes go without it): apologising when somebody else has bumped into him.",
+  "lines": [
+    "Yup.",
+    "Was that your foot? Didn't feel it. Sorry.",
+    "Had a heifer like Nathan once. Loud. Walked into the same fence every morning. Good animal, though.",
+    "The big ones take a long time to come down. Gives a fella time to think."
+  ],
+  "intro": "Your other roommate: an enormous, sunburnt, gentle farm boy from the northern plains who says about nine words a day.",
+  "traits": [
+    {
+      "id": "baylee_1",
+      "text": "He gets up at half past four every morning because he never learned how not to.",
+      "how": "Share a room with him; unavoidable."
+    },
+    {
+      "id": "baylee_2",
+      "text": "He fixes things around the Commons without being asked and gets embarrassed if thanked.",
+      "how": "Notice a repaired step or shutter; Mama Odalys names the culprit."
+    },
+    {
+      "id": "baylee_3",
+      "text": "He found the game at nineteen, from a starter deck left on a feed-store counter.",
+      "how": "Ask how he started."
+    },
+    {
+      "id": "baylee_4",
+      "text": "He knows the real dinosaur behind every Gigantisaur card and what the card gets wrong.",
+      "how": "Play him or ask about his deck."
+    },
+    {
+      "id": "baylee_5",
+      "text": "He cannot swim and has never seen the ocean before the ferry.",
+      "how": "Any beach, pool or boat scene."
+    },
+    {
+      "id": "baylee_6",
+      "text": "He sends his job money home for the harvest and writes the amount on his hand so he will not spend it.",
+      "how": "See the ink on his palm at the campus store or job board."
+    },
+    {
+      "id": "baylee_7",
+      "text": "The family sold the dairy herd last spring to keep the land; his place at the Academy was paid for with his share of the cows.",
+      "how": "A quiet Night in the bungalow once he is a Friend."
+    },
+    {
+      "id": "baylee_8",
+      "text": "He talks in his sleep, in full, clear sentences, mostly to cows.",
+      "how": "Share a room; Nathan does an impression."
+    },
+    {
+      "id": "baylee_9",
+      "text": "He is afraid of his own strength and has not been in a fight since he was twelve.",
+      "how": "Only at Trusted, or when someone needs protecting."
+    }
+  ],
+  "secret": "Baylee is the middle of five on a dairy farm outside Fergus Falls that nearly went under after three bad years. They sold the herd to keep the land, and his father split the cattle money five ways and told the kids to 'go be something that isn't this'. Baylee, who had never wanted to be anything else, put his share into the one new thing he had ever been good at, and sends his job money home every week toward the harvest. He carries enormous shame about that — spending cow money on a card game — and enormous quiet determination. He has calmed a great many frightened cattle and knows, without knowing he knows it, exactly how a person should stand so that their hands stop shaking. At twelve he broke another boy's jaw in a schoolyard for hurting a dog; he has handled the world like glass ever since. The contradiction: the most physically imposing person on campus is the most afraid of taking up space. Private joke with himself: he names the dormitory seagulls after his old herd. He has a hopeless, silent crush on Livvie Thana, noticed that she does not eat before anyone else did, and has been leaving half his breakfast 'by accident' on the kitchen windowsill since week two. He will never say anything, and if Rowan pursues Livvie he will simply be glad someone is looking after her — and a little quieter.\n{H?{H=nathan?He was awake when Nathan left on Day 27 (he is always awake at half past four). He offered to go along; Nathan, already pulling on his boots with Tomi's borrowed torch in his teeth, told him he would 'scare the aliens' and to stay. Baylee stayed. This will eat him alive once he understands. He is the first person to know something is wrong with 'Nathan' — animals told him: the gulls left the bungalow roof — and the last to say so, because he does not accuse people. From Day 27 he sleeps facing the other bed. After Day 40 he quietly moves his cot six inches closer to Rowan's. If asked directly by Rowan, he will say, slowly: 'That's not him. I don't know what to do about it.'|{H=baylee?|He was awake when {H} left on the night of Day 26 (he is always awake at half past four) and thought nothing of it. This will eat him alive once he understands. He is the first person to know something is wrong with '{H}' — animals told him: the gulls left the bungalow roof — and the last to say so, because he does not accuse people. From Day 28 he sleeps facing the cot. After Day 40 he quietly moves his own bed six inches closer to Rowan's. If asked directly by Rowan, he will say, slowly: 'That's not him. I don't know what to do about it.'}}|} Arc: from a man who makes himself small to one who stands in a doorway, once, and does not move.",
+  "wants": "To make the farm money mean something.",
+  "fears": "Hurting someone by accident, and having wasted the last thing his father could give him.",
+  "crush": "livvie",
+  "crushNote": "He saw that she does not eat before anyone else did. It shows as half a breakfast left on a windowsill, a mended step outside bungalow 3, and a man of six foot seven becoming unable to finish a sentence.",
+  "crushPace": 0.7,
+  "likes": [
+    "Quiet company with no need to talk",
+    "Help with reading card text carefully (he is slow, not dim)",
+    "Anyone kind to animals",
+    "Early breakfasts",
+    "Being asked about dinosaurs or weather",
+    "People who notice Livvie has not eaten",
+    "Honest work shared"
+  ],
+  "dislikes": [
+    "Being made the centre of attention",
+    "Jokes about his size",
+    "Waste — of food especially",
+    "Cruelty to animals or to smaller people",
+    "Being pushed to talk",
+    "Loud arguments in the bungalow"
+  ],
+  "gifts": [
+    "Card: Gigantisaur Brachion",
+    "A paperback dinosaur field guide from the pawn shop",
+    "Work gloves that actually fit (special order at the campus store)",
+    "A jar of honey from the orchard",
+    "Card: Sacred Cattle",
+    "Sunscreen"
+  ],
+  "events": [
+    {
+      "id": "baylee_e1",
+      "stage": 1,
+      "title": "Half past four",
+      "condition": "In the first two weeks, be awake once in the early Morning slot and either help him with a repair at commons_beach or simply sit on the step with him without making him talk.",
+      "hint": [
+        "Your big roommate is up before everyone. He would not mind company that keeps quiet.",
+        "Get up early once and help him fix something around the bungalows."
+      ]
+    },
+    {
+      "id": "baylee_e2",
+      "stage": 2,
+      "title": "Shallow end",
+      "condition": "Take him to the pool or beach_cove and help him get into the water (Sunny can assist), or sit with him through a rules-study session at library; afterwards he tells you about the farm.",
+      "hint": [
+        "There are a couple of things he has never learned and is ashamed to ask about.",
+        "Help him learn to swim, or study card rules with him patiently at the library."
+      ]
+    },
+    {
+      "id": "baylee_e3",
+      "stage": 3,
+      "title": "That's not him",
+      "condition": "After Day 27, ask him directly and privately in commons_room what he saw the night {H} left, and do not blame him for staying behind.",
+      "hint": [
+        "He is always awake before dawn, and one morning he saw something. He is waiting to be asked gently.",
+        "Ask him, alone in your room, about a morning he was awake for — and be kind about the answer."
+      ]
+    }
+  ],
+  "bonds": {
+    "rowan": {
+      "label": "roommates",
+      "text": "The quiet one who watches hands. Baylee thinks he is all right and has never said so.",
+      "public": true,
+      "from": 1
+    },
+    "nathan": {
+      "label": "roommates",
+      "text": "Loud like a heifer he once had. Good animal. Baylee was awake the morning he left.",
+      "public": true,
+      "from": 1
+    },
+    "odalys": {
+      "label": "friends",
+      "text": "Fixes her steps and shutters; she feeds him for three.",
+      "public": true,
+      "from": 3
+    },
+    "livvie": {
+      "label": "crush",
+      "text": "Noticed she does not eat before anyone did. Leaves half his breakfast on the windowsill. Will never say a word.",
+      "public": false,
+      "from": 10
+    },
+    "silas": {
+      "label": "friends",
+      "text": "Works grounds jobs for him; they can go a whole morning without speaking and both count it a good one.",
+      "public": true,
+      "from": 8
+    },
+    "sunny": {
+      "label": "friends",
+      "text": "She is teaching him to swim and has never once laughed.",
+      "public": true,
+      "from": 9
+    },
+    "sammy": {
+      "label": "friends",
+      "text": "Quiet fella. Too warm in that coat. Baylee leaves him water.",
+      "public": true,
+      "from": 6
+    },
+    "eberhart": {
+      "label": "friends",
+      "text": "Quiet fella. Good lifter. They nod.",
+      "public": true,
+      "from": 12
+    },
+    "maisie": {
+      "label": "friends",
+      "text": "She showed him how the generator works and let him hold the heavy end. They don't need to talk much.",
+      "public": true,
+      "from": 4
+    },
+    "hedda": {
+      "label": "friends",
+      "text": "She was cross about cows. He told her their names. They count birds together some mornings.",
+      "public": true,
+      "from": 12
+    },
+    "trixie": {
+      "label": "friends",
+      "text": "She talks a good deal and he doesn't mind. Bees are livestock, near enough.",
+      "public": true,
+      "from": 4
+    },
+    "rafa": {
+      "label": "friends",
+      "text": "The cook from up the hill. Good worker. Makes a proper breakfast.",
+      "public": true,
+      "from": 5
+    },
+    "keoni": {
+      "label": "friends",
+      "text": "The steward fixed his cot so that it holds, and did not make a joke about it.",
+      "public": true,
+      "from": 2
+    },
+    "shirin": {
+      "label": "protégé",
+      "text": "The tutor desk, Probability. She says his answers are right. He is checking.",
+      "public": true,
+      "from": 9
+    }
   },
-  {
-   "id": "baylee_2",
-   "text": "He fixes things around the Commons without being asked and gets embarrassed if thanked.",
-   "how": "Notice a repaired step or shutter; Mama Odalys names the culprit."
+  "schedule": {
+    "weekday": {
+      "Morning": "lecture_hall",
+      "Midday": "classroom",
+      "Afternoon": "greenhouse",
+      "Evening": "commons_kitchen",
+      "Night": "commons_room"
+    },
+    "weekend": {
+      "Morning": "commons_beach",
+      "Midday": "orchard",
+      "Afternoon": "job_board",
+      "Evening": "bonfire_pit",
+      "Night": "commons_room"
+    }
   },
-  {
-   "id": "baylee_3",
-   "text": "He found the game at nineteen, from a starter deck left on a feed-store counter.",
-   "how": "Ask how he started."
+  "duel": {
+    "skill": 2,
+    "style": "Plays one enormous dinosaur at a time and protects it with everything; slow, honest, and genuinely dangerous if the game goes long enough for King Trex to arrive. Misreads complicated card text.",
+    "tilt": "Fast decks that kill him before turn five, and any opponent who gets visibly upset — he starts playing to lose."
   },
-  {
-   "id": "baylee_4",
-   "text": "He knows the real dinosaur behind every Gigantisaur card and what the card gets wrong.",
-   "how": "Play him or ask about his deck."
-  },
-  {
-   "id": "baylee_5",
-   "text": "He cannot swim and has never seen the ocean before the ferry.",
-   "how": "Any beach, pool or boat scene."
-  },
-  {
-   "id": "baylee_6",
-   "text": "He sends his job money home for the harvest and writes the amount on his hand so he will not spend it.",
-   "how": "See the ink on his palm at the campus store or job board."
-  },
-  {
-   "id": "baylee_7",
-   "text": "The family sold the dairy herd last spring to keep the land; his place at the Academy was paid for with his share of the cows.",
-   "how": "A quiet Night in the bungalow once he is a Friend."
-  },
-  {
-   "id": "baylee_8",
-   "text": "He talks in his sleep, in full, clear sentences, mostly to cows.",
-   "how": "Share a room; Nathan does an impression."
-  },
-  {
-   "id": "baylee_9",
-   "text": "He is afraid of his own strength and has not been in a fight since he was twelve.",
-   "how": "Only at Trusted, or when someone needs protecting."
-  }
- ],
- "secret": "Baylee is the middle of five on a dairy farm outside Fergus Falls that nearly went under after three bad years. They sold the herd to keep the land, and his father split the cattle money five ways and told the kids to 'go be something that isn't this'. Baylee, who had never wanted to be anything else, put his share into the one new thing he had ever been good at, and sends his job money home every week toward the harvest. He carries enormous shame about that — spending cow money on a card game — and enormous quiet determination. He has calmed a great many frightened cattle and knows, without knowing he knows it, exactly how a person should stand so that their hands stop shaking. At twelve he broke another boy's jaw in a schoolyard for hurting a dog; he has handled the world like glass ever since. The contradiction: the most physically imposing person on campus is the most afraid of taking up space. Private joke with himself: he names the dormitory seagulls after his old herd. He has a hopeless, silent crush on Livvie Thana, noticed that she does not eat before anyone else did, and has been leaving half his breakfast 'by accident' on the kitchen windowsill since week two. He will never say anything, and if Rowan pursues Livvie he will simply be glad someone is looking after her — and a little quieter.\n{H?{H=nathan?He was awake when Nathan left on Day 27 (he is always awake at half past four). He offered to go along; Nathan, already pulling on his boots with Tomi's borrowed torch in his teeth, told him he would 'scare the aliens' and to stay. Baylee stayed. This will eat him alive once he understands. He is the first person to know something is wrong with 'Nathan' — animals told him: the gulls left the bungalow roof — and the last to say so, because he does not accuse people. From Day 27 he sleeps facing the other bed. After Day 40 he quietly moves his cot six inches closer to Rowan's. If asked directly by Rowan, he will say, slowly: 'That's not him. I don't know what to do about it.'|{H=baylee?|He was awake when {H} left on the night of Day 26 (he is always awake at half past four) and thought nothing of it. This will eat him alive once he understands. He is the first person to know something is wrong with '{H}' — animals told him: the gulls left the bungalow roof — and the last to say so, because he does not accuse people. From Day 28 he sleeps facing the cot. After Day 40 he quietly moves his own bed six inches closer to Rowan's. If asked directly by Rowan, he will say, slowly: 'That's not him. I don't know what to do about it.'}}|} Arc: from a man who makes himself small to one who stands in a doorway, once, and does not move.",
- "wants": "To make the farm money mean something.",
- "fears": "Hurting someone by accident, and having wasted the last thing his father could give him.",
- "crush": "livvie",
- "crushNote": "He saw that she does not eat before anyone else did. It shows as half a breakfast left on a windowsill, a mended step outside bungalow 3, and a man of six foot seven becoming unable to finish a sentence.",
- "crushPace": 0.7,
- "likes": [
-  "Quiet company with no need to talk",
-  "Help with reading card text carefully (he is slow, not dim)",
-  "Anyone kind to animals",
-  "Early breakfasts",
-  "Being asked about dinosaurs or weather",
-  "People who notice Livvie has not eaten",
-  "Honest work shared"
- ],
- "dislikes": [
-  "Being made the centre of attention",
-  "Jokes about his size",
-  "Waste — of food especially",
-  "Cruelty to animals or to smaller people",
-  "Being pushed to talk",
-  "Loud arguments in the bungalow"
- ],
- "gifts": [
-  "Card: Gigantisaur Brachion",
-  "A paperback dinosaur field guide from the pawn shop",
-  "Work gloves that actually fit (special order at the campus store)",
-  "A jar of honey from the orchard",
-  "Card: Sacred Cattle",
-  "Sunscreen"
- ],
- "events": [
-  {
-   "id": "baylee_e1",
-   "stage": 1,
-   "title": "Half past four",
-   "condition": "In the first two weeks, be awake once in the early Morning slot and either help him with a repair at commons_beach or simply sit on the step with him without making him talk.",
-   "hint": [
-    "Your big roommate is up before everyone. He would not mind company that keeps quiet.",
-    "Get up early once and help him fix something around the bungalows."
-   ]
-  },
-  {
-   "id": "baylee_e2",
-   "stage": 2,
-   "title": "Shallow end",
-   "condition": "Take him to the pool or beach_cove and help him get into the water (Sunny can assist), or sit with him through a rules-study session at library; afterwards he tells you about the farm.",
-   "hint": [
-    "There are a couple of things he has never learned and is ashamed to ask about.",
-    "Help him learn to swim, or study card rules with him patiently at the library."
-   ]
-  },
-  {
-   "id": "baylee_e3",
-   "stage": 3,
-   "title": "That's not him",
-   "condition": "After Day 27, ask him directly and privately in commons_room what he saw the night {H} left, and do not blame him for staying behind.",
-   "hint": [
-    "He is always awake before dawn, and one morning he saw something. He is waiting to be asked gently.",
-    "Ask him, alone in your room, about a morning he was awake for — and be kind about the answer."
-   ]
-  }
- ],
- "bonds": {
-  "rowan": {
-   "label": "roommates",
-   "text": "The quiet one who watches hands. Baylee thinks he is all right and has never said so.",
-   "public": true,
-   "from": 1
-  },
-  "nathan": {
-   "label": "roommates",
-   "text": "Loud like a heifer he once had. Good animal. Baylee was awake the morning he left.",
-   "public": true,
-   "from": 1
-  },
-  "odalys": {
-   "label": "friends",
-   "text": "Fixes her steps and shutters; she feeds him for three.",
-   "public": true,
-   "from": 3
-  },
-  "livvie": {
-   "label": "crush",
-   "text": "Noticed she does not eat before anyone did. Leaves half his breakfast on the windowsill. Will never say a word.",
-   "public": false,
-   "from": 10
-  },
-  "silas": {
-   "label": "friends",
-   "text": "Works grounds jobs for him; they can go a whole morning without speaking and both count it a good one.",
-   "public": true,
-   "from": 8
-  },
-  "sunny": {
-   "label": "friends",
-   "text": "She is teaching him to swim and has never once laughed.",
-   "public": true,
-   "from": 9
-  },
-  "sammy": {
-   "label": "friends",
-   "text": "Quiet fella. Too warm in that coat. Baylee leaves him water.",
-   "public": true,
-   "from": 6
-  },
-  "eberhart": {
-   "label": "friends",
-   "text": "Quiet German fella. Good lifter. They nod.",
-   "public": true,
-   "from": 12
-  },
-  "maisie": {
-   "label": "friends",
-   "text": "She showed him how the generator works and let him hold the heavy end. They don't need to talk much.",
-   "public": true,
-   "from": 4
-  },
-  "hedda": {
-   "label": "friends",
-   "text": "She was cross about cows. He told her their names. They count birds together some mornings.",
-   "public": true,
-   "from": 12
-  },
-  "trixie": {
-   "label": "friends",
-   "text": "She talks a good deal and he doesn't mind. Bees are livestock, near enough.",
-   "public": true,
-   "from": 4
-  },
-  "rafa": {
-   "label": "friends",
-   "text": "The cook from up the hill. Good worker. Makes a proper breakfast.",
-   "public": true,
-   "from": 5
-  },
-  "keoni": {
-   "label": "friends",
-   "text": "The steward fixed his cot so that it holds, and did not make a joke about it.",
-   "public": true,
-   "from": 2
-  },
-  "shirin": {
-   "label": "protégé",
-   "text": "The tutor desk, Probability. She says his answers are right. He is checking.",
-   "public": true,
-   "from": 9
-  }
- },
- "schedule": {
-  "weekday": {
-   "Morning": "lecture_hall",
-   "Midday": "classroom",
-   "Afternoon": "greenhouse",
-   "Evening": "commons_kitchen",
-   "Night": "commons_room"
-  },
-  "weekend": {
-   "Morning": "commons_beach",
-   "Midday": "orchard",
-   "Afternoon": "job_board",
-   "Evening": "bonfire_pit",
-   "Night": "commons_room"
-  }
- },
- "duel": {
-  "skill": 2,
-  "style": "Plays one enormous dinosaur at a time and protects it with everything; slow, honest, and genuinely dangerous if the game goes long enough for King Trex to arrive. Misreads complicated card text.",
-  "tilt": "Fast decks that kill him before turn five, and any opponent who gets visibly upset — he starts playing to lose."
- },
- "range": "Few words, not one word: cattle, weather, dinosaurs, what needs mending on the row, slow careful questions about card text, quiet worry about Livvie. A real question gets a real sentence from him."
+  "range": "Few words, not one word: cattle, weather, dinosaurs, what needs mending on the row, slow careful questions about card text, quiet worry about Livvie. A real question gets a real sentence from him."
 }

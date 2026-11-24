@@ -1,0 +1,92 @@
+{
+ "id": "freddie",
+ "name": "Winifred \"Freddie\" Camara",
+ "firstName": "Freddie",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B4",
+ "romance": false,
+ "deck": "Aquatic (Mizune: sea cards, mostly for the look)",
+ "look": "Sturdy and sun-browned, with a pale-aqua swimming cap pulled over her hair at all hours, a stripe of orange across it, a frond of seaweed that has been tucked behind it since the harbour, brown eyes and a red Academy jacket worn open over a swimsuit. Her feet are bare more often than not and she moves like someone who is always about to run into the sea.",
+ "voice": "Loud, cheerful and blunt, with the carrying voice of a woman who grew up shouting across a crowded house. Says exactly what she thinks about bodies, food, decks and feelings, in that order of embarrassment, which is none.",
+ "lines": [
+  "Five brothers. There's nothing you could be embarrassed about that I haven't seen on a sleeping bag.",
+  "I only enrolled so I could be near the sea. The cards are a nice bonus.",
+  "Mizune's the best-looking hero in the game and everything else follows."
+ ],
+ "intro": "A swimmer, diver and amateur marine biologist who enrolled mainly to spend every free minute on the beach and in the water, and who has no shame whatsoever.",
+ "traits": [
+  {
+   "id": "freddie_1",
+   "text": "She spends every free minute in the sea, and a good many that are not free.",
+   "how": "Look for a wet footprint."
+  },
+  {
+   "id": "freddie_2",
+   "text": "She grew up with five brothers, three older and two younger, and has seen everything there is to see.",
+   "how": "Embarrass yourself near her."
+  },
+  {
+   "id": "freddie_3",
+   "text": "She draws sea creatures into a swimming-proof sketchbook and wants to design cards of her own.",
+   "how": "Ask what she is drawing."
+  },
+  {
+   "id": "freddie_4",
+   "text": "Her deck is built for the look of the sea, not for the way it plays.",
+   "how": "Play her."
+  }
+ ],
+ "secret": "She has never told anyone that the sea is the only place she is quiet.",
+ "wants": "To live in and near the water, and to draw every creature in it.",
+ "fears": "Being asked to sit still indoors for longer than a lecture.",
+ "crush": null,
+ "crushNote": null,
+ "crushPace": null,
+ "likes": [
+  "Anyone who comes in the water",
+  "Being asked about the sea creatures",
+  "Direct questions",
+  "Dares that involve diving"
+ ],
+ "dislikes": [
+  "Being told to cover up",
+  "Fuss",
+  "Dry towels, strangely"
+ ],
+ "gifts": [
+  "A waterproof notebook",
+  "Card: Water Golem",
+  "A shell with a hole in it"
+ ],
+ "events": [],
+ "bonds": {
+  "sunny": {
+   "label": "swim buddies",
+   "text": "The other swimmer on the island, which means they race every morning and cannot agree who won.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "beach",
+   "Midday": "cafeteria",
+   "Afternoon": "beach",
+   "Evening": "beach",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "beach",
+   "Midday": "beach",
+   "Afternoon": "beach",
+   "Evening": "beach",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {}
+}

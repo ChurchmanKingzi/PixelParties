@@ -1,0 +1,94 @@
+{
+ "id": "branden",
+ "name": "Branden Sunflower",
+ "firstName": "Branden",
+ "age": 10,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S2",
+ "romance": false,
+ "deck": "Hot Stuff (burn: Luna Pele)",
+ "look": "Small even for ten, with spiky flame-orange hair that looks as though it is mid-shout, a mouth that is usually open, wide eyes and a red Academy jacket three sizes too big, its sleeves flapping past his hands like flags. He is never still, and almost never alone for long, because someone is always about to be pranked.",
+ "voice": "Loud, fast and gloriously unashamed: boasts in headlines, interrupts himself with new boasts, and says 'technically' about everything. Insults are a form of affection, and he has never once apologised on purpose.",
+ "lines": [
+  "I'm the national champion. Under tens. Two years running. Technically that's the best kind of champion, because I have fewer years to be it in.",
+  "Curfew? Is that a kind of cheese?",
+  "Fireball. Fireball. Fireball. Heat Wave. You're welcome."
+ ],
+ "intro": "A ten-year-old burn-deck prodigy, national champion of his age bracket, who pranks everyone, obeys no curfew and has noticed, with enormous interest, that someone younger than sixteen is already famous.",
+ "traits": [
+  {
+   "id": "branden_1",
+   "text": "He won the national championship for players aged ten and under two years running and tells everyone, in order, with dates.",
+   "how": "Common knowledge; he will tell you within a minute."
+  },
+  {
+   "id": "branden_2",
+   "text": "He plays pranks constantly and never apologises for any of them.",
+   "how": "Spend a day on the Commons side."
+  },
+  {
+   "id": "branden_3",
+   "text": "He ignores every rule and every curfew that applies to him and several that do not.",
+   "how": "Be out after dark."
+  },
+  {
+   "id": "branden_4",
+   "text": "He is jealous of Georgie and pretends he is not.",
+   "how": "Watch him watch her at a table."
+  }
+ ],
+ "secret": "He has never lost a game to anyone he could not blame on a technicality, and is quietly terrified of the first time it is simply true.",
+ "wants": "To be the best and to be seen being the best, by everyone, immediately.",
+ "fears": "Being the second prodigy, the one people say 'also' about.",
+ "crush": null,
+ "crushNote": null,
+ "crushPace": null,
+ "likes": [
+  "Being asked for a prank plan, with respect",
+  "A good dare",
+  "Fireworks, in a notional sense",
+  "Being told he is better than the older kids, truthfully",
+  "Sweets, on principle"
+ ],
+ "dislikes": [
+  "Being called cute",
+  "Bedtimes",
+  "Being told to wait his turn",
+  "People who lose slowly"
+ ],
+ "gifts": [
+  "Card: Fireball",
+  "A firework that does nothing but whistle",
+  "Sour sweets, in bulk"
+ ],
+ "events": [],
+ "bonds": {
+  "georgie": {
+   "label": "rival",
+   "text": "The only other child in the building, who is four years older, quieter, and nationally ranked. He decided she was a threat in the first minute and has not stopped being rude to her about it.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "cafeteria",
+   "Afternoon": "trial_dome",
+   "Evening": "quad",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "quad",
+   "Midday": "cafeteria",
+   "Afternoon": "card_shop",
+   "Evening": "quad",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {}
+}

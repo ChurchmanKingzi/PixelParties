@@ -340,7 +340,7 @@
   @if deck_known_marit
     @end
   @choice
-    > "Flame clips, an ember bow tie, a scarf the colour of coals, and you stepped onto a bollard like it was a stage. Let me guess: Phoenix." @hint From her look
+    > "Hair like two flames, an ember bow tie, a scarf the colour of coals, and you stepped onto a bollard like it was a stage. Let me guess: Phoenix." @hint From her look
       [marit!] "**OH!** *Oh!* He is **GOOD!** Ladies and gentlemen, the stranger has **SEEN** me!"
       [marit!] "**PHOENIX ENCORE!** The *rise!* The *fall!* The **RISE AGAIN!**"
       @aff marit +3 | Read her from her look
@@ -546,12 +546,12 @@
   @if not deck_known_livvie
     @deckinfo livvie
   @if won:ferry_livvie
-    Livvie counts the five credits twice, each coin with great precision.
+    Livvie counts the five Smug Coins twice, each coin with great precision.
     [livvie] "Quick thing — your Gathering Storm broke a Crystal I handed you. Did you notice?"
     [rowan] "I noticed. I played around the Well by not taking the first one. It cost me tempo."
     [livvie] "That's the intended counter." She looks, unexpectedly, impressed. "Nobody works it out. They all take the gift."
   @else
-    Livvie takes your five credits, then, a half-second later, hands three of them back without looking at you.
+    Livvie takes your five Smug Coins, then, a half-second later, hands three of them back without looking at you.
     [livvie] "The Crystal Well gave you a Crystal on turn one and you used it to break my own spell level."
     [rowan] "That was the whole deck: turn her own present against her."
     [livvie] "Nobody does that." Eyes down, a small sideways look. "It was quite clever. Don't say I said so."

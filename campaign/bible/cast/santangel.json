@@ -12,7 +12,7 @@
  "romance": false,
  "deck": "Tempo Lesson (stun-and-poison tempo control)",
  "look": "Silver at the temples, a sharp black goatee, a black turtleneck in every season and the posture of a man still half expecting cameras. He wears a world-finalist's ring on his right hand and turns it when he is thinking. His eyes are tired and very quick.",
- "voice": "Smooth, sardonic and exacting, Madrid-inflected; he lectures in aphorisms and praises in the past tense. Surnames only. He turns cold and brief if his lost final is mentioned, and oddly young and animated in front of a truly new idea. RARE habit (once in a scene at most; most scenes go without it): 'Adequate.' as the highest mark he gives.",
+ "voice": "Smooth, sardonic and exacting, capital-inflected; he lectures in aphorisms and praises in the past tense. Surnames only. He turns cold and brief if his lost final is mentioned, and oddly young and animated in front of a truly new idea. RARE habit (once in a scene at most; most scenes go without it): 'Adequate.' as the highest mark he gives.",
  "lines": [
   "Tempo, Vance, is the only resource you cannot draw. You have just spent three turns of it on being careful.",
   "That was adequate. Do not smile. Adequate is where it starts.",
@@ -53,7 +53,7 @@
   },
   {
    "id": "santangel_7",
-   "text": "He was the son of a Madrid taxi driver and paid for his first deck by washing cabs.",
+   "text": "He was the son of a capital taxi driver and paid for his first deck by washing cabs.",
    "how": "Friend stage, late office hours."
   },
   {

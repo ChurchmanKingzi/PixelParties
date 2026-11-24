@@ -12,7 +12,7 @@
  "romance": true,
  "deck": "Letter of the Law (Idej: three hundred-health lords behind projections and blades — Idej Lord Daiyo; Idej Lord Nobunakin; Idej Lord Todugawin)",
  "look": "Slim and straight-backed (about 5'7\"), pale olive skin, and thick wavy black hair cut short at the nape and left long on top, pushed back off the forehead, with one natural silver-white lock at the front left. Heavy straight eyebrows, steady grey-brown eyes, a long straight nose with a tiny gold stud in the left nostril, a mouth usually pressed shut on a remark. She wears the black Auxiliary jacket buttoned with the blue Rare collar, a white cloth band on the left upper sleeve lettered LADDER in black, and thin steel-rimmed reading glasses on a black cord that she puts on only to write. A tall, narrow ledger bound in black with brass corners is held flat against her left side, and a brass self-inking date stamp hangs from a belt reel at her right hip. Black ink along the side of her right little finger. She stands with her feet together and her chin slightly down, looking up through her brows.",
- "voice": "Quiet, dry and precise, Izmir Turkish under careful English: short sentences, a pause before anything she is unsure of. She answers the rules question asked, then the one that should have been. Deadpan — her jokes sound like rulings. Flustered, she turns formal and looks at the ledger. With the harbour's old men she is loud and quick; about running, coffee and her grandmother, almost talkative. RARE habit (once in a scene at most; most scenes go without it): 'For the record.'",
+ "voice": "Quiet, dry and precise, a harbour accent under careful English: short sentences, a pause before anything she is unsure of. She answers the rules question asked, then the one that should have been. Deadpan — her jokes sound like rulings. Flustered, she turns formal and looks at the ledger. With the harbour's old men she is loud and quick; about running, coffee and her grandmother, almost talkative. RARE habit (once in a scene at most; most scenes go without it): 'For the record.'",
  "lines": [
   "Result, please. Winner signs first. No, the other line. Thank you.",
   "Tavla is not luck. The dice are luck. What you do after is your own fault.",
@@ -77,7 +77,7 @@
    "how": "Compare your line in the ledger with the ones around it."
   }
  ],
- "secret": "FUNCTION (use her instead of a nameless scorekeeper or floor judge): LADDER REGISTRAR and judge's assistant of the Battle Arena. Every ranked result is signed at her table (Trial Domes at Midday, the Great Arena in the Afternoon, the Duel Terraces in the Evening), checked three times and stamped into the black ledger; she prints the ladder sheets, books the domes, logs challenges and refusals for the vice-president's desk, and takes first call on rules questions at ladder tables, strictly by the rulebook. Hard calls go up to Lucas Brennan, then Ms Kirishima. She cannot be hurried and never guesses.\nWHO SHE IS. From Izmir; raised largely by a grandmother who embroidered and played tavla for money. Shy in English; loud and funny in Turkish with the harbour's net-menders. Wound: last year, in a Promotion Duel, she gave a wrong ruling on a Reaction's timing; the loser, a Commons second-year, left the Academy in June. She found the error a week later and wrote the correction in the margin; nobody else has opened that page. Contradiction: the island's most reliable judge thinks she is one mistake from a fraud.\nSECRET. She has watched Best_Tarleinn_NA's online games for two years (her second-year paper is on a ruling in his qualifier final) and knew the name on the Wildcard list. She would rather resign than have him know. It shows only in the ledger: his line is always in her hand.\nAFTER DAY 27 she notices, as a professional matter, that one first-year from bungalow 7 hands in slips with nothing to correct, in a hand that grows neater every week. If Brant is found on Day 40, the Dome 3 booking sheet, which is hers, is taken by the Chancellor's office before she has read it and comes back with two words blacked out. Every result is legal. She has begun to dread the stamp.",
+ "secret": "FUNCTION (use her instead of a nameless scorekeeper or floor judge): LADDER REGISTRAR and judge's assistant of the Battle Arena. Every ranked result is signed at her table (Trial Domes at Midday, the Great Arena in the Afternoon, the Duel Terraces in the Evening), checked three times and stamped into the black ledger; she prints the ladder sheets, books the domes, logs challenges and refusals for the vice-president's desk, and takes first call on rules questions at ladder tables, strictly by the rulebook. Hard calls go up to Lucas Brennan, then Ms Kirishima. She cannot be hurried and never guesses.\nWHO SHE IS. From a harbour town; raised largely by a grandmother who embroidered and played tavla for money. Shy in English; loud and funny in her mother tongue with the harbour's net-menders. Wound: last year, in a Promotion Duel, she gave a wrong ruling on a Reaction's timing; the loser, a Commons second-year, left the Academy in June. She found the error a week later and wrote the correction in the margin; nobody else has opened that page. Contradiction: the island's most reliable judge thinks she is one mistake from a fraud.\nSECRET. She has watched Best_Tarleinn's online games for two years (her second-year paper is on a ruling in his qualifier final) and knew the name on the Wildcard list. She would rather resign than have him know. It shows only in the ledger: his line is always in her hand.\nAFTER DAY 27 she notices, as a professional matter, that one first-year from bungalow 7 hands in slips with nothing to correct, in a hand that grows neater every week. If Brant is found on Day 40, the Dome 3 booking sheet, which is hers, is taken by the Chancellor's office before she has read it and comes back with two words blacked out. Every result is legal. She has begun to dread the stamp.",
  "wants": "A ledger with no notes in the margin — and, absurdly, for one particular first-year to ask her a rules question that takes a long time to answer.",
  "fears": "Being wrong in ink again, with somebody's year depending on it.",
  "crush": "rowan",
@@ -90,7 +90,7 @@
   "Tavla, night running, bitter coffee",
   "A misplay admitted before she finds it",
   "Old men who cheat openly",
-  "Being spoken to in bad Turkish",
+  "Being spoken to in her mother tongue, badly",
   "Silence that is not awkward"
  ],
  "dislikes": [
@@ -106,7 +106,7 @@
   "Card: Idej Projection",
   "A good pen, fine nib, black",
   "Card: Idej Lord Daiyo",
-  "Turkish coffee from the Saturday market",
+  "Strong black coffee from the Saturday market",
   "Card: Idej Projector",
   "A correctly filled result slip, winner's signature first"
  ],
@@ -116,7 +116,7 @@
   "style": "Rulings as conversation; admits nothing.",
   "text": "Zeynep has liked Rowan secretly since before he arrived and would deny it for the record. She does not flirt: she is simply always the one at his table, with the ruling ready. An easy route in disguise — any honest rules question is met more than halfway. Ask how, not whether; own your misplays; never tease her in front of a queue."
  },
- "intimacy": "Guarded, then startlingly direct. For weeks it is a stool pulled up to the scorer's table after the last match, two glasses of tea, his notation corrected with the cap still on her pen. She does not like to be watched while she decides; once she has decided she says so in one sentence and takes off the reading glasses. Quiet, intent, drily funny; she slips into Turkish. A night run ending on the top terrace; room 407, the ledger locked away. Fade as she turns the date stamp to tomorrow.",
+ "intimacy": "Guarded, then startlingly direct. For weeks it is a stool pulled up to the scorer's table after the last match, two glasses of tea, his notation corrected with the cap still on her pen. She does not like to be watched while she decides; once she has decided she says so in one sentence and takes off the reading glasses. Quiet, intent, drily funny; she slips into her mother tongue. A night run ending on the top terrace; room 407, the ledger locked away. Fade as she turns the date stamp to tomorrow.",
  "events": [
   {
    "id": "zeynep_e1",

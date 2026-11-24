@@ -1,0 +1,169 @@
+{
+ "name": "Aquatic",
+ "owner": "freddie",
+ "heroes": [
+  "Silent Water Mizune",
+  "Kit, the Shark Researcher",
+  "Madaga, the Forsaken Seafarer"
+ ],
+ "main": [
+  [
+   4,
+   "Magic Arts"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Creativity"
+  ],
+  [
+   2,
+   "Navigation"
+  ],
+  [
+   3,
+   "Deepsea Pirate"
+  ],
+  [
+   3,
+   "Frolake"
+  ],
+  [
+   2,
+   "Greatmaw Shark"
+  ],
+  [
+   2,
+   "Land Sharks"
+  ],
+  [
+   2,
+   "Slippery Narw"
+  ],
+  [
+   2,
+   "Steam Dwarf Diver"
+  ],
+  [
+   3,
+   "Water Golem"
+  ],
+  [
+   2,
+   "Crying Seagulls"
+  ],
+  [
+   1,
+   "Populated Island Turtle"
+  ],
+  [
+   2,
+   "Splashy Slime"
+  ],
+  [
+   3,
+   "Aquatic Arrows"
+  ],
+  [
+   3,
+   "Aquatic Shield"
+  ],
+  [
+   3,
+   "Aquatic Spear"
+  ],
+  [
+   2,
+   "Dive Down"
+  ],
+  [
+   2,
+   "Diver Helmet"
+  ],
+  [
+   2,
+   "Teal Fishing Rod"
+  ],
+  [
+   2,
+   "Capture Net"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Smuggler's Pier"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Silent Water Mizune": "Hero",
+  "Kit, the Shark Researcher": "Hero",
+  "Madaga, the Forsaken Seafarer": "Hero",
+  "Magic Arts": "Ability",
+  "Summoning Magic": "Ability",
+  "Creativity": "Ability",
+  "Navigation": "Ability",
+  "Deepsea Pirate": "Creature L1",
+  "Frolake": "Creature L1",
+  "Greatmaw Shark": "Creature L1",
+  "Land Sharks": "Creature L1",
+  "Slippery Narw": "Creature L1",
+  "Steam Dwarf Diver": "Creature L1",
+  "Water Golem": "Creature L1",
+  "Crying Seagulls": "Creature L1",
+  "Populated Island Turtle": "Creature L3",
+  "Splashy Slime": "Creature L0",
+  "Aquatic Arrows": "Spell (Destruction Magic)",
+  "Aquatic Shield": "Spell (Magic Arts)",
+  "Aquatic Spear": "Spell (Destruction Magic)",
+  "Dive Down": "Spell (Magic Arts)",
+  "Diver Helmet": "Artifact",
+  "Teal Fishing Rod": "Artifact",
+  "Capture Net": "Artifact",
+  "Deepsea Idol": "Artifact",
+  "Smuggler's Pier": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Silent Water Mizune": "The main hero: once per turn she sends a Surprise from the board to the discard pile to draw a card.",
+  "Water Golem": "A Surprise creature: it activates when one of Freddie's Surprises is sent away, which Mizune does on purpose.",
+  "Aquatic Arrows": "A Destruction Magic Surprise. None of Freddie's heroes can cast it, which she regards as a detail.",
+  "Aquatic Shield": "A Magic Arts Surprise that reduces damage to the hero who takes it; the only Aquatic spell her heroes can actually use.",
+  "Aquatic Spear": "Another Destruction Magic Surprise that, like its siblings, sits in her hand and looks lovely.",
+  "Frolake": "Draws two when it arrives and keeps the hand full."
+ },
+ "plan": "Freddie's deck is the sea: Water Golems, Deepsea Pirates, Land Sharks and Narwhals, a few real Magic Arts Surprises for Mizune to throw away and draw from, and three kinds of Aquatic spell that her heroes cannot cast at all, because none of them has Destruction Magic. She includes them because they are called Aquatic. The deck is therefore half a plan and half a mood board: it draws well, defends with a Diver Helmet and stalls on its own hand, and has no clear way to finish anything.",
+ "looks": {
+  "early": "Frolake, a Water Golem face-down and Mizune looking pleased with a hand full of Aquatics.",
+  "mid": "Land Sharks and a Narwhal sliding about, a Diver Helmet on Mizune and three dead spells in her hand.",
+  "late": "A lovely board that nobody can quite win with."
+ },
+ "profile": {},
+ "situations": {}
+}

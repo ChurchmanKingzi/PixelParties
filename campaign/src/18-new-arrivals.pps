@@ -1,0 +1,278 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · FÄHRE · BRANDEN SUNFLOWER (10) und FREDDIE CAMARA (19)
+#  Branden: Brandstifter-Deck (Luna Pele), nationaler Meister der unter Zehnjährigen, Streiche, kein Curfew;
+#           nimmt Georgie den Titel "das Wunderkind" und weiß es genau.
+#  Freddie: Schwimmerin, Taucherin, Hobby-Meeresbiologin, Design-Studium; Aquatic-Deck mit Mizune "fürs Thematische".
+#           Fünf Brüder, nichts ist ihr peinlich. Wohnt im Bungalow 4.
+#  Deck-Gespräche wie in 15-deck-talk.pps: Rowan kommentiert erst, wenn er das Deck kennt.
+# ═══════════════════════════════════════════════════════════════════
+
+# ───────────────────────────── BRANDEN ─────────────────────────────
+
+@scene ferry_branden
+  @if not met:branden
+    Somebody has taken the lifebuoy off the rail and is rolling it down the deck like a hoop. The somebody is perhaps ten years old. The first thing you notice is the hair, a flame-orange mop that stands up in spikes as if it is in the middle of a shout. The second is the jacket, three sizes too big, its sleeves flapping past his hands like flags. The third is the grin, which has already decided to regret nothing.
+    [branden?] "You! Jacketless! Be my timekeeper! I get this thing to the funnel without a crewman catching me and you owe me a Smug Coin. I get caught and you owe me a Smug Coin anyway, for witnessing."
+    @choice
+      > "That's the ship's lifebuoy. Somebody might need it."
+        [branden?] "Nobody's drowning. Technically. I checked the whole deck."
+        [branden?] "Branden Sunflower. National champion. Under tens. Two years running. And you're the boring one who's about to tell on me."
+        [rowan] "I haven't told anyone."
+        [branden?] "*Yet!*"
+        @aff branden -1 | Pointed at the lifebuoy
+        @flag branden_scolded
+      > "All right. I'll time you. Go."
+        [branden?] "A SPORT! Okay! On three! One! Two — "
+        He is off along the deck with the buoy bowling ahead of him. Half a dozen heads turn. From somewhere above the lounge stairs a voice that can only belong to a captain shouts "WHO HAS MY LIFEBUOY?" and the sprinter takes a corner so fast that he skids.
+        [branden?] "Eleven seconds! Pay up!" Breathless, magnificent, unashamed. "Branden Sunflower! Remember it! You timed the best!"
+        @aff branden +3 | Timed his run
+        @flag branden_prank_buddy
+      > "How old are you, exactly?"
+        [branden?] "TEN. Ten and three quarters. Technically eleven in spirit."
+        [branden?] "Branden Sunflower. National champion. Under tens. Two years running. You can write it down, but I won't wait."
+        @aff branden +1 | Asked his age
+    @meet branden
+    @add ferry_talked +1
+    [branden] "Everyone else on this boat is *old*. You're old. You're, what, seventeen? That's *ancient*. I'm the youngest here, so technically I've got the best seat in the house, and I'm not giving it up."
+    @time 6
+  @else
+    [branden] "Jacketless!" He has found a fresh bit of deck and is arranging a bucket on the lifeboat cover with enormous care. "Don't look at the bucket. There's no bucket."
+    @choice
+      > "Do you want a game, Branden?" @if not flag_branden_game and not branden_scolded
+        [branden] "A GAME! Finally somebody brave!" He abandons the bucket without a backward glance.
+        @scene deck_branden
+        @duel ferry_branden deck=branden name="Branden Sunflower"
+          @win
+            [branden] "That doesn't count. That was a trial run. You got lucky, that's — hang on — what do you mean, *good game*?"
+            @aff branden +2 | Beat him fairly
+            @flag beat_branden
+          @lose
+            [branden] "National champion! Two years running! Write it DOWN!" He is jigging on the spot. "You were a *very* good opponent. For somebody ancient."
+            @aff branden +2 | Played a proper game
+        @scene post_branden
+        @flag flag_branden_game
+        @time 25
+      > "Can I ask you something, Branden?" @if not chat_branden_done
+        @scene chat_branden
+      > "Is that a bucket, Branden?"
+        [branden] "NO."
+        [rowan] "It's a bucket on a lifeboat cover. Above the door to the lounge."
+        [branden] "…It's art." A pause. "It's performance art. You haven't seen it. Walk through the door."
+        @aff branden +1 | Spotted the bucket
+      > Leave him to his art.
+    @time 4
+  @if met:branden and not chat_branden_offered and not flag_branden_game
+    @flag chat_branden_offered
+    @scene chat_branden
+
+@scene deck_branden
+  @if deck_known_branden
+    @end
+  @choice
+    > "What do you play, Branden?"
+      [branden] "BURN! Luna Pele! The Flame Dancer! She turns every burning thing into a card! Fireball! Fireball! Heat Wave! You're welcome!"
+      [branden] "National champion! Under tens! Technically *burning* is the best way to win a championship. Nobody else has a plan for the other side of the table."
+      @aff branden +1 | Asked about his deck
+    > Let the cards wait for now.
+      @flag deck_skipped_branden
+      @end
+  Rowan has put his head on one side. His voice comes out low and quick.
+  [rowan] "…Luna Pele. Poison burns for the rest of the game. Every burn, a card, up to four a turn. Ida for Destruction that can't be blocked. Fire Bolts. Fireball on two. Heat Wave lights the whole board, then Heart of the Mountain draws one per burning target. Flame Avalanche to finish." A pause. "All spells. No board. When the burn runs out there's nothing."
+  [branden] "There's *always* something!" Offended, but a little too quick. "There's — Fiery Slime! There's an egg!"
+  [rowan] "There's an egg."
+  [branden] "…It's a *very* good egg."
+  @deckinfo branden
+
+@scene post_branden
+  @if not deck_known_branden
+    @deckinfo branden
+  @if won:ferry_branden
+    Branden is sitting very upright with his arms folded and his chin out, in the posture of a boy who is not going to cry because he is the national champion.
+    [branden] "You Heat-Waved. I mean, *I* Heat-Waved. You — you put out the Heart of the Mountain. Nobody does that."
+    [rowan] "You'd burned the whole board. It was the only card that could draw you anything."
+    [branden] "…" He looks at you for a long, searching moment. "That's *rude*. And clever. Do it again tomorrow. When I'm ready."
+  @else
+    Branden has climbed onto the bench and is standing on it, arms up, in the posture of a small and tremendous emperor.
+    [branden] "FIREBALL! Did you SEE the Fireball? Two heroes! In ONE TURN!"
+    [rowan] "I saw it. I didn't have an answer."
+    [branden] "Nobody does! That's the *point!* National champion!" He climbs down, suddenly almost shy. "…You were the first person today who didn't say it was luck."
+  @aff branden +1 | Talked it through
+
+@scene chat_branden
+  @label top
+  @if chat_branden_1 and chat_branden_2 and chat_branden_3
+    @flag chat_branden_done
+    [branden] "That's enough questions. You're welcome. I'll take that Smug Coin now." A beat. "…I'll take it *later*."
+    @end
+  @choice
+    > "Tell me about being national champion." @if not chat_branden_1
+      [branden] "Two years running. Under tens. The final was in a *school gym*, the other kid cried, I did a lap of honour, they let me keep the trophy for a week."
+      [branden] "I do not *give* the trophy back. They keep sending letters. I have a drawer for the letters."
+      [rowan] "Do you read them?"
+      [branden] "I *file* them." Dignified. "Technically that's a different thing."
+      @aff branden +2 | Let him boast
+      @flag chat_branden_1
+      @time 2
+      @jump top
+    > "What's the best prank you've ever pulled?" @if not chat_branden_2
+      [branden] "Oh, *wow*, do you have an hour? There was the bucket. And the other bucket. And the time I put every single shoe in the school gym on the roof."
+      [rowan] "How did you get them up there?"
+      [branden] "A *ladder*, Rowan." Very patient. "I'm not a *magician*. Technically I'm *better*."
+      [branden] "Don't tell my mum I said 'roof'. She thinks it was a window."
+      @aff branden +2 | Asked about the pranks
+      @flag chat_branden_2
+      @time 2
+      @jump top
+    > "Aren't you supposed to be in bed at some point? Isn't there a curfew?" @if not chat_branden_3
+      [branden] "A *what*?" Suspicious delight. "Is that a kind of cheese?"
+      [branden] "No. Okay. I know what a curfew is. It's an idea that other people have about me. I've decided it doesn't apply."
+      [rowan] "Who decides that?"
+      [branden] "*Me!* National champion!" A very small, very brief flash of something different. "…The other kids on the ship get a lot of rules. I just like it when nobody can find me."
+      @aff branden +1 | Asked about the rules
+      @flag chat_branden_3
+      @time 2
+      @jump top
+    > "Have you met Georgie? The girl with the dark-blue feather?" @if met:georgie and not chat_branden_4
+      [branden] "The *old* one?" A snort. "She's fourteen. She won the under-sixteens. Technically that's the *old people's* league."
+      [rowan] "She seemed a bit nervous."
+      [branden] "That's because she's seen the competition." A beat, and then, a little less loudly: "…She asked if she could sit on the rope. Nobody asks that. I was going to say yes if she'd asked me. I was going to charge her a Smug Coin."
+      [branden] "…It's *annoying*. She used to be the youngest. Now it's me. And everyone's still looking at her *first*."
+      @aff branden +2 | Listened
+      @flag chat_branden_4
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_branden
+      @scene deck_branden
+      @jump top
+    > "I'll leave you to your bucket."
+      [branden] "There's no bucket!"
+      @end
+
+# ───────────────────────────── FREDDIE ─────────────────────────────
+
+@scene ferry_freddie
+  @if not met:freddie
+    At the stern rail a girl in a pale-aqua swimming cap and a red jacket worn open over a swimsuit is hanging over the wake by her waist, peering at the water through a diver's mask, with her bare feet hooked round the lowest bar. A frond of seaweed is stuck to her cap. She is, with great concentration, talking to the sea.
+    [freddie?] "Come on — come ON — I saw you, you big brown — that's a ray. That's a *ray*. Hey! Jacketless! Is that a ray?"
+    @choice
+      > "I can't see anything. I think that's the shadow of a cloud."
+        [freddie?] "A cloud." She hauls herself upright with one arm, completely unbothered, and looks at you as if you had said something endearing. "Shadows don't flap. Come here. Look. *There.*"
+        You look. Something broad and brown does indeed flap, deep down, in the white seam of the wake.
+        [freddie?] "Ray. Told you." A hundred-watt grin. "Winifred Camara. Freddie. I answer to anything but Winifred."
+        @aff freddie +2 | Looked where she pointed
+      > "Should you be hanging off the stern like that?"
+        [freddie?] "Five brothers." Cheerfully, hanging there. "If I'd waited for permission I'd still be stuck in the hallway at home."
+        [freddie?] "Winifred Camara. Freddie. I answer to anything but Winifred. And you've got the face of somebody about to say something about *safety*, so don't, I can swim the last mile of this whole ship's wake, I've timed myself."
+        @aff freddie +1 | Asked straight
+      > "I'm Rowan. I can hold your jacket, if you want to lean out a bit further."
+        [freddie?] "Oh, *yes*. Good man. Hold this." She shrugs the jacket off, tosses it over, and, entirely without ceremony, begins to wriggle out of the top of a wetsuit that you now realise she has been wearing underneath all this time, rolling it down to her waist over a sports top.
+        [freddie?] "Turn round if you like. I don't mind either way." A pause. "You've gone red. That's sweet. Five brothers, Rowan. There is nothing you could be embarrassed about in front of me that I haven't seen on a sleeping bag. Winifred Camara. Freddie."
+        @aff freddie +3 | Helped without making it weird
+    @meet freddie
+    @add ferry_talked +1
+    [freddie] "I only enrolled to be near the sea. The cards are a lovely bonus. I'm going to swim round this whole island before the end of the week, and then the other way. You in? I mean it. I'll hold the towel."
+    @time 8
+  @else
+    [freddie] "Jacketless! Come and look at this, there's a — oh, it's gone." She leans out again, unashamed and upside down. "It was a *shark*. Probably."
+    @choice
+      > "Fancy a game, Freddie?" @if not flag_freddie_game
+        [freddie] "A game! Brilliant. I get to show off Mizune."
+        @scene deck_freddie
+        @duel ferry_freddie deck=freddie name="Freddie Camara"
+          @win
+            [freddie] "Oh, you beat me! Good. That's fair, I never got to the Aquatics. Does that count as a loss?" She does not seem to mind in the least. "It was lovely to look at, anyway."
+            @aff freddie +2 | Good game
+          @lose
+            [freddie] "I WON! With the *sea*! Did you see the Golem? Did you see the whole *aquarium*?" She hugs the nearest rail. "Nobody expects the aquarium."
+            @aff freddie +2 | Played a proper game
+        @scene post_freddie
+        @flag flag_freddie_game
+        @time 25
+      > "Can I ask you a few things, Freddie?" @if not chat_freddie_done
+        @scene chat_freddie
+      > Wave and let her look for the shark.
+    @time 4
+  @if met:freddie and not chat_freddie_offered and not flag_freddie_game
+    @flag chat_freddie_offered
+    @scene chat_freddie
+
+@scene deck_freddie
+  @if deck_known_freddie
+    @end
+  @choice
+    > "A swimming cap, a diver's mask, seaweed on your head. I'm guessing the deck is the sea. Aquatic?" @hint From her gear
+      [freddie] "AQUATIC!" She slaps the rail so hard that a gull relocates. "He's *seen* me! Aquatic! Silent Water Mizune! She's the best-looking hero in the whole game, and everything else follows!"
+      @aff freddie +3 | Read her from her gear
+    > "What do you play, Freddie?"
+      [freddie] "Aquatic! Mizune! It's the sea! It's gorgeous! You'll love it!"
+      @aff freddie +1 | Asked about her deck
+    > Let the cards wait for now.
+      @flag deck_skipped_freddie
+      @end
+  Rowan has stopped listening to her and started on the sea.
+  [rowan] "…Mizune sends a Surprise to the discard, draws a card. Water Golem for the Surprise. Frolake draws two. Land Sharks, Narwhal, Diver Helmet. Aquatic Shield. Aquatic Arrows. Aquatic Spear." He stops. "Aquatic Arrows is Destruction Magic. Mizune hasn't got Destruction Magic. None of your heroes have."
+  [freddie] "…" A very long, very serene pause. "They're *aquatic*. Casting them is not the *point*."
+  [rowan] "Then what's the point?"
+  [freddie] "Look at them! They've got *waves* on! They've got a little *fish*!" She holds up a card she apparently carries about in her hand. "They look gorgeous *in my hand*!"
+  [rowan] "…That's — fair. They do."
+  @deckinfo freddie
+
+@scene post_freddie
+  @if not deck_known_freddie
+    @deckinfo freddie
+  @if won:ferry_freddie
+    Freddie is studying the board with the cheerful attention of a naturalist who has found a very interesting dead fish.
+    [freddie] "I couldn't cast a single Aquatic. Not *one*. Not even Aquatic Shield, and Mizune can cast that." She considers. "That's a design flaw. Do you want to hear my solution?"
+    [rowan] "Is it 'add a Destruction Magic hero'?"
+    [freddie] "…Ah. No. It's 'bigger crabs'."
+  @else
+    Freddie is on her back on the planks with her arms spread, looking up at the sky.
+    [freddie] "I *won*. With a Water Golem and a shark. The Aquatics didn't do anything at all, and I won anyway." She is thrilled. "Is that allowed? Is it *always* going to be this easy?"
+    [rowan] "It isn't. You had a lot of draw and I had nowhere to hide."
+    [freddie] "Mizune did that! I'll tell her." She pats the deck box. "Good girl."
+  @aff freddie +1 | Talked it through
+
+@scene chat_freddie
+  @label top
+  @if chat_freddie_1 and chat_freddie_2 and chat_freddie_3
+    @flag chat_freddie_done
+    [freddie] "Right! That's me! Biography, anatomy and a free shark! You've been wonderful. Hold the towel next time."
+    @end
+  @choice
+    > "You said five brothers. Where do you fit?" @if not chat_freddie_1
+      [freddie] "Smack in the middle! Three older, two younger. Sandwich filling. You learn very quickly who's going to shout, who's going to steal your sandwich, and who needs you to hold the little one's hand."
+      [freddie] "One bathroom. Seven people. If you have shame, you have it for about a week, and then you have a towel."
+      [rowan] "That explains the towel."
+      [freddie] "It explains *everything*."
+      @aff freddie +2 | Asked about her family
+      @flag chat_freddie_1
+      @time 2
+      @jump top
+    > "What's your favourite thing in the sea?" @if not chat_freddie_2
+      [freddie] "Octopuses." No hesitation. "They have three hearts, they can open jars, and every single time somebody tells them to stay in the tank, they leave. I think we'd get on."
+      [freddie] "I want to draw all of them. Every creature in the sea. I keep a notebook. It's waterproof."
+      @aff freddie +2 | Asked about the sea
+      @flag chat_freddie_2
+      @time 2
+      @jump top
+    > "Did you say you're going to design cards?" @if not chat_freddie_3
+      [freddie] "I'm in the Design stream! Hello! I'm going to do *all* the sea ones." A fat pencil appears from nowhere. "Look. This is Moray, the Eel With Opinions. She can't be Burned, because she's wet, and she can't be Frozen, because she's an eel."
+      [rowan] "That would break the game."
+      [freddie] "Then they'll have to put a *rule* about it." She grins. "Isn't that the best thing about cards? You get to make the rules."
+      @aff freddie +3 | Admired her card
+      @flag chat_freddie_3
+      @time 2
+      @jump top
+    > "You and Sunny both swim, don't you?" @if met:sunny and not chat_freddie_4
+      [freddie] "Oh, *Sunny*." Warmly, and a little threatening. "We're racing at dawn tomorrow. Two kilometres. She thinks she's going to win. She has no idea about my breaststroke."
+      [freddie] "I'm going to let her think so for a *bit*."
+      @aff freddie +1 | Mentioned Sunny
+      @flag chat_freddie_4
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_freddie
+      @scene deck_freddie
+      @jump top
+    > "I'll let you get back to the shark."
+      [freddie] "It was a ray. Probably. Go on, off with you!"
+      @end

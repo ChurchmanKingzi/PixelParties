@@ -41,7 +41,15 @@ const startDeck = worldCfg.start.deck;
 
 // ── Umgebung für den Compiler ──
 const allCtx = new Map();
+const TITLES = new Set(['Captain','Mama','Ms.','Mr.','Dr.','Prof.','Chancellor','Coach','Nurse','Madame','Dr','Ms','Mr','Prof']);
+const nameRe = new Map();
+for (const id of castIds) {
+  const toks = new Set();
+  for (const src of [castData[id].name, castData[id].firstName, names[id]]) for (const w of String(src || '').replace(/["“”]/g, ' ').split(/\s+/)) { const x = w.replace(/[(),]/g, ''); if (x.length >= 2 && !TITLES.has(x) && /^[A-ZÀ-Ý]/.test(x)) toks.add(x); }
+  if (toks.size) nameRe.set(id, new RegExp('(?:^|[^A-Za-z])(' + [...toks].map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![A-Za-z])'));
+}
 const env = {
+  nameRe,
   pool: pool.pool, pron: pool.pronouns, words: 0, decks: new Set(), warn,
   alias: (id) => aliases[id] || '???',
   ctxFor: (id) => { const c = { cast: new Set(), places: new Set(), bgs: new Set(), reads: new Set(), sets: new Set(), sceneRefs: new Set(), duels: new Set(), hostCond: false, pickhost: false }; allCtx.set(id, c); return c; },

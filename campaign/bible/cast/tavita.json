@@ -1,236 +1,236 @@
 {
- "id": "tavita",
- "name": "Tavita \"Tavi\" Leota",
- "firstName": "Tavita",
- "age": 22,
- "sex": "m",
- "group": "student",
- "major": "CP",
- "year": 4,
- "dorm": "commons",
- "room": "The Old Row (upper-year Commons bungalows), bungalow 14",
- "romance": false,
- "deck": "Night Watch (defensive wall: Diamond, the Keeper of Peace; Broghan, the Frozen Guardian of the North; Xal, the Animated Armor)",
- "look": "Very tall (about 6'4\") and enormously broad, a rugby prop's build with a thick neck and heavy forearms, warm brown Samoan skin, and black curly hair shaved at the sides and tied in a short topknot. Calm dark-brown eyes, a broad nose that has been broken, a cauliflowered left ear, and a wide, slow smile. A traditional tatau band circles his right forearm, visible below the rolled sleeve. He wears the red Competitive Play jacket, straining slightly at the shoulders, with the plain grey Commons collar, the dark council sash (deep royal blue with a thin gold edge) worn from the right shoulder to the left hip, and a brass head-proctor's badge shaped like a small lantern on the sash. He carries a brass storm lantern on rounds and a carbon-copy slip pad in his breast pocket, and off duty he is in rubber sandals whatever the weather.",
- "voice": "Deep, slow and gentle, New Zealand vowels with Samoan underneath; he speaks to everyone, from a lost first-year to the Chancellor, in the same patient tone, and never needs to raise it. Fair to the point of stubbornness: he explains the rule, writes the slip, and then asks if you have eaten. Humour dry and sideways. He goes very quiet when someone lies to him. RARE habit (once in a scene at most; most scenes go without it): 'First one's free' — a warning in place of a slip.",
- "lines": [
-  "First one's free, bro. Second one's a slip. Third one, you and me have a cup of tea with Mama, and nobody enjoys that.",
-  "Same list for the Tower as for the Row. If I'm not looking under a white collar's bed, I'm not looking under yours.",
-  "A slip is cheaper than a stretcher. I learned that the dear way.",
-  "Walls, mostly — that's my deck. You can hit it all night. I'll still be standing here in the morning with the kettle on."
- ],
- "intro": "The student council's head proctor: a huge, gentle fourth-year from the Commons' Old Row who runs room inspections and hall order, and who hands out a warning before he ever writes a slip.",
- "traits": [
-  {
-   "id": "tavita_1",
-   "text": "He is the council's head proctor: room inspections, noise, lost property and order at events are his, and he writes the slips himself.",
-   "how": "Termly room inspection; any event door."
+  "id": "tavita",
+  "name": "Tavita \"Tavi\" Leota",
+  "firstName": "Tavita",
+  "age": 22,
+  "sex": "m",
+  "group": "student",
+  "major": "CP",
+  "year": 4,
+  "dorm": "commons",
+  "room": "The Old Row (upper-year Commons bungalows), bungalow 14",
+  "romance": false,
+  "deck": "Night Watch (defensive wall: Diamond, the Keeper of Peace; Broghan, the Frozen Guardian of the North; Xal, the Animated Armor)",
+  "look": "Very tall and enormously broad, a rugby prop's build with a thick neck and heavy forearms and a habit of flexing when nobody asked. Spiky bleached-blond hair under a wide red headband, one bright blue eye (the other is usually screwed up in a wink), a broken nose, a cauliflowered left ear and a wide, slow smile. A band of blue ink circles his right forearm. He wears red trousers and the red Competitive Play jacket slung over one shoulder, with the plain grey Commons collar, the dark council sash (deep royal blue with a thin gold edge) worn from the right shoulder to the left hip, and a brass head-proctor's badge shaped like a small lantern on the sash. He carries a brass storm lantern on rounds and a carbon-copy slip pad in his breast pocket, and off duty he is in rubber sandals whatever the weather.",
+  "voice": "Deep, slow and gentle, slow island vowels with something older underneath; he speaks to everyone, from a lost first-year to the Chancellor, in the same patient tone, and never needs to raise it. Fair to the point of stubbornness: he explains the rule, writes the slip, and then asks if you have eaten. Humour dry and sideways. He goes very quiet when someone lies to him. RARE habit (once in a scene at most; most scenes go without it): 'First one's free' — a warning in place of a slip.",
+  "lines": [
+    "First one's free, bro. Second one's a slip. Third one, you and me have a cup of tea with Mama, and nobody enjoys that.",
+    "Same list for the Tower as for the Row. If I'm not looking under a white collar's bed, I'm not looking under yours.",
+    "A slip is cheaper than a stretcher. I learned that the dear way.",
+    "Walls, mostly — that's my deck. You can hit it all night. I'll still be standing here in the morning with the kettle on."
+  ],
+  "intro": "The student council's head proctor: a huge, gentle fourth-year from the Commons' Old Row who runs room inspections and hall order, and who hands out a warning before he ever writes a slip.",
+  "traits": [
+    {
+      "id": "tavita_1",
+      "text": "He is the council's head proctor: room inspections, noise, lost property and order at events are his, and he writes the slips himself.",
+      "how": "Termly room inspection; any event door."
+    },
+    {
+      "id": "tavita_2",
+      "text": "He gives everybody one warning before a slip, and remembers who has had theirs.",
+      "how": "Be caught at something small."
+    },
+    {
+      "id": "tavita_3",
+      "text": "He refuses to inspect one dorm harder than another and has said so in open session.",
+      "how": "A council session; ask Teobalt."
+    },
+    {
+      "id": "tavita_4",
+      "text": "He is a fourth-year who has lived in the Commons all four years, and says the food is the reason.",
+      "how": "Commons kitchen, any Sunday."
+    },
+    {
+      "id": "tavita_5",
+      "text": "He played prop for his province's under-eighteens and still trains with the conditioning class at dawn.",
+      "how": "Gym, Morning; ask about the ear."
+    },
+    {
+      "id": "tavita_6",
+      "text": "He carries a brass storm lantern on evening rounds and trims the wick himself.",
+      "how": "Meet him on the quad after dark."
+    },
+    {
+      "id": "tavita_7",
+      "text": "The band tattooed on his forearm was done by his uncle, by hand, over two days, and he will tell you what it stands for if you ask properly.",
+      "how": "Friend stage."
+    },
+    {
+      "id": "tavita_8",
+      "text": "He once let a friend off, and he has never let anyone off since.",
+      "how": "Trusted; or from Willas, who was there."
+    }
+  ],
+  "secret": "OFFICE. Head Proctor of the Student Council — the discipline office. Before the curfew that means the dull, constant things that shape a first-year's daily life: the termly ROOM INSPECTIONS (he leads the council delegates round with each dorm's warden — in the Commons, Mama Odalys with the spoon), noise and nuisance complaints, lost property, the door and the floor at every event, and the proctor's slip: a carbon-copy notice that costs a fine at Imara's table or a chore on the row. From Day 67 it becomes the largest job in the school: Tavita writes the NIGHT ROTA (staff and council in pairs, with lanterns), issues the lanterns, walks the longest round himself, and signs every curfew pass before the vice-president stamps it. He cannot sanction or forbid a duel — that is the Charter's business — but he can clear a room, close a dome for the night and escort anyone home. How he uses the office: with a fairness so complete it is its own kind of obstacle. He cannot be charmed, bribed, outranked or hurried. Everyone gets one warning ('first one's free'); after that the slip is written, kindly, whoever you are — he has slipped the Battle Team captain's boyfriend and a professor's bicycle. For Rowan he is the proctor most likely to be standing on the boardwalk at the wrong moment, and also the officer most likely to walk him home, feed him and ask a sensible question. He is a possible ally of real weight: he will bend nothing, but he will listen to the truth and act on it.\nWHO HE IS. Born in a port town, raised in a hill suburb, third of six in a family that ran the church hall kitchen; a provincial under-eighteen prop who took up cards on away trips. He arrived with a Commons placement and has turned down promotion to Rare Hall twice — officially for Mama Odalys's cooking, in truth because the Old Row is the only part of the school that feels like a village, and somebody ought to be the big brother of it. Wound: in his second year, newly a proctor, he caught a friend — Callum Reid, a Rare second-year — drunk on the clock-tower gallery after a party and, being a friend, let him off with a laugh. Callum went back up an hour later and fell; he lived, with a broken back, and went home on the ferry. Tavita has not let anyone off since. The warnings, the slips, the 'cheaper than a stretcher' are penance in procedure. Contradiction: the gentlest man in the school is its enforcer, and the strictest officer on the council is the one students run TO. Private habit: he keeps Callum's unsigned slip — the one he never wrote — folded in the back of the pad.\nTHE COUNCIL QUARREL. He and Sebastian Thorne are the council's open war. The vice-president wants 'targeted' inspections of the bungalows and discretion over who is written up; Tavita will run no inspection in the Row that he does not run in the Tower, and has read the list aloud in session to prove it. With Octavia the quarrel is quieter and deeper: after Day 40 he thinks the council should tell students what it knows, and says so every week. Imara pays for his lanterns from the fines and takes his receipts in a shoebox. Pilar Estévez orders him about at every event and he lets her. He trains the first-year proctors (Anni Brandt from Day 67 — he has asked her, mildly, to let the first one be free) and has made Teobalt his deputy in all but name.\nTHE DARK TURN. He is not clever about what is happening and does not pretend to be. He knows what he sees on his rounds: a first-year {H=@near?who sits outside|from} bungalow 7 standing at the waterline at ten past two every night, 'no infraction'; frost on a dome door; the birds gone from his own roof. The Guest is courteous to him — it finds a man who applies one rule to everyone 'very clear' — and once asked whether a proctor is 'one who counts'. He said he only counts heads. By default it is Tavita who is walking the Spectral run on the night of Day 150, and Tavita to whom his year-mate and old Commons neighbour Willas Tann says, 'I've an errand, Tavi. Ten minutes. On my word.' He lets him go: the second and last time he has ever let a friend off. If that happens, the GM should let it break him and then make him useful — in the finale he is the one who can empty a building, hold a door and keep a hall full of frightened students in one place because they trust him. It can be prevented if Rowan has told him the truth beforehand: then he says no to Willas, and means it.\nHe is quietly, hopelessly fond of Nurse Camille Moreau, to whom he has carried more students than anyone alive.",
+  "wants": "Everyone on his list in their own bed by morning.",
+  "fears": "Letting one more friend off, and what it costs.",
+  "crush": "camille",
+  "crushNote": "He has carried more people to her infirmary than anyone alive, and she is the only person who ever tells HIM to sit down. It shows as a lantern left burning at the ward door on his rounds, kitchen leftovers delivered at midnight, and a very large man finding small reasons to have his knuckles looked at.",
+  "crushPace": 0.6,
+  "likes": [
+    "The truth, told plainly, however bad",
+    "People who take a warning as a warning",
+    "A full table and second helpings",
+    "Anyone who walks a first-year home",
+    "Rugby, church harmonies, strong sweet tea",
+    "Rules that apply to everybody",
+    "Being asked what the tatau means"
+  ],
+  "dislikes": [
+    "Being lied to (he goes quiet; it is worse than shouting)",
+    "One rule for the Tower and one for the Row",
+    "Bullies",
+    "Drinking on high places",
+    "Being asked to 'make an exception, just this once'",
+    "Wasted food",
+    "Shoes, off duty"
+  ],
+  "gifts": [
+    "Card: Diamond, the Keeper of Peace",
+    "Lamp oil and a new wick",
+    "Card: Guardian Angel",
+    "Coconut buns from the night market",
+    "A pad of carbon paper",
+    "Card: Broghan, the Frozen Guardian of the North"
+  ],
+  "events": [
+    {
+      "id": "tavita_e1",
+      "stage": 1,
+      "title": "First one's free",
+      "condition": "Be caught by him at something small (noise, a late return before the curfew, a failed corner at room inspection) and take the warning honestly; do not earn the slip. Thank him.",
+      "hint": [
+        "The head proctor gives one warning. What you do with it is remembered.",
+        "Take his first warning in good part and do not need a second."
+      ]
+    },
+    {
+      "id": "tavita_e2",
+      "stage": 2,
+      "title": "Same list",
+      "condition": "Help on an inspection day or a set-up at commons_beach or great_arena, or back him in open session at council_room when he refuses to inspect the bungalows harder than the Tower; share a meal at commons_kitchen and ask about the tatau.",
+      "hint": [
+        "He is in a running argument about fairness and would not say no to someone standing next to him.",
+        "Lend him a hand with his duties or support him in council, and eat with him at the Commons."
+      ]
+    },
+    {
+      "id": "tavita_e3",
+      "stage": 3,
+      "title": "The slip he never wrote",
+      "condition": "After Day 67, when he finds you out after curfew, tell him the whole truth about why — he will not be lied to — and ask him about the folded slip in the back of his pad; before Day 150, tell him that if a friend ever asks to be let off for 'an errand' he must say no.",
+      "hint": [
+        "He has let one person off in his life. He should be told, in time, why he must not do it again.",
+        "Be completely honest with him when he catches you at night, and warn him about a favour a friend will ask."
+      ]
+    }
+  ],
+  "bonds": {
+    "sebastian": {
+      "label": "enemies",
+      "text": "One rule for the Tower and one for the Row is what the vice-president calls discretion. Tavita calls it by its name.",
+      "public": true,
+      "from": 0
+    },
+    "imara": {
+      "label": "friends",
+      "text": "She finds lantern oil in a budget that had none. He would trust her with his own wages and does.",
+      "public": true,
+      "from": 0
+    },
+    "pilar": {
+      "label": "friends",
+      "text": "She orders him about at every event and he lets her; the doors are his, the shouting is hers.",
+      "public": true,
+      "from": 0
+    },
+    "octavia": {
+      "label": "colleagues",
+      "text": "She keeps the school running and keeps things from it. He tells her so, politely, every week.",
+      "public": true,
+      "from": 0
+    },
+    "noor": {
+      "label": "friends",
+      "text": "She tells him what a proctor may and may not do under the Charter, and he does precisely that.",
+      "public": true,
+      "from": 14
+    },
+    "teobalt": {
+      "label": "mentor",
+      "text": "His deputy in all but name: the first-year who turns up to every inspection with a repair list instead of a complaint.",
+      "public": true,
+      "from": 13
+    },
+    "camille": {
+      "label": "crush",
+      "text": "He has carried more students to her door than anyone alive, and she is the only person who tells him to sit down.",
+      "public": true,
+      "from": 0
+    },
+    "odalys": {
+      "label": "friends",
+      "text": "Four years at her table. He has turned down Rare Hall twice and tells people it is the rice.",
+      "public": true,
+      "from": 0
+    },
+    "willas": {
+      "label": "friends",
+      "text": "Year-mate, and a neighbour on the Row in first year. Loud, loyal, and a man whose word Tavita would take.",
+      "public": true,
+      "from": 0
+    },
+    "rox": {
+      "label": "protégé",
+      "text": "Coach lets him run the dawn conditioning class when she is away, and taught him that a tired room is a quiet room.",
+      "public": true,
+      "from": 0
+    },
+    "anni": {
+      "label": "mentor",
+      "text": "Trains the first-year proctors. He has asked Miss Brandt, mildly, to let the first one be free.",
+      "public": true,
+      "from": 14
+    },
+    "dmitri": {
+      "label": "friends",
+      "text": "The boy in the blanket is awake on the Row all night and sees more than any patrol. Tavita stops for tea and compares notes.",
+      "public": true,
+      "from": 20
+    },
+    "silas": {
+      "label": "friends",
+      "text": "The keeper lends him lamp oil and tells him what the weather will do to a night round.",
+      "public": true,
+      "from": 0
+    },
+    "keoni": {
+      "label": "friends",
+      "text": "Old Row neighbour and the row's steward. Keoni settles things before they reach the slip pad; Tavita writes the ones he cannot.",
+      "public": true,
+      "from": 0
+    }
   },
-  {
-   "id": "tavita_2",
-   "text": "He gives everybody one warning before a slip, and remembers who has had theirs.",
-   "how": "Be caught at something small."
+  "schedule": {
+    "weekday": {
+      "Morning": "gym",
+      "Midday": "great_arena",
+      "Afternoon": "council_room",
+      "Evening": "commons_kitchen",
+      "Night": "quad"
+    },
+    "weekend": {
+      "Morning": "commons_kitchen",
+      "Midday": "beach_cove",
+      "Afternoon": "gym",
+      "Evening": "bonfire_pit",
+      "Night": "quad"
+    }
   },
-  {
-   "id": "tavita_3",
-   "text": "He refuses to inspect one dorm harder than another and has said so in open session.",
-   "how": "A council session; ask Teobalt."
-  },
-  {
-   "id": "tavita_4",
-   "text": "He is a fourth-year who has lived in the Commons all four years, and says the food is the reason.",
-   "how": "Commons kitchen, any Sunday."
-  },
-  {
-   "id": "tavita_5",
-   "text": "He played prop for his province's under-eighteens and still trains with the conditioning class at dawn.",
-   "how": "Gym, Morning; ask about the ear."
-  },
-  {
-   "id": "tavita_6",
-   "text": "He carries a brass storm lantern on evening rounds and trims the wick himself.",
-   "how": "Meet him on the quad after dark."
-  },
-  {
-   "id": "tavita_7",
-   "text": "The band tattooed on his forearm was done by his uncle, by hand, over two days, and he will tell you what it stands for if you ask properly.",
-   "how": "Friend stage."
-  },
-  {
-   "id": "tavita_8",
-   "text": "He once let a friend off, and he has never let anyone off since.",
-   "how": "Trusted; or from Willas, who was there."
+  "duel": {
+    "skill": 5,
+    "style": "A wall: Diamond keeps a line of small guardians standing, Xal stacks ability on ability, and Broghan deals one enormous blow late, once his deck has thinned. He never rushes, never bluffs and is very hard to move.",
+    "tilt": "Dishonesty at the table — a sharp practice or a lie about game state. He stops the match to deal with it and does not get his rhythm back."
   }
- ],
- "secret": "OFFICE. Head Proctor of the Student Council — the discipline office. Before the curfew that means the dull, constant things that shape a first-year's daily life: the termly ROOM INSPECTIONS (he leads the council delegates round with each dorm's warden — in the Commons, Mama Odalys with the spoon), noise and nuisance complaints, lost property, the door and the floor at every event, and the proctor's slip: a carbon-copy notice that costs a fine at Imara's table or a chore on the row. From Day 67 it becomes the largest job in the school: Tavita writes the NIGHT ROTA (staff and council in pairs, with lanterns), issues the lanterns, walks the longest round himself, and signs every curfew pass before the vice-president stamps it. He cannot sanction or forbid a duel — that is the Charter's business — but he can clear a room, close a dome for the night and escort anyone home. How he uses the office: with a fairness so complete it is its own kind of obstacle. He cannot be charmed, bribed, outranked or hurried. Everyone gets one warning ('first one's free'); after that the slip is written, kindly, whoever you are — he has slipped the Battle Team captain's boyfriend and a professor's bicycle. For Rowan he is the proctor most likely to be standing on the boardwalk at the wrong moment, and also the officer most likely to walk him home, feed him and ask a sensible question. He is a possible ally of real weight: he will bend nothing, but he will listen to the truth and act on it.\nWHO HE IS. Born in Apia, raised in Porirua, New Zealand, third of six in a family that ran the church hall kitchen; a provincial under-eighteen prop who took up cards on away trips. He arrived with a Commons placement and has turned down promotion to Rare Hall twice — officially for Mama Odalys's cooking, in truth because the Old Row is the only part of the school that feels like a village, and somebody ought to be the big brother of it. Wound: in his second year, newly a proctor, he caught a friend — Callum Reid, a Rare second-year — drunk on the clock-tower gallery after a party and, being a friend, let him off with a laugh. Callum went back up an hour later and fell; he lived, with a broken back, and went home on the ferry. Tavita has not let anyone off since. The warnings, the slips, the 'cheaper than a stretcher' are penance in procedure. Contradiction: the gentlest man in the school is its enforcer, and the strictest officer on the council is the one students run TO. Private habit: he keeps Callum's unsigned slip — the one he never wrote — folded in the back of the pad.\nTHE COUNCIL QUARREL. He and Sebastian Thorne are the council's open war. The vice-president wants 'targeted' inspections of the bungalows and discretion over who is written up; Tavita will run no inspection in the Row that he does not run in the Tower, and has read the list aloud in session to prove it. With Octavia the quarrel is quieter and deeper: after Day 40 he thinks the council should tell students what it knows, and says so every week. Imara pays for his lanterns from the fines and takes his receipts in a shoebox. Pilar Estévez orders him about at every event and he lets her. He trains the first-year proctors (Anni Brandt from Day 67 — he has asked her, mildly, to let the first one be free) and has made Teobalt his deputy in all but name.\nTHE DARK TURN. He is not clever about what is happening and does not pretend to be. He knows what he sees on his rounds: a first-year {H=@near?who sits outside|from} bungalow 7 standing at the waterline at ten past two every night, 'no infraction'; frost on a dome door; the birds gone from his own roof. The Guest is courteous to him — it finds a man who applies one rule to everyone 'very clear' — and once asked whether a proctor is 'one who counts'. He said he only counts heads. By default it is Tavita who is walking the Spectral run on the night of Day 150, and Tavita to whom his year-mate and old Commons neighbour Willas Tann says, 'I've an errand, Tavi. Ten minutes. On my word.' He lets him go: the second and last time he has ever let a friend off. If that happens, the GM should let it break him and then make him useful — in the finale he is the one who can empty a building, hold a door and keep a hall full of frightened students in one place because they trust him. It can be prevented if Rowan has told him the truth beforehand: then he says no to Willas, and means it.\nHe is quietly, hopelessly fond of Nurse Camille Moreau, to whom he has carried more students than anyone alive.",
- "wants": "Everyone on his list in their own bed by morning.",
- "fears": "Letting one more friend off, and what it costs.",
- "crush": "camille",
- "crushNote": "He has carried more people to her infirmary than anyone alive, and she is the only person who ever tells HIM to sit down. It shows as a lantern left burning at the ward door on his rounds, kitchen leftovers delivered at midnight, and a very large man finding small reasons to have his knuckles looked at.",
- "crushPace": 0.6,
- "likes": [
-  "The truth, told plainly, however bad",
-  "People who take a warning as a warning",
-  "A full table and second helpings",
-  "Anyone who walks a first-year home",
-  "Rugby, church harmonies, strong sweet tea",
-  "Rules that apply to everybody",
-  "Being asked what the tatau means"
- ],
- "dislikes": [
-  "Being lied to (he goes quiet; it is worse than shouting)",
-  "One rule for the Tower and one for the Row",
-  "Bullies",
-  "Drinking on high places",
-  "Being asked to 'make an exception, just this once'",
-  "Wasted food",
-  "Shoes, off duty"
- ],
- "gifts": [
-  "Card: Diamond, the Keeper of Peace",
-  "Lamp oil and a new wick",
-  "Card: Guardian Angel",
-  "Coconut buns from the night market",
-  "A pad of carbon paper",
-  "Card: Broghan, the Frozen Guardian of the North"
- ],
- "events": [
-  {
-   "id": "tavita_e1",
-   "stage": 1,
-   "title": "First one's free",
-   "condition": "Be caught by him at something small (noise, a late return before the curfew, a failed corner at room inspection) and take the warning honestly; do not earn the slip. Thank him.",
-   "hint": [
-    "The head proctor gives one warning. What you do with it is remembered.",
-    "Take his first warning in good part and do not need a second."
-   ]
-  },
-  {
-   "id": "tavita_e2",
-   "stage": 2,
-   "title": "Same list",
-   "condition": "Help on an inspection day or a set-up at commons_beach or great_arena, or back him in open session at council_room when he refuses to inspect the bungalows harder than the Tower; share a meal at commons_kitchen and ask about the tatau.",
-   "hint": [
-    "He is in a running argument about fairness and would not say no to someone standing next to him.",
-    "Lend him a hand with his duties or support him in council, and eat with him at the Commons."
-   ]
-  },
-  {
-   "id": "tavita_e3",
-   "stage": 3,
-   "title": "The slip he never wrote",
-   "condition": "After Day 67, when he finds you out after curfew, tell him the whole truth about why — he will not be lied to — and ask him about the folded slip in the back of his pad; before Day 150, tell him that if a friend ever asks to be let off for 'an errand' he must say no.",
-   "hint": [
-    "He has let one person off in his life. He should be told, in time, why he must not do it again.",
-    "Be completely honest with him when he catches you at night, and warn him about a favour a friend will ask."
-   ]
-  }
- ],
- "bonds": {
-  "sebastian": {
-   "label": "enemies",
-   "text": "One rule for the Tower and one for the Row is what the vice-president calls discretion. Tavita calls it by its name.",
-   "public": true,
-   "from": 0
-  },
-  "imara": {
-   "label": "friends",
-   "text": "She finds lantern oil in a budget that had none. He would trust her with his own wages and does.",
-   "public": true,
-   "from": 0
-  },
-  "pilar": {
-   "label": "friends",
-   "text": "She orders him about at every event and he lets her; the doors are his, the shouting is hers.",
-   "public": true,
-   "from": 0
-  },
-  "octavia": {
-   "label": "colleagues",
-   "text": "She keeps the school running and keeps things from it. He tells her so, politely, every week.",
-   "public": true,
-   "from": 0
-  },
-  "noor": {
-   "label": "friends",
-   "text": "She tells him what a proctor may and may not do under the Charter, and he does precisely that.",
-   "public": true,
-   "from": 14
-  },
-  "teobalt": {
-   "label": "mentor",
-   "text": "His deputy in all but name: the first-year who turns up to every inspection with a repair list instead of a complaint.",
-   "public": true,
-   "from": 13
-  },
-  "camille": {
-   "label": "crush",
-   "text": "He has carried more students to her door than anyone alive, and she is the only person who tells him to sit down.",
-   "public": true,
-   "from": 0
-  },
-  "odalys": {
-   "label": "friends",
-   "text": "Four years at her table. He has turned down Rare Hall twice and tells people it is the rice.",
-   "public": true,
-   "from": 0
-  },
-  "willas": {
-   "label": "friends",
-   "text": "Year-mate, and a neighbour on the Row in first year. Loud, loyal, and a man whose word Tavita would take.",
-   "public": true,
-   "from": 0
-  },
-  "rox": {
-   "label": "protégé",
-   "text": "Coach lets him run the dawn conditioning class when she is away, and taught him that a tired room is a quiet room.",
-   "public": true,
-   "from": 0
-  },
-  "anni": {
-   "label": "mentor",
-   "text": "Trains the first-year proctors. He has asked Miss Brandt, mildly, to let the first one be free.",
-   "public": true,
-   "from": 14
-  },
-  "dmitri": {
-   "label": "friends",
-   "text": "The boy in the blanket is awake on the Row all night and sees more than any patrol. Tavita stops for tea and compares notes.",
-   "public": true,
-   "from": 20
-  },
-  "silas": {
-   "label": "friends",
-   "text": "The keeper lends him lamp oil and tells him what the weather will do to a night round.",
-   "public": true,
-   "from": 0
-  },
-  "keoni": {
-   "label": "friends",
-   "text": "Old Row neighbour and the row's steward. Keoni settles things before they reach the slip pad; Tavita writes the ones he cannot.",
-   "public": true,
-   "from": 0
-  }
- },
- "schedule": {
-  "weekday": {
-   "Morning": "gym",
-   "Midday": "great_arena",
-   "Afternoon": "council_room",
-   "Evening": "commons_kitchen",
-   "Night": "quad"
-  },
-  "weekend": {
-   "Morning": "commons_kitchen",
-   "Midday": "beach_cove",
-   "Afternoon": "gym",
-   "Evening": "bonfire_pit",
-   "Night": "quad"
-  }
- },
- "duel": {
-  "skill": 5,
-  "style": "A wall: Diamond keeps a line of small guardians standing, Xal stacks ability on ability, and Broghan deals one enormous blow late, once his deck has thinned. He never rushes, never bluffs and is very hard to move.",
-  "tilt": "Dishonesty at the table — a sharp practice or a lie about game state. He stops the match to deal with it and does not get his rhythm back."
- }
 }

@@ -60,7 +60,7 @@
           @aff trixie +2 | Greeted the bee
           @flag chat_trixie_1
         > "Do you keep bees at home?" @if not chat_trixie_2
-          [trixie] "My dad does! Devon! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home." She rattles it off without drawing breath. "I say good morning to the bees and they say it back. Mostly. In their own way."
+          [trixie] "My dad does! The orchard coast! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home." She rattles it off without drawing breath. "I say good morning to the bees and they say it back. Mostly. In their own way."
           [trixie] "It's sad here without them. I'm going to put a hotel under the bungalow roof. If you've got a spare plank, I'll love you forever."
           @aff trixie +2 | Asked about home
           @flag chat_trixie_2
@@ -88,7 +88,7 @@
         > "How does it work? The projector, I mean." @if not chat_maisie_1
           [maisie] "A lamp, some lenses and a lot of faith." She holds up a coil of wire like a trophy. "Every hologram on the island is a slide with ambitions. I'm trying to make the light *stay put* long enough to be a thing."
           [rowan] "Is that possible?"
-          [maisie] "Not yet. But 'not yet' is the best phrase in the English language. It's got hope in it."
+          [maisie] "Not yet. But 'not yet' is the best phrase in any language. It's got hope in it."
           @aff maisie +2 | Asked how it works
           @flag chat_maisie_1
         > "Can I hold something? I'm not much use, but I can hand you things." @if not chat_maisie_2
@@ -180,7 +180,7 @@
           @aff tobias +2 | Asked his opinion
           @flag chat_tobias_1
         > "What do you make of the Academy so far?" @if not chat_tobias_2
-          [tobias] "A club for fat cats." Flat. "Nothing against the cats. They can't help it. But I want a sister out of Salford, and this is the only door with my name on it."
+          [tobias] "A club for fat cats." Flat. "Nothing against the cats. They can't help it. But I want a sister out of Saltgate, and this is the only door with my name on it."
           [rowan] "That's a good reason."
           [tobias] "It's the *only* reason." A dry, level glance. "Where I come from, you tell people your reasons, they know how to use them. Tell nobody. Mind your pockets."
           @aff tobias +2 | Heard his reason
@@ -199,7 +199,7 @@
           @aff dmitri +2 | Asked about his nights
           @flag chat_dmitri_1
         > "What kind of tea?" @if not chat_dmitri_2
-          [dmitri] "Strong. Black. Russian-strong, which is a different kind of strong." For the first time he opens his eyes fully. "You ask about the tea first. Not the name, not the deck. The tea."
+          [dmitri] "Strong. Black. Harbour-strong, which is a different kind of strong." For the first time he opens his eyes fully. "You ask about the tea first. Not the name, not the deck. The tea."
           [dmitri] "Come by after midnight. I will pour you a cup. It will be, I think, the best conversation you have this week."
           @aff dmitri +3 | Asked about the tea
           @flag chat_dmitri_2

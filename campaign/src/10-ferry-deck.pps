@@ -4,7 +4,7 @@
 #  Kanon: bible/places/ferry_*.json, bible/intro.txt
 #
 #  WISSENSMODELL (wer weiß am Morgen was über Rowan?)
-#    · Öffentlich: am Brückendeck hängt die Passagierliste, 35 getippte Namen und einer in Tinte: "Vance, R. — Wildcard".
+#    · Öffentlich: am Brückendeck hängt die Passagierliste, 37 getippte Namen und einer in Tinte: "Vance, R. — Wildcard".
 #      Jeder Erstsemester trägt seit dem Hafen eine Jacke (per Post gekommen); Rowan ist der Einzige ohne.
 #    · Nathan hat die Liste gelesen, weiß aber nicht, WER es ist, bis Rowan seinen Nachnamen nennt (told_wildcard).
 #    · Scharfe Beobachter (Gideon, Magnus, Teobalt) schließen es aus Liste plus fehlender Jacke.
@@ -20,8 +20,10 @@
   object baylee sprite=baylee x=14 y=99 h=78 label="Baylee" scene=ferry_baylee when day=1 and time<10:40 and flag_prologue_done and not follow_baylee
   object ed sprite=ed x=56 y=84 h=56 label="Boy in a hat" scene=ferry_ed when day=1 and time<10:40 and not met:ed
   object ed_m sprite=ed x=56 y=84 h=56 label="Ed" scene=ferry_ed when day=1 and time<10:40 and met:ed
-  object georgie sprite=georgie x=76 y=100 h=46 label="Little girl" scene=ferry_georgie when day=1 and time<10:40 and not met:georgie
+  object georgie sprite=georgie x=76 y=100 h=46 label="Girl with the dark-blue feather" scene=ferry_georgie when day=1 and time<10:40 and not met:georgie
   object georgie_m sprite=georgie x=76 y=100 h=46 label="Georgie" scene=ferry_georgie when day=1 and time<10:40 and met:georgie
+  object branden sprite=branden x=100 y=100 h=40 label="Flame-haired kid" scene=ferry_branden when day=1 and time<10:40 and not met:branden
+  object branden_m sprite=branden x=100 y=100 h=40 label="Branden" scene=ferry_branden when day=1 and time<10:40 and met:branden
   object pippa sprite=pippa x=88 y=96 h=58 label="Girl with a camera" scene=ferry_pippa when day=1 and time<10:40 and not met:pippa
   object pippa_m sprite=pippa x=88 y=96 h=58 label="Pippa" scene=ferry_pippa when day=1 and time<10:40 and met:pippa
   object mikoto sprite=mikoto x=42 y=101 h=56 label="Boy with a gull" scene=ferry_mikoto when day=1 and time<10:40 and not met:mikoto
@@ -39,21 +41,22 @@
   Salt on your lips. An engine thrumming somewhere under your shoes. You must have dozed off against the railing.
   You open your eyes to a morning so bright it hurts. The ferry left the mainland in the dark, and since then there has been nothing but water.
   Now there is an island.
-  It is still far off: a dark volcano with cloud round its top, jungle down its flanks, one white speck that must be a lighthouse. Caldera Key. Pixel Academy.
+  It is still far off: a grey volcano with a thin thread of smoke above it, jungle down its flanks, one white speck that must be a lighthouse. Caldera Key. Pixel Academy.
   Two weeks ago you were folding other people's sheets in Aunt Dee's laundromat, phone propped against the detergent shelf, climbing the online ladder one match at a time between dryer cycles.
-  Best_Tarleinn_NA. Top ten in North America for your age bracket. Winner of the Wildcard Qualifier — the last open seat of the year.
+  Best_Tarleinn. Top ten on the ladder for your age bracket. Winner of the Wildcard Qualifier — the last open seat of the year.
   You have never once played this game on a real table. Never shuffled a real deck in front of a real person who was looking at your hands.
   Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Seventy-four cards, counting the three heroes and their six starting abilities, and you know every one of them by heart.
   The acceptance letter is still in your bag, folded so often it has gone soft. At the bottom, in smaller print: "Housing: The Commons, Bungalow 7 (late admission)."
+  Folded inside the letter, a small canvas pouch: a hundred and forty Smug Coins, one starting purse for every student on the island, each stamped with a smirking little face. The Academy's own money. Good here, and nowhere else. The few folded notes in your sock, which are every scrap of mainland money you own, are worth exactly nothing past the arch.
   You do not know yet what that means.
   The deck around you is full: duffel bags, deck boxes, thirty-odd people your age in stiff new uniform jackets, red and gold and black. Every one of them is a stranger. They received their jackets in the post a month ago. Yours, the letter says, will be issued on arrival, which makes you the only one on deck in a rain jacket and the only one who looks like it.
   A loudspeaker crackles above the wheelhouse.
-  [?Loudspeaker] "Morning, all. Captain Stroud speaking. Thirty-six new heads aboard, I counted twice. We tie up at ten-forty. There is coffee in the lounge. Hold on to your hats."
+  [?Loudspeaker] "Morning, all. Captain Stroud speaking. Thirty-eight new heads aboard, I counted twice. We tie up at ten-forty. There is coffee in the lounge. Hold on to your hats."
   @enter nathan x=30 y=98 h=64
   [nathan?=laughing!] "**DUDE.** Is that it? That's *IT*, right? That's the island! Hey — **HEY**, big guy, look, that's the island!"
-  The shout comes from about a foot behind your ear. Its owner has a square face, spiky black hair under a grey headband, a chipped front tooth and the widest grin you have seen all week. He points at the volcano with his whole arm.
+  The shout comes from about a foot behind your ear. Its owner has a square face, spiky charcoal hair standing up like a crown with one magenta clip at the temple, a chipped front tooth and the widest grin you have seen all week. He points at the volcano with his whole arm.
   @enter baylee x=14 y=99 h=78
-  The "big guy" is not hard to find. He is the tallest person on the deck by a head and a half, blond, sunburnt, built like a barn door, and he stands with his shoulders pulled in so that people can get past him.
+  The "big guy" is not hard to find. He is the tallest person on the deck by a head and a half, in a straw hat as wide as a cartwheel, sunburnt, built like a barn door, his jacket slung over one shoulder, and he stands with his shoulders pulled in so that people can get past him.
   [baylee?=shy] "…I see it."
   [nathan?=happy] "Nathan Whisper! War Counselors, best deck in the format, don't let anyone tell you different. You look wrecked. You a first-year too? What dorm? I got something called the Commons, sounds fancy."
   @meet nathan
@@ -153,7 +156,7 @@
   @scene lounge_first
   @end
   @label stay
-  ~ Calm down. Nobody here has seen you play. Nobody even knows who Best_Tarleinn_NA is.
+  ~ Calm down. Nobody here has seen you play. Nobody even knows who Best_Tarleinn is.
   The deck is yours for the moment. The ship has several places in it, and a lot of people who have not yet decided what they think of you.
   @end
 
@@ -172,17 +175,21 @@
   @if time<9:00
     The island is still a smudge with ambitions. You can only tell it from the clouds by its edges.
   @elif time<10:00
-    The island has grown a mountain. A real one: a black cone with a scarf of cloud and jungle running down its flanks to pale sand. A white speck at its foot has become a lighthouse.
+    The island has grown a mountain. A real one: a grey cone with a thread of smoke and jungle running down its flanks to pale sand. A white speck at its foot has become a lighthouse.
   @else
     You can make out the shape of the bay now, the pier, a line of low roofs. A white building on the hill catches the sun like a dropped coin.
   ~ In two weeks I will be on a real table in front of real people. I will be fine. I will be fine.
   Somewhere behind you Nathan is telling somebody about the plate.
+  @if not found_rail_coins
+    Down by the foot of the rail, between two planks beside the lifebuoy, something small and gold winks at you. Two Smug Coins, wedged tight, that somebody lost their nerve over. You prise them out with a thumbnail.
+    @coins 2
+    @flag found_rail_coins
   @time 10
 
 @scene deck_collars
   You lean against a bollard and count collars.
   Every first-year wears the same red jacket with one of three collars: white with a gold edge, blue, or plain grey. The white-and-gold ones stand a little apart from the others without seeming to try. The blue ones are scattered through the crowd. The grey ones hold their bags in both arms.
-  You count six white, twelve blue, seventeen grey. That makes thirty-five, and the one without a collar at all is the thirty-sixth.
+  You count seven white, twelve blue, eighteen grey. That makes thirty-seven, and the one without a collar at all is the thirty-eighth.
   It is not important until somebody tells you what the colours mean.
   @flag counted_collars
   @time 5
@@ -253,7 +260,7 @@
         [baylee] "Still working that out."
         He says it without a smile, but something in the sunburnt face loosens a little.
       > "I didn't catch much of that. Where are you from, Baylee?"
-        [baylee] "Minnesota. Farm. Dairy, mostly. Some corn." Another pause. "Cows are easier to talk to. They tell you when they're upset."
+        [baylee] "North of everything. Farm. Dairy, mostly. Some corn." Another pause. "Cows are easier to talk to. They tell you when they're upset."
         ~ He said that completely seriously, and somehow it is the most reassuring thing anyone has said to me all week.
         @aff baylee +2 | Asked about home
         @flag baylee_from_farm
@@ -314,7 +321,7 @@
       > "That's a very long drop. I'm Rowan, by the way. Does that hand ever get tired?"
         [ed?] "Rowan! Nope! It's the other hand that gets tired. I switch."
     He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning like the sun just rose.
-    [ed] "Ed Venture. Lazy V Ranch, Wyoming. Bungalow five, supposedly. They put the Commons on a beach. A BEACH."
+    [ed] "Ed Venture. Lazy V Ranch, up on the high plains. Bungalow five, supposedly. They put the Commons on a beach. A BEACH."
     @meet ed
     @add ferry_talked +1
     [ed] "What's yours?"
@@ -365,7 +372,7 @@
 
 @scene ferry_georgie
   @if not met:georgie
-    She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A violet feather is pinned in her wild black hair. A girl with a camera is orbiting her with great concentration.
+    She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A dark-blue feather is pinned in her wild black hair. A girl with a camera is orbiting her with great concentration.
     [pippa?] "Chin up. No — down. No — up again. Look at the volcano like it owes you money."
     The girl on the rope looks at the volcano. It does not owe her money. Her face says so.
     She notices you looking and goes the colour of a tomato.
@@ -479,6 +486,17 @@
         > "Could I ask you something, while you're not shooting?"
           @scene chat_pippa
         > Nod and move on.
+  @if met:pippa and found_lenscap and not lenscap_returned
+    @choice
+      > Give Pippa the lens cap you found.
+        [pippa] "My — oh, my CAP! It was in the — I have been using a sock!" She presses it to her chest, then, quickly, onto the lens. "Click. Home. Where did you — never mind, don't tell me, I'll want it to be a mystery."
+        [pippa] "You get a photograph. A good one. I'll have it by the end of the week."
+        @item "Pippa's lens cap" -1
+        @flag lenscap_returned
+        @flag pippa_photo_promised
+        @coins 5
+        @aff pippa +4 | Returned her lens cap
+      > Keep it a little longer.
   @if met:pippa and not chat_pippa_offered
     @flag chat_pippa_offered
     @scene chat_pippa
@@ -514,7 +532,7 @@
       > Offer to buy him a replacement sandwich.
         [rowan] "Let me get you another lunch. There's a galley hatch downstairs."
         [mikoto] "Oh — I couldn't — oh, would you?"
-        You find him one at the lounge hatch later; it costs three credits and a lot of his gratitude.
+        You find him one at the lounge hatch later; it costs three Smug Coins and a lot of his gratitude.
         @coins -3
         @aff mikoto +4 | Bought him lunch
         @flag mikoto_sandwich

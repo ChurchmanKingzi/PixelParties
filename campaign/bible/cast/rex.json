@@ -12,9 +12,9 @@
  "romance": false,
  "deck": "Lightning Caller",
  "look": "Wiry, midnight-blue hair standing up in spikes as if by static, a teal North Crown coat worn open over a yellow lightning-bolt band shirt, a studded choker and fingerless gloves. He bounces on his heels and cracks his knuckles. He has the pallor of someone who lives online and the grin of someone who wins there.",
- "voice": "Fast, cocky and online, Vancouver; trash talk is how he says hello, and he follows it with real respect and means both. Deferential only to his captain. When a game gets close he goes silent and very focused. RARE habit (once in a scene at most; most scenes go without it): 'Ez.' — usually just before it is not.",
+ "voice": "Fast, cocky and online, Harbourview; trash talk is how he says hello, and he follows it with real respect and means both. Deferential only to his captain. When a game gets close he goes silent and very focused. RARE habit (once in a scene at most; most scenes go without it): 'Ez.' — usually just before it is not.",
  "lines": [
-  "Wait, you're Best_Tarleinn_NA? No shot. You took nine points off me in March. I had your avatar on a dartboard.",
+  "Wait, you're Best_Tarleinn? No shot. You took nine points off me in March. I had your avatar on a dartboard.",
   "Lightning's simple. I count to lethal, you count to sad.",
   "Cap says I keep my mouth shut around that guy from the bungalows. Cap doesn't say stuff twice. So — mouth. Shut. Look at me go.",
   "Ez. ...Okay, not ez. Respect. Run it back?"
@@ -57,7 +57,7 @@
    "how": "Ferry dock, Day 68 or 70."
   }
  ],
- "secret": "Rex Tanaka was a Vancouver kid with a fast brain, an absent family and two expulsions for fighting when a North Crown scout found him on the ladder. The Institute's discipline — and Isolde, who sat him down on his first night and said 'You may be a nuisance or you may be mine; choose' — gave him a spine to hang the talent on. He would walk into the sea for her. He is the best pure online player in the cast after Lilia, which makes him the one outsider who KNOWS Rowan: they met on the ladder four times; Rowan took nine rating points off him in March with a storm turn Rex still talks about. This is useful: Rex is the first person on the island to treat Rowan as a known quantity rather than a charity case, loudly, in front of people. His 600-game rivalry with Kenji is the purest friendship either has and neither would call it that. Contradiction: all mouth online, and in person an oddly gentle kid who is seasick, homesick and has a rosary from his grandmother in his deck box.\nHe sees '{H}' at the Day 68 friendly and thinks {H:he} is a funny little guy on a heater. DEFAULT TIMELINE: during the Interschool Cup he mouths off at '{H}' in front of witnesses — trash talk is how he says hello — and the Guest, taking it for a conflict honestly offered, challenges him by name. A formal challenge cannot be refused. His captain finds him in the trial dome on the morning of Day 168. It is prevented if Isolde has been told the truth and orders him to keep his mouth shut: Cap does not say things twice, and he obeys. Saved, he is an ally: he can run Lightning at the Guest in a casual to give Dom and Kenji data, and he and Kenji finally exchange a twelfth word.",
+ "secret": "Rex Tanaka was a Harbourview kid with a fast brain, an absent family and two expulsions for fighting when a North Crown scout found him on the ladder. The Institute's discipline — and Isolde, who sat him down on his first night and said 'You may be a nuisance or you may be mine; choose' — gave him a spine to hang the talent on. He would walk into the sea for her. He is the best pure online player in the cast after Lilia, which makes him the one outsider who KNOWS Rowan: they met on the ladder four times; Rowan took nine rating points off him in March with a storm turn Rex still talks about. This is useful: Rex is the first person on the island to treat Rowan as a known quantity rather than a charity case, loudly, in front of people. His 600-game rivalry with Kenji is the purest friendship either has and neither would call it that. Contradiction: all mouth online, and in person an oddly gentle kid who is seasick, homesick and has a rosary from his grandmother in his deck box.\nHe sees '{H}' at the Day 68 friendly and thinks {H:he} is a funny little guy on a heater. DEFAULT TIMELINE: during the Interschool Cup he mouths off at '{H}' in front of witnesses — trash talk is how he says hello — and the Guest, taking it for a conflict honestly offered, challenges him by name. A formal challenge cannot be refused. His captain finds him in the trial dome on the morning of Day 168. It is prevented if Isolde has been told the truth and orders him to keep his mouth shut: Cap does not say things twice, and he obeys. Saved, he is an ally: he can run Lightning at the Guest in a casual to give Dom and Kenji data, and he and Kenji finally exchange a twelfth word.",
  "wants": "To be worth the coat, and to finally beat rexlightning's old nemeses in person.",
  "fears": "Being the nuisance again — thrown out of the one place that kept him.",
  "crush": "isolde",
@@ -120,7 +120,7 @@
  "bonds": {
   "rowan": {
    "label": "rivals",
-   "text": "Best_Tarleinn_NA: the patient storm player whose avatar he kept on a dartboard.",
+   "text": "Best_Tarleinn: the patient storm player whose avatar he kept on a dartboard.",
    "public": false,
    "from": 0
   },

@@ -35,7 +35,9 @@ const sceneScripts = sceneFiles.map(f => `<script>/* ${f} */\n(function(world,sc
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
 // ── welche Bilder, Porträts, Figuren braucht die Geschichte? ──
-const need = { bg: new Set(), portraits: new Set(), music: new Set(), sounds: new Set(), people: new Set() };
+const need = { bg: new Set(), portraits: new Set(), sprites: new Set(), music: new Set(), sounds: new Set(), people: new Set() };
+// Selbstgepixelte Figuren (campaign/sprites/<id>.png, Chroma-Key schon entfernt) ersetzen die alten Porträts, wo es sie gibt.
+const PX = fs.existsSync(path.join(ROOT, 'sprites')) ? fs.readdirSync(path.join(ROOT, 'sprites')).filter(f => f.endsWith('.png')).map(f => f.slice(0, -4)) : [];
 const store = { world: null };
 new Function('world', 'scene', fs.readFileSync(path.join(dir, '00-world.js'), 'utf8'))(w => { store.world = w; }, () => {});
 {
@@ -55,18 +57,19 @@ new Function('world', 'scene', fs.readFileSync(path.join(dir, '00-world.js'), 'u
   for (const [k, f] of Object.entries(store.world.musicFiles || {})) if (k !== 'fun') need.music.add(f);
   for (const s of ['ui_click', 'ping', 'buff', 'debuff', 'reveal', 'victory', 'shop_purchase', 'ui_prompt_open', 'heavy_impact', 'draw']) need.sounds.add(s);
   need.portraits.delete('rowan'); need.people.delete('rowan');
+  for (const id of [...need.portraits]) if (PX.includes(id)) { need.portraits.delete(id); need.sprites.add(id); }
 }
 
 // ── Daten für Personen-, Deck- und Sammlungsansicht ──
 const cardsList = (() => { const c = readJson(path.join(REPO, 'data', 'cards.json')); return Array.isArray(c) ? c : (c.cards || Object.values(c)); })();
 const cardBy = Object.fromEntries(cardsList.map(c => [c.name, c]));
 const sys = readJson(path.join(ROOT, 'bible', 'system.json'));
-const DATA = { people: {}, rowan: null, followers: store.world.followers || {}, stages: { friend: sys.FRIEND_STAGES, romance: sys.ROMANCE_STAGES }, startAff: sys.START_AFFINITY };
+const DATA = { px: PX, alias: readJson(path.join(ROOT, 'src', 'aliases.json')), people: {}, rowan: null, followers: store.world.followers || {}, stages: { friend: sys.FRIEND_STAGES, romance: sys.ROMANCE_STAGES }, startAff: sys.START_AFFINITY };
 for (const id of need.people) {
   const f = path.join(ROOT, 'bible', 'cast', id + '.json'); if (!fs.existsSync(f)) continue;
   const c = readJson(f); let deck = null;
   const df = path.join(ROOT, 'bible', 'decks', id + '.json');
-  if (fs.existsSync(df)) { const d = readJson(df); const g = d.gist && typeof d.gist === 'object' ? Object.entries(d.gist).slice(0, 3).map(([k, v]) => [k, String(v).slice(0, 170)]) : []; deck = { name: d.name, heroes: d.heroes, key: g }; }
+  if (fs.existsSync(df)) { const d = readJson(df); const g = d.gist && typeof d.gist === 'object' ? Object.entries(d.gist).slice(0, 3).map(([k, v]) => [k, String(v)]) : []; deck = { name: d.name, heroes: d.heroes, key: g }; }
   DATA.people[id] = { name: c.name, first: c.firstName, intro: c.intro, romance: !!c.romance, deck, bonds: Object.entries(c.bonds || {}).map(([w, b]) => ({ w, label: b.label, pub: !!b.public, from: b.from == null ? 0 : b.from })) };
 }
 {
@@ -100,10 +103,11 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #conv::after{content:"";position:absolute;inset:0;background:linear-gradient(#0000 55%,#0008);pointer-events:none}
 #cactors{position:absolute;inset:0;z-index:2}
 .ca{position:absolute;bottom:0;transform:translateX(-50%);aspect-ratio:256/320;transition:left .35s steps(6),filter .2s steps(3)}
+.ca.px{aspect-ratio:auto;bottom:3%}
 .ca canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
 .ca.dim{filter:brightness(.55) saturate(.8)}
 .ca.talk canvas{animation:talk .5s steps(1) infinite}
-@keyframes talk{50%{transform:translateY(-4px)}}
+@keyframes talk{50%{transform:translateY(calc(var(--bob,4px) * -1))}}
 .ca.ghost{background:linear-gradient(#a79fc0,#a79fc0) 50% 8%/34% 20% no-repeat,linear-gradient(#a79fc0,#a79fc0) 50% 92%/62% 66% no-repeat;opacity:.6}
 #mapRoot{position:absolute;inset:0}
 #bglabel{position:absolute;top:6px;left:8px;font-family:var(--title);font-size:12px;background:#08060dcc;color:var(--dim);padding:0 6px;z-index:5}
@@ -169,10 +173,18 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function newState(){const st=W.start,known=[];for(const[id,l]of Object.entries(W.locations))if(l.known)known.push(id);if(known.indexOf(st.location)<0)known.push(st.location);return{v:3,day:st.day,minutes:cmpTime(st.time,480),location:st.location,flags:{},vars:{},items:{},coins:st.coins||0,known,locked:{},visited:{},scenesDone:{},eventsDone:{},duels:{},collection:{},affLog:[]};}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const s=JSON.parse(r);if(s&&s.v===3)return s;}}catch(e){}return null;}
-const mutate = (fn) => { fn(S); save(); renderTop(); };
+const mutate = (fn) => { const b = { c: S.coins, it: Object.assign({}, S.items), co: Object.assign({}, S.collection) }; fn(S); save(); renderTop(); foundToasts(b); };
+function foundToasts(b){
+  try {
+    if (S.coins !== b.c) { const d = S.coins - b.c; if (d > 0) toast('', '+' + d + ' Smug Coins', ''); else if (d < 0 && b.c !== undefined) toast('down', d + ' Smug Coins', ''); }
+    for (const k of Object.keys(S.items)) if ((S.items[k] || 0) > (b.it[k] || 0)) toast('deck', 'Item found', esc(k));
+    for (const k of Object.keys(b.it)) if ((S.items[k] || 0) < b.it[k]) toast('', 'Item handed over', esc(k));
+    for (const k of Object.keys(S.collection)) if ((S.collection[k] || 0) > (b.co[k] || 0)) toast('up', 'Card found', esc(k));
+  } catch (e) {}
+}
 function renderTop(){
   const loc = W.locations[S.location] || {};
-  $('clock').textContent = 'Day ' + S.day + ' · ' + WEEK[(S.day-1)%7] + ' · ' + cmpFmtTime(S.minutes) + ' · ' + S.coins + ' cr';
+  $('clock').textContent = 'Day ' + S.day + ' · ' + WEEK[(S.day-1)%7] + ' · ' + cmpFmtTime(S.minutes) + ' · ' + S.coins + ' Smug Coins';
   $('where').textContent = loc.name || S.location;
 }
 const castName = (id) => { const c = W.cast[id]; return c ? c.name : id; };
@@ -192,7 +204,9 @@ function startMusic(key){
   musicEl = a;
 }
 function setMusic(key){ if (!key || key === curMusic) return; curMusic = key; startMusic(key); }
-function sfx(name, vol){ if (!audioOn || !audioUnlocked || !name) return; const a = new Audio('sounds/' + name + '.ogg'); a.volume = vol == null ? 0.45 : vol; const p = a.play(); if (p && p.catch) p.catch(() => {}); }
+let duckT = null;
+function duck(ms){ if (!musicEl) return; const a = musicEl; try { a.volume = 0.05; } catch (e) {} clearTimeout(duckT); duckT = setTimeout(() => { if (musicEl === a) fadeTo(a, 0.3, 700); }, ms); }
+function sfx(name, vol){ if (!audioOn || !audioUnlocked || !name) return; if (name === 'victory') { vol = 0.95; duck(3600); } const a = new Audio('sounds/' + name + '.ogg'); a.volume = vol == null ? 0.45 : vol; const p = a.play(); if (p && p.catch) p.catch(() => {}); }
 window.playSFX = (n) => sfx(n);
 function unlockAudio(){ if (audioUnlocked) return; audioUnlocked = true; if (curMusic) { const k = curMusic; curMusic = null; setMusic(k); } }
 function toggleSound(){
@@ -207,22 +221,24 @@ function locationMusic(){ if (musicOverride) return; const l = W.locations[S.loc
 const figs = new Map(); let figChain = Promise.resolve();
 function loadFig(id){
   if (figs.has(id)) return figs.get(id).p;
-  const rec = { ok: false, big: null, small: null };
+  const rec = { ok: false, big: null, small: null, px: null };
+  const isPx = DATA.px.indexOf(id) >= 0;
   rec.p = figChain = figChain.then(() => new Promise(done => {
     const im = new Image();
     im.onload = () => {
+      if (isPx) { try { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0); c.ppNative = true; rec.px = c; rec.small = c; rec.ok = true; } catch (e) { console.warn('sprite', id, e); } im.src = ''; done(rec); return; }
       try { const c = document.createElement('canvas'); c.width = 256; c.height = 320; c.getContext('2d').drawImage(im, 0, 0, 256, 320, 0, 0, 256, 320); rec.big = c; rec.ok = true;
         if (window.CalderaMap) { try { rec.small = window.CalderaMap.shrink(im, 0, 0, 256, 320); } catch (e) {} } } catch (e) { console.warn('figure', id, e); }
       im.src = ''; done(rec);
     };
     im.onerror = () => done(rec);
-    im.src = 'assets/portraits/' + id + '.png';
+    im.src = (isPx ? 'assets/sprites/' : 'assets/portraits/') + id + '.png';
   }).then(r => { renderConv(); if (CMAP) { refreshMapPeople(true); followKey = ''; refreshFollowers(); } return r; }));
   figs.set(id, rec); return rec.p;
 }
 function headCanvas(id, size){
   const c = document.createElement('canvas'); c.width = size; c.height = size;
-  const paint = () => { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, size, size); const r = figs.get(id); if (r && r.ok) g.drawImage(r.big, 52, 6, 152, 152, 0, 0, size, size); else { g.fillStyle = '#a79fc0'; g.fillRect(size * .3, size * .2, size * .4, size * .35); g.fillRect(size * .2, size * .6, size * .6, size * .4); } };
+  const paint = () => { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, size, size); const r = figs.get(id); if (r && r.ok && r.px) g.drawImage(r.px, 0, 0, r.px.width, Math.min(r.px.height, r.px.width), 0, 0, size, size); else if (r && r.ok) g.drawImage(r.big, 52, 6, 152, 152, 0, 0, size, size); else { g.fillStyle = '#a79fc0'; g.fillRect(size * .3, size * .2, size * .4, size * .35); g.fillRect(size * .2, size * .6, size * .6, size * .4); } };
   paint(); if (!figs.has(id) || !figs.get(id).ok) loadFig(id).then(paint);
   return c;
 }
@@ -230,17 +246,20 @@ function headCanvas(id, size){
 // ───────── Gesprächsansicht: nur die aktiven Figuren, groß ─────────
 function layout(n){ if (n <= 1) return [50]; if (n === 2) return [30, 70]; if (n === 3) return [20, 50, 80]; if (n === 4) return [14, 38, 62, 86]; const a = []; for (let i = 0; i < n; i++) a.push(10 + 80 * i / (n - 1)); return a; }
 // Grundhöhe 82 % der früheren (damit Große hineinpassen); Faktoren je Figur: Baylee ist einen Kopf größer als alle, Inya und Georgie sind klein.
-const HEIGHT = { baylee: 1.2, inya: .84, georgie: .86, tomi: .92 };
-function actorHeight(n){ return n <= 2 ? 77 : n === 3 ? 71 : 62; }
+const HEIGHT = { inya: .86, tomi: .92 };   // nur für die alten Porträts; die Pixel-Sprites haben ihre Größe selbst
+function actorHeight(n){ return n <= 2 ? 90 : n === 3 ? 82 : 72; }
+const PXH = 32, PXW = 21;   // höchster und breitester Sprite der Reihe, bestimmt die gemeinsame Pixelgröße
+function pxScale(n){ const st = $('stage'), H = st.clientHeight || 540, Wd = st.clientWidth || 976; const frac = n <= 2 ? 0.9 : n === 3 ? 0.84 : 0.76; return Math.max(2, Math.min(Math.floor(H * frac / PXH), Math.floor(Wd / Math.max(2, n) / PXW))); }
 function addActor(id){ if (!id || id === 'rowan' || actors.includes(id)) return; actors.push(id); loadFig(id); renderConv(); }
 function renderConv(){
   const box = $('cactors'); box.innerHTML = '';
   const xs = layout(actors.length), h = actorHeight(actors.length);
   actors.forEach((id, i) => {
     const el = document.createElement('div'); el.className = 'ca' + (speakerId && speakerId !== id ? ' dim' : '') + (speakerId === id ? ' talk' : '');
-    el.style.left = xs[i] + '%'; el.style.height = Math.min(98, h * (HEIGHT[id] || 1)) + '%';
+    el.style.left = xs[i] + '%';
     const r = figs.get(id);
-    if (r && r.ok) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320; cv.getContext('2d').drawImage(r.big, 0, 0); el.appendChild(cv); } else { el.classList.add('ghost'); loadFig(id); }
+    if (r && r.ok && r.px) { const S = pxScale(actors.length); el.classList.add('px'); el.style.width = (r.px.width * S) + 'px'; el.style.height = (r.px.height * S) + 'px'; el.style.setProperty('--bob', S + 'px'); const cv = document.createElement('canvas'); cv.width = r.px.width; cv.height = r.px.height; cv.getContext('2d').drawImage(r.px, 0, 0); el.appendChild(cv); }
+    else if (r && r.ok) { el.style.height = Math.min(98, h * (HEIGHT[id] || 1)) + '%'; const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320; cv.getContext('2d').drawImage(r.big, 0, 0); el.appendChild(cv); } else { el.style.height = h + '%'; el.classList.add('ghost'); loadFig(id); }
     box.appendChild(el);
   });
 }
@@ -309,8 +328,8 @@ function say(l){
     affNow = {};
     $('choices').innerHTML = '';
     const name = l.name || (l.speaker ? castName(l.speaker) : (l.think ? 'Rowan' : null));
-    speakerId = l.speaker && l.speaker !== 'rowan' ? l.speaker : null;
-    if (speakerId) addActor(speakerId);
+    speakerId = l.speaker && l.speaker !== 'rowan' ? l.speaker : ((l.speaker === 'rowan' || l.think) ? '__rowan' : null);
+    if (speakerId && speakerId !== '__rowan') addActor(speakerId);
     renderConv();
     hist.push({ name, text: l.text, think: !!l.think, shake: !!l.shake }); if (hist.length > 300) hist.shift();
     review = null;
@@ -340,8 +359,9 @@ function toast(kind, head, sub, id){
 // Pro Textbox und Figur höchstens EIN Zuneigungs-Popup: weitere Änderungen derselben Figur seit dem letzten Text werden zusammengelegt.
 let affNow = {};
 function affHtml(nm, n, why){ return esc(nm) + ' <span class="' + (n >= 0 ? 'up' : 'dn') + '">' + (n > 0 ? '▲ +' : n < 0 ? '▼ ' : '● ') + n + '</span>'; }
+const aliasName = (id) => DATA.alias[id] || castName(id);
 function popup(p){
-  const nm = castName(p.id);
+  const nm = (p.type === 'aff' && !met(p.id)) ? aliasName(p.id) : castName(p.id);
   if (p.type === 'met') { sfx('reveal', .5); toast('', 'New acquaintance', esc(nm), p.id); }
   else if (p.type === 'aff') {
     const prev = affNow[p.id];
@@ -375,7 +395,7 @@ const io = {
     $('spk').hidden = false; $('spk').textContent = 'DUEL'; $('txt').className = '';
     $('txt').innerHTML = 'Duel vs. <strong>' + esc(step.opponentName || step.opponent) + '</strong>' + (step.ante ? ' (ante)' : '') + '. <span class="note">Preview build: the real game plays this out. Pick the result to test the branches.</span>';
     const box = $('choices'); box.innerHTML = '';
-    [['I win', true], ['I lose', false]].forEach(([t, v]) => { const b = document.createElement('button'); b.textContent = t; b.onclick = (e) => { e.stopPropagation(); sfx(v ? 'victory' : 'debuff', .4); box.innerHTML = ''; res(v); }; box.appendChild(b); });
+    [['I win', true], ['I lose', false]].forEach(([t, v]) => { const b = document.createElement('button'); b.textContent = t; b.onclick = (e) => { e.stopPropagation(); sfx(v ? 'victory' : 'debuff', .5); box.innerHTML = ''; res(v); }; box.appendChild(b); });
     $('more').hidden = true;
   }),
   deckEdit: async () => {},
@@ -469,7 +489,7 @@ async function oneHour(){ if (busy) return; addTime(60); if (hasPending()) await
 // ───────── Karte (CalderaMap aus dem alten Artefakt) ─────────
 let mapPeopleKey = '', alertFrame = 0, followKey = '';
 function blankSprite(col){ const c = document.createElement('canvas'); c.width = 18; c.height = 22; const g = c.getContext('2d'); g.fillStyle = '#141020'; g.fillRect(5, 1, 8, 8); g.fillRect(3, 9, 12, 12); g.fillStyle = col; g.fillRect(6, 2, 6, 6); g.fillRect(4, 10, 10, 10); return c; }
-function bangSprite(base, up){ const c = document.createElement('canvas'); c.width = 18; c.height = 22; const g = c.getContext('2d'); g.drawImage(base, 0, up ? -1 : 0); g.fillStyle = '#000'; g.fillRect(12, 0, 5, 9); g.fillStyle = '#e8c170'; g.fillRect(13, 1, 3, 5); g.fillRect(13, 7, 3, 1); return c; }
+function bangSprite(base, up){ const w = Math.max(18, base.width), h = Math.max(22, base.height); const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); if (base.ppNative) { c.ppNative = true; g.drawImage(base, Math.round((w - base.width) / 2), (h - base.height) + (up ? -1 : 0)); } else g.drawImage(base, 0, up ? -1 : 0); g.fillStyle = '#000'; g.fillRect(w - 6, 0, 5, 9); g.fillStyle = '#e8c170'; g.fillRect(w - 5, 1, 3, 5); g.fillRect(w - 5, 7, 3, 1); return c; }
 function smallOf(id){ const r = figs.get(id) || (loadFig(id), figs.get(id)); return (r && r.small) || blankSprite('#a79fc0'); }
 function mapPeople(){
   const list = [];
@@ -586,6 +606,7 @@ function deckPanel(coll){
   h += '<div class="hh">HEROES (' + R.heroes.length + ') AND STARTING ABILITIES (' + nAb + ')</div><div class="cl">' + R.heroes.map(x => '<button data-c="h:' + esc(x.name) + '"><span class="n">1</span><span>' + esc(x.name) + '<br><span class="note">' + esc(x.abilities.join(' + ')) + '</span></span></button>').join('') + '</div>';
   for (const [t, list] of Object.entries(byType)) h += '<div class="hh">' + esc(t.toUpperCase()) + ' (' + list.reduce((a, c) => a + c.n, 0) + ')</div><div class="cl">' + list.map(c => '<button data-c="m:' + esc(c.name) + '"><span class="n">' + own(c) + '</span><span>' + esc(c.name) + '</span></button>').join('') + '</div>';
   h += '<div class="hh">POTION DECK (' + nPot + ')</div><div class="cl">' + R.potions.map(c => '<button data-c="p:' + esc(c.name) + '"><span class="n">' + own(c) + '</span><span>' + esc(c.name) + '</span></button>').join('') + '</div><div class="eff" id="ceff">Click a card to read its text.</div>';
+  if (coll) { const its = Object.entries(S.items || {}); h += '<div class="hh">THINGS YOU CARRY</div>' + (its.length ? its.map(i => '<div>' + esc(i[0]) + (i[1] > 1 ? ' x' + i[1] : '') + '</div>').join('') : '<div class="note">Nothing but what you came with.</div>'); }
   body.innerHTML = h;
   body.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c.slice(0, 1), n = b.dataset.c.slice(2); const list = k === 'h' ? R.heroes : k === 'm' ? R.main : R.potions; const c = list.find(x => x.name === n); $('ceff').innerHTML = '<b>' + esc(n) + '</b> · ' + esc(c.type || '') + '<br>' + esc(c.effect || ''); });
 }
@@ -638,7 +659,7 @@ const DATA=${JSON.stringify(DATA)};
 function defineWorld(def){const prev=STORY.world||{},d=def||{},m=Object.assign({},prev,d);m.locations=Object.assign({},prev.locations||{},d.locations||{});m.cast=Object.assign({},prev.cast||{},d.cast||{});m.events=(prev.events||[]).concat(d.events||[]);STORY.world=m;}
 function defineScene(id,def){STORY.scenes[id]=Object.assign({id},def);}
 ${engine}
-function cmpSfx(){}
+function cmpSfx(k){ var m = { coins: 'shop_purchase', item: 'reveal', itemLoss: 'debuff', spend: 'ui_click', learn: 'ping' }; if (m[k] && window.playSFX) window.playSFX(m[k]); }
 </script>
 <script src="engine.js"></script>
 ${sceneScripts}
@@ -648,15 +669,23 @@ const out = path.join(ROOT, 'dist', 'preview');
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'index.html'), html, { encoding: 'utf8' });
 const list = ['engine.js', 'assets/map/world.json', 'assets/map/ground.png', 'assets/map/objects.png',
-  ...[...need.bg].sort().map(b => `assets/bg/${b}.png`), ...[...need.portraits].sort().map(p => `assets/portraits/${p}.png`),
+  ...[...need.bg].sort().map(b => `assets/bg/${b}.png`), ...[...need.portraits].sort().map(p => `assets/portraits/${p}.png`), ...[...need.sprites].sort().map(p => `assets/sprites/${p}.png`),
   ...[...need.music].sort(), ...[...need.sounds].sort().map(s => `sounds/${s}.ogg`)];
 fs.writeFileSync(path.join(out, 'assets.json'), JSON.stringify(list, null, 1));
 let n = 0;
+const enginePatch = (src) => {
+  const a = "const sx = sheet.width >= 36 ? frame * 18 : 0, oy = sheet.width >= 36 ? 0 : frame;";
+  if (!src.includes(a)) throw new Error('engine.js: drawFigure nicht gefunden');
+  const b = "if (sheet.ppNative) { const w = sheet.width, h = sheet.height, nx = Math.round(wx - w / 2 - cam.x), ny = Math.round(wy - h + 1 - cam.y) + (frame ? 1 : 0); if (face < 0) { g.save(); g.translate(nx + w, ny); g.scale(-1, 1); g.drawImage(sheet, 0, 0); g.restore(); } else g.drawImage(sheet, nx, ny); return; }\n      " + a;
+  return src.replace(a, b);
+};
 for (const f of list) {
   let src = null;
-  if (/^(music|sounds)\//.test(f)) src = path.join(REPO, 'public', f); else if (ASSETS) src = path.join(ASSETS, f);
+  if (/^(music|sounds)\//.test(f)) src = path.join(REPO, 'public', f); else if (/^assets\/sprites\//.test(f)) src = path.join(ROOT, f.replace('assets/', '')); else if (ASSETS) src = path.join(ASSETS, f);
   if (!src) continue;
   if (!fs.existsSync(src)) { console.log('  fehlt: ' + f); continue; }
-  const dst = path.join(out, f); fs.mkdirSync(path.dirname(dst), { recursive: true }); fs.copyFileSync(src, dst); n++;
+  const dst = path.join(out, f); fs.mkdirSync(path.dirname(dst), { recursive: true });
+  if (f === 'engine.js') fs.writeFileSync(dst, enginePatch(fs.readFileSync(src, 'utf8'))); else fs.copyFileSync(src, dst);
+  n++;
 }
 console.log('preview: ' + (html.length / 1024).toFixed(0) + ' KB -> campaign/dist/preview/index.html · Assets kopiert: ' + n + '/' + list.length);

@@ -159,6 +159,7 @@ function compileScene(head, nodes, env) {
   const ctx = env.ctxFor(head.id);
   let labelN = 0; const uid = (p) => `${p}_${++labelN}`;
   const steps = [];
+  const named = new Set();   // Figuren, deren Name in dieser Szene schon gefallen ist (Sprecherschild ohne ? oder im Text)
   const err = (n, msg) => { throw new Error(`${n.file}:${n.line}: ${msg}`); };
 
   function emitSay(n, node) {
@@ -181,6 +182,8 @@ function compileScene(head, nodes, env) {
     if (mood) base.mood = mood;
     if (shake) base.shake = true;
     env.words += text.split(/\s+/).length;
+    if (speaker && !name) named.add(speaker);
+    if (env.nameRe) for (const [id, re] of env.nameRe) if (!named.has(id) && re.test(text)) named.add(id);
     if (hostTokens(text)) {
       if (!head.host) err(node, 'Platzhalter {H} nur in Szenen mit Kopfwort `host`');
       if (think) base.think = undefined;
@@ -218,6 +221,7 @@ function compileScene(head, nodes, env) {
         if (n) steps.push({ run: raw(`(s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: ${JSON.stringify(id)}, n: ${n}, why: ${JSON.stringify(why ? why.trim() : '')} }); }`) });
         break; }
       case 'meet': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('met_' + id);
+        if (env.nameRe && env.nameRe.has(id) && !named.has(id)) env.warn(`${node.file}:${node.line}: @meet ${id}: der Name fiel in dieser Szene noch nicht (Popup zeigt ihn vorweg)`);
         steps.push({ run: raw(`(s,io)=>{ if (io && io.popup && !s.flags[${JSON.stringify('met_' + id)}]) io.popup({ type: 'met', id: ${JSON.stringify(id)} }); }`) });
         steps.push({ flag: 'met_' + id }); } break;
       case 'follow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('follow_' + id); steps.push({ flag: 'follow_' + id }); } break;
@@ -252,6 +256,7 @@ function compileScene(head, nodes, env) {
         if (t.startsWith('@if ') || t === '@if') {
           const end = uid('end'); let ifs = [n];
           while (k + 1 < nodes.length && /^@(elif|else)\b/.test(nodes[k + 1].text)) ifs.push(nodes[++k]);
+          const before = new Set(named), ends = [];
           ifs.forEach((b, bi) => {
             const isElse = b.text.startsWith('@else');
             const next = uid('next');
@@ -260,11 +265,13 @@ function compileScene(head, nodes, env) {
               const c = condToJs(cond, ctx);
               steps.push({ when: raw(`(s)=>!(${c.src.replace(/^\(s\)=>/, '')})`), jump: next });
             }
-            block(b.body || []);
+            { named.clear(); before.forEach(x => named.add(x)); block(b.body || []); ends.push(new Set(named)); }
             if (bi < ifs.length - 1) steps.push({ jump: end });
             if (!isElse) steps.push({ label: next });
           });
           steps.push({ label: end });
+          if (!ifs.some(b => b.text.startsWith('@else'))) ends.push(new Set(before));
+          named.clear(); if (ends.length) for (const x of ends[0]) if (ends.every(e => e.has(x))) named.add(x);
         } else if (t.startsWith('@host ')) {
           const ids = t.slice(6).split(/[\s,]+/).filter(Boolean); ctx.hostCond = true; if (!head.host) err(n, '@host nur in Szenen mit Kopfwort `host`');
           const next = uid('next');
@@ -286,15 +293,19 @@ function compileScene(head, nodes, env) {
           if (!opts.length) err(n, '@choice ohne Optionen');
           steps.push({ prompt, choice: opts.map(o => ({ text: o.text, goto: o.label, when: o.when ? condToJs(o.when, ctx) : undefined, hint: o.hint || undefined })) });
           steps.push({ jump: end });
+          const cbefore = new Set(named), cends = [];
           for (const o of opts) {
+            named.clear(); cbefore.forEach(x => named.add(x));
             steps.push({ label: o.label }); env.words += o.text.split(/\s+/).length;
             if (o.quoted) { // gesprochene Option: Rowan sagt sie auch laut (Echo), danach geht der Block weiter
               if (hostTokens(o.text)) err(o.o, '{H} nicht in Antwortoptionen');
               steps.push({ say: 'rowan', text: o.text });
             }
-            block(o.o.body || []); steps.push({ jump: end });
+            block(o.o.body || []); cends.push(new Set(named));
+            steps.push({ jump: end });
           }
           steps.push({ label: end });
+          named.clear(); if (cends.length) for (const x of cends[0]) if (cends.every(e => e.has(x))) named.add(x);
         } else if (t.startsWith('@duel ')) {
           const p = parseKV(t.slice(6)); const id = p.pos[0]; ctx.duels.add(id);
           const win = (n.body || []).find(b => b.text === '@win'), lose = (n.body || []).find(b => b.text === '@lose'), rew = (n.body || []).find(b => b.text.startsWith('@reward'));
