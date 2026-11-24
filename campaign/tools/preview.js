@@ -65,7 +65,7 @@ const cardsList = (() => { const c = readJson(path.join(REPO, 'data', 'cards.jso
 const cardBy = Object.fromEntries(cardsList.map(c => [c.name, c]));
 const sys = readJson(path.join(ROOT, 'bible', 'system.json'));
 const names = readJson(path.join(ROOT, 'src', 'names.json'));
-const DATA = { px: PX, alias: readJson(path.join(ROOT, 'src', 'aliases.json')), people: {}, rowan: null, followers: store.world.followers || {}, stages: { friend: sys.FRIEND_STAGES, romance: sys.ROMANCE_STAGES }, startAff: sys.START_AFFINITY };
+const DATA = { px: PX, letter: readJson(path.join(ROOT, 'src', 'letter.json')), alias: readJson(path.join(ROOT, 'src', 'aliases.json')), people: {}, rowan: null, followers: store.world.followers || {}, stages: { friend: sys.FRIEND_STAGES, romance: sys.ROMANCE_STAGES }, startAff: sys.START_AFFINITY };
 for (const id of need.people) {
   const f = path.join(ROOT, 'bible', 'cast', id + '.json'); if (!fs.existsSync(f)) continue;
   const c = readJson(f); let deck = null;
@@ -662,14 +662,17 @@ $('bSnd').onclick = () => { unlockAudio(); toggleSound(); };
 $('bReset').onclick = () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };
 function askName(){
   return new Promise(res => {
-    const o = $('overlay'); o.hidden = false;
-    const fld = 'font:inherit;font-size:22px;padding:6px 10px;background:#1b1626;color:#f3e9c8;border:2px solid #c8a85a;width:100%;box-sizing:border-box';
-    o.innerHTML = '<div><p style="font-size:22px">What name was written on your acceptance letter?</p>'
-      + '<p style="display:flex;gap:12px;flex-wrap:wrap"><label style="flex:1;min-width:200px">First name<br><input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="' + fld + '"></label>'
-      + '<label style="flex:1;min-width:200px">Last name<br><input id="plIn" maxlength="14" value="' + esc(LN()) + '" style="' + fld + '"></label></p>'
-      + '<p style="text-align:center;margin-top:20px"><button id="pnOk" style="font:inherit;font-size:28px;padding:12px 56px">Start</button></p></div>';
+    const o = $('overlay'); o.hidden = false; o.style.background = '#000';
+    const L = DATA.letter;
+    const inp = 'font:inherit;font-size:24px;color:#2b2117;background:#e6d8ae;border:0;border-bottom:3px solid #6b4f1d;padding:2px 6px;width:11ch;margin:0 2px;outline:none';
+    o.innerHTML = '<div style="max-width:760px;background:#f1e6c3;color:#2b2117;border:4px solid #c8a85a;padding:24px 32px 0;line-height:1.45;font-size:18px">'
+      + '<p style="font-size:24px;margin:0 0 14px">' + esc(L.salutation) + ' <input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="' + inp + '" aria-label="First name"> <input id="plIn" maxlength="14" value="' + esc(LN()) + '" style="' + inp + '" aria-label="Last name">,</p>'
+      + L.paragraphs.map(x => '<p style="margin:0 0 12px;text-align:justify">' + esc(x) + '</p>').join('')
+      + '<p style="margin:18px 0 0">' + esc(L.closing) + '</p>'
+      + '<p style="margin:6px 0 0;font-size:21px"><b>' + esc(L.signature[0]) + '</b><br><span style="font-size:17px">' + esc(L.signature[1]) + '</span></p>'
+      + '<p style="text-align:center;margin:20px -32px 0;padding:14px 0 18px;position:sticky;bottom:0;background:#f1e6c3;border-top:2px solid #c8a85a"><button id="pnOk" style="font:inherit;font-size:28px;padding:12px 56px">Start</button></p></div>';
     const clean = (v, d) => (v || '').replace(/[<>&]/g, '').trim().slice(0, 14) || d;
-    const go = () => { S.vars = S.vars || {}; S.vars.pn = clean($('pnIn').value, 'Rowan'); S.vars.pl = clean($('plIn').value, 'Vance'); S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; res(); };
+    const go = () => { S.vars = S.vars || {}; S.vars.pn = clean($('pnIn').value, 'Rowan'); S.vars.pl = clean($('plIn').value, 'Vance'); S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; o.style.background = ''; res(); };
     $('pnOk').onclick = go; for (const id of ['pnIn', 'plIn']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     setTimeout(() => { try { $('pnIn').focus(); $('pnIn').select(); } catch (e) {} }, 50);
   });
