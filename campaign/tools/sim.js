@@ -59,7 +59,7 @@ async function playRun() {
   let s = newState(); let steps = 0, crashed = false, ended = false;
   const mutate = (fn) => { fn(s); };
   const io = {
-    state: () => s, mutate, sleep: async () => {},
+    state: () => s, mutate, sleep: async () => {}, popup() {},
     say: async (l) => { stats.linesShown++; if (VERBOSE) console.log('   ' + (l.speaker || '·') + ': ' + String(l.text).slice(0, 90)); },
     choose: async (c) => { stats.choicesMade++; return Math.floor(rnd() * c.options.length); },
     addTime: (m) => { s.minutes += m; while (s.minutes >= 1440) { s.minutes -= 1440; s.day++; } },
@@ -122,6 +122,7 @@ async function playRun() {
       const opts = [];
       for (const o of loc.objects || []) if (E.cmpCond(s, o.when) && o.scene) opts.push(() => playScene(o.scene, false));
       for (const a of loc.actions || []) if (E.cmpCond(s, a.when)) opts.push(async () => { if (a.scene) await playScene(a.scene, false); });
+      for (const [fid, fsc] of Object.entries(W.followers || {})) if (s.flags['follow_' + fid]) opts.push(() => playScene(fsc, false));
       for (const id of s.known) { const l = W.locations[id]; if (!l || id === s.location || s.locked[id] || !E.cmpCond(s, l.when)) continue; opts.push(() => travel(id, undefined, false)); }
       if (!opts.length) { stats.deadEnds.push(`Tag ${s.day} ${E.cmpTime ? '' : ''}${Math.floor(s.minutes / 60)}:${String(s.minutes % 60).padStart(2, '0')} @ ${s.location}`); break; }
       // Zeit voranschieben, wenn sich nichts bewegt, sonst läuft die Uhr nie weiter

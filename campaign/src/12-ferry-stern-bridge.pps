@@ -109,6 +109,8 @@
     @else
       [jessica] "Rowan."
       @time 3
+  @if met:jessica and not deck_known_jessica and not deck_skipped_jessica
+    @scene deck_jessica
 
 @scene ferry_ashton
   @if not met:ashton
@@ -150,6 +152,7 @@
       @aff ashton +1 | Brought news
     > "Would you fancy a casual game, Ashton? No stake, just something to do while the lady makes up her mind." @if not flag_ashton_game
       [ashton] "For no stake. Lazily. Is she watching?" He glances at Jessica, who is not. "She is. Very well."
+      @scene deck_ashton
       @duel ferry_ashton deck=ashton name="Ashton Beaumont-Lyle"
         @win
           [ashton] "Poisoned the field and still lost. How instructive. Naturally." A beat. "…What was the question?"
@@ -158,11 +161,14 @@
         @lose
           [ashton] "Do tell the lady, if she asks, that I won gracefully."
           @aff ashton +2 | Won gracefully
+      @scene post_ashton
       @flag flag_ashton_game
       @time 25
     > Go and speak to the girl with the caskets.
       [ashton] "Do. Do. And tell her I said hello. Or that I said nothing. Or don't."
   @time 6
+  @if met:ashton and not deck_known_ashton and not deck_skipped_ashton
+    @scene deck_ashton
 
 @scene ferry_victoria
   @if not met:victoria
@@ -206,6 +212,8 @@
       [ophelia] "She's thinking. Give her a minute."
       @aff ophelia +0 | Waited
     @time 5
+  @if met:victoria and not deck_known_victoria and not deck_skipped_victoria
+    @scene deck_victoria
 
 @scene ferry_ophelia
   @if not met:ophelia
@@ -231,6 +239,8 @@
   @else
     [ophelia] "She's thinking. Give her a minute." A beat. "Meaning what?"
     @time 3
+  @if met:ophelia and not deck_known_ophelia and not deck_skipped_ophelia
+    @scene deck_ophelia
 
 @scene ferry_sunny
   @if not met:sunny
@@ -263,6 +273,7 @@
       [sunny] "Right. Ten push-ups for the loser. On the planks."
       @choice
         > "You're on. Ten push-ups for the loser, on the planks."
+          @scene deck_sunny
           @duel ferry_sunny deck=sunny name="Sunny Aldane"
             @win
               [sunny] "No dramas!" She is already face-down on the planks, counting aloud, loudly, with great goodwill. "Seven! Eight! Nine — I'm lying, that was six. TEN!" She bounces up. "Good game, Wildcard!"
@@ -271,6 +282,7 @@
               [sunny] "Ha!" Triumphant. "Ten! Go on! Face down!"
               You do ten. By the seventh your arms are shaking. By the tenth you are lying on the planks next to a seagull with the sun on your back, and Sunny is lying next to you, laughing, and you realise you are laughing too.
               @aff sunny +4 | Did the push-ups
+          @scene post_sunny
           @flag flag_sunny_game
           @time 25
         > "Not on a wet deck, I'll slip. Find me on land and I'll take your challenge."
@@ -279,13 +291,15 @@
       [sunny] "Hey, Wildcard! Still alive?"
       @aff sunny +1 | Chatted
       @time 5
+  @if met:sunny and not deck_known_sunny and not deck_skipped_sunny
+    @scene deck_sunny
 
 @scene ferry_marit
   @if not met:marit
     A girl in a flame-orange bow tie is standing on a mooring bollard, reciting to the gulls.
     "…and in that hour, when the sea went grey as a forgotten promise —" She has long flame-orange ombré hair that stands up at the crown. She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter.
     She sees you. The recital stops.
-    [marit?] "A human! An audience! Behold!"
+    [marit?!] "A human! An audience! **Behold!**"
     [marit?] "Marit Solberg. Commentary track, theatre kid, flame-adjacent. And you are the brooding stranger without a jacket."
     @meet marit
     @add ferry_talked +1
@@ -296,7 +310,7 @@
         [marit] "Oh, the good kind. The kind where you start out afraid of something and end up with a very good coat." She grins. "I'll let you know."
         @aff marit +2 | Played along
       > "How about a game, then? Narrate away." @hint She narrates
-        [marit] "A GAME. Yes. Yes yes yes. And I shall narrate every move. Because I cannot help it."
+        [marit!] "A **GAME.** Yes. Yes yes yes. And I shall narrate every move. Because I cannot help it."
         @jump marit_game
       > "Is all this a hobby, or a calling? You're very good at it."
         [marit] "It's a calling." Quieter, an aside, almost ordinary. "Also a hobby. I'm not 'too much'. I'm the correct amount for a larger room."
@@ -305,12 +319,13 @@
   @else
     @label marit_game
     @if not flag_marit_game
-      [marit] "A game! I shall narrate. You will hate it. You will love it. Behold!"
+      [marit!] "A game! I shall narrate. You will hate it. You will *love* it. **Behold!**"
       @choice
-        > "All right, Marit. Let's see this phoenix."
+        > "All right, Marit. Let's play. And I'd like to hear the narration."
           A small crowd gathers around the bollard in the time it takes to shuffle. Six people, then eight. The deckhand with the tea, two girls from the lounge, a boy with a clipboard. Your hands begin to shake the moment you pick up the deck.
           ~ Everyone's watching. Not me, exactly. The game. But close enough.
-          [marit] "From the ashes of my frankly terrible opening hand — she RETURNS! (I had no idea that would work.)"
+          [marit!] "From the ashes of my frankly terrible opening hand — she **RETURNS!** *(I had no idea that would work.)*"
+          @scene deck_marit
           @duel ferry_marit deck=marit name="Marit Solberg"
             @win
               [marit] "Alas! Defeat! And what a defeat, ladies and gentlemen, what a — no, it's a good one. Rowan Vance, you have a very quiet kind of thunder."
@@ -318,6 +333,7 @@
             @lose
               [marit] "The phoenix, ladies and gentlemen. Always the phoenix." She takes a very small, very private bow, then drops, mid-flourish, into her ordinary voice: "That was lovely. Thank you for letting me."
               @aff marit +3 | Played with her
+          @scene post_marit
           @flag flag_marit_game
           @time 25
         > "Maybe later. I'd like to see the rest of the ship first."
@@ -326,6 +342,8 @@
       [marit] "Rowan! Protagonist! Have you seen the island? It has a MOUNTAIN. I've already written a monologue."
       @aff marit +1 | Chatted
       @time 5
+  @if met:marit and not deck_known_marit and not deck_skipped_marit
+    @scene deck_marit
 
 # ───────────────────────────── BRÜCKE ─────────────────────────────
 
@@ -448,6 +466,8 @@
         > Leave her.
           [rana] "Good."
       @time 4
+  @if met:rana and not deck_known_rana and not deck_skipped_rana
+    @scene deck_rana
 
 @scene ferry_teobalt
   @if not met:teobalt
@@ -479,3 +499,5 @@
       [teobalt] "Teal. Yes." A very small, very pleased pause. "Nobody ever notices the teal."
       @aff teobalt +2 | Noticed the teal
     @time 3
+  @if met:teobalt and not deck_known_teobalt and not deck_skipped_teobalt
+    @scene deck_teobalt

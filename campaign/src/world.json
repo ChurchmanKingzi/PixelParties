@@ -1,6 +1,45 @@
 {
-  "start": { "location": "ferry_deck", "day": 1, "time": "08:00", "coins": 140, "deck": "rowan" },
+  "start": {
+    "location": "ferry_deck",
+    "day": 1,
+    "time": "08:00",
+    "coins": 140,
+    "deck": "rowan"
+  },
   "music": "menu",
   "defaultTravel": 8,
-  "dayEnd": { "at": "23:30", "wake": "07:00", "scene": "sleep", "location": "commons_room" }
+  "dayEnd": {
+    "at": "23:30",
+    "wake": "07:00",
+    "scene": "sleep",
+    "location": "commons_room"
+  },
+  "musicFiles": {
+    "ship": "music/bgm_score_schiffsdeck.ogg",
+    "plaza": "music/bgm_score_plaza.ogg",
+    "beach": "music/bgm_score_strand.ogg",
+    "kitchen": "music/bgm_score_cafeteria.ogg",
+    "dorm": "music/bgm_score_dorm.ogg",
+    "friends": "music/bgm_score_gespraeche_unter_freunden.ogg",
+    "emotional": "music/bgm_score_emotional.ogg",
+    "fun": "music/bgm_score_lustig.ogg",
+    "duel": "music/bgm_battle2.ogg"
+  },
+  "musicAt": {
+    "ferry_deck": "ship",
+    "ferry_lounge": "ship",
+    "ferry_stern": "ship",
+    "ferry_bridge": "ship",
+    "ferry_dock": "plaza",
+    "main_gate": "plaza",
+    "quad": "plaza",
+    "commons_beach": "beach",
+    "commons_kitchen": "kitchen",
+    "commons_room": "dorm",
+    "trial_dome": "duel"
+  },
+  "followers": {
+    "nathan": "ferry_nathan",
+    "baylee": "ferry_baylee"
+  }
 }

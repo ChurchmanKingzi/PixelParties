@@ -157,11 +157,11 @@ for (const id of castIds) { const c = castData[id]; cast[id] = { name: names[id]
 const locations = {};
 for (const id of placeIds) {
   const p = placeData[id], ov = placeOv[id] || { objects: [], actions: [] };
-  locations[id] = { name: p.name, background: p.bg, known: ov.known || (id === worldCfg.start.location) || undefined, travel: ov.travel, travelFrom: ov.travelFrom, lockedText: ov.lockedText, closedText: ov.closedText, when: ov.when, onArrive: ov.onArrive && ov.onArrive.length ? ov.onArrive : undefined, objects: ov.objects.length ? ov.objects : undefined, actions: ov.actions.length ? ov.actions : undefined };
+  locations[id] = { name: p.name, background: p.bg, music: (worldCfg.musicAt || {})[id], known: ov.known || (id === worldCfg.start.location) || undefined, travel: ov.travel, travelFrom: ov.travelFrom, lockedText: ov.lockedText, closedText: ov.closedText, when: ov.when, onArrive: ov.onArrive && ov.onArrive.length ? ov.onArrive : undefined, objects: ov.objects.length ? ov.objects : undefined, actions: ov.actions.length ? ov.actions : undefined };
 }
 for (const id of Object.keys(placeOv)) if (!placeIds.has(id)) fail(`@place ${id}: Ort fehlt in bible/places`);
 const dayEnd = worldCfg.dayEnd;
-const world = { title: 'Pixel Academy', assets: { spriteUnit: 10, avatarUnit: 10 }, start: worldCfg.start, music: worldCfg.music || 'menu', defaultTravel: worldCfg.defaultTravel != null ? worldCfg.defaultTravel : 8, dayEnd, cast, locations, events };
+const world = { followers: worldCfg.followers, musicFiles: worldCfg.musicFiles, title: 'Pixel Academy', assets: { spriteUnit: 10, avatarUnit: 10 }, start: worldCfg.start, music: worldCfg.music || 'menu', defaultTravel: worldCfg.defaultTravel != null ? worldCfg.defaultTravel : 8, dayEnd, cast, locations, events };
 
 // ── Ausgabe ──
 const header = (src) => `// GENERIERT von campaign/tools/build.js aus ${src} — nicht von Hand ändern.\n`;

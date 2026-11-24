@@ -285,6 +285,8 @@
   @scene welcome_supper
 
 @scene welcome_supper bg=commons_kitchen
+  @unfollow nathan baylee
+  @music friends
   Bungalow one, which is Mama's kitchen, is one long table, one blackened range, and eighteen strangers arriving in clumps.
   The table is a single slab of dark wood under a tin roof, worn smooth by twelve years of elbows. The benches on both sides have been squeezed together. Dented pans hang from the walls. Twelve years of group photographs look down from the rafters. A radio on the sill plays boleros through static.
   Mama Odalys is carrying a pot that ought to need two people. She sets it down in the centre of the table, in a cloud of steam, with a clang like the end of a bell.
@@ -397,6 +399,7 @@
   @scene first_night
 
 @scene first_night bg=commons_room
+  @music emotional
   @goto commons_room 2
   The row at night is a string of yellow windows. The surf breathes. The geckos chirp under the eaves. Every board of the boardwalk gives a different note under your feet.
   Back in bungalow 7, the ceiling fan ticks on every fourth turn. Three beds. Three footlockers. One bare bulb that is, at last, switched off.

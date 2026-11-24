@@ -14,7 +14,9 @@
 //   @place id / @event id ...                                                 (Spalte 0, siehe unten)
 //   @bg x  @music x  @sfx x  @fx shake|flash|fadeout|fadein [ms]  @wait ms  @clear
 //   @enter id [x= y= h= flip]  @exit id  @move id x= [ms=]  @face id [flip]  @dim id
-//   @flag a b  @unflag a  @set k=v  @add k +n  @aff id +n | Begründung  @meet id
+//   @flag a b  @unflag a  @set k=v  @add k +n  @aff id +n | Begründung (Popup)  @meet id (Popup)  @deckinfo id (Popup)
+//   @follow id id  @unfollow id      Begleiter laufen auf der Karte hinter Rowan her und stehen in Gesprächen mit auf der Bühne
+//   [id!] Rede mit Schütteltext   Text darf **fett**, *kursiv* und {farbe:Text} enthalten (wie in Pixel Parties)
 //   @item "Name" [n]  @coins n  @card "Name" [n]  @learn place  @lock place  @unlock place
 //   @time n  @clock HH:MM  @wake HH:MM (nächster Tag)  @goto place [Minuten]  @scene id  @end  @gameover "Text"
 //   @label x  @jump x  @pickhost
@@ -162,18 +164,22 @@ function compileScene(head, nodes, env) {
   function emitSay(n, node) {
     let text = node.text, speaker = null, name = null, mood = null, think = false;
     let m;
-    if ((m = text.match(/^\[([?]?)([A-Za-z0-9_ .'-]+?)(\?|=(\w+))?\]\s*(.*)$/s))) {
-      const rawId = m[2]; text = m[5];
+    let shake = false;
+    if ((m = text.match(/^\[([?]?)([A-Za-z0-9_ .'-]+?)(\?)?(?:=(\w+))?(!)?\]\s*(.*)$/s))) {
+      const rawId = m[2]; text = m[6];
       if (m[1]) name = rawId; else { speaker = rawId; ctx.cast.add(rawId); }
       if (m[3] === '?') name = env.alias(rawId);
       if (m[4]) mood = m[4];
-    } else if (text.startsWith('~ ')) { think = true; text = text.slice(2); }
+      if (m[5]) shake = true;
+    } else if (text.startsWith('[')) { err(node, 'Zeile beginnt mit [ und ist keine gültige Sprecherzeile: ' + text.slice(0, 50)); }
+    else if (text.startsWith('~ ')) { think = true; text = text.slice(2); }
     text = stripQ(text);
     if (text.length > 480) env.warn(`${node.file}:${node.line}: Zeile hat ${text.length} Zeichen (lang für eine Dialogbox)`);
     const base = {};
     if (speaker && !name) base.say = speaker; else if (name) { base.say = speaker || undefined; base.name = name; }
     if (think) base.think = text; else base.text = text;
     if (mood) base.mood = mood;
+    if (shake) base.shake = true;
     env.words += text.split(/\s+/).length;
     if (hostTokens(text)) {
       if (!head.host) err(node, 'Platzhalter {H} nur in Szenen mit Kopfwort `host`');
@@ -207,8 +213,18 @@ function compileScene(head, nodes, env) {
       case 'unflag': for (const f of rest.split(/\s+/)) steps.push({ unflag: f }); break;
       case 'set': for (const kvp of rest.split(/\s+/)) { const [k, v] = kvp.split('='); steps.push({ set: { [k]: /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : v } }); } break;
       case 'add': { const [k, v] = rest.split(/\s+/); steps.push({ add: { [k]: Number(v) } }); break; }
-      case 'aff': { const [spec, why] = rest.split('|'); const [id, v] = spec.trim().split(/\s+/); ctx.cast.add(id); steps.push({ add: { ['aff_' + id]: Number(v) }, why: why ? why.trim() : undefined }); break; }
-      case 'meet': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('met_' + id); steps.push({ flag: 'met_' + id }); } break;
+      case 'aff': { const [spec, why] = rest.split('|'); const [id, v] = spec.trim().split(/\s+/); ctx.cast.add(id); const n = Number(v);
+        steps.push({ add: { ['aff_' + id]: n } });
+        if (n) steps.push({ run: raw(`(s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: ${JSON.stringify(id)}, n: ${n}, why: ${JSON.stringify(why ? why.trim() : '')} }); }`) });
+        break; }
+      case 'meet': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('met_' + id);
+        steps.push({ run: raw(`(s,io)=>{ if (io && io.popup && !s.flags[${JSON.stringify('met_' + id)}]) io.popup({ type: 'met', id: ${JSON.stringify(id)} }); }`) });
+        steps.push({ flag: 'met_' + id }); } break;
+      case 'follow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('follow_' + id); steps.push({ flag: 'follow_' + id }); } break;
+      case 'unfollow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); steps.push({ unflag: 'follow_' + id }); } break;
+      case 'deckinfo': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('deck_known_' + id);
+        steps.push({ run: raw(`(s,io)=>{ if (io && io.popup && !s.flags[${JSON.stringify('deck_known_' + id)}]) io.popup({ type: 'deck', id: ${JSON.stringify(id)} }); }`) });
+        steps.push({ flag: 'deck_known_' + id }); } break;
       case 'item': { const p = P(); steps.push({ item: p.pos[0], n: num(p.pos[1]) }); break; }
       case 'coins': steps.push({ coins: Number(rest) }); break;
       case 'card': { const p = P(); steps.push({ card: p.pos[0], n: num(p.pos[1]) }); break; }

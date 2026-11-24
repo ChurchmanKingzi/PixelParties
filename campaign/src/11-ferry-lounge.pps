@@ -66,6 +66,7 @@
   The small girl turns and looks you up and down. It does not take long.
   [inya?] "Him?" Dubious. Sharp. "The one in the rain jacket?"
   You have been looking for a way to be unnoticed on this ship for two hours. It has just been taken from you in front of fifty people.
+  @sfx ping
   @flag lounge_seen
   @flag gideon_rule_stated
   @flag rowan_singled_out
@@ -206,6 +207,8 @@
     > "What if there were a second table?" @if noor_ruled and not table_resolved
       [gideon] "A second table." He says it as if it were a foreign word. "Do go on. I should like to see where you intend to put it."
       @scene table_settle
+    > "I watched you play. Let me guess what you run." @if saw_counter and not deck_known_gideon
+      @scene deck_gideon
     > "Do you ever actually enjoy it?" @if not table_resolved
       [gideon] "Enjoy." He tilts his head. "You have a very quiet face, Vance. I find that I cannot tell what it is thinking at all." The corner of his mouth moves. "That is unusual. I wonder if it is also useful."
       @aff gideon +1 | Held his gaze
@@ -460,6 +463,8 @@
     > Leave him to it.
       [tomi] "Come back when you've got something to trade. Or a bet."
   @time 6
+  @if met:tomi and not deck_known_tomi and not deck_skipped_tomi
+    @scene deck_tomi
 
 # ───────────────────────────── MAGNUS ─────────────────────────────
 
@@ -506,6 +511,7 @@
   @if not flag_magnus_played
     @choice
       > "All right. Let's play."
+        @scene deck_magnus
         @duel ferry_magnus deck=magnus name="Magnus Prospero"
           @win
             [magnus] "Congratulations. No, really. Enjoy it. I'll have the replay broken down by breakfast."
@@ -515,11 +521,14 @@
           @lose
             [magnus] "A clean loss on your side. I'll put it in the file. 'Casual, ferry, unofficial.'" Thin, relieved smile. "Forty-one and one."
             @aff magnus +1 | Beat you fairly
+        @scene post_magnus
         @flag flag_magnus_played
         @time 25
       > "Not right now. I'm still finding my feet."
         [magnus] "I can wait. I have been waiting two years."
   @time 8
+  @if met:magnus and not deck_known_magnus and not deck_skipped_magnus
+    @scene deck_magnus
 
 # ───────────────────────────── NOOR ─────────────────────────────
 
@@ -546,6 +555,7 @@
       @aff noor +2 | Asked the right question
     > "Would you like to play a game? No stake." @if not flag_noor_played
       [noor] "Gladly. No stake. I will announce every step; it is a habit."
+      @scene deck_noor
       @duel ferry_noor deck=noor name="Noor Al-Sayed"
         @win
           [noor] "To be precise, you did not win on time. You won on the board. That is better."
@@ -553,6 +563,7 @@
         @lose
           [noor] "I announced it on turn two, and you were still surprised. That is a legitimate compliment to my honesty."
           @aff noor +3 | Played straight
+      @scene post_noor
       @flag flag_noor_played
       @time 25
     > "Help me build a second table, if you're willing." @if noor_ruled and not table_resolved
@@ -563,6 +574,8 @@
     > Leave her to the book.
       [noor] "Thank you. Article seven is demanding."
   @time 6
+  @if met:noor and not deck_known_noor and not deck_skipped_noor
+    @scene deck_noor
 
 # ───────────────────────────── LIVVIE ─────────────────────────────
 
@@ -596,6 +609,7 @@
       @choice
         > Play for five credits. @if coins>=5
           [livvie] "Five. Thank you."
+          @scene deck_livvie
           @duel ferry_livvie deck=livvie name="Livvie Thana"
             @win
               @coins 10
@@ -606,6 +620,7 @@
               [livvie] "I took five off you." Eyes down. "I'll give you three back if you promise not to say I did." She does not wait for an answer.
               @coins 3
               @aff livvie +2 | Generous
+          @scene post_livvie
           @flag flag_livvie_played
           @time 25
         > Decline politely.
@@ -614,6 +629,8 @@
       [livvie] "Rowan." A small, wry nod. "I've done the sums eleven ways. Ten need a miracle."
       @aff livvie +1 | Small talk
   @time 6
+  @if met:livvie and not deck_known_livvie and not deck_skipped_livvie
+    @scene deck_livvie
 
 # ═══════════════════════════ DER TISCH: AUFLÖSUNGEN ═══════════════════════════
 
@@ -639,6 +656,7 @@
     > Say nothing and shuffle.
       She watches your hands. She says nothing either.
   @flag gideon_scouts_rowan
+  @scene deck_inya
   @duel table_rowan_inya deck=inya name="Inya Bell"
     @win
       Inya stares at the board for a long, unmoving time. It is not defeat. It is something more private.
@@ -694,6 +712,7 @@
   Your hands shake the moment you pick up the deck. You hide them under the table, take a long breath, and try to remember that the cards under your fingers are the same cards you have played four hundred times in a laundromat.
   ~ Don't attack first. Don't attack first. He's waiting for you to attack first.
   @flag gideon_scouts_rowan
+  @scene deck_gideon
   @duel table_gideon_rowan deck=gideon name="Gideon Pryce"
     @win
       Gideon looks at the board for a long moment. A very slight line appears between his eyebrows.
@@ -703,6 +722,7 @@
       He puts his gloves back on, one finger at a time, and does not look at you as he speaks.
       [gideon] "Well played, Vance. Your duffel will be at your door."
       The saloon erupts into noise. Nathan, from somewhere behind the crowd, is bellowing "THE WILDCARD! THE WILDCARD!" to a room that has already turned to look at him.
+      @sfx victory
       @flag ferry_table_won
       @flag table_resolved
       @aff gideon +2 | Beat him fairly
@@ -750,6 +770,7 @@
     [inya] "Rude. Accurate." She is not smiling. She is shaking all over. "Four cases, Pryce."
     [gideon] "Four cases." And he stands, and does it without ceremony: he takes off his jacket, folds it, and starts looking for his luggage.
     The saloon explodes. Nathan: "THE LITTLE ONE! THE LITTLE ONE!"
+    @sfx victory
     @flag ferry_inya_won
     @aff inya +5 | You told her how
   @else
@@ -858,6 +879,7 @@
     @end
   A bench near the galley. Two decks. The cards held down with a coffee cup.
   [inya] "Don't let me win."
+  @scene deck_inya
   @duel ferry_inya deck=inya name="Inya Bell"
     @win
       [inya] "Rude." Instantly. Four seconds of furious sulking pass across her face. Then, very fast: "Rematch. Not now. Later. On a real table. You owe me a real table."
@@ -869,6 +891,7 @@
       [inya] "I'll take the rolls. Six credits. You said."
       @coins -6
       @aff inya +4 | Won fairly
+  @scene post_inya
   @flag flag_inya_played
   @time 25
 

@@ -16,8 +16,8 @@
   known
   travel 0
   onArrive ferry_prologue
-  object nathan sprite=nathan x=27 y=98 h=64 label="Nathan" scene=ferry_nathan when day=1 and time<10:40 and flag_prologue_done
-  object baylee sprite=baylee x=14 y=99 h=78 label="Baylee" scene=ferry_baylee when day=1 and time<10:40 and flag_prologue_done
+  object nathan sprite=nathan x=27 y=98 h=64 label="Nathan" scene=ferry_nathan when day=1 and time<10:40 and flag_prologue_done and not follow_nathan
+  object baylee sprite=baylee x=14 y=99 h=78 label="Baylee" scene=ferry_baylee when day=1 and time<10:40 and flag_prologue_done and not follow_baylee
   object ed sprite=ed x=56 y=84 h=56 label="Boy in a hat" scene=ferry_ed when day=1 and time<10:40 and not met:ed
   object ed_m sprite=ed x=56 y=84 h=56 label="Ed" scene=ferry_ed when day=1 and time<10:40 and met:ed
   object georgie sprite=georgie x=76 y=100 h=46 label="Little girl" scene=ferry_georgie when day=1 and time<10:40 and not met:georgie
@@ -50,7 +50,7 @@
   A loudspeaker crackles above the wheelhouse.
   [?Loudspeaker] "Morning, all. Captain Stroud speaking. Thirty-six new heads aboard, I counted twice. We tie up at ten-forty. There is coffee in the lounge. Hold on to your hats."
   @enter nathan x=30 y=98 h=64
-  [nathan?=laughing] "DUDE. Is that it? That's IT, right? That's the island! Hey — HEY, big guy, look, that's the island!"
+  [nathan?=laughing!] "**DUDE.** Is that it? That's *IT*, right? That's the island! Hey — **HEY**, big guy, look, that's the island!"
   The shout comes from about a foot behind your ear. Its owner has a square face, spiky black hair under a grey headband, a chipped front tooth and the widest grin you have seen all week. He points at the volcano with his whole arm.
   @enter baylee x=14 y=99 h=78
   The "big guy" is not hard to find. He is the tallest person on the deck by a head and a half, blond, sunburnt, built like a barn door, and he stands with his shoulders pulled in so that people can get past him.
@@ -69,6 +69,7 @@
     > "Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means."
       @aff nathan +2 | Introduced himself properly
       @aff baylee +1 | Polite hello
+      @follow nathan baylee
       You take the hand. It shakes yours the way a pump handle would, if the pump were delighted.
       [nathan=happy] "SEVEN! That's — hold on. Hold on. Vance? Vance, R.?"
       He lets go of your hand and stares at you with the kind of expression normally reserved for a UFO.
@@ -104,7 +105,8 @@
           @flag told_wildcard
           @aff nathan +2 | Trusted him with it
           @aff baylee +1 | Asked for discretion
-    > "Rowan. Just Rowan for now. I'm in the Commons too, apparently. What's the island like? You said you've been everywhere."
+    > "Rowan. Just Rowan for now. I'm in the Commons too, apparently. You said you've been everywhere on this ship. What have you found out so far?"
+      @follow nathan baylee
       [nathan=laughing] "ROWAN! Just Rowan! Like a wizard!"
       [baylee] "Like a bartender."
       [nathan=grin] "Like a WIZARD bartender. Okay. I like you. You asked ME a question. Nobody asked me a question since the harbour, they all just ran away!"
@@ -114,6 +116,7 @@
     > Shake his hand and say only that you are tired and new, and that you would rather listen for a while.
       @aff nathan +1 | Shook on it
       @aff baylee +1 | Polite hello
+      @follow nathan baylee
       [rowan] "Tired, and new. I'm going to listen for a bit, if that's all right. I think I came here with too many questions."
       [nathan=happy] "A listener! Okay, okay, I can talk for TWO people. That's my second-best skill!"
       [baylee] "What's the first?"
@@ -233,6 +236,8 @@
         [nathan=grin] "Right?! The suspense is killing me!"
   @aff nathan +1 | Heard him out
   @time 5
+  @if met:nathan and not deck_known_nathan and not deck_skipped_nathan
+    @scene deck_nathan
 
 @scene ferry_baylee
   @if not flag_baylee_chat
@@ -275,6 +280,7 @@
         @aff baylee +1 | Small talk
       > "Do you fancy that game now?" @if baylee_game_offered and not flag_baylee_game
         [baylee] "…Could do. Quick one. Casual."
+        @scene deck_baylee
         @duel ferry_baylee deck=baylee name="Baylee Halvorsen"
           @win
             [baylee] "Good game. You've got — a way with the sky, with that deck. Looks like rain's coming in all at once."
@@ -282,11 +288,14 @@
           @lose
             [baylee] "Huh." He looks at his big dinosaurs for a long moment. "Lucky. Sorry."
             @aff baylee +2 | Won kindly
+        @scene post_baylee
         @flag flag_baylee_game
         @time 25
       > Leave him to his rail.
         [baylee] "Thanks."
     @time 5
+  @if met:baylee and not deck_known_baylee and not deck_skipped_baylee
+    @scene deck_baylee
 
 @scene ferry_ed
   @if not met:ed
@@ -325,6 +334,7 @@
       @choice
         > "Sure, let's play. On a bench, with both feet on the ground."
           [ed] "Fine, fine! Both feet! Mostly!"
+          @scene deck_ed
           @duel ferry_ed deck=ed name="Ed Venture"
             @win
               [ed] "Ha! Whoa! You did a thing with the lightning! I didn't see that thing coming. Is it — would you say it's dangerous? That deck?"
@@ -332,6 +342,7 @@
             @lose
               [ed] "WHOOP! Grab the shiny thing and figure it out on the way down! Good game, Rowan! GOOD game!"
               @aff ed +2 | Won happily
+          @scene post_ed
           @flag flag_ed_game
           @time 25
         > "Maybe later. I want to see the rest of the ship."
@@ -340,6 +351,8 @@
       [ed] "Rowan! Hey! Did you see the lighthouse? It's real. They keep it lit even in the daytime! I asked the captain! Is that dangerous? Lighting it in the day?"
       @aff ed +1 | Chatted
       @time 5
+  @if met:ed and not deck_known_ed and not deck_skipped_ed
+    @scene deck_ed
 
 @scene ferry_georgie
   @if not met:georgie
@@ -385,6 +398,7 @@
       @choice
         > Play her.
           [georgie] "Thank you for the game."
+          @scene deck_georgie
           @duel ferry_georgie deck=georgie name="Georgie Santa"
             @win
               Georgie stares at the board for a long time, completely still.
@@ -399,12 +413,15 @@
               [rowan] "For what?"
               [georgie] "For winning. I always say it. I can't stop."
               @aff georgie +3 | Played well
+          @scene post_georgie
           @flag flag_georgie_played
           @time 25
         > Tell her you would rather wait.
           [rowan] "Not right now. I'd love a game later, though, if that's all right."
           [georgie] "Okay. It's fine."
           @end
+  @if met:georgie and not deck_known_georgie and not deck_skipped_georgie
+    @scene deck_georgie
 
 @scene ferry_pippa
   @if not met:pippa
@@ -443,6 +460,8 @@
     [pippa] "Hang on — hang on —" She lifts the camera, clicks. "Sorry. Habit. How's the crossing?"
     @aff pippa +1 | Chatted
     @time 5
+  @if met:pippa and not deck_known_pippa and not deck_skipped_pippa
+    @scene deck_pippa
 
 @scene ferry_mikoto
   @if not met:mikoto
@@ -486,6 +505,7 @@
       @choice
         > "Sure, let's play. I'd like that."
           [mikoto] "Oh! Oh good. Oh no. I mean — good! I'll — sorry!"
+          @scene deck_mikoto
           @duel ferry_mikoto deck=mikoto name="Mikoto Yamaguchi"
             @win
               [mikoto] "Sorry — sorry — you beat me — that's fine — that's what's supposed to happen — sorry — they get up again, you see. The skeletons. Nothing's ever properly finished."
@@ -493,6 +513,7 @@
             @lose
               [mikoto] "I won? I'm sorry! I didn't — I'm — oh, I'm so sorry!" He laughs, stops, laughs again. "That was wonderful. Sorry."
               @aff mikoto +2 | Played with him
+          @scene post_mikoto
           @flag flag_mikoto_game
           @time 25
         > "Maybe on the island, once I've got my bearings."
@@ -501,3 +522,5 @@
       [mikoto] "Rowan! Hello. The gull's still looking at me. I think she wants dessert."
       @aff mikoto +1 | Chatted
       @time 5
+  @if met:mikoto and not deck_known_mikoto and not deck_skipped_mikoto
+    @scene deck_mikoto

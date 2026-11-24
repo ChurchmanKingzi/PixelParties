@@ -8,6 +8,7 @@
 @event ferry_docks scene=ferry_docks day=1 from=10:40 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
 
 @scene ferry_horn
+  @sfx heavy_impact
   A horn sounds, long and flat and enormous, so deep that the deck plates sing with it. The ship's fixtures rattle in their brackets.
   People abandon whatever they were doing and head for the rails. Bags are shouldered. Somebody calls "Island!" and somebody else, from the stern, calls "We KNOW."
   The captain's voice on the loudspeaker, unhurried: "Fifteen minutes, folks. Mind your luggage and your elbows."
