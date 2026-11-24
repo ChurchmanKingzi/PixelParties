@@ -71,31 +71,51 @@
 
 @scene ferry_jessica
   @if not met:jessica
-    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest. Long golden curls under a small gold coronet set with a red stone and a blue one, blue eyes, a small beauty mark under the left.
-    A small silver swallow brooch pinned at the collar, chosen fresh this morning and worn as if it were nothing. A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
+    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest.
+    Long golden curls under a small gold coronet set with a red stone and a blue one, blue eyes, a small beauty mark under the left.
+    A small silver swallow brooch pinned at the collar, chosen fresh this morning and worn as if it were nothing.
+    A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
+    She has, you notice, a very particular way of sitting: perfectly upright, perfectly still, her ankles crossed, as though a portrait were being painted and the artist had warned her not to blink.
     She is not looking at you. She has, however, noticed you crossing the deck.
     @choice
       > "Hello. I'm Rowan. I wanted to say it properly, because nobody else seems to have crossed the deck." @hint Plain
-        [jessica?] "Hello." She looks up. A small, real smile, like a candle catching. "That's the first time this morning anyone has crossed the deck to say that and nothing else."
-        [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my gloves off for these." A tilt of the head at the caskets.
+        [jessica?] "Hello."
+        She looks up. A small, real smile, like a candle catching.
+        [jessica?] "That's the first time this morning anyone has crossed the deck to say that and nothing else."
+        [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my gloves off for these."
+        A tilt of the head at the caskets.
         @meet jessica
         @aff jessica +4 | Said hello plainly
         @flag jessica_plain
       > "Those caskets look like they hold either jewels or a very elegant corpse." @hint Line
-        [jessica?] "How lovely." It is a very warm, very final phrase. "Those are my jewels. Not the corpses you were about to suggest."
+        [jessica?] "How lovely."
+        It is a very warm, very final phrase.
+        [jessica?] "Those are my jewels. Not the corpses you were about to suggest."
         [jessica?] "Jessica Montclair."
         @meet jessica
         @aff jessica +1 | Made a joke
       > "Forgive me, but the sea has never looked less beautiful than it does next to you." @hint Cheesy
-        [jessica?] "Ah." A gracious, faintly sorrowful lift of the brow. "I have been addressed that way four times this morning. By the same boy. You are, I think, an imitation, and I am not sure how I feel about that."
+        [jessica?] "Ah."
+        A gracious, faintly sorrowful lift of the brow.
+        [jessica?] "I have been addressed that way four times this morning. By the same boy. You are, I think, an imitation, and I am not sure how I feel about that."
         [jessica?] "Jessica Montclair."
         @meet jessica
         @aff jessica -2 | Used a line
     @add ferry_talked +1
+    @note jessica | Gracious and formal. Travels with three caskets of jewellery.
     @if jessica_plain
       [jessica] "Where are you going to be living?"
       [rowan] "The Commons. Bungalow seven."
-      [jessica] "Spectral Tower. I have a room on the second floor, apparently. With a view of the volcano." A small, wry shrug. "Nobody has told me yet whether I am meant to find that pleasant."
+      [jessica] "Spectral Tower. I have a room on the second floor, apparently. With a view of the volcano."
+      A small, wry shrug.
+      [jessica] "Nobody has told me yet whether I am meant to find that pleasant."
+      [rowan] "Do you?"
+      [jessica] "I find it very large. I find that I may like it, in time." She looks at the island for a moment. "It is nice to be asked."
+      @note jessica | Staying in the Spectral Tower, second floor, with a view of the volcano.
+    @else
+      [jessica] "You must forgive me. I am not accustomed to being spoken to without an introduction. It is an old habit."
+      [rowan] "I'm sorry."
+      [jessica] "Do not be. It is a good habit to be broken of." She says it very lightly. "It is just that it has been a long morning of lines."
     @time 8
   @else
     @if not jessica_game_after_docks
@@ -123,15 +143,23 @@
 
 @scene ferry_ashton
   @if not met:ashton
-    A tall, slim boy with violet hair swept up into one smooth dome stands very nobly at the rail, holding a single rose by the stem. A little silver knife is folded in his other hand. He is trying one line after another. Not one of them is working.
+    A tall, slim boy with violet hair swept up into one smooth dome stands very nobly at the rail, holding a single rose by the stem. A little silver knife is folded in his other hand.
+    He is trying one line after another. Not one of them is working.
     [ashton?] "A rose for the lady, and my condolences to every man she met before me."
     The lady in question, thirty feet away, is looking at the sea.
-    [ashton?] "Ah. An audience." He swings round, seeing you for the first time. "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does."
+    [ashton?] "Ah. An audience."
+    He swings round, seeing you for the first time, with the dazzling, wounded ease of a man who has not noticed he is wounded.
+    [ashton?] "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does."
     @meet ashton
     @add ferry_talked +1
+    @note ashton | Wealthy. Gives roses to every woman and talks like a novel.
     [ashton] "Vance, isn't it. The Wildcard. I can add up, old thing: a rain jacket, no collar, and a name in ink on the list at the wheelhouse door."
     [rowan] "That's — fair. I'm Rowan, and apparently I'm easy to work out."
     [ashton] "Not at all. You have a very quiet face. It's the jacket that gives you away."
+    He sets the little silver knife against the stem of the rose and, with three exact movements, removes a thorn you could not see.
+    [ashton] "I do this for every rose. It is a courtesy. One should not give a lady a thing that could hurt her without asking."
+    [rowan] "That's — actually quite nice."
+    [ashton] "Don't say it as if it were a surprise, old thing. I am a *very* nice person. It is simply a long way down."
   @else
     [ashton] "Vance! Rescue me."
   @choice
@@ -226,7 +254,9 @@
 
 @scene ferry_sunny
   @if not met:sunny
-    A tall girl is sitting on the lower bar of the rail with her bare feet dangling over the wake. A towel is slung round her neck like a scarf. Her ponytail is wet, although it has not rained. She is, at the exact moment you notice her, doing something with a deck of cards that involves flipping half of it into the air and catching it behind her back.
+    A tall girl is sitting on the lower bar of the rail with her bare feet dangling over the wake. A towel is slung round her neck like a scarf. Her ponytail is wet, although it has not rained.
+    She is, at the exact moment you notice her, doing something with a deck of cards that involves flipping half of it into the air and catching it behind her back.
+    She catches it. Every card. She does not look at them.
     She sees you looking and grins with her whole face.
     @if ship_knows_wildcard
       [sunny?] "You're the wildcard! Nice shoulders for a bloke who took the last seat. That's a compliment, don't make it weird."
@@ -236,17 +266,26 @@
     @add ferry_talked +1
     [sunny?] "Sunny Aldane. Sports scholarship. I'm the lifeguard, as of — what — Monday. Everything on the island's going to fall in the water, and I'm the one who fishes it out. It's literally the job."
     @meet sunny
-    [sunny] "I like you. There, said it. Your turn — or we can race for it."
+    @note sunny | Lifeguard on a sports scholarship. Says what she thinks the moment she thinks it.
+    [sunny] "I like you. There, said it."
+    She says it so simply, with so little fuss, that you have no idea where to put your hands.
+    [sunny] "Your turn. Or we can race for it."
     @choice
       > "You like me? You've known me for about thirty seconds. I'm Rowan, by the way."
         [sunny] "Takes me thirty. That's practically a marathon for me."
+        [rowan] "And if you stop liking me?"
+        [sunny] "Then I'll tell you. Same speed." She shrugs, entirely unbothered. "It saves a lot of time."
         @aff sunny +3 | Liked directly
       > "Race you where? I'm Rowan, and I should warn you I'm not especially fast."
-        [sunny] "Off the stern to the lifeboat and back! No — kidding, I'd get us both thrown off." She laughs, a big, easy sound. "Cards. Come on. Loser does ten push-ups."
+        [sunny] "Off the stern to the lifeboat and back! No — kidding, I'd get us both thrown off."
+        She laughs, a big, easy sound.
+        [sunny] "Cards. Come on. Loser does ten push-ups."
         @aff sunny +2 | Played along
         @jump sunny_game
       > Go red and say nothing.
-        [sunny] "Ha! There it is. That's a good colour on you."
+        [sunny] "Ha! There it is."
+        She looks at you with open, delighted interest.
+        [sunny] "That's a good colour on you."
         @aff sunny +1 | Blushed
     @time 8
   @else
@@ -388,9 +427,16 @@
 @scene ferry_abel
   @if not met:abel
     The man at the wheel is barrel-chested, with a full white beard and a blue bowler hat gone soft with age. His face is the colour and texture of a good saddle.
-    [abel?] "Thirty-seven and — hold on. Thirty-eight! There you are. I counted thirty-seven." He does not turn round. "Captain Abel Stroud. Welcome to the Second Chance. If you are going to be sick, do it leeward — that's the side that isn't me."
+    Through the open door the wheelhouse is warm and bright with brass. He has both hands on the wheel, with his feet planted apart, as if the whole ship were a very large, very slow horse that needed to be reminded who was riding it.
+    [abel?] "Thirty-seven and — hold on. Thirty-eight! There you are. I counted thirty-seven."
+    He does not turn round.
+    [abel?] "Captain Abel Stroud. Welcome to the Second Chance."
     @meet abel
     @add ferry_talked +1
+    @note abel | The ferry captain. Counts every student on and off.
+    [abel] "If you are going to be sick, do it leeward. That's the side that isn't me."
+    [rowan] "I'm not sick. I'm just — looking."
+    [abel] "That's the best thing to do on a bridge. Most of them come up here to complain."
   @else
     [abel] "Thirty-eight. Still thirty-eight."
   @choice
@@ -419,8 +465,11 @@
 
 @scene ferry_rana
   @if not met:rana
-    On the top step of the iron stair a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship. Rose-brown hair gathered in two fat puffs tied with dark-red ribbons, under a pale fringe. Black nail polish, chipped from biting. A plain grey collar studded with tiny silver studs. She is watching the planks.
-    She knows you are there. She does not look up.
+    On the top step of the iron stair a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship.
+    Rose-brown hair gathered in two fat puffs tied with dark-red ribbons, under a pale fringe. Black nail polish, chipped from biting. A plain grey collar studded with tiny silver studs.
+    She is watching the planks.
+    She knows you are there. You can tell from the set of her shoulders, which have gone, very slightly, a little straighter, in the manner of an animal that has heard a twig.
+    She does not look up.
     [rana?] "No."
     [rowan] "I haven't — "
     [rana?] "No. Whatever it is. No."
@@ -428,16 +477,26 @@
       > Sit down on the stair near her. @hint Quiet
         She makes a very small noise in her throat. It is not welcome, but it is not a wall, either.
         You sit. You say nothing.
+        The stair is cold iron, with salt on it. Below you, the whole ship is in motion, a thousand little conversations, and up here, in this narrow corner, it is oddly peaceful.
         After a while she speaks, without looking at you.
-        [rana?] "…You can read, right? There's a list. I'm on it. I'm on a different list, too, with a different collar." A very quick, very bitter glance. "Don't."
+        [rana?] "…You can read, right? There's a list. I'm on it. I'm on a different list, too, with a different collar."
+        A very quick, very bitter glance.
+        [rana?] "Don't."
         [rowan] "Don't what?"
         [rana?] "Whatever you were going to ask."
-        After a while, grudgingly, to the planks: [rana?] "…Rana. Since you're not going away."
+        After a while, grudgingly, to the planks:
+        [rana?] "…Rana. Since you're not going away."
         @meet rana
+        @note rana | Sits apart. Says she is on a different list with a different collar.
         @aff rana +2 | Didn't push
       > "I'm Rowan. I don't mean to bother you. What's your name?"
-        [rana?] "Rana. That's all you get." Under six words, nearly. "Why."
+        [rana?] "Rana. That's all you get."
+        It is under six words, nearly.
+        [rana?] "Why."
+        [rowan] "I just wanted to know who I'd be sharing the stairs with."
+        [rana?] "…You're not sharing them. I was here first."
         @meet rana
+        @note rana | Scowls. Keeps everyone at a distance.
         @aff rana +1 | Asked plainly
       > "Why are you sitting all the way out here by yourself?"
         Her whole body goes rigid. The scowl, which looked permanent, finds another notch.
@@ -469,28 +528,43 @@
 @scene ferry_teobalt
   @if not met:teobalt
     A boy with dark-blue hair standing up in neat spikes, in a long red coat buttoned to the collar, is standing very straight at the wheelhouse door with a clipboard. He is looking slightly over the heads of the crowd below, as if counting them. There is a spare pen behind his ear.
+    He is not so much waiting as supervising the idea of waiting. Every few seconds the pen leaves his ear, makes a very small mark on the clipboard, and returns to its place with a tiny click.
     [teobalt?] "Excuse me. Do you know in what order the luggage comes off? It is a question of logistics."
     [rowan] "I — no, I'm sorry. I came aboard late and I don't know anything about the unloading. I'm Rowan."
-    [teobalt?] "No. Nobody does. I have asked the captain, and he says it comes off in the order it comes off. That is, I'm afraid, not an order."
+    [teobalt?] "No. Nobody does. I have asked the captain, and he says it comes off in the order it comes off."
+    [teobalt?] "That is, I'm afraid, not an order."
     [teobalt?] "Teobalt Ferrant. I have drawn up a list."
     @meet teobalt
     @add ferry_talked +1
+    @note teobalt | Keeps lists and a clipboard. Worried about the unloading order.
     @choice
       > "Do you mind if I see your list? It sounds like it might save us all a lot of trouble."
-        [teobalt] "Three things." A rustle, a page, a pen. "One: the unloading order, which I have taken the liberty of estimating. Two: who has my stapler, which is not relevant yet. Three is confidential until I've solved one and two."
+        [teobalt] "Three things."
+        A rustle, a page, a pen.
+        [teobalt] "One: the unloading order, which I have taken the liberty of estimating. Two: who has my stapler, which is not relevant yet. Three is confidential until I have solved one and two."
         He tears out a clean copy and hands it over. It is colour-coded.
+        [teobalt] "I used teal for the items I am worried about."
+        [rowan] "There's a lot of teal."
+        [teobalt] "I am a worrying person." A very small, very pleased pause. "It is a gift."
         @item "Teobalt's unloading list"
         @flag has_unloading_list
+        @note teobalt | Has lost his stapler. Item three on his list is confidential.
         @aff teobalt +3 | Wanted the list
       > Hand him the stapler you found. @if found_stapler and not stapler_returned
-        [teobalt] "That is — " He stops. He takes it in both hands, turns it over, finds his own stencil, and for a moment says nothing at all. "Item two. Solved."
-        [teobalt] "I had it down as stolen. I had made a list of suspects." A very small, very bright pause. "You are not on it. You have never been on it."
+        [teobalt] "That is — "
+        He stops. He takes it in both hands, turns it over, finds his own stencil, and for a moment says nothing at all.
+        [teobalt] "Item two. Solved."
+        [teobalt] "I had it down as stolen. I had made a list of suspects."
+        A very small, very bright pause.
+        [teobalt] "You are not on it. You have never been on it."
         @item "Teobalt's stapler" -1
         @flag stapler_returned
         @coins 10
         @aff teobalt +4 | Returned his stapler
       > "Would you play a game with me at some point?"
-        [teobalt] "Thursday. I am making a list." A faint, regretful smile. "It is an excellent offer. I accept it for Thursday."
+        [teobalt] "Thursday. I am making a list."
+        A faint, regretful smile.
+        [teobalt] "It is an excellent offer. I accept it for Thursday."
         @flag teobalt_thursday
         @aff teobalt +1 | Asked politely
       > "Sorry to bother you."

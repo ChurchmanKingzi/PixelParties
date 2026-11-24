@@ -251,32 +251,58 @@
 @scene ferry_baylee
   @if not flag_baylee_chat
     Baylee stands with one hand on the rail, as if holding the ship in place while the rest of it moves.
+    In the full sun, with the straw hat pushed back and his jacket slung over one shoulder, he looks like a scarecrow that has been promoted. Several students walk round him, very carefully, as round a monument.
+    Somewhere behind you Nathan is telling somebody, with great volume, about a plate.
     [baylee] "Morning."
+    [rowan] "Morning."
+    There is a pause. It is a comfortable pause, deep and slow, with a gull in it.
     @choice
       > "Morning. Sorry about before, I think I ran over your introduction. Is he always like this?"
-        [baylee] "Yup." A pause long enough to watch a gull cross the sky. "Met him at the harbour. Sat next to me on the bus. Told me about his whole family before the first stop."
+        [baylee] "Yup."
+        A pause long enough to watch a gull cross the sky.
+        [baylee] "Met him at the harbour. Sat next to me on the bus. Told me about his whole family before the first stop."
         [baylee] "Ten minutes in, I figured he was either going to be a problem or the best thing that happened to me this year."
         [rowan] "Which was it?"
         [baylee] "Still working that out."
-        He says it without a smile, but something in the sunburnt face loosens a little.
+        He says it without a smile. But something in the sunburnt face loosens a little, the way a knot loosens when somebody has stopped pulling at it.
+        @aff baylee +1 | Asked about Nathan
       > "I didn't catch much of that. Where are you from, Baylee?"
-        [baylee] "North of everything. Farm. Dairy, mostly. Some corn." Another pause. "Cows are easier to talk to. They tell you when they're upset."
+        [baylee] "North of everything. Farm. Dairy, mostly. Some corn."
+        Another pause.
+        [baylee] "Cows are easier to talk to. They tell you when they're upset."
         ~ He said that completely seriously, and somehow it is the most reassuring thing anyone has said to me all week.
+        @note baylee | From a dairy farm. Says cows are easier to talk to.
         @aff baylee +2 | Asked about home
         @flag baylee_from_farm
+    You lean on the rail beside him. The iron is warm. Below, the sea slides past in long green folds, and for a minute neither of you says anything, and it does not feel like a gap.
     @choice
       > "He seems all right, actually. Loud, but all right."
-        [baylee] "He is." Quietly. "Loud. But he said hello to me first. Nobody does that."
+        [baylee] "He is."
+        He says it quietly, to the sea.
+        [baylee] "Loud. But he said hello to me first. Nobody does."
+        [rowan] "Nobody says hello to you?"
+        [baylee] "They say 'sorry' and walk round." A long, slow shrug that moves the whole ship an inch. "It's fine. I take up room."
+        [rowan] "I think you take up exactly the right amount."
+        [baylee] "…" His ears go the colour of the hat. "Thanks."
+        @note baylee | People walk round him instead of saying hello. Nathan did say hello first.
         @aff baylee +2 | Agreed about Nathan
       > "Do you play? What do you run?"
-        [baylee] "Big Stomp. Dinosaurs." He holds up a hand the size of a dinner plate, deck box lost in it. "Not good. Fun, though."
+        [baylee] "Big Stomp. Dinosaurs."
+        He holds up a hand the size of a dinner plate. The deck box is lost in it.
+        [baylee] "Not good. Fun, though."
         @scene mutter_baylee
         [baylee] "You can have a game later. If you want. If you're not busy."
         @aff baylee +1 | Offered a game
         @flag baylee_game_offered
       > "I'm a bit nervous about today, to be honest. First real table, first real people."
-        [baylee] "Yup." A very long pause. "Me too. Big boy, small ship. Everybody looks."
+        [baylee] "Yup."
+        A very long pause. The kind that has a cow in it, and a gate, and weather.
+        [baylee] "Me too."
+        [rowan] "You don't look nervous."
+        [baylee] "Big boy, small ship. Everybody looks. You learn to look calm so they stop."
         [baylee] "Tables are just tables, though. They hold things up."
+        You think about that for a while. It is, you decide, entirely true.
+        @note baylee | Gets nervous too. Looks calm so people stop staring.
         @aff baylee +3 | Shared a worry
         @flag told_baylee_nerves
     @flag flag_baylee_chat
@@ -313,30 +339,46 @@
 @scene ferry_ed
   @if not met:ed
     Somebody is hanging off the bow rail by one hand.
-    He is hanging the way other people stand, entirely at ease, the other hand holding a battered cowboy hat in place against the wind. The sea slides past thirty feet below his dangling boots. Nobody else on the deck seems to find this remarkable.
+    He is hanging the way other people stand, entirely at ease, the other hand holding a battered cowboy hat in place against the wind. The sea slides past thirty feet below his dangling boots.
+    Nobody else on the deck seems to find this remarkable.
+    You stop. You look. You look again. He is whistling.
     [ed?] "Hey! Hey, you! Can you see it? The volcano? It's got a CRATER. I read about it. There's a hole in the middle you can walk down into!"
     @choice
       > "I can see it. But would you mind coming back over the rail first? I'd rather not watch you go in."
         [ed?] "Is it — is it dangerous, coming back over? That's what I'd want to know."
+        [rowan] "It's a lot less dangerous than staying out there."
+        [ed?] "…Huh." He considers this for a moment, upside down. "That's a good point."
       > "That's a very long drop. I'm Rowan, by the way. Does that hand ever get tired?"
         [ed?] "Rowan! Nope! It's the other hand that gets tired. I switch."
+        He demonstrates, with a flourish, and the hat goes briefly airborne and is caught.
     He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning like the sun just rose.
     [ed] "Ed Venture. Lazy V Ranch, up on the high plains. Bungalow five, supposedly. They put the Commons on a beach. A BEACH."
     @meet ed
     @add ferry_talked +1
+    @note ed | Grew up on a ranch. Hangs off things. Wants to go everywhere that has a fence round it.
+    [ed] "Do you know how long it's been since I saw water I couldn't walk across? This is the best thing that ever happened to me. Don't tell my mum, she'll think I've become soft."
+    [rowan] "I won't."
     [ed] "What's yours?"
     @choice
       > "Rowan Vance. I'm in the Commons too, bungalow seven, so two doors down from you. I got in late, so I'm still finding out what's where."
         [ed] "Two doors down! Rowan! That's a good name, it goes up and down, like a horse on a hill."
+        [rowan] "I've never been compared to a horse before."
+        [ed] "It's the highest compliment I've got!"
         @aff ed +2 | Same dorm row
       > "Rowan. I'd rather you didn't fall in the sea. I've only just met you."
-        [ed] "Aw, I won't. I've got — I always have a plan. It's a small plan, usually, but it's got steps."
+        [ed] "Aw, I won't."
+        He pats the rail as if it were a horse.
+        [ed] "I've got — I always have a plan. It's a small plan, usually, but it's got steps."
+        [rowan] "What are the steps?"
+        [ed] "One: don't fall in. Two: if I fall in, swim." A beat. "I haven't worked out three."
         @aff ed +1 | Worried about him
       > "Rowan Vance. What's the most dangerous place on the island, do you think?" @hint Bold
         Ed's whole face lights up like a pinball machine.
-        [ed] "Okay. Okay okay okay. I've got a MAP. Hang on. Not on me. It's in my bag. It's got all the forbidden places on it. Volcano rim, ruins field, the north shore — I'm going to go to all of them. All of them! You in?"
+        [ed] "Okay. Okay okay okay. I've got a MAP. Hang on. Not on me. It's in my bag."
+        [ed] "It's got all the forbidden places on it. Volcano rim, ruins field, the north shore, I'm going to go to all of them. All of them! You in?"
         [rowan] "I'll think about it."
         [ed] "That's a yes in ranch!"
+        @note ed | Has a map of every dangerous place on the island, and plans to visit them all.
         @aff ed +3 | Shared his enthusiasm
         @flag ed_map_offered
     @time 10
@@ -372,33 +414,54 @@
 
 @scene ferry_georgie
   @if not met:georgie
-    She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A dark-blue feather is pinned in her wild black hair. A girl with a camera is orbiting her with great concentration.
+    She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A dark-blue feather is pinned in her wild black hair.
+    A girl with a camera is orbiting her with great concentration.
     [pippa?] "Chin up. No — down. No — up again. Look at the volcano like it owes you money."
     The girl on the rope looks at the volcano. It does not owe her money. Her face says so.
-    She notices you looking and goes the colour of a tomato.
+    There is something curiously still about her. It is not calm. It is more the stillness of a small animal that has learned that moving is what gets you noticed.
+    She notices you looking, and goes the colour of a tomato.
     [georgie?] "Sorry. Was I — is this your rope?"
     @choice
       > "No, it's not my rope. I'm Rowan, I was only looking at your deck box. Is it a good deck?"
-        [georgie?] "Oh. Okay." She makes herself smaller, and then, quite suddenly, bigger. "It is. It's — yes. It's a very good deck. I'm Georgie. Sorry. Santa. Georgie Santa."
+        [georgie?] "Oh. Okay."
+        She makes herself smaller, and then, quite suddenly, bigger.
+        [georgie?] "It is. It's — yes. It's a very good deck."
+        [georgie?] "I'm Georgie. Sorry. Santa. Georgie Santa."
       > "Please sit wherever you like. I'm Rowan, by the way. Don't mind me."
-        [georgie?] "Okay. Thank you. Georgie." She hesitates. "Santa. Georgie Santa. Sorry."
+        [georgie?] "Okay. Thank you."
+        She hesitates, plainly deciding whether this is a trick.
+        [georgie?] "Georgie." A pause. "Santa. Georgie Santa. Sorry."
     @meet georgie
     @add ferry_talked +1
+    @note georgie | Very small, very shy. Holds her deck box in both hands.
+    The girl with the camera lowers it, and gives you a look of frank assessment, as though weighing you for a composition.
+    [pippa?] "She's fourteen, you know." Quite gently. "She's allowed to sit on the rope. I've told her. She doesn't believe me."
+    [georgie] "…Pippa."
+    [pippa?] "I'm only saying."
     @choice
       > "Is that a dragon on your bag?"
         A green plush dragon hangs from her backpack by one wing, much loved and slightly grey around the edges.
-        [georgie] "Ember." Almost a whisper. "She's been to nationals twice. Please don't hold her by the wing."
+        [georgie] "Ember."
+        It is almost a whisper.
+        [georgie] "She's been to nationals twice. Please don't hold her by the wing."
         [rowan] "I won't. She looks like she's seen worse."
-        [georgie] "She has." A tiny, startled smile. "…Thank you for asking first."
+        [georgie] "She has."
+        A tiny, startled smile.
+        [georgie] "…Thank you for asking first."
+        @note georgie | Her green dragon plush is called Ember. Do not hold it by the wing.
         @aff georgie +3 | Asked politely
         @flag georgie_ember
       > "Would you like to play a game, Georgie? Nothing riding on it, just for fun."
-        [georgie] "…Yes." Almost inaudible. Then, braver: "Yes. Please. Not for anything. I don't — I'm not allowed to play for anything. But yes."
+        [georgie] "…Yes."
+        It is almost inaudible. Then, braver:
+        [georgie] "Yes. Please. Not for anything. I don't — I'm not allowed to play for anything. But yes."
         @flag georgie_game_asked
         @aff georgie +2 | Asked for a game
         @jump georgie_game
       > "Nice to meet you, Georgie. I'll leave you in peace."
         [georgie] "Nice to — yes. You too. Sorry."
+        [pippa] "She means it. She says 'sorry' when she means thank you."
+        [georgie] "Pippa!"
         @aff georgie +1 | Said hello
     @time 8
   @else
@@ -447,15 +510,21 @@
 @scene ferry_pippa
   @if not met:pippa
     A girl with a heavy old film camera hung round her neck is crouched on the deck, taking a picture of absolutely nothing.
-    Strawberry-orange hair sticks up at the crown. There is a yellow bow tie under her chin and freckles on every visible surface.
+    Strawberry-orange hair sticks up at the crown. There is a yellow bow tie under her chin and freckles on every visible surface. She is crouched at a very odd angle, like a heron deciding about a fish.
+    The camera clicks. She waits, as if for the light to answer. It does not. She clicks again.
     [pippa?] "Hang on — don't move — okay. Sorry. You were looking at the island with your hand on your jacket pocket. That's the shot. I got it."
     @choice
       > "I'm sorry, what shot? I'm Rowan, and I didn't know I was being photographed."
-        [pippa?] "Light. Foreground. You were backlit. Good, actually." She lowers the camera. "Pippa Lund. I'm the photographer. Nobody asked me to be. I just got here first."
+        [pippa?] "Light. Foreground. You were backlit. Good, actually."
+        She lowers the camera and, for the first time, looks at you without a lens in the way.
+        [pippa?] "Pippa Lund. I'm the photographer. Nobody asked me to be. I just got here first."
       > "Did you just take my picture? Do I get to see it, at least?"
-        [pippa?] "Later! It's film. I'll develop it in a week. You'll hate it. It'll be perfect." She lowers the camera. "Pippa Lund. Photographer, by default."
+        [pippa?] "Later! It's film. I'll develop it in a week. You'll hate it. It'll be perfect."
+        She lowers the camera.
+        [pippa?] "Pippa Lund. Photographer, by default."
     @meet pippa
     @add ferry_talked +1
+    @note pippa | The photographer. Shoots on film.
     @choice
       > "Rowan Vance. I only came aboard in a hurry, so I'm not wearing the jacket they sent everybody else."
         @if ship_knows_wildcard
@@ -463,18 +532,26 @@
           [rowan] "Is everyone going to say that?"
           [pippa] "Probably. Hope not. Might be sort of nice."
         @else
-          [pippa] "Vance. Rowan Vance." She says it like a caption. "That'll be on the list at the wheelhouse door. I've been reading it. There's one name in ink and I think I've just found it."
+          [pippa] "Vance. Rowan Vance." She says it like a caption.
+          [pippa] "That'll be on the list at the wheelhouse door. I've been reading it. There's one name in ink and I think I've just found it."
           [rowan] "…You may have."
           [pippa] "I'm good at finding the thing in a picture that doesn't match."
           @flag told_wildcard
         @aff pippa +1 | Offered his name
       > "Is that an old film camera? I didn't think anybody still shot on film."
-        [pippa] "Film is the only honest thing left." She turns it so you can see the dented brass. "You can't delete it. You get one frame, and you have to be sorry about it afterwards if it's bad."
+        [pippa] "Film is the only honest thing left." She turns it so you can see the dented brass.
+        [pippa] "You can't delete it. You get one frame, and you have to be sorry about it afterwards if it's bad."
         [pippa] "It was my aunt's. It has a light leak in the corner. I think it gives them character."
+        [rowan] "Do you always shoot people without asking?"
+        [pippa] "Only the ones who hold still." A beat. "You did, actually. Quite well. Nobody's ever held that still for me."
+        @note pippa | The camera was her aunt's. Everything she shoots is one frame, no deleting.
         @aff pippa +2 | Asked about her camera
         @flag pippa_film
       > "Do you always shoot strangers without asking?"
-        [pippa] "Only the ones that hold still. Which — you did, actually. Quite well. Nobody's ever held that still for me."
+        [pippa] "Only the ones that hold still. Which — you did, actually. Quite well."
+        [pippa] "Nobody's ever held that still for me. I think it's the jacket. It makes you look like you're waiting for a verdict."
+        [rowan] "I don't have a jacket."
+        [pippa] "Exactly. That's the picture."
         @aff pippa +1 | Held still
     @time 8
   @else
@@ -512,26 +589,37 @@
     [mikoto?] "Sorry! I'm Mikoto. I laugh when I'm frightened. It isn't funny. I know it isn't funny."
     @choice
       > "It's all right, really. I'm Rowan. And I think the gull won that one fair and square."
-        [mikoto?] "She did. She really did." A breathless little laugh, and then, mercifully, a genuine smile.
+        [mikoto?] "She did. She really did."
+        A breathless little laugh, and then, mercifully, a genuine smile.
+        [mikoto?] "She's called Mrs Pemberton. I decided. She's very good at what she does."
       > "Don't apologise to the gull. I'm Rowan. Are you all right?"
         [mikoto?] "Oh — yes. No. A bit. I'm — thank you for asking, nobody asks."
+        [mikoto?] "It's a very big boat. And a very big sea. And I've made a list of everything that could happen, and so far, three of the things have."
     @meet mikoto
     @add ferry_talked +1
+    @note mikoto | Laughs when frightened. Keeps lists. Gives everyone a nickname.
     @if ship_knows_wildcard
       [mikoto] "You're — oh. You're the one with the — Nathan told me everything. Wildcard. Rowan. Is it all right if I call you Row-Row? I won't. I'll ask first. May I?"
     @else
       [mikoto] "Rowan. That's a nice name. It sounds like a bird. Would it be all right — would you mind if I gave you a nickname? I won't. I'll ask first. May I?"
     @choice
       > "Sure. Row-Row is fine."
-        [mikoto] "Row-Row!" A brilliant smile. "Oh, that's — thank you! I'll try not to — I'll use it sparingly!"
+        [mikoto] "Row-Row!"
+        A brilliant smile breaks over his whole face, and he claps a hand to his mouth as though it might get out.
+        [mikoto] "Oh, that's — thank you! I'll try not to — I'll use it sparingly! Like a good candle!"
         @aff mikoto +3 | Allowed the nickname
         @flag mikoto_rowrow
       > "I'd rather keep it as Rowan, thanks. Maybe you can try again once we know each other better."
-        [mikoto] "Rowan. Of course. Rowan." A tiny nod. "Sorry. I'll remember. I'll write it down."
+        [mikoto] "Rowan. Of course. Rowan."
+        A tiny nod. He takes a notebook out of his pocket and writes something in it, very carefully.
+        [mikoto] "Sorry. I'll remember. I've written it down."
+        [rowan] "What did you write?"
+        [mikoto] "'Rowan. Not Row-Row. Yet.'" A small, hopeful look over the rim of the glasses. "I've put the 'yet' in brackets."
         @aff mikoto +1 | Respectful
       > Offer to buy him a replacement sandwich.
         [rowan] "Let me get you another lunch. There's a galley hatch downstairs."
         [mikoto] "Oh — I couldn't — oh, would you?"
+        He looks at you as if you had offered him a kidney.
         You find him one at the lounge hatch later; it costs three Smug Coins and a lot of his gratitude.
         @coins -3
         @aff mikoto +4 | Bought him lunch

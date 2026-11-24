@@ -64,13 +64,14 @@ new Function('world', 'scene', fs.readFileSync(path.join(dir, '00-world.js'), 'u
 const cardsList = (() => { const c = readJson(path.join(REPO, 'data', 'cards.json')); return Array.isArray(c) ? c : (c.cards || Object.values(c)); })();
 const cardBy = Object.fromEntries(cardsList.map(c => [c.name, c]));
 const sys = readJson(path.join(ROOT, 'bible', 'system.json'));
+const names = readJson(path.join(ROOT, 'src', 'names.json'));
 const DATA = { px: PX, alias: readJson(path.join(ROOT, 'src', 'aliases.json')), people: {}, rowan: null, followers: store.world.followers || {}, stages: { friend: sys.FRIEND_STAGES, romance: sys.ROMANCE_STAGES }, startAff: sys.START_AFFINITY };
 for (const id of need.people) {
   const f = path.join(ROOT, 'bible', 'cast', id + '.json'); if (!fs.existsSync(f)) continue;
   const c = readJson(f); let deck = null;
   const df = path.join(ROOT, 'bible', 'decks', id + '.json');
   if (fs.existsSync(df)) { const d = readJson(df); const g = d.gist && typeof d.gist === 'object' ? Object.entries(d.gist).slice(0, 3).map(([k, v]) => [k, String(v)]) : []; deck = { name: d.name, heroes: d.heroes, key: g }; }
-  DATA.people[id] = { name: c.name, first: c.firstName, intro: c.intro, romance: !!c.romance, deck, bonds: Object.entries(c.bonds || {}).map(([w, b]) => ({ w, label: b.label, pub: !!b.public, from: b.from == null ? 0 : b.from })) };
+  DATA.people[id] = { name: (names[id] || c.name), first: c.firstName, romance: !!c.romance, deck, bonds: Object.entries(c.bonds || {}).map(([w, b]) => ({ w, label: b.label, pub: !!b.public, from: b.from == null ? 0 : b.from })) };
 }
 {
   const d = readJson(path.join(ROOT, 'bible', 'decks', 'rowan.json'));
@@ -140,6 +141,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #prompt{color:var(--cyan)}
 #bBack,#bPresent{position:absolute;bottom:8px;font-family:var(--title);font-size:13px;padding:2px 10px}
 #bBack{left:10px}#bPresent{right:10px;background:var(--cyan);color:#1a1626;border-color:#000}
+#bBack:disabled{opacity:.2;box-shadow:none;border-color:var(--edge);color:var(--dim);cursor:default}
 #bar{display:flex;flex-direction:column;gap:8px}
 #bar .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #bar .lbl{font-family:var(--title);font-size:13px;color:var(--dim);min-width:84px}
@@ -176,7 +178,7 @@ function load(){try{const r=localStorage.getItem(KEY);if(r){const s=JSON.parse(r
 const mutate = (fn) => { const b = { c: S.coins, it: Object.assign({}, S.items), co: Object.assign({}, S.collection) }; fn(S); save(); renderTop(); foundToasts(b); };
 function foundToasts(b){
   try {
-    if (S.coins !== b.c) { const d = S.coins - b.c; if (d > 0) toast('', '+' + d + ' Smug Coins', ''); else if (d < 0 && b.c !== undefined) toast('down', d + ' Smug Coins', ''); }
+    if (S.coins !== b.c) { const d = S.coins - b.c; if (d > 0) toast('', '+' + d + ' SC', ''); else if (d < 0 && b.c !== undefined) toast('down', d + ' SC', ''); }
     for (const k of Object.keys(S.items)) if ((S.items[k] || 0) > (b.it[k] || 0)) toast('deck', 'Item found', esc(k));
     for (const k of Object.keys(b.it)) if ((S.items[k] || 0) < b.it[k]) toast('', 'Item handed over', esc(k));
     for (const k of Object.keys(S.collection)) if ((S.collection[k] || 0) > (b.co[k] || 0)) toast('up', 'Card found', esc(k));
@@ -184,10 +186,13 @@ function foundToasts(b){
 }
 function renderTop(){
   const loc = W.locations[S.location] || {};
-  $('clock').textContent = 'Day ' + S.day + ' · ' + WEEK[(S.day-1)%7] + ' · ' + cmpFmtTime(S.minutes) + ' · ' + S.coins + ' Smug Coins';
+  $('clock').textContent = 'Day ' + S.day + ' · ' + WEEK[(S.day-1)%7] + ' · ' + cmpFmtTime(S.minutes) + ' · ' + S.coins + ' SC';
   $('where').textContent = loc.name || S.location;
 }
 const castName = (id) => { const c = W.cast[id]; return c ? c.name : id; };
+// Was Rowan über den Namen weiß: 'Olivia "Livvie" Thana' erscheint als 'Livvie Thana', bis der volle Name gefallen ist (@fullname).
+function shownName(id){ const p = DATA.people[id]; let n = p ? p.name : castName(id); if (!S.flags['fullname_' + id]) n = n.replace(/^(\S+)\s+"([^"]+)"\s+/, '$2 '); return n; }
+const knowsRel = (a, b) => !!(S.flags['rel_' + a + '_' + b] || S.flags['rel_' + b + '_' + a]);
 const met = (id) => !!S.flags['met_' + id];
 const following = () => Object.keys(DATA.followers).filter(id => S.flags['follow_' + id]);
 
@@ -361,7 +366,7 @@ let affNow = {};
 function affHtml(nm, n, why){ return esc(nm) + ' <span class="' + (n >= 0 ? 'up' : 'dn') + '">' + (n > 0 ? '▲ +' : n < 0 ? '▼ ' : '● ') + n + '</span>'; }
 const aliasName = (id) => DATA.alias[id] || castName(id);
 function popup(p){
-  const nm = (p.type === 'aff' && !met(p.id)) ? aliasName(p.id) : castName(p.id);
+  const nm = (p.type === 'aff' && !met(p.id)) ? aliasName(p.id) : shownName(p.id);
   if (p.type === 'met') { sfx('reveal', .5); toast('', 'New acquaintance', esc(nm), p.id); }
   else if (p.type === 'aff') {
     const prev = affNow[p.id];
@@ -380,7 +385,7 @@ function popup(p){
   else if (p.type === 'deck') { sfx('ping', .5); const d = DATA.people[p.id]; toast('deck', 'Deck learned', esc((d && d.deck ? d.deck.name : '') + ' · ' + nm), p.id); }
 }
 function affection(id){ let v = (DATA.startAff[id] != null ? DATA.startAff[id] : DATA.startAff['default'] != null ? DATA.startAff['default'] : 8); v += (S.vars['aff_' + id] || 0); return Math.max(0, Math.min(100, v)); }
-function stageOf(id, v){ const p = DATA.people[id]; const list = p && p.romance ? DATA.stages.romance : DATA.stages.friend; for (const s of list) if (v <= s.cap) return { name: s.name, cap: s.cap }; return { name: list[list.length - 1].name, cap: 100 }; }
+function stageOf(id, v){ const list = DATA.stages.friend; for (const s of list) if (v <= s.cap) return { name: s.name, cap: s.cap }; return { name: list[list.length - 1].name, cap: 100 }; }
 
 const io = {
   state: () => S, mutate, sleep, say, choose, addTime, popup,
@@ -389,7 +394,7 @@ const io = {
   enter(id){ addActor((W.cast[id] && W.cast[id].sprite) || id); },
   exit(id){ actors = actors.filter(a => a !== id); renderConv(); },
   move(){}, face(){}, dim(){}, music(n){ if (MUSIC[n]) { musicOverride = true; setMusic(n); } },
-  fx: async () => {}, revealCards: async () => {},
+  fx: async (name, ms) => { const f = $('fade'); if (name === 'fadeout') { f.classList.add('on'); await sleep(Math.min(ms || 400, 900)); } else if (name === 'fadein') { f.classList.remove('on'); await sleep(Math.min(ms || 400, 900)); } else if (name === 'flash' || name === 'shake') { await sleep(150); } }, revealCards: async () => {},
   applyReward: async (r) => { mutate(s => { if (r.coins) s.coins = Math.max(0, s.coins + r.coins); for (const f of r.flags || []) s.flags[f] = true; }); },
   duel: (step) => new Promise(res => {
     $('spk').hidden = false; $('spk').textContent = 'DUEL'; $('txt').className = '';
@@ -579,22 +584,24 @@ function peoplePanel(sel, draw){
   const body = $('pbody'); const ids = Object.keys(DATA.people).filter(met);
   if (sel && DATA.people[sel]) {
     const p = DATA.people[sel], v = affection(sel), st = stageOf(sel, v);
-    let h = '<p><button id="pback">◀ All people</button></p><div class="det"><div class="pcard" id="pic"></div><b style="font-family:var(--title);font-size:22px;color:var(--gold)">' + esc(p.name) + '</b><div>' + esc(p.intro || '') + '</div>';
+    let h = '<p><button id="pback">◀ All people</button></p><div class="det"><div class="pcard" id="pic"></div><b style="font-family:var(--title);font-size:22px;color:var(--gold)">' + esc(shownName(sel)) + '</b>';
+    const nts = (S.notes && S.notes[sel]) || [];
+    h += '<div class="hh">WHAT YOU KNOW</div>' + (nts.length ? nts.map(x => '<div>· ' + esc(x) + '</div>').join('') : '<div class="note">Only that you have met.</div>');
     h += '<div class="hh">HOW YOU STAND</div><div>' + esc(st.name) + ' · ' + v + '/' + st.cap + '</div><div class="bar"><i style="width:' + v + '%"></i></div>';
     const log = (S.affLog || []).filter(a => a.id === sel).slice(-6).reverse();
     if (log.length) h += '<div class="note">' + log.map(a => (a.n > 0 ? '▲ +' : '▼ ') + a.n + ' ' + esc(a.why || '')).join(' · ') + '</div>';
     h += '<div class="hh">DECK</div>';
     if (S.flags['deck_known_' + sel] && p.deck) h += '<div><b>' + esc(p.deck.name) + '</b></div><div class="note">Heroes: ' + esc(p.deck.heroes.join(', ')) + '</div>' + p.deck.key.map(k => '<div class="eff"><b>' + esc(k[0]) + '</b>: ' + esc(k[1]) + '</div>').join('');
-    else h += '<div class="note">You do not know what ' + esc(p.first) + ' plays yet. Ask, or guess from the clues.</div>';
-    const bonds = p.bonds.filter(b => b.pub && b.from <= S.day && met(b.w) && DATA.people[b.w]);
-    h += '<div class="hh">RELATIONSHIPS YOU KNOW OF</div>' + (bonds.length ? bonds.map(b => '<div>' + esc(DATA.people[b.w].name) + ' — ' + esc(b.label) + '</div>').join('') : '<div class="note">Nothing yet.</div>');
+    else h += '<div class="note">You do not know what ' + esc(shownName(sel).split(' ')[0]) + ' plays yet. Ask, or guess from the clues.</div>';
+    const bonds = p.bonds.filter(b => knowsRel(sel, b.w) && DATA.people[b.w]);
+    h += '<div class="hh">RELATIONSHIPS YOU KNOW OF</div>' + (bonds.length ? bonds.map(b => '<div>' + esc(shownName(b.w)) + ' — ' + esc(b.label) + '</div>').join('') : '<div class="note">Nothing yet.</div>');
     h += '</div>'; body.innerHTML = h;
     $('pic').appendChild(headCanvas(sel, 48)); $('pback').onclick = () => draw('people');
     return;
   }
   if (!ids.length) { body.innerHTML = '<div class="note">You have not met anyone yet.</div>'; return; }
   const g = document.createElement('div'); g.className = 'pgrid';
-  ids.forEach(id => { const p = DATA.people[id], v = affection(id), st = stageOf(id, v); const b = document.createElement('button'); b.className = 'pcard'; b.appendChild(headCanvas(id, 48)); const d = document.createElement('div'); d.style.minWidth = 0; d.innerHTML = '<b>' + esc(p.first || p.name) + '</b><small>' + esc(st.name) + ' · ' + v + '</small><div class="bar"><i style="width:' + v + '%"></i></div>' + (S.flags['deck_known_' + id] && p.deck ? '<small>' + esc(p.deck.name) + '</small>' : ''); b.appendChild(d); b.onclick = () => draw('people', id); g.appendChild(b); });
+  ids.forEach(id => { const p = DATA.people[id], v = affection(id), st = stageOf(id, v); const b = document.createElement('button'); b.className = 'pcard'; b.appendChild(headCanvas(id, 48)); const d = document.createElement('div'); d.style.minWidth = 0; d.innerHTML = '<b>' + esc(shownName(id).split(' ')[0]) + '</b><small>' + esc(st.name) + ' · ' + v + '</small><div class="bar"><i style="width:' + v + '%"></i></div>' + (S.flags['deck_known_' + id] && p.deck ? '<small>' + esc(p.deck.name) + '</small>' : ''); b.appendChild(d); b.onclick = () => draw('people', id); g.appendChild(b); });
   body.innerHTML = ''; body.appendChild(g);
 }
 function deckPanel(coll){

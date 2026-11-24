@@ -339,6 +339,22 @@
   [nathan] "NATHAN WHISPER! SEVEN! WAR COUNSELORS! I SNORE!"
   [baylee] "Baylee Halvorsen. Seven." A long pause. "…Yup."
   @meet freya hedda trixie inya livvie rana maisie freddie fiona leona ed tomi sammy tobias dmitri
+  @fullname livvie tomi trixie freddie
+  @rel freya hedda
+  @rel freya trixie
+  @rel hedda trixie
+  @rel inya livvie
+  @rel inya rana
+  @rel livvie rana
+  @rel maisie fiona
+  @rel maisie leona
+  @rel fiona leona
+  @rel sammy tobias
+  @rel sammy dmitri
+  @rel tobias dmitri
+  @rel maisie freddie
+  @rel fiona freddie
+  @rel leona freddie
   [odalys] "And last, as in the list, the Wildcard. Stand up, mijo. Everybody is looking at you anyway."
   @choice
     > "Rowan Vance. Seven. I'm — happy to be here."

@@ -1,0 +1,553 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · 10:25 · LAND IN SICHT · DIE GROSSE SZENE AN DECK
+#  Das Horn läutet das Ende der Überfahrt ein. Der Bildschirm wird geleert (alle Figuren des letzten Gesprächs weg),
+#  dann sammelt sich das ganze Schiff an der Reling. Rowan hat bis zum Anlegen Zeit für drei Gruppen (Bug, Salon-Treppe,
+#  Heck, Mitte), dann kommt das Finale und DIREKT danach die Gangway (ferry_docks in 13-ferry-docks.pps).
+#  Alle Dialoge hängen davon ab, ob Rowan die Figur kennt und wie die Zuneigung ist; wer noch fremd ist, stellt sich vor.
+#  Wissensstand: Namen fallen vor @meet, Beziehungen und Notizen nur, wenn sie hier gesagt werden.
+# ═══════════════════════════════════════════════════════════════════
+
+@event ferry_arrival scene=ferry_arrival day=1 from=10:25 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
+
+@scene ferry_arrival bg=ferry_deck
+  @clear
+  @set arrival_visits=0
+  @goto ferry_deck 0
+  @fx fadeout 400
+  @wait 300
+  @fx fadein 400
+  @sfx heavy_impact
+  A horn sounds, long and flat and enormous, so deep that the deck plates sing with it. The fixtures rattle in their brackets, and a gull that has been sitting on the rail since dawn gives up the whole business and leaves.
+  For a second nobody on the ship says anything at all.
+  Then the whole vessel seems to turn to face one way.
+  People abandon whatever they were doing. Bags are shouldered. Somebody calls "Island!" and somebody else, from the stern, calls "We KNOW."
+  The captain's voice comes on the loudspeaker, unhurried and warm.
+  [?Loudspeaker] "Fifteen minutes, folks. Mind your luggage and your elbows. The ladies and gentlemen who are going to want a last look, the rail is wide enough for all of you. The gentleman with the lifebuoy knows who he is."
+  You are standing at the rail with your hands on the wet iron, and you are, for the first time in two hours, entirely alone.
+  The island has stopped being a picture. It has trees on it now.
+  A grey cone of volcano, a thread of smoke leaning off its top. Jungle pouring down the flanks to a ribbon of pale sand, and, on the sand, tiny and perfect, a long wooden pier with a blue arch at its end. A little red cable car crawls along a wire over the canopy like a bead on a string. The sea around it is so clear that you can see, where the ship's shadow falls, a line where the green turns to blue.
+  ~ That's it. That's where I live now.
+  ~ Fifteen minutes. And then I won't be a person on a boat any more. I'll be a person on an island.
+  Behind you, the iron door of the saloon bangs open, and the whole ship starts to arrive.
+  @scene arrival_hub
+  @clock 10:40
+  @scene arrival_finale
+  @scene ferry_docks
+
+# ───────────────────────────── DAS ANGEBOT: WOHIN? ─────────────────────────────
+
+@scene arrival_hub
+  @label top
+  @if var:arrival_visits=3
+    @end
+  @clear
+  @if var:arrival_visits=0
+    Four knots of people have formed along the rails: the bow, the saloon stairs, the stern, and the knot of small commotion in the middle of the deck. The ship is turning in towards the pier, slowly, like a very large animal making up its mind.
+  @elif var:arrival_visits=1
+    The island has moved. It is no longer a place in the distance but a coast, with a surf line and a smell: wet earth and salt and something green, frying.
+  @else
+    The pier is a clear line now, with a speck on it that is waving. You have about five minutes.
+  @choice Where do you go?
+    > Join the crowd at the bow rail. @if not arr_bow
+      @scene arrival_bow
+      @flag arr_bow
+      @add arrival_visits +1
+      @time 4
+      @jump top
+    > Go to the foot of the saloon stairs, where the table crowd is standing. @if lounge_seen and not arr_stairs
+      @scene arrival_stairs
+      @flag arr_stairs
+      @add arrival_visits +1
+      @time 4
+      @jump top
+    > Go aft, to the stern rail. @if not arr_stern
+      @scene arrival_stern
+      @flag arr_stern
+      @add arrival_visits +1
+      @time 4
+      @jump top
+    > Go to the middle of the deck, where somebody is organising a photograph. @if not arr_mid
+      @scene arrival_mid
+      @flag arr_mid
+      @add arrival_visits +1
+      @time 4
+      @jump top
+    > Stay where you are and watch the island come.
+      ~ I've heard enough from everyone. I'd like to see it arrive.
+      @end
+
+# ───────────────────────────── GRUPPE 1: DER BUG ─────────────────────────────
+
+@scene arrival_bow
+  @clear
+  @enter nathan
+  @enter baylee
+  @enter ed
+  @enter mikoto
+  The bow is the loudest place on the ship, which means that it is also where Nathan is.
+  @if follow_nathan
+    [nathan=laughing] "ROWAN! Over here! Look! Look at it! I counted! There are TWELVE gulls! I counted every single one of them and Baylee did not argue once!"
+    [baylee] "There were thirteen."
+    [nathan=grin] "Thirteen! He's right! He's always right! It's very annoying!"
+  @else
+    [nathan=laughing] "ROWAN! You came! I SAVED you a bit of rail! It's this bit! It's got a rivet! It's the best bit!"
+    [baylee] "He's been guarding it for ten minutes."
+    [nathan=grin] "I've been GUARDING it! I was ready to FIGHT for it!"
+  @if aff:nathan>=17
+    Nathan turns round with his back to the rail. For a moment the grin goes out of his face, and what is underneath it looks younger and more worried.
+    [nathan] "Rowan. Can I say a thing? Before everybody comes. It's — I'm glad you took my hand. This morning. When I stuck it out. Everybody else has been running away from me since the harbour, and I was getting really loud about it, so nobody would notice."
+    [rowan] "Nathan, you were extremely loud."
+    [nathan=happy] "It WORKED! You noticed!"
+    @aff nathan +2 | Told him he was glad
+  @elif aff:nathan>=11
+    [nathan=happy] "Big day, Wildcard! Big day! Do you know what they do on the first night? I read about it. There's a feast and a speech, and somebody gets thrown in the sea. I'm hoping it's not me. I'm hoping it's Baylee."
+    [baylee] "I'd float."
+    [nathan=laughing] "He WOULD."
+  @else
+    [nathan] "Hey." A pause, quite uncharacteristic. "I hope we're okay. I think I talk a lot. People tell me. I'm trying to say that I know that, and I'll — I'll dial it back. For you. By, like, fifteen percent."
+    [rowan] "Fifteen percent would be a start."
+    [nathan=happy] "FIFTEEN! Watch me!"
+  Baylee has been standing very still at the rail, with his hat pushed back and his huge forearms folded on the iron. He looks like something the ship was built round.
+  @if aff:baylee>=14
+    [baylee] "Rowan."
+    He steps aside, exactly one pace, which in Baylee's case opens up a space the width of a doorway.
+    [baylee] "Better view from here. Sun's behind the funnel. You can see the whole row of roofs."
+    You look. A line of tiny weathered bungalows is strung along the curve of the cove, like a necklace of matchboxes.
+    [baylee] "That's us. That's the last one. Seven."
+    [rowan] "How can you tell?"
+    [baylee] "It's the one that looks like it's trying not to be noticed."
+    @note baylee | Notices things and says very little. Likes quiet company.
+    @aff baylee +2 | Gave you the good spot
+  @else
+    [baylee] "Morning, Rowan. Almost afternoon." A pause. "Almost there."
+  @if met:ed
+    [ed] "THERE'S A WATERFALL!" Ed is standing on the lowest bar of the rail with one hand wrapped round a stanchion and the other pointing at the cliff. The hat is holding on by a miracle. "On the north side! Between the green bit and the other green bit! See it? Does anyone see it? I think it goes all the way down!"
+    @if aff:ed>=12
+      [ed] "Rowan! You've got to come with me when we land! There's a path! There's probably a path! There is DEFINITELY a place where a path should be!"
+      [rowan] "Ed, if you fall off, I'm not rescuing you off the ship."
+      [ed] "Is that dangerous? That's a bit dangerous! Good!"
+      @aff ed +1 | Cheered him on, from the rail's safe side
+    @else
+      [ed] "Is it dangerous, that waterfall? Or only a bit dangerous?" He considers. "I'm hoping very dangerous."
+  @else
+    A boy in a battered cowboy hat is standing on the lowest bar of the rail with one hand wrapped round a stanchion and the other pointing at the cliff. The hat is holding on by a miracle.
+    [ed?] "THERE'S A WATERFALL! On the north side! Between the green bit and the other green bit! Does anyone see it? I think it goes all the way down! Is it dangerous? I hope it's dangerous!"
+    [nathan=grin] "That's ED! Ed's from a RANCH! I've talked to him for four minutes and I know his horse's name!"
+    [ed?] "Ed Venture! Lazy V Ranch! The horse is Pickles! Hello!"
+    @meet ed
+    @note ed | Hangs off things. Asks whether everything is dangerous, hopefully.
+  @if met:mikoto
+    [mikoto] "Oh — oh, Rowan, hello. Sorry. Look, there's — I think I have to sit down. Everything is — everything is so much larger than the pictures." He laughs, high and brief, and presses a hand over his mouth. "Sorry. I'm looking. I'm looking at it."
+    [rowan] "You can hold the rail if you need to."
+    [mikoto] "Thank you." A quick, startled glance behind the lenses. "That's — very nice. That's nicer than 'calm down'."
+    @aff mikoto +1 | Offered him the rail
+  @else
+    A thin boy in round glasses is next to the gull-feeding rail, holding on with both hands and breathing very carefully.
+    [mikoto?] "Sorry. Sorry! I'm — it's just a very big volcano. I'm making a list. I'm — oh, you're looking at me. Mikoto. Yamaguchi. I'm Mikoto, I'm having a very good time, it just doesn't look like it."
+    @meet mikoto
+    @note mikoto | Laughs when frightened. Keeps lists.
+    [rowan] "Rowan. It's a big volcano. I'm having a good time too. It just doesn't look like it either."
+    [mikoto] "Oh." His face does something complicated and grateful. "Oh, that's — thank you. Row-Row. Would it — sorry. May I? Row-Row?"
+    @aff mikoto +2 | Said he was nervous too
+  A bell rings somewhere, thin and bright. The deck lurches an inch to starboard as the ship comes round.
+  @if follow_nathan
+    [nathan=laughing] "WE'RE TURNING! The island's TURNING! Baylee, the island is TURNING!"
+    [baylee] "It's us."
+    [nathan=grin] "It's US! WE'RE TURNING!"
+  @else
+    [nathan=laughing] "WE'RE TURNING! The island's TURNING!"
+    [baylee] "It's us, Nathan."
+  @time 3
+
+# ───────────────────────────── GRUPPE 2: DIE SALONTREPPE ─────────────────────────────
+
+@scene arrival_stairs
+  @clear
+  @enter gideon
+  @enter inya
+  @enter tomi
+  @enter noor
+  @enter livvie
+  The saloon stairs have turned into a gallery. The people from the table have come up with their drinks and their opinions, and have arranged themselves on the iron steps like an audience at the end of a play that nobody has quite agreed to applaud.
+  @if ferry_table_won
+    Gideon is standing on the bottom step with a single duffel at his feet. It is the first time you have seen him without all four of his cases within arm's reach. He is looking at the island with the controlled attention of a man re-reading a contract.
+    [gideon] "Vance."
+    [rowan] "Gideon."
+    [gideon] "I should like to say something before this ship docks, because I shall not say it ashore." A pause so level you could set a tray on it. "That was well played. And I was wrong about the collar."
+    [gideon] "I do not say that, as a rule. You will want to note the date."
+    @aff gideon +3 | Heard him say it
+    @note gideon | Corrects himself when he has to, and hates it.
+  @elif ferry_table_lost
+    Gideon is leaning against the rail, immaculate. Four dark leather cases stand at his heels like well-trained dogs.
+    [gideon] "Vance. I trust you are rested. The hill is — considerable."
+    [rowan] "I'll manage."
+    [gideon] "I have no doubt." A quarter-inch of a smile. "You carry a stake like a man who has carried a few. I find that I do not dislike it."
+    @aff gideon +1 | Took the stake with grace
+  @elif ferry_inya_won
+    Gideon has two bruise-coloured shadows under his eyes that were not there at breakfast. He stands apart from the others, gloved hands folded. Beside his feet there is a small rucksack, which is not his. It belongs to someone shorter.
+    [gideon] "I am told you have an opinion of the outcome, Vance."
+    [rowan] "I think it was a very good game."
+    [gideon] "It was a very good game." He says it like pulling a thread. "She was patient. I had not accounted for patience."
+    @note gideon | Lost the table to Inya. Took it hard, and took it quietly.
+  @elif ferry_table_settled
+    Gideon is turning a pair of white gloves slowly over in his hands. He has the look of a man who has had an idea that he did not choose and is, against every instinct, quite pleased with.
+    [gideon] "The second table, Vance. I am told it will be called the Commons Table, and that Miss Al-Sayed has taken the precaution of writing it into the Charter." A beat. "I did not know it was possible to be outflanked by an article."
+    @aff gideon +1 | Respected the second table
+  @else
+    Gideon has resumed his post at the end of the table, even though the table is now a long way below. The habit seems to be stronger than the room.
+    [gideon] "Vance." A very small, very formal nod. "The table remains closed. I find that I am less pleased about it than I expected."
+  @if ferry_inya_won
+    [inya] "Hey." Fast, sharp, trembling. "Hey, Wildcard. I won. I WON. You were there. You told me how."
+    [rowan] "You waited."
+    [inya] "I waited." She says it with a kind of wonder. "He never got to play me, not properly. I did it by not doing anything."
+    @aff inya +2 | Shared her win
+  @elif ferry_inya_lost
+    Inya is at the very end of the step with her deck box pressed to her chest and her chin up. She is, you notice, not looking at anyone.
+    [inya] "Don't say anything nice."
+    [rowan] "I wasn't going to."
+    [inya] "…Good." A beat. "…What were you going to say?"
+    [rowan] "That I'd like a game, on the island. On a bench. Loser buys the rolls."
+    [inya] "…" The amber eyes narrow, and something very small and very fierce flickers behind them. "Six Smug Coins."
+    @aff inya +3 | Offered a rematch
+    @flag inya_rematch_offered
+  @elif met:inya
+    [inya] "Hey." Flat, careful, as if she were testing a stair. "Are we — are you going to the Commons? Bungalow three. I asked. It was in the letter."
+    [rowan] "Seven."
+    [inya] "Seven." She considers it, with the air of a girl memorising a map. "That's — fine. That's four doors down. I'll know where to find you."
+    @aff inya +1 | Compared bungalows
+  @else
+    A small girl with mint-green tails held by a bunny clip is standing on the lowest step with a deck box pressed to her chest, and her eyes are fixed on Gideon as if he were an exam.
+    [inya?] "…You. The one without the jacket."
+    [rowan] "Rowan."
+    [inya?] "Inya. Bell. Inya Bell." A beat. "I'm in the Commons. Don't say anything about the bunny."
+    @meet inya
+    @note inya | Fiercely competitive. Keeps rabbits. Do not say 'bunny'.
+  @if met:tomi
+    [tomi] "Wildcard! Business is booming!" He is at the middle of the stair, a binder open on his knee, accepting and refusing money at the same time, like a very small stock exchange. "Everybody's got a take on whether you carried it right. I've got four to one that Gideon never speaks to you again, and three to one that he does. It's the second one that scares me."
+    [rowan] "Who's winning?"
+    [tomi] "The man who's not betting." He grins. "Friend price, Rowan. Everything's friend price. It's very stressful."
+    @aff tomi +1 | Joked with the bookie
+  @else
+    A boy in a yellow bandana, with a canvas bag of binders, is conducting business on the middle step with an air of tired joy.
+    [tomi?] "Wildcard! No — hold on — you're THE Wildcard. Don't move. Tomás Reyes. Tomi. I run the book."
+    @meet tomi
+    @note tomi | Runs the book on the ship. Everything has a friend price.
+  @if met:noor
+    [noor] "Rowan." She does not look up from the Charter, which she is reading as the ship slides in. "I am on article seven again. I find it comforting that the ship has its own rules about arrival. Rule four: no one may disembark before the gangway. I thought you would like to know."
+    [rowan] "Thank you, Noor."
+    [noor] "It is not a favour. It is information." A faint, dry smile. "It is possible that I am a little nervous."
+    @aff noor +1 | Accepted the rule with thanks
+  @else
+    A girl in a blue hijab is sitting on the second stair with a bound book open on her knee, and has marked her place with a pencil, as if the ship might not wait for her.
+    [noor?] "You are standing in the light. Forgive me." She does not seem to mind either way. "Noor Al-Sayed. You are the entrant in ink. I read the list twice. I find that it was nicely typed."
+    @meet noor
+    @note noor | Knows the Charter by heart. Wants to be a head judge.
+  @if met:livvie and livvie_fed
+    [livvie] "Quick thing." She is eating a cinnamon roll in tiny, exact bites, and keeping the other hand cupped under it to catch the crumbs.
+    [livvie] "I said I'd pay you back in information. Here's the information."
+    [livvie] "The Commons kitchen is the first bungalow. Mama Odalys runs it. Breakfast at six, supper at six. Do not be late. Do not be early. Do not say the word 'diet'."
+    [rowan] "Is that all?"
+    [livvie] "That's the whole payment. I've priced it. It's about right." A tiny, sideways look to see if it landed.
+    [livvie] "…It's also about to be six. So go and eat something."
+    @flag livvie_tip_odalys
+    @note livvie | Pays back every favour in information. Counts everything.
+    @aff livvie +2 | Paid you back in information
+  @elif met:livvie
+    [livvie] "Quick thing." She does not look up from the clipboard. "The Commons kitchen is the first bungalow. Mama Odalys. Breakfast at six, supper at six. Do not be late."
+    [rowan] "That's useful. Thank you."
+    [livvie] "That one was a free sample." A tiny, sideways look. "Don't get used to it."
+    @flag livvie_tip_odalys
+    @aff livvie +1 | Took the free sample
+  @else
+    A very pale, thin girl with a violet-black bob is standing at the bottom of the stairs with a pencil and a clipboard, and a cinnamon roll she is eating one tiny bite at a time, as if to make it last until Thursday.
+    [livvie?] "Quick thing. You look like you've not eaten." She says it to the clipboard. "I've eaten. I had a big breakfast. Livvie Thana."
+    @meet livvie
+    @note livvie | Trades, keeps lists, does not accept charity.
+  @time 3
+
+# ───────────────────────────── GRUPPE 3: DAS HECK ─────────────────────────────
+
+@scene arrival_stern
+  @clear
+  @enter jessica
+  @enter ashton
+  @enter sunny
+  @enter freddie
+  @enter marit
+  The stern is where the ship has put its grand gestures. The wake is long and white, the awning snaps in the breeze, and the stern rail is crowded with people who have each decided to be in a different film.
+  @if met:marit
+    [marit!] "**FRIENDS!** *ROMANS!* **COUNTRYMEN!** Lend me your ears — and your jackets, I'm not wearing mine, I have a *scarf* —"
+    [marit!] "**ACT ONE, SCENE LAST!** The *voyage ends!* The *island rises!* The *hero* — that is **YOU**, Rowan Vance — **steps ashore!**"
+    [rowan] "Marit, please sit down. You're on a bollard."
+    [marit!] "A bollard is a **PLINTH!**"
+    @if aff:marit>=13
+      She drops, abruptly, out of the big voice, into the quick wry one.
+      [marit] "I'm really glad you came to find me. I wasn't going to say that, there's a whole speech. It's got a pause in it. But you're here, and — it'd be silly not to say it."
+      @aff marit +2 | Dropped the act for him
+  @else
+    A girl in a flame-orange bow tie is standing on a mooring bollard with her arms flung out, reciting at the island.
+    [marit?!] "**ACT ONE, SCENE LAST!** The voyage ends! The island RISES! And there — look! — a **STRANGER** on the stern deck, in a rain jacket, who has no idea what comes *next!*"
+    [marit?!] "Marit Solberg! Theatre kid **EXTRAORDINAIRE!** We have not met, and I already love you, I have *decided* you are the lead!"
+    @meet marit
+    @note marit | Treats everything as a stage. Narrates, loudly.
+    [rowan] "Rowan. I'm not sure I'd know what to do with a lead."
+    [marit!] "Nobody does! That's what *rehearsals* are for!"
+  @if met:sunny
+    [sunny] "Wildcard! Come and look at THIS, I'm going to have a heart attack." She has her feet up on the lowest rail bar and is pointing at the shallows, which are the colour of a swimming-pool advert. "I can see the sand. From here. I can see the individual SHELLS. Do you know how long it's been since I was in water over a metre deep? Two days."
+    [rowan] "Two days isn't that long."
+    [sunny] "It's an *eternity.*"
+  @else
+    A tall girl is sitting on the lowest bar of the rail with her bare feet dangling, a towel round her neck, grinning at the shallows as if they were an old friend.
+    [sunny?] "Hey, Wildcard! Hey! You see this? I can see the SAND from here. I can see individual SHELLS!"
+    [rowan] "Rowan. Hello."
+    [sunny?] "Sunny Aldane. Lifeguard. Sports scholarship. I've been looking forward to a swim for two *days*, which I understand is not long, but it is to *me!*"
+    @meet sunny
+    @note sunny | Lifeguard on a sports scholarship. Says exactly what she thinks.
+  A girl in a pale-aqua swimming cap, with a red jacket worn open over a swimsuit, is climbing the stern rail.
+  @if met:freddie
+    [freddie] "Rowan! Jacketless! Hold this!" She hands you the jacket without looking round, which is, you realise, an instruction. "I've been timing it! Four hundred metres to the pier, a bit of a current, I can do it in eight minutes, easily. Eight and a half if the shark's about."
+    [sunny] "Freddie. FREDDIE. Get down."
+    [freddie] "I've done the maths!"
+    [sunny] "It's a *regulation*."
+    [freddie] "It's a very *short* regulation!"
+  @else
+    [freddie?] "Hey! Jacketless! Hold this!" She hands you the jacket without looking round, which is, you realise, an instruction. "I've been timing it! Four hundred metres to the pier, a bit of a current, eight minutes, easily. Eight and a half if the shark's about. Winifred Camara. Freddie. Hello!"
+    @meet freddie
+    @note freddie | Swimmer and diver. Wants to jump off the ship.
+    [sunny?] "FREDDIE. Get *down*."
+    [freddie?] "It's a very short regulation!"
+  The jacket is warm from the sun. The girl in it is already halfway over the rail with one foot on the outer bar, and the sea is a long way down.
+  @choice What do you do?
+    > "Freddie, the captain will have your head. Come back over."
+      [freddie] "Oh, *you're* no fun. Neither of you is any fun. I've got *five brothers.*"
+      She comes back over the rail like a cat from a garden wall and lands on her feet beside Sunny, who is gripping the back of her swimsuit strap with an expression of pure loving violence.
+      [sunny] "Thank you. I'd have caught her. I just didn't want to have to."
+      @aff sunny +2 | Helped her stop Freddie
+      @aff freddie +1 | Talked her down, kindly
+      @flag freddie_talked_down
+    > "Go on, then. I'll hold the jacket."
+      [freddie] "YES! A *friend!*"
+      She is gone before the word has finished. A long, clean, glittering arc over the stern rail and a very small white splash a long way down.
+      From somewhere over the bridge wing comes the captain's voice, not on the loudspeaker this time, just a man at the end of his patience: "THAT'S THIRTY-SEVEN. THAT'S THIRTY-SEVEN, AND NOT THIRTY-EIGHT, AND I WILL HAVE A WORD."
+      [sunny] "I'm going in after her. Hold my towel." She is already on the rail. "You — you're a *terrible* influence!"
+      [rowan] "I'm very sorry."
+      [sunny] "Don't be! It's the *best* thing anyone's done all day!" A whoop, a splash, and then two figures in the white water, one cheering, one swearing, both laughing.
+      @aff freddie +4 | Held the jacket
+      @aff sunny +1 | Was a bad influence, in the best way
+      @flag freddie_jumped
+      @exit freddie
+      @exit sunny
+    > Say nothing and hold out your hand for the mask.
+      [freddie] "…Wait." She looks down at your outstretched hand, and then at you. "That's not — you're taking my *mask*?"
+      [rowan] "I'm holding it. So that it doesn't fall in."
+      [freddie] "…That's actually the most responsible thing anyone's ever said to me." She comes back over the rail slowly, as if stepping out of a hot bath. "I'm leaving you with a very strong opinion of me."
+      @aff freddie +2 | Held the mask, not the argument
+      @flag freddie_talked_down
+  @if met:jessica
+    [jessica] "Rowan." She is the only person on the stern who is not in motion. She stands a little apart, with one gloved hand on the smallest of her caskets, and a bright lapis shawl over her shoulders that she did not have an hour ago. "I wished to say, before we land, that it was a pleasure to have been crossed to."
+    [rowan] "The pleasure was mine, Jessica."
+    [jessica] "I shall hold you to that." A small, genuine smile. "In writing, if necessary."
+    @aff jessica +1 | Answered in kind
+  @else
+    A girl in a lapis shawl is standing a little apart from the commotion with one gloved hand on a small leather casket. She has a silver swallow brooch at her throat and a look of patient serenity, like a lamp that has not yet been told it is the only light in the room.
+    [jessica?] "You are watching the water. So am I. It is a pleasant thing to share." She does not turn her head. "Jessica Montclair. I should offer my hand, but it is gloved, and the casket does not like to be left."
+    @meet jessica
+    @note jessica | Formal, gracious. Travels with three caskets of jewellery.
+  @if met:ashton
+    [ashton] "Vance! Rescue me." He is, as before, at the rail with a rose in one hand, and a look of tender intent aimed squarely at Jessica's profile. "I have prepared a speech. It has four paragraphs and a joke about gulls. She has looked at the sea for fourteen minutes. I think I'm making progress."
+    [rowan] "You're not."
+    [ashton] "I am, old thing! I'm ten per cent less ignored than I was at breakfast."
+  @else
+    A tall boy with violet hair swept into a smooth dome is standing at the rail with a single red rose, and a very small silver knife folded in his other hand. His whole attention is directed at the girl in the lapis shawl.
+    [ashton?] "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does." He does not look round. "I'm told you are the entrant in ink. I have prepared a speech for the lady. It has four paragraphs and a joke about gulls."
+    @meet ashton
+    @note ashton | Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes.
+  @if met:victoria
+    [victoria] "Rowan." She is sitting on the dry bench under the striped awning with her parasol open, in the full sun, which does not seem to trouble her. "I have finished looking at the wake. It has become the sea. I should like to look at the island now."
+    [rowan] "Would you like me to stand somewhere?"
+    [victoria] "No. Sit, if you wish." A pause. "It is a very large island. I should like company in looking at it."
+    You sit. Neither of you says anything for most of a minute, and it is, to your surprise, the best conversation you have had all morning.
+    @aff victoria +2 | Sat with her
+  @else
+    On the dry bench under the awning a girl in a ruffled dress is sitting with a lace parasol open over her head, although she is already in the shade. Her wide sky-blue eyes are on the island, and her lips are moving very slightly, as if she were counting.
+    [victoria?] "Forty-one." She turns her head, slowly. "I was counting the palm trees on the nearest slope. There are forty-one. I wished to know. Victoria Capulet."
+    @meet victoria
+    @note victoria | Speaks slowly and exactly. Sits under a parasol even in the shade.
+    [rowan] "Rowan. That's a good number."
+    [victoria] "Thank you. I think so as well."
+  @time 3
+
+# ───────────────────────────── GRUPPE 4: DIE MITTE ─────────────────────────────
+
+@scene arrival_mid
+  @clear
+  @enter georgie
+  @enter pippa
+  @enter branden
+  @enter rana
+  @enter teobalt
+  In the middle of the deck, where the planks are widest and there is least to lean on, a small group has formed around a camera.
+  @if met:pippa
+    [pippa] "ROWAN! Perfect. You're in the right place. Hang on — don't move —" Click. "That's the arrival. That's the face. I've shot twelve people now with that face. Everybody's got the same face. It's lovely."
+  @else
+    A girl with a heavy old film camera round her neck is standing on a crate with her eye pressed to the viewfinder, arranging four people with a series of small, firm hand-signals.
+    [pippa?] "You! Stranger! Yes, you! Stand there. No, there. No — in front of the lifeboat. Perfect. Hold it —" Click. "Pippa Lund. I'm the photographer. Nobody asked me to be. I've shot twelve people now. Everyone's got the same face when the island arrives. It's lovely."
+    @meet pippa
+    @note pippa | Photographs everyone. Film only.
+  @if met:georgie
+    Georgie is standing on the lowest rung of the lifeboat ladder, with a deck box in one hand and the green dragon plush in the other, and her eyes are enormous. She has not said anything, but she is smiling, a small, astonished, private smile, the way you smile when you are alone with a thing you love.
+    [georgie] "Hi, Rowan." Barely audible. "Ember's looking. She's never — she's never seen an island. It's — it's bigger than the pictures. Is that normal?"
+    [rowan] "I think that's what an island's meant to be like."
+    [georgie] "…Oh. Good." She holds the plush a little higher. "She'll be pleased."
+    @aff georgie +1 | Told her it was normal
+  @else
+    A small girl in a jacket too big for her is standing on the lowest rung of the lifeboat ladder with a deck box in one hand and a green dragon plush in the other, and her eyes are enormous. She has not said anything, but she is smiling, a small, astonished, private smile.
+    [georgie?] "…Sorry. Is this your ladder?"
+    [rowan] "No, it's anybody's. I'm Rowan."
+    [georgie?] "Georgie. Santa. Georgie Santa." She looks at the plush. "This is Ember. She's — she hasn't seen the island."
+    @meet georgie
+    @note georgie | Very shy. Very good at cards. Carries a dragon plush named Ember.
+  @if met:branden
+    [branden] "ROWAN! Jacketless! Look! I've got it!" He is holding the lifebuoy over his head like a trophy, and he is, with great delicacy, not looking at the bridge wing. "Nobody saw. Nobody saw anything. I have a lifebuoy and a clean conscience."
+    [?Captain Stroud] "BRANDEN SUNFLOWER. I CAN SEE YOU. I HAVE SEEN YOU SINCE THE FUNNEL. I AM A CAPTAIN. MY WHOLE JOB IS SEEING."
+    [branden] "…Technically it's an *exercise*."
+    @if branden_prank_buddy
+      [branden] "Rowan! Tell him it's an exercise! You timed it! You're my WITNESS!"
+      [rowan] "I timed it, Captain. It was eleven seconds."
+      [?Captain Stroud] "Eleven seconds is a *record*, young man. Put it back."
+      @aff branden +2 | Stood up for him
+    @else
+      [branden] "…It's fine. It's FINE. Put it back. I know."
+  @else
+    A small boy with flame-orange spikes of hair is holding a lifebuoy over his head, and is, with great delicacy, not looking up at the bridge wing.
+    [branden?] "Nobody saw! Nobody saw anything! I have a lifebuoy and a clean conscience!"
+    [?Captain Stroud] "YOU, SIR. WITH THE HAIR. I CAN SEE YOU. I HAVE SEEN YOU SINCE THE FUNNEL. I AM A CAPTAIN. MY WHOLE JOB IS SEEING."
+    [branden?] "…Technically it's an *exercise*." A sidelong look. "Branden Sunflower. National champion. Under tens. Two years running. You can write it down."
+    @meet branden
+    @note branden | Ten, loud, and a national champion. Pranks everyone.
+  @if met:rana
+    On the top step of the iron stair to the wheelhouse, a girl with two fat puffs of rose-brown hair is sitting, knees drawn up, with her back to the crowd and her eyes on the island.
+    @if aff:rana>=11
+      [rana] "…Hey."
+      [rowan] "Hey."
+      [rana] "Don't tell me it's pretty."
+      [rowan] "I wasn't going to."
+      [rana] "It's pretty. I know it's pretty. I know what it looks like when it's —" She stops. "…I've seen it before. Last year. Don't ask."
+      @note rana | Has been to the island before. Will not say why.
+      @aff rana +3 | Didn't ask
+    @else
+      [rana] "…What."
+      [rowan] "Just standing."
+      [rana] "Fine." A pause. "Don't talk."
+  @else
+    On the top step of the iron stair to the wheelhouse a girl is sitting with her knees drawn up and her back to the crowd. Her hair is gathered in two fat rose-brown puffs, and her eyes are on the island.
+    [rana?] "…No."
+    [rowan] "I haven't said anything."
+    [rana?] "Rana. That's all you get."
+    @meet rana
+    @note rana | Scowls. Keeps to herself.
+  @if met:teobalt
+    [teobalt] "Rowan. Excellent timing." He is standing perfectly straight next to the stair, in his long red coat, with the clipboard at chest height and the spare pen behind his ear, and he is counting heads aloud under his breath. "I am at forty-one on the starboard side. I shall need you at forty-two."
+    @if has_unloading_list
+      [teobalt] "The list is holding. The duffels will come off first, the trunks second, and the tuba third. I believe the order is correct. I will accept corrections until the gangway."
+      [rowan] "It's teal."
+      [teobalt] "It is *very* teal." A small, bright pleasure. "Thank you for noticing."
+      @aff teobalt +1 | Noticed the teal again
+    @else
+      [teobalt] "I have drawn up an unloading order. You are somewhere in the middle. I am sorry. It is nothing personal. It is alphabetical."
+  @else
+    A boy in a long red coat buttoned to the collar is standing perfectly straight beside the stair with a clipboard at chest height, counting heads aloud, under his breath, to the nearest crate.
+    [teobalt?] "Forty-one. Forty-two. Excuse me — you are in the way of the count. Not unkindly. It is a *fact*. Teobalt Ferrant. I am making a list of the order in which we leave."
+    @meet teobalt
+    @note teobalt | Makes lists. Organises everything.
+    [rowan] "Rowan. How am I doing?"
+    [teobalt] "You are in the middle. It is alphabetical. It is nothing personal."
+  @if met:pippa
+    Pippa jumps off the crate with the camera held out in front of her like a lantern.
+    [pippa] "Right! Everybody! Group photo! Everybody who's here! Georgie, you're at the front. Branden, drop the buoy. Rana — Rana, I can see your elbow, I'll take it. Teobalt, stand — no, you're fine, you're fine, you're always fine."
+    @if pippa_photo_promised
+      [pippa] "And Rowan, you're in the middle, because you've earned it. I said you'd get a photograph. Well, now you're in one."
+    [pippa] "Everyone say — I don't know — 'island'!"
+    All of you, awkwardly, in a ragged line, say "island."
+    Click.
+    @choice
+      > "Wait. Give me the camera. You should be in one."
+        [pippa] "Hm?" The camera does not move for a moment, and then, very slowly, it comes down. "…What?"
+        [rowan] "You're in none of these. You've shot twelve people. I want one of you. In front of the island. Here."
+        [pippa] "That's — nobody ever — it's a rule. There's always one person behind the —" She stops. She looks at the camera, and at you, and at the lifeboat ladder behind her, where Georgie has stopped breathing. "…Okay. Okay. Just — don't do anything clever. Just — hold it straight."
+        You take the camera. It is heavier than you expected, with a cold brass weight that fits the heel of the hand. You look through the viewfinder. A freckled girl in a yellow bow tie is standing in front of an island, trying, with enormous effort, not to pose.
+        [rowan] "Don't try. Just look at the island."
+        She looks at it. Her face does something you cannot name, and you press the shutter.
+        Click.
+        [pippa] "…" She is very quiet. "Is that — how did it look?"
+        [rowan] "Like you."
+        [pippa] "…That's the nicest thing anyone's ever said about a photograph." A very small, unguarded smile. "Thank you."
+        @note pippa | Never appears in her own photographs. You took one of her.
+        @aff pippa +5 | Took her photograph
+        @flag pippa_photographed
+      > Smile for the picture and say nothing else.
+        [pippa] "Perfect. Lovely. *Everyone* looks good when the island arrives. It's a rule."
+        @aff pippa +1 | Was a good sport
+  @else
+    The girl with the camera jumps down off the crate.
+    [pippa?] "Right! Everybody! Group photo! Georgie, you're at the front. Everyone say 'island'!"
+    All of you, awkwardly, in a ragged line, say "island." Click.
+  @time 3
+
+# ───────────────────────────── DAS FINALE ─────────────────────────────
+
+@scene arrival_finale
+  @clear
+  @set fin_n=0
+  The bell rings again, three times, loud and clear. The engine note drops. All round you, the ship, which has been a collection of separate little worlds all morning, slowly becomes one.
+  Everyone has come to the rails.
+  @enter nathan
+  @enter baylee
+  @add fin_n 2
+  @if met:georgie and not var:fin_n=6
+    @enter georgie
+    @add fin_n 1
+  @if met:pippa and not var:fin_n=6
+    @enter pippa
+    @add fin_n 1
+  @if met:ed and not var:fin_n=6
+    @enter ed
+    @add fin_n 1
+  @if met:inya and not var:fin_n=6
+    @enter inya
+    @add fin_n 1
+  @if met:marit and not var:fin_n=6
+    @enter marit
+    @add fin_n 1
+  @if met:branden and not var:fin_n=6
+    @enter branden
+    @add fin_n 1
+  [nathan=laughing] "THERE! THE PIER! Everybody look at the PIER! There's people on the pier! They're WAVING!"
+  [baylee] "It's the welcome."
+  [nathan=grin] "WELCOME!!"
+  @if met:georgie
+    [georgie] "…They're very far away. They're — they're waving at us. All of us." A tiny pause. "Is that all right? To be waved at?"
+    [pippa] "It's the best part. You wave back."
+    Georgie raises one hand an inch off the rail, and holds it there as if she were checking whether it would be taken away.
+  @if met:ed
+    [ed] "They've got a CABLE CAR! Is that dangerous? Does it go over the volcano? Can we go on it? Can we go on it TODAY?"
+  @if met:inya
+    [inya] "That's an arch." She is standing on tiptoe at the rail, with her deck box under her arm, looking at the blue gate at the end of the pier. "Gold letters. It says 'WELCOME, DUELISTS'. They know." A fierce pause. "They know what we are."
+  @if met:marit
+    [marit!] "**FIN!** *CURTAIN!* **THE SEA PARTS, AND THE HEROES ARRIVE!** I am going to cry. I'm *prepared* to cry. I have a *handkerchief* —"
+  @if met:branden
+    [branden] "I'm going to be the first one off the gangway! I've decided! I'll hold the rail! No-one will stop me!"
+    [baylee] "I'll be on the gangway."
+    [branden] "…I'll be the *second* one off."
+  The engine falls from a thrum to a murmur. The pier swings round, huge and brown, and all at once you can see individual planks, each with its own bleach of salt, and each stained in its own particular way by forty years of boots.
+  @if arr_bow
+    ~ I did that. I did all of that. I talked to people today.
+  @else
+    ~ I haven't talked to half of them. I'll have to.
+  ~ Whatever I do on the island, I'll start it here.
+  A long, deep note from below, like a cello being played by a mountain. A ripple through the soles of your feet. The ship shudders once, very gently, and then stops.
+  [?Loudspeaker] "Ten-forty on the nose. Mind the gap."
+  @sfx heavy_impact
+  Nobody moves.
+  And then somebody, near the bow, starts to cheer.
+  @clear

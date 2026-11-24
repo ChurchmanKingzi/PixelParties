@@ -112,6 +112,7 @@
       [branden] "I *file* them." Dignified. "Technically that's a different thing."
       @aff branden +2 | Let him boast
       @flag chat_branden_1
+      @note branden | National champion, under tens, two years running. Files the trophy letters in a drawer.
       @time 2
       @jump top
     > "What's the best prank you've ever pulled?" @if not chat_branden_2
@@ -121,6 +122,7 @@
       [branden] "Don't tell my mum I said 'roof'. She thinks it was a window."
       @aff branden +2 | Asked about the pranks
       @flag chat_branden_2
+      @note branden | Pranks: the bucket, and every shoe in the school gym on the roof.
       @time 2
       @jump top
     > "Aren't you supposed to be in bed at some point? Isn't there a curfew?" @if not chat_branden_3
@@ -130,6 +132,7 @@
       [branden] "*Me!* National champion!" A very small, very brief flash of something different. "…The other kids on the ship get a lot of rules. I just like it when nobody can find me."
       @aff branden +1 | Asked about the rules
       @flag chat_branden_3
+      @note branden | Ignores curfews: 'an idea other people have about me.'
       @time 2
       @jump top
     > "Have you met Georgie? The girl with the dark-blue feather?" @if met:georgie and not chat_branden_4
@@ -139,6 +142,8 @@
       [branden] "…It's *annoying*. She used to be the youngest. Now it's me. And everyone's still looking at her *first*."
       @aff branden +2 | Listened
       @flag chat_branden_4
+      @note branden | Is jealous that Georgie used to be the youngest.
+      @rel branden georgie
       @time 2
       @jump top
     > Steer the talk to cards. @if not deck_known_branden
@@ -246,6 +251,7 @@
       [freddie] "It explains *everything*."
       @aff freddie +2 | Asked about her family
       @flag chat_freddie_1
+      @note freddie | Middle of five brothers, three older and two younger. One bathroom, no shame.
       @time 2
       @jump top
     > "What's your favourite thing in the sea?" @if not chat_freddie_2
@@ -253,6 +259,7 @@
       [freddie] "I want to draw all of them. Every creature in the sea. I keep a notebook. It's waterproof."
       @aff freddie +2 | Asked about the sea
       @flag chat_freddie_2
+      @note freddie | Loves octopuses. Keeps a waterproof notebook.
       @time 2
       @jump top
     > "Did you say you're going to design cards?" @if not chat_freddie_3
@@ -261,6 +268,7 @@
       [freddie] "Then they'll have to put a *rule* about it." She grins. "Isn't that the best thing about cards? You get to make the rules."
       @aff freddie +3 | Admired her card
       @flag chat_freddie_3
+      @note freddie | Is in the Design stream and wants to draw all the sea cards.
       @time 2
       @jump top
     > "You and Sunny both swim, don't you?" @if met:sunny and not chat_freddie_4
@@ -268,6 +276,7 @@
       [freddie] "I'm going to let her think so for a *bit*."
       @aff freddie +1 | Mentioned Sunny
       @flag chat_freddie_4
+      @note freddie | Is racing Sunny at dawn.
       @time 2
       @jump top
     > Steer the talk to cards. @if not deck_known_freddie

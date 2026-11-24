@@ -15,6 +15,7 @@
 //   @bg x  @music x  @sfx x  @fx shake|flash|fadeout|fadein [ms]  @wait ms  @clear
 //   @enter id [x= y= h= flip]  @exit id  @move id x= [ms=]  @face id [flip]  @dim id
 //   @flag a b  @unflag a  @set k=v  @add k +n  @aff id +n | Begründung (Popup)  @meet id (Popup)  @deckinfo id (Popup)
+//   @rel a b  (Rowan erfährt die Beziehung)  @fullname id  (voller Name gefallen)  @note id | Text  (Notiz im Personenbuch)
 //   @follow id id  @unfollow id      Begleiter laufen auf der Karte hinter Rowan her und stehen in Gesprächen mit auf der Bühne
 //   [id!] Rede mit Schütteltext   Text darf **fett**, *kursiv* und {farbe:Text} enthalten (wie in Pixel Parties)
 //   @item "Name" [n]  @coins n  @card "Name" [n]  @learn place  @lock place  @unlock place
@@ -192,7 +193,34 @@ function compileScene(head, nodes, env) {
         if (think) st.think = v.text; else st.text = v.text;
         steps.push(st);
       }
+    } else if ((speaker || name) && !think) {
+      for (const part of splitBeats(text)) {
+        const st = Object.assign({}, base);
+        if (part.beat) { delete st.say; delete st.name; delete st.mood; delete st.shake; st.text = part.t; }
+        else st.text = part.t;
+        steps.push(st);
+      }
     } else steps.push(base);
+  }
+
+  // Tempo: "Rede." Handlung von mehr als fünf Wörtern. "Rede." wird zu drei Textboxen. Kurze Spielanweisungen
+  // ("Quietly.", "A beat.", "Eyes down.") bleiben bei der Rede.
+  function splitBeats(text) {
+    const parts = []; const re = /"[^"]*"/g; let last = 0, m;
+    const pushText = (s) => { s = s.trim(); if (s) parts.push({ q: false, t: s }); };
+    while ((m = re.exec(text))) { pushText(text.slice(last, m.index)); parts.push({ q: true, t: m[0] }); last = m.index + m[0].length; }
+    pushText(text.slice(last));
+    if (parts.length < 2 || !parts.some(x => x.q)) return [{ beat: false, t: text }];
+    const out = []; let cur = null;
+    const words = (s) => s.split(/\s+/).filter(Boolean).length;
+    for (let i = 0; i < parts.length; i++) {
+      const x = parts[i];
+      if (!x.q && words(x.t) >= 6 && i > 0) { if (cur) { out.push(cur); cur = null; } out.push({ beat: true, t: x.t }); continue; }
+      if (!x.q && words(x.t) >= 6 && i === 0) { out.push({ beat: true, t: x.t }); continue; }
+      if (!cur) cur = { beat: false, t: x.t }; else cur.t += ' ' + x.t;
+    }
+    if (cur) out.push(cur);
+    return out.length ? out : [{ beat: false, t: text }];
   }
 
   function cmd(n, node) {
@@ -224,6 +252,10 @@ function compileScene(head, nodes, env) {
         if (env.nameRe && env.nameRe.has(id) && !named.has(id)) env.warn(`${node.file}:${node.line}: @meet ${id}: der Name fiel in dieser Szene noch nicht (Popup zeigt ihn vorweg)`);
         steps.push({ run: raw(`(s,io)=>{ if (io && io.popup && !s.flags[${JSON.stringify('met_' + id)}]) io.popup({ type: 'met', id: ${JSON.stringify(id)} }); }`) });
         steps.push({ flag: 'met_' + id }); } break;
+      case 'rel': { const [a, b] = rest.split(/\s+/); ctx.cast.add(a); ctx.cast.add(b); ctx.sets.add('rel_' + a + '_' + b); steps.push({ flag: 'rel_' + a + '_' + b }); break; }
+      case 'fullname': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('fullname_' + id); steps.push({ flag: 'fullname_' + id }); } break;
+      case 'note': { const [id, ...tx] = rest.split(/\s+/); const text = stripQ(tx.join(' ').replace(/^\|\s*/, '')); ctx.cast.add(id);
+        steps.push({ run: raw(`(s)=>{ s.notes = s.notes || {}; const a = (s.notes[${JSON.stringify(id)}] = s.notes[${JSON.stringify(id)}] || []); if (a.indexOf(${JSON.stringify(text)}) < 0) a.push(${JSON.stringify(text)}); }`) }); break; }
       case 'follow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('follow_' + id); steps.push({ flag: 'follow_' + id }); } break;
       case 'unfollow': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); steps.push({ unflag: 'follow_' + id }); } break;
       case 'deckinfo': for (const id of rest.split(/\s+/)) { ctx.cast.add(id); ctx.sets.add('deck_known_' + id);

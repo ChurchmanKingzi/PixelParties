@@ -427,21 +427,30 @@
 @scene ferry_tomi
   @if not met:tomi
     He is small and quick, a yellow bandana knotted over spiky black hair, a canvas bag of binders at his hip. He has the cheerful, unhurried eyes of someone who is already counting what you have in your pockets.
+    He is sitting on the back of a bench rather than the seat, so that he can see the whole saloon at once. A pencil is tucked behind one ear. Another is in his hand. A third, you suspect, is somewhere about his person.
+    On his knee lies a binder, open to a page of tight columns of names and figures. People keep leaning in, whispering, and leaning out again, having parted with something.
     @if ship_knows_wildcard
-      [tomi?] "Wildcard! Wildcard Vance. Don't look at me like that, the whole ship's talking. Tomás Reyes. Tomi. I run the book."
+      [tomi?] "Wildcard! Wildcard Vance. Don't look at me like that, the whole ship's talking."
     @else
-      [tomi?] "Hey. New face. Tomás Reyes, Tomi, I run the book. And you are — the jacketless one, am I right? That makes you the ink name."
+      [tomi?] "Hey. New face. You're the jacketless one, am I right? That makes you the ink name."
+    [tomi?] "Tomás Reyes. Tomi. I run the book."
     @meet tomi
     @add ferry_talked +1
+    @note tomi | Runs the betting book on the ship. Everything has a friend price.
     @choice
       > "Rowan Vance, yes. I'll admit I'm not sure I'm ready for the whole ship to know it."
         [tomi] "Fair. Information's inventory. I won't trade yours for free."
+        [rowan] "That's reassuring. I think."
+        [tomi] "It's not meant to be reassuring. It's meant to be *accurate*."
         @aff tomi +2 | Was straight about it
       > "That's me. And what would a book on me pay, out of curiosity?"
         [tomi] "Even money that you don't throw up on the first duel. I've got ten on you. Friend price."
+        [rowan] "You've bet on me."
+        [tomi] "I've bet on *everyone*. It's the only way to make sure I'm always right about somebody." He grins. "It's a very lonely system."
         @aff tomi +1 | Played along
     [tomi] "You need sleeves. Friend price. Everybody's a friend, the price is the price."
     [tomi] "Smug Coins only, by the way. Mainland money is wallpaper out here."
+    @time 6
   @else
     [tomi] "Wildcard! Business?"
   @choice
@@ -498,11 +507,16 @@
 
 @scene ferry_magnus
   @if not met:magnus
-    Two benches back from the table, a wiry boy with slicked ginger hair has a tablet balanced on his knee and a stylus in his teeth. His sneakers are designer and still creased from the box. He has logged every game at the table. You can tell from the way his thumb hovers at the end of each round.
+    Two benches back from the table, a wiry boy with slicked ginger hair has a tablet balanced on his knee and a stylus in his teeth. His sneakers are designer and still creased from the box.
+    He has logged every game at the table. You can tell from the way his thumb hovers at the end of each round, and the way his lips move on the scores.
     He has looked at you twice since you came in. Once, and then again, as if making sure.
+    ~ I don't know him. I'm sure I don't know him.
     @choice
       > "Hello. I'm Rowan. You've been looking at me since I came down the stairs. Do we know each other?"
         [magnus?] "You're slow." He does not look up. "Number six isn't a slow place. Number six has patience."
+        [rowan] "…I'm sorry — what?"
+        [magnus?] "Nothing."
+        He still has not looked up. His thumb is going very fast on the tablet.
         @jump magnus_game
       > "Best_Tarleinn?" @hint Say the handle
         His head comes up so fast the stylus drops out of his mouth.
@@ -513,18 +527,26 @@
         His eyes follow you across the saloon, the way a cat tracks a fly.
         @end
     @label magnus_game
-    [magnus?] "Magnus Prospero. Two years, Vance. Two years at number six, looking at your avatar in fifth. The Qualifier published your handle with your name, so I have known this face for three weeks and your avatar for two years. You don't even remember the series, do you?"
+    [magnus?] "Magnus Prospero."
+    He says it as a man says the name of an enemy he has had a very long time to prepare for.
+    [magnus?] "Two years, Vance. Two years at number six, looking at your avatar in fifth. The Qualifier published your handle with your name, so I have known this face for three weeks, and your avatar for two years."
+    [magnus?] "You don't even remember the series, do you?"
     @meet magnus
     @add ferry_talked +1
+    @note magnus | Ranked just below you on the online ladder for two years. Keeps a file.
     @choice
       > "The Nightfall Open, game three. You played the list off the top, and your read on turn four was late."
         A very long pause.
         [magnus] "…You held your sweeper for six turns and let me overextend."
-        [magnus] "Late." He says it as if tasting it. "Yes. I'd — yes. I wrote that down." A tight, careful politeness slides over his face, much more telling than a scowl. "One game. Right now. It will not count. I will remember it anyway."
+        [magnus] "Late." He says it as if tasting it. "Yes. I'd — yes. I wrote that down."
+        A tight, careful politeness slides over his face, much more telling than a scowl.
+        [magnus] "One game. Right now. It will not count. I will remember it anyway."
         @aff magnus +3 | Remembered the game
         @flag magnus_recalled
       > "I don't remember a specific series. I'm sorry. Should I?"
-        [magnus] "No." Very tight. "No. Why would you." A breath through the nose. "One game. It does not count. I will remember it anyway."
+        [magnus] "No." Very tight. "No. Why would you."
+        A breath through the nose.
+        [magnus] "One game. It does not count. I will remember it anyway."
         @aff magnus -2 | Forgot him
       > "Sorry. I've played a lot of people, and I never saw the names."
         [magnus] "Forty-one losses, Vance. I have kept the file."
@@ -563,15 +585,38 @@
 
 @scene ferry_noor
   @if not met:noor
-    A calm girl in a blue hijab sits on a window bench with the Academy rulebook open on her knee. Its margins are bristling with pencil tabs. She is reading with the complete stillness of someone who finishes the sentence before reacting.
+    A calm girl in a blue hijab sits on a window bench with the Academy rulebook open on her knee. Its margins are bristling with pencil tabs.
+    The window behind her is huge and spotless, and full of sea. She is not looking at the sea. She is reading, with the complete stillness of someone who finishes the sentence before reacting.
+    Around her, the saloon is a fairground of duffel bags and raised voices. The bench has a clear half-metre of space on either side, as if the whole crowd had agreed on it without being told.
+    You stand there for a moment. Then, unexpectedly, the pencil stops.
     [noor?] "May I help you?"
+    It is a perfectly courteous question. It is also, you realise, a very polite way of saying that you have been standing in her light for a minute and a half.
     @choice
       > "Sorry to interrupt. I'm Rowan Vance. I was curious what you were reading."
-        [noor?] "It's the Charter. Nine articles and the Handbook. I am on article seven, for the third time." A small, courteous pause. "Noor Al-Sayed."
+        [noor?] "It's the Charter."
+        She lifts the book half an inch so you can see the cover, a heavy, official, very worn blue.
+        [noor?] "Nine articles and the Handbook, bound together. I am on article seven, for the third time."
+        [rowan] "Is it a hard article?"
+        [noor?] "It is the one about conflicts." A small, courteous pause. "I find that it repays attention."
       > "Hello. I'm Rowan. Is that book the rulebook for the whole Academy?"
-        [noor?] "The Charter, yes, with the Handbook bound in. Nine articles. I am on article seven, for the third time." A small, courteous pause. "Noor Al-Sayed."
+        [noor?] "The Charter, yes, with the Handbook bound in. Nine articles."
+        She lets that settle.
+        [noor?] "I am on article seven, for the third time. It is the one about conflicts."
+        [rowan] "Is it a hard one?"
+        [noor?] "It is a very good one. I find that it repays attention."
+    [noor?] "Noor Al-Sayed."
     @meet noor
     @add ferry_talked +1
+    @note noor | Knows the Academy Charter by heart. Reading article seven for the third time.
+    @if ship_knows_wildcard
+      [noor] "You are the entrant in ink. I read the list twice. It was nicely typed." A pause. "I believe it is considered rude to mention it. I find that I cannot help myself."
+      [rowan] "I'm getting used to it."
+      [noor] "That is a sensible strategy. It will not work, but it is sensible."
+    @else
+      [noor] "May I ask what you are going to do about the table? Everyone is waiting to see what everyone else will do. It seems to me a poor use of a morning."
+      [rowan] "I haven't decided."
+      [noor] "That is honest. It is a rare quality in a crowd."
+    ~ She hasn't once looked at the crowd. She hasn't once looked at the table. She is the calmest person on the ship.
   @else
     [noor] "Rowan."
   @choice
@@ -611,29 +656,75 @@
 
 @scene ferry_livvie
   @if not met:livvie
-    At the galley end of the saloon, a very pale, thin girl with a glossy violet-black bob and two bright cyan hair clips is adding a column on a clipboard. Her red jacket has been mended at both elbows in slightly different wool. The galley hatch is six feet away, selling cinnamon rolls. She has not bought one.
+    At the galley end of the saloon, a very pale, thin girl with a glossy violet-black bob and two bright cyan hair clips is adding a column on a clipboard.
+    Her red jacket has been mended at both elbows in slightly different wool. The galley hatch is six feet away, selling cinnamon rolls. She has not bought one.
+    She has not looked up. Her pencil moves down the clipboard in short, exact strokes, and every so often it stops and makes a very small tick.
+    ~ She's counting something. Or someone.
+    You stand there for what feels like a little too long. The smell of cinnamon is warm and loud and unfair.
+    Her stomach growls. It is a small, distinct, entirely audible sound.
+    She does not hear it. She very clearly does not hear it.
     [livvie?] "Quick thing — are you using that rare?"
-    [rowan] "What rare? I'm Rowan, and I'm — I don't have one on me."
-    [livvie?] "Oh. Sorry." Eyes down, a small sideways look to see if it landed. "I wasn't looking at your pockets. Professionally speaking, I was."
-    [livvie?] "Livvie Thana. I trade. I run lists. I've eaten. I had a big breakfast. Yesterday counts."
+    [rowan] "What rare?"
+    [livvie?] "The one in your pocket." Eyes down. "You've touched it three times. You're a good liar for somebody who keeps touching it."
+    [rowan] "I don't have a rare on me. I'm Rowan. I've only just got here."
+    [livvie?] "Oh."
+    A tiny pause. A small sideways look to see whether it landed.
+    [livvie?] "Sorry. I wasn't looking at your pockets. Professionally speaking, I was."
+    [livvie?] "Livvie Thana. I trade. I run lists. I've eaten. I had a big breakfast."
+    A longer pause.
+    [livvie?] "Yesterday counts."
     @meet livvie
     @add ferry_talked +1
-    ~ Her stomach just growled. She very clearly did not hear it.
+    @note livvie | Trades, runs lists. Insists that she has eaten.
+    Her stomach growls again.
+    ~ She very clearly did not hear that either.
     @choice
       > Offer to buy her a roll. @if coins>=3
-        [rowan] "I was about to get a roll. Can I get you one as well? It's no trouble."
-        [livvie] "I couldn't." Eyes still down. "…What kind?"
-        [rowan] "Cinnamon."
+        [rowan] "I was about to get a cinnamon roll. Can I get you one as well? It's no trouble."
+        [livvie] "I couldn't."
+        She says it quickly, to the clipboard. The pencil has stopped.
+        [rowan] "I'd be getting one anyway."
+        [livvie] "…"
+        [livvie] "…What kind?"
+        [rowan] "Cinnamon. There's only the one kind."
+        [livvie] "Then okay. Yes. Thank you. I'll pay you back."
+        You go to the hatch. The woman in the apron gives you a look that is the friendliest possible version of "I have seen this before", and slides a roll across the counter without a word. Three Smug Coins.
         @coins -3
-        [livvie] "I'll pay you back. In information. Which is a currency." She eats the roll in tiny, exact bites, as if it might be taken away. "That was kind. I'm going to have to think about what I owe you now."
+        You carry it back. You hold it out.
+        She takes it in both hands, carefully, the way you take something that might be taken back.
+        [livvie] "In information. I'll pay you back in information. Which is a currency."
+        [rowan] "I didn't ask you to pay me back."
+        [livvie] "I know. That's why I have to."
+        She takes the first bite.
+        It is very small. She chews it for a very long time, with her eyes closed.
+        [livvie] "…That's very good."
+        She eats the rest of it in tiny, exact bites, one after another, with a pause between each, as if she were making it last until Thursday. She does not say anything else until it is gone.
+        Then she wipes her fingers on a handkerchief, folds the handkerchief, and looks at you properly for the first time.
+        Her eyes are grey, with shadows under them, and extremely clear.
+        [livvie] "That was kind. I'm going to have to think about what I owe you now."
+        [rowan] "You don't owe me anything."
+        [livvie] "Everyone owes something. It's only a question of what it's worth."
+        A small, tired, entirely sincere smile.
+        [livvie] "Quick thing. Thank you."
+        @note livvie | Will not accept charity. Pays everything back in kind.
         @aff livvie +4 | Bought her lunch
         @flag livvie_fed
       > "Do you play, Livvie? What do you run?"
         [livvie] "Crystal Gifts. For five Smug Coins a side. Or not at all."
-        @aff livvie +1 | Asked about cards
+        She says it quickly, in the voice of someone reading a menu.
+        [rowan] "That's a very specific price."
+        [livvie] "It's a very specific deck."
         @scene mutter_livvie
+        @aff livvie +1 | Asked about cards
       > Nod, and move on without pushing.
-        [livvie] "Quick thing — you could do with sleeves. Tomi's friend price is the price. I'm cheaper."
+        [rowan] "Good to meet you. I'll leave you to your lists."
+        [livvie] "Quick thing."
+        You stop.
+        [livvie] "You could do with sleeves. Tomi's friend price is the price. I'm cheaper." A beat. "Don't tell him I said that."
+        [rowan] "I won't."
+        @note livvie | Sells sleeves cheaper than Tomi.
+        @aff livvie +1 | Took the hint about sleeves
+    @time 8
   @else
     @if not flag_livvie_played
       [livvie] "Five a side?"

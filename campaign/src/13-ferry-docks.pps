@@ -4,37 +4,107 @@
 #  Zeitplan: 09:50 Tisch läuft von allein ab · 10:25 Horn · 10:40 Anlegen · 11:00 Begrüßung auf dem Quad
 # ═══════════════════════════════════════════════════════════════════
 
-@event ferry_horn scene=ferry_horn day=1 from=10:25 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
-@event ferry_docks scene=ferry_docks day=1 from=10:40 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
+# Horn und Anlegen sind jetzt EIN Ablauf: 19-ferry-arrival.pps (Land in Sicht, Gruppen an Deck, Finale), danach beginnt dieser Teil.
 
-@scene ferry_horn
-  @sfx heavy_impact
-  A horn sounds, long and flat and enormous, so deep that the deck plates sing with it. The ship's fixtures rattle in their brackets.
-  People abandon whatever they were doing and head for the rails. Bags are shouldered. Somebody calls "Island!" and somebody else, from the stern, calls "We KNOW."
-  The captain's voice on the loudspeaker, unhurried: "Fifteen minutes, folks. Mind your luggage and your elbows."
-  The volcano has stopped being a picture. It has trees on it now.
-  @time 0
-
-@scene ferry_docks bg=ferry_dock
+@scene ferry_docks bg=ferry_deck
+  @clear
+  The gangway comes down with a rattle, a long, iron-voiced slide of chain and a final, ringing thump against the planks of the pier.
+  The decks empty at once, the way a bath empties: a few big gulps, a swirl, and then the whole crowd is pouring towards the head of the gangway, duffels bumping, deck boxes clutched, voices rising.
+  Captain Stroud is standing at the top of it, with his bowler in one hand and a small brass clicker in the other, and a look of grim, sentimental concentration.
+  @enter abel
+  [abel] "ONE AT A TIME! One at a time, folks, I want every one of you off this ship in the same number as you came on! Thirty-eight! I will count you out and I will count you in!"
+  Click. Click. He says "Welcome" to each head as it passes, as if signing it for.
+  @if freddie_jumped
+    [abel] "Thirty-seven, and one in the harbour." He taps the clicker once against his chest. "She's a good swimmer. She's also on my list. I will have a word with the young lady about regulation four-oh-one."
+  @enter nathan
+  @enter baylee
+  @if follow_nathan
+    [nathan=laughing] "ROWAN! Stay close! Don't lose us! I've got Baylee's bag and my bag and a hat that isn't mine!"
+    [baylee] "That's my hat."
+    [nathan=grin] "That's what I SAID!"
+  @else
+    [nathan=laughing] "ROWAN! Over here! We're going down together! I've decided! It's a rule!"
+    [baylee] "He decided at the funnel."
+  @if has_snapper
+    [abel] "A word, young man." He has not taken his eyes off the stream of students, but one enormous hand has found your elbow and steered you, very gently, a half-step out of the line. "The crate from under the tarp. You have it?"
+    [rowan] "Yes, Captain."
+    [abel] "Good." A very long pause. His beard works. "Mind the step."
+    [rowan] "I will."
+    [abel] "…No. Not the gangway step. *The* step. At the top of the bungalow row. It's got a loose board. She'll tell you she's fixed it. She hasn't."
+    @aff abel +2 | Carried the snapper
+  @if met:georgie
+    @enter georgie
+    A very small girl is standing at the head of the line with her plush dragon held out in front of her, at arm's length, like a lantern.
+    [georgie] "…Is it all right if I go first? Ember wanted to see it. She's — it's the first time she's been somewhere that's not a hotel."
+    [abel] "Little miss, you go as first as you like." He tips his hat. "Mind the plank. It's got opinions."
+    She goes down it with both hands tight round the plush and the corners of her mouth curving, very slowly, upward.
+    @exit georgie
+  @if met:jessica
+    @enter jessica
+    [jessica] "Rowan." She passes, with two ship's porters behind her wheeling three leather caskets on a trolley, and a graciousness so complete that nobody dares to hurry her. "I shall see you on the island. It is not a large one."
+    [rowan] "I'll look out for you."
+    [jessica] "Do." A small smile. "Cross the lawn."
+    @exit jessica
+  @if met:marit
+    @enter marit
+    [marit!] "**FAREWELL, SHIP!**" She is already at the head of the gangway, scarf flapping, hand pressed to her brow. "*Thou hast carried us well!* **Thou art free to go!**"
+    [?Captain Stroud] "It is a FERRY, Miss Solberg."
+    [marit!] "**IT IS A VESSEL OF DESTINY!**"
+    @exit marit
+  @if met:ed
+    @enter ed
+    [ed] "Is the plank dangerous? It looks dangerous! It looks really good!" He is already halfway down it with both arms out, like a tightrope walker, to the unconcealed horror of the deckhand beside him.
+    @exit ed
+  @if met:inya
+    @enter inya
+    @if ferry_inya_won
+      [inya] "Hey. Hey, Wildcard." She goes by with her chin high and her deck box under her arm. Behind her, ten paces back, Gideon is carrying her rucksack with a face like a man being photographed with a tax inspector. "Watch this."
+      @aff inya +1 | Shared the walk off the ship
+    @elif ferry_inya_lost
+      [inya] "I'm fine." She does not look back. "Don't say anything. I'll see you on the sand."
+    @else
+      [inya] "Bunkhouse three. Bunkhouse number three. Come and find me on the beach." She says it fast, like a challenge. "I want that game."
+    @exit inya
+  [abel] "…Thirty. Thirty-one. Thirty-two. Mind your heads. Mind your elbows."
+  And then it is your turn.
+  The gangway is steeper than it looked. The planks ring, one after another, under your feet, and the rail is warm from the sun. Halfway down you stop, for no reason, and look back at the ship.
+  The Second Chance is not very big. She has a funnel with a chip in it, a lifeboat painted twice in two different blues, and a line of washing hung from the stern. You have been on her for two and a half hours, and you are going to miss her.
+  [abel] "Don't dawdle, son! The island waits for no man! It does, in fact, but it likes to pretend otherwise!"
+  @exit abel
+  @fx fadeout 400
   @goto ferry_dock 0
-  The horn sounds again, once, short. The engine note drops, steps down through three tones and fades to a thrum, and then there is a bump so gentle you would hardly feel it if you were not holding a rail.
-  Ten-forty, on the nose.
-  The gangway comes down with a rattle. The decks empty at once, the way a bath empties: a few big gulps, a swirl, and then the whole crowd is flowing down the plank in two columns, duffels bumping, deck boxes clutched, voices rising.
-  A long timber pier on barnacled piles stretches ahead of you towards a pale beach and a wall of jungle. At its head stands a blue arch with gold lettering and a little golden gem on top: WELCOME, DUELISTS.
-  Palms lean over the sand behind it, the volcano trails its thread of smoke above the trees, and a small red cable car creaks along a wire over the canopy. Under the arch, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders.
-  "Spectral! Spectral first-years, this way, mind the step!"
-  "Rare! Rare Hall over here, blue collars!"
-  "Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!"
+  @bg ferry_dock
+  @clear
+  @fx fadein 400
+  And then your foot is on wood that does not move.
+  It is a long timber pier on barnacled piles, stretching ahead of you towards a pale beach and a wall of jungle. At its head stands a blue arch with gold lettering and a little golden gem on top: WELCOME, DUELISTS.
+  Palms lean over the sand behind it, the volcano trails its thread of smoke above the trees, and a small red cable car creaks along a wire over the canopy.
+  Under the arch, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders.
+  [?Older student] "Spectral! Spectral first-years, this way, mind the step!"
+  [?Older student] "Rare! Rare Hall over here, blue collars!"
+  [?Older student] "Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!"
   The water under the planks is so clear you can see crabs arguing on the bottom. The air smells of tar, kelp and wet rope.
+  @enter cati
   At the mooring bollard an old man with a face like driftwood is checking the lines with the minute, unhurried care of someone who has done it every day for forty years. A girl with a mail sack, bright-eyed, hair in a braid, is catching the bow rope as it sails across from the deck above.
-  [?Cati] "Got it! Got it, Captain! You've got the aim of a retired postman!"
-  [abel] "I AM a retired postman!"
+  [cati?] "Got it! Got it, Captain! You've got the aim of a retired postman!"
+  [?Captain Stroud] "I AM a retired postman!"
+  [cati?] "I'm Cati! Campus post! If you've got a letter for home, you give it to me, and if you don't, I'll find you one!"
+  @meet cati
+  @note cati | Runs the campus post. Talks to the ferry captain like an old friend.
   ~ Everyone on this island seems to have been doing this a very long time.
+  @if freddie_jumped
+    @enter freddie
+    @enter sunny
+    At the far side of the pier a dripping figure in a pale-aqua swimming cap is hauling herself up a ladder, grinning, with a towel-wrapped lifeguard hauling after her and shouting something about "a *week* of nothing but breaststroke."
+    [freddie] "ROWAN! JACKETLESS! IT WAS EIGHT AND A HALF MINUTES! I TOLD YOU!"
+    [sunny] "Seven and a half, you absolute liar."
+    @exit freddie
+    @exit sunny
   Halfway down the pier a pale boy in white gloves holds out a thick fold of mainland notes to a deckhand who has offered to take a case. The deckhand looks at the money the way a person looks at a leaf.
   [?Deckhand] "Smug Coins only, sir. Mainland paper's no good past the arch."
   The pale boy looks at the notes. For a moment the most self-possessed person on the ship has nothing at all to say.
   @if has_snapper
-    Behind you, Captain Stroud comes down the gangway with a small crate of fish under one arm, and a face that is trying very hard to look like nobody's business.
+    You shift the small crate of snapper from one arm to the other. It smells, if anything, more of snapper than it did on the ship.
   @flag arrived_dock
   @lock ferry_deck
   @lock ferry_lounge
@@ -141,6 +211,8 @@
     From somewhere to your left, a thin, courteous voice murmurs, "Here." You do not turn round.
   The names go on. Each one is a small door closing behind a face in the crowd, and each face crosses the grass to join an older student in a white-and-gold collar and vanishes up the hill.
   [octavia] "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Ferrant, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
+  @if met:sunny
+    @fullname sunny
   It is a long list. You start counting, and stop, and start again, because it is easier than thinking about what it means that your name has not been read.
   The Spectral cluster is gone. The Rare cluster is gone. The lawn has a hole in it where thirty-eight people used to be, and the remainder are all clutching their bags a little tighter.
   [octavia] "The Commons."
@@ -150,8 +222,15 @@
   [octavia] "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred."
   [octavia] "Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor."
   [octavia] "Bungalow six: Counts, Sammy. Crowe, Tobias. Volkov, Dmitri."
+  @if met:livvie
+    @fullname livvie
+  @if met:tomi
+    @fullname tomi
+  @if met:freddie
+    @fullname freddie
   A pause. She turns a page.
   [octavia] "Bungalow seven. Halvorsen, Baylee. Whisper, Nathan."
+  @rel nathan baylee
   Another pause, a precise one.
   [octavia] "Vance, Rowan. Late admission. The Wildcard entrant."
   Somebody, near the back, says "oh," in the way people say it when they have just worked something out. A girl in a ruffled dress turns her head. A boy with a clipboard looks at his clipboard.
