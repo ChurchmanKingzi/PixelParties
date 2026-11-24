@@ -1081,7 +1081,11 @@ function cmpFindLabel(steps, label) {
 /** Baut den Interpreter. `io` bündelt alles, was der Interpreter an der
  *  Oberfläche anfassen darf — damit bleibt er selbst frei von React. */
 function cmpMakeRunner(io) {
+  // @end beendet die aktuelle Szene; eine mit @scene eingeschobene Szene kehrt danach zur aufrufenden zurück.
+  // SIG_STOP (gameOver, verlorenes mustWin) beendet dagegen alles.
   const SIG_END = { end: true };
+  const SIG_STOP = { stop: true };
+  const ends = (r) => r === SIG_END || r === SIG_STOP;
 
   async function runSteps(steps) {
     if (!Array.isArray(steps)) return null;
@@ -1093,7 +1097,7 @@ function cmpMakeRunner(io) {
       if (!step) { i++; continue; }
       if (step.when != null && !cmpCond(io.state(), step.when)) { i++; continue; }
       const res = await runStep(step);
-      if (res === SIG_END) return SIG_END;
+      if (ends(res)) return res;
       if (res && res.jump) {
         const target = cmpFindLabel(steps, res.jump);
         if (target < 0) { console.error('[Kampagne] Sprungmarke "' + res.jump + '" fehlt.'); return null; }
@@ -1174,7 +1178,7 @@ function cmpMakeRunner(io) {
         if (chosen) {
           if (chosen.time) io.addTime(chosen.time);
           if (chosen.flag) io.mutate(s => { s.flags[chosen.flag] = true; });
-          if (chosen.steps) { const r = await runSteps(chosen.steps); if (r === SIG_END) return SIG_END; }
+          if (chosen.steps) { const r = await runSteps(chosen.steps); if (ends(r)) return r; }
           if (chosen.goto) return { jump: chosen.goto };
         }
       }
@@ -1187,23 +1191,23 @@ function cmpMakeRunner(io) {
       const branch = won ? step.onWin : step.onLose;
       const reward = won ? (step.reward || step.rewardWin) : step.rewardLose;
       if (reward) await io.applyReward(reward);
-      if (!won && step.mustWin) { await io.gameOver(step.loseText); return SIG_END; }
-      if (branch) { const r = await runSteps(branch); if (r === SIG_END) return SIG_END; }
+      if (!won && step.mustWin) { await io.gameOver(step.loseText); return SIG_STOP; }
+      if (branch) { const r = await runSteps(branch); if (ends(r)) return r; }
       if (won && step.gotoWin) return { jump: step.gotoWin };
       if (!won && step.gotoLose) return { jump: step.gotoLose };
     }
 
     // ── Sonstiges ──
     if (step.deckEdit) await io.deckEdit();
-    if (step.scene) { const r = await io.playScene(step.scene, true); if (r === SIG_END) return SIG_END; }
+    if (step.scene) { const r = await io.playScene(step.scene, true); if (r === SIG_STOP) return SIG_STOP; }
     if (step.goto) await io.goTo(step.goto, step.travel != null ? step.travel : 0);
-    if (step.gameOver) { await io.gameOver(step.gameOver); return SIG_END; }
+    if (step.gameOver) { await io.gameOver(step.gameOver); return SIG_STOP; }
     if (step.jump) return { jump: step.jump };
     if (step.end) return SIG_END;
     return null;
   }
 
-  return { runSteps, SIG_END };
+  return { runSteps, SIG_END, SIG_STOP };
 }
 
 // ═══════════════════════════════════════════

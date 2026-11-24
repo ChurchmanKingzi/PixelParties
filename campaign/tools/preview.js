@@ -107,12 +107,13 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .ca.ghost{background:linear-gradient(#a79fc0,#a79fc0) 50% 8%/34% 20% no-repeat,linear-gradient(#a79fc0,#a79fc0) 50% 92%/62% 66% no-repeat;opacity:.6}
 #mapRoot{position:absolute;inset:0}
 #bglabel{position:absolute;top:6px;left:8px;font-family:var(--title);font-size:12px;background:#08060dcc;color:var(--dim);padding:0 6px;z-index:5}
-#toasts{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;z-index:30;pointer-events:none;max-width:70%}
-.toast{display:flex;gap:8px;align-items:center;background:#08060df2;border:2px solid var(--gold);padding:3px 10px 3px 4px;font-family:var(--title);font-size:14px;box-shadow:3px 3px 0 #000;animation:tin .25s steps(4)}
+#toasts{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:30;pointer-events:none;max-width:78%}
+.cm-tip:empty{display:none!important}
+.toast{display:flex;gap:12px;align-items:center;background:#08060df2;border:3px solid var(--gold);padding:6px 16px 6px 6px;font-family:var(--title);font-size:20px;box-shadow:4px 4px 0 #000;animation:tin .25s steps(4)}
 .toast.up{border-color:var(--green)}.toast.down{border-color:var(--red)}.toast.deck{border-color:var(--cyan)}
 @keyframes tin{from{transform:translateX(30px);opacity:0}}
-.toast canvas{width:40px;height:40px;image-rendering:pixelated;background:#120f1c;border:2px solid var(--edge);flex:0 0 auto}
-.toast b{display:block;font-weight:600}.toast small{display:block;color:var(--dim);font-family:var(--body);font-size:16px}
+.toast canvas{width:64px;height:64px;image-rendering:pixelated;background:#120f1c;border:3px solid var(--edge);flex:0 0 auto}
+.toast b{display:block;font-weight:600}.toast small{display:block;color:var(--dim);font-family:var(--body);font-size:22px;line-height:1.05}
 .toast .up{color:var(--green)}.toast .dn{color:var(--red)}
 #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s steps(5);z-index:40}
 #fade.on{opacity:1}
@@ -228,20 +229,23 @@ function headCanvas(id, size){
 
 // ───────── Gesprächsansicht: nur die aktiven Figuren, groß ─────────
 function layout(n){ if (n <= 1) return [50]; if (n === 2) return [30, 70]; if (n === 3) return [20, 50, 80]; if (n === 4) return [14, 38, 62, 86]; const a = []; for (let i = 0; i < n; i++) a.push(10 + 80 * i / (n - 1)); return a; }
-function actorHeight(n){ return n <= 2 ? 94 : n === 3 ? 86 : 76; }
+// Grundhöhe 82 % der früheren (damit Große hineinpassen); Faktoren je Figur: Baylee ist einen Kopf größer als alle, Inya und Georgie sind klein.
+const HEIGHT = { baylee: 1.2, inya: .84, georgie: .86, tomi: .92 };
+function actorHeight(n){ return n <= 2 ? 77 : n === 3 ? 71 : 62; }
 function addActor(id){ if (!id || id === 'rowan' || actors.includes(id)) return; actors.push(id); loadFig(id); renderConv(); }
 function renderConv(){
   const box = $('cactors'); box.innerHTML = '';
   const xs = layout(actors.length), h = actorHeight(actors.length);
   actors.forEach((id, i) => {
     const el = document.createElement('div'); el.className = 'ca' + (speakerId && speakerId !== id ? ' dim' : '') + (speakerId === id ? ' talk' : '');
-    el.style.left = xs[i] + '%'; el.style.height = h + '%';
+    el.style.left = xs[i] + '%'; el.style.height = Math.min(98, h * (HEIGHT[id] || 1)) + '%';
     const r = figs.get(id);
     if (r && r.ok) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320; cv.getContext('2d').drawImage(r.big, 0, 0); el.appendChild(cv); } else { el.classList.add('ghost'); loadFig(id); }
     box.appendChild(el);
   });
 }
-function setBg(name){ $('conv').style.backgroundImage = name ? 'url("assets/bg/' + name + '.png")' : 'none'; $('bglabel').textContent = name || ''; }
+const pretty = (n) => String(n || '').replace(/_/g, ' ').replace(/\b[a-z]/g, c => c.toUpperCase());
+function setBg(name){ $('conv').style.backgroundImage = name ? 'url("assets/bg/' + name + '.png")' : 'none'; $('bglabel').textContent = pretty(name); }
 
 // ───────── Text: Typewriter, Auszeichnung, Verlauf ─────────
 function parseInline(raw){
@@ -302,6 +306,7 @@ function advance(){
 }
 function say(l){
   return new Promise(res => {
+    affNow = {};
     $('choices').innerHTML = '';
     const name = l.name || (l.speaker ? castName(l.speaker) : (l.think ? 'Rowan' : null));
     speakerId = l.speaker && l.speaker !== 'rowan' ? l.speaker : null;
@@ -315,7 +320,7 @@ function say(l){
 }
 function choose(c){
   return new Promise(res => {
-    const box = $('choices'); box.innerHTML = ''; review = null; speakerId = null; renderConv();
+    const box = $('choices'); box.innerHTML = ''; review = null; speakerId = null; renderConv(); affNow = {};
     clearInterval(typeTimer); typingDone = true;
     if (c.prompt) { $('spk').hidden = true; $('txt').className = ''; $('txt').innerHTML = '<span id="prompt">' + renderSegs(parseInline(c.prompt), 9999) + '</span>'; }
     c.options.forEach((o, i) => { const b = document.createElement('button'); b.innerHTML = renderSegs(parseInline(o.text), 9999) + (o.hint ? '<small>' + esc(o.hint) + '</small>' : ''); b.onclick = (e) => { e.stopPropagation(); unlockAudio(); sfx('ui_click', .4); box.innerHTML = ''; res(i); }; box.appendChild(b); });
@@ -327,17 +332,30 @@ function addTime(m){ if (!m) return; mutate(s => { s.minutes += m; while (s.minu
 // ───────── Popups: kennengelernt, Zuneigung, Deck ─────────
 function toast(kind, head, sub, id){
   const t = document.createElement('div'); t.className = 'toast ' + kind;
-  if (id) t.appendChild(headCanvas(id, 40));
+  if (id) t.appendChild(headCanvas(id, 64));
   const d = document.createElement('div'); d.innerHTML = '<b>' + head + '</b>' + (sub ? '<small>' + sub + '</small>' : ''); t.appendChild(d);
-  $('toasts').appendChild(t); setTimeout(() => t.remove(), 4200); while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+  $('toasts').appendChild(t); setTimeout(() => t.remove(), 4800); while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+  return t;
 }
+// Pro Textbox und Figur höchstens EIN Zuneigungs-Popup: weitere Änderungen derselben Figur seit dem letzten Text werden zusammengelegt.
+let affNow = {};
+function affHtml(nm, n, why){ return esc(nm) + ' <span class="' + (n >= 0 ? 'up' : 'dn') + '">' + (n > 0 ? '▲ +' : n < 0 ? '▼ ' : '● ') + n + '</span>'; }
 function popup(p){
   const nm = castName(p.id);
   if (p.type === 'met') { sfx('reveal', .5); toast('', 'New acquaintance', esc(nm), p.id); }
   else if (p.type === 'aff') {
-    (S.affLog = S.affLog || []).push({ id: p.id, n: p.n, why: p.why, day: S.day });
+    const prev = affNow[p.id];
+    if (prev && prev.el.isConnected) {
+      prev.n += p.n; prev.why = prev.why && p.why && prev.why !== p.why ? prev.why + ' · ' + p.why : (prev.why || p.why || '');
+      prev.log.n = prev.n; prev.log.why = prev.why;
+      prev.el.className = 'toast ' + (prev.n > 0 ? 'up' : prev.n < 0 ? 'down' : '');
+      prev.el.querySelector('div').innerHTML = '<b>' + affHtml(nm, prev.n) + '</b><small>' + esc(prev.why) + '</small>';
+      return;
+    }
+    const log = { id: p.id, n: p.n, why: p.why, day: S.day }; (S.affLog = S.affLog || []).push(log);
     sfx(p.n > 0 ? 'buff' : 'debuff', .45);
-    toast(p.n > 0 ? 'up' : 'down', esc(nm) + ' <span class="' + (p.n > 0 ? 'up' : 'dn') + '">' + (p.n > 0 ? '▲ +' : '▼ ') + p.n + '</span>', esc(p.why || ''), p.id);
+    const el = toast(p.n > 0 ? 'up' : p.n < 0 ? 'down' : '', affHtml(nm, p.n), esc(p.why || ''), p.id);
+    affNow[p.id] = { el, n: p.n, why: p.why || '', log };
   }
   else if (p.type === 'deck') { sfx('ping', .5); const d = DATA.people[p.id]; toast('deck', 'Deck learned', esc((d && d.deck ? d.deck.name : '') + ' · ' + nm), p.id); }
 }
@@ -406,11 +424,13 @@ async function afterScene(){
   while ((ev = pickEvent()) && guard++ < 6) { mutate(s => { s.eventsDone[ev.id || ev.scene] = true; }); await playScene(ev.scene, true); }
 }
 // Ein Gespräch: Überblendung ins Gespräch, Szene(n) spielen, danach zurück zur Karte.
-async function conversation(fn, preset){
+// keepLoc: Ort, an dem Rowan nach dem Gespräch weiterläuft; steht er dort noch, kehrt er auf den Pixel zurück (kein Teleport zum Ortsanfang).
+async function conversation(fn, preset, keepLoc){
   if (busy) return; busy = true; updateBar();
+  const pos = CMAP && view === 'map' ? { map: CMAP.A.id, x: CMAP.P.x, y: CMAP.P.y } : null;
   await fade(async () => { actors = []; (preset || []).forEach(id => { actors.push(id); loadFig(id); }); speakerId = null; setBg((W.locations[S.location] || {}).background); setView('conv'); renderConv(); $('choices').innerHTML = ''; });
   try { await fn(); await afterScene(); } catch (e) { console.error(e); }
-  await fade(async () => { actors = []; speakerId = null; $('choices').innerHTML = ''; setView('map'); syncMap(); });
+  await fade(async () => { actors = []; speakerId = null; $('choices').innerHTML = ''; setView('map'); syncMap(pos, keepLoc); });
   busy = false; locationMusic(); refresh();
 }
 const followerIds = () => following().map(id => (W.cast[id] && W.cast[id].sprite) || id);
@@ -418,11 +438,20 @@ async function talkTo(o){
   if (busy) return;
   const sprite = o.sprite;
   await conversation(async () => {
-    if (o.at && o.at !== S.location) await travel(o.at, undefined, true);
-    if (o.scene && cmpCond(S, o.when)) await playScene(o.scene, true);
-  }, [sprite].concat(followerIds().filter(x => x !== sprite)));
+    let alone = false;
+    if (o.at && o.at !== S.location) {
+      await travel(o.at, undefined, true);
+      // Wer zu Fuß ankommt, erlebt zuerst die Ankunftsszene des Ortes; Szenen mit "alone" stehen für sich (danach spricht man die Person erneut an).
+      const arr = arriveScene(); if (arr) { await playScene(arr, true); alone = !!(STORY.scenes[arr] && STORY.scenes[arr].alone); }
+    }
+    if (!alone && o.scene && cmpCond(S, o.when)) await playScene(o.scene, true);
+  }, [sprite].concat(followerIds().filter(x => x !== sprite)), o.at || S.location);
 }
-async function runAction(a){ if (busy || !a.scene) return; await conversation(async () => { await playScene(a.scene, true); }, followerIds()); }
+async function talkFollower(id){
+  if (busy) return; const sc = DATA.followers[id]; if (!sc) return;
+  await conversation(async () => { await playScene(sc, true); }, [id].concat(followerIds().filter(x => x !== id)), S.location);
+}
+async function runAction(a){ if (busy || !a.scene) return; await conversation(async () => { await playScene(a.scene, true); }, followerIds(), S.location); }
 async function travel(id, cost, fromScene){
   const loc = W.locations[id]; if (!loc) return;
   const c = cost != null ? cost : cmpTravelCost(W, S, id);
@@ -434,8 +463,8 @@ async function goPlace(id){
   const info = placeInfo(id); if (!info || !info.ok || id === S.location) return;
   await conversation(async () => { await travel(id, undefined, true); const sc = arriveScene(); if (sc) await playScene(sc, true); }, followerIds());
 }
-async function wait15(){ if (busy) return; addTime(15); if (hasPending()) await conversation(async () => {}, followerIds()); else refresh(); }
-async function oneHour(){ if (busy) return; addTime(60); if (hasPending()) await conversation(async () => {}, []); else refresh(); }
+async function wait15(){ if (busy) return; addTime(15); if (hasPending()) await conversation(async () => {}, followerIds(), S.location); else refresh(); }
+async function oneHour(){ if (busy) return; addTime(60); if (hasPending()) await conversation(async () => {}, [], S.location); else refresh(); }
 
 // ───────── Karte (CalderaMap aus dem alten Artefakt) ─────────
 let mapPeopleKey = '', alertFrame = 0, followKey = '';
@@ -462,9 +491,16 @@ function refreshMapPeople(force){
 function refreshFollowers(){
   if (!CMAP) return; const ids = following(), key = ids.join(',') + '|' + ids.map(i => (figs.get(i) && figs.get(i).ok) ? 1 : 0).join('');
   if (key === followKey) return; followKey = key;
-  try { CMAP.setFollowers(ids.map(id => ({ id, name: castName(id), sprite: smallOf(id) }))); } catch (e) { console.warn('followers', e); }
+  try { CMAP.setFollowers(ids.map(id => ({ id, name: '', sprite: smallOf(id) }))); } catch (e) { console.warn('followers', e); }
 }
-function syncMap(){ if (!CMAP) return; try { if (lastMapLoc !== S.location) { CMAP.goPlace(S.location); lastMapLoc = S.location; } } catch (e) {} refreshMapPeople(true); followKey = ''; refreshFollowers(); updateBar(); }
+function syncMap(pos, keepLoc){
+  if (!CMAP) return;
+  try {
+    if (pos && keepLoc != null && S.location === keepLoc) { CMAP.goTo(pos.map, Math.floor(pos.x / 16), Math.floor((pos.y - 1) / 16)); lastMapLoc = S.location; }
+    else if (lastMapLoc !== S.location) { CMAP.goPlace(S.location); lastMapLoc = S.location; }
+  } catch (e) {}
+  refreshMapPeople(true); followKey = ''; refreshFollowers(); updateBar();
+}
 function placeInfo(id){
   const loc = W.locations[id]; if (!loc) return null;
   if (!S.known.includes(id)) return { ok: false, why: 'You have not heard of this place yet.' };
@@ -478,7 +514,7 @@ async function initMap(){
     CMAP = await window.CalderaMap.create({ stage: $('mapRoot'), base: 'assets/map/', hero: blankSprite('#e8c170'), minimap: false, german: false,
       canAct: () => view === 'map' && !busy && $('overlay').hidden,
       onPlace: (p) => { near = p; updateBar(); },
-      onTalk: (npc) => { const all = Object.entries(W.locations).flatMap(([lid, l]) => (l.objects || []).map(o => Object.assign({}, o, { at: lid }))); const o = all.find(x => x.id === npc.id); if (o && view === 'map') { sfx('ui_prompt_open', .4); talkTo(o); } },
+      onTalk: (npc) => { if (DATA.followers[npc.id]) { if (view === 'map') { sfx('ui_prompt_open', .4); talkFollower(npc.id); } return; } const all = Object.entries(W.locations).flatMap(([lid, l]) => (l.objects || []).map(o => Object.assign({}, o, { at: lid }))); const o = all.find(x => x.id === npc.id); if (o && view === 'map') { sfx('ui_prompt_open', .4); talkTo(o); } },
     });
     CMAP.pause(true);
     setInterval(() => { if (view === 'map') { alertFrame ^= 1; refreshMapPeople(); } }, 500);
@@ -496,7 +532,7 @@ function updateBar(){
   r1.appendChild(mk('Wait 15 minutes', wait15)); bar.appendChild(r1);
   const p = near && near.id, info = p && W.locations[p] ? placeInfo(p) : null;
   if (info && p !== S.location) { const r2 = document.createElement('div'); r2.className = 'row'; r2.innerHTML = '<span class="lbl">NEARBY</span><span class="near">' + esc(near.name) + '</span>'; r2.appendChild(mk(info.ok ? 'Go there  +' + info.cost + ' min' : info.why, () => goPlace(p), 'go', !info.ok)); bar.appendChild(r2); }
-  const fl = following(); if (fl.length) { const r3 = document.createElement('div'); r3.className = 'row'; r3.innerHTML = '<span class="lbl">WITH YOU</span>'; for (const id of fl) { const sc = DATA.followers[id]; r3.appendChild(mk('Talk to ' + castName(id), () => conversation(async () => { await playScene(sc, true); }, [id].concat(followerIds().filter(x => x !== id))))); } bar.appendChild(r3); }
+  const fl = following(); if (fl.length) { const r3 = document.createElement('div'); r3.className = 'row'; r3.innerHTML = '<span class="lbl">WITH YOU</span>'; for (const id of fl) { const sc = DATA.followers[id]; r3.appendChild(mk('Talk to ' + castName(id), () => talkFollower(id))); } bar.appendChild(r3); }
   const hint = document.createElement('div'); hint.className = 'note'; hint.textContent = 'Arrows / WASD: walk · Space: look and talk · talk to a person on the map to start a conversation'; bar.appendChild(hint);
 }
 function refresh(){ renderTop(); refreshFollowers(); refreshMapPeople(false); updateBar(); locationMusic(); }

@@ -173,7 +173,7 @@ let idx = 10;
 for (const [file, list] of byFile) {
   const base = path.basename(file, '.pps');
   const body = header(file) + list.map(s => {
-    const def = { once: s.head.once || undefined, when: s.head.whenJs, background: s.head.bg, music: s.head.music, time: s.head.time, steps: s.steps };
+    const def = { once: s.head.once || undefined, alone: s.head.alone || undefined, when: s.head.whenJs, background: s.head.bg, music: s.head.music, time: s.head.time, steps: s.steps };
     return `scene(${JSON.stringify(s.head.id)}, ${P.ser(def)});\n`;
   }).join('\n');
   files.push({ name: `scenes/${String(idx).padStart(2, '0')}-${base}.js`, body }); idx += 1;

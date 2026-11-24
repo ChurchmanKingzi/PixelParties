@@ -43,17 +43,17 @@
   @if ferry_table_lost
     @scene dock_cases_lost
   @elif ferry_inya_won
-    Down the jetty a pale boy in white gloves is walking behind a very small girl with mint-green hair and a single rucksack, which he is carrying. She is eating a cinnamon roll. He has the look of a man who has lost a bet and intends never to mention it. Tomi, passing, pays somebody out of a pocket binder.
+    Down the jetty a pale boy in white gloves is walking behind a small girl with mint-green hair and a single rucksack, which he is carrying. She is eating a cinnamon roll. He has the look of a man who has lost a bet and intends never to mention it. Tomi, passing, pays somebody out of a pocket binder.
   @elif ferry_table_won
     Gideon, ahead of you on the jetty, is looking at his four cases with the grave disinterest of a man who has been told he owes somebody a duffel and is deciding when to start. Three of his things are being rolled on a cart by an upper-year in a gold jacket. The fourth, you notice, is not.
   @elif ferry_table_settled
     Gideon, a dozen paces ahead, glances back once. He inclines his head a quarter of an inch, as one does to an equal. Beside him, Inya walks with her deck box tucked under her arm and a spring in her step.
   @elif ferry_table_denied
-    Down the jetty a very small girl with mint-green hair is walking alone, deck box clamped to her chest, looking at nobody. A little way ahead, a pale boy in white gloves strides up the planks with his hands entirely free and four matched cases being rolled behind him on a cart by an upper-year. Nobody carries anything. It is, somehow, worse.
+    Down the jetty a small girl with mint-green hair is walking alone, deck box clamped to her chest, looking at nobody. A little way ahead, a pale boy in white gloves strides up the planks with his hands entirely free and four matched cases being rolled behind him on a cart by an upper-year. Nobody carries anything. It is, somehow, worse.
     @if lounge_seen
       She sees you watching. Her chin comes up. She does not say anything, and neither do you.
   @else
-    Down the jetty a very small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks. She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her.
+    Down the jetty a small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks. She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her.
     @if lounge_seen
       She sees you watching. Her chin comes up. She does not say anything, and neither do you.
       ~ I could have said something. I know I could.
@@ -93,7 +93,7 @@
   He says it quite courteously. He does not gloat. He does not need to.
   @if not carried_all_four
     @if not nathan_carried and not baylee_carried
-      Beside you, a very small girl with mint-green hair has been walking all the way up the avenue as well, a few steps behind, with her hands in her hoodie pockets. She stops at the tower door.
+      Beside you, a small girl with mint-green hair has been walking all the way up the avenue as well, a few steps behind, with her hands in her hoodie pockets. She stops at the tower door.
       [inya] "I'd have been carrying those." Quietly. "If you hadn't asked."
       [rowan] "I know."
       [inya] "Rude. Accurate. Thank you."

@@ -57,6 +57,7 @@
   [baylee?=shy] "…I see it."
   [nathan?=happy] "Nathan Whisper! War Counselors, best deck in the format, don't let anyone tell you different. You look wrecked. You a first-year too? What dorm? I got something called the Commons, sounds fancy."
   @meet nathan
+  @deckinfo nathan
   He sticks out a hand. Behind him the giant gives you a small nod.
   [baylee?] "Baylee. Commons too. …He has been like this since the harbour."
   @meet baylee
@@ -105,7 +106,7 @@
           @flag told_wildcard
           @aff nathan +2 | Trusted him with it
           @aff baylee +1 | Asked for discretion
-    > "Rowan. Just Rowan for now. I'm in the Commons too, apparently. You said you've been everywhere on this ship. What have you found out so far?"
+    > "Rowan. Just Rowan for now. I'm in the Commons too, apparently. Have you had a look round the ship yet? Anything worth finding?"
       @follow nathan baylee
       [nathan=laughing] "ROWAN! Just Rowan! Like a wizard!"
       [baylee] "Like a bartender."
@@ -181,7 +182,7 @@
 @scene deck_collars
   You lean against a bollard and count collars.
   Every first-year wears the same red jacket with one of three collars: white with a gold edge, blue, or plain grey. The white-and-gold ones stand a little apart from the others without seeming to try. The blue ones are scattered through the crowd. The grey ones hold their bags in both arms.
-  You count eleven white, twelve blue, twelve grey. Counting nobody, because you have no jacket at all, that makes thirty-five, and one without a collar is the thirty-sixth.
+  You count six white, twelve blue, seventeen grey. That makes thirty-five, and the one without a collar at all is the thirty-sixth.
   It is not important until somebody tells you what the colours mean.
   @flag counted_collars
   @time 5
@@ -236,8 +237,9 @@
         [nathan=grin] "Right?! The suspense is killing me!"
   @aff nathan +1 | Heard him out
   @time 5
-  @if met:nathan and not deck_known_nathan and not deck_skipped_nathan
-    @scene deck_nathan
+  @if not chat_nathan_offered
+    @flag chat_nathan_offered
+    @scene chat_nathan
 
 @scene ferry_baylee
   @if not flag_baylee_chat
@@ -261,6 +263,7 @@
         @aff baylee +2 | Agreed about Nathan
       > "Do you play? What do you run?"
         [baylee] "Big Stomp. Dinosaurs." He holds up a hand the size of a dinner plate, deck box lost in it. "Not good. Fun, though."
+        @scene mutter_baylee
         [baylee] "You can have a game later. If you want. If you're not busy."
         @aff baylee +1 | Offered a game
         @flag baylee_game_offered
@@ -278,6 +281,8 @@
       > "How is the crossing treating you?"
         [baylee] "Long. Good long. Haven't been on a boat since the county fair ferry, and that was two minutes."
         @aff baylee +1 | Small talk
+      > "Mind if I stand here a while and ask you a few things?" @if not chat_baylee_done
+        @scene chat_baylee
       > "Do you fancy that game now?" @if baylee_game_offered and not flag_baylee_game
         [baylee] "…Could do. Quick one. Casual."
         @scene deck_baylee
@@ -294,8 +299,9 @@
       > Leave him to his rail.
         [baylee] "Thanks."
     @time 5
-  @if met:baylee and not deck_known_baylee and not deck_skipped_baylee
-    @scene deck_baylee
+  @if met:baylee and not chat_baylee_offered
+    @flag chat_baylee_offered
+    @scene chat_baylee
 
 @scene ferry_ed
   @if not met:ed
@@ -347,12 +353,15 @@
           @time 25
         > "Maybe later. I want to see the rest of the ship."
           [ed] "Later! Great! Later's my second favourite time!"
+        > "First, tell me about the ranch." @if not chat_ed_done
+          @scene chat_ed
     @else
       [ed] "Rowan! Hey! Did you see the lighthouse? It's real. They keep it lit even in the daytime! I asked the captain! Is that dangerous? Lighting it in the day?"
       @aff ed +1 | Chatted
       @time 5
-  @if met:ed and not deck_known_ed and not deck_skipped_ed
-    @scene deck_ed
+  @if met:ed and not chat_ed_offered
+    @flag chat_ed_offered
+    @scene chat_ed
 
 @scene ferry_georgie
   @if not met:georgie
@@ -385,12 +394,16 @@
         [georgie] "Nice to — yes. You too. Sorry."
         @aff georgie +1 | Said hello
     @time 8
-    @end
   @else
     @if flag_georgie_played
       Georgie is back to holding her deck box with both hands. The camera girl has moved on to somebody else's elbow.
       [georgie] "Hi, Rowan."
       @aff georgie +1 | Said hi
+      @if not chat_georgie_done
+        @choice
+          > "May I ask you something? Only if you don't mind."
+            @scene chat_georgie
+          > Smile and let her be.
       @end
     @label georgie_game
     @if not flag_georgie_played
@@ -420,8 +433,9 @@
           [rowan] "Not right now. I'd love a game later, though, if that's all right."
           [georgie] "Okay. It's fine."
           @end
-  @if met:georgie and not deck_known_georgie and not deck_skipped_georgie
-    @scene deck_georgie
+  @if met:georgie and not chat_georgie_offered and not flag_georgie_played
+    @flag chat_georgie_offered
+    @scene chat_georgie
 
 @scene ferry_pippa
   @if not met:pippa
@@ -447,11 +461,11 @@
           [pippa] "I'm good at finding the thing in a picture that doesn't match."
           @flag told_wildcard
         @aff pippa +1 | Offered his name
-      > "Who's that girl you were photographing? She looked nervous."
-        [pippa] "Georgie. I met her ten minutes ago. She's fourteen. Did you know? Fourteen. She's the national under-sixteens champion and she asked me whether she was allowed to sit on the rope."
-        [pippa] "I've decided I'm her older sister. It's not up for discussion."
-        @aff pippa +2 | Cared about Georgie
-        @flag pippa_georgie_sister
+      > "Is that an old film camera? I didn't think anybody still shot on film."
+        [pippa] "Film is the only honest thing left." She turns it so you can see the dented brass. "You can't delete it. You get one frame, and you have to be sorry about it afterwards if it's bad."
+        [pippa] "It was my aunt's. It has a light leak in the corner. I think it gives them character."
+        @aff pippa +2 | Asked about her camera
+        @flag pippa_film
       > "Do you always shoot strangers without asking?"
         [pippa] "Only the ones that hold still. Which — you did, actually. Quite well. Nobody's ever held that still for me."
         @aff pippa +1 | Held still
@@ -460,8 +474,14 @@
     [pippa] "Hang on — hang on —" She lifts the camera, clicks. "Sorry. Habit. How's the crossing?"
     @aff pippa +1 | Chatted
     @time 5
-  @if met:pippa and not deck_known_pippa and not deck_skipped_pippa
-    @scene deck_pippa
+    @if not chat_pippa_done
+      @choice
+        > "Could I ask you something, while you're not shooting?"
+          @scene chat_pippa
+        > Nod and move on.
+  @if met:pippa and not chat_pippa_offered
+    @flag chat_pippa_offered
+    @scene chat_pippa
 
 @scene ferry_mikoto
   @if not met:mikoto
@@ -522,5 +542,11 @@
       [mikoto] "Rowan! Hello. The gull's still looking at me. I think she wants dessert."
       @aff mikoto +1 | Chatted
       @time 5
-  @if met:mikoto and not deck_known_mikoto and not deck_skipped_mikoto
-    @scene deck_mikoto
+      @if not chat_mikoto_done
+        @choice
+          > "Do you mind if I ask you a few things? Only if it's all right."
+            @scene chat_mikoto
+          > Leave him to his gull.
+  @if met:mikoto and not chat_mikoto_offered and not flag_mikoto_game
+    @flag chat_mikoto_offered
+    @scene chat_mikoto

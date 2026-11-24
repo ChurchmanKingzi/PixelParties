@@ -14,8 +14,6 @@
   object ashton_m sprite=ashton x=36 y=94 h=70 label="Ashton" scene=ferry_ashton when day=1 and time<10:40 and met:ashton
   object victoria sprite=victoria x=56 y=88 h=60 label="Girl with a parasol" scene=ferry_victoria when day=1 and time<10:40 and not met:victoria
   object victoria_m sprite=victoria x=56 y=88 h=60 label="Victoria" scene=ferry_victoria when day=1 and time<10:40 and met:victoria
-  object ophelia sprite=ophelia x=68 y=100 h=64 label="Short-haired girl" scene=ferry_ophelia when day=1 and time<10:40 and not met:ophelia
-  object ophelia_m sprite=ophelia x=68 y=100 h=64 label="Ophelia" scene=ferry_ophelia when day=1 and time<10:40 and met:ophelia
   object sunny sprite=sunny x=80 y=100 h=68 label="Girl on the rail" scene=ferry_sunny when day=1 and time<10:40 and not met:sunny
   object sunny_m sprite=sunny x=80 y=100 h=68 label="Sunny" scene=ferry_sunny when day=1 and time<10:40 and met:sunny
   object marit sprite=marit x=92 y=94 h=64 label="Girl on a bollard" scene=ferry_marit when day=1 and time<10:40 and not met:marit
@@ -45,7 +43,7 @@
   You follow the side deck aft past the funnel, which breathes warmth over your shoulder like a large, sleeping animal. And then the noise falls away.
   The open after deck: a long white wake running back to an empty horizon, gulls riding the air above the flagstaff, a wire luggage cage stacked to the top with trunks. One bench stands dry under a canvas awning. The rest of the planking shines with spray.
   It is quieter here than forward. The mainland is gone.
-  Half a dozen people are scattered across the deck, each in their own small piece of calm, and none of them is quarrelling with anybody. A girl is reciting to the gulls. A boy is standing very nobly at the rail holding a rose. Beside the cage, a very still girl in a ruffled dress sits under a parasol, and a short-haired girl with her arms crossed stands guard at her elbow.
+  Half a dozen people are scattered across the deck, each in their own small piece of calm, and none of them is quarrelling with anybody. A girl is reciting to the gulls. A boy is standing very nobly at the rail holding a rose. Beside the cage, a very still girl in a ruffled dress sits alone under a parasol.
   ~ So this is where people go who want to meet each other.
   @time 3
 
@@ -58,7 +56,7 @@
 
 @scene stern_cage
   The luggage cage is a wire pen stacked to the top with trunks, duffels, and one inexplicable tuba. Every item has a paper label tied to it, handwritten.
-  You read some. HALVORSEN B. — FRAGILE (a very large hard case that you suspect holds nothing breakable at all). WHISPER N. — OPEN ME AND DIE (a battered duffel, with a smaller, tidier label beneath that says in another hand: *please don't*). CAPULET V. & O. — HANDLE WITH GRACE. LUND P. — CAMERA, DON'T. THANA O. — one small bag, tied twice.
+  You read some. HALVORSEN B. — FRAGILE (a very large hard case that you suspect holds nothing breakable at all). WHISPER N. — OPEN ME AND DIE (a battered duffel, with a smaller, tidier label beneath that says in another hand: *please don't*). CAPULET V. — HANDLE WITH GRACE. LUND P. — CAMERA, DON'T. THANA O. — one small bag, tied twice.
   At the bottom of the pile, sagging, you find your own duffel. The label says, in Aunt Dee's handwriting: ROWAN — CALL HER WHEN YOU LAND.
   ~ I will. I will call her the minute I know what to say.
   @flag found_duffel
@@ -66,7 +64,7 @@
 
 @scene ferry_jessica
   @if not met:jessica
-    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest. Long dark chestnut curls, violet eyes, a small beauty mark under the left one. Jewellery chosen fresh this morning and worn as if it were nothing. A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
+    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest. Long dark chestnut curls, violet eyes, a small beauty mark under the left one. A small silver swallow brooch pinned at the collar, chosen fresh this morning and worn as if it were nothing. A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
     She is not looking at you. She has, however, noticed you crossing the deck.
     @choice
       > "Hello. I'm Rowan. I wanted to say it properly, because nobody else seems to have crossed the deck." @hint Plain
@@ -104,13 +102,16 @@
           [jessica] "On a boat? With my caskets in the way?" A gracious headshake. "After we dock. If you remember to ask me then."
           @flag jessica_game_after_docks
           @aff jessica +1 | Asked politely
+        > "May I ask you a few things, if you've the patience?" @if not chat_jessica_done
+          @scene chat_jessica
         > Excuse yourself.
           [jessica] "Of course. Go and cross some other deck."
     @else
       [jessica] "Rowan."
       @time 3
-  @if met:jessica and not deck_known_jessica and not deck_skipped_jessica
-    @scene deck_jessica
+  @if met:jessica and not chat_jessica_offered
+    @flag chat_jessica_offered
+    @scene chat_jessica
 
 @scene ferry_ashton
   @if not met:ashton
@@ -164,83 +165,56 @@
       @scene post_ashton
       @flag flag_ashton_game
       @time 25
+    > "Let's talk for a bit. I'd like to know what you make of all this." @if not chat_ashton_done
+      @scene chat_ashton
     > Go and speak to the girl with the caskets.
       [ashton] "Do. Do. And tell her I said hello. Or that I said nothing. Or don't."
   @time 6
-  @if met:ashton and not deck_known_ashton and not deck_skipped_ashton
-    @scene deck_ashton
+  @if met:ashton and not chat_ashton_offered and not flag_ashton_game
+    @flag chat_ashton_offered
+    @scene chat_ashton
 
 @scene ferry_victoria
   @if not met:victoria
     Under the one dry canvas awning, on the one dry bench, a girl in a ruffled dress sits with a lace parasol open over her head, although she is already under an awning. Long pale-gold ringlets tied with ribbons. Wide sky-blue eyes that rest on things rather than people. She is watching the wake.
-    She does not look round. A very short girl, standing at her elbow, is looking at you.
+    She does not look round.
     @choice
       > "Excuse me. I'm Rowan. Is it all right if I sit with you for a moment? I won't talk much." @hint Plain
-        [victoria?] "Yes." She turns her head. "I should like that. I have been here since Tuesday." A pause. "That is a joke. I am told that I do not make them. I was practising."
-        [victoria?] "Victoria Capulet. This is my sister Ophelia."
-        @meet victoria
+        [victoria?] "Yes." She turns her head, slowly. "I should like that. I have been here since Tuesday." A pause. "That is a joke. I am told that I do not make them. I was practising."
+        [victoria?] "Victoria Capulet."
         @aff victoria +3 | Asked her plainly
         @flag victoria_plain
       > "Is that for the sun, or in case the sea tries anything?" @hint Joke
-        Silence. The sea goes on being the sea.
-        Then the short-haired girl at her elbow says, flatly, "Meaning what?"
-        [ophelia?] "She didn't hear you. She's looking at the sea. She'll finish in about a minute."
-        @meet ophelia
-        @aff victoria -1 | Joked at her
-        @aff ophelia -1 | Joked at her sister
-      > "Hey, you three — what's the story with the parasol? Is everyone in Rare Hall this fancy?" @hint Group
-        Heads turn along the rail. The silence is very polite. And then very, very long.
-        [ophelia?] "That's a lot of people. She doesn't talk to crowds."
-        @meet ophelia
-        @aff ophelia -1 | Crowded her sister
+        The sea goes on being the sea. A gull crosses the sky. Nothing at all happens, and goes on happening, for what feels like a full minute.
+        ~ Either she didn't hear me, or that was the longest mistake of my life.
+        [victoria?] "I did not hear you, because I was looking at the wake." She turns her head. The sky-blue eyes arrive on you like a slow, polite weather. "I have finished now."
+        [victoria?] "It is for the sun, and in case the sea tries anything. Both. I like to be prepared, and it is also pretty. Victoria Capulet."
+        @aff victoria +1 | Waited for her answer
+        @flag victoria_parasol
+      > "Hey, you, in the lace! What's the story with the parasol? Does it come with the dress, or is it an upgrade?" @hint Loud
+        Heads turn along the rail. The silence from the bench is very polite. And then very, very long.
+        [victoria?] "I did not hear you, because I was looking at the wake. I have finished now." She turns her head. "You spoke rather quickly, and rather loudly, and I could not tell which part was the question."
+        [victoria?] "I answer one thing at a time. If you would be so good as to ask again, more slowly, I should like to answer. Victoria Capulet."
+        @aff victoria -1 | Hurried her
+        @flag victoria_hurried
+    @meet victoria
     @add ferry_talked +1
     @time 8
   @else
-    @if victoria_plain
-      [victoria] "Rowan." She looks up. It is a very still, very attentive look. "The sea has been exactly the same colour since we left. I find that restful."
-      @choice
-        > "What are you looking at, if you don't mind my asking?"
-          [victoria] "The place where the wake becomes the sea. It is not a line. It is a decision." Quiet. "It is not a very large decision. I like it."
-          @aff victoria +2 | Asked about her view
-        > "Would you play a game with me at some point? I'd like to see how you play." @hint After docks
-          [victoria] "I do not play in a crowd. After we dock. At a table." A faint, almost-smile. "I should like it very much."
-          @flag victoria_game_after_docks
-          @aff victoria +1 | Asked politely
-        > Let her be.
-          [victoria] "Thank you."
-    @else
-      [ophelia] "She's thinking. Give her a minute."
-      @aff ophelia +0 | Waited
-    @time 5
-  @if met:victoria and not deck_known_victoria and not deck_skipped_victoria
-    @scene deck_victoria
-
-@scene ferry_ophelia
-  @if not met:ophelia
-    A short-haired, short-tempered looking girl in a red jacket stands at the luggage cage with her arms crossed and her eyes on the dry bench. The sleeves are shoved to the elbow and the collar unbuttoned. At first glance she could be a boy. She seems quite used to that.
-    [ophelia?] "You're staring."
-    [rowan] "I'm — sorry. I was looking at the cage."
-    [ophelia?] "It's a cage. It has luggage in it. What did you expect?"
-    @meet ophelia
-    [ophelia] "Ophelia Capulet. Second-year. That's my sister on the bench. Don't crowd her."
-    @add ferry_talked +1
+    [victoria] "Rowan." She looks up. It is a very still, very attentive look. "The sea has been exactly the same colour since we left. I find that restful."
     @choice
-      > "Would you play a game with me? I'm Rowan, and I'd like to ask nicely." @hint Cards
-        [ophelia] "After we dock." Flat. "Not on a boat. Boats are for waiting."
-        @flag ophelia_game_after_docks
-        @aff ophelia +1 | Asked a plain question
-      > "What does your sister do, Ophelia? She seems to see everything."
-        [ophelia] "She looks at things." Bluntly. "She's very good at it. Don't make that into a joke."
-        @aff ophelia +2 | Respectful
-      > "Sorry. I didn't mean to stare. I'll go."
-        [ophelia] "Good."
-        @aff ophelia +0 | Backed off
-    @time 5
-  @else
-    [ophelia] "She's thinking. Give her a minute." A beat. "Meaning what?"
-    @time 3
-  @if met:ophelia and not deck_known_ophelia and not deck_skipped_ophelia
-    @scene deck_ophelia
+      > "Would you play a game with me at some point? I'd like to see how you play." @if not victoria_game_after_docks @hint After docks
+        [victoria] "I do not play in a crowd. After we dock. At a table." A faint, almost-smile. "I should like it very much."
+        @flag victoria_game_after_docks
+        @aff victoria +1 | Asked politely
+      > "May I ask you a few things? One at a time." @if not chat_victoria_done
+        @scene chat_victoria
+      > Let her be.
+        [victoria] "Thank you."
+    @time 4
+  @if met:victoria and not chat_victoria_offered
+    @flag chat_victoria_offered
+    @scene chat_victoria
 
 @scene ferry_sunny
   @if not met:sunny
@@ -285,41 +259,49 @@
           @scene post_sunny
           @flag flag_sunny_game
           @time 25
+        > "Let me ask you something first, before I hit the planks." @if not chat_sunny_done
+          @scene chat_sunny
         > "Not on a wet deck, I'll slip. Find me on land and I'll take your challenge."
           [sunny] "Chicken." Affectionately. "Come find me on land."
     @else
       [sunny] "Hey, Wildcard! Still alive?"
       @aff sunny +1 | Chatted
       @time 5
-  @if met:sunny and not deck_known_sunny and not deck_skipped_sunny
-    @scene deck_sunny
+      @if not chat_sunny_done
+        @choice
+          > "Have you got a minute? I've got questions."
+            @scene chat_sunny
+          > Wave and move on.
+  @if met:sunny and not chat_sunny_offered and not flag_sunny_game
+    @flag chat_sunny_offered
+    @scene chat_sunny
 
 @scene ferry_marit
   @if not met:marit
     A girl in a flame-orange bow tie is standing on a mooring bollard, reciting to the gulls.
-    "…and in that hour, when the sea went grey as a forgotten promise —" She has long flame-orange ombré hair that stands up at the crown. She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter.
+    "…and in that hour, when the sea went grey as a forgotten promise —" She has long flame-orange ombré hair that stands up at the crown, two little flame-shaped clips pinned into it, and a scarf the colour of embers wound twice round her throat. She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter.
     She sees you. The recital stops.
-    [marit?!] "A human! An audience! **Behold!**"
-    [marit?] "Marit Solberg. Commentary track, theatre kid, flame-adjacent. And you are the brooding stranger without a jacket."
+    [marit?!] "A **HUMAN!** An *AUDIENCE!* The gods are *generous* this morning! **BEHOLD!**"
+    [marit?!] "Marit Solberg! Commentary track! Theatre kid **EXTRAORDINAIRE!** Flame-adjacent in every conceivable respect! And *you* — you are the **BROODING STRANGER** without a jacket!"
     @meet marit
     @add ferry_talked +1
     [rowan] "I'm Rowan Vance, and I'm not brooding. I'm just underdressed."
-    [marit] "Rowan Vance. Brooding, underdressed, and brand new. I have decided we are having an arc."
+    [marit!] "**UNDERDRESSED!** Rowan Vance — brooding, underdressed and *brand new!* I have decided, here and now, upon this very bollard, that we are having an **ARC!**"
     @choice
       > "What kind of arc did you have in mind? I'd like to know what I'm signing up for."
-        [marit] "Oh, the good kind. The kind where you start out afraid of something and end up with a very good coat." She grins. "I'll let you know."
+        [marit!] "Oh, the **GOOD** kind! The kind where you start out terrified of something and end up with a *very* good coat!" She grins. "I'll let you know."
         @aff marit +2 | Played along
       > "How about a game, then? Narrate away." @hint She narrates
-        [marit!] "A **GAME.** Yes. Yes yes yes. And I shall narrate every move. Because I cannot help it."
+        [marit!] "A **GAME!** Yes. Yes yes **YES!** And I shall narrate every move, because I physically cannot *help* it!"
         @jump marit_game
       > "Is all this a hobby, or a calling? You're very good at it."
-        [marit] "It's a calling." Quieter, an aside, almost ordinary. "Also a hobby. I'm not 'too much'. I'm the correct amount for a larger room."
+        [marit!] "A **CALLING!**" Then — quieter, an aside, almost ordinary: "Also a hobby. I'm not 'too much'. I'm the correct amount for a larger room."
         @aff marit +3 | Saw behind the act
     @time 8
   @else
     @label marit_game
     @if not flag_marit_game
-      [marit!] "A game! I shall narrate. You will hate it. You will *love* it. **Behold!**"
+      [marit!] "A game! I shall narrate. You will hate it. You will *love* it. **BEHOLD!**"
       @choice
         > "All right, Marit. Let's play. And I'd like to hear the narration."
           A small crowd gathers around the bollard in the time it takes to shuffle. Six people, then eight. The deckhand with the tea, two girls from the lounge, a boy with a clipboard. Your hands begin to shake the moment you pick up the deck.
@@ -328,22 +310,30 @@
           @scene deck_marit
           @duel ferry_marit deck=marit name="Marit Solberg"
             @win
-              [marit] "Alas! Defeat! And what a defeat, ladies and gentlemen, what a — no, it's a good one. Rowan Vance, you have a very quiet kind of thunder."
+              [marit!] "**ALAS!** *DEFEAT!* And what a defeat, ladies and gentlemen, what a — no. No, it's a good one." She drops, for exactly one sentence, into an ordinary voice. "Rowan Vance, you have a very quiet kind of thunder."
               @aff marit +3 | Good game
             @lose
-              [marit] "The phoenix, ladies and gentlemen. Always the phoenix." She takes a very small, very private bow, then drops, mid-flourish, into her ordinary voice: "That was lovely. Thank you for letting me."
+              [marit!] "The **PHOENIX**, ladies and gentlemen! **ALWAYS** the Phoenix!" She takes a very small, very private bow, then drops, mid-flourish, into her ordinary voice: "That was lovely. Thank you for letting me."
               @aff marit +3 | Played with her
           @scene post_marit
           @flag flag_marit_game
           @time 25
+        > "Let me ask you something first, and then we play." @if not chat_marit_done
+          @scene chat_marit
         > "Maybe later. I'd like to see the rest of the ship first."
-          [marit] "Later! The sequel! The sequel is always better."
+          [marit!] "Later! The **SEQUEL!** The sequel is *always* better!"
     @else
-      [marit] "Rowan! Protagonist! Have you seen the island? It has a MOUNTAIN. I've already written a monologue."
+      [marit!] "Rowan! **PROTAGONIST!** Have you seen the island? It has a **MOUNTAIN!** I have already written a monologue!"
       @aff marit +1 | Chatted
       @time 5
-  @if met:marit and not deck_known_marit and not deck_skipped_marit
-    @scene deck_marit
+      @if not chat_marit_done
+        @choice
+          > "Do you have a minute between monologues? I've got questions."
+            @scene chat_marit
+          > Applaud politely and move on.
+  @if met:marit and not chat_marit_offered and not flag_marit_game
+    @flag chat_marit_offered
+    @scene chat_marit
 
 # ───────────────────────────── BRÜCKE ─────────────────────────────
 
@@ -455,19 +445,16 @@
     @else
       [rana] "…Yeah?"
       @choice
-        > "Can I ask you a deckbuilding question? I heard you're good at it." @hint Tentative
-          [rana] "What." A beat. Then, very fast: "Chain LOCUST off ANTS before their next turn and the whole swarm comes in a turn early. It's not that interesting." And then, to herself, softer: "Whatever."
-          [rowan] "That's actually quite clever."
-          [rana] "Don't."
-          @aff rana +3 | Asked about decks
-          @flag rana_deck_talk
+        > "Do you play? I'm not asking for a game. I just don't know what anybody's running." @if not deck_known_rana @hint Tentative
+          @scene answer_rana
+        > "Would it be all right if I sat here a while? I won't talk." @if not chat_rana_done
+          @scene chat_rana
         > "Good to see you again."
           [rana] "Mm."
         > Leave her.
           [rana] "Good."
       @time 4
-  @if met:rana and not deck_known_rana and not deck_skipped_rana
-    @scene deck_rana
+
 
 @scene ferry_teobalt
   @if not met:teobalt
@@ -485,7 +472,7 @@
         @item "Teobalt's unloading list"
         @flag has_unloading_list
         @aff teobalt +3 | Wanted the list
-      > "Would you play a game with me at some point? Not today, I gather."
+      > "Would you play a game with me at some point?"
         [teobalt] "Thursday. I am making a list." A faint, regretful smile. "It is an excellent offer. I accept it for Thursday."
         @flag teobalt_thursday
         @aff teobalt +1 | Asked politely
@@ -499,5 +486,11 @@
       [teobalt] "Teal. Yes." A very small, very pleased pause. "Nobody ever notices the teal."
       @aff teobalt +2 | Noticed the teal
     @time 3
-  @if met:teobalt and not deck_known_teobalt and not deck_skipped_teobalt
-    @scene deck_teobalt
+    @if not chat_teobalt_done
+      @choice
+        > "Have you got a moment between items? I've got a few questions."
+          @scene chat_teobalt
+        > "I'll let you get back to it."
+  @if met:teobalt and not chat_teobalt_offered
+    @flag chat_teobalt_offered
+    @scene chat_teobalt

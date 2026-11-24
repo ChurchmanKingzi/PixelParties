@@ -1,0 +1,761 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · GESPRÄCHS-HUBS
+#  Jede Figur der Fähre hat nach dem Erstkontakt einen kleinen Gesprächskreis: zwei, drei Fragen, die sich aus dem ergeben,
+#  was Rowan bis dahin gesehen oder gehört hat (nie mehr), und einen Abschied. Wer will, geht nach dem ersten Satz,
+#  wer fragt, lernt die Figur kennen. chat_<id>_1..3 merken die gestellten Fragen, chat_<id>_done schließt den Kreis.
+#  Pro Frage höchstens ein Zuneigungs-Update je Figur (ein Popup je Textbox).
+#  Das Deck-Thema steht als beschreibende Option dabei, solange Rowan das Deck noch nicht kennt.
+# ═══════════════════════════════════════════════════════════════════
+
+# ───────────────────────────── DAS VORDECK ─────────────────────────────
+
+@scene chat_nathan
+  @label top
+  @if chat_nathan_1 and chat_nathan_2 and shop_nathan_done
+    @flag chat_nathan_done
+    [nathan=happy] "Okay, that's — we've covered, like, a THIRD of my life story! Come back for the rest! There's a lot of it and it's all great!"
+    @end
+  @choice
+    > "Where are you from, Nathan?" @if not chat_nathan_1
+      [nathan=happy] "Bayonne, New Jersey! Four brothers, one bathroom, a dinner table the size of a postage stamp! You had to be louder than the food to get heard. That's not a personality, that's a survival adaptation."
+      [rowan] "That explains the volume."
+      [nathan=laughing] "It explains EVERYTHING!"
+      @aff nathan +1 | Asked about home
+      @flag chat_nathan_1
+      @time 2
+      @jump top
+    > "What made you want to come here, of all places?" @if not chat_nathan_2
+      [nathan=grin] "Because at home there's the smart one, the strong one, the funny one — and then there's me. I'd like to be a different word."
+      [rowan] "Which word?"
+      [nathan=happy] "I don't know yet! That's why I came! I figured the island would have one lying around!"
+      @aff nathan +2 | Asked him seriously
+      @flag chat_nathan_2
+      @time 2
+      @jump top
+    > Talk shop about his deck. @if not shop_nathan_done
+      @scene shop_nathan
+      @jump top
+    > "I'd like to look around some more, Nathan. Thanks."
+      [nathan=happy] "Go! Go go go! Meet people! Come back and tell me everything! I'll know already, but still!"
+      @end
+
+@scene chat_baylee
+  @label top
+  @if chat_baylee_1 and chat_baylee_2 and chat_baylee_3
+    @flag chat_baylee_done
+    [baylee] "…That's about all I've got." A very small pause. "Thanks for asking. Folks mostly don't."
+    @end
+  @choice
+    > "How did you start playing, Baylee?" @if not chat_baylee_1
+      [baylee] "Starter deck. Left on the counter at the feed store. Nineteen." He turns his hand over, like a man checking for rain. "Read the card text for a week. Finger under the line. I'm slow at reading. Not dim. Slow."
+      [rowan] "I don't think anyone who reads every line is slow."
+      [baylee] "…Yup." The sunburnt face does something complicated. "Nobody's said that."
+      @aff baylee +2 | Respected how he reads
+      @flag chat_baylee_1
+      @time 2
+      @jump top
+    > "It's a long way from Minnesota to here. What brought you?" @if not chat_baylee_2
+      [baylee] "Farm money. Dad put it by. Said it ought to go on something that mattered."
+      [baylee] "Seemed wrong to waste it on staying home."
+      [rowan] "I hope it does matter."
+      [baylee] "Me too." Plainly. "Working on it."
+      @aff baylee +2 | Listened
+      @flag chat_baylee_2
+      @time 2
+      @jump top
+    > "What's it like being the tallest person in every room?" @if not chat_baylee_3
+      [baylee] "Doorways. Ceilings. People." A pause long enough to watch a gull. "You learn to stand so folks can get past. Then you forget you're doing it."
+      [rowan] "I noticed. On the deck. You had your shoulders in."
+      [baylee] "…Yup. Most don't."
+      @aff baylee +1 | Noticed how he stands
+      @flag chat_baylee_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_baylee
+      @scene deck_baylee
+      @jump top
+    > "I'll let you get back to the sea, Baylee."
+      [baylee] "Yup. Mind the step."
+      @end
+
+@scene chat_ed
+  @label top
+  @if chat_ed_1 and chat_ed_2 and chat_ed_3
+    @flag chat_ed_done
+    [ed] "That's my whole life story! Well — that's the parts where nobody got hurt. The rest is mostly injuries!"
+    @end
+  @choice
+    > "Tell me about the ranch, Ed." @if not chat_ed_1
+      [ed] "Lazy V! Three thousand acres and one road, and the road's mostly a rumour! I've been bucked off four horses, a bull, a barn roof and one very surprised goat."
+      [ed] "Mom says I'm half rope. She's right, I was walking on a fence before I was walking on the ground."
+      [rowan] "And the other half?"
+      [ed] "Hat!"
+      @aff ed +1 | Asked about the ranch
+      @flag chat_ed_1
+      @time 2
+      @jump top
+    > "What's first on your list for the island?" @if not chat_ed_2
+      [ed] "The crater! Then the ruins field! Then the north shore, which has a *sign* — it says DO NOT in capitals, and I think that's just rude. Somebody's got to answer a sign like that."
+      [rowan] "And if somebody gets hurt?"
+      [ed] "Then it's an adventure with a bandage! Is that dangerous? That's a bit dangerous. You in?"
+      @aff ed +2 | Didn't tell him off
+      @flag chat_ed_2
+      @time 2
+      @jump top
+    > "Does the hat ever come off?" @if not chat_ed_3
+      [ed] "**NO.**" Very fast, and very serious. Then, cheerfully, a half-second later: "It was my grandad's. Rule one. Nobody touches the hat."
+      [rowan] "I wasn't going to."
+      [ed] "I know! You're a good guy! You can *look* at it, though." He tilts the brim a quarter-inch towards you, with the air of a man unveiling a statue.
+      @aff ed +2 | Respected the hat
+      @flag chat_ed_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_ed
+      @scene deck_ed
+      @jump top
+    > "I should go look at the rest of the ship. See you, Ed."
+      [ed] "See you on the sand! Bring rope!"
+      @end
+
+@scene chat_georgie
+  @label top
+  @if chat_georgie_1 and chat_georgie_2 and chat_georgie_3
+    @flag chat_georgie_done
+    [georgie] "Thank you for — for asking things. Normally people ask me about the winning." A tiny pause. "You asked about the feather."
+    @end
+  @choice
+    > "That feather is lovely. Is there a story to it?" @if not chat_georgie_1
+      [georgie] "Oh — thank you." She touches it, as if to make sure it is still there. "I found it on the steps outside the hall in Lyon. The day of my first big final. Nobody else wanted it, and I thought somebody should."
+      [rowan] "Did the final go well?"
+      [georgie] "…It went fine." Barely a whisper, and then, braver: "It went very well. Sorry. That sounded like boasting."
+      [rowan] "It sounded like a feather story."
+      @aff georgie +2 | Asked about the feather
+      @flag chat_georgie_1
+      @time 2
+      @jump top
+    > "I'm nervous about playing at a table with people watching. I've never done it. Is it very hard?" @if not chat_georgie_2
+      [georgie] "…Never?" A flicker of surprise, and then something warmer. "Then it's the hands. Everybody watches the hands. Don't. Watch the cards."
+      [georgie] "The cards are exactly the same as they were at home. They don't know anybody's looking."
+      [rowan] "That's — actually very helpful."
+      [georgie] "I've had a lot of practice being frightened." A very small smile. "I'm sorry. That wasn't a joke. It was a bit of a joke."
+      @aff georgie +3 | Trusted her with it
+      @flag chat_georgie_2
+      @time 2
+      @jump top
+    > "What do you do when you aren't playing?" @if not chat_georgie_3
+      [georgie] "Draw dragons. Eat pudding." She brightens, very slightly. "And French. Maman says it's good for me. It isn't. The verbs are horrible."
+      [rowan] "Mine's worse. I took it for one term."
+      [georgie] "Then we could be bad at it together." The second the words leave her she goes red. "If — if you wanted. It's fine if not."
+      [rowan] "I'd like that."
+      @aff georgie +2 | Offered to be bad at French with her
+      @flag chat_georgie_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_georgie
+      @scene deck_georgie
+      @jump top
+    > "I'll leave you in peace, Georgie. Thank you."
+      [georgie] "Okay. Bye. Sorry — no. Not sorry." A breath. "Bye."
+      @end
+
+@scene chat_pippa
+  @label top
+  @if chat_pippa_1 and chat_pippa_2 and chat_pippa_3
+    @flag chat_pippa_done
+    [pippa] "You're good at this. Most people want to be *in* the picture. You asked about the picture."
+    @end
+  @choice
+    > "What are you hoping to find to photograph on the island?" @if not chat_pippa_1
+      [pippa] "Light. Tide pools. Hands doing something they've done a thousand times." She lifts the camera and does not click. "And the one photograph where somebody looks like themselves. That's the whole job, really. Everything else is just practice."
+      [rowan] "Have you taken one?"
+      [pippa] "Not yet. Maybe the one of you at the rail. We'll see in a week."
+      @aff pippa +2 | Asked about her work
+      @flag chat_pippa_1
+      @time 2
+      @jump top
+    > "Do you know anybody here already?" @if not chat_pippa_2 and not met:georgie
+      [pippa] "No! That's why I'm shooting everyone I can before the boat docks. It's the quickest way I know of to find the ones I'm going to like."
+      [pippa] "You find people through a lens. It's cheating. It works."
+      @aff pippa +1 | Asked about her
+      @flag chat_pippa_2
+      @time 2
+      @jump top
+    > "The girl with the violet feather — you were photographing her. Do you know her?" @if not chat_pippa_2 and met:georgie
+      [pippa] "Georgie. I met her ten minutes before you did. She's fourteen — did you know? Fourteen! National under-sixteens champion, and she asked me whether she was *allowed* to sit on the rope."
+      [pippa] "I've decided I'm her older sister. It's not up for discussion."
+      @aff pippa +2 | Cared about Georgie
+      @flag chat_pippa_2
+      @flag pippa_georgie_sister
+      @time 2
+      @jump top
+    > "Why are you never in your own photographs?" @if not chat_pippa_3
+      [pippa] "Hm?" The camera comes down an inch. "Oh — that's — because somebody has to be behind it. It's a rule. There's always one person behind it."
+      A very small pause. It is quick, and she covers it with a grin, but it was there.
+      [pippa] "Do you want to try? Take one of me. You'll be terrible. It'll be perfect."
+      @aff pippa +2 | Noticed she wasn't in the picture
+      @flag chat_pippa_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_pippa
+      @scene deck_pippa
+      @jump top
+    > "I'll let you get back to it. Thanks, Pippa."
+      [pippa] "Hang on —" Click. "Okay. Go."
+      @end
+
+@scene chat_mikoto
+  @label top
+  @if chat_mikoto_1 and chat_mikoto_2 and chat_mikoto_3
+    @flag chat_mikoto_done
+    [mikoto] "That's — that was nice. Sorry. I mean thank you, not sorry. I'm — I'm working on it."
+    @end
+  @choice
+    > "What made you choose the Academy, Mikoto?" @if not chat_mikoto_1
+      [mikoto] "My mother looked it up. She thought, since I'm very good at lists, a place with lots of rules would suit me. Sorry. It does. Mostly." A quick, high laugh, stopped at once. "There are fewer rules than I'd hoped."
+      [rowan] "Do you miss them?"
+      [mikoto] "Yes. Rules are very kind. They tell you where the edge is."
+      @aff mikoto +2 | Asked about him
+      @flag chat_mikoto_1
+      @time 2
+      @jump top
+    > "Does everybody get a nickname, or only me?" @if not chat_mikoto_2
+      [mikoto] "Everybody! Sorry. It's — I can't help it. The captain's Bowler. The gull is Mrs. Pemberton. I haven't decided about the volcano yet, I'm waiting for it to do something."
+      [rowan] "And what's mine, if I'd said no?"
+      [mikoto] "Rowan." Very seriously. "I wrote it down. I'd have used it sparingly. Like a good candle."
+      @aff mikoto +2 | Played along
+      @flag chat_mikoto_2
+      @time 2
+      @jump top
+    > "What are you most nervous about, today?" @if not chat_mikoto_3
+      [mikoto] "Everything. In order of likelihood. One: my first duel. Two: my roommate, whoever he is. Three: that I'll laugh at the wrong moment and somebody will think it's about them."
+      [rowan] "I'm on that list too."
+      [mikoto] "Are you?" A quick, startled look, magnified by the glasses. "Oh. Oh, that's — thank you. It's much better with two."
+      @aff mikoto +3 | Admitted he was nervous too
+      @flag chat_mikoto_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_mikoto
+      @scene deck_mikoto
+      @jump top
+    > "I'll go and see more of the ship. Good talking to you, Mikoto."
+      [mikoto] "Oh — you too! Sorry! Not sorry. Good. You too."
+      @end
+
+# ───────────────────────────── DER SALON ─────────────────────────────
+
+@scene chat_gideon
+  @label top
+  @if chat_gideon_1 and chat_gideon_2 and chat_gideon_3
+    @flag chat_gideon_done
+    [gideon] "That will do, Vance. I find that I have said rather more than I intended. Do not mention it to anyone." A quarter-inch of a smile. "I shall know if you do."
+    @end
+  @choice
+    > "How long have you been sitting at this table?" @if not chat_gideon_1
+      [gideon] "Since the harbour. It is the only real table on the ship. One must be seen to be using it." He squares the deck, once. "A table that nobody is at is merely furniture."
+      [rowan] "And a table somebody is at?"
+      [gideon] "A position."
+      @aff gideon +1 | Asked about his habits
+      @flag chat_gideon_1
+      @time 2
+      @jump top
+    > "Why the white gloves?" @if not chat_gideon_2
+      [gideon] "Manners." He lays one hand flat on the felt, the way another boy might lay down a card. "One should have clean hands when one touches things that belong to other people."
+      [gideon] "Cards, chiefly. Occasionally other things."
+      [rowan] "Which other things?"
+      [gideon] "Hm." The grey eyes rest on you a moment. "You do ask the right second question, Vance. It is a rare habit."
+      @aff gideon +2 | Asked the second question
+      @flag chat_gideon_2
+      @time 2
+      @jump top
+    > "You plainly have questions for me. Go on and ask." @if not chat_gideon_3
+      [gideon] "How very direct." He appears, for a moment, genuinely pleased. "Where did you learn to play?"
+      @choice
+        > "Online, mostly. I never played at a real table until today. I'd rather you didn't spread that around."
+          [gideon] "I shall not." He means it, which is the most unsettling part. "That is a great deal to give a stranger, Vance. Thank you."
+          @aff gideon +2 | Was honest with him
+        > "In a laundromat, between dryer cycles. It's a good place to learn patience."
+          [gideon] "A laundromat." Slowly. "Patience." Another quarter-inch. "I begin to understand why you are quiet."
+          @aff gideon +1 | Gave him a true answer
+        > "I'd rather keep that to myself, thanks."
+          [gideon] "A reasonable answer. Almost everyone says more." He makes a very small, dry note in his head. "That is also informative."
+      @flag chat_gideon_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_gideon
+      @scene deck_gideon
+      @jump top
+    > "I'll leave you to your cards, Gideon."
+      [gideon] "Good morning, then."
+      @end
+
+@scene chat_inya
+  @label top
+  @if chat_inya_1 and chat_inya_2 and chat_inya_3
+    @flag chat_inya_done
+    [inya] "Okay. That's enough. That was — that was more than I usually say to people." A narrow, fierce look. "Don't make it weird."
+    @end
+  @choice
+    > "Tell me about the rabbits. Properly. I won't call them bunnies." @if not chat_inya_1
+      [inya] "…Rabbits." The amber eyes light up all at once, like a switch. "Nine, at home. Two lops, five Dutch, a Netherland Dwarf who's a menace, and Colonel."
+      [rowan] "Colonel?"
+      [inya] "Flemish Giant. Fifteen pounds. He isn't a rabbit, he's a *statement*. He sits on my feet when I study." A breath. "I can list every breed by ear length. Do you want to hear it?"
+      [rowan] "Not all of it. Maybe the top three."
+      [inya] "Flemish, French Lop, English Lop." Very fast. "Ears, in that order. You listened. That's — fine."
+      @aff inya +2 | Asked about the rabbits
+      @flag chat_inya_1
+      @time 2
+      @jump top
+    > "What do you want out of the Academy, Inya?" @if not chat_inya_2
+      [inya] "A pro seat." No hesitation. "Not a favour. Not somebody's. *Earned.* I'm going to win it with the cards I've got, in my own name."
+      [rowan] "Your own name?"
+      [inya] "It's — a figure of speech." Fast and flat. "I want the seat to be mine. That's all."
+      @aff inya +2 | Asked what she wanted
+      @flag chat_inya_2
+      @time 2
+      @jump top
+    > "What do you do when you lose?" @if not chat_inya_3
+      [inya] "Write it down." She does not look at you. "Every loss. One line, what I should have done. Four notebooks. I read them on the way to bed."
+      [rowan] "Does it help?"
+      [inya] "It's not supposed to *help*. It's supposed to *stay*." A very small pause. "Don't tell Tomi. He'd put odds on it."
+      @aff inya +3 | Didn't laugh
+      @flag chat_inya_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_inya
+      @scene deck_inya
+      @jump top
+    > "I'll leave you to it. Good talking to you, Inya."
+      [inya] "Don't forget about the real game. I mean it."
+      @end
+
+@scene chat_tomi
+  @label top
+  @if chat_tomi_1 and chat_tomi_2 and chat_tomi_3
+    @flag chat_tomi_done
+    [tomi] "That's the whole sales pitch and the family history. Free, because I like you. The next one costs a credit." A grin. "Friend price."
+    @end
+  @choice
+    > "Where did you learn to trade?" @if not chat_tomi_1
+      [tomi] "My uncle's stall at a flea market in Queens. Age eight. First rule: never lie about the condition. Second rule: never lie about the price."
+      [tomi] "Third rule: lie about nothing, and look like you're lying about everything. That's the whole job."
+      [rowan] "Does the third rule work?"
+      [tomi] "It's why they come back to check." Delighted. "Information's inventory."
+      @aff tomi +2 | Asked how he started
+      @flag chat_tomi_1
+      @time 2
+      @jump top
+    > "You keep saying 'friend price'. Does everyone get it?" @if not chat_tomi_2
+      [tomi] "Everyone's a friend. Some are better friends. Commons kids get the best price." He taps the binder. "I never cheat a Commons kid, and I give first-timers one free bad trade back. That's not charity. That's investment."
+      [rowan] "And Gideon?"
+      [tomi] "Gideon pays double. It's not personal. It's *marketing*."
+      @aff tomi +2 | Asked about his rules
+      @flag chat_tomi_2
+      @time 2
+      @jump top
+    > "If you had to bet on how the first year goes, what would you say?" @if not chat_tomi_3
+      [tomi] "Spectral wins the first week. Rare wins the first month. Commons wins the year." A shrug. "Long odds, long game. Don't tell Gideon, he'll want to put money on it."
+      [rowan] "Why would Commons win?"
+      [tomi] "Because they're the ones who know what everything's worth. Prices don't care about a collar."
+      @aff tomi +1 | Played the odds with him
+      @flag chat_tomi_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_tomi
+      @scene deck_tomi
+      @jump top
+    > "I'll let you get back to business."
+      [tomi] "Come back with something to trade. Or a bet."
+      @end
+
+@scene chat_magnus
+  @label top
+  @if chat_magnus_1 and chat_magnus_2 and chat_magnus_3
+    @flag chat_magnus_done
+    [magnus] "That is quite enough. I have said more to you in the last ten minutes than to my own roommate." He taps the stylus against his teeth. "Do not let it go to your head."
+    @end
+  @choice
+    > "Do you really keep a file on everyone?" @if not chat_magnus_1
+      [magnus] "On everyone who has beaten me. It is a short file." A thin, precise smile. "It is, at present, one entry long."
+      [rowan] "Do I get to see it?"
+      [magnus] "No. But I update it every night."
+      @aff magnus +1 | Asked about the file
+      @flag chat_magnus_1
+      @time 2
+      @jump top
+    > "How do you pick your deck every week?" @if not chat_magnus_2
+      [magnus] "The ladder. I take the three best lists of the week and look for what all three lose to." He does not look up. "It is not creativity. It is arithmetic."
+      [rowan] "That's more than most people do."
+      [magnus] "I am aware." A very small pause. "Do you also do it? Pick by the numbers?"
+      @choice
+        > "Sometimes. But mostly I just play what I understand."
+          [magnus] "Understand." He writes the word on the tablet. "I shall have to look up what that means in practice."
+          @aff magnus +1 | Answered honestly
+        > "No. I play the same deck every week. I've never changed it."
+          [magnus] "Never." The stylus stops. "For *two years*. And it was *still* better than mine." A breath through the nose. "Thank you. That is deeply unhelpful."
+          @aff magnus -1 | Rubbed it in
+      @flag chat_magnus_2
+      @time 2
+      @jump top
+    > "Why does it matter so much to you, being ranked above me?" @if not chat_magnus_3
+      [magnus] "Because for two years I have been *second*, Vance." He says it very quietly. "It is a rank nobody mentions. Nobody writes an article about the one below. Nobody makes a handle for the one below."
+      [rowan] "I never knew you were there."
+      [magnus] "I know. That is what I find so difficult."
+      @aff magnus +1 | Heard him out
+      @flag chat_magnus_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_magnus
+      @scene deck_magnus
+      @jump top
+    > "I should let you get back to the replays."
+      [magnus] "I have all of them. One more will not hurt."
+      @end
+
+@scene chat_noor
+  @label top
+  @if chat_noor_1 and chat_noor_2 and chat_noor_3
+    @flag chat_noor_done
+    [noor] "That is a more thorough conversation than I expected to have before docking. Thank you. I shall mark it down as a pleasant irregularity."
+    @end
+  @choice
+    > "What got you interested in rules?" @if not chat_noor_1
+      [noor] "My grandmother." A small, private pause. "She told me a promise is only as good as the person who can say what it meant. I wanted to be that person."
+      [rowan] "Is it a good thing to be?"
+      [noor] "It is a hard thing to be. But somebody has to stand at the line and say exactly where it is."
+      @aff noor +2 | Asked about her grandmother
+      @flag chat_noor_1
+      @time 2
+      @jump top
+    > "What do you want to do after the Academy?" @if not chat_noor_2
+      [noor] "Be a head judge. Not a champion." She says it without apology, the way another girl might say she wants to be a pilot. "Somebody has to stand between the players and the clock."
+      [rowan] "I've never met anybody who wanted that."
+      [noor] "That is why there are so few good ones."
+      @aff noor +2 | Respected her ambition
+      @flag chat_noor_2
+      @time 2
+      @jump top
+    > "Is there anywhere on the ship quiet enough for you, at midday? I'd gladly help keep the shouting down." @if not chat_noor_3
+      [noor] "…" She regards you for a moment, with great and courteous attention. "You asked, rather than assumed. Thank you. People usually either avoid the question or make it a debate."
+      [noor] "The stern bench, at noon. It faces the wake. It is the quietest place on the ship, and it is not on the list of places to be seen."
+      [rowan] "Then I'll make sure Nathan doesn't find it."
+      [noor] "A very small and well-chosen kindness." A faint dry smile. "I accept it."
+      @aff noor +3 | Asked, instead of assuming
+      @flag chat_noor_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_noor
+      @scene deck_noor
+      @jump top
+    > "I'll leave you to article seven."
+      [noor] "Thank you. It is demanding."
+      @end
+
+@scene chat_livvie
+  @label top
+  @if chat_livvie_1 and chat_livvie_2 and chat_livvie_3
+    @flag chat_livvie_done
+    [livvie] "Quick thing — that's more than I usually give away for free. Don't tell Tomi. He'd want a cut."
+    @end
+  @choice
+    > "How long have you been trading, Livvie?" @if not chat_livvie_1
+      [livvie] "Since I could count. There was a card shop in my town that gave you store credit for working the till, so I worked the till." Eyes down, a small sideways look. "I know the price of every card in the Commons binder. To the credit."
+      [rowan] "That's impressive."
+      [livvie] "It's *arithmetic*. But — thank you."
+      @aff livvie +2 | Asked about her work
+      @flag chat_livvie_1
+      @time 2
+      @jump top
+    > "What's on that clipboard? Is it a list, or something you're making?" @if not chat_livvie_2
+      [livvie] "…Both." She holds it a half-inch closer to her chest, then, after a pause, turns it round. A tidy column of credits, and in the margin, in very small letters, a drawing of a card. "Spare Change. A common. It costs nothing and pays one credit when it dies."
+      [rowan] "That's good. That's really good."
+      [livvie] "It's a *common*." But the corner of her mouth moves. "I do them on the backs of receipts. It's cheaper than paper."
+      @aff livvie +3 | Praised her design
+      @flag chat_livvie_2
+      @time 2
+      @jump top
+    > "I've got a hundred and forty credits and no idea what a week costs. Any advice?" @if not chat_livvie_3
+      [livvie] "Quick thing — ninety if you eat the Commons breakfast, a hundred and ten if you don't, plus sleeves, plus whatever Tomi's selling you as a necessity." Fast, exact, almost relaxed. "Don't buy sleeves from Tomi. Buy them from me. I'm cheaper and I don't call it 'friend price'."
+      [rowan] "I'll remember that."
+      [livvie] "Good. Don't make it a favour. Pay me a credit and it's a transaction." A very small, very real smile. "Transactions I can do."
+      @aff livvie +2 | Asked for advice
+      @flag chat_livvie_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_livvie
+      @scene deck_livvie
+      @jump top
+    > "I'll let you get back to your sums."
+      [livvie] "Quick thing — thank you. For the questions."
+      @end
+
+# ───────────────────────────── HECK UND BRÜCKE ─────────────────────────────
+
+@scene chat_jessica
+  @label top
+  @if chat_jessica_1 and chat_jessica_2 and chat_jessica_3
+    @flag chat_jessica_done
+    [jessica] "I think that is the longest I have talked to anyone this morning without being asked for my hand." A small, real smile. "It was a pleasant change."
+    @end
+  @choice
+    > "Is there a reason for that brooch? A swallow?" @if not chat_jessica_1
+      [jessica] "You noticed that it was chosen." Her fingers go to it, lightly. "It was my grandmother's. Swallows come back, you see. Every spring. I thought it suitable for a crossing."
+      [rowan] "Do you wear a different piece every day?"
+      [jessica] "Every day, yes. It is a small discipline. It means I have to decide who I am, at least once, before breakfast."
+      @aff jessica +3 | Noticed the brooch
+      @flag chat_jessica_1
+      @time 2
+      @jump top
+    > "What's it like, travelling with three caskets?" @if not chat_jessica_2
+      [jessica] "Ruinous. The leather is Italian, and the porters are not." A very small, dry smile. "I should say I could manage with one. But I find I cannot decide which one."
+      [rowan] "Is that a joke?"
+      [jessica] "A very small one. I am practising them. It is said to be good for a person."
+      @aff jessica +1 | Made her smile
+      @flag chat_jessica_2
+      @time 2
+      @jump top
+    > "What made you come to the Academy?" @if not chat_jessica_3
+      [jessica] "My family has a long tradition of attending things." She says it lightly, and watches the wake. "I should like, in this case, to do something that was not on the list."
+      [rowan] "Is it going well?"
+      [jessica] "I have not yet decided what it is." A pause. "Ask me again in June."
+      @aff jessica +2 | Asked about her reasons
+      @flag chat_jessica_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_jessica
+      @scene deck_jessica
+      @jump top
+    > "I'll let you enjoy the crossing, Jessica."
+      [jessica] "Thank you, Rowan. It was a pleasure to be crossed to."
+      @end
+
+@scene chat_ashton
+  @label top
+  @if chat_ashton_1 and chat_ashton_2 and chat_ashton_3
+    @flag chat_ashton_done
+    [ashton] "You are an excellent listener, Vance. It is a much rarer vice than talking. Do come back, and I shall give you the sequel."
+    @end
+  @choice
+    > "How many roses have you handed out since the harbour?" @if not chat_ashton_1
+      [ashton] "Eleven." He examines the stem. "Seven were accepted. Two were thrown overboard, with great and, I thought, admirable aim. Two are under review."
+      [ashton] "A rose is a conversation. Hand one over, and you learn everything about a person from what they do next."
+      [rowan] "And Jessica?"
+      [ashton] "Jessica has not yet done anything at all." Cheerfully. "It is the most promising reaction I have ever had."
+      @aff ashton +1 | Asked about the roses
+      @flag chat_ashton_1
+      @time 2
+      @jump top
+    > "How did you know so much about me? The jacket, the list, my name?" @if not chat_ashton_2
+      [ashton] "Replays, old thing. I watch every replay of every player in the year. Your Qualifier, game four: your turn-three line was frankly insolent."
+      [rowan] "You've watched my games?"
+      [ashton] "Everybody's. It is how I pass the time on boats. One learns openers, hesitations, the way people hold a hand they dislike." He smiles. "You hold a bad hand like a man waiting for a bus. Wholly serene. Rather unsettling."
+      @aff ashton +1 | Asked how he knew
+      @flag chat_ashton_2
+      @time 2
+      @jump top
+    > "Why Jessica? She's barely looked at you." @if not chat_ashton_3
+      [ashton] "No." He does not seem to mind, for once. "But she hasn't asked me to stop. And everyone else said yes by the second sentence."
+      [ashton] "I should like — very much — to be chosen by somebody who could easily have said no." The smile stays, and something behind it moves. "It is a ridiculous thing to want. I am aware."
+      [rowan] "It doesn't sound ridiculous."
+      [ashton] "Doesn't it? How very kind." A breath, and the old gloss comes back. "Do not repeat that. I should have to challenge you."
+      @aff ashton +2 | Took him seriously
+      @flag chat_ashton_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_ashton
+      @scene deck_ashton
+      @jump top
+    > "I'll leave you to your campaign."
+      [ashton] "Do. Do. And wish me luck. Or don't. I shall pretend you did."
+      @end
+
+@scene chat_victoria
+  @label top
+  @if chat_victoria_1 and chat_victoria_2 and chat_victoria_3
+    @flag chat_victoria_done
+    [victoria] "Thank you for asking one thing at a time. It is a great kindness. I do not believe you know how great." She looks at the wake again. "I shall finish looking now."
+    @end
+  @choice
+    > "What are you looking at, if you don't mind my asking?" @if not chat_victoria_1
+      [victoria] "The place where the wake becomes the sea. It is not a line. It is a decision." Quiet. "It is not a very large decision. I like it."
+      [rowan] "Has it decided yet?"
+      [victoria] "Nearly. Each time, nearly." The smallest almost-smile. "That is why I keep looking."
+      @aff victoria +2 | Asked about her view
+      @flag chat_victoria_1
+      @time 2
+      @jump top
+    > "Is somebody meeting you on the island?" @if not chat_victoria_2
+      [victoria] "My sister, Ophelia." She says it with great steadiness. "She is a second-year. She has been on the island since September. She is shorter than I am, and a great deal louder, and she will be on the pier."
+      [victoria] "She has written to me that if anybody is unkind, I am to say her name. I have not yet had to. I am hopeful that I shall not have to."
+      [rowan] "I hope not too."
+      [victoria] "Thank you." A very small pause. "She will say 'Meaning what?' to you. It is her way of being fond."
+      @aff victoria +2 | Asked about her sister
+      @flag chat_victoria_2
+      @time 2
+      @jump top
+    > "What's the parasol for?" @if not chat_victoria_3 and not victoria_parasol
+      [victoria] "For the sun, and in case the sea tries anything. I like to be prepared, and it is also pretty."
+      [rowan] "Has the sea tried anything?"
+      [victoria] "Not yet." A very small, very pleased pause. "That is how I know that it works."
+      @aff victoria +2 | Asked about the parasol
+      @flag chat_victoria_3
+      @time 2
+      @jump top
+    > "What do you like about the game?" @if not chat_victoria_3 and victoria_parasol
+      [victoria] "The pictures." At once, and with great warmth. "Each card is a small window. I cannot open it, but I may look in. It is very restful."
+      [rowan] "Do you have a favourite?"
+      [victoria] "The Moonlight Butterfly. It is lovely. It does not do very much, which I find a comfort."
+      @aff victoria +2 | Asked what she loves
+      @flag chat_victoria_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_victoria
+      @scene deck_victoria
+      @jump top
+    > "I'll let you look. Thank you, Victoria."
+      [victoria] "Thank you for the questions. They were kindly asked."
+      @end
+
+@scene chat_sunny
+  @label top
+  @if chat_sunny_1 and chat_sunny_2 and chat_sunny_3
+    @flag chat_sunny_done
+    [sunny] "Right! That's about everything interesting I've got. Which isn't much, but I'm very good at saying it fast!"
+    @end
+  @choice
+    > "How did you get into swimming?" @if not chat_sunny_1
+      [sunny] "Broke my leg when I was nine. Fell off a trampoline, do not ask. The pool was the only place that didn't hurt." A grin, with a very small shadow behind it. "And then I got fast. And then I got *faster*."
+      [rowan] "And the cards?"
+      [sunny] "Physio waiting rooms! They had a deck on the table and nothing else to do. It was either cards or the fish tank."
+      @aff sunny +2 | Asked about her story
+      @flag chat_sunny_1
+      @time 2
+      @jump top
+    > "Tell me about the scholarship." @if not chat_sunny_2
+      [sunny] "Four hundred metres, free. I came second at nationals." Her face does something between a grin and a wince. "By a hand's breadth. I still think about the hand."
+      [rowan] "Does it get better?"
+      [sunny] "It gets *quicker*. Same thing, I reckon." She kicks her feet over the wake. "There's always a next race."
+      @aff sunny +2 | Asked about the race
+      @flag chat_sunny_2
+      @time 2
+      @jump top
+    > "Do you say that sort of thing to everyone? 'I like you'?" @if not chat_sunny_3
+      [sunny] "Only when it's true! I tell people the second I decide. And I tell them the second I stop. Saves time." Totally unembarrassed. "You get used to it."
+      [rowan] "That's — efficient."
+      [sunny] "It's *honest*. Efficient's a bonus." She leans back. "You blush really nicely, by the way. Just saying."
+      @aff sunny +1 | Took it in stride
+      @flag chat_sunny_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_sunny
+      @scene deck_sunny
+      @jump top
+    > "I'd better go and look at the rest of the ship."
+      [sunny] "Go! See you on land, Wildcard! Don't fall in. If you do, I'm on shift."
+      @end
+
+@scene chat_marit
+  @label top
+  @if chat_marit_1 and chat_marit_2 and chat_marit_3
+    @flag chat_marit_done
+    [marit!] "**THAT** — ladies and gentlemen — was the *finest* intermission of the morning!"
+    @end
+  @choice
+    > "How long have you been doing this, Marit?" @if not chat_marit_1
+      [marit!] "**DOING?** *Doing?* Darling. I have been **every part** in **every school play** in a town of four hundred souls! I was the **Wicked Stepmother!** The **Fairy Godmother!** Both **Ugly Sisters!** And the *Pumpkin!*"
+      [rowan] "All in one production?"
+      [marit!] "In *separate* productions, thank you, I have *standards!*" Then, quieter, ordinary, a plain aside: "Four hundred people, above the Arctic Circle. It gets very dark there. You learn to make your own light."
+      @aff marit +2 | Asked about her past
+      @flag chat_marit_1
+      @time 2
+      @jump top
+    > "Do you always narrate?" @if not chat_marit_2
+      [marit!] "**ALWAYS!** If I stop, it is just a girl standing on a bollard! With narration it is an **EVENT!** A **HAPPENING!** A **MOMENT IN HISTORY!**"
+      [rowan] "And when you're alone?"
+      [marit] "…" A long pause, much quieter than anything she has done all morning. "Then I narrate for the walls. The quiet is the part I can't stand. I'd rather fill it with *anything*."
+      [marit!] "**ANYWAY!** Next question!"
+      @aff marit +3 | Asked what she's like when nobody watches
+      @flag chat_marit_2
+      @time 2
+      @jump top
+    > "What's the drama society?" @if not chat_marit_3
+      [marit!] "**THE DRAMA SOCIETY!** Founded **this very morning!** By *me!* Membership is **FREE**, auditions are **OPTIONAL**, and parts are assigned **WITHOUT CONSENT!**"
+      [rowan] "I've been cast already, haven't I?"
+      [marit!] "As the **BROODING STRANGER**, naturally! It is a *lead!* You are *welcome!*"
+      @aff marit +2 | Accepted the part
+      @flag chat_marit_3
+      @flag marit_cast_rowan
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_marit
+      @scene deck_marit
+      @jump top
+    > "I'll let you get back to the gulls."
+      [marit!] "**EXIT**, stage left, pursued by a **PROTAGONIST!**"
+      @end
+
+@scene chat_rana
+  @label top
+  @if chat_rana_1 and chat_rana_2
+    @flag chat_rana_done
+    [rana] "…That's enough." Without heat. "Don't push it."
+    @end
+  @choice
+    > Sit quietly on the stair. @if not chat_rana_1
+      Neither of you says anything for a while. The stair is cold. The gulls complain about the wake. Rana bites a nail, looks at it, and puts the hand down.
+      [rana] "…Free ship."
+      @aff rana +2 | Stayed, and said nothing
+      @flag chat_rana_1
+      @time 3
+      @jump top
+    > "What's the best thing about this island so far?" @if not chat_rana_2
+      [rana] "It's far away."
+      [rowan] "From what?"
+      [rana] "Everything." A pause. "…And there's meant to be a late bar at the Commons, apparently. Nobody's said where."
+      @aff rana +2 | Gave her something to say
+      @flag chat_rana_2
+      @time 3
+      @jump top
+    > Ask whether she plays. @if not deck_known_rana
+      @scene deck_rana
+      @jump top
+    > "I'll leave you to it."
+      [rana] "Good."
+      @end
+
+@scene chat_teobalt
+  @label top
+  @if chat_teobalt_1 and chat_teobalt_2 and chat_teobalt_3
+    @flag chat_teobalt_done
+    [teobalt] "I find that I have exceeded my conversational allowance. I shall carry the surplus forward." A small, pleased pause. "Thank you."
+    @end
+  @choice
+    > "Have you solved number one yet, the unloading order?" @if not chat_teobalt_1
+      [teobalt] "Provisionally. Duffels, then trunks, then the tuba." A very small, very pained pause. "I am less certain about the tuba."
+      [rowan] "Whose is it?"
+      [teobalt] "I do not know. That is the item on the list that most concerns me. A thing nobody owns is a thing nobody will collect."
+      @aff teobalt +2 | Took the list seriously
+      @flag chat_teobalt_1
+      @time 2
+      @jump top
+    > "Why do you make lists?" @if not chat_teobalt_2
+      [teobalt] "Because things go wrong in an *order*." He pushes his glasses up with one finger. "If you know the order, you can stand in front of it."
+      [rowan] "And if you don't?"
+      [teobalt] "Then you make a list of what you don't know. It is surprisingly effective."
+      @aff teobalt +2 | Asked why
+      @flag chat_teobalt_2
+      @time 2
+      @jump top
+    > "What do you want out of the Academy?" @if not chat_teobalt_3
+      [teobalt] "For things to work." A pause. "I know it sounds small. It is not small. Ask anyone who has ever lost a stapler."
+      [rowan] "I think it sounds like a very good thing to want."
+      [teobalt] "Does it? Most people say it is a very dull one." The faintest, most pleased flush. "Thank you."
+      @aff teobalt +2 | Took his aim seriously
+      @flag chat_teobalt_3
+      @time 2
+      @jump top
+    > Steer the talk to cards. @if not deck_known_teobalt
+      @scene deck_teobalt
+      @jump top
+    > "I'll let you get back to the rota."
+      [teobalt] "Thank you. It will not sort itself."
+      @end

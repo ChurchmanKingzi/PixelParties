@@ -1,260 +1,267 @@
 # ═══════════════════════════════════════════════════════════════════
 #  TAG 1 · DECK-GESPRÄCHE und NACHGESPRÄCHE
-#  Rowan ist ein Analytiker: er liest Leute an ihren Accessoires und fragt nach Schlüsselkarten.
-#  deck_<id>   wird nach dem Erstkontakt und vor jedem Duell angeboten (setzt deck_known_<id>)
+#
+#  REGELN (damit Rowan nie etwas weiß, was er nicht wissen kann)
+#    · Ein Deck kommentiert Rowan erst, wenn deck_known_<id> gesetzt ist (Antwort der Person, Duell oder Hinweis im Text).
+#    · Raten darf er nur mit Anhaltspunkt (sichtbare Dinge aus der Erstszene) und nicht bei jedem:
+#        richtiger Tipp   marit, inya, jessica, victoria, teobalt (allgemein), georgie (Drachen, nur mit Ember), gideon (nur wenn er ihn spielen sah)
+#        falscher Tipp    ed (Pferde statt Affen), ashton (Dornen statt Verschmutzung)
+#        halbrichtig      sunny (Wasser statt Eis), tomi (Hortet statt zu stehlen)
+#        nur Nachfragen   baylee, pippa, mikoto, magnus, noor, livvie, rana (kein Anhaltspunkt)
+#        Nathan           sagt sein Deck schon im Prolog; hier nur das Fachsimpeln (shop_nathan).
+#    · Nach der Auskunft murmelt Rowan die Karten im Stakkato vor sich hin: er hat das Deck schon hundertmal online gesehen.
+#  deck_<id>   wird in den Gesprächen angeboten und vor jedem Duell (setzt deck_known_<id>)
 #  post_<id>   Nachgespräch nach dem Duell, getrennt nach Sieg und Niederlage (won:<duell-id>)
 #  Karten und Helden stammen aus bible/decks/<id>.json
 # ═══════════════════════════════════════════════════════════════════
 
 # ───────────────────────────── DECK-GESPRÄCHE ─────────────────────────────
 
-@scene deck_nathan
-  @if deck_known_nathan
-    @end
-  @choice
-    > "War Counselors, you said. Do you run all six of them, one of each, so they power each other up?" @hint Test a guess
-      [nathan=happy] "SIX! One of each! You KNOW them! Censpartan, Cykyran, Gorinthian, Harpthenean, Minocrete, Thebinxan, I can say them all, I practised!"
-      [rowan] "And they all get stronger for every other Counselor on the table. So the first one is weak, and the fourth one is a problem."
-      [nathan=laughing] "The fourth one is a PARTY!"
-      @aff nathan +2 | Knew his deck
-    > "Tell me about War Counselors. I only ever played against it online, I never worked out what it wants."
-      [nathan=happy] "It wants EVERYBODY! Six different dudes, one at a time, and every dude is better when his friends are there. It's basically Thanksgiving."
-      [rowan] "Thanksgiving. Right. So the gameplan is to keep the table from filling up."
-      [nathan=grin] "That's the only gameplan that works against me, and I'm not telling you that, I'm telling EVERYONE that."
-      @aff nathan +1 | Asked about his deck
-    > Let the cards wait for now.
-      @flag deck_skipped_nathan
-      @end
-  [rowan] "Censpartan makes the others untargetable, doesn't he? That's a proper engine, honestly. People undersell it."
-  [nathan=happy] "THANK you. Nobody says that. Baylee says it's loud."
-  [baylee] "It is loud."
-  @deckinfo nathan
+@scene shop_nathan
+  # Nathans Deck ist seit der Begrüßung bekannt; das hier ist reines Fachsimpeln.
+  [rowan] "War Counselors. You said best deck in the format. Talk me through it."
+  [nathan=happy] "SIX different dudes! Censpartan, Cykyran, Gorinthian, Harpthenean, Minocrete, Thebinxan, I can say them ALL, I practised in the shower! You play one a turn and every dude is better for every OTHER dude on the table. It's basically Thanksgiving!"
+  Rowan's eyes have drifted out of focus. His lips are moving a half-second ahead of his voice.
+  [rowan] "…One of each at a time. Each one stronger per Counselor out. War Chest pays for the Gathering Place, so the new one acts the turn it lands. Three or four out and the board does everything. Stuns. Doubled shots. Gold cannon." A breath. "Over-commits every game. One sweep and the whole table goes at once. Right. *Right.*"
+  [nathan] "…Did you just say *sweep*?"
+  [baylee] "He's right."
+  [nathan=laughing] "He's — okay, he's right! But nobody sweeps! It's rude!"
+  [rowan] "Somebody always sweeps. I'd keep a Counselor in hand until I knew they couldn't."
+  [nathan=happy] "A Counselor in HAND. Baylee! He said keep one in HAND! Nobody's ever told me that, they just tell me I'm loud!"
+  @aff nathan +2 | Took his deck seriously
+  @flag shop_nathan_done
+  @time 3
 
 @scene deck_baylee
   @if deck_known_baylee
     @end
   @choice
-    > "You said dinosaurs. Do you run the Chimera? The one you summon by throwing away three different Gigantisaurs?" @hint Test a guess
-      [baylee] "…Yup. Four." A very long pause. "How'd you know that?"
-      [rowan] "Big Stomp is the only deck I know that does that. It spends the first turns apparently doing nothing."
-      [baylee] "Stacking Summoning Magic. Alex, Kit, Performance." A slow nod. "Folks think I'm asleep. I'm not asleep."
-      @aff baylee +2 | Knew his deck
-    > "What does Big Stomp actually do? I've never seen it played properly."
-      [baylee] "Nothing, for a while." Slowly. "Then a lot at once. You build up Summoning Magic till a hero can call a Gigantisaur, and then every hero gets one."
-      [baylee] "Big ones take a long time to come down. Gives a fella time to think."
+    > "What do you run, Baylee? Only if you feel like saying."
+      [baylee] "Big Stomp. Dinosaurs." He looks at his own hand for a moment. "Not good. Fun, though."
       @aff baylee +1 | Asked about his deck
+      @scene mutter_baylee
     > Let the cards wait for now.
       @flag deck_skipped_baylee
       @end
-  [rowan] "It's a patient deck. Your opponent has to decide, before it comes online, whether to race you or wall you."
-  [baylee] "Mostly they decide too late."
+
+@scene mutter_baylee
+  @if deck_known_baylee
+    @end
+  Rowan's eyes have gone to the horizon. He talks to it, low and quick.
+  [rowan] "…Güldefaber, Kit, Alex. Training. Performance. Stack the Summoning Magic until one hero can call a Gigantisaur. Four Chimeras to close. Stomp each turn for every hero beside a giant. Pier keeps the hand full." A beat. "Slow. Honest. Heroes sit there for turns."
+  [baylee] "…Yup." A very long pause. "You've seen it."
+  [rowan] "Online. A few times. Never next to the man who plays it."
+  [baylee] "Folks think I'm asleep, those first turns. I'm not asleep."
+  @aff baylee +1 | Knew the deck
   @deckinfo baylee
 
 @scene deck_ed
   @if deck_known_ed
     @end
   @choice
-    > "Cowboy hat, bandana, ranch. Is the deck monkeys? Something that takes risks and figures out the rest on the way down?" @hint Test a guess
-      [ed] "MONKEES! Two e's! Monkee Rodeo! How did you — is it the hat? It's the hat."
-      [rowan] "It's the hat and the way you hang off rails. Do you run Logan, the Investment Monkee?"
-      [ed] "Logan! He turns gold into Invest Counters and then at the end of the turn he either collects or — hang on, is it dangerous? It's a bit dangerous. It's a lot dangerous."
-      @aff ed +2 | Knew his deck
-    > "What do you play, Ed? I'd bet it's something with a lot of momentum."
-      [ed] "Monkee Rodeo! Every time I gain gold, a Monkee wakes up! Cheeky ones hit people, Nimble ones come out for free, Non-Fungible ones pay again when they come and go!"
-      [ed] "I don't actually understand the Non-Fungible ones. They pay twice. Dad says it's financial."
+    > "Cowboy hat, ranch, boots over the rail. Horses, I'd say. Warhorse, Sun Sword, everything piled on one hero?" @hint From his look
+      [ed] "Ha! Nope! Horses are lovely, I'd never say a word against a horse, but no."
+      [ed] "**MONKEES!** Two e's! Monkee Rodeo! The hat's for the *Rodeo!* Not the horse!"
+      [rowan] "…Monkees. Right. That's — that's a better one than mine."
+      @aff ed +1 | Guessed wrong, cheerfully
+    > "What do you play, Ed?"
+      [ed] "Monkee Rodeo! Two e's! Every time I gain gold a Monkee wakes up and does something! Cheeky ones hit people, Nimble ones come out free, Non-Fungible ones pay twice!"
+      [ed] "I don't actually understand the Non-Fungible ones. Dad says it's financial."
       @aff ed +1 | Asked about his deck
     > Let the cards wait for now.
       @flag deck_skipped_ed
       @end
-  [rowan] "Every gold gain is a trigger. That's a lovely engine, and it's very exposed to anyone who punishes the gold gain."
-  [ed] "Punishes? Is that — can they do that? Is it dangerous?"
+  Rowan has stopped listening to the joke. His eyes are on the sea and his voice drops to a rapid undertone.
+  [rowan] "…Gold in, Monkee out. Cheeky hits, Nimble free, Resilient free. Non-Fungible pays when it comes and when it goes. Wealth. Treasure Chest. Golden Bananas. Real money goes onto Logan as Invest Counters, rolls over, deletes a hero at end of turn. Smug Coin. Bamboo Shield." He frowns. "Logan's the smallest hero on the table. Freeze him and the bank stops. Right."
+  [ed] "Did he just say freeze my banker? Is that — can they do that? Is it dangerous?"
+  [rowan] "Only if someone's watching the gold."
   @deckinfo ed
 
 @scene deck_georgie
   @if deck_known_georgie
     @end
   @choice
-    > "That dragon plush and the violet feather. Is the deck dragons? Not big ones, eggs?" @hint Test a guess
-      [georgie] "…Hatchery." Barely a whisper. Then, quickly, as if she had to say it before she lost the nerve: "Eggs first. They're free and they have one health."
-      [rowan] "And they're only worth anything if they break on your own turn. Icy, Flaming, Shimmering. You sacrifice them into Green Dragoneer shots."
-      [georgie] "You — yes. How did you know it was the sacrificing?"
-      @aff georgie +3 | Knew her deck
+    > "That dragon on your bag. Is the deck dragons?" @if georgie_ember @hint Ember is a clue
+      [georgie] "…Yes." Barely a whisper. Then, quicker, as if she must say it before she loses the nerve: "Hatchery. Dragons, and eggs. The eggs come first."
+      @aff georgie +3 | Noticed Ember
     > "Would it be all right if I asked what you play? You can say no."
-      [georgie] "It's — Hatchery. Dragons and eggs. Rubin hatches things and Kit, and Luna Pele, she's — it's fine. It's a good deck."
+      [georgie] "It's — Hatchery. Dragons and eggs. Rubin and Kit and Luna Pele, she's — it's fine. It's a good deck."
       [georgie] "Sorry. I said it too quietly."
       @aff georgie +2 | Asked gently
     > Let the cards wait for now.
       @flag deck_skipped_georgie
       @end
-  [rowan] "Rubin casts a Destruction spell whenever she summons by sacrificing. That is a timing puzzle I'd really like to see you solve."
-  [georgie] "It's the best part." A small, brave smile. "Nobody asks about the best part."
+  Rowan has gone very still. When he speaks it is to the middle distance, soft and fast.
+  [rowan] "…Icy, Flaming, Shimmering eggs. Free, one health. Worthless unless they break on your own turn. Sacrifice them into Green Dragoneer. Every sacrifice-summon, Rubin fires a Destruction spell on top. Black-Thorn Dragon, and neither can be touched by spells. Luna turns burns into cards." A breath. "Tight. Never wastes a trigger."
+  [georgie] "You — you know the *order*." She has gone pink to the ears. "Nobody knows the order."
+  [rowan] "I saw it online. I've never seen it from this side."
+  [georgie] "…It's the best part. Nobody asks about the best part."
+  @aff georgie +1 | Knew the order of her deck
   @deckinfo georgie
 
 @scene deck_pippa
   @if deck_known_pippa
     @end
   @choice
-    > "Photographers and slimes, I'd guess. Something that splits when it's hit and gets worse the more you hit it?" @hint Test a guess
-      [pippa] "Slimes! Yes! How — hang on — don't move —" She clicks the camera. "That. That was the look of a person solving me. Slimy Infestation!"
-      [rowan] "Alice and Stellan. Cloudy Slime, Fiery Slime, Shadowy Slime. Every slime does something the moment it arrives."
-      [pippa] "Burn something forever, freeze something, switch something off. And then Slime Rancher doubles it."
-      @aff pippa +2 | Knew her deck
-    > "What do you play, Pippa? I'd love to know what a photographer builds."
+    > "I've been wondering what a photographer plays. What's yours?"
       [pippa] "Slimes! They split when you hit them. More of them the worse it gets. Oof, I relate."
-      [pippa] "Alice, Stellan the cat, Barker. And a lot of Cute Cheese."
+      [pippa] "Alice, Stellan the cat, Barker. And a ridiculous amount of Cute Cheese."
       @aff pippa +1 | Asked about her deck
     > Let the cards wait for now.
       @flag deck_skipped_pippa
       @end
-  [rowan] "Flooding the board so every card you want to kill makes two more. That's a deck I don't want to sweep."
-  [pippa] "Everybody sweeps. It's very rude of them."
+  Rowan is looking at the camera, but not through it. His voice comes out of the side of his mouth.
+  [rowan] "…Slimy Infestation. Cloudy, Fiery, Shadowy, Splashy, Sparky, Shiny. Every slime does its job the moment it lands. Burn something forever. Freeze. Switch off. Slime Rancher doubles it. Shadowy brings them back. Alice hits for every creature that's sat a turn. Rain of Arrows hits the whole side." A pause. "Wide board that lives a turn is the entire plan."
+  [pippa] "Hang on — don't move —" She clicks the shutter. "That. That was your *face*. That was the face of somebody doing arithmetic. Does it do that every time?"
+  [rowan] "Every time."
+  [pippa] "I'm putting it in the book."
+  @aff pippa +2 | Knew her deck
   @deckinfo pippa
 
 @scene deck_mikoto
   @if deck_known_mikoto
     @end
   @choice
-    > "Is yours something that refuses to stay dead? Skeletons, maybe?" @hint Test a guess
-      [mikoto] "Oh — oh! Yes! They get up again, you see. Nothing's ever properly finished. I find that very calming. Sorry."
-      [rowan] "Rha'Bi, Vacarn, Styx. Tiny Bone Friends?"
-      [mikoto] "You know the name! Nobody — people just say 'the skeleton boy'. Sorry, that's fine. That's lovely."
-      @aff mikoto +3 | Knew his deck
-    > "Do you mind telling me what you play? I'll understand if you'd rather not."
-      [mikoto] "Skeletons. Healers and mages, mostly. Sorry. They heal each other, and The Bonegrinder turns every Skeleton that dies into a card. Is that all right? That's all right."
+    > "Would you mind telling me what you play, Mikoto? I'll understand if you'd rather not."
+      [mikoto] "Skeletons. Healers and mages, mostly. Sorry. They heal each other, and when one dies, The Bonegrinder turns it into a card. Is that all right? That's all right."
       @aff mikoto +2 | Asked gently
     > Let the cards wait for now.
       @flag deck_skipped_mikoto
       @end
-  [rowan] "Raise the Minions brings three back at once. If I kill your board, I have to kill it for good, not just once."
-  [mikoto] "Yes. Exactly. Sorry. I mean, *yes*."
+  Rowan's lips are moving. He is not looking at Mikoto any longer. He is looking at a board nobody else can see.
+  [rowan] "…Tiny Bone Friends. Healer, Priest, Mage, Wizard. Necromancer brings one back. Treasure Skeleton draws. Bonegrinder turns every dead one into a card. Raise the Minions after a sweep, three at once. Vacarn is the weak point, he's always the weak point." A breath. "Grinds. Doesn't rush. Patient."
+  [mikoto] "You — you know all of them? Sorry. Sorry, I — nobody — they only ever know the Death Knight."
+  [rowan] "The Death Knight's the dull one. The Healers are the deck."
+  [mikoto] "Oh." A small, wet laugh, stopped at once. "Oh, that's — thank you. Sorry. That's lovely."
+  @aff mikoto +3 | Knew his deck
   @deckinfo mikoto
 
 @scene deck_gideon
   @if deck_known_gideon
     @end
-  @if not saw_counter
-    ~ I haven't seen enough of his deck to guess. I'd have to watch him play first.
-    @end
   @choice
-    > "Guardian Beasts. You only summon them while your own discard pile is empty, and every one of them pays by deleting cards. Yours and mine." @hint From what you saw
+    > "I watched your game with the deckhand. Guardian Beasts, one beside the other, and you never attacked. Guardians of the Treasure Cave?" @if saw_beasts @hint From the game you watched
       [gideon] "Ma, Hou, Hu." A very small, very satisfied pause. "You were watching the discard piles. Nobody watches the discard piles."
-      [rowan] "You keep your graveyard empty on purpose. That's why you never attack first: every card you play is a card you can't afford to lose."
-      [gideon] "How resourceful."
       @aff gideon +2 | Read his deck
-    > "What is it you run, exactly? I only saw part of it."
-      [gideon] "A deck." Mild. "I should hate to spoil it for someone who might one day have to beat it."
-      [gideon] "Guardians of the Treasure Cave, Vance. I imagine you will meet them again."
+    > "What is it you run, exactly?"
+      [gideon] "A deck." Mild. "I should hate to spoil it for someone who might one day have to beat it." He relents, by a quarter of an inch. "Guardians of the Treasure Cave, Vance. I imagine you will meet them again."
       @aff gideon +0 | Asked him outright
     > Let the cards wait for now.
       @flag deck_skipped_gideon
       @end
+  [rowan] "…Beasts only come down while your own pile's empty. Every one of them deletes cards when it lands. Yours. Mine. First Circle of Hell wipes an odd pile. Zhu skips a turn, eventually. Never attacks first, because every card he plays is a card he can't afford to lose." A breath. "Lets Ma fill both piles. Right."
+  [gideon] "How resourceful."
+  [rowan] "It only breaks if something lands in your pile and nothing is there to delete it."
+  [gideon] "…" He squares his deck against the felt. Once. Twice. "You may keep that thought. I shall be keeping it as well."
   @deckinfo gideon
 
 @scene deck_inya
   @if deck_known_inya
     @end
   @choice
-    > "Bunny hairclip, bunny keychain, a bunny on your sleeve. Let me guess: Cutes? Some sort of bunny pile?" @hint Test a guess
+    > "Bunny hairclip, a bunny charm on the deck box. I'm going to guess bunnies." @hint From her look
       [inya] "It is *not* a pile." Instantly. "Hop and Pop. It's a deck. There's a plan."
-      [rowan] "Bubbles, the Bouncy Bunny. She absorbs the hits aimed at your creatures. And Cute Bunny, Cheering Rabbit, Aggressive Town Guard, going wide."
-      [inya] "…And Haressassins." A flicker of something that could be respect. "They shoot every turn starting the turn after they arrive. Nobody ever sees them coming."
-      @aff inya +3 | Respected her deck
-    > "What do you play, Inya? And I won't say anything about bunnies."
+      @aff inya +2 | Spotted the bunnies
+    > "What do you play, Inya? I won't say a word about bunnies."
       [inya] "Hop and Pop. Bunnies." A narrow look. "You promised."
-      [inya] "Go wide with cheap creatures, let Haressassins shoot, and Bubbles takes the damage."
       @aff inya +1 | Asked about her deck
     > Let the cards wait for now.
       @flag deck_skipped_inya
       @end
-  [rowan] "Bunny Bombs ticking in the back, and you decide when they go off. That's a clock your opponent can't see until it's too late."
+  Rowan's eyes have unfocused. His voice runs on under his breath.
+  [rowan] "…Bubbles soaks the hits. Cute Bunny, Cheering Rabbit, Town Guard, wide and cheap. Haressassins shoot from the turn after they land. Bunny Bombs ticking in the back, and she picks when it goes. Deepsea Idol and Thicket for cover." A pause. "Fast. Thin. Bubbles falls, everything falls."
+  [inya] "…" She looks at him for a long moment. "Who told you about Bubbles."
+  [rowan] "Nobody. It's the whole deck."
   [inya] "Rude." Quietly, delighted. "Accurate. But rude."
+  @aff inya +1 | Understood the plan
   @deckinfo inya
 
 @scene deck_tomi
   @if deck_known_tomi
     @end
   @choice
-    > "You keep a book and you quote prices to the credit. Free Port? Something that takes your gold?" @hint Test a guess
-      [tomi] "Ha! Okay, Wildcard, that's a nice read. Free Port. Thieving on every hero, Mimics, Pirates, Dirty Smugglers, and every turn your purse is a little emptier."
-      [rowan] "And then Smuggler's Pier, so you can buy things with what you took."
-      [tomi] "Friend price."
-      @aff tomi +2 | Knew his deck
+    > "A binder on your hip and prices in your head. You count what everyone's holding. Gold? Wealth, Treasure Chests, a big pile?" @hint From his look
+      [tomi] "Ha! Right pocket, wrong direction." Delighted. "I don't *pile* it, Wildcard. I take yours."
+      [tomi] "Free Port. Thieving on all three heroes, Mimics, Pirates, Dirty Smugglers, and every turn your purse is a little emptier."
+      @aff tomi +1 | Nearly had it
     > "Is your deck as much of a business as you are? What do you run?"
       [tomi] "Free Port. Smugglers. I take your gold. Thieving on all three heroes, and then I buy with it."
       @aff tomi +1 | Asked about his deck
     > Let the cards wait for now.
       @flag deck_skipped_tomi
       @end
-  [rowan] "The question is what you do when somebody comes to the table with no gold. Do you run Gold Trap?"
+  Rowan has stopped listening to the patter. Under his breath, quick and flat:
+  [rowan] "…Thieving. Mimic. Deepsea Pirate. Dirty Smuggler. Golden Abomination redirects the income. Key buys the artifacts out from under you. Smuggler's Pier, so he spends it on the way past. Thieving Strikes, soft hits." A beat. "Answers that cost gold can't be paid for. Gold Trap?"
   [tomi] "Three. And you're the first person who's ever asked that without wanting to rob me."
+  @aff tomi +1 | Understood his plan
   @deckinfo tomi
 
 @scene deck_magnus
   @if deck_known_magnus
     @end
   @choice
-    > "Whatever tops the ladder, I suppose. What's the deck this week? Fighting? Ghuanjun?" @hint Test a guess
-      [magnus] "Ghuanjun, Bill, Elana." Tight. Quick. "One-Two-Punch. Three attacks a turn with different bonuses, a stun, a discard, a poison."
-      [magnus] "The first turn cannot kill. The second turn does not need to."
-      [rowan] "Sacred Hammer of the Volcano and Blow of the Venom Snake? That's a very good list. It's also not a deck you love."
-      @aff magnus +0 | Called his bluff
-    > "What are you playing these days? I know it changes."
-      [magnus] "Whatever the data says. One-Two-Punch this week. Fighting, Heavy Hit, Muscle Training." A quick glance at the tablet. "Win rate fifty-nine point four."
-      @aff magnus +1 | Asked about his deck
+    > "You change lists every week or two, if I remember right. What's it this week?"
+      [magnus] "Whatever the data says." A glance at the tablet. "One-Two-Punch. Ghuanjun, Bill, Elana. Win rate fifty-nine point four." A very small pause. "You remember that."
+      @aff magnus +1 | Remembered how he plays
     > Let the cards wait for now.
       @flag deck_skipped_magnus
       @end
-  [rowan] "It's clean. You pilot it from a script."
-  [magnus] "That is the point of a script."
+  Rowan's eyes go to the stylus in Magnus's hand, and stay there, and his voice comes out low and fast.
+  [rowan] "…Ferocious Tiger Kick, Blow of the Venom Snake, Whirlwind Strike. Three attacks a turn, the second and third with a bonus. Stun. Discard. Poison. First turn can't kill. Stranglehold and the Sun Sword next turn. Jump in the River keeps the one attacker alive." A breath. "One hero deep. Every attack announced."
+  [magnus] "You have looked at the same lists I have."
+  [rowan] "Everyone has. It's the best list on the ladder this week."
+  [magnus] "…It is." He does not say anything else for a moment. Then, carefully: "It is a clean list. It is not a deck I *love*."
+  @aff magnus +1 | Spoke his language
   @deckinfo magnus
 
 @scene deck_noor
   @if deck_known_noor
     @end
   @choice
-    > "A rulebook full of tabs and a pencil. Doom Clock? A deck that tells you exactly when it wins?" @hint Test a guess
-      [noor] "To be precise —" She closes the book. "Countdown. And yes, it tells you. It seems only fair to give notice."
-      [rowan] "Doom Prophecy fetches the Clock with three counters on it and ends your turn. And only you can take counters off it."
-      [noor] "Basketskull. Eagle Warriors. Jaguar Warriors. They enter by removing counters." The faintest dry smile. "Nobody ever argues with the count."
-      @aff noor +3 | Knew her deck
-    > "What do you play, Noor? I'd guess it's something that needs a very exact judge."
-      [noor] "Countdown. The Doom Clock. Twenty counters end the game for whoever places the last one." A pause. "It is entirely transparent."
-      @aff noor +2 | Asked about her deck
+    > "Would you tell me what you play, Noor?"
+      [noor] "To be precise —" She closes the book on her pencil. "Countdown. The Doom Clock. Twenty counters end the game for whoever places the last one." A pause. "It is entirely transparent. It seems only fair to give notice."
+      @aff noor +2 | Asked politely
     > Let the cards wait for now.
       @flag deck_skipped_noor
       @end
-  [rowan] "Transparent and almost impossible to interrupt. It's the most honest threat in the format."
-  [noor] "Thank you. I have been trying to say that for two years."
+  Rowan's mouth has started moving a half-second before his voice does.
+  [rowan] "…Doom Prophecy fetches the Clock with three counters on it. Only she takes them off. Eagle Warrior, Jaguar Warrior — enter by removing one. Basketskull, a fistful off, turned into damage. Warrior of Teocuilatl spends them as shields. Archers shoot when one lands." A breath. "Twentieth one falls on whoever she's picked. Right. Right."
+  [noor] "…You have said that in the correct order."
+  [rowan] "Transparent, and nearly impossible to interrupt. It's the most honest threat in the format."
+  [noor] "Thank you." A very faint, very dry smile. "I have been trying to say that for two years."
+  @aff noor +2 | Knew her deck
   @deckinfo noor
 
 @scene deck_livvie
   @if deck_known_livvie
     @end
   @choice
-    > "You said your deck gives people presents. Crystal Well? You hand the opponent a card each turn?" @hint Test a guess
-      [livvie] "Quick thing — nobody guesses that. They think it's a joke." Eyes down. A small sideways look. "Crystal Gifts. Cooldin opens the Well on turn one."
-      [livvie] "I hand you a Crystal. It sits revealed in your hand and breaks something. Your spell levels. Your support zones."
-      [rowan] "A gift that costs you. That's a fantastic idea. It's also exactly why nobody will touch it."
-      @aff livvie +3 | Understood her deck
-    > "What does 'a deck that gives people presents' actually mean, Livvie?"
-      [livvie] "Quick thing — it hands you cards. Crystals. And then they break something of yours." A tiny, tired smile. "They hate it. It's the nicest thing I own."
-      @aff livvie +2 | Asked about her deck
+    > "Quick thing — what's in your box, Livvie?"
+      [livvie] "Crystal Gifts." Eyes down, a small sideways look to see if it landed. "Cooldin opens the Well on turn one. I give you a card a turn. It sits revealed in your hand, and it breaks something."
+      @aff livvie +1 | Asked about her deck
+      @scene mutter_livvie
     > Let the cards wait for now.
       @flag deck_skipped_livvie
       @end
-  [rowan] "Mary Crestmas draws a card for every card you hand over. So it's a gift economy."
-  [livvie] "It's a gift economy with teeth."
+
+@scene mutter_livvie
+  @if deck_known_livvie
+    @end
+  Rowan has stopped looking at her. His voice is flat and very fast.
+  [rowan] "…Crystal Well. A gift a turn. Crystals break spell levels, shuffling, hero effects, until you pay to get rid of them. Letter of Misinformations takes the best two cards. Mary draws for every gift. Slow, Magic Amber, Spreading Rumor strip the rest of the hand. Laser Volley asks for what's left." A breath. "No board. Heroes like glass."
+  [livvie] "…That's all of it." Her voice has gone quite small. "Nobody has ever said all of it."
+  [rowan] "It's a gift economy. With teeth."
+  [livvie] "…That's what I call it." A tiny, tired smile. "Don't tell anyone I do."
+  @aff livvie +2 | Knew her deck
   @deckinfo livvie
 
 @scene deck_jessica
   @if deck_known_jessica
     @end
   @choice
-    > "Is the deck as well furnished as you are? Wealth, Treasure Chests, Golden Ankh. A gold pile no other student has?" @hint Test a guess
+    > "Three caskets of jewellery. Is the deck the same idea? Everything you own piled onto one hero, Sun Sword, Warhorse?" @hint From her caskets
       [jessica] "How lovely." The most gracious tilt of the head. "That was a considered guess. Dowry."
-      [jessica] "I out-spend people, Rowan. Willy takes five cards or a pile of gold, and it all goes into jewellery for Boris."
-      [rowan] "Sun Sword, Warhorse. And nothing she owns can be stolen or taken over."
-      [jessica] "You read the hero card. Most people read the jewellery."
+      [jessica] "I out-spend people, Rowan. Willy takes five cards or a pile of gold, and all of it goes into jewellery for Boris."
       @aff jessica +3 | Read her deck
     > "What do you play, Jessica? I'd love to hear what a person with your taste builds."
       [jessica] "Dowry. It is, I am told, an acquired taste: gold, artifacts, and a great deal of patience."
@@ -262,36 +269,38 @@
     > Let the cards wait for now.
       @flag deck_skipped_jessica
       @end
+  Rowan's gaze drifts to the nearest casket, and goes through it.
+  [rowan] "…Wealth. Treasure Chest. Mimic. A gold pile nobody else has. Sun Sword, Warhorse, the Vampiric Sword when it comes. All on Boris. Heavy Hit stuns, Quick Attack swings again, heals off the damage. Golden Apple borrows a hero of mine." A pause. "Everything she paid for sits on one hero. Freeze him, stun him — the whole dowry sits."
+  [jessica] "You read the hero card." She says it quietly. "Most people read the jewellery."
   @deckinfo jessica
 
 @scene deck_ashton
   @if deck_known_ashton
     @end
   @choice
-    > "You said your deck spoils the field. Pollution? Pyroblast with tokens on your own side?" @hint Test a guess
-      [ashton] "Spell Industrialization, old thing. Pyroblast hits as many targets as I like and leaves a Pollution Token on my own side for each."
-      [rowan] "And every token shrinks your hand limit. So it's power on credit."
-      [ashton] "On credit! Yes! Somebody understands the economics." He is, for a moment, entirely sincere. "I launder them through the Piranhas."
-      @aff ashton +2 | Read his deck
+    > "A rose, and you trim the thorns yourself. A flower with a very sharp edge. Rain of Arrows? A thousand small cuts?" @hint From his rose
+      [ashton] "Good heavens, no." Genuinely wounded. "The thorns are for the roses, old thing. They are not a *strategy*."
+      [ashton] "Spell Industrialization. Pollution. Naturally."
+      @aff ashton +1 | Guessed wrong
     > "What do you play, Ashton? I assume it's flashy."
       [ashton] "Spell Industrialization. Pollution. Naturally."
       @aff ashton +1 | Asked about his deck
     > Let the cards wait for now.
       @flag deck_skipped_ashton
       @end
-  [rowan] "Pollution Spewer and Pollution Piranha. You can't cast without leaking."
-  [ashton] "People show you who they are when everything's a little poisoned."
+  Rowan's eyes have gone distant. He speaks without moving his head.
+  [rowan] "…Pyroblast, as many targets as he likes. One Pollution Token on his own side for each. Every token shrinks the hand. Victorica lifts one a turn. Piranha is summoned by removing one. Spewer fires when one leaves. Rain of Arrows across my whole side." A breath. "Eraser Beam, once a game. Slow start. Zones clog. Power on credit."
+  [ashton] "On *credit!*" He is, for a moment, entirely sincere. "Somebody understands the economics."
+  [rowan] "It's a very beautiful way to lose, if you misjudge the tokens."
   @deckinfo ashton
 
 @scene deck_victoria
   @if deck_known_victoria
     @end
   @choice
-    > "Is yours built around the art? I couldn't see anything else holding that kind of cards together." @hint Test a guess
-      [victoria] "Yes." A pause as the thought settles. "How did you know that? Ophelia says people do not usually guess it."
-      [victoria] "I chose each one because it is lovely. The Moonlight Butterfly. The Golden Apple. The Rainbow's Arrow."
-      [rowan] "The Golden Apple borrows one of my heroes for a turn. That's the only card in there that scares me."
-      [victoria] "It is the only one that does anything." Utterly serious. "I like it for its colour."
+    > "The ribbons, the lace, the parasol. Is the deck pretty things? Birds and butterflies and healers?" @hint From her look
+      [victoria] "Yes." A pause as the thought settles. "How did you know that? I am told people do not usually guess it."
+      [victoria] "I chose each one because it is lovely. Pretty Things. The Moonlight Butterfly. The Golden Apple. The Rainbow's Arrow."
       @aff victoria +3 | Understood her deck
     > "Which cards do you play, Victoria? I'd like to hear how you choose."
       [victoria] "The lovely ones." A calm blink. "I am told this is not a strategy. I consider it one."
@@ -299,65 +308,53 @@
     > Let the cards wait for now.
       @flag deck_skipped_victoria
       @end
+  Rowan's eyes have unfocused, and for a few seconds the words come out without a face behind them.
+  [rowan] "…Moonlight Butterfly. Cute Bird, no Phoenix behind it. Rainbow's Arrow. Angelfeather Arrow, an arrow with no attack. Gems, every colour. Heal. Healing Melody. Golden Apple — borrows a hero of mine. Magic Ruby. No engine. No finisher. Wins if I beat myself."
+  He blinks. His eyes come back. He has said all of that out loud.
+  [rowan] "I'm — that was out loud. I'm sorry. That was a rude thing to say about somebody's cards."
+  [victoria] "It was perfectly accurate." She does not seem offended in the least. "I am told it is not a strategy. I consider it one. I should like it very much if you were *kind* about the Golden Apple."
   @deckinfo victoria
-
-@scene deck_ophelia
-  @if deck_known_ophelia
-    @end
-  @choice
-    > "Armageddon with Ifrits? Nothing for six turns, and then every hero off the table?" @hint Test a guess
-      [ophelia] "Meaning what?" Suspicious. Then, flatly, surprised: "…Yes. Last Day. How did you know it was Ifrits?"
-      [rowan] "Damus places one a turn, and Ifrits ignore Armageddon. Three of them make it enormous."
-      [ophelia] "Four Armageddons. Four Ifrits. Nothing happens for six turns." A shrug. "I don't see what's funny about that."
-      @aff ophelia +3 | Understood her deck
-    > "What do you play, Ophelia? I'd like to know what to expect."
-      [ophelia] "Last Day. Nothing happens for six turns and then you're dead." Flat. "That's the plan."
-      @aff ophelia +1 | Asked about her deck
-    > Let the cards wait for now.
-      @flag deck_skipped_ophelia
-      @end
-  [rowan] "It's a very honest threat. Your opponent can see it coming. They just can't do anything about it."
-  [ophelia] "Good."
-  @deckinfo ophelia
 
 @scene deck_sunny
   @if deck_known_sunny
     @end
   @choice
-    > "Towel, goggle tan, wet ponytail. Slippery things? Something that slides around the board?" @hint Test a guess
-      [sunny] "Ha! Nice read! Everything in my deck slides, nothing stays where you put it. Drives the control kids mental."
-      [rowan] "Slippery Spikeblock, Pengu, Skates. They slide into the neighbouring hero every turn and each slide does something."
-      [sunny] "And Whoolmoth, once every one of my heroes has a creature. Huge. Free."
-      @aff sunny +3 | Read her deck
+    > "Towel, goggle tan, wet ponytail. Water, then? Deepsea Idols, sharks, something from the deep end?" @hint From her look
+      [sunny] "Ha! Right pool, wrong temperature! It's the cold end. **Ice!**"
+      [sunny] "Slip 'n Slide. Everything slides, nothing stays where you put it. Drives the control kids mental."
+      @aff sunny +2 | Close enough
     > "What do you play? I'm guessing it's something with a lot of splash."
       [sunny] "Slip 'n Slide! Everything slides. No dramas."
       @aff sunny +1 | Asked about her deck
     > Let the cards wait for now.
       @flag deck_skipped_sunny
       @end
-  [rowan] "Every slide is a trigger. Do you ever run out of space to slide into?"
-  [sunny] "Only when the other bloke's very, very clever. Which you are, I reckon."
+  Rowan's mouth moves before his voice does, low and quick.
+  [rowan] "…Pengu, Polar, Snobbit, Snowman. Skates for an extra slide. Spikeblock. Whoolmoth once every hero has a creature. Every Slippery slides into the neighbouring hero each turn, and every slide does something. Ingo gets paid per slide." A beat. "Middle hero falls, outer ones aren't neighbours. Right."
+  [sunny] "…Oh, he's *good*." She says it to the gulls. "That's the whole weakness and he said it in one go. Rude."
+  [rowan] "It's only a weakness if the other side finds the middle hero."
+  [sunny] "That's what I said. Rude *and* clever."
   @deckinfo sunny
 
 @scene deck_marit
   @if deck_known_marit
     @end
   @choice
-    > "Flame clips, a flame scarf, a bow tie the colour of an ember. You're either burn or something that keeps coming back. Phoenix?" @hint Test a guess
-      [marit!] "Oh! *Oh!* He is GOOD. Behold!"
-      [marit] "Phoenix Encore. Cute Phoenix at the heart of it, and I throw things away on purpose."
-      [rowan] "That's the Cute Bird, isn't it? When it dies you discard two cards and a Cute Phoenix comes straight from the deck."
-      [marit] "From the ashes of my frankly terrible opening hand." Dry, quick, ordinary. "That's the whole deck. It's a discard pile in a petting zoo."
-      @aff marit +3 | Read her deck
-    > "What do you play, Marit? I'm always curious how people build."
-      [marit] "Phoenix Encore! Cute, Cute Phoenix! A discard deck dressed as a petting zoo. Cute Cat mills three, Cute Dog discards for value —"
-      [marit] "I throw cards away on purpose. It's very liberating."
+    > "Flame clips, an ember bow tie, a scarf the colour of coals, and you stepped onto a bollard like it was a stage. Let me guess: Phoenix." @hint From her look
+      [marit!] "**OH!** *Oh!* He is **GOOD!** Ladies and gentlemen, the stranger has **SEEN** me!"
+      [marit!] "**PHOENIX ENCORE!** The *rise!* The *fall!* The **RISE AGAIN!**"
+      @aff marit +3 | Read her from her look
+    > "What do you play, Marit?"
+      [marit!] "**Phoenix Encore!** A *grand* revival, a discard pile in a *petting zoo!* Cute Cat, Cute Dog, Cute **PHOENIX!**"
       @aff marit +2 | Asked about her deck
     > Let the cards wait for now.
       @flag deck_skipped_marit
       @end
-  [rowan] "Skull Necklace and Glass of Marbles pay you on the way down. So the discard pile is the engine, not the graveyard."
-  [marit!] "It is the SECOND ACT! Thank you!"
+  Rowan has put one hand over his mouth. Behind it his voice is a steady, level murmur.
+  [rowan] "…Cute Bird in front. It dies, she discards two, a Phoenix comes off the deck. Cats mill three. Dog comes back out of the pile. Skull Necklace pays on the way down. Glass of Marbles. Gravedigger Slap for every differently named creature in the pile." A breath. "Right. *Right.*"
+  [marit] "Is he — is he doing a *monologue?* He's doing a **monologue!** Ladies and gentlemen —"
+  [rowan] "Sorry. Sorry. The pile's the engine, not the graveyard. That's all."
+  [marit!] "It is the **SECOND ACT!** *Thank* you!"
   @deckinfo marit
 
 @scene deck_rana
@@ -366,42 +363,51 @@
   @if rana_pressed
     @end
   @choice
-    > "Face-down cards. Never acting first. Cybugs? Something waiting for you to attach, or search, or draw?" @hint Test a guess
-      [rana] "…" A very long pause. The scowl does not change. Something in her shoulders does. "Debug Mode."
-      [rowan] "Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill."
-      [rana] "…You read the names." Under her breath. "Nobody reads the names."
-      [rana] "Whatever."
-      @aff rana +3 | Read her deck
-      @flag rana_deck_talk
-    > "What do you play, Rana? I'd rather ask than assume."
-      [rana] "Debug. Face-down cards. They each wait for one thing you do." A shrug that tries to be indifferent. "It's not interesting."
-      @aff rana +1 | Asked about her deck
+    > "Do you play? I'm not asking for a game. I just don't know what anybody's running."
+      @scene answer_rana
     > Let the cards wait for now.
       @flag deck_skipped_rana
       @end
+
+@scene answer_rana
+  @if deck_known_rana
+    @end
+  [rana] "…" A very long pause. The scowl does not change. Something in her shoulders does. "Debug Mode."
+  [rana] "Face-down cards. They each wait for one thing you do." A shrug that tries very hard to be indifferent. "It's not interesting."
+  @aff rana +1 | Asked, and didn't push
+  Rowan says nothing for a moment. Then, so low she may not be meant to hear:
+  [rowan] "…Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill. Bee, Centipede, Rhinoceros, Scarab. Each one waits for exactly one thing. Bakhm hits for every trap that fires. Paid for by deleting the matching artifact." A breath. "Troop Annihilation refills them. Nobody plays it like that."
+  [rana] "…You read the names." Under her breath. "Nobody reads the names."
+  [rana] "Whatever."
+  @flag rana_deck_talk
   @deckinfo rana
 
 @scene deck_teobalt
   @if deck_known_teobalt
     @end
   @choice
-    > "A clipboard, a rota and a list for everything. Order of Tusca? The deck that makes rules? Hatusbal and no shuffling?" @hint Test a guess
+    > "A clipboard, a rota, a list for everything. You'd play something that makes rules. Control? A lock?" @hint From his clipboard
       [teobalt] "Three things." Brightly. "One: yes. Two: *yes*. Three: I can't believe you guessed it."
-      [teobalt] "Hatusbal forbids shuffling. Every Tuscan adds another clause. No Potions, no multi-card draws, no extra gold."
-      [rowan] "And Natas takes a fresh Master's Plan instead of a draw. You're writing the rulebook while I play."
-      [teobalt] "It's a very *good* rulebook."
-      @aff teobalt +3 | Read his deck
+      [teobalt] "Order of Tusca. Hatusbal forbids shuffling, and every Tuscan adds another clause."
+      @aff teobalt +2 | Read his deck
     > "What do you play, Teobalt? I'd guess it involves procedure."
       [teobalt] "Order of Tusca. Control. Hatusbal makes it impossible to shuffle, and each creature adds a clause." A very small, very pleased pause. "Yes, that is how it sounds."
       @aff teobalt +1 | Asked about his deck
     > Let the cards wait for now.
       @flag deck_skipped_teobalt
       @end
+  Rowan has taken a half-step back. His voice is low and exact, as if reading from a sheet.
+  [rowan] "…Aristocrat, Artist, Mystic, Prisoner. Each one a clause. No Potions. No multi-card draws. No extra gold. Natas makes a Master's Plan every turn and cancels the one card that mattered. Slow. Icy Grave. Forbidden Zone. Mr. Jiggles and a Haressassin grind for the damage." A breath. "Plain mid-sized bodies. One Master's Plan a turn, no more."
+  [teobalt] "…You are describing my deck." A very quiet, very serious voice. "That is the most accurate description I have ever heard of my deck, including my own."
+  @aff teobalt +1 | Knew his deck
   @deckinfo teobalt
 
 # ───────────────────────────── NACHGESPRÄCHE ─────────────────────────────
+#  Ein Duell zeigt das Deck: auch ohne vorheriges Gespräch gilt es danach als bekannt.
 
 @scene post_baylee
+  @if not deck_known_baylee
+    @deckinfo baylee
   @if won:ferry_baylee
     Baylee turns his hand over, one big dinosaur at a time, and studies the board.
     [baylee] "You didn't attack at all."
@@ -418,6 +424,8 @@
   @aff baylee +1 | Talked it through
 
 @scene post_ed
+  @if not deck_known_ed
+    @deckinfo ed
   @if won:ferry_ed
     Ed is flat on his back on the planks with his hat on his chest, grinning at the sky.
     [ed] "Whoa. I didn't see the Storm come back around. It just — kept zapping! Every turn! Is that allowed?"
@@ -433,6 +441,8 @@
   @aff ed +1 | Talked it through
 
 @scene post_georgie
+  @if not deck_known_georgie
+    @deckinfo georgie
   @if won:ferry_georgie
     Georgie is looking at her last egg, which is still unbroken. She has gone very quiet.
     [georgie] "I couldn't break it. They only pay when they break on my turn, and you never let me have a turn where it mattered."
@@ -451,6 +461,8 @@
   @aff georgie +1 | Talked it through
 
 @scene post_mikoto
+  @if not deck_known_mikoto
+    @deckinfo mikoto
   @if won:ferry_mikoto
     Mikoto is looking at the board with wide, unfocused eyes. A skeleton at the bottom of his discard pile has not quite finished falling over.
     [mikoto] "Sorry — oh. Sorry. You killed all my healers before they could heal anything. I didn't — that's — that's good. That's what you should do."
@@ -464,6 +476,8 @@
   @aff mikoto +1 | Talked it through
 
 @scene post_ashton
+  @if not deck_known_ashton
+    @deckinfo ashton
   @if won:ferry_ashton
     Ashton regards a board that is mostly smoke.
     [ashton] "I over-leaked. I always over-leak. It's a vice."
@@ -478,6 +492,8 @@
   @aff ashton +1 | Talked it through
 
 @scene post_sunny
+  @if not deck_known_sunny
+    @deckinfo sunny
   @if won:ferry_sunny
     Sunny is still on her face on the planks, counting push-ups aloud, and then rolls over with a grin and a towel on her face.
     [sunny] "Ten! No dramas! Nobody told me you'd go for the Whoolmoth first."
@@ -491,26 +507,30 @@
   @aff sunny +1 | Talked it through
 
 @scene post_marit
+  @if not deck_known_marit
+    @deckinfo marit
   @if won:ferry_marit
-    [marit!] "Alas! Defeat! And what a defeat, ladies and gentlemen!"
+    [marit!] "**ALAS!** *DEFEAT!* And what a defeat, ladies and gentlemen — the **GREATEST** defeat of the **MORNING!**"
     The crowd, which has grown to a dozen, applauds. Marit takes a very small, very private bow and drops, mid-flourish, into her ordinary voice.
-    [marit] "That was the Storm. It never stopped hitting. I couldn't get a Cute Phoenix to stay on the board for more than a turn."
-    [rowan] "I killed the Cute Bird before it could discard anything. If it dies in your own discard pile you can't bring the Phoenix back."
-    [marit] "You *denied* the Bird. Oh, that's cold." A bright, delighted laugh. "I love it. Nobody's ever had the nerve."
+    [marit] "That was the Storm. It never stopped hitting. I couldn't get a Phoenix to stay on the board for more than a turn."
+    [rowan] "The Cute Bird died while you only had one card in hand. You couldn't discard two, so nothing came off the deck. After that I just kept the Phoenix off the table."
+    [marit] "You *starved* the Bird. Oh, that's cold." A bright, delighted laugh. "I love it. Nobody's ever had the nerve."
     [rowan] "Your deck is gorgeous. I mean it. The discard pile as an engine. I'd never have built it."
     [marit] "*Thank* you. I stay up at night thinking nobody understands it." She looks, for a second, entirely sincere. "You do."
   @else
-    [marit!] "The Phoenix, ladies and gentlemen! Always the phoenix!"
-    She takes a bow. The small crowd cheers. And then she drops, mid-flourish, into her ordinary voice, the quick, wry one.
+    [marit!] "**THE PHOENIX!** Ladies and gentlemen, **BEHOLD** — the *PHOENIX!* **ALWAYS** the Phoenix!"
+    She takes a bow so deep her scarf trails on the planks. The small crowd cheers. And then she drops, mid-flourish, into her ordinary voice, the quick, wry one.
     [marit] "That was lovely. Thank you for letting me. Your Storm was very hard to play around."
     [rowan] "I held Chain Lightning for three turns and you discarded two Cute Cats. I thought I had you, and then the Cute Bird died and the Phoenix came back."
     [marit] "From the ashes of my frankly terrible opening hand." A beat. "I had no idea that would work. I really didn't."
     [rowan] "It works because you're willing to throw cards away. Most people can't."
-    [marit!] "It's the *only* thing I'm good at!"
-  [marit] "I'm Marit, by the way. Properly. Not the bow tie one. Come and find me at the commentary desk, Rowan Vance. I'll tell you everything."
+    [marit!] "It's the **ONLY** thing I'm good at!"
+  [marit] "Properly, by the way, it's Marit. Not the bow tie one. Come and find me at the commentary desk, Rowan Vance. I'll tell you *everything*."
   @aff marit +1 | Talked it through
 
 @scene post_noor
+  @if not deck_known_noor
+    @deckinfo noor
   @if won:ferry_noor
     [noor] "To be precise, you did not win on time. You won on the board." She turns her last card face up. "I had four counters on the Clock and no way to use them."
     [rowan] "I killed your Warriors before they could remove counters. If one had landed I'd have been two turns from losing."
@@ -523,6 +543,8 @@
   @aff noor +1 | Talked it through
 
 @scene post_livvie
+  @if not deck_known_livvie
+    @deckinfo livvie
   @if won:ferry_livvie
     Livvie counts the five credits twice, each coin with great precision.
     [livvie] "Quick thing — your Gathering Storm broke a Crystal I handed you. Did you notice?"
@@ -536,6 +558,8 @@
   @aff livvie +1 | Talked it through
 
 @scene post_magnus
+  @if not deck_known_magnus
+    @deckinfo magnus
   @if won:ferry_magnus
     Magnus is staring at the tablet. He has already started a note.
     [magnus] "One-Two-Punch cannot kill on the first turn. You knew that. You used the first turn to set up a Storm that kills before the second."
@@ -552,6 +576,8 @@
   @aff magnus +1 | Talked it through
 
 @scene post_inya
+  @if not deck_known_inya
+    @deckinfo inya
   @if won:ferry_inya
     Inya looks at the board for a long time. Her last bunny is still on it.
     [inya] "I should have set off the Bomb on turn five."

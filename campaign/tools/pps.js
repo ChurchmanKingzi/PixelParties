@@ -10,7 +10,7 @@
 //   {H} {H:he} {H:him} {H:his} {H:He} {H:His} {H:himself} {H:full} {H:mate}
 //                                        Platzhalter für den Host; nur in Szenen mit Kopfwort `host`
 //
-//   @scene id [once] [host] [bg=x] [music=x] [time=n] [when <Bedingung>]     (Spalte 0)
+//   @scene id [once] [host] [alone] [bg=x] [music=x] [time=n] [when <Bedingung>]     (Spalte 0)
 //   @place id / @event id ...                                                 (Spalte 0, siehe unten)
 //   @bg x  @music x  @sfx x  @fx shake|flash|fadeout|fadein [ms]  @wait ms  @clear
 //   @enter id [x= y= h= flip]  @exit id  @move id x= [ms=]  @face id [flip]  @dim id
@@ -328,7 +328,7 @@ function parseSceneHead(text) {
   const [headPart, whenStr] = splitWhen(text.replace(/^@scene\s+/, ''));
   const p = parseKV(headPart); const id = p.pos[0];
   if (!/^[a-z0-9_]+$/.test(id)) throw new Error('Szenen-Id nur a-z 0-9 _ : ' + id);
-  return { id, once: p.flags.has('once'), host: p.flags.has('host'), bg: p.kv.bg, music: p.kv.music, time: p.kv.time ? Number(p.kv.time) : undefined, when: whenStr };
+  return { id, once: p.flags.has('once'), host: p.flags.has('host'), alone: p.flags.has('alone'), bg: p.kv.bg, music: p.kv.music, time: p.kv.time ? Number(p.kv.time) : undefined, when: whenStr };
 }
 
 module.exports = { raw, ser, Raw, condToJs, readLines, parseBlock, compileScene, parseSceneHead, parseKV, splitWhen, WEEKDAYS };

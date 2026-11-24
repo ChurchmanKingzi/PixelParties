@@ -1,0 +1,213 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · NACHMITTAG · DIE BUNGALOW-REIHE: Gesprächskreise
+#  Die drei Reihenszenen stellen je drei Nachbarn mit einem Satz vor. Danach kann Rowan bleiben und fragen
+#  (zwei Fragen je Person, Reihenfolge frei), statt dass die Szene nach der ersten Antwort abbricht.
+#  chat_<id>_1/2 merken die Fragen, chat_<id>_done schließt die Person.
+#  Wie bei den Fähren-Hubs: nur Fragen, die sich aus dem ergeben, was Rowan gesehen oder gehört hat.
+# ═══════════════════════════════════════════════════════════════════
+
+# ───────────────────────────── BUNGALOW 2: Hedda, Freya, Trixie ─────────────────────────────
+
+@scene chat_row_b2
+  @label top
+  @if chat_hedda_done and chat_freya_done and chat_trixie_done
+    @flag chat_row_b2_done
+    [freya] "That's the whole porch. You've done the rounds." The book comes down for a moment, and the pale blue eye is almost warm. "Come by tonight. We start at ten. The sausage will still be wrong."
+    @end
+  @choice Who do you stay and talk to?
+    > Stay with Hedda and her banner. @if not chat_hedda_done
+      @choice
+        > "What's the banner for, Hedda?" @if not chat_hedda_1
+          [hedda] "Tonight's stew! It's a protest and a service announcement! 'Ask what's in the pot!'" She jabs the brush at the red letters. "People think a petition is a shout. A petition is a *list*. A list is what wins."
+          [rowan] "How many names have you got?"
+          [hedda] "Eighty-one, since the harbour. I'd have ninety, but half of Rare Hall wouldn't sign without a lawyer." Fierce and quick, entirely delighted. "I counted them twice. I always count twice."
+          @aff hedda +2 | Asked about her cause
+          @flag chat_hedda_1
+        > "Why the megaphone? You don't seem short of volume." @if not chat_hedda_2
+          [hedda] "I'm *tiny*." Without a shred of embarrassment. "In a crowd, nobody sees me. With a megaphone, nobody can miss me. It's not about being loud, it's about being the right size."
+          [hedda] "And it makes the pigeons flinch. That's a bonus."
+          @aff hedda +1 | Took the megaphone seriously
+          @flag chat_hedda_2
+        > Back to the porch.
+          @jump top
+      @if chat_hedda_1 and chat_hedda_2
+        @flag chat_hedda_done
+      @jump top
+    > Sit by Freya's chairs. @if not chat_freya_done
+      @choice
+        > "Do you always lie on two chairs with a book on your face?" @if not chat_freya_1
+          [freya] "Only before ten." The book lifts. "It's how I save my face for the evening. The rest of the day it's a rumour."
+          [rowan] "What are you reading?"
+          [freya] "Nothing. I have been looking at the same sentence since lunch. It is a very good sentence."
+          @aff freya +2 | Played along
+          @flag chat_freya_1
+        > "You said 'wicked by ten'. What does that mean, exactly?" @if not chat_freya_2
+          [freya] "It means that by ten I will tell you what I think of you, and then I will tell you what I should like to do about it." A cool, level pause. "Both parts are, as a rule, flattering."
+          [freya] "You'll want a water. Ask anyone. Everybody wants a water, eventually."
+          @aff freya +1 | Asked straight
+          @flag chat_freya_2
+        > Back to the porch.
+          @jump top
+      @if chat_freya_1 and chat_freya_2
+        @flag chat_freya_done
+      @jump top
+    > Hold still for Trixie and Belinda. @if not chat_trixie_done
+      @choice
+        > "Who's Belinda?" @if not chat_trixie_1
+          [trixie] "Honeybee! Very decent. Very busy. She's been on my finger since breakfast, and I have *not* been asked for a single piece of paperwork." A bright, gap-toothed grin. "She's a good listener. Ask her anything. She'll wait till the end."
+          [rowan] "Good morning, Belinda."
+          [trixie] "She says good morning!" Wholly serious. "She also says you've got a flower on your collar, which is nice, because that was me. I put it there when you weren't looking."
+          @aff trixie +2 | Greeted the bee
+          @flag chat_trixie_1
+        > "Do you keep bees at home?" @if not chat_trixie_2
+          [trixie] "My dad does! Devon! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home." She rattles it off without drawing breath. "I say good morning to the bees and they say it back. Mostly. In their own way."
+          [trixie] "It's sad here without them. I'm going to put a hotel under the bungalow roof. If you've got a spare plank, I'll love you forever."
+          @aff trixie +2 | Asked about home
+          @flag chat_trixie_2
+        > Back to the porch.
+          @jump top
+      @if chat_trixie_1 and chat_trixie_2
+        @flag chat_trixie_done
+      @jump top
+    > "I should get on. Thanks, all of you."
+      [hedda] "Come back! With a signature!"
+      [trixie] "Bye! Belinda says bye!"
+      @end
+
+# ───────────────────────────── BUNGALOW 4: Maisie, Fiona, Leona ─────────────────────────────
+
+@scene chat_row_b4
+  @label top
+  @if chat_maisie_done and chat_fiona_done and chat_leona_done
+    @flag chat_row_b4_done
+    [maisie] "Right! That's the lot of us. You can come by any time, love. Just mind the hot end."
+    @end
+  @choice Who do you stay and talk to?
+    > Watch Maisie work. @if not chat_maisie_done
+      @choice
+        > "How does it work? The projector, I mean." @if not chat_maisie_1
+          [maisie] "A lamp, some lenses and a lot of faith." She holds up a coil of wire like a trophy. "Every hologram on the island is a slide with ambitions. I'm trying to make the light *stay put* long enough to be a thing."
+          [rowan] "Is that possible?"
+          [maisie] "Not yet. But 'not yet' is the best phrase in the English language. It's got hope in it."
+          @aff maisie +2 | Asked how it works
+          @flag chat_maisie_1
+        > "Can I hold something? I'm not much use, but I can hand you things." @if not chat_maisie_2
+          [maisie] "A helper! Right. Screwdriver, the flat one — no, the *other* flat one. Ta." For a few minutes she says nothing at all, and you hold things in the places she points. It is the most quietly useful you have felt all day.
+          [maisie] "You've got steady hands, you. Don't waste them."
+          @aff maisie +3 | Lent a hand
+          @flag chat_maisie_2
+        > Back to the porch.
+          @jump top
+      @if chat_maisie_1 and chat_maisie_2
+        @flag chat_maisie_done
+      @jump top
+    > Sit beside Fiona's candle. @if not chat_fiona_done
+      @choice
+        > "That candle's lit in broad daylight. Does it ever go out?" @if not chat_fiona_1
+          [fiona] "It has not gone out since I carried it in this morning." Low, slow, very grave. "It is the only thing in the bungalow with any sense of occasion."
+          [rowan] "Is it hard, keeping it alight?"
+          [fiona] "Not at all. I simply don't open the window." The corner of her mouth moves, and she presses it flat again. "That was a joke. Do not tell the others I make them."
+          @aff fiona +2 | Matched her deadpan
+          @flag chat_fiona_1
+        > "What are you reading?" @if not chat_fiona_2
+          [fiona] "A book of very old, very upsetting poems. They are all about rain." She turns the leather cover so you can see the title. "Do you like rain?"
+          [rowan] "I grew up above a laundromat. I like anywhere with the windows closed and something warm in the next room."
+          [fiona] "…" A long, slow pause. "That is the best thing anybody has said to me today. I shall not tell you so."
+          @aff fiona +3 | Answered honestly
+          @flag chat_fiona_2
+        > Back to the porch.
+          @jump top
+      @if chat_fiona_1 and chat_fiona_2
+        @flag chat_fiona_done
+      @jump top
+    > Sit with Leona on the step. @if not chat_leona_done
+      @choice
+        > "What do you like to do, when you're not playing?" @if not chat_leona_1
+          [leona] "Find out how buildings work. Where the stairs go. Who has the keys." Even, mild, entirely unhurried. "It is relaxing. Everything has an order, if you look."
+          [rowan] "Have you found out anything here?"
+          [leona] "That the Commons has one front door and four ways out." A very small pause. "That is a good number."
+          @aff leona +1 | Asked what she likes
+          @flag chat_leona_1
+        > "Have you been in the bungalow long? Which bed is yours?" @if not chat_leona_2
+          [leona] "This noon. The one by the window. I have made the bed." A beat. "I remember what you told me. 'Rowan.' That is an easy name to remember."
+          [rowan] "Thank you for remembering."
+          [leona] "People rarely say that." The faintest, mildest smile. "I make a point of it."
+          @aff leona +2 | Thanked her for remembering
+          @flag chat_leona_2
+        > Back to the porch.
+          @jump top
+      @if chat_leona_1 and chat_leona_2
+        @flag chat_leona_done
+      @jump top
+    > "I should get on. It was good to meet you all."
+      [maisie] "Mind the cable, love!"
+      @end
+
+# ───────────────────────────── BUNGALOW 6: Sammy, Tobias, Dmitri ─────────────────────────────
+
+@scene chat_row_b6
+  @label top
+  @if chat_sammy_done and chat_tobias_done and chat_dmitri_done
+    @flag chat_row_b6_done
+    [dmitri] "Hm." Slow and dry. "That was a very full afternoon for bungalow 6. Come after midnight. It's better."
+    @end
+  @choice Who do you stay and talk to?
+    > Stay by Sammy at the edge of the shade. @if not chat_sammy_done
+      @choice
+        > "Do you keep that coat on all the time?" @if not chat_sammy_1
+          [sammy] "Always." Low, slow, ominous. Then, normal speed, very quickly: "Well — outside. Inside I hang it up. It's very heavy." He clears his throat and drops it again. "It lends a certain atmosphere."
+          [rowan] "Does it work?"
+          [sammy] "…Three people have asked me if I'm unwell since the harbour." A very small, hopeful pause. "That is a very good result, I think."
+          @aff sammy +2 | Asked about the coat
+          @flag chat_sammy_1
+        > "What brings you here, Sammy?" @if not chat_sammy_2
+          [sammy] "The cards. And the — the chance to be somebody." He clears his throat. "Somebody who stands at the edge of a room and is *looked at*, not *looked past*. It's a bit more difficult than I planned."
+          [rowan] "I'm looking at you."
+          [sammy] "…Yes." Normal voice, quite quiet. "You are. That's — that was nice. Thank you."
+          @aff sammy +3 | Looked at him
+          @flag chat_sammy_2
+        > Back to the porch.
+          @jump top
+      @if chat_sammy_1 and chat_sammy_2
+        @flag chat_sammy_done
+      @jump top
+    > Lean on the rail by Tobias. @if not chat_tobias_done
+      @choice
+        > "Is the new jacket really that obvious?" @if not chat_tobias_1
+          [tobias] "Stiff. Smells of the shop. Sleeves still creased." He does not take his hands out of his pockets. "Don't worry. Give it a week. Then nobody can tell the new ones from the old ones."
+          [rowan] "Is that a good thing?"
+          [tobias] "It's the only thing. A club for fat cats works hardest to hide who's new."
+          @aff tobias +2 | Asked his opinion
+          @flag chat_tobias_1
+        > "What do you make of the Academy so far?" @if not chat_tobias_2
+          [tobias] "A club for fat cats." Flat. "Nothing against the cats. They can't help it. But I want a sister out of Salford, and this is the only door with my name on it."
+          [rowan] "That's a good reason."
+          [tobias] "It's the *only* reason." A dry, level glance. "Where I come from, you tell people your reasons, they know how to use them. Tell nobody. Mind your pockets."
+          @aff tobias +2 | Heard his reason
+          @flag chat_tobias_2
+        > Back to the porch.
+          @jump top
+      @if chat_tobias_1 and chat_tobias_2
+        @flag chat_tobias_done
+      @jump top
+    > Sit by Dmitri's hammock. @if not chat_dmitri_done
+      @choice
+        > "Do you actually sleep at night, or only talk about it?" @if not chat_dmitri_1
+          [dmitri] "I sleep in the morning. In class. With my eyes open." A slow, dry smile. "It is a very efficient system. Nobody has noticed, apart from the teachers."
+          [rowan] "And the nights?"
+          [dmitri] "The nights I watch. Tea, a thermos, a very good view of who comes home when." A beat. "I do not repeat it. That is the other half of the system."
+          @aff dmitri +2 | Asked about his nights
+          @flag chat_dmitri_1
+        > "What kind of tea?" @if not chat_dmitri_2
+          [dmitri] "Strong. Black. Russian-strong, which is a different kind of strong." For the first time he opens his eyes fully. "You ask about the tea first. Not the name, not the deck. The tea."
+          [dmitri] "Come by after midnight. I will pour you a cup. It will be, I think, the best conversation you have this week."
+          @aff dmitri +3 | Asked about the tea
+          @flag chat_dmitri_2
+        > Back to the porch.
+          @jump top
+      @if chat_dmitri_1 and chat_dmitri_2
+        @flag chat_dmitri_done
+      @jump top
+    > "I should get on. Good to meet you all."
+      [sammy] "Good — afternoon. Yes. Good afternoon."
+      @end

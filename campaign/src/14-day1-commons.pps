@@ -12,9 +12,9 @@
   travelFrom commons_kitchen=1 commons_room=1
   action boardwalk "Walk the boardwalk" scene=row_boardwalk when day=1
   action hammock "Lie in a hammock" scene=row_hammock when day=1 and not rowan_hammock
-  action b2 "Knock on bungalow 2" scene=row_b2 when day=1 and not met:hedda
-  action b4 "Visit bungalow 4" scene=row_b4 when day=1 and not met:maisie
-  action b6 "Stop at bungalow 6" scene=row_b6 when day=1 and not met:dmitri
+  action b2 "Knock on bungalow 2" scene=row_b2 when day=1 and not chat_row_b2_done
+  action b4 "Visit bungalow 4" scene=row_b4 when day=1 and not chat_row_b4_done
+  action b6 "Stop at bungalow 6" scene=row_b6 when day=1 and not chat_row_b6_done
 
 @place commons_kitchen
   travel 1
@@ -116,6 +116,11 @@
 # Nachbarn kann man schon VOR dem Abendessen treffen — oder erst dort.
 
 @scene row_b2
+  @if met:hedda
+    The porch of bungalow 2 is still a small war zone, and nobody minds you coming back.
+    @scene chat_row_b2
+    @time 10
+    @end
   The porch of bungalow 2 is a small war zone. Banners. A megaphone on the rail. A pot of lavender. A ceramic bowl of water for gulls. A tall girl with an ice-blonde braid is lying flat on her back across two chairs with a book on her face. A tiny green-haired girl with flowers in her hair is painting a banner in great red letters. And a honey-blonde girl in yellow-striped socks is talking to a bee on the end of her finger.
   [hedda?] "You! Are you for the sausage or against the sausage?"
   [rowan] "I — what sausage?"
@@ -143,10 +148,16 @@
       [hedda] "Jokes about veganism! The OLDEST evasion in the book!"
       [freya] "Hedda. He is nineteen and he is new."
       @aff hedda -2 | Joked about veganism
+  @scene chat_row_b2
   @add ferry_talked +1
   @time 15
 
 @scene row_b4
+  @if met:maisie
+    The workbench on the porch of bungalow 4 is still humming, not quite as it should.
+    @scene chat_row_b4
+    @time 10
+    @end
   A trestle workbench on the porch of bungalow 4 is covered in the entrails of a projector. A girl in oil-stained overalls and welding goggles is leaning over it, tongue between her teeth, with a soldering iron in one fist.
   [maisie?] "It's meant to hum. It's not meant to hum like THAT. Stand a bit further back, love."
   @meet maisie
@@ -173,10 +184,16 @@
     > Sit with Leona. @hint Quiet
       [leona] "Thank you." A small pause. "People rarely do. It isn't a talent. It's a face."
       @aff leona +3 | Sat with her
+  @scene chat_row_b4
   @add ferry_talked +1
   @time 15
 
 @scene row_b6
+  @if met:dmitri
+    The long shade on the porch of bungalow 6 has moved a little, and everybody in it is where they were.
+    @scene chat_row_b6
+    @time 10
+    @end
   On the porch of bungalow 6 a boy in a long black coat is standing at the edge of the shade, brooding at the horizon with the stiffness of someone who has practised it in a mirror. A broad boy with a broken nose is sitting on the step with a grey hoodie under his red jacket and his hands in his pockets. A hollow-eyed boy in a grey beanie is lying in a hammock under a blanket, one eye open.
   [sammy?] "I am — " Low, slow, ominous. He catches your eye. His voice jumps up an octave into something ordinary and sweet and Midlands: "Oh. Hello. Sorry. I was — never mind." He clears his throat and drops it again. "Sammy Counts."
   @meet sammy
@@ -196,6 +213,7 @@
     > "Why are you in the hammock, Dmitri, and not in a bed?" @hint Curious
       [dmitri] "Because I am not in the bed." A slow, dry smile. "You will find that the night is more interesting. Come and see, if you like. Bring tea."
       @aff dmitri +3 | Curious
+  @scene chat_row_b6
   @add ferry_talked +1
   @time 15
 
