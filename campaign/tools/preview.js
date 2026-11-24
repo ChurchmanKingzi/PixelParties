@@ -205,7 +205,7 @@ $('bReset').onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} location.
 })();
 `;
 
-const html = `<title>Pixel Academy: Day 1</title>
+const html = `<title>Academy Playtest</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=VT323&display=swap">
 <style>${css}</style>
