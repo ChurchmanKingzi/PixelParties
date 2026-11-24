@@ -77,7 +77,7 @@ function parsePlaceProps(node, file) {
       case 'closedText': o.closedText = rest.replace(/^"|"$/g, ''); break;
       case 'when': o.when = P.condToJs(rest, ctx); break;
       case 'onArrive': o.onArrive = (o.onArrive || []).concat([{ scene: kv.pos[0], once: !kv.flags.has('repeat'), when: wcond }]); ctx.sceneRefs.add(kv.pos[0]); break;
-      case 'object': o.objects.push({ id: kv.pos[0], sprite: kv.kv.sprite, x: kv.kv.x && Number(kv.kv.x), y: kv.kv.y && Number(kv.kv.y), h: kv.kv.h && Number(kv.kv.h), label: kv.kv.label, scene: kv.kv.scene, flip: kv.flags.has('flip') || undefined, when: wcond }); if (kv.kv.scene) ctx.sceneRefs.add(kv.kv.scene); break;
+      case 'object': o.objects.push({ id: kv.pos[0], sprite: kv.kv.sprite, x: kv.kv.x && Number(kv.kv.x), y: kv.kv.y && Number(kv.kv.y), h: kv.kv.h && Number(kv.kv.h), label: kv.kv.label, scene: kv.kv.scene, flip: kv.flags.has('flip') || undefined, alert: kv.kv.alert ? P.condToJs(kv.kv.alert, ctx) : (kv.flags.has('alert') || undefined), when: wcond }); if (kv.kv.scene) ctx.sceneRefs.add(kv.kv.scene); break;
       case 'action': o.actions.push({ id: kv.pos[0], label: kv.pos[1], scene: kv.kv.scene, text: kv.kv.text, flag: kv.kv.flag, time: kv.kv.time && Number(kv.kv.time), when: wcond }); if (kv.kv.scene) ctx.sceneRefs.add(kv.kv.scene); break;
       default: fail(`${file}:${c.line}: @place ${node.id}: unbekannte Eigenschaft "${key}"`);
     }

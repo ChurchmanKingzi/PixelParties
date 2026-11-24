@@ -1,7 +1,15 @@
 # ═══════════════════════════════════════════════════════════════════
 #  TAG 1 · MORGEN · DIE FÄHRE — Prolog und Vordeck
-#  Ablauf: 08:00 Start · 10:25 Horn · 10:40 Anlegen (siehe 13-ferry-docks.pps)
-#  Kanon: bible/places/ferry_*.json, bible/intro.txt, plot/hooks.json (h_ferry_table)
+#  Ablauf: 08:00 Start · 09:30 Inya sucht Rowan · 09:45 Schiff erkennt den Wildcard · 10:25 Horn · 10:40 Anlegen
+#  Kanon: bible/places/ferry_*.json, bible/intro.txt
+#
+#  WISSENSMODELL (wer weiß am Morgen was über Rowan?)
+#    · Öffentlich: am Brückendeck hängt die Passagierliste, 35 getippte Namen und einer in Tinte: "Vance, R. — Wildcard".
+#      Jeder Erstsemester trägt seit dem Hafen eine Jacke (per Post gekommen); Rowan ist der Einzige ohne.
+#    · Nathan hat die Liste gelesen, weiß aber nicht, WER es ist, bis Rowan seinen Nachnamen nennt (told_wildcard).
+#    · Scharfe Beobachter (Gideon, Magnus, Teobalt) schließen es aus Liste plus fehlender Jacke.
+#    · Alle anderen erfahren es von Rowan, von Nathan (der alles weitererzählt) oder um 09:45 (ship_knows_wildcard).
+#  Rowan ist ein vollwertiger Gesprächspartner: gesprochene Optionen werden automatisch von ihm laut gesagt.
 # ═══════════════════════════════════════════════════════════════════
 
 @place ferry_deck
@@ -23,6 +31,8 @@
   action lighthouse "Look for the lighthouse" scene=deck_lighthouse when day=1 and time<10:40 and time>=9:30
   action seasick "Be seasick" scene=deck_seasick when day=1 and time<10:40
 
+@event ship_figures_it_out scene=ship_figures_it_out day=1 from=09:45 when not ship_knows_wildcard and (at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge)
+
 # ───────────────────────────── PROLOG ─────────────────────────────
 
 @scene ferry_prologue once bg=ferry_deck music=menu
@@ -33,10 +43,10 @@
   Two weeks ago you were folding other people's sheets in Aunt Dee's laundromat, phone propped against the detergent shelf, climbing the online ladder one match at a time between dryer cycles.
   Best_Tarleinn_NA. Top ten in North America for your age bracket. Winner of the Wildcard Qualifier — the last open seat of the year.
   You have never once played this game on a real table. Never shuffled a real deck in front of a real person who was looking at your hands.
-  Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Sixty-five cards, and you know every one of them by heart.
+  Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Seventy-four cards, counting the three heroes and their six starting abilities, and you know every one of them by heart.
   The acceptance letter is still in your bag, folded so often it has gone soft. At the bottom, in smaller print: "Housing: The Commons, Bungalow 7 (late admission)."
   You do not know yet what that means.
-  The deck around you is full: duffel bags, deck boxes, thirty-odd people your age in stiff new uniform jackets, red and gold and black. Every one of them is a stranger. Your own jacket, the letter says, will be issued on arrival.
+  The deck around you is full: duffel bags, deck boxes, thirty-odd people your age in stiff new uniform jackets, red and gold and black. Every one of them is a stranger. They received their jackets in the post a month ago. Yours, the letter says, will be issued on arrival, which makes you the only one on deck in a rain jacket and the only one who looks like it.
   A loudspeaker crackles above the wheelhouse.
   [?Loudspeaker] "Morning, all. Captain Stroud speaking. Thirty-six new heads aboard, I counted twice. We tie up at ten-forty. There is coffee in the lounge. Hold on to your hats."
   @enter nathan x=30 y=98 h=64
@@ -50,40 +60,86 @@
   He sticks out a hand. Behind him the giant gives you a small nod.
   [baylee?] "Baylee. Commons too. …He has been like this since the harbour."
   @meet baylee
-  [nathan=laughing] "I've been EVERYWHERE since the harbour. Okay, listen. Down those steps there's a lounge with an actual card table, green felt and everything. A guy in white gloves has sat at it all morning. Gideon something. Won three in a row."
-  [nathan=grin] "And there's this tiny girl with green hair, Inya, she's been waiting twenty minutes to play him and he won't. He just sits there. And a kid called Tomi is taking bets on it. Bets! On a boat!"
-  [nathan=happy] "Also, at the back there's a girl with three treasure chests. Real ones. I counted. And the captain lets you look at the steering wheel if you ask nice."
-  Under the wheelhouse a door stands open on a flight of steps. You can hear it from here: cards slapping on felt, a girl's voice, quick and sharp, and a second voice that stays low and does not hurry. A few people on the benches have turned their heads that way.
-  A side deck runs aft past the funnel to the stern, where gulls hang over the wake. An iron stair climbs to the wheelhouse door. The island stands dead ahead, still small. The clock over the lounge door says eight.
-  Nathan's hand is still out.
   @flag flag_prologue_done
   @learn ferry_lounge
   @learn ferry_stern
   @learn ferry_bridge
-  @choice
-    > Shake his hand: "Rowan. Commons too."
-      @aff nathan +2 | You shook on it
+  Nathan's hand is still out. Two strangers are waiting to find out who you are, and nobody has told you yet how much of it you have to say.
+  @choice How do you introduce yourself?
+    > "Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means."
+      @aff nathan +2 | Introduced himself properly
       @aff baylee +1 | Polite hello
       You take the hand. It shakes yours the way a pump handle would, if the pump were delighted.
-      [nathan=happy] "ROWAN! Rowan Commons! Rowan-Commons-Too! Okay, I'm calling you Wildcard, everyone's going to want to know the Wildcard, you ARE the Wildcard, right? Nobody else got in after the deadline, I asked the captain."
-      ~ Fourteen minutes on the island's ferry and the entire ship already knows my admission status.
-      [rowan] "Rowan Vance. And yes. Wildcard."
-      [nathan=laughing] "Called it! Baylee, I called it!"
-      [baylee] "You called it."
-      [nathan=grin] "Come on. Lounge. I'll show you the table, you'll love it, there's a PLATE."
-      @flag told_nathan_wildcard
-      @time 5
-      @jump toward_lounge
-    > "Show me this card table."
+      [nathan=happy] "SEVEN! That's — hold on. Hold on. Vance? Vance, R.?"
+      He lets go of your hand and stares at you with the kind of expression normally reserved for a UFO.
+      [nathan=laughing] "There's a name on the passenger list. By the wheelhouse door. In INK, like somebody added it with a fountain pen at the last minute. 'Vance, R. — Wildcard.' Nobody knows who it is! There's a whole betting pool going on the lounge benches about who it is! That's YOU?"
+      ~ I never told him my last name was on a list. It's on a list.
+      @flag nathan_read_list
+      @choice
+        > "Yes, that's me. I won the Wildcard Qualifier two weeks ago, the last open seat of the year. I still feel a bit strange saying it out loud."
+          [nathan=happy] "THE LAST OPEN SEAT! Baylee, he got the last seat! That's like winning the lottery but with cards!"
+          [baylee] "Congratulations."
+          [nathan=grin] "That's — Rowan. Rowan! You're famous! You're the whole boat's mystery! I've got to tell everyone!"
+          [rowan] "Please don't tell everyone. I only just got here."
+          [nathan=laughing] "I'm already telling everyone!"
+          @flag told_wildcard
+          @flag ship_knows_wildcard
+          @aff nathan +1 | Was honest about it
+        > "Yes. But I would honestly rather the whole boat didn't hear about it before I've even found the lounge."
+          [nathan=happy] "Oh. OH. You're shy! That's fine! I get it! I'll only tell, like, half the boat!"
+          [baylee] "Nathan."
+          [nathan=grin] "A quarter! A QUARTER of the boat."
+          [baylee] "He will tell all of it."
+          [nathan=laughing] "I will tell all of it."
+          @flag told_wildcard
+          @flag ship_knows_wildcard
+          @aff nathan +1 | Asked him to keep quiet
+          @aff baylee +1 | Asked for discretion
+        > Admit it and ask him to tell nobody until you have had breakfast.
+          [rowan] "That's me. I'd like to keep it quiet until I've had something to eat and found my feet. Could you do that for me?"
+          Nathan puts a hand over his mouth, which lasts about four seconds.
+          [nathan=happy] "I can do that! I can absolutely not do that! But I'll try! That's honest!"
+          [baylee] "He means it."
+          [baylee] "He'll still tell."
+          @flag told_wildcard
+          @aff nathan +2 | Trusted him with it
+          @aff baylee +1 | Asked for discretion
+    > "Rowan. Just Rowan for now. I'm in the Commons too, apparently. What's the island like? You said you've been everywhere."
+      [nathan=laughing] "ROWAN! Just Rowan! Like a wizard!"
+      [baylee] "Like a bartender."
+      [nathan=grin] "Like a WIZARD bartender. Okay. I like you. You asked ME a question. Nobody asked me a question since the harbour, they all just ran away!"
+      @aff nathan +2 | Asked him something
+      @aff baylee +1 | Polite hello
+      @flag nathan_gave_tour
+    > Shake his hand and say only that you are tired and new, and that you would rather listen for a while.
+      @aff nathan +1 | Shook on it
+      @aff baylee +1 | Polite hello
+      [rowan] "Tired, and new. I'm going to listen for a bit, if that's all right. I think I came here with too many questions."
+      [nathan=happy] "A listener! Okay, okay, I can talk for TWO people. That's my second-best skill!"
+      [baylee] "What's the first?"
+      [nathan=grin] "Talking for three!"
+  [nathan=laughing] "Okay, listen. Down those steps there's a lounge with an actual card table, green felt and everything. A guy in white gloves has sat at it all morning. Gideon something. Won three in a row."
+  [nathan=grin] "And there's this tiny girl with green hair, Inya, she's been waiting twenty minutes to play him and he won't. He just sits there. And a kid called Tomi is taking bets on it. Bets! On a boat!"
+  [nathan=happy] "Also, at the back there's a girl with three treasure chests. Real ones. I counted. And the captain lets you look at the steering wheel if you ask nice."
+  Under the wheelhouse a door stands open on a flight of steps. You can hear it from here: cards slapping on felt, a girl's voice, quick and sharp, and a second voice that stays low and does not hurry. A few people on the benches have turned their heads that way.
+  A side deck runs aft past the funnel to the stern, where gulls hang over the wake. An iron stair climbs to the wheelhouse door. The island stands dead ahead, still small. The clock over the lounge door says eight.
+  @choice What do you do?
+    > "Show me this card table. I want to see how he plays."
       @aff nathan +1 | Wanted to see the table
       [nathan=happy] "THAT'S what I'm talking about. Baylee, he's a table guy!"
       [baylee] "Seems so."
       @time 3
       @jump toward_lounge
+    > "I'd like to have a look at the whole ship first. Come with me, if you want."
+      [nathan=grin] "Tour! Yes! I'm basically a tour guide! Baylee, we're a tour!"
+      [baylee] "We're a tour."
+      @aff nathan +1 | Took him along
+      @aff baylee +1 | Took him along
+      @time 5
+      @jump stay
     > Stay at the rail and watch the island come closer.
-      Nathan's hand hangs in the air a second longer than is comfortable. Then he claps it onto Baylee's arm instead, as if that had been the plan.
-      [nathan=grin] "Quiet type! Respect. The quiet ones are always the best at cards, my mom says, or the worst, she wasn't sure."
-      [baylee] "…Come on, Nathan. Let him look."
+      Nathan's mouth opens, thinks better of it, and closes. It is perhaps the longest he has been silent since the harbour.
+      [baylee] "Let him look, Nathan."
       [nathan] "I'll be around! I'm always around! I'm on the whole ship!"
       The two of them peel away along the rail. The island does not look any nearer, but it does look more real.
       @time 10
@@ -96,6 +152,14 @@
   ~ Calm down. Nobody here has seen you play. Nobody even knows who Best_Tarleinn_NA is.
   The deck is yours for the moment. The ship has several places in it, and a lot of people who have not yet decided what they think of you.
   @end
+
+@scene ship_figures_it_out
+  A cheer goes up near the lounge steps, a sharp ripple of laughter, and then a girl's voice, high and delighted, calling across the whole deck: "It's the one without the jacket! It's the jacket!"
+  Heads turn. Thirty-odd people check the collar of every other person, then the single rain jacket, and arrive, one by one, at the same conclusion.
+  The passenger list has been read, the arithmetic has been done, and the ship has worked out which of its passengers was added in ink.
+  ~ Well. That didn't take long.
+  @flag ship_knows_wildcard
+  @time 0
 
 # ───────────────────────────── DECK: ORTSHANDLUNGEN ─────────────────────────────
 
@@ -114,7 +178,7 @@
 @scene deck_collars
   You lean against a bollard and count collars.
   Every first-year wears the same red jacket with one of three collars: white with a gold edge, blue, or plain grey. The white-and-gold ones stand a little apart from the others without seeming to try. The blue ones are scattered through the crowd. The grey ones hold their bags in both arms.
-  You count eleven white, twelve blue, twelve grey. Counting yourself as grey, that makes thirty-six. You tell yourself it is not important.
+  You count eleven white, twelve blue, twelve grey. Counting nobody, because you have no jacket at all, that makes thirty-five, and one without a collar is the thirty-sixth.
   It is not important until somebody tells you what the colours mean.
   @flag counted_collars
   @time 5
@@ -138,16 +202,35 @@
     [nathan=laughing] "You've talked to — what — SIX people already? I was going to say seven! Baylee, pay me!"
     [baylee] "I did not bet."
     [nathan=grin] "You will!"
-    @add ferry_nathan_count +1
   @elif var:ferry_talked>=2
-    [nathan=grin] "Hey! Hey, I heard you talked to somebody! Everyone's talking about it! Okay, I started it, but still!"
-    [rowan] "Nathan. What did you hear?"
-    [nathan=happy] "That you're polite. No offence."
-    ~ The offence was in the word polite, apparently.
-  @else
+    [nathan=grin] "Hey! I heard you talked to somebody! Everyone's talking about it! Okay, I started it, but still!"
+    @choice
+      > "What exactly did you tell them about me?"
+        [nathan=happy] "Only true things! That you're polite, that you shook my hand, and that you have a rain jacket."
+        [rowan] "That's — fair."
+        [nathan=laughing] "No offence!"
+        @aff nathan +1 | Asked him straight
+      > "Please remember that I haven't told you much, so you can't have much to repeat."
+        [nathan=grin] "I made up the rest! That's okay, right? Most of it was flattering."
+        @aff nathan +0 | Joked with him
+  @elif told_wildcard
     [nathan=happy] "Rowan! I've told eleven people you're the Wildcard. Is that okay? I told them before you said it was okay."
-    [rowan] "You told them already."
-    [nathan=laughing] "I'm very efficient!"
+    @choice
+      > "It's all right. Just let me say the next bit myself."
+        [nathan=grin] "Deal! I'll hold the introductions! I'll only do the volume!"
+        @aff nathan +2 | Fair deal
+      > "Nathan, I asked you to keep it quiet."
+        [nathan=laughing] "You did! And I did! For four seconds! That's a personal best!"
+        @aff nathan -1 | Told everyone anyway
+  @else
+    [nathan=happy] "Rowan! I've told everybody about the list, the one with the ink name! Nobody knows who it is! There's a pool going!"
+    @choice
+      > "Nathan, I'm the one in ink. Vance, R. Please don't announce it yet."
+        [nathan=happy] "THAT'S YOU. THAT'S —" He claps both hands over his own mouth. A pause. "…sorry. Sorry. Sorry. I'm not telling. Nobody. Not a soul. That's the best secret I've ever had and I'm going to hold it for at least ten minutes."
+        @flag told_wildcard
+        @aff nathan +2 | Trusted him with it
+      > "I hope they find out soon." @hint Keep it to yourself
+        [nathan=grin] "Right?! The suspense is killing me!"
   @aff nathan +1 | Heard him out
   @time 5
 
@@ -155,36 +238,42 @@
   @if not flag_baylee_chat
     Baylee stands with one hand on the rail, as if holding the ship in place while the rest of it moves.
     [baylee] "Morning."
-    [rowan] "Morning. He — Nathan. Is he always like this?"
-    [baylee] "Yup." A pause long enough to watch a gull cross the sky. "Met him at the harbour. Sat next to me on the bus. Told me about his whole family before the first stop."
-    [baylee] "Ten minutes in, I figured he was either going to be a problem or the best thing that happened to me this year."
-    [rowan] "Which was it?"
-    [baylee] "Still working that out."
-    He says it without a smile, but something in the sunburnt face loosens a little.
     @choice
-      > "Where are you from?"
+      > "Morning. Sorry about before, I think I ran over your introduction. Is he always like this?"
+        [baylee] "Yup." A pause long enough to watch a gull cross the sky. "Met him at the harbour. Sat next to me on the bus. Told me about his whole family before the first stop."
+        [baylee] "Ten minutes in, I figured he was either going to be a problem or the best thing that happened to me this year."
+        [rowan] "Which was it?"
+        [baylee] "Still working that out."
+        He says it without a smile, but something in the sunburnt face loosens a little.
+      > "I didn't catch much of that. Where are you from, Baylee?"
         [baylee] "Minnesota. Farm. Dairy, mostly. Some corn." Another pause. "Cows are easier to talk to. They tell you when they're upset."
         ~ He said that completely seriously, and somehow it is the most reassuring thing anyone has said to me all week.
         @aff baylee +2 | Asked about home
         @flag baylee_from_farm
-      > "He seems all right, actually."
+    @choice
+      > "He seems all right, actually. Loud, but all right."
         [baylee] "He is." Quietly. "Loud. But he said hello to me first. Nobody does that."
         @aff baylee +2 | Agreed about Nathan
-      > "Do you play?" @hint Cards
+      > "Do you play? What do you run?"
         [baylee] "Big Stomp. Dinosaurs." He holds up a hand the size of a dinner plate, deck box lost in it. "Not good. Fun, though."
         [baylee] "You can have a game later. If you want. If you're not busy."
         @aff baylee +1 | Offered a game
         @flag baylee_game_offered
+      > "I'm a bit nervous about today, to be honest. First real table, first real people."
+        [baylee] "Yup." A very long pause. "Me too. Big boy, small ship. Everybody looks."
+        [baylee] "Tables are just tables, though. They hold things up."
+        @aff baylee +3 | Shared a worry
+        @flag told_baylee_nerves
     @flag flag_baylee_chat
     @time 8
   @else
     Baylee is where he was, which seems to be the general policy.
     [baylee] "Yup?"
     @choice
-      > Ask how the crossing is for him.
+      > "How is the crossing treating you?"
         [baylee] "Long. Good long. Haven't been on a boat since the county fair ferry, and that was two minutes."
         @aff baylee +1 | Small talk
-      > "Want a game?" @if baylee_game_offered
+      > "Do you fancy that game now?" @if baylee_game_offered and not flag_baylee_game
         [baylee] "…Could do. Quick one. Casual."
         @duel ferry_baylee deck=baylee name="Baylee Halvorsen"
           @win
@@ -193,6 +282,7 @@
           @lose
             [baylee] "Huh." He looks at his big dinosaurs for a long moment. "Lucky. Sorry."
             @aff baylee +2 | Won kindly
+        @flag flag_baylee_game
         @time 25
       > Leave him to his rail.
         [baylee] "Thanks."
@@ -203,21 +293,24 @@
     Somebody is hanging off the bow rail by one hand.
     He is hanging the way other people stand, entirely at ease, the other hand holding a battered cowboy hat in place against the wind. The sea slides past thirty feet below his dangling boots. Nobody else on the deck seems to find this remarkable.
     [ed?] "Hey! Hey, you! Can you see it? The volcano? It's got a CRATER. I read about it. There's a hole in the middle you can walk down into!"
-    [rowan] "You should probably come back over the rail."
-    [ed?] "Is that — is it dangerous, coming back over? That's what I'd want to know."
+    @choice
+      > "I can see it. But would you mind coming back over the rail first? I'd rather not watch you go in."
+        [ed?] "Is it — is it dangerous, coming back over? That's what I'd want to know."
+      > "That's a very long drop. I'm Rowan, by the way. Does that hand ever get tired?"
+        [ed?] "Rowan! Nope! It's the other hand that gets tired. I switch."
     He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning like the sun just rose.
     [ed] "Ed Venture. Lazy V Ranch, Wyoming. Bungalow five, supposedly. They put the Commons on a beach. A BEACH."
     @meet ed
     @add ferry_talked +1
     [ed] "What's yours?"
     @choice
-      > "Rowan Vance. Commons too, bungalow seven."
+      > "Rowan Vance. I'm in the Commons too, bungalow seven, so two doors down from you. I got in late, so I'm still finding out what's where."
         [ed] "Two doors down! Rowan! That's a good name, it goes up and down, like a horse on a hill."
         @aff ed +2 | Same dorm row
-      > "Rowan. I'd rather you didn't fall in the sea."
+      > "Rowan. I'd rather you didn't fall in the sea. I've only just met you."
         [ed] "Aw, I won't. I've got — I always have a plan. It's a small plan, usually, but it's got steps."
         @aff ed +1 | Worried about him
-      > "What's the most dangerous place on the island?" @hint Bold
+      > "Rowan Vance. What's the most dangerous place on the island, do you think?" @hint Bold
         Ed's whole face lights up like a pinball machine.
         [ed] "Okay. Okay okay okay. I've got a MAP. Hang on. Not on me. It's in my bag. It's got all the forbidden places on it. Volcano rim, ruins field, the north shore — I'm going to go to all of them. All of them! You in?"
         [rowan] "I'll think about it."
@@ -230,7 +323,7 @@
       Ed has his hat on and his sleeves rolled and a look of bright, unfocused enthusiasm.
       [ed] "Rowan! You want to play? On the rail? I'd do it on the rail, but they say that's against the rules, which is a real shame."
       @choice
-        > "Sure. On a bench. With both feet on the ground." @hint Casual game
+        > "Sure, let's play. On a bench, with both feet on the ground."
           [ed] "Fine, fine! Both feet! Mostly!"
           @duel ferry_ed deck=ed name="Ed Venture"
             @win
@@ -241,7 +334,7 @@
               @aff ed +2 | Won happily
           @flag flag_ed_game
           @time 25
-        > "Maybe later."
+        > "Maybe later. I want to see the rest of the ship."
           [ed] "Later! Great! Later's my second favourite time!"
     @else
       [ed] "Rowan! Hey! Did you see the lighthouse? It's real. They keep it lit even in the daytime! I asked the captain! Is that dangerous? Lighting it in the day?"
@@ -255,8 +348,11 @@
     The girl on the rope looks at the volcano. It does not owe her money. Her face says so.
     She notices you looking and goes the colour of a tomato.
     [georgie?] "Sorry. Was I — is this your rope?"
-    [rowan] "It's not my rope."
-    [georgie?] "Oh. Okay." She makes herself smaller. "I'm Georgie. Sorry. Santa. Georgie Santa."
+    @choice
+      > "No, it's not my rope. I'm Rowan, I was only looking at your deck box. Is it a good deck?"
+        [georgie?] "Oh. Okay." She makes herself smaller, and then, quite suddenly, bigger. "It is. It's — yes. It's a very good deck. I'm Georgie. Sorry. Santa. Georgie Santa."
+      > "Please sit wherever you like. I'm Rowan, by the way. Don't mind me."
+        [georgie?] "Okay. Thank you. Georgie." She hesitates. "Santa. Georgie Santa. Sorry."
     @meet georgie
     @add ferry_talked +1
     @choice
@@ -267,12 +363,12 @@
         [georgie] "She has." A tiny, startled smile. "…Thank you for asking first."
         @aff georgie +3 | Asked politely
         @flag georgie_ember
-      > "Would you like to play a game? Nothing riding on it."
+      > "Would you like to play a game, Georgie? Nothing riding on it, just for fun."
         [georgie] "…Yes." Almost inaudible. Then, braver: "Yes. Please. Not for anything. I don't — I'm not allowed to play for anything. But yes."
         @flag georgie_game_asked
         @aff georgie +2 | Asked for a game
         @jump georgie_game
-      > "Nice to meet you, Georgie."
+      > "Nice to meet you, Georgie. I'll leave you in peace."
         [georgie] "Nice to — yes. You too. Sorry."
         @aff georgie +1 | Said hello
     @time 8
@@ -305,7 +401,8 @@
               @aff georgie +3 | Played well
           @flag flag_georgie_played
           @time 25
-        > Not right now.
+        > Tell her you would rather wait.
+          [rowan] "Not right now. I'd love a game later, though, if that's all right."
           [georgie] "Okay. It's fine."
           @end
 
@@ -314,22 +411,31 @@
     A girl with a heavy old film camera hung round her neck is crouched on the deck, taking a picture of absolutely nothing.
     Strawberry-orange hair sticks up at the crown. There is a yellow bow tie under her chin and freckles on every visible surface.
     [pippa?] "Hang on — don't move — okay. Sorry. You were looking at the island with your hand on your jacket pocket. That's the shot. I got it."
-    [rowan] "I — what?"
-    [pippa?] "Light. Foreground. You were backlit. Good, actually." She lowers the camera. "Pippa Lund. I'm the photographer. Nobody asked me to be. I just got here first."
+    @choice
+      > "I'm sorry, what shot? I'm Rowan, and I didn't know I was being photographed."
+        [pippa?] "Light. Foreground. You were backlit. Good, actually." She lowers the camera. "Pippa Lund. I'm the photographer. Nobody asked me to be. I just got here first."
+      > "Did you just take my picture? Do I get to see it, at least?"
+        [pippa?] "Later! It's film. I'll develop it in a week. You'll hate it. It'll be perfect." She lowers the camera. "Pippa Lund. Photographer, by default."
     @meet pippa
     @add ferry_talked +1
     @choice
-      > "Rowan Vance."
-        [pippa] "Vance! The Wildcard. Your name's on the list at the wheelhouse door. In ink. Very dramatic."
-        [rowan] "Is everyone going to say that?"
-        [pippa] "Probably. Hope not. Might be sort of nice."
+      > "Rowan Vance. I only came aboard in a hurry, so I'm not wearing the jacket they sent everybody else."
+        @if ship_knows_wildcard
+          [pippa] "Vance! The Wildcard. Your name's on the list at the wheelhouse door. In ink. Very dramatic."
+          [rowan] "Is everyone going to say that?"
+          [pippa] "Probably. Hope not. Might be sort of nice."
+        @else
+          [pippa] "Vance. Rowan Vance." She says it like a caption. "That'll be on the list at the wheelhouse door. I've been reading it. There's one name in ink and I think I've just found it."
+          [rowan] "…You may have."
+          [pippa] "I'm good at finding the thing in a picture that doesn't match."
+          @flag told_wildcard
         @aff pippa +1 | Offered his name
-      > "Who's that girl you were photographing?" @hint Georgie
+      > "Who's that girl you were photographing? She looked nervous."
         [pippa] "Georgie. I met her ten minutes ago. She's fourteen. Did you know? Fourteen. She's the national under-sixteens champion and she asked me whether she was allowed to sit on the rope."
         [pippa] "I've decided I'm her older sister. It's not up for discussion."
         @aff pippa +2 | Cared about Georgie
         @flag pippa_georgie_sister
-      > "You always shoot strangers?"
+      > "Do you always shoot strangers without asking?"
         [pippa] "Only the ones that hold still. Which — you did, actually. Quite well. Nobody's ever held that still for me."
         @aff pippa +1 | Held still
     @time 8
@@ -347,19 +453,27 @@
     [mikoto?] "…Sorry."
     He notices you and laughs, a high, helpless giggle that stops as quickly as it started.
     [mikoto?] "Sorry! I'm Mikoto. I laugh when I'm frightened. It isn't funny. I know it isn't funny."
-    [rowan] "It's all right."
+    @choice
+      > "It's all right, really. I'm Rowan. And I think the gull won that one fair and square."
+        [mikoto?] "She did. She really did." A breathless little laugh, and then, mercifully, a genuine smile.
+      > "Don't apologise to the gull. I'm Rowan. Are you all right?"
+        [mikoto?] "Oh — yes. No. A bit. I'm — thank you for asking, nobody asks."
     @meet mikoto
     @add ferry_talked +1
-    [mikoto] "You're — oh. You're the one with the — Nathan told me everything. Wildcard. Rowan. Is it all right if I call you Row-Row? I won't. I'll ask first. May I?"
+    @if ship_knows_wildcard
+      [mikoto] "You're — oh. You're the one with the — Nathan told me everything. Wildcard. Rowan. Is it all right if I call you Row-Row? I won't. I'll ask first. May I?"
+    @else
+      [mikoto] "Rowan. That's a nice name. It sounds like a bird. Would it be all right — would you mind if I gave you a nickname? I won't. I'll ask first. May I?"
     @choice
       > "Sure. Row-Row is fine."
         [mikoto] "Row-Row!" A brilliant smile. "Oh, that's — thank you! I'll try not to — I'll use it sparingly!"
         @aff mikoto +3 | Allowed the nickname
         @flag mikoto_rowrow
-      > "I'd rather just Rowan."
+      > "I'd rather keep it as Rowan, thanks. Maybe you can try again once we know each other better."
         [mikoto] "Rowan. Of course. Rowan." A tiny nod. "Sorry. I'll remember. I'll write it down."
         @aff mikoto +1 | Respectful
-      > "Want a replacement sandwich?"
+      > Offer to buy him a replacement sandwich.
+        [rowan] "Let me get you another lunch. There's a galley hatch downstairs."
         [mikoto] "Oh — I couldn't — oh, would you?"
         You find him one at the lounge hatch later; it costs three credits and a lot of his gratitude.
         @coins -3
@@ -370,7 +484,7 @@
     @if not flag_mikoto_game
       [mikoto] "Rowan! Hi. Hello. Would you — would you like a game? You don't have to. I'll understand. I'm a bit — I'll apologise all the way through."
       @choice
-        > "Sure, let's play."
+        > "Sure, let's play. I'd like that."
           [mikoto] "Oh! Oh good. Oh no. I mean — good! I'll — sorry!"
           @duel ferry_mikoto deck=mikoto name="Mikoto Yamaguchi"
             @win
@@ -381,7 +495,7 @@
               @aff mikoto +2 | Played with him
           @flag flag_mikoto_game
           @time 25
-        > "Maybe on the island."
+        > "Maybe on the island, once I've got my bearings."
           [mikoto] "Of course. Of course. Sorry. On the island."
     @else
       [mikoto] "Rowan! Hello. The gull's still looking at me. I think she wants dessert."

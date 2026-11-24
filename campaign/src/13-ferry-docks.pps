@@ -4,12 +4,8 @@
 #  Zeitplan: 09:50 Tisch läuft von allein ab · 10:25 Horn · 10:40 Anlegen · 11:00 Begrüßung auf dem Quad
 # ═══════════════════════════════════════════════════════════════════
 
-@event table_default scene=table_default day=1 from=09:50 when not table_resolved and (at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge)
 @event ferry_horn scene=ferry_horn day=1 from=10:25 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
 @event ferry_docks scene=ferry_docks day=1 from=10:40 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
-
-@scene table_default
-  @scene table_play_default
 
 @scene ferry_horn
   A horn sounds, long and flat and enormous, so deep that the deck plates sing with it. The ship's fixtures rattle in their brackets.
@@ -51,6 +47,10 @@
     Gideon, ahead of you on the jetty, is looking at his four cases with the grave disinterest of a man who has been told he owes somebody a duffel and is deciding when to start. Three of his things are being rolled on a cart by an upper-year in a gold jacket. The fourth, you notice, is not.
   @elif ferry_table_settled
     Gideon, a dozen paces ahead, glances back once. He inclines his head a quarter of an inch, as one does to an equal. Beside him, Inya walks with her deck box tucked under her arm and a spring in her step.
+  @elif ferry_table_denied
+    Down the jetty a very small girl with mint-green hair is walking alone, deck box clamped to her chest, looking at nobody. A little way ahead, a pale boy in white gloves strides up the planks with his hands entirely free and four matched cases being rolled behind him on a cart by an upper-year. Nobody carries anything. It is, somehow, worse.
+    @if lounge_seen
+      She sees you watching. Her chin comes up. She does not say anything, and neither do you.
   @else
     Down the jetty a very small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks. She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her.
     @if lounge_seen
@@ -164,10 +164,10 @@
   She does not offer a hand. Her glasses swing on their silver chain.
   [okonkwo] "The Wildcard entrant. You arrived by the back door. See that you leave by the front."
   @choice
-    > "Yes, ma'am."
+    > "Yes, ma'am. I'll try to leave by the front, and I'll try not to be late."
       [okonkwo] "Good." A single, dry inclination of the head. "I find that you may be the only person today who has said that without being asked."
       @aff okonkwo +2 | Respectful
-    > "I'll do my best." @hint Honest
+    > "I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have." @hint Honest
       [okonkwo] "You will do better than that, or you will do something else." She does not smile. Something in the line of her mouth, however, has moved a millimetre. "We shall see."
       @aff okonkwo +1 | Honest
     > Say nothing and nod.
@@ -190,7 +190,7 @@
   @if has_snapper and not snapper_delivered
     You are still carrying a small crate of snapper. It smells, increasingly, of snapper. You catch up with her at the head of the line.
     @choice
-      > "Mrs Fuentes? The captain sent this."
+      > "Mrs Fuentes? Captain Stroud asked me to bring you this. He said you would know what it is."
         She stops walking so abruptly that three people walk into her.
         [odalys] "Captain — Abel? He sent—"
         She looks into the crate. For a long moment she does not say anything at all. The wooden spoon, for once, hangs entirely still.

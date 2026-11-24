@@ -133,8 +133,8 @@ async function playRun() {
     }
     if (steps >= 400) stats.loops++;
     if (s.flags.day1_complete) stats.finished++;
-    for (const k of ['ferry_table_won', 'ferry_table_lost', 'ferry_inya_won', 'ferry_table_settled']) if (s.flags[k]) stats.tableEnds[k] = (stats.tableEnds[k] || 0) + 1;
-    if (s.flags.table_resolved && !['ferry_table_won', 'ferry_table_lost', 'ferry_inya_won', 'ferry_table_settled'].some(k => s.flags[k])) stats.tableEnds.default_or_sided = (stats.tableEnds.default_or_sided || 0) + 1;
+    for (const k of ['ferry_table_won', 'ferry_table_lost', 'ferry_inya_won', 'ferry_inya_lost', 'ferry_table_denied', 'ferry_table_settled']) if (s.flags[k]) stats.tableEnds[k] = (stats.tableEnds[k] || 0) + 1;
+    if (s.flags.table_resolved && !['ferry_table_won', 'ferry_table_lost', 'ferry_inya_won', 'ferry_inya_lost', 'ferry_table_denied', 'ferry_table_settled'].some(k => s.flags[k])) stats.tableEnds.default_or_sided = (stats.tableEnds.default_or_sided || 0) + 1;
     if (!s.flags.table_resolved && s.flags.arrived_dock) stats.tableEnds.UNRESOLVED_BUG = (stats.tableEnds.UNRESOLVED_BUG || 0) + 1;
   } catch (e) { stats.crashes.push('Lauf: ' + e.message + (VERBOSE ? '\n' + e.stack : '')); }
   stats.runs++;

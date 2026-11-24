@@ -261,12 +261,23 @@ function compileScene(head, nodes, env) {
             let tx = o.text.slice(2).trim(), when = null, hint = null, m;
             if ((m = tx.match(/\s@hint\s+(.+)$/))) { hint = m[1].trim(); tx = tx.slice(0, m.index); }
             if ((m = tx.match(/\s@if\s+(.+)$/))) { when = m[1].trim(); tx = tx.slice(0, m.index); }
-            return { o, text: stripQ(tx), when, hint, label: uid('opt') };
+            // Format der Antwortoptionen: entweder ausschließlich wörtliche Rede ("…") oder eine beschreibende Anweisung ohne Anführungszeichen.
+            const quoted = /^".*"$/s.test(tx.trim()) && !tx.trim().slice(1, -1).includes('"');
+            if (!quoted && tx.includes('"')) err(o, 'Antwortoption mischt Rede und Beschreibung: entweder komplett "in Anführungszeichen" oder ohne Anführungszeichen formulieren: ' + tx.slice(0, 60));
+            if (quoted && /\s@hint|\s@if/.test(stripQ(tx))) err(o, 'Antwortoption: Marker gehören hinter das schließende Anführungszeichen');
+            return { o, text: stripQ(tx), when, hint, quoted, label: uid('opt') };
           });
           if (!opts.length) err(n, '@choice ohne Optionen');
           steps.push({ prompt, choice: opts.map(o => ({ text: o.text, goto: o.label, when: o.when ? condToJs(o.when, ctx) : undefined, hint: o.hint || undefined })) });
           steps.push({ jump: end });
-          for (const o of opts) { steps.push({ label: o.label }); env.words += o.text.split(/\s+/).length; block(o.o.body || []); steps.push({ jump: end }); }
+          for (const o of opts) {
+            steps.push({ label: o.label }); env.words += o.text.split(/\s+/).length;
+            if (o.quoted) { // gesprochene Option: Rowan sagt sie auch laut (Echo), danach geht der Block weiter
+              if (hostTokens(o.text)) err(o.o, '{H} nicht in Antwortoptionen');
+              steps.push({ say: 'rowan', text: o.text });
+            }
+            block(o.o.body || []); steps.push({ jump: end });
+          }
           steps.push({ label: end });
         } else if (t.startsWith('@duel ')) {
           const p = parseKV(t.slice(6)); const id = p.pos[0]; ctx.duels.add(id);

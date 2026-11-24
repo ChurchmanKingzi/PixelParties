@@ -69,22 +69,23 @@
 @scene row_mama
   Mama Odalys is stirring a pot that could comfortably contain a person.
   @choice
-    > Ask how long she has been here.
+    > "How long have you been running this kitchen, Mrs Fuentes?"
       [odalys] "Twelve years with this stove. The left burner and I are not on speaking terms." She says it with great affection. "Before that, Miami. Before that, Havana, but I do not talk about that before supper."
       @aff odalys +2 | Asked about her
-    > Offer to help with the cooking.
+    > "Can I help? I'm no cook, but I can wash anything you hand me."
       [odalys] "Wash these. And then peel those. And then I will tell you what I think of the way you hold a knife."
       You wash, and peel, and are told, within two minutes, that you hold the knife like you are angry at the onion. She shows you how. It is a better way.
       @aff odalys +3 | Helped in the kitchen
       @time 20
-    > Ask who is on the row.
+    > "Who is on the row? I'd like to know whose bungalow is whose."
       [odalys] "Eighteen. Six bungalows' worth. Every one of them mine." A heavy, fond pause. "Do not let the loud one tell you he is the most trouble. He is the most noise. It is different."
       @aff odalys +1 | Chatted
   @time 8
 
 @scene room_unpack
   You unpack the duffel, slowly, on the thin mattress. It is a short job. There is not much in it.
-  A rain jacket, which you are wearing. A second pair of jeans. Three T-shirts, one of which says LAUNDRY KING in Aunt Dee's hand-painted iron-on letters. One good shirt, folded in tissue. A wire-bound notebook in which you have, over four years, kept a handwritten record of every deck you have faced on the ladder. The cracked phone, face-down, wrapped in a sock. And, at the bottom, tied with a ribbon, a small plastic tub of cinnamon sweets from Aunt Dee, which she must have slipped in when you were not looking.
+  A rain jacket, which you are wearing. A second pair of jeans. Three T-shirts, one of which says LAUNDRY KING in Aunt Dee's hand-painted iron-on letters.
+  One good shirt, folded in tissue. A wire-bound notebook in which you have, over four years, kept a handwritten record of every deck you have faced on the ladder. The cracked phone, face-down, wrapped in a sock. And, at the bottom, tied with a ribbon, a small plastic tub of cinnamon sweets from Aunt Dee, which she must have slipped in when you were not looking.
   You set the good shirt on a hanger. You set the notebook on the desk. You put the phone on the windowsill, where it picks up exactly one bar.
   ~ That's everything I own. It fits in a duffel. It also fits in a window.
   @flag unpacked_done
@@ -134,10 +135,10 @@
       [hedda] "That's — okay, that's a fair point. I'll check the source." A beat, as if she did not expect to say it. "…Thanks."
       @aff hedda +4 | Read the leaflet
       @flag hedda_leaflet_read
-    > Decline politely. "Maybe after dinner."
+    > "Maybe after dinner. I'd like to read it properly, and I don't want to rush it."
       [hedda] "After dinner. Fine. I'll hold my fire."
       @aff hedda +1 | Polite
-    > Joke about the sausage. @hint Risky
+    > "Is the sausage a witness, or a defendant?" @hint Risky
       The megaphone comes up. You are very glad it is not switched on.
       [hedda] "Jokes about veganism! The OLDEST evasion in the book!"
       [freya] "Hedda. He is nineteen and he is new."
@@ -162,10 +163,10 @@
   @meet leona
   [leona] "I got in the same way everyone did. There was a form."
   @choice
-    > Ask Maisie about the hologram. @hint Tech
+    > "What are you building, Maisie? Is that a hologram projector?" @hint Tech
       [maisie] "Oh! Oh, you're a person who asks." She comes alive. "Every hologram on this island is a lantern slide with ambitions. I want one you can shake hands with."
       @aff maisie +3 | Asked about her work
-    > Ask Fiona about the coffin pin. @hint Aesthetic
+    > "That is a very good pin, Fiona. Where did it come from?" @hint Aesthetic
       [fiona] "A gift. From my mother." A very small, very private pause. "She owns a funeral home. It is a family business." A beat. "I know. It's too good."
       @aff fiona +3 | Asked about the pin
       @flag fiona_funeral_home
@@ -184,15 +185,15 @@
   [dmitri?] "…Dmitri." Slow, dry, one word at a time as if each cost something. "Morning is a rumour. It is afternoon. I am keeping my strength."
   @meet dmitri
   @choice
-    > Ask Sammy about the coat. @hint Kind
+    > "That is quite a coat, Sammy. Isn't it hot in that?" @hint Kind
       [sammy] "I chose it before I knew about the weather here. I'm committed now." A very small, genuine smile, which he immediately tries to hide. "Did that sound deliberate?"
       @aff sammy +3 | Asked about the coat
-    > Ask Tobias where he is from. @hint Plain
+    > "Where are you from, Tobias? I can't place the accent." @hint Plain
       [tobias] "Salford." A dry beat. "It's near Manchester. Nobody's heard of it."
       [rowan] "I've heard of Manchester."
       [tobias] "Good. That's the first right answer today."
       @aff tobias +3 | Plain question
-    > Ask Dmitri why he's in the hammock. @hint Curious
+    > "Why are you in the hammock, Dmitri, and not in a bed?" @hint Curious
       [dmitri] "Because I am not in the bed." A slow, dry smile. "You will find that the night is more interesting. Come and see, if you like. Bring tea."
       @aff dmitri +3 | Curious
   @add ferry_talked +1
@@ -232,7 +233,7 @@
       You lock your fingers in your lap and breathe in for four counts, out for four. It does not work. It does, however, mean nobody can see it.
       [hana] "Mr Vance, hands where the table may see them. It is a rule."
       @flag nerve_hid
-    > Admit it. "My hands shake. It'll pass."
+    > "My hands shake. It will pass once the first card goes down."
       [hana] "Noted." Not unkindly. She looks at you for a moment longer than the rule requires. "Stating a problem aloud is the first step in resolving it. Please proceed."
       A quiet murmur goes through the benches. It is not a mocking one.
       @flag nerve_admitted
@@ -408,7 +409,7 @@
   [nathan] "Were you scared? Today? When the little domes thing happened. I was in the back. I couldn't tell."
   You look at the ceiling. The fan ticks. From the other bed, the very large, very gentle shape of Baylee has gone entirely still, which means, you have already learned, that he is listening.
   @choice
-    > Tell the truth. "My hands shook the whole time."
+    > "They did, honestly. My hands shook the whole time."
       [nathan] "…Huh." A pause. "I would've said they didn't. I was watching. Honest."
       [baylee] "Yup. Didn't see it."
       [nathan] "The thing is, I'm scared all the time. Of everything. I just do it louder."
@@ -416,12 +417,12 @@
       @aff nathan +3 | Told him the truth
       @aff baylee +2 | Told them both the truth
       @flag told_roommates_nerves
-    > Deflect. "It was fine."
+    > "It was fine, really. I've done harder things."
       [nathan] "Cool! Yeah! Cool! I'd have thrown up."
       [baylee] "He would."
       [nathan] "I WOULD."
       @aff nathan +1 | Cheerful night talk
-    > "Were you?"
+    > "Were you, Nathan? Scared, I mean?"
       [nathan] "Me? NO." A pause. "…A bit. Nobody here's from anywhere near where I'm from. Everyone's got like, a whole deck of people. I've got my mom and a hamster."
       [baylee] "I've got a lot of cows."
       [nathan] "BAYLEE'S GOT COWS!"
