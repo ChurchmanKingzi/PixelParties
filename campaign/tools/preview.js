@@ -190,7 +190,15 @@ function renderTop(){
   $('where').textContent = loc.name || S.location;
 }
 const PN = () => (S && S.vars && S.vars.pn) || 'Rowan';
-function sub(s){ if (s == null) return s; const n = PN(); if (n === 'Rowan') return s; const rr = n.slice(0, 3); return String(s).replace(/Row-Row/g, rr + '-' + rr).replace(/\bRowan\b/g, n); }
+const LN = () => (S && S.vars && S.vars.pl) || 'Vance';
+function sub(s){
+  if (s == null) return s;
+  const f = PN(), l = LN();
+  if (f === 'Rowan' && l === 'Vance') return s;
+  const rr = f.slice(0, 3);
+  return String(s).replace(/Vance, R\./g, l + ', ' + f.charAt(0).toUpperCase() + '.').replace(/Row-Row/g, rr + '-' + rr)
+    .replace(/\bROWAN\b/g, f.toUpperCase()).replace(/\bVANCE\b/g, l.toUpperCase()).replace(/\bRowan\b/g, f).replace(/\bVance\b/g, l);
+}
 const castName = (id) => { const c = W.cast[id]; return c ? c.name : id; };
 // Was Rowan über den Namen weiß: 'Olivia "Livvie" Thana' erscheint als 'Livvie Thana', bis der volle Name gefallen ist (@fullname).
 function shownName(id){ if (S.names && S.names[id]) return S.names[id]; const p = DATA.people[id]; return (p && p.first) || castName(id); }
@@ -655,9 +663,14 @@ $('bReset').onclick = () => { try { localStorage.removeItem(KEY); } catch (e) {}
 function askName(){
   return new Promise(res => {
     const o = $('overlay'); o.hidden = false;
-    o.innerHTML = '<div><h2>Your name</h2><p>The student on the ferry is called <b>Rowan</b>. Enter a different name if you like (up to 14 characters).</p><p><input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="font:inherit;font-size:22px;padding:6px 10px;background:#1b1626;color:#f3e9c8;border:2px solid #c8a85a;width:60%"></p><p><button id="pnOk">Start</button></p></div>';
-    const go = () => { let v = ($('pnIn').value || '').replace(/[<>&]/g, '').trim().slice(0, 14) || 'Rowan'; S.vars = S.vars || {}; S.vars.pn = v; S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; res(); };
-    $('pnOk').onclick = go; $('pnIn').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    const fld = 'font:inherit;font-size:22px;padding:6px 10px;background:#1b1626;color:#f3e9c8;border:2px solid #c8a85a;width:100%;box-sizing:border-box';
+    o.innerHTML = '<div><h2>Your name</h2><p>What name was written on your acceptance letter?</p>'
+      + '<p style="display:flex;gap:12px;flex-wrap:wrap"><label style="flex:1;min-width:200px">First name<br><input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="' + fld + '"></label>'
+      + '<label style="flex:1;min-width:200px">Last name<br><input id="plIn" maxlength="14" value="' + esc(LN()) + '" style="' + fld + '"></label></p>'
+      + '<p><button id="pnOk">Start</button></p></div>';
+    const clean = (v, d) => (v || '').replace(/[<>&]/g, '').trim().slice(0, 14) || d;
+    const go = () => { S.vars = S.vars || {}; S.vars.pn = clean($('pnIn').value, 'Rowan'); S.vars.pl = clean($('plIn').value, 'Vance'); S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; res(); };
+    $('pnOk').onclick = go; for (const id of ['pnIn', 'plIn']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     setTimeout(() => { try { $('pnIn').focus(); $('pnIn').select(); } catch (e) {} }, 50);
   });
 }
