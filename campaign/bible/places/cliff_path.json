@@ -1,0 +1,20 @@
+{
+ "name": "The Cliff Path",
+ "zone": "wild",
+ "bg": "cliff_path",
+ "night": false,
+ "hike": 1,
+ "hours": "Open; unlit, unfenced, and closed by staff in high wind.",
+ "sight": "A goat track cut into the western cliffs, running from below Spectral Tower north toward the sea cave and the campsite. On one side, rock hung with succulents and nesting holes; on the other, nothing, and then the sea. Frigatebirds hang at eye level. The wind tugs your jacket like someone wanting attention, and the tower above looks like a tooth.",
+ "things": [
+  "Walk it for the view and the vertigo",
+  "Watch the seabird colony on the ledges",
+  "Find the bench at the halfway point with a plaque too worn to read",
+  "Run it at dawn with the conditioning class",
+  "Look down on the surf break and see who is out",
+  "Take the fork that drops by iron rungs to the sea cave (low tide only)",
+  "Sit with your legs over the edge and say what you came up here to say"
+ ],
+ "secret": "Coach Rox's dawn runs use it. A route north that avoids the main jungle trail and, from Day 29, the cordon's first checkpoint. The worn plaque reads, by rubbing: 'For the crew of the Agnieszka — C.K.' From D27 the seabird colony thins from the north end; by Day 67 the ledges are empty and white with old guano. In Term 2, if the Guest wears Gideon, he walks this path every dawn to the point nearest the crater and stands there until the breakfast bell.",
+ "access": "Closed in gales; from Day 67 off limits after the Afternoon slot."
+}

@@ -1,0 +1,397 @@
+{
+ "name": "Cool Gang",
+ "owner": "lilia",
+ "heroes": [
+  "Cooldin, King of Coolness",
+  "Thorad, Strength of Coolness",
+  "Freshya, Beauty of Coolness"
+ ],
+ "main": [
+  [
+   4,
+   "Alchemy"
+  ],
+  [
+   4,
+   "Booby Trap"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   4,
+   "Coolness Overcharge"
+  ],
+  [
+   1,
+   "Divine Gift of Coolness"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   2,
+   "Fireshield"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Hammer Throw"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   4,
+   "Juice"
+  ],
+  [
+   4,
+   "Prophecy of Coolness"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Ragnarock"
+  ],
+  [
+   2,
+   "Swellpnir, Mount of Coolness"
+  ],
+  [
+   2,
+   "Thieving Strike"
+  ],
+  [
+   3,
+   "Toughness"
+  ],
+  [
+   2,
+   "Wowhalla, the Hall of the Cool"
+  ]
+ ],
+ "potions": [
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   1,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cooldin, King of Coolness": "Hero",
+  "Thorad, Strength of Coolness": "Hero",
+  "Freshya, Beauty of Coolness": "Hero",
+  "Alchemy": "Ability",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Coolness Overcharge": "Spell (Decay Magic)",
+  "Divine Gift of Coolness": "Attack (Attachment)",
+  "Fighting": "Ability",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Heavy Hit": "Attack",
+  "Juice": "Artifact (Reaction)",
+  "Prophecy of Coolness": "Spell (Magic Arts)",
+  "Quick Attack": "Attack",
+  "Ragnarock": "Spell (Magic Arts, Reaction)",
+  "Swellpnir, Mount of Coolness": "Artifact (Equipment)",
+  "Thieving Strike": "Attack",
+  "Toughness": "Ability",
+  "Wowhalla, the Hall of the Cool": "Area (Magic Arts)",
+  "Elixir of Immortality": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Cooldin, King of Coolness": "Once per turn plays an Area straight from hand or deck, whatever its level, and ends the turn. On her first turn that is always Wowhalla.",
+  "Wowhalla, the Hall of the Cool": "Area. Starts the Coolness Stack and adds the top card of her deck to it at the end of every one of her turns. When you try to remove it she deletes the top stack card to cancel that. If it does leave, the whole stack is deleted.",
+  "Thorad, Strength of Coolness": "The finisher: every card in the Coolness Stack makes each single-target attack or spell of his hit harder. Very tough, tougher with Toughness.",
+  "Freshya, Beauty of Coolness": "Once per turn puts a hand card on the stack and draws three.",
+  "Prophecy of Coolness": "Tutors any card onto the top of the stack; usually the mount.",
+  "Swellpnir, Mount of Coolness": "Equipment played from the top of the stack: its hero gets a second action each turn, usable only for an attack.",
+  "Coolness Overcharge": "With six or more cards in the stack: a free action that sends any non-hero card on the board to the discard pile.",
+  "Ragnarock": "Reaction: burns the top stack card to cancel an Ability you activate and knock a copy of it off your hero.",
+  "Burning Finger": "Single-target burn; from Thorad it also scales with the stack.",
+  "Heavy Hit": "Attack that stuns its target for a turn.",
+  "Quick Attack": "A free first attack each turn.",
+  "Thieving Strike": "Attack that steals a random card from your hand.",
+  "Booby Trap": "Face-down trap: hurts whoever hits that hero and cancels the hit if the attacker dies.",
+  "Fireshield": "Reaction: throws part of a hit back at the attacker.",
+  "Divine Gift of Coolness": "Once per game: one hero becomes permanently immune to stun, freeze, burn and every other status.",
+  "Alchemy": "Ability: buys draws from her Potion Deck (three fresh cards, a tutor, a revive, an Elixir of Immortality).",
+  "Golden Ankh": "Brings a fallen hero back for one more turn; she runs four."
+ },
+ "plan": "On her first turn Cooldin puts Wowhalla into play from the deck, and from then on the Coolness Stack grows by itself every turn, faster with Freshya (who also draws three) and Prophecy of Coolness. Every card in it adds to each single-target hit Thorad lands, Swellpnir gives him two attacks a turn, and at six cards Coolness Overcharge deletes whatever you were relying on. She plays no creatures, so sweepers are blank; Booby Trap and Fireshield punish single hits; Ragnarock answers your Abilities; four Golden Ankhs and her potions undo your kills. The one structural weakness is that the whole stack hangs on Wowhalla: each attempt to remove the hall costs her the top stack card, and if it ever leaves, the stack is gone.",
+ "looks": {
+  "early": "Wowhalla over the table from turn one, a face-up Coolness Stack of two or three cards, a Booby Trap under Thorad.",
+  "mid": "Thorad on Swellpnir swinging twice a turn with a tall stack behind him; Freshya drawing three; a trap on every hero.",
+  "late": "A stack past six, Coolness Overcharge in hand, Thorad immune under Divine Gift of Coolness, and a Golden Ankh for whoever you manage to drop."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Wowhalla is already out and the Coolness Stack is only two or three cards deep; Freshya is drawing three a turn.",
+   "why": "Now is when the stack is cheapest to attack: every removal aimed at Wowhalla burns one of her few stack cards, and Freshya, the engine, has ordinary health; trying to out-build a deck that grows by itself every turn is hopeless."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Thorad has mounted Swellpnir and attacks twice a turn; she controls no creatures at all, only face-down traps.",
+   "why": "There is nothing to sweep and every single shot risks a Booby Trap or Fireshield, so only what kills you matters: blunt Thorad each turn (freeze, Homerun!, Cloud in a Bottle) and keep the rest of your damage on Freshya and Cooldin."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "The stack has reached six and she holds cards back; anything you attach now is one Coolness Overcharge from the discard pile.",
+   "why": "Two removals at Wowhalla in one turn (The Yeeting, then a free Cataclysm) each cost her a stack card and drop her below six, switching Overcharge off and shrinking Thorad; building instead just feeds the Overcharge."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Thorad stands almost alone, enormous, with her Golden Ankhs and traps spent.",
+   "why": "Unpreventable single shots (Acid Vial) and Storm ticks on a single remaining target are the fastest clock you have; there is still no board for a sweeper."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Cooldin plays Wowhalla straight from the deck and her turn ends; one card lies face-up beside it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the hall now: it costs her the only stack card"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Freshya before the draws start"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up and trust your plan"
+     }
+    ]
+   },
+   {
+    "board": "Freshya puts a card on the stack and draws three; a card goes face-down under Thorad.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Freshya"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning before the traps multiply"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle for a perfect hand"
+     }
+    ]
+   },
+   {
+    "board": "Prophecy of Coolness puts Swellpnir on top of the stack; three cards deep.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free under her own Area: she must burn the mount to save the hall"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Set Firewall on your caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Find Gathering Storm first"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Thorad rides Swellpnir and has just hit one of your heroes twice; a Booby Trap waits on him.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Freeze Thorad, Storm ticks at Freshya"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the mount"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche her creatureless board"
+     }
+    ]
+   },
+   {
+    "board": "Ragnarock cancels your Leadership and knocks a copy off; her stack shrinks by one.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Stop activating into her stack; just cast"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Bait a second Ragnarock to drain the stack"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach and rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Heavy Hit stuns your caster; the second attack takes a hero to the brink.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Thorad, Homerun! held"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Cooldin down"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit out the stun"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Six cards in the stack, Coolness Overcharge surely in hand; your Storm is not attached yet.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeeting and Cataclysm at Wowhalla in one turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep the Storm in hand, fight with direct spells"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach Gathering Storm now"
+     }
+    ]
+   },
+   {
+    "board": "Thorad is immune under Divine Gift of Coolness; Freshya and Cooldin are both wounded.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang: one action, no second attack"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish the two small heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for something better"
+     }
+    ]
+   },
+   {
+    "board": "She Golden Ankhs Freshya back for one turn just to draw three more.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the revived Freshya before she acts"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Save Homerun! for Thorad's double swing"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Spend the turn healing"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Only Thorad is left, towering with Toughness; you have one healthy hero and a Storm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and every spell into Thorad"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang, then let the Storm work"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold sweepers for nothing"
+     }
+    ]
+   },
+   {
+    "board": "Wowhalla is gone and the stack with it; Thorad hits like an ordinary fighter.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Race him now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! in hand, hit back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild levels"
+     }
+    ]
+   },
+   {
+    "board": "Thorad and a just-revived Cooldin, who is reaching for a second Wowhalla.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning: Cooldin falls again"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Cooldin"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm and pray"
+     }
+    ]
+   }
+  ]
+ }
+}

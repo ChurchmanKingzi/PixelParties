@@ -1,0 +1,197 @@
+{
+ "id": "felix",
+ "name": "Felix Okoro",
+ "firstName": "Felix",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "GD",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor",
+ "romance": false,
+ "deck": "Dream Journal (Dream Landers)",
+ "look": "A gold Game Design jacket, blue Rare collar, worn open over a blue jumper with a white scarf looped round his neck, shoulder-length locs held off his face by an orange headband, and a sketchbook that is never far away. There is always a streak of some improbable colour on his jaw. He has a slow smile and looks at people a beat longer than is usual, as though colouring them in.",
+ "voice": "Slow, warm and visual, Lagos-London, with long comfortable pauses; he speaks in images, teases gently and takes teasing well. He looks at people a beat longer than is usual and is entirely at ease being looked at back. RARE habit (once in a scene at most; most scenes go without it): asking for the colour of something instead of its meaning.",
+ "lines": [
+  "Tell me what you dreamed. Not what it meant. What colour the floor was.",
+  "Teobalt came upstairs and alphabetised my paints. By hue, within brand. I'm deciding whether it's a war crime or love.",
+  "My deck swaps your world for a stranger one. People complain. Then they ask to see the art.",
+  "Lately everyone's dreaming the same room. I don't like drawing it. I keep drawing it."
+ ],
+ "intro": "A second-year card illustrator from Rare Hall, usually covered in paint, who will draw your dream if you describe it to him.",
+ "traits": [
+  {
+   "id": "felix_1",
+   "text": "He draws people's dreams for them, free, if they tell him honestly.",
+   "how": "Meet him in the student lounge or at the night market."
+  },
+  {
+   "id": "felix_2",
+   "text": "He painted the mural in the Rare common room and half the theatre's backdrops.",
+   "how": "Visit either."
+  },
+  {
+   "id": "felix_3",
+   "text": "The first-year who alphabetised his paints lives one floor down, and their friendship looks like a border dispute.",
+   "how": "Rare Hall; ask either of them."
+  },
+  {
+   "id": "felix_4",
+   "text": "He sells sketches at the night market on Saturdays beside the fortune teller's table.",
+   "how": "Night market, weekend."
+  },
+  {
+   "id": "felix_5",
+   "text": "He works with Wren Ishikawa as her illustrator and is the only one who can get her to go to bed.",
+   "how": "Design lab."
+  },
+  {
+   "id": "felix_6",
+   "text": "He grew up in Lagos and Peckham; his mother paints signs and taught him lettering before reading.",
+   "how": "Ask about the lettering on his sketches."
+  },
+  {
+   "id": "felix_7",
+   "text": "He keeps a dated book of every dream anyone on the island has told him.",
+   "how": "Friend stage; he shows a few pages."
+  },
+  {
+   "id": "felix_8",
+   "text": "Since autumn, too many of those dreams have started to match.",
+   "how": "Trusted; or tell him a dream of your own after Day 27."
+  }
+ ],
+ "secret": "Felix is the easiest person on the island to be around and one of the most perceptive. His mother, Ngozi, is a sign-painter; his father drove night buses; he learned early that people will tell you anything if you are drawing while they talk. He is content in a way that unnerves strivers, which is his contradiction: a completely unambitious person at the most competitive school on earth, who is nevertheless going to be the best card illustrator of his generation because he cannot stop. Wound: his younger brother Emeka's night terrors — Felix started drawing dreams at eleven to take the monsters out of the room and put them on paper. Private joke: he has drawn Teobalt as every animal known to science and leaves them in the rota folder.\nHis dream book is a plot instrument. For a year it has held ordinary dreams. From about Day 20 (before the bang) people begin describing, independently, a room with a tiled floor and no ceiling, and 'someone at a table with their back turned'. After Day 27: a green-white light under water; a roommate who is awake. After each Hollowing several people dream of the victim sitting at that table, 'playing, not winning or losing, just playing'. Felix has dated, independent sketches. He takes them to Madame Oru because she is the only adult who does not laugh; she looks at the tiled floor and says 'You draw very well for someone who has never been there' and buys the page. He does not know what he has. Shown the Vault, he will realise he has been drawing it for months. He is also the only artist who has managed to draw a Cosmic Depths card accurately — by drawing someone's dream of it rather than the card. He is gentle, not brave, and brave anyway: in ward B he sits and draws what the Hollowed might be dreaming, and pins the pages above their beds.",
+ "wants": "To draw what people actually see behind their eyes, and get it right.",
+ "fears": "A dream he cannot get out of the room by drawing it.",
+ "crush": "wren",
+ "crushNote": "He has drawn her asleep on the camp bed more times than he has shown her. It shows as food left by her elbow, a blanket, and a patience with her tangents that he has for nobody else.",
+ "crushPace": 0.5,
+ "likes": [
+  "A dream told honestly, with details",
+  "Being watched while he works, quietly",
+  "Colour, any strong colour",
+  "People who are kind to Wren and patient with Teobalt",
+  "Night market food",
+  "Being asked to draw someone's deck hero as they imagine it"
+ ],
+ "dislikes": [
+  "Being hurried",
+  "'What does it mean?'",
+  "Art treated as decoration for mechanics",
+  "Mockery of someone's nightmare",
+  "Dishonest dreams made up to impress him",
+  "Being asked to draw a certain tiled room again"
+ ],
+ "gifts": [
+  "Card: Dream Dust",
+  "A tube of real ultramarine from the boutique",
+  "A dream of yours, told properly",
+  "Card: Dream World Portal",
+  "Suya spice from the night market"
+ ],
+ "events": [
+  {
+   "id": "felix_e1",
+   "stage": 1,
+   "title": "What colour was the floor",
+   "condition": "Tell him a real dream (student_lounge or night_market) and accept the drawing.",
+   "hint": [
+    "He draws dreams. You have to tell him a true one.",
+    "Describe one of your actual dreams to him and let him draw it."
+   ]
+  },
+  {
+   "id": "felix_e2",
+   "stage": 2,
+   "title": "The border dispute",
+   "condition": "Spend time in rare_room or design_lab with him, Teobalt and Wren; help him carry backdrops to theatre; he shows a few dated pages of the dream book.",
+   "hint": [
+    "He keeps a book that is not for sale.",
+    "Help him out with his painting work and he will show you his private sketchbook."
+   ]
+  },
+  {
+   "id": "felix_e3",
+   "stage": 3,
+   "title": "The same room",
+   "condition": "After Day 27, tell him a dream you have had since the bang, and look through the matching pages with him; take him seriously and help him decide who else should see them.",
+   "hint": [
+    "Too many people have been telling him the same dream.",
+    "Later in the term, tell him what you have been dreaming lately and go through his sketches together."
+   ]
+  }
+ ],
+ "bonds": {
+  "teobalt": {
+   "label": "friends",
+   "text": "Draws Teobalt as a different animal every week and leaves it in the rota folder.",
+   "public": true,
+   "from": 5
+  },
+  "marit": {
+   "label": "friends",
+   "text": "The loudest muse he has ever had.",
+   "public": true,
+   "from": 9
+  },
+  "wren": {
+   "label": "best friends",
+   "text": "Her illustrator, and the only one who can get her to go to sleep.",
+   "public": true,
+   "from": 0
+  },
+  "oru": {
+   "label": "friends",
+   "text": "Shares a pitch with her at the night market; she is the only adult who does not laugh at his dream book.",
+   "public": true,
+   "from": 0
+  },
+  "eloise": {
+   "label": "friends",
+   "text": "The first-year paints what a card is doing. He wants to put their sketchbooks side by side and has not yet found the hour she will remember.",
+   "public": true,
+   "from": 6
+  },
+  "junho": {
+   "label": "friends",
+   "text": "Sends back sketches with numbered corrections. Felix draws the corrections as little creatures in the margin.",
+   "public": true,
+   "from": 8
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "Tariq will find any reference picture in the building if asked nicely and teased a little.",
+   "public": true,
+   "from": 0
+  },
+  "pilar": {
+   "label": "friends",
+   "text": "She pays in paint and praise, and stands over him until it is dry.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "theatre",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rare_common_room",
+   "Midday": "theatre",
+   "Afternoon": "design_lab",
+   "Evening": "night_market",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Dream Landers: swaps the board for a stranger one mid-game and wins in the confusion, if he remembers he is trying to win. Plays the prettiest line.",
+  "tilt": "Nothing much; he loses happily. Seeing certain new cards on the table makes him put his hand down and start sketching."
+ }
+}

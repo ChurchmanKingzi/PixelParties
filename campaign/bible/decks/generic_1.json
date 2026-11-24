@@ -1,0 +1,405 @@
+{
+ "name": "Burning Inferno",
+ "owner": null,
+ "heroes": [
+  "Alex, Trainer of Heroes",
+  "Luna Pele, the Flame Dancer",
+  "Barker, the Monster Tamer"
+ ],
+ "main": [
+  [
+   3,
+   "Angry Cheese"
+  ],
+  [
+   2,
+   "Boiling Oil"
+  ],
+  [
+   4,
+   "Candlestick Squire"
+  ],
+  [
+   2,
+   "Coffee"
+  ],
+  [
+   2,
+   "Dance of the Flame Pillars"
+  ],
+  [
+   8,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Dichotomy of Luna and Tempeste"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   3,
+   "Fireshield"
+  ],
+  [
+   1,
+   "Goff, the Burnbringer"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   1,
+   "Gon, the Frostbringer"
+  ],
+  [
+   4,
+   "Grunge Harpyformer"
+  ],
+  [
+   4,
+   "Heart of the Mountain"
+  ],
+  [
+   4,
+   "Heat Wave"
+  ],
+  [
+   4,
+   "Luna Kiai"
+  ],
+  [
+   2,
+   "Mountain Tear River"
+  ],
+  [
+   1,
+   "Outbreak"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Waitress"
+  ]
+ ],
+ "potions": [
+  [
+   1,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Alex, Trainer of Heroes": "Hero",
+  "Luna Pele, the Flame Dancer": "Hero",
+  "Barker, the Monster Tamer": "Hero",
+  "Angry Cheese": "Artifact",
+  "Boiling Oil": "Spell (Destruction Magic)",
+  "Candlestick Squire": "Creature L1",
+  "Coffee": "Artifact",
+  "Dance of the Flame Pillars": "Spell (Destruction Magic)",
+  "Destruction Magic": "Ability",
+  "Dichotomy of Luna and Tempeste": "Spell (Destruction Magic, Attachment)",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Goff, the Burnbringer": "Creature L0",
+  "Golden Ankh": "Artifact",
+  "Gon, the Frostbringer": "Hero",
+  "Grunge Harpyformer": "Creature L0",
+  "Heart of the Mountain": "Artifact",
+  "Heat Wave": "Spell (Destruction Magic)",
+  "Luna Kiai": "Creature L1",
+  "Mountain Tear River": "Spell (Destruction Magic, Surprise)",
+  "Outbreak": "Spell (Destruction Magic)",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Waitress": "Creature L1",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Heat Wave": "Burns every target on the board except the caster, for the rest of the game; targets already burning take a heavy hit instead.",
+  "Luna Pele, the Flame Dancer": "Draws a card each time something is set on fire, several times a turn.",
+  "Alex, Trainer of Heroes": "Spreads Abilities to his team-mates; this is how Destruction Magic reaches level three.",
+  "Barker, the Monster Tamer": "Starts the game with a small creature in play.",
+  "Luna Kiai": "Creature that sets the deck's own heroes on fire on purpose; while it stands, their maximum health grows each time they take burn damage.",
+  "Dichotomy of Luna and Tempeste": "Attachment: the deck's own burning targets take half damage from everything except the burn.",
+  "Heart of the Mountain": "Draws a card for every burning target on the board.",
+  "Candlestick Squire": "Free creature (by curing one burn) that draws a card per burning target each turn.",
+  "Grunge Harpyformer": "Free summon that fetches Destruction Magic and can discard one to burn a target.",
+  "Goff, the Burnbringer": "Once a Gon hero card is tucked under it: burn damage on your side is doubled.",
+  "Mountain Tear River": "Trap: burns whoever targets its hero.",
+  "Boiling Oil": "Light damage to your whole side.",
+  "Dance of the Flame Pillars": "Hits several targets, more for each different Destruction spell in the discard pile.",
+  "Fireshield": "Reaction: returns part of a hit.",
+  "Divine Gift of Fire": "Once per game: one side burns for good."
+ },
+ "plan": "Everything burns, the deck's own heroes included. Heat Wave, Divine Gift of Fire and the Harpyformers set the table alight; Luna Pele, Candlestick Squires and Heart of the Mountain turn every burning target into cards, Luna Kiai and Dichotomy make the deck's own burns nearly harmless, and Goff with Gon underneath doubles yours. A second Heat Wave then hits everything that is already on fire. Until Luna Kiai and Dichotomy are in place it hurts itself as much as you, and it has no way to stop a faster clock.",
+ "looks": {
+  "early": "A Grunge Harpyformer, one burning hero on each side, Luna Pele drawing.",
+  "mid": "The whole table on fire, Luna Kiai keeping its own heroes comfortable, a fat hand.",
+  "late": "Goff doubling your burns, a second Heat Wave in hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Its own heroes are burning too and nothing protects them from it yet.",
+   "why": "Before Luna Kiai and Dichotomy arrive the fire costs it exactly what it costs you, and you have the Storm on top."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Luna Kiai stands beside its heroes and a Dichotomy is attached: its own burn has become harmless.",
+   "why": "Those two cards make mutual fire one-sided; remove them (The Yeeting, Dark Gear) and the race is level again."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Your heroes are all burning, Goff has a hero card under it, and a second Heat Wave is due.",
+   "why": "Heat Wave only punishes targets already on fire: Tea moves a burn onto its side, shields and healing take the hit, and Goff can be frozen or stolen."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Both sides are low and burning.",
+   "why": "Burn ticks on everyone at once; whoever adds real damage on top wins, and that is the Storm."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "A Grunge Harpyformer burns your caster; an Angry Cheese has cost its own hero health.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn back, harder"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the burn across"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build while both sides smoulder"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Fire: your whole side burns for the rest of the duel.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Race: they will be burning soon too"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Accept it and build"
+     }
+    ]
+   },
+   {
+    "board": "Heat Wave: everything on the table is burning except its caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "They burn too: press"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Luna Kiai arrives; its heroes now grow whenever their burn ticks.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear Luna Kiai"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the growing heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one creature"
+     }
+    ]
+   },
+   {
+    "board": "Dichotomy halves everything you do to its burning heroes.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Dichotomy"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Unpreventable Acid Vial"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Heart of the Mountain and two Candlestick Squires draw it a new hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards, sweep the Squires"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Luna Pele"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Match its hand"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Goff tucks a Gon card under itself: your burns now hurt twice as much.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon Goff, Tea a burn away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill its caster first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "A second Heat Wave is clearly coming.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and heal now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it out of the hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hope"
+     }
+    ]
+   },
+   {
+    "board": "A Mountain Tear River waits face-down on Luna Pele.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick; do not target her"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire into it"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One hero each, both burning.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm plus spell"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea your burn over"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to clear"
+     }
+    ]
+   },
+   {
+    "board": "It is out of cards; the fire does the work.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish faster than the fire"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Luna Pele.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

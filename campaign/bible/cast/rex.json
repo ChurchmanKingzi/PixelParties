@@ -1,0 +1,167 @@
+{
+ "id": "rex",
+ "name": "Rex Tanaka",
+ "firstName": "Rex",
+ "age": 21,
+ "sex": "m",
+ "group": "visitor",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "The inn (visiting)",
+ "romance": false,
+ "deck": "Lightning Caller",
+ "look": "Wiry, midnight-blue hair standing up in spikes as if by static, a teal North Crown coat worn open over a yellow lightning-bolt band shirt, a studded choker and fingerless gloves. He bounces on his heels and cracks his knuckles. He has the pallor of someone who lives online and the grin of someone who wins there.",
+ "voice": "Fast, cocky and online, Vancouver; trash talk is how he says hello, and he follows it with real respect and means both. Deferential only to his captain. When a game gets close he goes silent and very focused. RARE habit (once in a scene at most; most scenes go without it): 'Ez.' — usually just before it is not.",
+ "lines": [
+  "Wait, you're Best_Tarleinn_NA? No shot. You took nine points off me in March. I had your avatar on a dartboard.",
+  "Lightning's simple. I count to lethal, you count to sad.",
+  "Cap says I keep my mouth shut around that guy from the bungalows. Cap doesn't say stuff twice. So — mouth. Shut. Look at me go.",
+  "Ez. ...Okay, not ez. Respect. Run it back?"
+ ],
+ "intro": "North Crown Institute's ace: a cocky, fast-talking ladder star with a lightning deck and a long online history with half the Battle Team.",
+ "traits": [
+  {
+   "id": "rex_1",
+   "text": "He is North Crown's ace and one of the top online players in the world.",
+   "how": "Bex's preview before Day 68."
+  },
+  {
+   "id": "rex_2",
+   "text": "He trash-talks constantly and shakes hands sincerely.",
+   "how": "Play him."
+  },
+  {
+   "id": "rex_3",
+   "text": "He and the Academy's 'Grinder' have played six hundred online games and never spoken.",
+   "how": "Watch them meet on Day 68."
+  },
+  {
+   "id": "rex_4",
+   "text": "He remembers every handle that ever beat him — including a certain Wildcard's.",
+   "how": "Introduce yourself by handle."
+  },
+  {
+   "id": "rex_5",
+   "text": "He does whatever his captain says, at once.",
+   "how": "See him with Isolde."
+  },
+  {
+   "id": "rex_6",
+   "text": "He was expelled from two schools before North Crown and says the coat saved his life.",
+   "how": "Friend stage."
+  },
+  {
+   "id": "rex_7",
+   "text": "He is terrified of the ferry and spends crossings below deck with his headphones on.",
+   "how": "Ferry dock, Day 68 or 70."
+  }
+ ],
+ "secret": "Rex Tanaka was a Vancouver kid with a fast brain, an absent family and two expulsions for fighting when a North Crown scout found him on the ladder. The Institute's discipline — and Isolde, who sat him down on his first night and said 'You may be a nuisance or you may be mine; choose' — gave him a spine to hang the talent on. He would walk into the sea for her. He is the best pure online player in the cast after Lilia, which makes him the one outsider who KNOWS Rowan: they met on the ladder four times; Rowan took nine rating points off him in March with a storm turn Rex still talks about. This is useful: Rex is the first person on the island to treat Rowan as a known quantity rather than a charity case, loudly, in front of people. His 600-game rivalry with Kenji is the purest friendship either has and neither would call it that. Contradiction: all mouth online, and in person an oddly gentle kid who is seasick, homesick and has a rosary from his grandmother in his deck box.\nHe sees '{H}' at the Day 68 friendly and thinks {H:he} is a funny little guy on a heater. DEFAULT TIMELINE: during the Interschool Cup he mouths off at '{H}' in front of witnesses — trash talk is how he says hello — and the Guest, taking it for a conflict honestly offered, challenges him by name. A formal challenge cannot be refused. His captain finds him in the trial dome on the morning of Day 168. It is prevented if Isolde has been told the truth and orders him to keep his mouth shut: Cap does not say things twice, and he obeys. Saved, he is an ally: he can run Lightning at the Guest in a casual to give Dom and Kenji data, and he and Kenji finally exchange a twelfth word.",
+ "wants": "To be worth the coat, and to finally beat rexlightning's old nemeses in person.",
+ "fears": "Being the nuisance again — thrown out of the one place that kept him.",
+ "crush": "isolde",
+ "crushNote": "She sat him down on his first night and told him to choose, and he has been hers ever since in a way he calls loyalty. It shows as instant obedience, trash talk that stops when she raises an eyebrow, and a seasick boy standing on deck because she is there.",
+ "crushPace": 0.6,
+ "likes": [
+  "Being recognised by handle",
+  "A rematch, immediately",
+  "Trash talk returned",
+  "Respect for Isolde",
+  "Energy drinks, arcade cabinets",
+  "Kenji, in a way he cannot articulate"
+ ],
+ "dislikes": [
+  "Boats",
+  "Slow rolls",
+  "Insults to North Crown or his captain",
+  "Being called a streamer",
+  "Losing to control decks",
+  "Anyone questioning his captain's orders"
+ ],
+ "gifts": [
+  "Card: Bottled Lightning",
+  "Ginger tablets for seasickness",
+  "Card: Champion, the Stormbringer",
+  "A token for the arcade's oldest cabinet"
+ ],
+ "events": [
+  {
+   "id": "rex_e1",
+   "stage": 1,
+   "title": "No shot",
+   "condition": "On Day 68–70, introduce yourself by your ladder handle and play him a casual at arcade or duel_terraces; give the trash talk back.",
+   "hint": [
+    "One of the visitors has heard of you — by another name.",
+    "Tell North Crown's ace your online handle and play him."
+   ]
+  },
+  {
+   "id": "rex_e2",
+   "stage": 2,
+   "title": "Run it back",
+   "condition": "Bring him and Kenji face to face and get them to play in person; keep in touch over the ladder in Term 2.",
+   "hint": [
+    "He has a rival he has never spoken to. Somebody should introduce them.",
+    "Get Rex and Kenji to finally meet properly."
+   ]
+  },
+  {
+   "id": "rex_e3",
+   "stage": 3,
+   "title": "Cap doesn't say stuff twice",
+   "condition": "During the Interschool Cup window, tell him and Isolde the truth, and ask him for a casual game against '{H}' for data — with his captain's consent — and keep him from trash-talking his way into a formal challenge.",
+   "hint": [
+    "He follows one person's orders. Work with that, not around it.",
+    "Bring him into the plan through his captain, and keep his mouth out of trouble."
+   ]
+  }
+ ],
+ "bonds": {
+  "rowan": {
+   "label": "rivals",
+   "text": "Best_Tarleinn_NA: the patient storm player whose avatar he kept on a dartboard.",
+   "public": false,
+   "from": 0
+  },
+  "kenji": {
+   "label": "rivals",
+   "text": "The Grinder. His favourite opponent on earth, not that he would say it.",
+   "public": true,
+   "from": 0
+  },
+  "isolde": {
+   "label": "teammates",
+   "text": "Cap. He would walk into the sea for her.",
+   "public": true,
+   "from": 0
+  },
+  "magnus": {
+   "label": "rivals",
+   "text": "Prospero: plays a different deck every week and loses with all of them.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "great_arena",
+   "Midday": "arcade",
+   "Afternoon": "duel_terraces",
+   "Evening": "inn",
+   "Night": "inn"
+  },
+  "weekend": {
+   "Morning": "arcade",
+   "Midday": "great_arena",
+   "Afternoon": "main_street",
+   "Evening": "inn",
+   "Night": "inn"
+  }
+ },
+ "duel": {
+  "skill": 8,
+  "style": "Lightning Caller: counts burn to the exact point and fires it all at once; the fastest clock in the cast. Online-perfect, slightly worse with real cards and a real opponent's face.",
+  "tilt": "Lifegain and long games; and Isolde looking disappointed."
+ }
+}

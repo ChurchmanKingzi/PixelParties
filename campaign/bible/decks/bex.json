@@ -1,0 +1,379 @@
+{
+ "name": "Snow Day",
+ "owner": "bex",
+ "heroes": [
+  "Klaus, the Cult Leader",
+  "Silent Water Mizune",
+  "Rafflesia, the Poison Princess"
+ ],
+ "main": [
+  [
+   5,
+   "Decay Magic"
+  ],
+  [
+   3,
+   "Frost Breaker"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Ice Sculpture Garden"
+  ],
+  [
+   3,
+   "Icebolt"
+  ],
+  [
+   3,
+   "Icy Grave"
+  ],
+  [
+   3,
+   "Mischief Invasion"
+  ],
+  [
+   3,
+   "Mischief Militia - Banner Bearer"
+  ],
+  [
+   4,
+   "Mischief Militia - Bear Rider"
+  ],
+  [
+   3,
+   "Mischief Militia - Chilly Dog"
+  ],
+  [
+   3,
+   "Mischief Militia - Chilly Wizard"
+  ],
+  [
+   4,
+   "Mischief Militia - Heli Troopers"
+  ],
+  [
+   3,
+   "Mischief Militia - SnowItAll"
+  ],
+  [
+   4,
+   "Mischief Militia - Thaw Blader"
+  ],
+  [
+   3,
+   "Sculpture Guards"
+  ],
+  [
+   1,
+   "Sculpture Theft"
+  ],
+  [
+   2,
+   "Snowstorm Mischief"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The White Army"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Klaus, the Cult Leader": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Rafflesia, the Poison Princess": "Hero",
+  "Decay Magic": "Ability",
+  "Frost Breaker": "Spell (Decay Magic)",
+  "Golden Ankh": "Artifact",
+  "Ice Sculpture Garden": "Spell (Magic Arts)",
+  "Icebolt": "Spell (Decay Magic)",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Mischief Invasion": "Spell (Summoning Magic)",
+  "Mischief Militia - Banner Bearer": "Creature L2 (Surprise)",
+  "Mischief Militia - Bear Rider": "Creature L2",
+  "Mischief Militia - Chilly Dog": "Creature L1",
+  "Mischief Militia - Chilly Wizard": "Creature L2",
+  "Mischief Militia - Heli Troopers": "Creature L0",
+  "Mischief Militia - SnowItAll": "Creature L1",
+  "Mischief Militia - Thaw Blader": "Creature L1",
+  "Sculpture Guards": "Spell (Support Magic, Reaction)",
+  "Sculpture Theft": "Spell (Magic Arts, Reaction)",
+  "Snowstorm Mischief": "Spell (Decay Magic)",
+  "Summoning Magic": "Ability",
+  "The White Army": "Spell (Summoning Magic)"
+ },
+ "gist": {
+  "Mischief Militia - Heli Troopers": "Tiny creature; when it dies she freezes any target for a turn.",
+  "Mischief Militia - Thaw Blader": "Hits a frozen target very hard and thaws it; can do so the turn it arrives.",
+  "Mischief Militia - Bear Rider": "Cheaper for every frozen target on the board, free at zero; hits a frozen target hard each turn.",
+  "Mischief Militia - Chilly Wizard": "Summoned into ANY hero's support zone, yours included; whatever status the Wizard has, that hero has too.",
+  "Mischief Militia - Chilly Dog": "Her own frozen creatures keep their effects and may act the turn they arrive.",
+  "Mischief Militia - SnowItAll": "Summons another small creature for free, frozen.",
+  "Mischief Militia - Banner Bearer": "Trap creature: blunts a hit on one of her targets and freezes that target for two turns, on purpose.",
+  "Mischief Invasion": "Summons a Militia creature for each frozen target, then freezes that many more.",
+  "Ice Sculpture Garden": "Draws a card for every frozen target on the board.",
+  "The White Army": "Freezes targets, half as many as she has creatures.",
+  "Snowstorm Mischief": "Freezes every creature on the board for two turns.",
+  "Sculpture Guards": "Reaction: a frozen target of hers takes no damage.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Icebolt": "Damage and a one-turn freeze.",
+  "Frost Breaker": "Thaws a frozen target with a heavy hit."
+ },
+ "plan": "Bex counts frozen things, on both sides. Every frozen target makes Bear Riders cheaper, Ice Sculpture Garden deeper and Mischief Invasion bigger, so she happily freezes her own creatures (Chilly Dog keeps them working) as well as your heroes. Then the Thaw Bladers, Bear Riders and Frost Breaker cash the frozen targets in for heavy hits. A frozen hero of yours cannot act, so the Storm caster spends half the duel on ice. The deck needs the freeze count to stay high and its hitters are small; a target that thaws is immune to freezing for a turn, and a freeze moved onto her own hero by Tea counts against her.",
+ "looks": {
+  "early": "Heli Troopers and a SnowItAll, one of your heroes frozen for two turns by Icy Grave.",
+  "mid": "Half the board iced over, hers and yours alike; Bear Riders arriving for free; a Chilly Wizard sitting in your own support zone.",
+  "late": "Thaw Bladers and Frost Breakers cashing in frozen heroes one at a time."
+ },
+ "profile": {
+  "opening": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Her first creatures are Heli Troopers, which freeze something of yours when they die.",
+   "why": "Sweeping the Troopers freezes your own heroes for her; aim past them at her three ordinary heroes and answer only the freeze on your caster."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Count the frozen targets on both sides: her Bear Riders are free and her Garden draws a card for each.",
+   "why": "The whole deck scales with that number: Tea lifts a freeze from your hero and puts it on one of hers, a just-thawed hero cannot be refrozen for a turn, and a frozen caster that waits simply stays frozen."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "A Chilly Wizard sits in the support zone of your Storm caster.",
+   "why": "Whatever freezes the Wizard freezes your hero with it, and her Snowstorm freezes every creature; The Yeeting on that one creature frees the caster for the rest of the duel."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Few targets are frozen any more, so her big cards are expensive again; her hitters are spent.",
+   "why": "With the count low her Bear Riders cannot be cast and her Garden draws nothing; her heroes have no other defence."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Bex lands two Heli Troopers and an Icy Grave on your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze onto Klaus, leave the Troopers"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mizune with the other heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Troopers and get frozen for it"
+     }
+    ]
+   },
+   {
+    "board": "SnowItAll summons a Thaw Blader for free, frozen.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks at heroes, single shot at the Blader"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Thaw Blader"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for the thaw"
+     }
+    ]
+   },
+   {
+    "board": "The White Army freezes one of your heroes and one of her own creatures.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea yours onto her hero"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit with the two that can still act"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Act with the heroes still free and aim past the Troopers"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Four targets are frozen across the table; a Bear Rider rides in for nothing and Ice Sculpture Garden draws four.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Thaw yours with Tea and lower the count"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill Bear Rider and Thaw Blader"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit frozen and wait"
+     }
+    ]
+   },
+   {
+    "board": "Mischief Invasion: two more Militia arrive and two more of your targets freeze.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche while they are bunched"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang her follow-up turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race with one free hero"
+     }
+    ]
+   },
+   {
+    "board": "A Thaw Blader shatters your frozen hero for a huge hit and thaws it.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "That hero is immune to freezing this turn: use it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything at Klaus"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Thaw Blader"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "A Chilly Wizard is planted in your caster's support zone and Snowstorm Mischief freezes every creature for two turns.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Wizard"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze away each turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Give up the caster and race"
+     }
+    ]
+   },
+   {
+    "board": "Sculpture Guards makes her frozen hitter immune to your removal.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Aim at heroes instead"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards for the next Guards"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Try again on the creature"
+     }
+    ]
+   },
+   {
+    "board": "Frost Breaker lines up on your frozen caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! or Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea first, so there is nothing frozen to break"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade heroes"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One frozen target on the whole table; her hand is full of Bear Riders she cannot afford.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish her heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the last hitters"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Relax"
+     }
+    ]
+   },
+   {
+    "board": "Banner Bearer freezes her own hero to save it for two turns.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other one first"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick and wait"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "One hero each, and an Icebolt in her hand for yours.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Go now, before it lands"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep Tea"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

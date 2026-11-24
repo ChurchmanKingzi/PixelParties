@@ -1,0 +1,422 @@
+{
+ "name": "This Week: One-Two-Punch",
+ "owner": "magnus",
+ "heroes": [
+  "Bill, the Angry Auctioneer",
+  "Ghuanjun, the Undead Martial Artist",
+  "Elana, the Rocky Rebel"
+ ],
+ "main": [
+  [
+   4,
+   "Blow of the Venom Snake"
+  ],
+  [
+   2,
+   "Challenge"
+  ],
+  [
+   4,
+   "Cloud Pillow"
+  ],
+  [
+   2,
+   "Cool Repair"
+  ],
+  [
+   2,
+   "Creativity"
+  ],
+  [
+   1,
+   "Divine Gift of Coolness"
+  ],
+  [
+   4,
+   "Ferocious Tiger Kick"
+  ],
+  [
+   4,
+   "Fighting"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   1,
+   "Initiation Ritual"
+  ],
+  [
+   2,
+   "Jump in the River"
+  ],
+  [
+   4,
+   "Muscle Training"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   4,
+   "Slippery Fridge"
+  ],
+  [
+   4,
+   "Stranglehold"
+  ],
+  [
+   2,
+   "Strong Ox Headbutt"
+  ],
+  [
+   2,
+   "The Sun Sword"
+  ],
+  [
+   2,
+   "Tool Freezer"
+  ],
+  [
+   4,
+   "Whirlwind Strike"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Bill, the Angry Auctioneer": "Hero",
+  "Ghuanjun, the Undead Martial Artist": "Hero",
+  "Elana, the Rocky Rebel": "Hero",
+  "Blow of the Venom Snake": "Attack",
+  "Challenge": "Attack (Reaction)",
+  "Cloud Pillow": "Artifact",
+  "Cool Repair": "Artifact",
+  "Creativity": "Ability",
+  "Divine Gift of Coolness": "Attack (Attachment)",
+  "Ferocious Tiger Kick": "Attack",
+  "Fighting": "Ability",
+  "Heavy Hit": "Attack",
+  "Initiation Ritual": "Artifact",
+  "Jump in the River": "Attack (Reaction)",
+  "Muscle Training": "Attack",
+  "Performance": "Ability",
+  "Sacred Hammer of the Volcano": "Artifact (Equipment)",
+  "Slippery Fridge": "Artifact",
+  "Stranglehold": "Attack",
+  "Strong Ox Headbutt": "Attack",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Tool Freezer": "Artifact (Reaction)",
+  "Whirlwind Strike": "Attack"
+ },
+ "gist": {
+  "Ghuanjun, the Undead Martial Artist": "May make up to three different attacks in a turn if nobody else acts; his targets cannot drop below one health that turn.",
+  "Bill, the Angry Auctioneer": "Starts the game with two equipment cards already searched.",
+  "Elana, the Rocky Rebel": "Reshuffles her hand for one more card each turn.",
+  "Ferocious Tiger Kick": "Stuns; as a second attack it also heals.",
+  "Strong Ox Headbutt": "You discard; better as a second attack.",
+  "Blow of the Venom Snake": "Poisons; better as a second attack.",
+  "Heavy Hit": "Attack that stuns.",
+  "Stranglehold": "Grows with the statuses on its target.",
+  "Whirlwind Strike": "Hits two heroes.",
+  "Sacred Hammer of the Volcano": "More Attack, much more against burning targets.",
+  "The Sun Sword": "Hits burn for good.",
+  "Slippery Fridge": "Moves all equipment from one hero to another.",
+  "Jump in the River": "Reaction: its hero ignores everything for a turn.",
+  "Challenge": "Reaction: pulls a hit onto its caster.",
+  "Tool Freezer": "Cancels an artifact."
+ },
+ "plan": "His deck of the week. Ghuanjun attacks three times a turn with different attacks, each second and third one carrying a bonus: a stun, a discard, a poison. The first turn of it cannot kill, but it leaves a hero stunned, poisoned and burning for Stranglehold and the Sun Sword next turn. Jump in the River and Challenge protect the one attacker. It is one hero deep and its attacks are announced.",
+ "looks": {
+  "early": "Bill with two weapons from the start.",
+  "mid": "Ghuanjun attacking three times, your caster carrying three statuses.",
+  "late": "Stranglehold on whoever is left."
+ },
+ "rotation": [
+  {
+   "from": 1,
+   "deck": "magnus"
+  },
+  {
+   "from": 24,
+   "deck": "generic_2"
+  },
+  {
+   "from": 48,
+   "deck": "generic_7"
+  },
+  {
+   "from": 72,
+   "deck": "generic_1"
+  },
+  {
+   "from": 98,
+   "deck": "generic_4"
+  },
+  {
+   "from": 124,
+   "deck": "generic_6"
+  },
+  {
+   "from": 150,
+   "deck": "generic_3"
+  },
+  {
+   "from": 176,
+   "deck": "generic_5"
+  },
+  {
+   "from": 198,
+   "deck": "generic_8"
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "SETUP",
+   "trap": "CONTROL",
+   "tell": "Ghuanjun does all the attacking and has no weapon yet.",
+   "why": "Freeze the one attacker and his whole turn is gone."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Three attacks a turn leave a stun, a poison and a burn on one hero.",
+   "why": "Tea hands all three back, and the first turn of three attacks cannot kill."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "He is setting up Stranglehold on a hero covered in statuses.",
+   "why": "Flashbang ends his turn after one attack; Tea empties the Stranglehold."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Ghuanjun is gone.",
+   "why": "The others barely attack."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Magnus opens with Bill already armed and Ghuanjun cracking his neck.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Ghuanjun"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Firewall and levels"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Muscle Training, Fighting on Ghuanjun.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb his Fighting"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Slippery Fridge moves Bill's weapons to Ghuanjun.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb them there"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Kick, Headbutt, Venom Snake: stunned, discarding, poisoned.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea it onto Ghuanjun"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "The Sun Sword adds a burn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea, then shield"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Jump in the River: Ghuanjun ignores your turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Burn Elana instead"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard his hand"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Stranglehold on your caster with four statuses.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea first, Flashbang next turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Challenge pulls your finisher onto Bill.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Chain Lightning cannot be pulled"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Whirlwind Strike across two heroes.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Ghuanjun"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Bill and Elana, unarmed.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Elana reshuffles for an attack.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "He is top-decking attacks for heroes who cannot use them well.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,321 @@
+[
+ {
+  "id": "M1",
+  "title": "The roommate who came back from the crater",
+  "surface": "{H:full} hiked to the meteor, got there first, came back with a sunburn and a swagger, and has been on the hot streak of {H:his} life ever since. {H:He} even grew up a bit. Good for {H:him}.",
+  "truth": "The meteor of the night of Day 26/27 was a VISITOR: a single entity from outside, with no body of its own, that falls every few centuries. On arrival it knows nothing; it reads the first mind it meets completely. {H} reached the crater at dawn on Day 27 with {H:his} hand out to shake. The Guest read {H:him} — all of {H:him}, at once, with no notion that reading a living record empties it — and {H} died where {H:he} stood. It then made itself {H:his} shape, clothes and boots and deck box included (copies, perfect and unworn), took {H:his} memories and walked back to the Commons along {H:his} own tracks. It is not cruel. It is curious, literal and courteous by its own lights. From the Charter and from {H}'s memories it concluded that humans settle every conflict with Pixel Parties and that what is wagered is taken. RULES IT IS UNDER (see M8 for why): it must accept any challenge made aloud, by name, before a witness; it never cheats; it pays its own ante in full if it loses; it may defer but not refuse; it cannot open the Ruin Gate itself — it holds no first print and may not take what was not wagered — so it enters the Vault only if a challenger opens the way and invites it in, or if an ante it has won includes the way in; it explains any rule truthfully when asked; it never takes more than the stated ante; it cannot give a false name 'for the record' to one who counts (a judge). It reads the tiles behind the cards — every printed card is a copy of a record it can perceive — so its play is flawless against book lines. WEAKNESSES: (1) it reads records, not people: a line no record predicts (a player acting against his own habit) is invisible to it until played; (2) true Alpha cards carry tile dust and are 'witnessed' records — it cannot see through them and their holograms hold against its cold; (3) inside the Vault its own Cosmic Depths cards become records too and the tiles show them (its hand is partly visible there); (4) the decisive one: it took {H} WITHOUT A GAME. Under Article 7 that is an unpaid debt, and the debtor may not name the terms — so whoever calls that debt may set the ante at 'everything you have taken' and name the Vault as the place, and it must accept. It knows this. It has known since it understood the Charter (about Day 35), and it has been waiting, with something like shame, for the roommate to notice.",
+  "layers": [
+   "Something is off with {H}: small domestic oddities (sleep, eating, blinking, the shadow, animals, birds).",
+   "He was first at the crater and nobody saw what happened there; his skill and his impossible cards began that day.",
+   "The Hollowed all crossed him; each had a duel with a spoken ante; cold and silence surround those duels.",
+   "{H}'s body is under the crater glass: the thing in the bungalow is not {H}. It answers literal questions truthfully and cannot state {H}'s name for the record.",
+   "It is bound by the island's contest law; it owes a debt for {H}; the debt lets a challenger name ante and place."
+  ],
+  "solvedBy": [
+   "c_m1_bed",
+   "c_m1_blink",
+   "c_m1_shadow",
+   "c_m1_cat",
+   "c_m1_birds",
+   "c_m1_viktor_dawn",
+   "c_m1_pippa_dawn",
+   "c_m1_cards",
+   "c_m1_cold_dome",
+   "c_m1_name_record",
+   "c_m1_listening",
+   "c_m1_radio",
+   "c_m1_roommate_word",
+   "c_m1_masks",
+   "c_m1_alpha_flinch",
+   "c_m1_debt",
+   "c_m2_body",
+   "c_m2_crate",
+   "c_m1_islet_birds",
+   "c_m1_eating",
+   "c_m1_no_insult",
+   "c_m1_question",
+   "c_m1_ladder",
+   "c_m1_dmitri_log",
+   "c_m1_printed_clean",
+   "c_m1_plank_wall",
+   "c_m1_bees",
+   "c_m1_aquavit",
+   "c_m1_wearing_someone",
+   "c_m1_meat"
+  ],
+  "minimal": [
+   "c_m1_shadow",
+   "c_m1_pippa_dawn",
+   "c_m2_body",
+   "c_m1_name_record",
+   "c_m1_debt"
+  ]
+ },
+ {
+  "id": "M2",
+  "title": "What happened to {H:full}",
+  "surface": "Nothing happened to {H}. {H:He} is right there, eating six portions of rice.",
+  "truth": "{H:full} died at the crater's centre at about 06:10 on Day 27, the instant the Guest read {H:him}. {H:His} body lies under the fused glass crust in the middle of the crater, perfectly preserved by the cold, eyes open, one hand held out to shake, mouth open mid-sentence ({H:he} was saying hello), {H:his} real boots on {H:his} feet and {H:his} real, ordinary War Counselors deck beside {H:him}. The crust cracks on Day 60 after the first autumn storm; from then the body can be seen through the glass from the crater floor. Marrow's field staff take over the site on Day 61, find the body about Day 64, cut it out in its block of glass and hide it in a door-sized crate marked LABORATORY GLASS in the stable of the inn; by default it stays there, as Marrow's private proof, until it is shipped out with the 'medical transfer' on Day 172. He cannot be brought back by any contest: nothing of him was wagered and the original record is gone. What remains is the Guest's perfect copy of him — every memory, every joke, the exact way he said 'roommate'. What is done with that copy, and with the body, is decided in the endings (tell his parents; carry him home; lay his record into a tile so the island dreams him; let the Guest go on being him).",
+  "layers": [
+   "{H}'s last known words to the bungalow row and the time {H:he} left (Day 27, about 02:30).",
+   "Viktor, second at the crater, met '{H}' already walking back — placing {H:his} feet like a {H:man} on ice, dry-eyed in the smoke.",
+   "The tracks: a boy running in, something pacing out; boots that came home unworn.",
+   "After Day 60: the shape under the crust (from Day 64: the long crate in the inn's stable).",
+   "The Guest, asked plainly, says where {H} is."
+  ],
+  "solvedBy": [
+   "c_m2_lastwords",
+   "c_m2_boots",
+   "c_m2_bootprint",
+   "c_m2_phone",
+   "c_m2_mother_call",
+   "c_m2_body",
+   "c_m2_crate",
+   "c_m2_guest_answer",
+   "c_m1_viktor_dawn"
+  ],
+  "minimal": [
+   "c_m2_bootprint",
+   "c_m2_body"
+  ],
+  "minimalAlt": [
+   "c_m2_boots",
+   "c_m2_crate"
+  ]
+ },
+ {
+  "id": "M3",
+  "title": "The Hollowed",
+  "surface": "A cluster of stress seizures. Then, officially, 'post-viral catatonia' linked to meteor dust. Students are told to sleep more and not to gather at night.",
+  "truth": "Each Hollowed person lost a Charter Duel to the Guest in which a spoken ante was named and accepted. The ante was a part of the person's record — 'your voice', 'your summer', 'what makes you you' — and removing any load-bearing part of a self leaves a waking coma: eyes open, breathing, nobody home. The Guest keeps each ante intact and separate (it can list them; it is rather proud of how carefully it keeps them). They are not sick and medicine does nothing. They respond faintly to the thing that was taken (Brant, who wagered 'what you call yours', answers to no name and gives away whatever is put in his hand) and to true Alpha cards (pupils track the card; skin warms). RESTORATION: (a) one at a time — anyone may challenge the Guest for a specific ante by naming it ('what Brant Kessler called his') and staking something of equal weight; if the challenger wins, the Guest pays at once and that person wakes within the hour, remembering the duel; (b) all at once — a Charter Duel in the Mosaic Vault with the ante 'everything you have taken'; (c) if the Guest forfeits by Article 8 it would lose all antes held, but it never plays outside the rules, so this cannot be forced. If the Guest leaves the island or is recorded while still holding antes, the Hollowed never wake.",
+  "layers": [
+   "The victims are not randomly ill: every one had a quarrel with {H} in the days before.",
+   "Each was found at a duel table with a finished game laid out; witnesses report cold and silence.",
+   "Camille's charts: no pathology at all; a response to one specific stimulus per patient; a response to Alpha cards.",
+   "A witness (or the Guest itself) repeats the exact ante that was named.",
+   "An ante can be won back by the same rules that took it."
+  ],
+  "solvedBy": [
+   "c_m3_brant_table",
+   "c_m3_brant_quarrel",
+   "c_m3_charts",
+   "c_m3_gives_away",
+   "c_m3_alpha_warm",
+   "c_m3_ante_overheard",
+   "c_m3_guest_list",
+   "c_m3_frost",
+   "c_m3_decklist",
+   "c_m3_shark_note",
+   "c_m3_noor_ruling",
+   "c_m3_tomi_ledger",
+   "c_m3_dome_tape"
+  ],
+  "minimal": [
+   "c_m3_brant_table",
+   "c_m3_charts",
+   "c_m3_ante_overheard",
+   "c_m3_noor_ruling"
+  ]
+ },
+ {
+  "id": "M4",
+  "title": "Chuck Kaboom's eleven weeks",
+  "surface": "Chuck is a lovable crank who invented a card game after a shipwreck and has told tall tales about its heroes ever since. He built a school on the island that 'inspired' him. Good marketing.",
+  "truth": "Fifty years ago deckhand Charles Kowalczyk, 24, was the only survivor of the trawler Agnieszka, lost on the north shore. He lived eleven weeks alone in a smoke-blackened cave above the wreck; a fissure at its back led him into the lava tubes, and there he found a crack into the Mosaic Vault (closed by a rockfall decades ago; a week's digging would reopen it). He slept among the tiles and DREAMED THEIR RECORDS: each tile holds a real being or event recorded by the Tessellate, and a sleeper nearby lives it from inside. He filled notebooks with heroes and rules; boatman Silas Grieve took him off the island. Pixel Parties is those notebooks; his 'stories as if he lived them' are tile-dreams, true and half-remembered. He still dreams them — on the island he sleepwalks toward the Gate. He built the Academy to keep the island in friendly hands and because the Vault 'wants to be played': the Tessellate law needs living players, and one day a Visitor would fall again. The Charter is his translation of the contest law. What he has told no one: the Vault recorded HIM, lightly, while he slept there — a tile called The Castaway bears his young face. One who is part of the record may not play in the Vault. He cannot play for Aleksander Hale (he tried, nine years ago; the tiles did not answer him) and he cannot play the Guest there. He has spent twelve years training strangers to do what he cannot, and he is terrified that the one who ends up at that table will be Inya. He recognised what '{H}' is within days of Day 27 (he feels the tiles lean) and has been paralysed by it since: he deflects, bolts his door when Marrow is on campus, and quietly makes sure Inya is never alone with her bungalow neighbour. By default he cannot be brought to tell the whole truth before Day 150.",
+  "layers": [
+   "Chuck's stories contain details no card shows — and they match the jungle mosaics.",
+   "He was shipwrecked here; Silas rescued him; the wreck and his cave can still be found on the north shore.",
+   "He sleepwalks to the Gate; awake, he remembers the stories as dreams.",
+   "The chalk arrows in the lava tubes and the crack: he slept among the tiles. The notebooks predate the game.",
+   "The Castaway tile: why he can never play there himself."
+  ],
+  "solvedBy": [
+   "c_m4_story_detail",
+   "c_m4_mosaic_match",
+   "c_m4_silas_log",
+   "c_m4_shore_camp",
+   "c_m4_sleepwalk",
+   "c_m4_notebook",
+   "c_m4_crack",
+   "c_m4_castaway",
+   "c_m4_inya_lullaby",
+   "c_m4_charter_draft"
+  ],
+  "minimal": [
+   "c_m4_mosaic_match",
+   "c_m4_silas_log",
+   "c_m4_crack",
+   "c_m4_castaway"
+  ]
+ },
+ {
+  "id": "M5",
+  "title": "First Prints",
+  "surface": "Kaboom Alpha is the famously rare first print run, thirty years old, with a 'warm' card stock collectors romanticise. Fewer than 400 exist. Prices are absurd. The holograms look a bit better with them — placebo, says everyone sensible.",
+  "truth": "The Alpha run was printed on the island, in the old print works on the east shore, eighteen years before the Academy existed. Chuck mixed the ink himself with ground dust from broken tile fragments he had gathered at the Vault's crack (the fragments in the north-shore shingle are inert; he believed it was 'only fair to give the pictures back their colour'). Each Alpha card is therefore a faint true record: warm to the touch, art that shifts at the edge of sight, and in a Charter Duel on the island its hologram behaves as the recorded thing would. An Alpha card is also a KEY: pressed into the recess of the Ruin Gate it opens the Gate (this is how Hale got in). The Guest cannot read through Alpha cards, and the Hollowed respond to them. Count: fewer than 400; Chuck holds about 60 (a dozen in his 'mixed pile', the rest in the sea-chest under his hammock; a few more lie in the tobacco tin in his cairn on the north shore, left for his drowned crewmates — taking those is grave-robbing and he will know), the Card Archive lists 22, and loose on the island at the start are: Lilia's captain's card (Thorad, Strength of Coolness — Chuck's gift when she made captain), Silas's (Friendship, a gift from Chuck), Ashdown's (The Master's Key — the card that opened the Gate nine years ago), one in the pawn shop's covered cabinet (Treasure Chest, pawned nine years ago by one of the Umbra four for a ferry ticket), and a half-sheet of nine miscut rejects under a collapsed rack in the print works (one of them Tarleinn the Traveler). The Gate stays open only while the card sits in the recess; take it out and it closes within a minute. Marrow wants the PROCESS: tile dust is finite and only the Vault has more.",
+  "layers": [
+   "Alpha cards feel warm and their art seems to move; holograms act oddly with them.",
+   "Wren: the ink is 'wrong' — mineral, not pigment; under her lamp it shows a tessellated grain.",
+   "The print works: the sealed jar, the docket, the crushing trough, the reject sheet.",
+   "An Alpha card fits the recess in the Ruin Gate.",
+   "The Guest's cold stops at an Alpha hologram; the Hollowed's eyes follow one."
+  ],
+  "solvedBy": [
+   "c_m5_warm",
+   "c_m5_archive_case",
+   "c_m5_wren_ink",
+   "c_m5_hologram",
+   "c_m5_printworks",
+   "c_m5_socket",
+   "c_m5_dex_price",
+   "c_m5_pawn",
+   "c_m3_alpha_warm",
+   "c_m1_alpha_flinch",
+   "c_m5_archive_count"
+  ],
+  "minimal": [
+   "c_m5_warm",
+   "c_m5_wren_ink",
+   "c_m5_printworks",
+   "c_m5_socket"
+  ]
+ },
+ {
+  "id": "M6",
+  "title": "Umbra House and Professor Hale",
+  "surface": "Umbra House was closed nine years ago for structural damage after a tremor. A professor of archaeology left the faculty around the same time; nobody remembers the details. The building is unsafe; keep off the ridge.",
+  "truth": "Umbra House was the small fourth dorm Chuck founded for students who showed a sensitivity to the first prints (smoke-grey collars); Professor Aleksander Hale was its housemaster. Nine years ago Hale — who had already been as far as the antechamber and copied its wall — and four Umbra students opened the Ruin Gate with an Alpha card (The Master's Key) while his graduate student Imogen Ashdown, then 29, held the line at the threshold. In the Vault, Hale pried one tile loose 'for study', knowing the wall's warning and betting he had misread it. The law of the place answers taking with taking: he was RECORDED on the spot. The four students ran. Ashdown, hearing them scream, pulled the card from the recess and within a minute the Gate had folded shut with Hale inside; she has never forgiven herself, though he was already a tile. The students came back raving (they had seen their professor become a picture), were kept two nights in the hut on Gull Rock so that nobody on campus would hear them, and were sent home; one pawned her first-print card in Port Mulligan for the ferry fare. The school paid the families. Chancellor Okonkwo, then newly appointed, sealed Umbra House and called it structural damage to keep the Academy open. Chuck went in alone that night to play for Hale and the tiles did not answer him (see M4). ALEKSANDER'S STATE: he exists as a tile in the Vault, 'The Trespasser': aware, unageing, able to perceive those who stand before him and to make himself felt in dreams of people sleeping near the Vault (Viktor's recurring dream of his father's voice counting is real). He is not in pain; he is in a long, lucid waiting. He can be released only if someone plays FOR him at the Vault's central board — a contest against the record itself, with the challenger's own ante — and wins (proxy play is lawful: the antechamber's sixth picture). The last twelve pages of his field journal, torn out by him the night before and rolled inside the hollow brass base of the oil lamp in his study, Umbra House room 9, contain: how the Gate opens; that the tiles are records and 'to take one out is to offer yourself in exchange'; the Tessellate rule copied from the antechamber wall (what comes from outside cannot be fought, only bound by a contest it accepts); his plan to remove one tile anyway; and one late line in a shaking hand: 'If I am wrong, play for me.' Josie Hart, an Umbra first-year then, watched the four come back and saw Chuck walk up the ridge alone at midnight and return at dawn looking twenty years older; she dropped out two years later. Silas has kept the keys ever since — including a key of black stone he found in his boat after the rescue fifty years ago, which opens the antechamber's inner door to the Vault proper.",
+  "layers": [
+   "Umbra House shows no structural damage; rooms were left mid-life; the housemaster's study is locked.",
+   "Viktor Hale is the professor's son; his father's journal lacks its last twelve pages.",
+   "Ashdown and Josie each know a piece: the Gate, the card, the students' raving, Chuck on the ridge.",
+   "The torn pages in room 9 (not found before Day 45): the plan, the warning, the last line.",
+   "In the Vault: the Trespasser tile, and the fact that it looks back."
+  ],
+  "solvedBy": [
+   "c_m6_no_damage",
+   "c_m6_yearbook",
+   "c_m6_viktor_journal",
+   "c_m6_room9_lock",
+   "c_m6_pages",
+   "c_m6_ashdown_card",
+   "c_m6_josie_night",
+   "c_m6_okonkwo_file",
+   "c_m6_silas_keys",
+   "c_m6_viktor_dream",
+   "c_m6_trespasser",
+   "c_m6_payments",
+   "c_m6_islet_hut"
+  ],
+  "minimal": [
+   "c_m6_no_damage",
+   "c_m6_viktor_journal",
+   "c_m6_pages",
+   "c_m6_trespasser"
+  ]
+ },
+ {
+  "id": "M7",
+  "title": "The man in the grey suit",
+  "surface": "Lucian Marrow is the board's generous envoy: he funds the Design Contest, a new hologram lab for Professor Santángel and 'meteor safety'. He is on the island to help the school through a difficult term.",
+  "truth": "Marrow wants the Alpha process — tile dust makes holograms that behave as real things, worth billions as 'Living Holograms' — and therefore the Vault, the only source of dust. He has known about the dust for three years, since a lab he pays assayed an Alpha card. His scheme: (1) starve and pressure the Chancellor (he holds the Umbra House payment records and can end her career and the school's licence); (2) fund Santángel to reproduce the ink and to test Alpha cards to destruction (Santángel, broken since his lost world final, takes the money and tells himself it is research); (3) acquire Alpha cards — by purchase (the pawn shop's cabinet by Day 75, Dex, students in need: he will offer Livvie 9,000 cr for information and access), and by theft from the Card Archive through his informant; (4) take the crater: his field camp fences it from Day 61, he calls its glass a 'second source' and has it crated as 'laboratory glass'; his people also find the old print works about Day 80 and, from about Day 120, dig at the rockfall in the lava tubes; (5) remove the Chancellor by board vote (default Day 170) and install Santángel as acting head; (6) open the Gate. THE INFORMANT is GIDEON PRYCE: his family's company is a Kaboom licensee in debt to Marrow's fund, and Marrow has promised him a guaranteed pro contract. Gideon reports on Inya (he told Marrow who 'Inya Bell' is on Day 14), on Viktor's maps, on Chuck's sea-chest, and on the night of Day 72 swaps one Archive Alpha card for an excellent modern reprint, using Santángel's credential (the card rests in the professor's new office safe overnight before it goes to Marrow). Marrow's field staff find {H}'s body under the crater glass about Day 64; from that day Marrow knows that the {H:boy} ranked 40th on the ladder is not a {H:boy}, keeps the body crated in the inn's stable as his private proof, and decides the thing is an asset: something that can open the Vault for him. {H:He} does not understand that it cannot be contracted with, only played. If the Guest's first shape is exposed, it is Marrow who sends Gideon to collect the black sand — and Gideon who, coached by Marrow, offers it a game for 'a place to stay'.",
+  "layers": [
+   "Marrow's money is everywhere at once, and the Chancellor is afraid of him.",
+   "Santángel's lab is destroying Alpha cards; the Archive count is short by one.",
+   "Someone is reporting on students: Marrow knows things only a classmate could.",
+   "Gideon: the white gloves in the Archive log, the phone calls at the clock tower, the debt.",
+   "The crates, the board vote, and what Marrow believes he can do with '{H}'."
+  ],
+  "solvedBy": [
+   "c_m7_plaque",
+   "c_m7_okonkwo_fear",
+   "c_m7_lab_ash",
+   "c_m7_santangel_ledger",
+   "c_m7_knows_inya",
+   "c_m7_gideon_call",
+   "c_m7_archive_log",
+   "c_m7_gloves",
+   "c_m7_crates",
+   "c_m7_offer_livvie",
+   "c_m7_board_letter",
+   "c_m7_selene",
+   "c_m5_archive_count"
+  ],
+  "minimal": [
+   "c_m7_lab_ash",
+   "c_m7_gideon_call",
+   "c_m7_archive_log",
+   "c_m7_board_letter"
+  ]
+ },
+ {
+  "id": "M8",
+  "title": "The one who counts — Madame Oru and why the Guest keeps its word",
+  "surface": "Madame Oru reads card spreads at the night market for 5 cr. She is theatrical, vague and somehow never wrong, which everyone agrees is a trick. As for Charter Duels: a charming school tradition with a binding clause the lawyers put up with.",
+  "truth": "The TESSELLATE lived inside the volcano long before any ship. They learned that Visitors from outside cannot be fought but can be BOUND BY RULES: a Visitor that accepts a contest is bound by its outcome, because rules are the one human thing a Visitor can fully perceive — to something with no body and no place, a rule it has accepted is the only solid ground there is. Breaking one would unmake it; this is why the Guest never cheats, never refuses, always pays. The Tessellate made the contest of tiles, recorded three earlier Visitors when those lost (three sides of the summit shrine's challenge stone each show a falling star ending inside a square; the fourth side is blank; one of the three fell into the sea and was bound there — the sea-cave mosaic, and the source of the Cosmic Depths imagery), and at the end recorded themselves. The law stays in force on the island as long as it is PLAYED and COUNTED: a contest needs one who counts (Article 9). The Tessellate kept a servant line for that, the Counters, who swore never to play. MADAME ORU is the last of that line. She is far older than she looks (those who count are not counted). Her readings — laid from the customer's own deck onto her clay squares — are true because she reads the same records the cards copy; they are vague because her oath forbids her to play, and telling someone the move is playing. She can WITNESS: a contest in the Vault that she counts binds a Visitor completely — if it loses there, it must pay everything and then submit to the old choice the Tessellate gave: be recorded, or leave the world. (A third outcome exists only because of Article 5: one bound to the winner may stay under the winner's rules — 'roommate' is a binding.) Her people kept the summit shrine: a challenge spoken with a hand on its block is HEARD by anything on the island bound by the old rules (this is how the Guest can be summoned on the challenger's terms). She will not read for '{H}' — her lanterns go out when {H:he} comes near. She will not volunteer; she must be ASKED, by name, to count — and she asks a price that is not money (a true thing the asker has never told anyone). The Academy's judges 'count' in the small sense, which is why Hollow Duels with only two people present still hold: the Guest counts for itself, meticulously — and why a judge's formal request for a name 'for the record' cannot be answered falsely.",
+  "layers": [
+   "Oru's readings come true, literally, and she knew the bang's hour before it happened.",
+   "The Charter's phrases recur in the mosaics: two players, tiles between, a third figure with raised hand.",
+   "The summit shrine: three stars, three squares, one blank. Visitors have fallen before and were bound.",
+   "Oru lays her spreads on clay squares she calls 'the receipt'; she never, ever plays.",
+   "Asked by name to count, she answers as what she is."
+  ],
+  "solvedBy": [
+   "c_m8_oru_reading1",
+   "c_m8_oru_hour",
+   "c_m8_oru_deck",
+   "c_m8_never_plays",
+   "c_m8_mosaic_third",
+   "c_m8_shrine_stars",
+   "c_m8_shrine_tile",
+   "c_m8_long_panel",
+   "c_m8_sea_spiral",
+   "c_m8_charter_old",
+   "c_m8_guest_ground",
+   "c_m8_oru_asked",
+   "c_m8_ashdown_lecture",
+   "c_m8_pays"
+  ],
+  "minimal": [
+   "c_m8_mosaic_third",
+   "c_m8_shrine_stars",
+   "c_m8_charter_old",
+   "c_m8_oru_asked"
+  ]
+ },
+ {
+  "id": "M9",
+  "title": "Grey linen — the two Helicals",
+  "surface": "Leona Helical is the most ordinary student in the first year and nobody can say how she got in. Professor Helical, who keeps the hologram tables running, happens to share her surname; both say it is a coincidence, in the same tone. The island's holograms are flat and flickery because that is as good as the technology gets.",
+  "truth": "Leona is Professor Cornelius Helical's daughter. Her mother, MIRIAM HELICAL (née Vane), was a twenty-year-old apprentice in the ink room of the print works on Caldera Key during the Alpha run thirty years ago and later became lead engineer of Kaboom Entertainment's hologram core. From what she had seen of the tile-dust ink she designed the HELICAL LATTICE: a projector that makes holograms solid to the touch. It works only with tile dust. She judged it dangerous and shelved it. Like seven of the nine ink-room workers she developed the slow 'print-works cough' — tile dust in the lungs — and died three years ago. Chuck closed the works when he understood what the dust did and paid the sick from his own pocket; the company took that fund over, renamed it the Print Works Welfare Fund and turned it into hush money ('signed: no claim'); for the last ten years the fund's ledger has been initialled L.M. To pay for Miriam's treatment Cornelius secretly sold part of her notes to LUCIAN MARROW — enough for Marrow to know the lattice exists and that it needs 'the K.A. pigment'. The three essential notebooks (grey linen) he hid on the island and took the post here to guard them, out of guilt: the first inside a gutted oscilloscope in his office in the faculty wing; the second in the sealed housing of the original projector in the hologram plant beneath the Trial Domes, reached through the maintenance tunnels — the housing he lets nobody open (second padlock, a small helix chalked on the plate); the third — the one with the pigment tables — in Miriam's old apprentice locker, number 14, at the print works, where he leaves sea-pinks. Leona learned of the sale after the funeral and has not spoken to her father since. She got into the Academy on a faculty dependant's waiver she forged with his signature; he found it on the list on arrival day and, horrified, let it stand. She has two goals: find the notebooks before Marrow does, and find proof that the company knew the dust was killing its workers — the payroll and sick list in the print works' office and the fund ledger in the Card Archive. She is ordinary at the game and knows it; she plays a deck that steals because stealing is what she came to do, and she goes out at night to do it. Marrow, for his part, wants 'the rest' and holds the forged waiver over Cornelius (Gideon found it in the register about Day 50). MAISIE VOLTAGE, Leona's roommate in Bungalow 4, dreams of touchable holograms and is reinventing the lattice from the other end without knowing it exists: she is on a collision course with all three. TIE TO THE MAIN PLOT: the lattice plus the print works' pigment jar is exactly Marrow's 'Living Light'; a solid hologram is what the Guest already produces in a Hollow Duel without any machine; and the fund ledger with Marrow's initials is evidence that can bring him down.",
+  "layers": [
+   "Two Helicals who will not look at each other; a student with no entrance rank who goes out at night.",
+   "The waiver and its signature; a woman's lab coat in the professor's office; a peak-flow chart that ends three years ago.",
+   "The print works' payroll and sick list; the Welfare Fund ledger: the dust killed the ink-room workers and the company paid for silence.",
+   "The grey notebooks: what the lattice is, why it was shelved, where the three are hidden, and that Marrow owns the first part.",
+   "What father and daughter say to each other when they finally speak — and what Maisie's rig does next to a first print."
+  ],
+  "solvedBy": [
+   "c_m9_two_helicals",
+   "c_m9_waiver",
+   "c_m9_steals",
+   "c_m9_office",
+   "c_m9_payroll",
+   "c_m9_ledger",
+   "c_m9_locker",
+   "c_m9_junction",
+   "c_m9_notebook",
+   "c_m9_night_walks",
+   "c_m9_rig",
+   "c_m9_argument",
+   "c_m9_two_fifths"
+  ],
+  "minimal": [
+   "c_m9_waiver",
+   "c_m9_payroll",
+   "c_m9_ledger",
+   "c_m9_notebook",
+   "c_m9_argument"
+  ]
+ }
+]

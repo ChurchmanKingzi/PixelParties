@@ -1,0 +1,256 @@
+{
+ "id": "chuck",
+ "name": "Chuck Kaboom",
+ "firstName": "Chuck",
+ "age": 74,
+ "sex": "m",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "A hammock in his workshop",
+ "romance": false,
+ "deck": "Whatever I Remember (Alpha pile)",
+ "look": "Wiry and sun-browned, with wild white hair, a huge white moustache and round orange-tinted glasses that make his eyes look like two small sunsets. A green roll-neck jumper under a long rumpled tweed coat with chalk in the pockets — the Hawaiian shirts come out for warm days and grand occasions — a mug of coffee in his fist, sandals in every weather. His hands are a sailor's hands: scarred, quick, never still.",
+ "voice": "Big, warm and wandering: he starts in the middle of a story, loses the thread on purpose and arrives somewhere better. A showman's volume, a sailor's plain words, and a habit of answering a different question from the one asked. When he is serious the voice drops by half and the sentences get short. RARE habit (once in a scene at most; most scenes go without it): a first-person memory of something that only ever happened on a card.",
+ "lines": [
+  "When Tarleinn and I crossed the Sandlands — no, sit, this is relevant — we had one canteen and a deck of forty. Guess which one we rationed.",
+  "A card isn't a picture of a thing. It's a promise somebody made about a thing. Design is deciding which promises you can keep.",
+  "Balanced? Nothing alive is balanced. I want it fair. Different word. Write that one down.",
+  "Don't ask an old man where he gets his ideas. He might tell you, and then where would we both be."
+ ],
+ "intro": "The founder himself: creator of Pixel Parties, honorary lecturer in Card Design, and a gloriously unreliable narrator of his own game.",
+ "traits": [
+  {
+   "id": "chuck_1",
+   "text": "He tells stories from the game universe as if he had personally been there, and never breaks character.",
+   "how": "Any lecture or chance meeting."
+  },
+  {
+   "id": "chuck_2",
+   "text": "He was a deckhand before he was a designer and still ties every knot he sees wrong back the right way.",
+   "how": "Seen at the harbor, the boathouse or on the ferry dock."
+  },
+  {
+   "id": "chuck_3",
+   "text": "He cannot cook anything except one thing: a shipwreck stew he refuses to give the recipe for.",
+   "how": "Visit the workshop in the evening, or ask Mama Odalys about him."
+  },
+  {
+   "id": "chuck_4",
+   "text": "He keeps every student design submitted in twelve years in flat files, and remembers who drew what.",
+   "how": "Hand in a design assignment or visit the workshop with Wren."
+  },
+  {
+   "id": "chuck_5",
+   "text": "He changed his name from Kowalczyk; he says 'Kaboom' was the sound the idea made.",
+   "how": "Ask about the name after earning a little trust, or read the plaque in the card archive."
+  },
+  {
+   "id": "chuck_6",
+   "text": "He sleeps badly and walks the campus before dawn, talking to nobody in particular.",
+   "how": "Be on the quad or cliff path in a Night or early Morning slot."
+  },
+  {
+   "id": "chuck_7",
+   "text": "There is a hero card called 'Chuck, the Crazy Veteran' and he is embarrassed by it: marketing printed it while he was at sea.",
+   "how": "Show him the card or get it mentioned in class."
+  },
+  {
+   "id": "chuck_8",
+   "text": "He lost his daughter's good opinion decades ago by always being somewhere else, and has been trying to deserve the next generation ever since.",
+   "how": "Only in a quiet workshop scene at Trusted, or from someone close to his family."
+  },
+  {
+   "id": "chuck_9",
+   "text": "He is frightened of his own first print run and has never said why.",
+   "how": "Bring an Alpha card into his sight; watch his hands."
+  }
+ ],
+ "secret": "What he knows, exactly. At 24 he was the only survivor of the trawler Agnieszka, lost on the north shore (he built a cairn there for his drowned crewmates and has never forgiven himself for being the one who floated). He lived eleven weeks in a smoke-blackened cave above the wreck — seventy-seven tally marks and burnt-stick drawings are still on its wall — and a fissure at the back led him through the lava tubes to a crack into the Mosaic Vault. He slept among the tiles and DREAMED THEIR RECORDS, each one lived from inside. He knows the tiles are records of real beings and events; that the tile-people made the contest to bind things that fall from the sky; that the law needs living players, which is what he means by 'the Vault wants to be played'. His notebooks call the fallen things 'the Long Guests', and he deliberately never printed the tiles he dreamed about them — the Cosmic Depths. He printed the Alpha run on the island, at the old print works, with ink he mixed himself from ground tile fragments ('only fair to give the pictures back their colour'); he closed the works when he understood what the dust did to the people who ground it — seven of the nine in the ink room got the cough — and paid the sick out of his own pocket for twenty years; the company then took that fund over, renamed it the Print Works Welfare Fund and made every payment conditional on 'no claim' (the ledger in the Card Archive carries his initials for the first twenty years and L.M. for the last ten; he has never forgiven himself for either column). He knows Alphas are faint true records, that they behave wrongly in Charter Duels here, and that one opens the Ruin Gate. The Academy Charter's nine articles are his half-remembered translation of the Tessellate contest law. He still dreams the tiles: on the island he sleepwalks toward the Gate, speaking a language he does not know when awake (Silas follows him with a lantern; he always stops at the gate).\nWhat he has told no one at all: the Vault recorded HIM, lightly, while he slept there — a tile called The Castaway bears his young face — and one who is part of the record may not play in the Vault. Nine years ago, the night the four Umbra students came back, he walked up the ridge alone at midnight, opened the Gate, and tried to play for Aleksander Hale. The tiles did not answer him. He came down at first light looking twenty years older. So he KNOWS Hale is a tile and that he himself can do nothing about it, and he has spent twelve years training strangers to do what he cannot, terrified that the one who ends up at that table will be Inya. Silas knows the most; Okonkwo knows the cover-up; Inya knows nothing. That is the lie he lives: he tells himself he is protecting her career from his shadow when he is protecting himself from her verdict.\nAfter the bang: he recognises what '{H}' is within days (he feels the tiles lean) and is paralysed by it. He gets louder and funnier in class, bolts his door when Marrow is on campus, moves his Alphas into the sea-chest under his hammock, and quietly arranges that Inya is never alone with {H=@near?the girl on the steps of|the boy from} bungalow 7. After Day 40 he recognises a Hollowing for what it is ('the ante is kept'). When he sees a Cosmic Depths card on a table he goes silent mid-sentence — the only time anyone has seen that. By default he cannot be brought to tell the whole truth before Day 150, and then only to Inya and Rowan together — unless someone describes to him the young sailor on the antechamber wall. Arc: from charming evasion to having to tell Inya everything, badly, late, and then being useful anyway: he is the one living person who has dreamed the rules.",
+ "wants": "To hand the island and the game to Inya's generation without handing them the debt that came with it.",
+ "fears": "That Inya will learn what he hid and look at him the way her mother does.",
+ "crush": "odalys",
+ "crushNote": "He walked into her lunch counter twelve years ago and has been finding reasons to eat in the Commons kitchen ever since. It shows as an old man washing up without being asked and telling his stories a little better when she is in the room; he would never name it.",
+ "crushPace": 0.5,
+ "likes": [
+  "Questions that start with 'why' about a card's design",
+  "Being told a story back (any story, told well)",
+  "Students who break a card he designed and show him how",
+  "Kindness to Inya that has nothing to do with her name",
+  "Proper knots, hand tools, things repaired instead of replaced",
+  "Being challenged to a casual game with a silly ante",
+  "People who notice Silas"
+ ],
+ "dislikes": [
+  "Reverence — being called 'sir' or 'Mr Kaboom'",
+  "Questions about money, licensing or the board",
+  "Anyone handling Alpha cards carelessly or greedily",
+  "Being pinned to a straight answer before he is ready",
+  "Students who treat the Commons as beneath them",
+  "Mentions of Lucian Marrow"
+ ],
+ "gifts": [
+  "A coil of good tarred hemp rope",
+  "A jar of Mama Odalys's pickled peppers",
+  "A hand-drawn fan card of your own design",
+  "Card: Tea",
+  "A battered paperback sea adventure from the pawn shop",
+  "Card: Tarleinn's Floating Island"
+ ],
+ "events": [
+  {
+   "id": "chuck_e1",
+   "stage": 1,
+   "title": "Office hours, allegedly",
+   "condition": "Attend at least two Card Design lectures and then visit chuck_workshop with a real question about why a specific card works the way it does; he sets a tiny design exercise and Rowan actually hands it in.",
+   "hint": [
+    "The old man likes people who ask why.",
+    "Bring him a genuine design question in his workshop, and do the homework he gives you."
+   ]
+  },
+  {
+   "id": "chuck_e2",
+   "stage": 2,
+   "title": "The shipwreck stew",
+   "condition": "Earn his notice outside class: either reach the top 16 of the Freshman Cup or submit to the Design Contest, then accept his evening invitation to the workshop; listen to one full story without asking whether it is true.",
+   "hint": [
+    "He invites people he has been watching. Give him a reason to watch.",
+    "Do something notable in the Freshman Cup or the Design Contest, then share a meal in his workshop and just listen."
+   ]
+  },
+  {
+   "id": "chuck_e3",
+   "stage": 3,
+   "title": "The other notebook",
+   "condition": "After Day 40, come to him with something true (a photo, a card nobody printed, a place you should not have been) rather than an accusation, while Inya's trust in Rowan is at least Close/Friend level; he shows the first notebook and admits one thing he has never told anyone.",
+   "hint": [
+    "He tells the truth only to people who bring him some.",
+    "Later in the year, show him real evidence of something in private — and be someone his family trusts."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "family",
+   "text": "His granddaughter, the person he most wants to deserve — and the one he has told least.",
+   "public": false,
+   "from": 0
+  },
+  "wren": {
+   "label": "protégé",
+   "text": "The best designer he has taught, and a reminder of what the game felt like before it cost anything.",
+   "public": true,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "She runs the school he dreamed up, and they have a long habit of not asking each other certain questions.",
+   "public": true,
+   "from": 0
+  },
+  "blum": {
+   "label": "friends",
+   "text": "Backgammon on Thursdays. Ezra is the only man on the island who wants nothing from him.",
+   "public": true,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "owes",
+   "text": "She paid for his silence with nine years of her life, and he has never said so to her.",
+   "public": false,
+   "from": 0
+  },
+  "silas": {
+   "label": "best friends",
+   "text": "The boy in the boat who pulled him off the rocks; fifty years his friend and his conscience.",
+   "public": true,
+   "from": 0
+  },
+  "dex": {
+   "label": "friends",
+   "text": "Gave him the Main Street lease for a pound a year because a game needs a shop.",
+   "public": true,
+   "from": 0
+  },
+  "oru": {
+   "label": "owes",
+   "text": "She has never read for him. He knows why, and that the debt is real.",
+   "public": false,
+   "from": 0
+  },
+  "marrow": {
+   "label": "enemies",
+   "text": "The board's man. Chuck is charming to him and has hidden the workshop keys.",
+   "public": true,
+   "from": 0
+  },
+  "victoria": {
+   "label": "mentor",
+   "text": "She described a painting he has only ever seen in his sleep. He admitted her on the spot and has never said why.",
+   "public": false,
+   "from": 0
+  },
+  "eloise": {
+   "label": "mentor",
+   "text": "She paints what a card is doing. Some of what she paints he has only seen in his sleep, and it frightens him.",
+   "public": false,
+   "from": 5
+  },
+  "helical": {
+   "label": "owes",
+   "text": "Her mother swept his pigment room at twenty. He mixed that ink himself. He cannot look the man in the eye.",
+   "public": false,
+   "from": 0
+  },
+  "junho": {
+   "label": "mentor",
+   "text": "The boy can find the unfair card on any table in ten seconds. Chuck is trying to teach him that fair is not the same as even.",
+   "public": true,
+   "from": 4
+  },
+  "tariq": {
+   "label": "mentor",
+   "text": "Sharp lad; keeps the collection as a collection should be kept. Chuck is careful which drawers he opens in front of him.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "chuck_workshop",
+   "Midday": "lecture_hall",
+   "Afternoon": "chuck_workshop",
+   "Evening": "card_archive",
+   "Night": "cliff_path"
+  },
+  "weekend": {
+   "Morning": "harbor",
+   "Midday": "chuck_workshop",
+   "Afternoon": "lighthouse",
+   "Evening": "chuck_workshop",
+   "Night": "quad"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Plays a mismatched pile of Alpha cards with no visible plan and a frightening instinct; half his lines are blunders and the other half are things nobody has seen since the first rulebook. Never plays for stakes.",
+  "tilt": "Any formal ante. The moment a duel is 'for something' he plays like a man holding hot coals and usually concedes."
+ },
+ "away": [
+  {
+   "when": {
+    "flags": [
+     "chuck_down"
+    ],
+    "dayFrom": 166,
+    "dayTo": 185
+   },
+   "place": "infirmary",
+   "cover": {
+    "gd110": "wren"
+   },
+   "gm": "Chuck Kaboom [chuck] is in the INFIRMARY until Day 185: Silas found him at dawn on Day 166 on the threshold of the Ruin Gate, alive and not speaking; Nurse Camille keeps him in a side room of the infirmary (not in the wards). He is NOT in his workshop, in class, at the Cup or at his own festival. Wherever a plan or a calendar entry below says 'Chuck' or 'the Founder' without a condition, play the version WITHOUT him: his chair stands empty and people look at it; the workshop half-door is shut and the Monday storytelling hour does not take place; Inya is at his bedside at visiting hour and carries what messages there are; Wren Ishikawa [wren] takes Card Design Basics from his notes and sits in for him on staff panels. He can be visited (@place infirmary): short, quiet scenes — he listens, presses a hand, tells no stories."
+  }
+ ]
+}

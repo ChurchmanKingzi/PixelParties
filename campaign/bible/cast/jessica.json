@@ -1,0 +1,268 @@
+{
+ "id": "jessica",
+ "name": "Jessica Montclair",
+ "firstName": "Jessica",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S2",
+ "romance": true,
+ "deck": "Dowry (Gold & Artifacts, Teocuilatl)",
+ "look": "A true beauty and aware of it as a responsibility: long curling dark-chestnut hair, violet eyes, a beauty mark below the left one, and jewellery chosen fresh every morning. In uniform she wears a dark fitted blazer over a ruffled white blouse; her own dresses are cut very low and worn with a posture so immaculate that it reads as elegance rather than display. She never hurries and never fidgets.",
+ "voice": "Unhurried, warm and beautifully finished, with a trace of French schooling; she lets a silence sit until the other person fills it. Gracious as a matter of training and amused as a matter of temperament, she never swears and never raises her voice — displeasure is a slight cooling. RARE habit (once in a scene at most; most scenes go without it): 'How lovely', which can mean three different things.",
+ "lines": [
+  "You may sit. I'd decided you might ask, and I had rather hoped you would be quicker about it.",
+  "How lovely. No — truly. Nobody has brought me a thing they made in years. People bring me things they bought.",
+  "I don't chase, Rowan. It isn't pride. It's that I should like to know someone crossed the room on purpose.",
+  "Oh, I can count cards perfectly well. I simply find it's more instructive to watch who explains the rules to me."
+ ],
+ "intro": "A strikingly beautiful Auxiliary first-year (commentary track) from old money: gracious, always in jewels, and plainly accustomed to being courted.",
+ "traits": [
+  {
+   "id": "jessica_1",
+   "text": "She brought three caskets to the island and wears a different piece of jewellery every day.",
+   "how": "Visible from Day 1; Georgie counts."
+  },
+  {
+   "id": "jessica_2",
+   "text": "She plans outings — picnics, harbour walks, dinners — with the care other students give to deck lists.",
+   "how": "Be invited once, or hear Marit describe one."
+  },
+  {
+   "id": "jessica_3",
+   "text": "She brushes the wild hair of the fourteen-year-old in the next suite every morning, pins her feather straight and checks her homework.",
+   "how": "Visit the Spectral lobby or suite in the Morning."
+  },
+  {
+   "id": "jessica_4",
+   "text": "She speaks four languages and reads the financial pages before breakfast.",
+   "how": "Catch her at the cafe or Spectral terrace early."
+  },
+  {
+   "id": "jessica_5",
+   "text": "She loses duels gracefully and far less often than her rank suggests she should win.",
+   "how": "Play her; or notice her results sheet."
+  },
+  {
+   "id": "jessica_6",
+   "text": "Every piece of jewellery has a name and a story, and she tells them like introductions.",
+   "how": "Compliment a specific piece rather than her."
+  },
+  {
+   "id": "jessica_7",
+   "text": "She has never cooked a meal, and is secretly taking lessons from Mama Odalys on Thursdays.",
+   "how": "Be in the Commons kitchen on a Thursday afternoon."
+  },
+  {
+   "id": "jessica_8",
+   "text": "Her late grandmother Eugénie, who once sat at a commentary desk herself, taught her that a lady is never in a hurry and never in debt; she repeats only the first half.",
+   "how": "A long evening once she is Close."
+  },
+  {
+   "id": "jessica_9",
+   "text": "She would like, once, to be surprised by someone, and has almost stopped expecting it.",
+   "how": "Dating stage; she says it looking away."
+  },
+  {
+   "id": "jessica_10",
+   "text": "There is a piece missing from the second casket that she will not talk about.",
+   "how": "Notice an empty velvet slot in her suite, or meet her by chance near the pawn shop."
+  }
+ ],
+ "secret": "The Montclair fortune is gone. Her father, Armand, mortgaged the house, the vineyard and finally the name into a private-credit scheme that collapsed eighteen months ago; it is not public yet because the creditors are also old friends and nobody wants the scene. Her mother has retreated to Geneva and the conviction that Jessica will marry it all better. The caskets are not vanity: two hold grandmother Eugénie's jewels, left to Jessica personally, the only assets no creditor can touch — and her entire tuition, allowance and escape fund. The third holds no jewellery at all but Eugénie's old tournament deck and scorebooks: her grandmother was the commentator at the very first Kaboom Alpha exhibition and was laughed off the desk for being 'decorative'. Jessica reads a board better than half the CP year and hides it; putting a Montclair back on the microphone, taken seriously this time, is the real ambition under the dating plans. She pawns one piece at a time, discreetly, at the Port Mulligan pawn shop (first on Day 13), choosing the ones with the weakest stories and grieving each anyway. She chose the Auxiliary major, commentary track, because a beautiful, composed woman who understands money can earn her own living in front of a camera, and she intends to. So: the 'lady who invests more in dating plans than in duelling' is partly a role she was bred for, partly real pleasure — she does love attention, loves being looked at, sees nothing shameful in the low necklines or in enjoying desire — and partly a survival strategy she despises: her family expects a rich husband, and Ashton Beaumont-Lyle was the audition she walked out of by letter. Her contradiction is that the most 'kept'-looking woman on the island is quietly the most financially literate and the most alone with it. She is smarter than she lets on because letting on has never been safe. Private joke: she grades men's approaches out of ten in a tiny notebook, in French; Rowan's first entry is a question mark.\nWhy she is the deepest route: she must be COURTED — invited, planned for, surprised — by a boy who has no money, and must discover that courtship is attention, not expenditure; and he must discover that she is not a prize but a person doing arithmetic in the dark. The turn in her route is the pawn ticket. If Rowan finds out and treats her as fallen, or as a damsel to rescue with credits, the route dies. If he treats her as she is — proud, frightened, competent — she stops performing.\nDark turn: she is not brave about monsters and does not pretend to be. After Day 40 she sleeps with the lamp on and the caskets under the bed, and looks after Georgie with fierce practical tenderness. Marrow notices her (name, face, need of money) around Day 70 and offers her a 'presenter contract' with strings; whether she takes it depends on whether anyone has shown her she has another option. In Stage D she is the one who can talk to boards, lawyers and cameras as an equal, and that turns out to be a weapon.",
+ "wants": "To be chosen for herself by someone who had to cross the room to do it — and never again to depend on a man's money.",
+ "fears": "Ending up exactly what her mother planned: an ornament sold to cover a debt.",
+ "crush": "teobalt",
+ "crushNote": "He makes a plan, writes down the time and arrives at it: without knowing it he courts exactly as she wishes to be courted, and wants nothing from her name. It shows as her finding small committees to sit on and asking his opinion with unusual attention.",
+ "crushPace": 0.8,
+ "likes": [
+  "Being formally invited: a time, a place, a plan",
+  "Handmade or thought-out gestures over bought ones",
+  "Compliments on a specific choice (a piece, a phrase, a play)",
+  "Being asked her opinion on something serious",
+  "Good manners toward staff and toward Georgie",
+  "Patience — letting her set the pace of the evening",
+  "Being admired openly and without apology",
+  "Punctuality"
+ ],
+ "dislikes": [
+  "Being grabbed at, rushed or presumed upon",
+  "Vulgar remarks about her figure",
+  "Being treated as stupid, or as a purse",
+  "Pity",
+  "Lateness without a message",
+  "Men who talk over her at the commentary desk",
+  "Offers of money"
+ ],
+ "gifts": [
+  "A planned picnic basket (bread, pears, a borrowed blanket)",
+  "Card: Golden Apple",
+  "A hand-written invitation",
+  "Card: The Sacred Mirror",
+  "A pressed island orchid from the greenhouse",
+  "Card: Treasure Chest"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Invitational: she opens the door and waits to see who walks through.",
+  "text": "Jessica flirts first and immediately — a held gaze, a hand offered to be helped down a step, 'you may sit' — but she never pursues. She creates openings and judges what is done with them. She wants a suitor: someone who asks properly, names a day, turns up on time and has thought about where they are going. Money is irrelevant and she will say so; effort is everything. She enjoys being looked at and will tease a boy for pretending he is not looking. Rushing her, or assuming that the neckline is an invitation to touch, ends the evening with perfect courtesy. Being surprised — genuinely — undoes her composure for a second, and that second is what the whole route is about."
+ },
+ "intimacy": "She sets a deliberate, old-fashioned pace and enjoys every step of it: an arm taken on the harbour wall, a gloved hand kissed, a dance at the Gala where she lets herself be held close. She likes anticipation better than hurry and is frank, in private, about liking to be wanted — she will choose a dress for the effect and watch for it. When she finally decides, it is a decision: her suite, the door locked, her jewellery taken off piece by piece and laid in its casket while he waits — and she asks him to undo the last clasp. She wants to be undressed slowly and told what he sees. Warm, unhurried, a little imperious, unexpectedly playful once the door is shut; the scene fades as the lamp is turned down.",
+ "events": [
+  {
+   "id": "jessica_e1",
+   "stage": 1,
+   "title": "You may sit",
+   "condition": "Be properly presented to her (Marit, Pippa or Teobalt will do it), or return the glove she drops on the spectral_terrace steps without comment; accept the seat she then offers, and within a few days, invite HER somewhere specific with a time and a plan — however modest.",
+   "hint": [
+    "She opens doors. She notices who walks through with a plan.",
+    "After she first speaks to you, formally invite her on an outing you have actually thought through."
+   ]
+  },
+  {
+   "id": "jessica_e2",
+   "stage": 2,
+   "title": "A picnic costs nothing",
+   "condition": "Take her on at least two planned outings that cost little or nothing (beach_cove, orchard, lighthouse walk), be on time for both, and on one of them ask about the story of the piece she is wearing.",
+   "hint": [
+    "What she values is not on a price tag. Find out what is.",
+    "Court her properly with a couple of thoughtful, inexpensive outings, and ask about her jewellery's history."
+   ]
+  },
+  {
+   "id": "jessica_e3",
+   "stage": 3,
+   "title": "The ticket",
+   "condition": "Learn about the missing piece (see her at pawn_shop, or she tells you after Day 47), keep it entirely to yourself, and do NOT offer her money or pity; instead ask what she intends to do. She answers honestly, and asks to be taken to the Night of Masks (Day 54) or the next festival as his partner.",
+   "hint": [
+    "She is carrying something alone. What matters is what you do once you know.",
+    "If you learn her secret, keep it, respect it, and ask about her plans rather than trying to rescue her."
+   ]
+  },
+  {
+   "id": "jessica_e4",
+   "stage": 4,
+   "title": "The last clasp",
+   "condition": "Ask her to the Winter Gala in person, in words, at least seven days ahead; escort her (Day 103) at gala_ballroom with a plan of your own; when Marrow or her family's expectations come up that evening, back her right to refuse. She invites Rowan to her suite afterwards.",
+   "hint": [
+    "There is a formal evening where she will have to decide whose expectations she is dressing for.",
+    "Be her partner at the Winter Gala and stand with her when someone tries to buy her future."
+   ]
+  },
+  {
+   "id": "jessica_e5",
+   "stage": 5,
+   "title": "Nobody's ornament",
+   "condition": "In Term 2, support her first paid on-camera work on her own terms (Island Open desk, Days 124–126, or the Interschool Cup broadcast) and be there when she writes to her mother; she redeems one piece from the pawn shop with her own earnings and gives its story to Rowan.",
+   "hint": [
+    "She means to earn her own way. She would like one witness.",
+    "Help her win her first real commentary job and stay beside her when she breaks with what her family expects."
+   ]
+  }
+ ],
+ "bonds": {
+  "ashton": {
+   "label": "exes",
+   "text": "The audition she walked out of, by letter. She is fond of him the way one is of a mistake that taught something.",
+   "public": true,
+   "from": 0
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "The fourteen-year-old next door, whom she looks after with complete seriousness.",
+   "public": true,
+   "from": 2
+  },
+  "octavia": {
+   "label": "friends",
+   "text": "Their families have known each other for three generations. Octavia thinks she wastes herself; Jessica lets her think so.",
+   "public": true,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "The instructor who told her that composure on camera is a profession.",
+   "public": true,
+   "from": 8
+  },
+  "marit": {
+   "label": "friends",
+   "text": "Commentary-track classmates and complete opposites; Marit makes her laugh in public.",
+   "public": true,
+   "from": 5
+  },
+  "selene": {
+   "label": "friends",
+   "text": "A regular at the spa; one of the few people she is unguarded with.",
+   "public": true,
+   "from": 10
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Pippa's favourite subject, and a partner in looking after Georgie.",
+   "public": true,
+   "from": 9
+  },
+  "odalys": {
+   "label": "protégé",
+   "text": "Secret cooking lessons on Thursdays. She has never been so bad at anything or enjoyed it so much.",
+   "public": false,
+   "from": 11
+  },
+  "victoria": {
+   "label": "friends",
+   "text": "The only person on the island with better posture, and the only one Jessica never has to perform for.",
+   "public": true,
+   "from": 6
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "The fierce sister. Jessica admires the loyalty and privately thinks someone ought to look after her for a change.",
+   "public": true,
+   "from": 8
+  },
+  "tobias": {
+   "label": "distrusts",
+   "text": "He looks at her jewellery as a valuer would. She does not know that he knows, or that he is the reason nobody else does.",
+   "public": false,
+   "from": 14
+  },
+  "cas": {
+   "label": "rivals",
+   "text": "Mr Abernathy has the voice; she has the read. She would like the second chair and intends to earn it.",
+   "public": true,
+   "from": 6
+  },
+  "pilar": {
+   "label": "friends",
+   "text": "Miss Estévez runs a room as her grandmother did. Jessica finds it a pleasure to watch and has said so.",
+   "public": true,
+   "from": 14
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "classroom",
+   "Afternoon": "spectral_terrace",
+   "Evening": "cafe",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_suite",
+   "Midday": "boutique",
+   "Afternoon": "spa",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Sits behind a wall of Artifacts, accumulates Gold without visible effort and ends the game with Teocuilatl once you have run out of answers. Plays slower than anyone and makes fewer mistakes than people assume.",
+  "tilt": "Being hurried by the clock or patronised by the opponent; she becomes very polite and very careless."
+ }
+}

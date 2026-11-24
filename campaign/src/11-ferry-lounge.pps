@@ -1,0 +1,616 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · MORGEN · FÄHRE · SALON — der Tisch (Hook h_ferry_table)
+#  Genau EINE Auflösung setzt table_resolved plus genau eines von:
+#     ferry_table_won · ferry_table_lost · ferry_inya_won · ferry_table_settled
+#  (oder keines: Inya verliert allein; Rowan hat sich rausgehalten oder Gideons Seite gewählt)
+# ═══════════════════════════════════════════════════════════════════
+
+@place ferry_lounge
+  travel 0
+  travelFrom ferry_deck=2 ferry_stern=2 ferry_bridge=2
+  onArrive lounge_first
+  object gideon sprite=gideon x=50 y=92 h=62 label="Boy in white gloves" scene=ferry_gideon when day=1 and time<10:40 and not met:gideon
+  object gideon_m sprite=gideon x=50 y=92 h=62 label="Gideon" scene=ferry_gideon when day=1 and time<10:40 and met:gideon
+  object inya sprite=inya x=64 y=96 h=40 label="Mint-haired girl" scene=ferry_inya when day=1 and time<10:40 and not met:inya
+  object inya_m sprite=inya x=64 y=96 h=40 label="Inya" scene=ferry_inya when day=1 and time<10:40 and met:inya
+  object tomi sprite=tomi x=22 y=98 h=50 label="Boy in a yellow bandana" scene=ferry_tomi when day=1 and time<10:40 and not met:tomi
+  object tomi_m sprite=tomi x=22 y=98 h=50 label="Tomi" scene=ferry_tomi when day=1 and time<10:40 and met:tomi
+  object magnus sprite=magnus x=10 y=90 h=60 label="Boy with a tablet" scene=ferry_magnus when day=1 and time<10:40 and not met:magnus
+  object magnus_m sprite=magnus x=10 y=90 h=60 label="Magnus" scene=ferry_magnus when day=1 and time<10:40 and met:magnus
+  object noor sprite=noor x=84 y=90 h=58 label="Girl with a rulebook" scene=ferry_noor when day=1 and time<10:40 and not met:noor
+  object noor_m sprite=noor x=84 y=90 h=58 label="Noor" scene=ferry_noor when day=1 and time<10:40 and met:noor
+  object livvie sprite=livvie x=38 y=96 h=56 label="Girl with a clipboard" scene=ferry_livvie when day=1 and time<10:40 and not met:livvie
+  object livvie_m sprite=livvie x=38 y=96 h=56 label="Livvie" scene=ferry_livvie when day=1 and time<10:40 and met:livvie
+  action plate "Read the brass plate on the table" scene=lounge_plate when day=1 and time<10:40
+  action watch "Watch a game at the table" scene=lounge_watch when day=1 and time<10:40 and not saw_counter
+  action galley "Go to the galley hatch" scene=lounge_galley when day=1 and time<10:40
+  action binder "Look through a trade binder" scene=lounge_binder when day=1 and time<10:40
+
+# ───────────────────────────── ERSTER EINTRITT ─────────────────────────────
+
+@scene lounge_first once bg=ferry_lounge
+  The iron steps give onto a low saloon that smells of coffee, wet wool and diesel. The windows are fogged with salt. Rows of cracked red benches run fore and aft, and duffel bags fill every aisle.
+  The engine is louder down here. You can feel it in the soles of your feet.
+  At the forward end a hatch sells coffee and cinnamon rolls. In the middle of the room stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to the edge. People are standing round it two deep.
+  At the table sits a pale boy in white cotton gloves, squaring his deck against the felt. He does it twice, as if it might have changed. His gloves lie folded beside it. He has not looked up since you came in.
+  At the far end of the table stands a very small girl with mint-green hair in two low tails. She is holding a deck box in both hands, and the box is shaking slightly, the way a leaf shakes.
+  [inya?] "The plate says winner stays."
+  [gideon?] "It does."
+  [inya?] "So I'm next."
+  [gideon?] "It does not say whom the winner has to play."
+  He looks, for the first time, at her. Not at her face. At the plain grey collar above the oversized hoodie.
+  [gideon?] "I do not play for nothing."
+  The crowd shifts. Somebody breathes out.
+  [gideon?] "The loser carries the winner's luggage from the dock to the winner's door. I have four cases."
+  Nobody says anything. On the nearest bench a boy in a yellow bandana turns the lid of a binder towards the room and takes the pencil from behind his ear.
+  [tomi?] "Even money on the house, folks, ten-credit limit. Gideon's three and oh. The girl's about to be four. Friend price on the girl: I'll give you six to one."
+  The small girl lifts her chin.
+  [inya?] "Fine. Four cases."
+  Nobody asks you to do anything. Nobody even looks at you. It is simply happening, in front of you, whether you take part or not.
+  ~ I could say something. I could do nothing. Both of those are also decisions.
+  @flag lounge_seen
+  @time 5
+  @end
+
+# ───────────────────────────── ORTSHANDLUNGEN ─────────────────────────────
+
+@scene lounge_plate
+  The brass plate is screwed to the edge of the table and polished by a thousand sleeves. It reads, in small engraved capitals:
+  WINNER STAYS
+  Underneath, in a smaller and much more recent hand, somebody has scratched with a key: *(he doesn't have to play you though)*.
+  ~ The plate says who keeps the seat. It says nothing about who gets to sit down opposite.
+  @flag read_plate
+  @time 2
+
+@scene lounge_watch
+  @if table_resolved
+    Gideon has gone back to squaring his deck. The crowd has thinned. There is nothing left to watch that you have not already seen.
+    @end
+  @if saw_counter
+    You have seen enough of how he plays.
+    @end
+  A freckled deckhand on his break, a mug of tea in one hand and a deck of cards in the other, says, "Go on, then. One. I've got eleven minutes."
+  Gideon inclines his head a quarter of an inch. "How kind."
+  You find a spot at the rail of the crowd where you can see both hands.
+  The deckhand leads with everything he has: an attack on turn one, another on turn two, a Creature behind it. Gideon does nothing. He builds. A single Guardian Beast, two, then a third, set one beside the other like fence posts. The deckhand commits again on turn three and the board blinks.
+  Gideon has not attacked once. He has not needed to. Every blow the deckhand swung came back at him, and then some.
+  The game ends on turn five.
+  ~ He never attacks first. He sits behind the Guardians and lets you commit. He wins entirely on the counter-swing.
+  ~ Which means the only way to beat him is to wait. Longer than he can.
+  The deckhand looks at the board for a while, shrugs, finishes his tea and goes back to work.
+  Gideon looks up, finds you across the felt, and for a half-second something very quiet and very attentive lives behind his grey eyes.
+  [gideon?] "Did you find that instructive?"
+  @choice
+    > "Very."
+      [gideon?] "How resourceful."
+    > "No."
+      [gideon?] "A pity."
+  @flag saw_counter
+  @time 25
+
+@scene lounge_galley
+  A galley hatch with a hand-lettered sign: COFFEE 2 · CINNAMON ROLL 3. A cheerful woman in an apron is working it with the weary patience of someone who has watched four hundred first-years pretend not to be hungry.
+  @choice
+    > Buy a coffee. (2 cr) @if coins>=2
+      @coins -2
+      The coffee is dreadful, scalding and the best thing that has happened to you since breakfast. You wrap both hands round the cup.
+      @flag had_coffee
+    > Buy a cinnamon roll. (3 cr) @if coins>=3
+      @coins -3
+      The roll is soft, warm, and slightly flattened where somebody stacked something on it. You eat it in four bites and feel almost optimistic.
+      @flag had_roll
+    > Leave it.
+      Eight credits' worth of will power. You move off.
+  @time 3
+
+@scene lounge_binder
+  On the bench by the galley lies a trade binder, left open on its back, unattended. Someone has written TRADES — ASK TOMI in marker on the cover.
+  You page through it. Every sleeve holds a card, every card has a price in pencil, and every price has been crossed out and rewritten at least once. The cheapest is a common at one credit. The most expensive is a rare at fourteen, and it has a sleeve of its own.
+  You find, tucked into the back pocket, a small notebook. On the first page: a column of initials and numbers. G.P. 3–0. Then, next to it, in smaller letters: *never first. counters. 3 for 3.*
+  You close it. It is not yours, and you have a conscience, or at least a very strict aunt.
+  @flag saw_counter
+  @time 5
+
+# ───────────────────────────── GIDEON ─────────────────────────────
+
+@scene ferry_gideon
+  @if not met:gideon
+    Up close, he is smaller than you expected. Pale, black hair slicked flat, a thin smile that does not reach grey eyes. His jacket is spotless, his collar starched, white and gold.
+    He does not look up. He squares his deck.
+    [gideon?] "Vance."
+    ~ He knows my name. Nobody has told me his.
+    [gideon?] "The Wildcard. How resourceful of the admissions office. I am Gideon Pryce. I would offer to shake hands, but you will understand that I never do before a game."
+    @meet gideon
+    @add ferry_talked +1
+    [rowan] "How do you know who I am?"
+    [gideon] "A very loud boy has been telling the whole ship since the harbour." A small, dry pause. "I took an interest."
+    @aff gideon +0 | Met Gideon
+  @else
+    [gideon] "Vance."
+  @if table_resolved
+    @if ferry_table_won
+      [gideon] "I am told I owe you a bag. It will be at your door before supper. I do not intend to make a performance of it."
+    @elif ferry_table_lost
+      [gideon] "Good. I look forward to the shoulders."
+    @elif ferry_table_settled
+      [gideon] "You are the only person on this ship who has made me play a game for nothing and not regretted it. Do not read into it."
+    @elif ferry_inya_won
+      [gideon] "She stopped attacking. I wonder who told her." He looks at you for exactly one second. "Never mind."
+    @else
+      [gideon] "That was a straightforward game. I enjoyed it."
+  @choice
+    > "Ask Inya for her turn." @if not table_resolved and not inya_yielded
+      [gideon] "As you like. I will wait."
+      @scene table_ask_inya
+    > "Take Inya's turn, now that she has yielded." @if inya_yielded and not table_resolved
+      @scene table_ask_game
+    > "The plate says nothing about luggage." @if not table_resolved
+      [gideon] "It does not. It says nothing about a great many things I do." A quarter-inch smile. "I do hope you do not mean to take that up with the captain."
+      @aff gideon +1 | Could be argued with
+    > "Rules are rules. Play her." @if not table_resolved
+      [gideon] "I rather think that was my point."
+      @flag took_gideon_side
+      @aff gideon +2 | Took his side
+      @aff inya -3 | Sided with Gideon
+      @scene table_play_default
+    > "What if there were a second table?" @if noor_ruled and not table_resolved
+      [gideon] "A second table." He says it as if it were a foreign word. "Do go on. I should like to see where you intend to put it."
+      @scene table_settle
+    > "Compare notes on how the table works." @if saw_counter and not table_resolved
+      [gideon] "Notes." He tilts his head. "You have a very quiet face, Vance. I find that I cannot tell what it is thinking at all." The corner of his mouth moves. "That is unusual. I wonder if it is also useful."
+      @aff gideon +1 | Held his gaze
+    > Back away politely.
+      [gideon] "Good morning, then."
+  @time 5
+
+# ───────────────────────────── INYA ─────────────────────────────
+
+@scene ferry_inya
+  @if not met:inya
+    She is much smaller than the table. The mint-green tails, the oversized hoodie, the amber eyes narrowing as she watches the gloved boy's hands: all of it points one way, like a compass needle.
+    [inya?] "If you're here to tell me not to, don't."
+    [rowan] "I wasn't going to."
+    [inya?] "Oh." A pause. "Then what?"
+    [rowan] "Rowan. Vance."
+    [inya] "Inya." She does not offer a hand. She has not, you realise, let go of the deck box. "Bell. Inya Bell. Bunnies. Don't say anything about the bunnies, you'd be the fifth."
+    @meet inya
+    @add ferry_talked +1
+  @else
+    [inya] "Rowan."
+  @if not table_resolved
+    @choice
+      > "Why does it matter this much?"
+        [inya] "Because he doesn't think I'm worth a game." Fast, flat. "I've been standing here twenty minutes. I could have been somewhere else."
+        [inya] "But if I leave now he's won already. Even if I never sit down."
+        ~ She isn't wrong. That is the problem with her being right.
+        @aff inya +2 | Asked why
+        @flag inya_explained
+      > "He never attacks first." @if saw_counter
+        She goes completely still.
+        [inya] "…Say that again."
+        [rowan] "Three games. Every one on the counter. He sets his Guardians and waits for you to commit. If you don't commit, he doesn't have anything to counter with."
+        [inya] "So I wait him out." Her whole face rearranges itself, like a compass spinning to a new north. "So I make him come to me."
+        @scene table_tell
+      > "Would you let me take your turn?"
+        @scene table_ask_inya
+      > "Step aside. I'll handle him."
+        [inya] "Excuse me?"
+        [rowan] "I'm — you're shaking. I'll take the game."
+        Her eyes narrow into two amber slits.
+        [inya] "I am NOT shaking. And I'm not a — I don't need anybody to 'handle' anybody. I'll play him myself."
+        @aff inya -3 | Talked down to her
+        @flag stepped_past_inya
+        @scene table_play_default
+      > Say nothing and stand by her.
+        She glances at you sideways, then back at the table. She does not say thank you. She does not move away either.
+        @aff inya +1 | Stood by her
+  @else
+    @if ferry_inya_won
+      [inya] "I won." She says it as if testing whether it is true. "I WON. Four cases, and he's got to carry them, and — you told me. You told me how."
+      [rowan] "You waited. That was the hard part."
+      [inya] "Rude. Accurate, but rude." A tiny, fierce grin. "Thank you."
+      @aff inya +2 | Glad you helped
+    @elif ferry_table_settled
+      [inya] "A bench and a bag and a game for nothing. And I got a real game out of him." She is still half-disbelieving. "Thank you. Don't tell anyone I said so."
+    @elif ferry_table_won
+      [inya] "You played him." She is looking at you very hard. "You asked first. You asked ME first. And then you beat him."
+      [inya] "I'd have lost. I know I'd have lost. Don't let me win next time. If you let me win I'll know."
+    @elif ferry_table_lost
+      [inya] "You carried — you're going to carry the four cases." Quietly. "You asked me first. I'll go with you to the tower door. It's the least."
+    @else
+      [inya] "I lost." Flatly. "I attacked first. I attacked first and he — I'm going to carry four cases up the avenue."
+      [inya] "Don't say anything nice about it. I'll cry, and I don't have time."
+    @choice
+      > "Want a game? Loser buys the rolls."
+        [inya] "Six credits. Loser pays." The amber eyes light up with pure, undiluted competition. "Yes. On a bench. Right now."
+        @scene inya_rematch
+      > "Another time."
+        [inya] "Another time. Don't forget."
+  @time 8
+
+@scene inya_rematch
+  @if not met:inya
+    @end
+  @if flag_inya_played
+    [inya] "We did that. I remember. I'm still thinking about it."
+    @end
+  A bench near the galley. Two decks. The cards held down with a coffee cup.
+  [inya] "Don't let me win."
+  @duel ferry_inya deck=inya name="Inya Bell"
+    @win
+      [inya] "Rude." Instantly. Four seconds of furious sulking pass across her face. Then, very fast: "Rematch. Not now. Later. On a real table. You owe me a real table."
+      [inya] "You pay for the rolls. Six credits."
+      @coins -6
+      @aff inya +3 | Fair fight
+    @lose
+      [inya] "HA." She slaps the table. Then, remembering herself: "Good game. Accurate. Your storm was wrong for my bunnies and I told you so."
+      [inya] "I'll take the rolls. Six credits. You said."
+      @coins -6
+      @aff inya +4 | Won fairly
+  @flag flag_inya_played
+  @time 25
+
+# ───────────────────────────── TOMI ─────────────────────────────
+
+@scene ferry_tomi
+  @if not met:tomi
+    He is small and quick, a yellow bandana knotted over spiky black hair, a canvas bag of binders at his hip. He has the cheerful, unhurried eyes of someone who is already counting what you have in your pockets.
+    [tomi?] "Wildcard! Wildcard Vance. Don't look at me like that, Nathan told every bench from here to the bridge. Tomás Reyes. Tomi. I run the book."
+    @meet tomi
+    @add ferry_talked +1
+    [tomi] "You need sleeves. Friend price. Everybody's a friend, the price is the price."
+  @else
+    [tomi] "Wildcard! Business?"
+  @choice
+    > "What's the book on the table?" @if not table_resolved
+      [tomi] "Gideon three and oh. The girl's the longshot. Ten-credit limit, even money. You in?"
+      @choice
+        > Ten credits on Gideon. @if coins>=10 and not bet_gideon and not bet_inya
+          @coins -10
+          @flag bet_gideon
+          [tomi] "Smart. Boring, but smart." He writes it in the lid of the binder, a neat little line of numbers.
+        > Ten credits on Inya. @if coins>=10 and not bet_gideon and not bet_inya
+          @coins -10
+          @flag bet_inya
+          [tomi] "Heart over head. I respect that. I'll be sad to take it."
+        > Not today.
+          [tomi] "Smart. Or poor. Same thing, on a boat."
+      @aff tomi +1 | Did business
+    > "Do you keep notes on the games?" @if not saw_counter
+      [tomi] "Course I do. Information is inventory."
+      [tomi] "Three credits and I'll tell you what I've got on Pryce. Friend price."
+      @choice
+        > Pay three credits. @if coins>=3
+          @coins -3
+          [tomi] "Never attacks first. Sets Guardians and waits. Counter-swing, every game, three for three. If you want to beat him you've got to out-wait him. Which nobody's done, because nobody can stand it."
+          @flag saw_counter
+          @aff tomi +2 | Paid fair
+        > No thanks.
+          [tomi] "Offer stands. For as long as I'm in this room."
+    > "How's it going with the book?" @if table_resolved
+      @if bet_gideon and (ferry_table_lost or not (ferry_inya_won or ferry_table_won or ferry_table_settled))
+        [tomi] "Gideon came through. I paid out what I had to." He taps the binder lid. "You were good for ten, wasn't it? Twenty back."
+      @elif bet_inya and (ferry_inya_won or ferry_table_won)
+        [tomi] "Against Gideon is against Gideon, whoever does it. Your bet came in. I'm a poorer man, but a happier one. Twenty."
+      @elif ferry_table_settled
+        [tomi] "No result, no money. All bets void. I'm giving everyone their ten back with a hurt look."
+      @else
+        [tomi] "Didn't go your way. Next time."
+      @aff tomi +0 | Settled up
+    > "Why do you keep the book?"
+      [tomi] "Because everybody's going to bet anyway." Easily. "The only question is whether somebody keeps it honest."
+      [tomi] "Cheating's bad business. You only get to do it once."
+      @aff tomi +2 | Asked about him
+      @flag tomi_honest
+    > "Show me what you've got in the binder."
+      @scene lounge_binder
+    > Leave.
+      [tomi] "Come back when you've got something to trade. Or a bet."
+  @time 6
+
+# ───────────────────────────── MAGNUS ─────────────────────────────
+
+@scene ferry_magnus
+  @if not met:magnus
+    Two benches back from the table, a wiry boy with slicked ginger hair has a tablet balanced on his knee and a stylus in his teeth. His sneakers are designer and still creased from the box. He has logged every game at the table. You can tell from the way his thumb hovers at the end of each round.
+    He has looked at you twice since you came in. Once, and then again, as if making sure.
+    @choice
+      > Walk over and say hello.
+        [magnus?] "You're slow." He does not look up. "Number six isn't a slow place. Number six has patience."
+        @jump magnus_game
+      > "Best_Tarleinn_NA?" @hint Say the handle
+        His head comes up so fast the stylus drops out of his mouth.
+        [magnus?] "Finally."
+        @flag handle_said
+        @jump magnus_game
+      > Leave him to his tablet.
+        His eyes follow you across the saloon, the way a cat tracks a fly.
+        @end
+    @label magnus_game
+    [magnus?] "Magnus Prospero. Two years, Vance. Two years at number six, looking at your avatar in fifth. You don't even remember the series, do you?"
+    @meet magnus
+    @add ferry_talked +1
+    @choice
+      > "The Nightfall Open. Game three." @hint Remember it
+        A very long pause.
+        [magnus] "…You held your sweeper for six turns and let me overextend."
+        [rowan] "You played the list off the top. It was a good list. Your read on turn four was just — late."
+        [magnus] "Late." He says it as if tasting it. "Yes. I'd — yes. I wrote that down." A tight, careful politeness slides over his face, much more telling than a scowl. "One game. Right now. It will not count. I will remember it anyway."
+        @aff magnus +3 | Remembered the game
+        @flag magnus_recalled
+      > "I don't remember. Should I?"
+        [magnus] "No." Very tight. "No. Why would you." A breath through the nose. "One game. It does not count. I will remember it anyway."
+        @aff magnus -2 | Forgot him
+      > "Sorry. I play a lot of people."
+        [magnus] "Forty-one losses, Vance. I have kept the file."
+        [magnus] "One game. It does not count. I will remember it anyway."
+        @aff magnus -1 | Forgot the details
+  @else
+    @if not flag_magnus_played
+      [magnus] "One game. Now. It does not count."
+    @else
+      [magnus] "I am watching the replay. In my head. It is not pleasant." A thin smile. "Congratulations."
+      @end
+  @if not flag_magnus_played
+    @choice
+      > "All right."
+        @duel ferry_magnus deck=magnus name="Magnus Prospero"
+          @win
+            [magnus] "Congratulations. No, really. Enjoy it. I'll have the replay broken down by breakfast."
+            [magnus] "It did not count."
+            @aff magnus -1 | Lost to you
+            @flag beat_magnus
+          @lose
+            [magnus] "A clean loss on your side. I'll put it in the file. 'Casual, ferry, unofficial.'" Thin, relieved smile. "Forty-one and one."
+            @aff magnus +1 | Beat you fairly
+        @flag flag_magnus_played
+        @time 25
+      > "Not right now."
+        [magnus] "I can wait. I have been waiting two years."
+  @time 8
+
+# ───────────────────────────── NOOR ─────────────────────────────
+
+@scene ferry_noor
+  @if not met:noor
+    A calm girl in a blue hijab sits on a window bench with the Academy rulebook open on her knee. Its margins are bristling with pencil tabs. She is reading with the complete stillness of someone who finishes the sentence before reacting.
+    [noor?] "May I help you?"
+    [rowan] "I — no. I was looking at the book."
+    [noor?] "It's the Charter. Nine articles and the Handbook. I am on article seven, for the third time." A small, courteous pause. "Noor Al-Sayed."
+    @meet noor
+    @add ferry_talked +1
+  @else
+    [noor] "Rowan."
+  @choice
+    > "What does 'winner stays' actually mean?" @if not noor_ruled
+      [noor] "To be precise —" She closes the book on her pencil. "It says who keeps the seat. It says nothing about who gets to sit down opposite. And it says nothing at all about luggage."
+      [noor] "A second table is not forbidden. Neither is a game played for nothing. The plate is a plate, not a Charter."
+      [rowan] "So Gideon's rule is — "
+      [noor] "A private condition. Binding on whoever accepts it. Not binding on anyone else."
+      @flag noor_ruled
+      @aff noor +2 | Asked the right question
+    > "Would you play me? No stake." @if not flag_noor_played
+      [noor] "Gladly. No stake. I will announce every step; it is a habit."
+      @duel ferry_noor deck=noor name="Noor Al-Sayed"
+        @win
+          [noor] "To be precise, you did not win on time. You won on the board. That is better."
+          @aff noor +3 | Fair loss
+        @lose
+          [noor] "I announced it on turn two, and you were still surprised. That is a legitimate compliment to my honesty."
+          @aff noor +3 | Played straight
+      @flag flag_noor_played
+      @time 25
+    > "Help me build a second table." @if noor_ruled and not table_resolved
+      @scene table_settle
+    > "Do you ever lose track of the rules?"
+      [noor] "Never. I have lost track of everything else."
+      @aff noor +1 | Dry exchange
+    > Leave her to the book.
+      [noor] "Thank you. Article seven is demanding."
+  @time 6
+
+# ───────────────────────────── LIVVIE ─────────────────────────────
+
+@scene ferry_livvie
+  @if not met:livvie
+    At the galley end of the saloon, a very pale, thin girl with an ash-blonde bob is adding a column on a clipboard. Her cardigan has been mended at both elbows in slightly different wool. The galley hatch is six feet away, selling cinnamon rolls. She has not bought one.
+    [livvie?] "Quick thing — are you using that rare?"
+    [rowan] "What rare?"
+    [livvie?] "The one in your jacket pocket. I could see the sleeve edge when you came down the steps."
+    [rowan] "I don't have a — it's a deck box."
+    [livvie?] "Oh. Sorry." Eyes down, a small sideways look to see if it landed. "I wasn't looking at your pockets. Professionally speaking, I was."
+    [livvie?] "Livvie Thana. I trade. I run lists. I've eaten. I had a big breakfast. Yesterday counts."
+    @meet livvie
+    @add ferry_talked +1
+    ~ Her stomach just growled. She very clearly did not hear it.
+    @choice
+      > Offer to buy her a roll. @if coins>=3
+        [livvie] "I couldn't." Eyes still down. "…What kind?"
+        [rowan] "Cinnamon."
+        @coins -3
+        [livvie] "I'll pay you back. In information. Which is a currency." She eats the roll in tiny, exact bites, as if it might be taken away. "That was kind. I'm going to have to think about what I owe you now."
+        @aff livvie +4 | Bought her lunch
+        @flag livvie_fed
+      > "Do you play?"
+        [livvie] "For five credits a side. Or not at all."
+        @aff livvie +1 | Asked about cards
+      > Just nod and move on.
+        [livvie] "Quick thing — you could do with sleeves. Tomi's friend price is the price. I'm cheaper."
+  @else
+    @if not flag_livvie_played
+      [livvie] "Five a side?"
+      @choice
+        > Play for five credits. @if coins>=5
+          [livvie] "Five. Thank you."
+          @duel ferry_livvie deck=livvie name="Livvie Thana"
+            @win
+              @coins 10
+              [livvie] "My deck gives people presents. They hate it." She pays out five from a coin purse that is nearly empty. "…It's the nicest thing I own."
+              @aff livvie +2 | Fair game
+            @lose
+              @coins -5
+              [livvie] "I took five off you." Eyes down. "I'll give you three back if you promise not to say I did." She does not wait for an answer.
+              @coins 3
+              @aff livvie +2 | Generous
+          @flag flag_livvie_played
+          @time 25
+        > No, thanks.
+          [livvie] "Another time."
+    @else
+      [livvie] "Rowan." A small, wry nod. "I've done the sums eleven ways. Ten need a miracle."
+      @aff livvie +1 | Small talk
+  @time 6
+
+# ───────────────────────────── DER TISCH: AUFLÖSUNGEN ─────────────────────────────
+
+# Inya bittet man um ihre Runde — man geht nicht an ihr vorbei.
+@scene table_ask_inya
+  [rowan] "Inya. Would you let me take your turn?"
+  Her whole body goes sideways. She is not angry. She is not relieved. She is working out which of the two she is.
+  [inya] "You'd carry four cases." Slowly. "If you lost."
+  [rowan] "I know."
+  [inya] "You've never met me. You've never met him."
+  [rowan] "I've met the table."
+  The eyes narrow, amber, calculating. The deck box finally relaxes in her hands.
+  [inya] "You asked." A beat. "Not 'move.' Not 'I'll handle it.' You asked."
+  [inya] "Fine. Take it. But if you lose, you owe me a real game. On a real table. And you don't tell Tomi what I said."
+  @flag inya_yielded
+  @aff inya +4 | Asked her first
+  @time 3
+
+@scene table_ask_game
+  @if table_resolved
+    @end
+  @bg ferry_lounge
+  The room goes quiet in the particular way rooms go quiet when somebody is about to be embarrassed on purpose.
+  [gideon] "Vance." He looks you over, grey eyes taking inventory. "You wish to sit down."
+  [rowan] "If the table's free."
+  [gideon] "It is. The room is watching." A thin smile. "Since the room is watching, I accept."
+  He folds his gloves one over the other, takes them off, and sets them neatly to one side. It is the first time you have seen his hands bare. They are very still.
+  [gideon] "The loser carries the winner's luggage from the dock to the winner's door. I have four cases. You have, I take it, one duffel."
+  [rowan] "One."
+  [gideon] "Then the odds on the book are fair to you."
+  Tomi, three benches back, is writing furiously.
+  Your hands shake the moment you pick up the deck. You hide them under the table, take a long breath, and try to remember that the cards under your fingers are the same cards you have played four hundred times in a laundromat.
+  ~ Don't attack first. Don't attack first. He's waiting for you to attack first.
+  @duel ferry_gideon deck=gideon name="Gideon Pryce"
+    @win
+      Gideon looks at the board for a long moment. A very slight line appears between his eyebrows.
+      [gideon] "You did not attack."
+      [rowan] "Not once."
+      [gideon] "No." He says it as if it were a diagnosis. "That is — most irregular."
+      He puts his gloves back on, one finger at a time, and does not look at you as he speaks.
+      [gideon] "Well played, Vance. Your duffel will be at your door."
+      The saloon erupts into noise. Nathan, from somewhere behind the crowd, is bellowing "THE WILDCARD! THE WILDCARD!" to a room that has already turned to look at him.
+      @flag ferry_table_won
+      @flag table_resolved
+      @aff gideon +2 | Beat him fairly
+      @aff inya +2 | Played for her
+    @lose
+      Gideon sets down his last card with a courteous little click. The board is full of Guardians. Your hand, you notice, has stopped shaking. It just hasn't done anything useful.
+      [gideon] "Four cases. The Spectral Tower, Vance. I will go first. Do try to keep up."
+      A groan goes through the saloon, rolling aft like a wave. Nathan, at the back: "He CARRIED them? He's going to CARRY them? Baylee, he's going to carry them!"
+      [baylee] "I heard."
+      @flag ferry_table_lost
+      @flag table_resolved
+      @aff gideon +1 | Beaten, politely
+      @aff inya +1 | Played for her
+  @scene table_payout
+  @time 25
+
+@scene table_tell
+  [inya] "So I wait him out. I just — sit there. And let him come to me."
+  [rowan] "Yes. It's going to feel like forever."
+  [inya] "I've been standing here twenty minutes. I can wait."
+  She walks to the table. Gideon looks up. For one second his eyes find you across the saloon, and something shifts behind them.
+  [gideon] "Ah. The little one."
+  [inya] "Four cases."
+  [gideon] "Four cases."
+  They play.
+  You watch her do it. She builds, a single sad little bunny at a time, a wall of them, a field, and she does not attack. She does not attack on turn three or on turn four or on turn five. The crowd murmurs. Tomi's pencil has stopped.
+  By turn eight, a flicker of impatience crosses Gideon's face for the first time all morning.
+  On turn nine, he attacks first.
+  Inya takes the counter-swing in both hands and sets off a chain of Bunny Bombs that makes the saloon lights flicker. The Guardians fall in a row.
+  Nobody speaks.
+  [gideon] "…How interesting."
+  He looks, not at her, but straight at you.
+  [inya] "Rude. Accurate." She is not smiling. She is shaking all over. "Four cases, Pryce."
+  [gideon] "Four cases." And he stands, and does it without ceremony: he takes off his jacket, folds it, and starts looking for his luggage.
+  The saloon explodes. Nathan: "THE LITTLE ONE! THE LITTLE ONE!"
+  @flag ferry_inya_won
+  @flag table_resolved
+  @aff inya +5 | You told her how
+  @aff gideon +0 | Noticed you
+  @scene table_payout
+  @time 30
+
+# Inya spielt allein (Rowan hält sich raus / Gideons Seite / an ihr vorbeigegangen) — verliert, weil sie zuerst angreift.
+@scene table_play_default
+  @if table_resolved
+    @end
+  @if at:ferry_lounge
+    @bg ferry_lounge
+    The two of them sit. Tomi calls the last bets. The crowd closes in.
+    Inya attacks on turn one.
+    It is a good attack. It is also precisely what he has been waiting for.
+    The counter-swing lands on turn three, and the next one on turn five, and by the end the Guardians stand in a neat row across a table that holds only a few scattered rabbits.
+    [gideon] "Four cases. The Spectral Tower. Do try to keep up."
+    [inya] "…I know where it is."
+    She does not cry. She does not look at anyone. She folds her deck very carefully, puts it in the box, and walks out onto the fore deck without a word.
+    @if took_gideon_side
+      She passes you without looking. It costs her something, you can tell.
+    @elif stepped_past_inya
+      She passes you without looking. She does not need to say anything. You were the one who said she was shaking.
+  @else
+    You hear it from the fore deck: a roar, then a long groan rolling up the steps, then Nathan's voice, delighted, indignant, from somewhere inside: "SHE ATTACKED FIRST! Why did she attack FIRST?"
+    A deckhand passing with a bucket says, to nobody, "Little 'un went down in five. Guardians. Neat."
+  @flag table_resolved
+  @scene table_payout
+  @time 5
+
+@scene table_payout
+  @if bet_gideon and (ferry_table_lost or not (ferry_inya_won or ferry_table_won or ferry_table_settled))
+    @coins 20
+    Tomi finds you in the crowd afterwards and presses twenty credits into your palm. "Gideon came in. As written. You were good for ten, wasn't it?"
+  @elif bet_inya and (ferry_inya_won or ferry_table_won)
+    @coins 20
+    Tomi finds you in the crowd afterwards and presses twenty credits into your palm. "Against Gideon came in. You and four other optimists. I'm a poorer man, but a happier one."
+  @elif (bet_gideon or bet_inya) and ferry_table_settled
+    @coins 10
+    Tomi finds you afterwards and presses your ten credits back into your hand. "No result, no money. All bets void."
+  @elif bet_gideon or bet_inya
+    Tomi, passing, taps the lid of his binder, shrugs sympathetically, and does not stop walking.
+
+# Am Rand: Zweittisch aus zwei Bänken und einer Tasche — der friedliche Ausgang.
+@scene table_settle
+  @if table_resolved
+    @end
+  @if not noor_ruled
+    ~ I don't know enough about the plate to argue it. Somebody on this ship does.
+    @end
+  You cross the saloon to the bench where Noor is reading. She looks up at once.
+  [rowan] "If a second table isn't forbidden — "
+  [noor] "It is not."
+  [rowan] "Then I'd like to build one."
+  [noor] "To be precise," and there is, for the first time, something almost like delight under the dry courtesy, "you may use the hatch side. The benches are bolted in. You will need a bag."
+  Between you, you pull two benches into an L, set a duffel across the gap, and lay a rolled-up jacket on top for a surface. It wobbles. You smooth it with both hands.
+  [inya] "That's the worst table I've ever seen." But she has already sat down on one end of it.
+  [rowan] "Gideon." You say it loud enough to carry. "There's a free table at the galley end. No luggage. A game for the plate."
+  A silence. He looks at the new table. At Noor, standing beside it with her rulebook open to a marked page. At the crowd, who are starting, slowly, to look at the new table too.
+  The room has two centres. His is no longer the only one.
+  [gideon] "No luggage."
+  [rowan] "No stake. Nobody carries anything."
+  [gideon] "I do not play for nothing."
+  [rowan] "Then play for the room. Everyone's going to watch, whatever you do. You may as well win in front of them."
+  He considers that for a long moment. And then — slowly — a thin smile appears on his face, the first real one all morning.
+  [gideon] "How resourceful."
+  He crosses the saloon, takes off his gloves, and sits at the worst table on the ship.
+  The game takes twenty minutes, and it is, by all accounts, quite good. Inya waits him out for six turns, and he finally attacks first, and she loses by the width of a single rabbit. She shakes his hand afterwards and says "Rematch" and he says "I should be delighted."
+  Nobody carries anything.
+  @flag ferry_table_settled
+  @flag table_resolved
+  @aff inya +4 | Found a peaceful way
+  @aff gideon +2 | Played for the room
+  @aff noor +3 | Read the Charter
+  @scene table_payout
+  @time 30

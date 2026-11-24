@@ -1,0 +1,20 @@
+{
+ "name": "The Caldera Rim",
+ "zone": "wild",
+ "bg": "volcano_rim",
+ "night": false,
+ "hike": 2,
+ "hours": "Open in clear weather; a hard half-day climb from the ruins plateau. The mountain is classed as dormant.",
+ "sight": "The last hour is bare cinder, red and black, sliding under your boots. Then the ground stops and you are standing on the lip of a bowl a kilometre wide, its floor a jumble of grey rock, yellow sulphur stains and one small steaming lake the colour of jade. The wind is cold and fierce. Behind you the whole island is laid out like a map — campus, town, the white thread of the ferry's wake — and to the north, the slope falls away toward a shore nobody visits.",
+ "things": [
+  "Stand on the rim and turn in a full circle",
+  "Pick out every place you know from above",
+  "Watch the fumaroles breathe in the crater floor",
+  "Walk the rim path east to the lava tube skylight or north to the summit shrine",
+  "Eat a squashed sandwich in the lee of the summit cairn",
+  "Look down the north slope",
+  "Add a stone to the cairn"
+ ],
+ "secret": "The orientation point of the island: from here the geography of the whole plot is visible. Looking down the north slope from D27: a raw black scar in the green, perfectly round, glittering — the crater; with Pippa's long lens one can see the cordon tape, later Marrow's tents, and from Day 60 a pale shape under the glass at its centre. The caldera's jade lake sits directly above the Vault's dome; its level has not changed in the school's records until D27, since when it drops a hand's breadth a week. This is also the only spot where the radio in the tower hut and the lighthouse can both be signalled by mirror — Silas's and Chuck's old code.",
+ "access": "Beyond the cordon from Day 29 (reachable unseen via the lava-tube shoulder)."
+}

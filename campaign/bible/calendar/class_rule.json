@@ -1,0 +1,65 @@
+{
+ "first": 3,
+ "last": 207,
+ "off": {
+  "1": {
+   "en": "Arrival Day; classes begin on Day 3",
+   "de": "Anreisetag; der Unterricht beginnt an Tag 3"
+  },
+  "2": {
+   "en": "Orientation Day; classes begin on Day 3",
+   "de": "Orientierungstag; der Unterricht beginnt an Tag 3"
+  },
+  "19": {
+   "en": "Freshman Cup: all first-years are excused from classes",
+   "de": "Freshman Cup: alle Erstsemester sind vom Unterricht befreit"
+  },
+  "47": {
+   "en": "examinations — the papers replace the classes: see FIXED TIMES TODAY",
+   "ui": "the examinations replace the classes",
+   "de": "die Prüfungen ersetzen den Unterricht"
+  },
+  "96": {
+   "en": "examinations — the papers replace the classes: see FIXED TIMES TODAY",
+   "ui": "the examinations replace the classes",
+   "de": "die Prüfungen ersetzen den Unterricht"
+  },
+  "152": {
+   "en": "examinations — the papers replace the classes: see FIXED TIMES TODAY",
+   "ui": "the examinations replace the classes",
+   "de": "die Prüfungen ersetzen den Unterricht"
+  },
+  "180": {
+   "en": "Founder's Festival",
+   "de": "Gründerfest"
+  },
+  "194": {
+   "en": "examinations — the papers replace the classes: see FIXED TIMES TODAY",
+   "ui": "the examinations replace the classes",
+   "de": "die Prüfungen ersetzen den Unterricht"
+  },
+  "208": {
+   "en": "Commencement",
+   "de": "Abschlussfeier"
+  }
+ },
+ "excused": {
+  "38": {
+   "en": "whoever goes on the lava-tube trip has a permission slip for both classes",
+   "de": "wer am Ausflug in die Lavaröhren teilnimmt, hat einen Erlaubnisschein für beide Stunden"
+  },
+  "89": {
+   "en": "players, witnesses and crew of the Promotion Duels",
+   "de": "Spieler, Zeugen und Helfer der Promotion Duels"
+  },
+  "124": {
+   "en": "players and crew of the Island Open",
+   "de": "Spieler und Helfer der Island Open"
+  },
+  "166": {
+   "en": "players, squad and crew of the Interschool Cup",
+   "de": "Spieler, Kader und Helfer des Interschool Cup"
+  }
+ },
+ "note": "Classes: Mon–Fri, Morning and Midday, from day `first` to day `last`, except the days in `off`. On `excused` days classes are held, but an absence is not counted."
+}

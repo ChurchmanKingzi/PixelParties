@@ -1,0 +1,18 @@
+{
+ "name": "The Chancellor's Office",
+ "zone": "campus",
+ "bg": "chancellor_office",
+ "night": false,
+ "hours": "By summons or appointment through the secretary; Dr. Okonkwo works late, and the balcony lamp is the last light on campus.",
+ "sight": "A tall room at the top of the main building, all dark wood, navy leather and one wall of windows over the quad. The desk is bare except for a blotter, a brass ship's clock and a single card in a lucite block. Founding photographs line the walls: a much younger Chuck with a shovel, a line of students with four different collars. The quiet in here is expensive, and you sit lower than she does.",
+ "things": [
+  "Be summoned — and find out whether it is praise, a warning or a question",
+  "Ask for an appointment at the secretary's desk outside and wait a long time",
+  "Look at the founding photographs while you wait",
+  "Notice the card in the lucite block and try to read it upside down",
+  "Stand on the balcony, if invited, and see the whole school laid out like a board",
+  "Plead a case: a grade appeal, a probation hearing, permission to go north"
+ ],
+ "secret": "Okonkwo knows the truth about Umbra House and paid the families. The founding photographs show four collars — plain grey, blue, white with a gold edge, and a smoke-grey one cropped by the frame's mat in every picture but one. Her locked lower drawer holds the Hale file: the five names, the settlement letters, a statement by a first-year witness whose name is redacted (Josie). The card in the block is a modern reprint she was given at her appointment; it is not Alpha, and she knows the difference. From Day 61 Marrow uses the armchair by the window as if it were his. Probation hearings and the expulsion ending happen here. If Rowan brings her evidence that cannot be explained away (the studio's Dome 3 tape plus one more piece, or the board draft together with word that Hale's pages have been found — plot file, PREVENTION.okonkwo_ally), she stops stonewalling and becomes a cautious ally; brought too early or too thin, she confiscates it.",
+ "access": "By summons or appointment only. The secretary leaves with the Evening slot."
+}

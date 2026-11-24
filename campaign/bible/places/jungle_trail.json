@@ -1,0 +1,21 @@
+{
+ "name": "The Jungle Trail",
+ "zone": "wild",
+ "bg": "jungle_trail",
+ "night": false,
+ "hike": 1,
+ "hours": "Open in daylight; the main marked route north from campus, blazed with painted card symbols on the trees.",
+ "sight": "Behind the campus the ground rises into green: tree ferns, strangler figs, vines as thick as your arm, and light that comes down in coins. The trail is red mud and roots, marked every hundred paces with a painted symbol on a trunk. Everything drips and hums and smells of crushed leaves and rot, and things with too many legs cross the path without hurrying.",
+ "things": [
+  "Follow the blazes north to the waterfall, the rope bridge and beyond",
+  "Learn the blaze code: which symbol means water, shelter, turn back",
+  "Find a mosaic stone half swallowed by roots at the trailside",
+  "Listen: the layers of bird and insect noise, and where they stop",
+  "Pick wild guavas",
+  "Help carry survey gear for Professor Ashdown's field section",
+  "Take an unmarked side path and see where it goes",
+  "Get caught in a downpour under a leaf the size of a door"
+ ],
+ "secret": "Spine of the wild zone: gives access to waterfall, hot_springs, orchard (east fork), rope_bridge and from there the ruins and the mountain. The blaze code is Chuck's; one symbol — a small square inside a square — appears only on trees that stand over buried mosaics. The first surface mosaic most students ever see is at the first bend: a metre of small black-and-ochre tiles showing a figure holding out a square to something drawn as a spiral. NIGHT OF D26: {H=nathan?{H} takes this trail north by torchlight|{H} takes this trail north in the dark}; a careful tracker on Day 27 finds {H:his} boot prints going up — heavy, heel first — and one set coming down, lighter, toes first, evenly spaced as stitching. From D27 the zone of bird silence spreads down the trail from the north about a hundred metres a day until it meets the silence spreading up from the Commons. D29: tape and a staff rota at the north trailhead, the campus-side anchor of the rope bridge.",
+ "access": "From Day 67 off limits after the Afternoon slot."
+}

@@ -1,0 +1,269 @@
+{
+ "id": "octavia",
+ "name": "Octavia Sterling",
+ "firstName": "Octavia",
+ "age": 22,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 4,
+ "dorm": "spectral",
+ "room": "Spectral Tower, upper floors (an office with a bed in it)",
+ "romance": true,
+ "deck": "Nine Circles (Hell Circles, Dante)",
+ "look": "Silver-blonde hair in a flawless chignon, grey eyes, pearl earrings and the dark council sash worn over her gold Game Design jacket, white Spectral collar, like a rank. She carries a leather folio and a fountain pen and has never been seen to run. Her smile is exact and lasts as long as it is needed.",
+ "voice": "Cool, precise and managerial; she uses the passive voice for unpleasant decisions and first names as a tactic, and her compliments are assessments. Economy in everything. Very occasionally something dry and funny escapes and she looks faintly annoyed with it. RARE habit (once in a scene at most; most scenes go without it): 'Noted.'",
+ "lines": [
+  "Vance. The Wildcard. I approved the bungalow allocation. You're welcome, and I apologise.",
+  "Noted. It won't be actioned, but you may tell people it was noted.",
+  "Every circle in my deck is worse than the last and you choose each one yourself. People call it cruel. I call it accurate.",
+  "Kindness is a budget line. I fund it where it works."
+ ],
+ "intro": "The student council president: a fourth-year Game Design student who runs the student body like a company and is not known for warmth.",
+ "traits": [
+  {
+   "id": "octavia_1",
+   "text": "She has been student council president for two years and nothing in student life happens without her signature.",
+   "how": "Day 2 orientation; she gives the welcome address."
+  },
+  {
+   "id": "octavia_2",
+   "text": "She keeps office hours in the council room and they are booked a week ahead.",
+   "how": "Try to see her."
+  },
+  {
+   "id": "octavia_3",
+   "text": "She designed her own deck's core mechanic as a second-year project.",
+   "how": "Card Design class; Chuck mentions it with mixed feelings."
+  },
+  {
+   "id": "octavia_4",
+   "text": "She remembers every student's name, dorm and rank, and uses them.",
+   "how": "Meet her once; she already knows you."
+  },
+  {
+   "id": "octavia_5",
+   "text": "She and the Battle Team's vice-captain were a couple once, and both discuss it like a merger that was called off.",
+   "how": "Bex's stream; or ask Dom."
+  },
+  {
+   "id": "octavia_6",
+   "text": "She has a standing job offer from Kaboom Entertainment's head office for after graduation.",
+   "how": "Faculty wing gossip; or she tells you as a fact."
+  },
+  {
+   "id": "octavia_7",
+   "text": "She plays the cello alone in the old observatory, badly by her own standards.",
+   "how": "Old observatory at Night."
+  },
+  {
+   "id": "octavia_8",
+   "text": "She has not had a conversation with no agenda since she was about twelve.",
+   "how": "Close stage; she notices mid-sentence."
+  },
+  {
+   "id": "octavia_9",
+   "text": "Her family measures affection in achievements, and she has never been told she had done enough.",
+   "how": "Dating stage; a letter from home left on her desk."
+  }
+ ],
+ "secret": "Octavia is the youngest of three in a family of Sterlings who are, respectively, a QC, a hedge-fund partner and a junior minister; she was the afterthought and has been presenting quarterly results to her parents since prep school. She is brilliant — a better designer than she is credited for; Hell Circles is an elegant, bleak piece of work — and has concluded that warmth is unreliable and competence is not. She runs the council impeccably and mostly justly: the library's late hours and the Rare Hall roof exist because of her, and she will never mention it — though she will also cut a Commons hot-water petition to pieces on procedure if the numbers are not right. Wound: at fourteen she won a national design prize and her father's telegram read 'Good. What next?' Contradiction: she has arranged her whole life so that nobody can ever find her wanting and is starving to be found, period. She plays the cello in the old observatory where no one can grade it. Her rivalry with Wren Ishikawa is real: Wren has Chuck's affection, the thing no amount of management can requisition. With Dom it ended because they were, in her phrase, 'two people cc'ing each other'; she still trusts his numbers over anyone's. Private joke: she drafts devastating minutes of meetings that never happened, for her own amusement, and burns them.\nLucian Marrow has been courting her since last year — dinners when he visits, a guaranteed fast-track post at head office, the flattering suggestion that the Academy 'needs modern governance' and that she is the one adult in the building. She believes she is managing him. She has passed him council information she judged harmless (Alpha Archive access logs; the dormitory roster). When the Hollowings start she backs the Chancellor's 'seizure' line and the curfew because order is what she knows how to provide, and she suppresses a council motion for an independent inquiry on Marrow's advice — the act Teobalt breaks with her over. She is not a villain: she is a very capable person who has mistaken control for safety and an ally for a mentor. The hardest route: she does not flirt, does not have time, and assesses Rowan as a file ('Wildcard; Commons; rank volatile; potential leverage with the founder's granddaughter'). The route opens only if he is useful to her honestly, contradicts her and is right, and catches her being a person (the cello). Its hinge is whether she chooses the institution, Marrow, or the truth; with Rowan's trust she turns the council — and her inside knowledge of Marrow's plans — against him, at the cost of the job offer and her family's approval.",
+ "wants": "To be indispensable — and, though she has no line item for it, to be wanted when she is not being useful.",
+ "fears": "'Good. What next?' — that there is no amount of achievement after which she is allowed to stop.",
+ "crush": "dom",
+ "crushNote": "He is the one person who never wanted anything from her office and whose numbers she still trusts over her own. It shows as agenda items that require the vice-captain's opinion, and a move left for him on the lobby chessboard that is not Lilia's.",
+ "crushPace": 0.5,
+ "likes": [
+  "Competence, brevity, preparation",
+  "Being contradicted with a better plan",
+  "Discretion — things that stay in the room",
+  "People who do not want anything from her office",
+  "Music, especially played badly and sincerely",
+  "Being made to laugh unexpectedly",
+  "Reliability over charm",
+  "Being asked what she would do if nobody were watching"
+ ],
+ "dislikes": [
+  "Flattery and obvious flirting",
+  "Wasted time",
+  "Public scenes",
+  "Being called cold or a politician",
+  "Disloyalty disguised as principle (she is slow to see the difference)",
+  "Sloppy paperwork",
+  "Being managed"
+ ],
+ "gifts": [
+  "A sheet-music folio from the pawn shop",
+  "Card: Dante, the Wanderer of Hell",
+  "Fountain-pen ink, blue-black",
+  "Card: Storm Piano",
+  "A cake of cello rosin (special order through the campus store)",
+  "A single honest critique of one of her card designs"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "None at first; later, dry, private and precise.",
+  "text": "Octavia does not flirt and reads flirting as either a tactic or a waste of her calendar. Interest shows as allocation: she gives him five minutes, then fifteen, then says 'walk with me'; she asks his opinion and writes it down; she lets him see her annoyed. She will never initiate. Approach her with substance — a problem solved, a plan improved, a disagreement he wins — and with absolute discretion. Never compliment her looks before her mind. The route turns when he finds the person off the clock (the cello, the burned minutes) and does not use it. When she finally shows affection it is in private, startlingly direct, and scheduled — and then, eventually, not scheduled, which is the point."
+ },
+ "intimacy": "Glacial until it is not. For a long time closeness is proximity: side by side at the council table at midnight, her taking off the sash and the pearls and rubbing her neck without noticing he is watching. First touch is deliberate — she straightens his collar, and leaves her hand there. She kisses like someone signing something she has read carefully. In private the control is the first thing she wants to put down: the chignon unpinned, the lists stopped, someone else deciding for an hour. She is intense, quiet, startlingly tender, and afterwards talks more freely than at any other time. Her suite or the observatory by lamplight, with rain on the dome. Fade as the last hairpin goes onto the table.",
+ "events": [
+  {
+   "id": "octavia_e1",
+   "stage": 1,
+   "title": "Five minutes",
+   "condition": "Bring a concrete, costed proposal to her office hours in council_room (a Commons repair, a fix to the job board) and accept her edits; deliver what you promised by the date agreed.",
+   "hint": [
+    "She sees people by appointment. Bring something worth her time.",
+    "Book her office hours with a real proposal, and then deliver on it."
+   ]
+  },
+  {
+   "id": "octavia_e2",
+   "stage": 2,
+   "title": "Walk with me",
+   "condition": "Contradict her in a council matter with evidence and be proved right (around the Freshman Cup or midterms), in private rather than in public; and find her playing in old_observatory at Night — listen, and never mention it to anyone.",
+   "hint": [
+    "She values people who are right quietly. She also has one hour a week when she is not the president.",
+    "Disagree with her privately and be correct; and if you find her at the old observatory, keep it to yourself."
+   ]
+  },
+  {
+   "id": "octavia_e3",
+   "stage": 3,
+   "title": "Off the agenda",
+   "condition": "After Day 61, have at least one conversation with her that has no purpose, and when she tests him with a confidence (Marrow's offer), keep it. She says, as a statement of fact, that she would like to see him 'outside of business' — the Winter Gala (Day 103) as her escort.",
+   "hint": [
+    "She has not had a conversation without an agenda in years. She may not know how to start one.",
+    "Earn a confidence from her, keep it, and accept when she proposes an evening that is not work."
+   ]
+  },
+  {
+   "id": "octavia_e4",
+   "stage": 4,
+   "title": "Noted, and actioned",
+   "condition": "After Day 66, bring her the truth about the Hollowed and about what Marrow wants, with Teobalt's log or Pippa's photographs, and ask her to choose; whatever she decides that day, stay in the room. She unpins her hair.",
+   "hint": [
+    "She is holding a line she was advised to hold. She needs a reason, and a person, to let go of it.",
+    "Lay the evidence in front of her and ask her to act on it — and do not leave when it gets hard."
+   ]
+  },
+  {
+   "id": "octavia_e5",
+   "stage": 5,
+   "title": "What next",
+   "condition": "In Term 2, stand with her when she breaks publicly with Marrow and loses the head-office post, and be there when the letter from home arrives; she plays the cello for him, on purpose, with the door open.",
+   "hint": [
+    "Choosing rightly will cost her the future she was promised. Someone should be there for the bill.",
+    "Support her when doing the right thing costs her the career and approval she worked for."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "friends",
+   "text": "The one person on campus she has never needed to manage.",
+   "public": true,
+   "from": 0
+  },
+  "dom": {
+   "label": "exes",
+   "text": "'Two people cc'ing each other.' She still trusts his numbers over anyone's.",
+   "public": true,
+   "from": 0
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "A Montclair: clever, underused, and a friend of long standing she does not quite understand.",
+   "public": true,
+   "from": 0
+  },
+  "teobalt": {
+   "label": "mentor",
+   "text": "The most useful first-year representative she has had.",
+   "public": true,
+   "from": 12
+  },
+  "wren": {
+   "label": "rivals",
+   "text": "The founder's favourite: the one thing no amount of management can requisition.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "colleagues",
+   "text": "Believes she is managing him. He has promised her a post at head office.",
+   "public": false,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "protégé",
+   "text": "The Chancellor she intends to be more efficient than.",
+   "public": true,
+   "from": 0
+  },
+  "hedda": {
+   "label": "enemies",
+   "text": "A megaphone is not a motion. Octavia has said so in writing.",
+   "public": true,
+   "from": 14
+  },
+  "junho": {
+   "label": "mentor",
+   "text": "A first-year who read her design properly. She gave him forty minutes, which is unheard of.",
+   "public": true,
+   "from": 15
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "Efficient, discreet, and knows which ledgers she has looked at. She has noted that he knows.",
+   "public": true,
+   "from": 0
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "Her vice-president is capable, patient and wants the chair. She gives him forms rather than information, on purpose.",
+   "public": true,
+   "from": 0
+  },
+  "imara": {
+   "label": "colleagues",
+   "text": "The most honest treasurer the council has had — and paid for by the board, which is why Octavia cannot use her for one particular errand.",
+   "public": false,
+   "from": 0
+  },
+  "tavita": {
+   "label": "colleagues",
+   "text": "Her head proctor cannot be managed, only informed. She finds it restful and inconvenient in equal measure.",
+   "public": true,
+   "from": 0
+  },
+  "pilar": {
+   "label": "mentor",
+   "text": "Her own appointment: nothing Pilar runs has ever failed. Octavia does not ask how the bulletins make her feel.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "council_room",
+   "Afternoon": "council_room",
+   "Evening": "spectral_suite",
+   "Night": "old_observatory"
+  },
+  "weekend": {
+   "Morning": "council_room",
+   "Midday": "cafe",
+   "Afternoon": "library",
+   "Evening": "spectral_terrace",
+   "Night": "old_observatory"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Hell Circles: a sequence of enchantments each worse than the last, with Dante walking you through them. She makes you choose your own poison and has costed every option in advance.",
+  "tilt": "Losing control of the sequence — an opponent who skips her script or does something generous and inexplicable."
+ }
+}

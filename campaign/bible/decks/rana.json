@@ -1,0 +1,370 @@
+{
+ "name": "Debug Mode",
+ "owner": "rana",
+ "heroes": [
+  "Bakhm, the Desert Digger",
+  "Alleria, the Queen of Spiders",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   4,
+   "Cybug ANTS"
+  ],
+  [
+   3,
+   "Cybug BEE"
+  ],
+  [
+   3,
+   "Cybug CENTIPEDE"
+  ],
+  [
+   4,
+   "Cybug LADYBUG"
+  ],
+  [
+   4,
+   "Cybug LOCUST"
+  ],
+  [
+   4,
+   "Cybug RHINOCEROS"
+  ],
+  [
+   2,
+   "Cybug SCARAB"
+  ],
+  [
+   4,
+   "Excavator Bucket"
+  ],
+  [
+   4,
+   "Future Tech Gun"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Magic Amethyst"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   3,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Trapping"
+  ],
+  [
+   4,
+   "Treasure Hunter's Backpack"
+  ],
+  [
+   3,
+   "Troop Annihilation"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Bakhm, the Desert Digger": "Hero",
+  "Alleria, the Queen of Spiders": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Cybug ANTS": "Creature L1 (Surprise)",
+  "Cybug BEE": "Creature L1 (Surprise)",
+  "Cybug CENTIPEDE": "Creature L1 (Surprise)",
+  "Cybug LADYBUG": "Creature L1 (Surprise)",
+  "Cybug LOCUST": "Creature L1 (Surprise)",
+  "Cybug RHINOCEROS": "Creature L1 (Surprise)",
+  "Cybug SCARAB": "Creature L1 (Surprise)",
+  "Excavator Bucket": "Artifact (Equipment)",
+  "Future Tech Gun": "Artifact (Equipment)",
+  "Golden Ankh": "Artifact",
+  "Magic Amethyst": "Artifact",
+  "Magnetic Glove": "Artifact",
+  "Summoning Magic": "Ability",
+  "Trapping": "Ability",
+  "Treasure Hunter's Backpack": "Artifact",
+  "Troop Annihilation": "Spell (Summoning Magic, Reaction)",
+  "Wheels": "Artifact"
+ },
+ "gist": {
+  "Cybug LOCUST": "Face-down. When you equip or attach a card to one of your heroes, it is attached to Rana's hero instead. Paid for by deleting a Treasure Hunter's Backpack.",
+  "Cybug LADYBUG": "Face-down. When you activate an Ability, it is cancelled and a copy of any Ability on the board is knocked off. Paid for with a Magic Amethyst.",
+  "Cybug ANTS": "Face-down. When you damage its hero without killing it, the same damage is dealt to one of your targets. Paid for with a Future Tech Gun.",
+  "Cybug RHINOCEROS": "Face-down. When you place a card into an Area or support zone, that card is discarded. Paid for with an Excavator Bucket.",
+  "Troop Annihilation": "Reaction when one of her bugs dies: her other creatures die too and she sets that many new bugs face-down from the deck, unseen.",
+  "Future Tech Gun": "Equipment that mostly exists to be deleted for ANTS; returns to hand when the bug dies.",
+  "Magic Amethyst": "Makes you discard an Ability from a hero; also the fuel for LADYBUG.",
+  "Treasure Hunter's Backpack": "Free equipment from the deck; also the fuel for LOCUST.",
+  "Excavator Bucket": "Removes an Area each turn; also the fuel for RHINOCEROS.",
+  "Bakhm, the Desert Digger": "May hide trap creatures in his support zones as well, and every time any trap goes off he hits a target hard.",
+  "Alleria, the Queen of Spiders": "Sets a trap straight from the deck each turn, draws when her own trap fires and can pull a single hit onto a hero with a trap.",
+  "Cybug BEE": "Face-down. When you would search a card from your deck, she takes that card instead. Paid for with a Magnetic Glove.",
+  "Cybug CENTIPEDE": "Face-down. When you would draw cards by an effect, she draws the same number. Paid for with a Wheels.",
+  "Cybug SCARAB": "Face-down. When one of her other heroes is defeated, it stands back up on a little health. Paid for with a Golden Ankh.",
+  "Magnetic Glove": "Searches any card; also the fuel for BEE.",
+  "Wheels": "Draws three; also the fuel for CENTIPEDE."
+ },
+ "plan": "Rana never acts first. Her side of the table is face-down cards, each a Cybug waiting for one specific thing you might do: attach something, activate an Ability, search your deck, draw extra cards, deal non-lethal damage, place a card. The bug cancels or steals the play and Bakhm hits you for every trap that fires. Each Cybug is paid for by deleting a matching artifact, and Troop Annihilation refills the traps when a bug dies. It is an inventive, carefully built deck with very little proactive damage: it needs you to walk into things, it runs out of the paired artifacts over a long game, and a patient opponent who springs the traps with throwaway plays leaves her with little.",
+ "looks": {
+  "early": "Five or six face-down cards across Bakhm, Alleria and Mizune; nothing face-up at all.",
+  "mid": "A couple of tiny flipped Cybugs, fresh face-down cards replacing them, Bakhm hitting back every time something triggers.",
+  "late": "Fewer face-down cards than before, a deleted pile full of Guns and Amethysts, and Rana chewing her lip over what is left."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Every hero of hers has a face-down card, and she has not played a single card face-up.",
+   "why": "Each bug answers one kind of play, so spring them with things you do not mind losing before committing: attaching Gathering Storm into a hidden LOCUST hands her the Storm, and Leadership into a LADYBUG costs you the Ability, while a Magnetic Glove into a BEE hands her the card you searched."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "A flipped Cybug sits on her board with almost no health, and she is holding a single card ready.",
+   "why": "Killing a bug lets Troop Annihilation reload a fresh set of unseen traps and hands her fuel back; her heroes, on the other hand, have no protection that works against untargeted Storm ticks and Chain Lightning."
+  },
+  "crisis": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "Her deleted pile holds most of her Guns, Amethysts and Backpacks; the newest face-down cards went down without her paying anything.",
+   "why": "A Cybug cannot fire without its paired artifact left in hand or deck, so many of the remaining face-down cards are blanks: this is the safe moment to attach the Storm and The White Eye, and removal spent on bluffs is wasted."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "She has one or two traps left and is taking a long time over every decision.",
+   "why": "With the traps mostly spent she has no way to win a race; clearing the last tiny bugs only risks one more Troop Annihilation."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Rana sets a card face-down on every hero, Alleria pulls another from the deck, and she passes without a word.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Attach a spare Ability or play a throwaway to spring something"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Chain Lightning, which chooses nothing"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach Gathering Storm straight away"
+     }
+    ]
+   },
+   {
+    "board": "Your Leadership is cancelled by a Cybug LADYBUG and knocked off your hero; Bakhm hits you for the trouble.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Now you know one; probe the others the same way"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Stop activating, just cast untargeted spells"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach and try again"
+     }
+    ]
+   },
+   {
+    "board": "Bakhm has face-down cards in his support zones as well as his surprise zone.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet a face-down card on Bakhm"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Alleria, who feeds the traps"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build as if they were not there"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A flipped Cybug ANTS and a Cybug BEE sit on her side; three cards are still face-down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Leave the bugs, Storm ticks and spells at heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Alleria so no new trap arrives"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the little bugs"
+     }
+    ]
+   },
+   {
+    "board": "You hit Bakhm without killing him and a Cybug ANTS throws the damage back at your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Hit a different hero, or hit to kill"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and carry on"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the ANTS and see what replaces them"
+     }
+    ]
+   },
+   {
+    "board": "She plays Magic Amethyst and you lose a Destruction Magic.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Punish Mizune while her gold is spent"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb her Trapping"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild the level patiently"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Most of her Backpacks and Guns are in the deleted pile; two new face-down cards went down for free.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm and The White Eye now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn through, the traps are probably blanks"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Spend The Yeeting on a face-down card"
+     }
+    ]
+   },
+   {
+    "board": "A Troop Annihilation resets her board to three fresh face-down cards.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Count what fuel she has left before acting"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Untargeted damage only"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill whatever flips"
+     }
+    ]
+   },
+   {
+    "board": "Bakhm is low; a LOCUST already stole one of your Storms earlier and wears it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Bakhm and the stolen Storm goes with him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the stolen Storm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach another next to it"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One face-down card, two heroes, and Rana staring at her hand for a full minute.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Go, she has no race in her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun! and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hunt the last bug"
+     }
+    ]
+   },
+   {
+    "board": "She Golden Ankhs Alleria for one more trap from the deck.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Mizune and Bakhm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait and see"
+     }
+    ]
+   },
+   {
+    "board": "Only Mizune remains, behind a face-down card she has not paid for.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "It is a bluff, cast"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Send a small spell first"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Remove the card to be sure"
+     }
+    ]
+   }
+  ]
+ }
+}

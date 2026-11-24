@@ -1,0 +1,385 @@
+{
+ "name": "Parts of the Soul",
+ "owner": "junho",
+ "heroes": [
+  "Cute Nerd Magenta",
+  "Thep, the Court Scribe",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   8,
+   "Adventurousness"
+  ],
+  [
+   4,
+   "Book of Doom"
+  ],
+  [
+   2,
+   "Cute Cheese"
+  ],
+  [
+   4,
+   "Glass of Marbles"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Mystery Box"
+  ],
+  [
+   8,
+   "Necromancy"
+  ],
+  [
+   4,
+   "Sandy Blob"
+  ],
+  [
+   3,
+   "Soul Shard Ib"
+  ],
+  [
+   2,
+   "Soul Shard Ka"
+  ],
+  [
+   2,
+   "Soul Shard Khet"
+  ],
+  [
+   2,
+   "Soul Shard Ren"
+  ],
+  [
+   3,
+   "Soul Shard Sekhem"
+  ],
+  [
+   2,
+   "Soul Shard Shut"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   1,
+   "Bottled Flame"
+  ],
+  [
+   1,
+   "Bottled Lightning"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cute Nerd Magenta": "Hero",
+  "Thep, the Court Scribe": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Adventurousness": "Ability",
+  "Book of Doom": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Glass of Marbles": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Mystery Box": "Artifact",
+  "Necromancy": "Ability",
+  "Sandy Blob": "Creature L0",
+  "Soul Shard Ib": "Creature L1",
+  "Soul Shard Ka": "Creature L1",
+  "Soul Shard Khet": "Creature L2",
+  "Soul Shard Ren": "Creature L1",
+  "Soul Shard Sekhem": "Creature L2",
+  "Soul Shard Shut": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Acid Vial": "Potion",
+  "Bottled Flame": "Potion",
+  "Bottled Lightning": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Thep, the Court Scribe": "Each turn places a Soul Shard from the discard pile into play.",
+  "Necromancy": "Ability: each turn summons a creature from the discard pile as a free action; Soul Shards keep their effects.",
+  "Cute Nerd Magenta": "Discards a card to put any card from the deck into the discard pile.",
+  "Alice, the Puppeteer Girl": "Hits per creature that stayed on his board.",
+  "Soul Shard Sekhem": "Summoned from the discard pile: hits a target for every different Soul Shard there.",
+  "Soul Shard Khet": "Summoned from the discard pile: summons another creature from it.",
+  "Soul Shard Ka": "Summoned from the discard pile: fetches and summons a small creature from the deck.",
+  "Soul Shard Ren": "Summoned from the discard pile: searches any card.",
+  "Soul Shard Ib": "Summoned from the discard pile: heals its hero.",
+  "Soul Shard Shut": "Summoned from the discard pile: mills five more cards.",
+  "Sandy Blob": "Stings you each time an arrival effect goes off.",
+  "Adventurousness": "Ability: spend the action on gold.",
+  "Glass of Marbles": "Draws two when discarded.",
+  "Book of Doom": "Gold for small hits on many targets.",
+  "Cute Cheese": "Searches a creature."
+ },
+ "plan": "Soul Shards only work when they come out of the discard pile, so that is where Jun-ho wants them. Magenta puts them there, Necromancy and Thep bring one or two back every turn, and each return pays: a search, a heal, another creature, a hit from Sekhem that counts the Shards still in the pile, a sting from the Sandy Blob. A Shard you kill simply goes back to where it is most useful. The loop runs through Thep and the Necromancy heroes.",
+ "looks": {
+  "early": "Shards going into the discard pile on purpose.",
+  "mid": "Two Shards returning every turn, each with an effect; a Sandy Blob stinging.",
+  "late": "A discard pile with every Shard in it and Sekhem returning again."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "He is filling his discard pile and the Shards on the board have done nothing yet.",
+   "why": "A Shard is only strong arriving from the discard pile, so killing one is a favour; his heroes are frail."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Thep and Necromancy return two Shards a turn.",
+   "why": "Freeze Thep and half the returns stop; steal the Sandy Blob; sweeping sends the Shards home."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Sekhem returns every turn and its hit counts the Shards in the pile.",
+   "why": "It is one hit a turn on one hero: shield it and keep killing the hero who summons it."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Thep is down and only one Necromancy hero remains.",
+   "why": "One return a turn is not enough."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Jun-ho discards a Soul Shard with Magenta and sketches something.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Thep"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Magenta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing worth sweeping"
+     }
+    ]
+   },
+   {
+    "board": "Thep places a Soul Shard Ren, which searches a card.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Thep"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Shard"
+     }
+    ]
+   },
+   {
+    "board": "A Sandy Blob appears.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Blob"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Khet returns and brings Ka with it; the Blob stings twice.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Thep, steal the Blob"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Thep"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Send them home"
+     }
+    ]
+   },
+   {
+    "board": "Your sweep puts five Shards in his discard pile.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill a Necromancy hero before his turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   },
+   {
+    "board": "Shut mills five more cards.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye his hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Magenta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Sekhem returns and hits for six Shards.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze the summoner"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill Sekhem again"
+     }
+    ]
+   },
+   {
+    "board": "Ib heals Thep each time it returns.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Focus one hero, shield yours"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Thep"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Alice counts four Shards.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Alice"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Alice alone; no Necromancy left.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Now sweeping is safe"
+     }
+    ]
+   },
+   {
+    "board": "One return a turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Thep.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Alice"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

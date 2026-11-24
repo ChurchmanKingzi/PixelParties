@@ -1,0 +1,19 @@
+{
+ "name": "The Little Theatre",
+ "zone": "campus",
+ "bg": "theatre",
+ "night": false,
+ "hours": "Rehearsals most Afternoons and Evenings; Voice & Stage Presence classes for Auxiliary; shows before each festival. Lights and sound: Gani Villaluz.",
+ "sight": "A jewel-box playhouse of three hundred red velvet seats, a gilded proscenium chipped at child height, and a stage that still smells of sawdust and greasepaint. Costume rails crowd the wings; a painted volcano backdrop hangs half lowered. A single ghost light burns on a stand at centre stage when nobody is rehearsing.",
+ "things": [
+  "Watch a rehearsal from the back row",
+  "Be dragged on stage by Marit for 'just one line'",
+  "Try on something from the costume rail",
+  "Take the stage-presence workshop: how to stand, breathe and be looked at",
+  "Help paint flats or hang lights",
+  "Make a mask for the Night of Masks (workshop Day 53)",
+  "Stand in the ghost light alone and say something out loud",
+  "Learn to waltz, badly, before the Winter Gala"
+ ],
+ "secret": "Marit's kingdom and a second, gentler Nerve track: the stage-presence workshop and any performance raise it. Mask workshop Day 53; gala dance lesson Day 101; festival rehearsal Day 178. The Night of Masks pageant retells 'the Founder's shipwreck' as comedy; Chuck watches it every year from the back row and leaves before the cave scene. D54: '{H}' asks Marit, with real wonder, whether a person in a mask is 'allowed to be the other one'. She thinks it is the best thing anyone has ever said to her; she remembers it very differently later."
+}

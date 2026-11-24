@@ -1,0 +1,251 @@
+{
+ "id": "baraka",
+ "name": "Baraka Otieno",
+ "firstName": "Baraka",
+ "age": 23,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 4,
+ "dorm": "spectral",
+ "room": "Spectral Tower, fifth floor, room 5B",
+ "romance": false,
+ "deck": "Deep End (Greatmaw sharks fed on small creatures — Rakah, the Loan Shark; Kit, the Shark Researcher; Serket, Dread of the Desert)",
+ "look": "Tall (about 6'2\") with a swimmer's wide shoulders and narrow hips, very dark skin, and black hair in a short flat-top fade with a neat chin-strap beard. Slow-blinking dark eyes with heavy lashes, a broad calm face, a small vertical scar on the upper lip, long hands. He wears the red Competitive Play jacket open with the white, gold-edged Spectral collar over a white polo shirt with a small red cross stitched on the chest, a red first-aid sling bag across his back, two rolls of white athletic tape on a carabiner at his belt, and a plain steel watch worn on the inside of the left wrist. A faded surgical scar runs over the right shoulder (visible only in swimwear). He stands loosely with his thumbs hooked in the bag strap and looks at how people are standing before he looks at their faces.",
+ "voice": "Deep, slow and unbothered, Kenyan English with Swahili asides ('pole', 'sawa'); he asks what happened, then what really happened. Gentle bedside teasing. At the pool he never raises his voice: he lowers it, and people stop. Funny about himself, evasive about plans, talkative at night about westerns, fish and his mother's bargaining. Falls asleep in chairs and resumes the sentence. RARE habit (once in a scene at most; most scenes go without it): 'Breathe out first.'",
+ "lines": [
+  "Breathe out first. Longer. Good. Now tell me where it hurts, not where you fell.",
+  "I was fast once. Four hundred free. Then my shoulder had other plans.",
+  "I read westerns. Nobody in a western has an exam.",
+  "No running on the pool deck. I'm not shouting. I'm disappointed, which is worse.",
+  "Pole. Swahili for 'I'm sorry that happened to you'. English needs one.",
+  "My mother sells fish at Kisumu market and has never lost an argument about change.",
+  "Sharks keep moving or they sink. I rank twentieth and I'm sinking nicely.",
+  "Camille hasn't slept. If you're fond of her, bring bread and go away.",
+  "I can tape an ankle in forty seconds. I can't decide what to do in June."
+ ],
+ "intro": "The student first-aider: a tall, slow-spoken fourth-year who covers the infirmary's evenings so the nurse can sleep, tapes ankles at Conditioning class and stands safety at the pool — and once swam faster than anybody here.",
+ "traits": [
+  {
+   "id": "baraka_1",
+   "text": "He is the Academy's senior student first-aider: he covers the infirmary desk at Midday and in the Evening, and pushes the ambulance cart when it is called.",
+   "how": "Get hurt; or visit the infirmary in the Evening."
+  },
+  {
+   "id": "baraka_2",
+   "text": "He stands safety at the pool and at Coach Delgado's Conditioning class, and holds the rescue certificate Sunny lifeguards under.",
+   "how": "The pool in the Afternoon; or a Conditioning class."
+  },
+  {
+   "id": "baraka_3",
+   "text": "He never runs and never shouts, and people stop anyway.",
+   "how": "Watch him at the pool."
+  },
+  {
+   "id": "baraka_4",
+   "text": "He swam the four hundred metres freestyle for Kenya's juniors until his right shoulder was rebuilt.",
+   "how": "See the scar at the pool; or ask Sunny."
+  },
+  {
+   "id": "baraka_5",
+   "text": "He reads paperback westerns on the infirmary desk.",
+   "how": "Look at what is face down beside the register."
+  },
+  {
+   "id": "baraka_6",
+   "text": "His mother sells fish in Kisumu market; his schooling was paid by a swimming federation that stopped writing when he stopped winning.",
+   "how": "Friend stage; ask how a swimmer ends up at a card school."
+  },
+  {
+   "id": "baraka_7",
+   "text": "He was a Battle Team reserve in second year and has drifted down to about twentieth without seeming to mind.",
+   "how": "Ask Dom or Lilia; or the old team photographs in the arena tunnel."
+  },
+  {
+   "id": "baraka_8",
+   "text": "He falls asleep in chairs and wakes at the word 'nurse'.",
+   "how": "Find him at the tutor desk in exam week."
+  },
+  {
+   "id": "baraka_9",
+   "text": "He has sat the entrance examination for a medical school twice and is waiting for a third letter.",
+   "how": "Trusted stage; an envelope at the mail window."
+  },
+  {
+   "id": "baraka_10",
+   "text": "He does not intend to sit the professional licence examination in June.",
+   "how": "Trusted stage; late in Term 2."
+  }
+ ],
+ "secret": "FUNCTION (use him instead of a nameless orderly, lifeguard or first-aider): senior STUDENT FIRST-AIDER. He covers the Infirmary desk at Midday and in the Evening so Nurse Camille can eat and sleep, pushes the ambulance cart, tapes and ices at Coach Delgado's Conditioning class in the gym, and stands safety at the pool in the Afternoon and for the Wednesday swim squad (Sunny Aldane lifeguards under his certificate). From Day 40 he takes Ward B nights in turn with the hired night nurse. He treats scrapes, sunburn, jellyfish and panic and sends the rest to Camille.\nWHO HE IS. Kisumu, Kenya; a fish-seller's son, schooled on a swimming bursary; junior national four hundred freestyle until his right shoulder was rebuilt at seventeen. A Battle Team reserve in second year; dropped when he stopped caring, now about twentieth and drifting. Wound: he was valued for being fast, and then he was not fast; he trusts nothing that depends on his results. Contradiction: the steadiest man on the island has no plan and is hiding from one.\nSECRET. He wants to be a doctor. He has failed the entrance examination for the medical school in Nairobi twice, has sat it a third time by post, and will not sit the Academy's professional licence examination in June whatever the letter says. Coach Delgado does not know; nor does his mother. The answer will come through the mail window.\nAFTER DAY 40 (if Brant is found). He pushed the cart to Dome 3. He has told only Camille what he noticed: the room was colder than the morning outside, and Brant's pulse was that of a man resting. He does not believe in such a seizure. He sits with Brant's mother through her week on the ward, and he is on Thandi Mokoena's pencilled rota for Georgie and never misses a slot.\nDRAWN TO Shirin Daneshvar.",
+ "wants": "A letter from Nairobi that says yes — and, until then, everybody out of the water alive.",
+ "fears": "Being measured again and coming up a hundredth short.",
+ "crush": "shirin",
+ "crushNote": "The tutor desk's coordinator talks at twice his speed and has never once asked what he ranks. It shows as cardamom tea carried to the Library in exam week, his paperwork done at the table opposite hers, and his falling asleep there. She thinks he is being kind. He is that, too.",
+ "crushPace": 0.5,
+ "likes": [
+  "People who say where it actually hurts",
+  "Anyone who brings Camille food and then leaves",
+  "Slow swimmers who keep going",
+  "Westerns, ugali with fried tilapia, early light on water",
+  "Being asked nothing about June",
+  "A straight answer",
+  "Quiet company on a night shift"
+ ],
+ "dislikes": [
+  "Running on the pool deck",
+  "'Walk it off'",
+  "Being called a wasted talent",
+  "Results read out loud",
+  "Showing off in the deep end",
+  "Visitors who wake the ward",
+  "People who want the shoulder as a story"
+ ],
+ "gifts": [
+  "Card: Greatmaw Shark",
+  "A paperback western from the pawn shop shelf",
+  "Card: Kit, the Shark Researcher",
+  "Good bread for the infirmary desk",
+  "Card: Infected Greatmaw",
+  "A roll of proper athletic tape"
+ ],
+ "events": [
+  {
+   "id": "baraka_e1",
+   "stage": 1,
+   "title": "Breathe out first",
+   "condition": "Come to him hurt, sunburnt or shaking (infirmary, pool, or after a Conditioning class at gym) and tell him what really happened; or pass the swim test under his eye.",
+   "hint": [
+    "The first-aider asks every question twice. The second answer is the one he writes down.",
+    "Get patched up by him and tell him the truth about how it happened."
+   ]
+  },
+  {
+   "id": "baraka_e2",
+   "stage": 2,
+   "title": "Night desk",
+   "condition": "Keep him company through an Evening at the infirmary desk — bring bread for Camille and go when told — or, from Day 41, work an orderly shift beside him. Ask about the four hundred metres and accept a short answer.",
+   "hint": [
+    "Somebody sits up at the infirmary desk so that the nurse can sleep.",
+    "Keep him company on an evening shift at the infirmary."
+   ]
+  },
+  {
+   "id": "baraka_e3",
+   "stage": 3,
+   "title": "June",
+   "condition": "In Term 2, be at the mail window when his letter comes, or be the first person he tells that he will not sit the licence examination; help him say it to Coach Delgado. Whatever the letter says, he swims one length flat out for the first time in six years, and you hold the watch.",
+   "hint": [
+    "He is waiting for a letter, and it is not from home.",
+    "Be there when his letter arrives, and when he tells the coach."
+   ]
+  }
+ ],
+ "bonds": {
+  "camille": {
+   "label": "colleagues",
+   "text": "He takes the evening desk so that she can sleep, and wakes her only for what he cannot mend. She trusts his hands.",
+   "public": true,
+   "from": 0
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "Coach got him his placement and believes she is training a coach.",
+   "public": true,
+   "from": 0
+  },
+  "sunny": {
+   "label": "mentor",
+   "text": "She lifeguards under his certificate and out-swims him now. He times her lengths and says nothing about it.",
+   "public": true,
+   "from": 3
+  },
+  "lilia": {
+   "label": "friends",
+   "text": "Year-mates. When he handed back the reserve pin she kept it in her desk, in case.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "friends",
+   "text": "He was the one holding the ice when Willas split his eyebrow on a bunk in first year.",
+   "public": true,
+   "from": 0
+  },
+  "dom": {
+   "label": "rivals",
+   "text": "Dom took the seat he drifted out of, on the evidence, and has asked him twice for his old match notes.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "friends",
+   "text": "Year-mates in the Tower. She has offered him three committee posts and he has slept through two of the meetings.",
+   "public": true,
+   "from": 0
+  },
+  "thandi": {
+   "label": "friends",
+   "text": "Their duty evenings keep falling together on the rota. He has not asked why.",
+   "public": true,
+   "from": 0
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "He taught her to float on her back in the shallow end and never once mentioned how old she is.",
+   "public": true,
+   "from": 3
+  },
+  "ed": {
+   "label": "friends",
+   "text": "His most regular customer. Baraka has started ordering bandages with him in mind.",
+   "public": true,
+   "from": 5
+  },
+  "livvie": {
+   "label": "friends",
+   "text": "He carried her to the infirmary once and has been quietly counting her meals since.",
+   "public": true,
+   "from": 23
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "Awake at three, like the infirmary. They play cards at the desk without talking.",
+   "public": true,
+   "from": 10
+  },
+  "shirin": {
+   "label": "crush",
+   "text": "Talks at twice his speed and has never asked his rank. He does his paperwork where she can see him.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "friends",
+   "text": "She has seen the Nairobi postmark three times and has never said one word about it.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "gym",
+   "Midday": "infirmary",
+   "Afternoon": "pool",
+   "Evening": "infirmary",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "pool",
+   "Midday": "infirmary",
+   "Afternoon": "beach_cove",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Feeds small creatures to Greatmaw sharks: each sacrifice makes Rakah's Attack bigger for good. Patient, unhurried, then one enormous bite.",
+  "tilt": "Being told he could have been great: he plays on principle, not on the board."
+ }
+}

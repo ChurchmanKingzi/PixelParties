@@ -1,0 +1,374 @@
+{
+ "name": "Pyre",
+ "owner": "brant",
+ "heroes": [
+  "Rakah, the Loan Shark",
+  "Serket, Dread of the Desert",
+  "Calamitusk, the Chaorc War Chief"
+ ],
+ "main": [
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Chaorc Cannon Fodder"
+  ],
+  [
+   4,
+   "Chaorc Corpse Cannibal"
+  ],
+  [
+   4,
+   "Chaorc Friendly Fireballer"
+  ],
+  [
+   2,
+   "Chaorc Interception"
+  ],
+  [
+   3,
+   "Chaorc Pyre Grill Master"
+  ],
+  [
+   3,
+   "Chaorc Rider Warg"
+  ],
+  [
+   4,
+   "Chaorc Ruin Mourner"
+  ],
+  [
+   4,
+   "Chosen Sacrifice"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   4,
+   "Fireball"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Occultism"
+  ],
+  [
+   3,
+   "Quick Attack"
+  ],
+  [
+   8,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Suspicious Monster"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Rakah, the Loan Shark": "Hero",
+  "Serket, Dread of the Desert": "Hero",
+  "Calamitusk, the Chaorc War Chief": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Chaorc Cannon Fodder": "Creature L1",
+  "Chaorc Corpse Cannibal": "Creature L1",
+  "Chaorc Friendly Fireballer": "Creature L1",
+  "Chaorc Interception": "Spell (Destruction Magic, Reaction)",
+  "Chaorc Pyre Grill Master": "Creature L1",
+  "Chaorc Rider Warg": "Creature L2 (Reaction)",
+  "Chaorc Ruin Mourner": "Creature L4",
+  "Chosen Sacrifice": "Creature L0",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Fighting": "Ability",
+  "Fireball": "Spell (Destruction Magic)",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Occultism": "Ability",
+  "Quick Attack": "Attack",
+  "Summoning Magic": "Ability",
+  "Suspicious Monster": "Creature L1"
+ },
+ "gist": {
+  "Chaorc Ruin Mourner": "Gets cheaper for each sacrifice this turn; then hits a target every time he sacrifices something, several times a turn.",
+  "Chaorc Friendly Fireballer": "Fetches a Fireball whenever he sacrifices; can sacrifice a creature to cast a Fireball itself.",
+  "Chaorc Corpse Cannibal": "Jumps into the slot of a sacrificed creature and draws a card on sacrifices.",
+  "Chaorc Rider Warg": "Reaction: when you kill one of his creatures it leaps in and the dead creature counts as sacrificed.",
+  "Chaorc Pyre Grill Master": "Sacrifices a creature to permanently raise the Attack or the health of every hero on the table.",
+  "Chaorc Interception": "Reaction: sacrifices a Chaorc to cancel an attack, spell or effect aimed at something else of his.",
+  "Serket, Dread of the Desert": "Gains a Prey Counter per sacrifice and once per turn hits a target for the whole pile of them.",
+  "Rakah, the Loan Shark": "Starts with no Attack; permanently gains the health of every small creature he sacrifices. Has Occultism to do the sacrificing.",
+  "Calamitusk, the Chaorc War Chief": "Sacrifices an older creature to summon a different Chaorc from hand or deck as a free action, a level cheaper.",
+  "Occultism": "Ability: sacrifice an older creature to hit a target.",
+  "Chosen Sacrifice": "Can be sacrificed from hand instead of a creature on the board, and replaces itself.",
+  "Suspicious Monster": "Enters by replacing a sacrificed creature.",
+  "Fireball": "Hits up to two of your targets.",
+  "Heavy Hit": "Rakah's attack once his Attack has grown; stuns.",
+  "Chaorc Cannon Fodder": "Can be sacrificed to Chaorc effects on the very turn it is summoned."
+ },
+ "plan": "Brant feeds his own creatures to the fire and gets paid for each one. A sacrifice is a hit from the Ruin Mourner, a Fireball from the Fireballer, a Prey Counter for Serket, permanent Attack for Rakah and a card from the Cannibal, all at once; Chosen Sacrifice, Cannon Fodder and Calamitusk keep the bodies coming. With the Rider Warg in hand, creatures you kill count as sacrifices too. After a few turns Serket and Rakah each hit like a truck every turn. The engine needs creatures that have survived a turn and it needs the Ruin Mourner; his three heroes have no defence other than Chaorc Interception.",
+ "looks": {
+  "early": "A few cheap Chaorcs and a Town Guard that he clearly intends to burn next turn.",
+  "mid": "Ruin Mourner and Friendly Fireballer side by side, creatures vanishing in threes, Prey Counters stacking on Serket.",
+  "late": "Rakah with a monstrous Attack, Serket's pile of counters, and hardly any creatures left because he has eaten them."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "His creatures were all summoned this turn, and apart from the Cannon Fodder his sacrifice effects need creatures that have been out for a turn.",
+   "why": "For a turn or two the engine cannot run and his heroes stand in the open; every point of damage on them now is worth more than your own setup, because his damage only grows."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "A Chaorc Ruin Mourner stands at the back, and he is keeping one card ready whenever you look at his creatures.",
+   "why": "With a Rider Warg in hand every creature you kill counts as a sacrifice and pays him; the Mourner is the multiplier, so take that one card (Dark Gear is clean; The Yeeting counts as a kill and lets the Warg in once) and leave the rest alone."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Serket carries a pile of Prey Counters and Rakah's Attack has swollen; his board is nearly empty because he ate it.",
+   "why": "The damage now comes from two heroes, one hit each per turn: freeze Rakah, hold Homerun! for Serket's shot, and put the rest into them. There is nothing left worth sweeping."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He has no creatures left to sacrifice and his hand is empty.",
+   "why": "The engine has burned itself out; Serket's counters stay, but with no new sacrifices nothing grows and his heroes are simply targets."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Brant drops an Aggressive Town Guard and a Chaorc Corpse Cannibal and cracks his knuckles; nothing can be sacrificed until next turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Rakah while the engine is cold"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Cannibal"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Friendly Fireballer arrives; he is clearly saving the Town Guard for it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Fireballer"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the fodder"
+     }
+    ]
+   },
+   {
+    "board": "He sacrifices a Chosen Sacrifice from his hand to Occultism and stings your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Keep hitting Rakah"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on the caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Ruin Mourner lands almost for free after two sacrifices; each further one hits you.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Mourner"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon it and hit Serket"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, into a waiting Rider Warg"
+     }
+    ]
+   },
+   {
+    "board": "You kill a Chaorc; a Rider Warg leaps out of his hand and the dead one counts as sacrificed, paying everything.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Stop killing fodder; remove the Mourner"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Hit heroes only"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Warg too"
+     }
+    ]
+   },
+   {
+    "board": "The Pyre Grill Master raises the Attack of every hero on the table, yours included, which helps him far more.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb Rakah's Fighting"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze Rakah"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Enjoy the bonus"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Serket's counters are high and Rakah's Heavy Hit would nearly kill; he controls one creature.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon Rakah, Homerun! for Serket"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Serket down"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one creature"
+     }
+    ]
+   },
+   {
+    "board": "A Fireball cast by the Fireballer itself hits two of your heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, answer on Serket"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Fireballer"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal up"
+     }
+    ]
+   },
+   {
+    "board": "Chaorc Interception is surely in his hand; he keeps a Chaorc untouched.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Untargeted damage: Storm and Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Bait it with a small spell"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Aim your best spell at Serket"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No creatures, no cards; Serket and Rakah both wounded.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish them"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze whichever can still kill"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild at leisure"
+     }
+    ]
+   },
+   {
+    "board": "Calamitusk trades his last creature for a Ruin Mourner with nothing to feed it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep a shield for Serket's shot"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill it"
+     }
+    ]
+   },
+   {
+    "board": "Rakah alone, huge Attack, one Heavy Hit a turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon, then burn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for the Storm"
+     }
+    ]
+   }
+  ]
+ }
+}

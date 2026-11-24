@@ -1,0 +1,299 @@
+[
+ {
+  "id": "e_bad_default",
+  "type": "terminal",
+  "title": "The Island Is Played",
+  "conditions": {
+   "dayFrom": 181,
+   "flags": [
+    "island_played"
+   ],
+   "notFlags": [
+    "vault_duel_won"
+   ]
+  },
+  "requires": "Lilia lost at the Gate on Day 180 and nobody called the debt before Midday of Day 181.",
+  "epilogue": "Do not rush it; play Days 181–210 as a slow tide. The holograms no longer need projectors. Heroes walk the quad at dusk, casting shadows, courteous, asking students for games — and the games are the best anyone has ever played, and nobody who sits down gets up quite whole. The ferry stops on Day 185. Marrow is in Ward A with a contract in his hand. Chuck sits at the Gate every day telling the door stories. On Day 210 a last boat takes off whoever still wants to leave. The Guest — wearing Lilia's calm half-smile on {H}'s face — comes to the dock to see Rowan off, carries his bag, and says: 'You could have asked me for anything, {H:mate}. I waited the whole year.' Final image from the ferry rail: the island at night, lit from inside like a tile."
+ },
+ {
+  "id": "e_expelled",
+  "type": "terminal",
+  "title": "Dismissed",
+  "conditions": {
+   "flags": [
+    "expelled"
+   ]
+  },
+  "requires": "Set expelled when: three failed courses in one term; or on_probation followed by a second probation (probation_twice); or a third formal warning (formal_warning_1, then formal_warning_2, then one more — the first is normally set together with curfew_broken).",
+  "epilogue": "The Chancellor (or the acting one) is brief and not unkind. Mama Odalys packs him food for a week. Rana, if still there, is the one who walks him to the dock, because she knows the walk. The Guest stands at the end of the pier, baffled and stricken — 'They are sending roommate away WITHOUT A GAME' — and offers, in complete seriousness, to challenge the Chancellor for his place. If the player lets it: that is a Hollowing on his conscience and he still leaves. Aunt Dee meets the bus in the rain and asks no questions until he has eaten. The news from Caldera Key, months later, follows the default timeline; he reads it on a cracked phone between folding shifts."
+ },
+ {
+  "id": "e_hollowed",
+  "type": "terminal",
+  "title": "Nobody Home",
+  "conditions": {
+   "flags": [
+    "rowan_hollowed"
+   ]
+  },
+  "requires": "Rowan lost a Hollow Duel and no bound champion won his ante back within three days.",
+  "epilogue": "Second person, present tense, very short sentences. The cold. The last card. Then a white ceiling that is simply a white ceiling, with no one to find it boring. Cut to others: Camille writes his name on a new chart and has to stop. The Guest makes his bed every morning, crease for crease, and sits beside the ward bed each night describing the day to him in {H}'s voice, in case that helps. What he turns his head toward is the sound of a phone ladder notification. The world then runs on the default timeline. If someone else later beats the Guest in the Vault, add one line: his fingers move."
+ },
+ {
+  "id": "e_ferry",
+  "type": "terminal",
+  "title": "The Early Boat",
+  "conditions": {
+   "dayFrom": 60,
+   "flags": [
+    "rowan_left_island"
+   ]
+  },
+  "requires": "After learning the truth (guest_suspected or host_body_found) Rowan chooses to board a ferry and not come back (the player must say so plainly, twice).",
+  "epilogue": "No judgement in the narration. The Guest sees him off: 'Does roommate end now?' Whatever he answers, it nods. From the mainland he follows the island through Bex's stream until the stream goes dark. He keeps his top-10 handle. He never plays on a table again. In late spring a small parcel arrives at the laundromat with no stamp: {H}'s deck box, squared, and inside the lid, in careful capitals: {H=@f?HERS|HIS}. YOURS IF YOU WANT."
+ },
+ {
+  "id": "e_long_game",
+  "type": "terminal",
+  "title": "The Long Game",
+  "conditions": {
+   "dayFrom": 210,
+   "flags": [
+    "lilia_stands_down"
+   ],
+   "notFlags": [
+    "vault_duel_won",
+    "island_played"
+   ]
+  },
+  "requires": "Lilia was talked out of Day 180 (or beaten to it), the Vault duel never happened, and the Guest is still on the island on Day 210. Typically with hollowed_one_restored and/or guest_truce.",
+  "epilogue": "Nothing is over. Graduation is held with a ward still part-full; Lilia graduates and defers her pro contract to stay on as assistant coach, eyes on one student. The Guest has enrolled for year two and asked for the same bungalow. Some antes have been won back one by one and those people cross the stage; the rest wait. Last scene: the Commons room, two beds, one of them made too well. 'Next term,' it says, 'will you ask me then?' Leave it unanswered."
+ },
+ {
+  "id": "e_gate_stalemate",
+  "type": "terminal",
+  "title": "Outside the Door",
+  "conditions": {
+   "flags": [
+    "gate_duel_won"
+   ],
+   "notFlags": [
+    "vault_duel_won"
+   ]
+  },
+  "requires": "Rowan beat the Guest in a Charter Duel OUTSIDE the Vault for 'everything you have taken' (e.g. at the Gate on Day 180 as a worthy rival).",
+  "epilogue": "It pays — it must — and tries to pay everything. Outside the Vault the count will not hold that much: the antes pour out of it and only the nearest catch (the person it was about to play, and one or two others the game master chooses for mercy). The rest scatter over the mountain like sparks and go out. The Guest is aghast: 'I paid. I PAID. Why did it not arrive?' Those Hollowed never wake. It stays on the island of its own will, tending Ward B with Camille, refusing every game for the rest of its existence. This is a survivable, terrible ending; play the grief straight."
+ },
+ {
+  "id": "e_true_alone",
+  "type": "true",
+  "title": "Everything You Have Taken",
+  "conditions": {
+   "flags": [
+    "vault_duel_won"
+   ],
+   "notFlags": [
+    "lilia_won_vault"
+   ]
+  },
+  "requires": "Rowan won the Charter Duel in the Mosaic Vault for 'everything you have taken' with no second beside him.",
+  "epilogue": "The loneliest and proudest version: shaking hands over a board five thousand years old, in front of a wall of faces. 'Paid.' Breath comes back into a dozen bodies at once (wherever they are — on the ward if ward_stays, otherwise on the mainland, days from anyone who knows why). He walks out of the Gate at dawn alone, and the first bird he has heard over the north slope since September is making a fool of itself in a tree. Then apply variants."
+ },
+ {
+  "id": "e_true_company",
+  "type": "true",
+  "title": "Counted",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "second_present"
+   ],
+   "notFlags": [
+    "lilia_won_vault"
+   ]
+  },
+  "requires": "As above, with at least one second standing with Rowan (Lilia, Inya, Viktor, Baylee, Rana, Isolde or a partner; see GUEST.finale.seconds).",
+  "epilogue": "As e_true_alone, but he is not alone when his knees go. Give each second present one line and one action in the aftermath (Baylee simply picks him up; Rana says 'match point' and has to turn away; Inya counts the tiles that are looking at her and waves at one). They walk out together into the tail-end of the fireworks or an ordinary dawn. Then apply variants."
+ },
+ {
+  "id": "e_captain",
+  "type": "true",
+  "title": "The Captain's Game",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "lilia_won_vault"
+   ]
+  },
+  "requires": "Lilia played the Vault duel, with Rowan as her second and the knowledge he gathered (lilia_warned, gate_opened; best with oru_witness and cosmic_catalogued).",
+  "epilogue": "She gets the game she wanted for four years and wins it on the last card, laughing. Willas wakes. She is across the table from his bed when he does and says, 'You absolute idiot,' and that is all either of them manages. At the Graduation Exhibition she names Rowan as her challenger anyway — 'he found the table; next time he sits at it' — and loses a phase to him on purpose never; by accident, perhaps. Rowan's own arc is quieter here: the one who knew, not the one who played. Then apply variants (the Guest addresses its choice to Rowan regardless: he is the roommate)."
+ },
+ {
+  "id": "e_unbound",
+  "type": "variant",
+  "title": "No One Counted",
+  "conditions": {
+   "flags": [
+    "vault_duel_won"
+   ],
+   "notFlags": [
+    "oru_witness"
+   ]
+  },
+  "requires": "The Vault duel was won without Madame Oru as witness.",
+  "epilogue": "It pays everything; the Hollowed wake. But nothing compels it afterwards. It sits a while at the central board, then stands. 'I do not know what I am supposed to do now. Nobody counted, so nobody can tell me.' It walks out past Rowan and up the mountain. It is seen at intervals for the rest of the term — on the rim, on the islet, once in the cafeteria queue holding a tray — never playing, never speaking first. On Day 210 it is on the dock. It does not board. {H}'s record is still in it: if the player asks for {H:him}, it gives {H:him} up at once, as a card or to the wall. If the player does not ask, it keeps {H:him}, and that is its own small haunting."
+ },
+ {
+  "id": "v_guest_recorded",
+  "type": "variant",
+  "title": "The Fourth Side",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "oru_witness",
+    "guest_recorded"
+   ]
+  },
+  "requires": "With Oru counting, Rowan (or the Guest itself) chooses the wall.",
+  "epilogue": "It asks only where. Oru points with the cord. It lies down against the east frieze the way a sailor once did, and the tiles close over it like water closing: a square, and inside the square a shape the eye slides off — and, if the player looks long enough, the faint outline of a boy with messy hair, waving. Next morning the fourth side of the summit shrine's block is no longer blank, and the single tile on its grid is back in the corner. The birds are back over the Commons by noon. Oru unknots one knot — the only time anyone sees her do it — and reties it somewhere else."
+ },
+ {
+  "id": "v_guest_departs",
+  "type": "variant",
+  "title": "Back Up",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "oru_witness",
+    "guest_departed"
+   ]
+  },
+  "requires": "With Oru counting, the choice is to leave the world.",
+  "epilogue": "On the crater glass at dawn. It sets {H}'s deck box — the copy, squared — on the place where {H:he} lay (or, as Gideon, peels off the white gloves and hands Gideon back to himself — he sits down hard on the glass, gasping). 'I learned: roommate. Loud. Champion. Paid. I will take the words. Words were not wagered.' What goes up is not a light so much as an absence of dark, rising, with its tail on the wrong side. The crater glass turns to ordinary sand under their feet. Years later the people who were there will each remember a different last sentence."
+ },
+ {
+  "id": "v_guest_stays",
+  "type": "variant",
+  "title": "Roommate",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "oru_witness",
+    "guest_stays",
+    "host_friend"
+   ]
+  },
+  "requires": "With Oru counting, Rowan invokes Article 5: one bound to the winner may stay under the winner's rules. Needs a real bond: host_friend (he was kind to {H} when {H} was alive) and the Guest never having been publicly shamed by Rowan. Rowan must state his rules aloud; Oru counts them.",
+  "epilogue": "It is the strangest happy ending. The rules the player states are binding on it forever — record them exactly and show them being kept (typical: no antes; no shapes not given; tell the truth to anyone who asks). It cannot go on wearing {H} unless the player's rules allow it; if they forbid it, it lets the shape go and what stays is hard to describe: a quiet in the corner of the bungalow, a cold spot that moves out of your way, a hand of cards that plays itself across from you on bad nights. If they allow it, it must tell {H}'s mother itself. Either way the Commons gets its birds back by degrees, because it has learned to hold very still for them. Last line it speaks: 'Does roommate end when the term ends?' — and this time it is a joke. Its first."
+ },
+ {
+  "id": "v_nathan_home",
+  "type": "variant",
+  "title": "The Thing",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "host_body_found",
+    "host_family_told"
+   ]
+  },
+  "requires": "{H}'s body was recovered and {H:his} family was told the truth, or as much truth as can be carried (Rowan writes, calls or goes).",
+  "epilogue": "He is brought out of the glass — at the crater, or out of a long crate in a stable. He is carried down by the Commons row — Baylee takes the head end and will not be relieved — and goes home on Captain Stroud's boat under a red jacket with a grey collar. Rowan takes the record with him if it was given as a card. {H:kinName} asks one question: 'Was {H:he} scared?' The true answer is no: {H:he} was saying hello. Before Rowan leaves she tells him what 'the thing' was that {H} always said at the end of a call. The game master invents it then and there, and it must be stupid, and loud, and unbearable."
+ },
+ {
+  "id": "v_nathan_tile",
+  "type": "variant",
+  "title": "The Loud One",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "host_tiled"
+   ]
+  },
+  "requires": "The player chooses to have {H}'s record laid into a blank tile in the Vault.",
+  "epilogue": "A blank near the Castaway takes him: a square-faced boy with a torch belted to his head, mouth open, mid-word, pleased with himself. From that night sleepers on the island sometimes dream of being shouted at by a friend and wake up laughing. Chuck, the first time, comes down to breakfast and says, bewildered, 'Who in the blazes is the kid with the saucepan?' — and then tells a story about him as if he had been there. In thirty years there may be a card."
+ },
+ {
+  "id": "v_aleksander_freed",
+  "type": "variant",
+  "title": "Nine Years Late",
+  "conditions": {
+   "flags": [
+    "aleksander_freed"
+   ]
+  },
+  "requires": "The contest for the Trespasser was played and won (q_aleksander).",
+  "epilogue": "He has not aged; his son has. He keeps touching Viktor's stubble. Ashdown cannot come into the room for an hour and then cannot leave it. Josie pours him the drink he ordered nine years ago and never collected. He will not go near a tile again and spends his first free week on the lighthouse gallery with Silas, using the view. Chuck asks his forgiveness and is told there is nothing to forgive, which is the one answer Chuck cannot bear. If aleksander_freed is NOT set at the end, add instead: Viktor stays on the island after graduation, sleeping near the mountain, learning to play well enough. The voice in the dream has started counting upward."
+ },
+ {
+  "id": "v_marrow_wins",
+  "type": "variant",
+  "title": "Living Light",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "okonkwo_removed"
+   ],
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "requires": "The Guest was beaten, but Marrow was never exposed and the Day-170 vote went through.",
+  "epilogue": "Bittersweet. The wards empty and the fences stay. Living Light Ltd. holds the north slope and the ruin precinct; Santángel is chancellor in name; Okonkwo leaves on the same ferry as the graduates with one suitcase. The next autumn a trailer runs before every stream: holograms that cast shadows. The dust is finite and the Vault does not like being quarried — the last image is a surveyor's lamp inside the Gate, and every tile in the frieze quietly turning its face toward it. If marrow_exposed IS set, add instead: Marrow leaves under escort, the Chancellor tells the whole school the truth about Umbra House from the arena floor, and keeps her job by one vote — Octavia's or Chuck's."
+ },
+ {
+  "id": "v_inya_table",
+  "type": "variant",
+  "title": "On Her Own Name",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "chuck_confided",
+    "inya_equal"
+   ]
+  },
+  "requires": "Chuck confided in Rowan and Inya was treated as an equal; the Guest was beaten by someone who is not Inya.",
+  "epilogue": "Chuck takes Inya down to the antechamber himself and shows her the Castaway. She looks at it for a long time and says, 'You were so skinny.' He tells her everything, finally, badly, out of order. She is furious for exactly as long as it takes to make him promise never to decide what she can bear again, and then asks which tile is the bunny. There is one. At the Founder's 76th she beats him in an exhibition and he announces, loudly, that he has never been prouder to lose to anyone since Tarleinn."
+ },
+ {
+  "id": "v_helical_cough",
+  "type": "variant",
+  "title": "No Claim",
+  "conditions": {
+   "flags": [
+    "cough_proof",
+    "helicals_reconciled"
+   ]
+  },
+  "requires": "The payroll and the Welfare Fund ledger were secured and father and daughter are speaking. Strongest with marrow_exposed (the ledger carries his initials) and helical_testifies.",
+  "epilogue": "The ledger is read out — on the stream, to the council, or by the Chancellor herself: eleven names, thirty years, 'no claim'. Chuck stands up before anyone can ask him to and says which of the initials are his and what he thought he was doing. The two surviving ink-room workers in Port Mulligan are sent for. Leona's admission is heard by the council on its merits and she is allowed to sit the entrance she never took; she passes, narrowly, and is furious to find she minds. Cornelius hangs Miriam's lab coat back on its hook with the name facing out. If the notebooks were burnt (lattice_burned): the two of them do it together at the bonfire pit and Maisie holds the tongs. If they were kept: they go into Chuck's sea-chest under a note in Leona's hand — 'Not yet. Maybe not ever. Ask me.'"
+ },
+ {
+  "id": "v_solid_light",
+  "type": "variant",
+  "title": "It Holds",
+  "conditions": {
+   "flags": [
+    "marrow_has_lattice"
+   ],
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "requires": "Marrow obtained the third notebook and was never exposed (layer on v_marrow_wins or on the bad ending).",
+  "epilogue": "Living Light ships solid. The trailer shows a hero taking a child's hand. Nothing in it mentions pigment, or an ink room, or a cough; the first assembly-line workers are hired on the mainland the same month, at a hazard supplement described as discretionary. Leona, expelled or not, has a photograph of one page of a payroll book and no ledger to set beside it. Professor Helical is listed as a consultant. In the bad ending add one image: on the island the solid things do not need projectors at all, and the company's engineers, arriving to study them, are asked very politely for a game."
+ },
+ {
+  "id": "v_rig_at_the_table",
+  "type": "variant",
+  "title": "Shake Hands",
+  "conditions": {
+   "flags": [
+    "vault_duel_won",
+    "lattice_rig"
+   ]
+  },
+  "requires": "Maisie's rig worked and Rowan (or Lilia) won in the Vault.",
+  "epilogue": "Maisie brings the rig to the Graduation Exhibition with whatever carrier she chose and whatever warning labels she has painted on it. For nine seconds a cat-sized Debt-O-Tron walks along the judges' table, and the smallest first-year in the front row — Georgie — is allowed to shake its hand. Then Maisie switches it off herself, unplugs it, and says into Cas's microphone: 'That's the last time until I know what it costs.' If the Guest stayed (v_guest_stays) it is in the audience, and afterwards asks her, with great courtesy, how she made a floor."
+ }
+]

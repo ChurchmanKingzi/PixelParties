@@ -1,0 +1,238 @@
+{
+ "id": "josie",
+ "name": "Josie Hart",
+ "firstName": "Josie",
+ "age": 25,
+ "sex": "f",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Over The Mulligan",
+ "romance": true,
+ "deck": "House Special (potions and poison; her old Umbra list rebuilt behind the bar)",
+ "look": "Long dark red hair worn straight down her back under a red hairband — twisted up with a bar pencil when the work gets serious — a sleeveless white shirt and a dark waistcoat that leave her arms bare, tattooed with playing-card suits, waves and one small closed door. She has a bartender's quick hands and level gaze and a faint burn scar on her right palm. She moves behind the bar like someone who built it, because she did.",
+ "voice": "Low, wry and unhurried, with a rasp; a bartender's economy — she answers questions with better questions and teases students from the hill without malice. When one particular subject comes near she gets very busy with a glass and very flat. RARE habit (once in a scene at most; most scenes go without it): 'uphill kid' for any student.",
+ "lines": [
+  "What'll it be, uphill kid. Yes, I check; no, you don't look twenty-one; yes, I'll pour you a ginger beer and call it a mule.",
+  "I did three years up there. Left before they could hand me a piece of paper saying I'd been.",
+  "Not my circus. Used to be. I know which tent the lion's in.",
+  "You get one question about the ridge, and you've just used it deciding whether to ask."
+ ],
+ "intro": "Owner and bartender of The Mulligan, the harbour bar: an ex-Academy student who dropped out years ago and never left the island.",
+ "traits": [
+  {
+   "id": "josie_1",
+   "text": "She owns and runs the harbour bar and pours students ginger beer with a straight face.",
+   "how": "First town trip."
+  },
+  {
+   "id": "josie_2",
+   "text": "She was an Academy student herself and dropped out in third year.",
+   "how": "She says so; there is an old school jacket with a smoke-grey collar behind the bottles that regulars know not to mention."
+  },
+  {
+   "id": "josie_3",
+   "text": "She can still beat most students at the bar's back table and plays for bar tabs.",
+   "how": "Challenge her."
+  },
+  {
+   "id": "josie_4",
+   "text": "She rebuilt the bar herself from a wrecked chandlery.",
+   "how": "Ask about the beams."
+  },
+  {
+   "id": "josie_5",
+   "text": "She rents the attic to the card-shop clerk and complains about the dogs fondly.",
+   "how": "Ask about the barking."
+  },
+  {
+   "id": "josie_6",
+   "text": "She does not go up to campus, ever, and sends deliveries with someone else.",
+   "how": "Invite her."
+  },
+  {
+   "id": "josie_7",
+   "text": "The tattoo of a small closed door on her forearm is the only one she will not explain.",
+   "how": "Notice it while collecting glasses; ask once."
+  },
+  {
+   "id": "josie_8",
+   "text": "She came to the Academy at sixteen, the youngest of her year.",
+   "how": "Close stage."
+  },
+  {
+   "id": "josie_9",
+   "text": "She has slept with a light on for nine years.",
+   "how": "Dating stage; the lamp over the bar is never off."
+  }
+ ],
+ "secret": "What she knows, exactly. Josie Hart was an early admit at sixteen, nine years ago, and was sorted into Umbra House — then the fourth dorm, small, odd, proud, smoke-grey collars, for students who showed a 'sensitivity' to the first prints, which in practice meant Professor Hale's favourites. She was the youngest in the house. She was NOT one of the four who went. Her roommate was: Dara Oyelaran, eighteen, the one Josie adored. That evening, about sunset, Josie watched the four of them come back up the ridge holding on to each other. They did not know her. Dara kept saying, in a small reasonable voice, 'He's flat, he's flat, he looked at me and he's flat,' and her fingers kept laying out squares on her own knee. Professor Ashdown came after them with her hand wrapped in a shirt, bleeding. Before dark the four had been walked down to the cove and rowed out to Gull Rock 'so nobody would hear them'; two nights later the ferry took them. And at midnight, from her window, Josie saw the Founder go up the ridge path by himself — no torch, walking as if he knew the way blind — and come back down at first light. 'He went up a man of sixty-five. I swear he came down eighty.' By the weekend Umbra House had 'structural damage' and Josie had a room in Rare, a visit from the Chancellor, a form to sign and a generous adjustment to her bursary.\nShe stayed two more years, played brilliantly and joylessly, and in third year was formally challenged to a Charter Duel she could not make herself sit down to: she deferred the three days the Charter allows and was off campus, for good, before they ran out. She bought a ruined chandlery with the bursary money and has kept the bar for six years without closing it for a single night. She kept two things: her own red jacket with the smoke-grey collar, which hangs behind the bottles with the embroidery gone pale, and Dara's last postcard from Leeds — Dara writes once a year, sane, cheerful, never mentioning the island. She could not leave: twice she bought a ferry ticket and twice got off before it sailed, sick with the feeling that she was the only one left who had seen, and that if she went, it would all be 'structural damage' for ever.\nShe does NOT know about recording, the Vault's nature, or Visitors — but 'he's flat' and that walk up the ridge have been in her head for nine years. She recognised the name Viktor Hale the first time he signed a bar tab and has been pouring him doubles on the house since without saying why. She distrusts Ashdown ('she held the line, and then she didn't'), Okonkwo ('she held the pen') and Silas ('he held the oars').\nWound and lie: she tells everyone she left because the Academy was a con. The truth is that she is the girl who watched from a window and signed the form, and she has built a bar as near to that ridge as a person can live without going back up the hill. After the bang she does not sleep at all. When Bex comes about the Umbra story she nearly talks. She tells it, when she tells it, at the end of the harbour wall after closing. Arc: closing the bar for one night, and going back up the hill in the jacket with the grey collar.",
+ "wants": "To put the card back where it belongs and finally be able to leave — or to choose, freely, to stay.",
+ "fears": "'Not yet.' That whatever is up there has been waiting for her to finish the sentence.",
+ "crush": "viktor",
+ "crushNote": "She knew his surname the first time he signed a tab, and he is the only customer who sits at her bar without needing to be entertained. It shows as doubles on the house, the back table kept free, and questions about the ridge that she almost asks.",
+ "crushPace": 0.8,
+ "likes": [
+  "People who can sit at a bar without needing to be entertained",
+  "Being beaten at her own back table",
+  "Help with heavy lifting at closing",
+  "Honesty, especially the awkward kind",
+  "Students who treat the town as a place, not a backdrop",
+  "Good whiskey, bad jokes",
+  "Someone who does not flinch from a long silence",
+  "Kindness to Viktor"
+ ],
+ "dislikes": [
+  "Questions about why she dropped out",
+  "The Chancellor, in any form",
+  "Being called 'the bar lady'",
+  "Uphill kids being cruel to town kids",
+  "Being asked to come up to campus",
+  "Anyone reaching for the jacket behind the bottles",
+  "Lies"
+ ],
+ "gifts": [
+  "Card: Arthor, the King of Blackport",
+  "A bottle of something Irish (Saoirse knows which)",
+  "A new bar pencil, flat carpenter's kind",
+  "A photograph of the old chandlery from the pawn shop",
+  "Card: Beer"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": true,
+  "style": "A bartender's rebuild of her nine-year-old Umbra House list — everything comes out of a bottle: potions that leave small poisoning tokens behind — played fast and hard from muscle memory. Would be an 8 if she had not stopped.",
+  "text": "Josie flirts the way she pours: economically, with a raised eyebrow and exact measure. She will open — 'you're back, uphill kid; it's the ginger beer, is it, or the company' — because the bar is her stage and she is six years his senior and enjoys the advantage. It is banter with a real edge of interest, and she lets it stay banter for a long time. She wants someone who can hold his end of a conversation at one in the morning, stack chairs without being asked, and take a no about the ridge. Do not be dazzled by her and do not try to fix her. She is the one who will say, flatly, 'stay' — and mean several things by it."
+ },
+ "intimacy": "Frank, adult, unsentimental on the surface and deeply careful underneath. She has had lovers and no one she let upstairs twice. Closeness comes after closing time: the chairs up, the last light over the bar, two glasses, her boots off and her feet on the rail; a slow dance to the jukebox with nobody watching. She likes hands, forearms, being kissed against the back-bar; she is sure of herself, amused, direct, takes her time. What she does not let anyone see is the lamp she sleeps with — the first night she lets him turn it off is the real intimacy of the route. Upstairs, rain on the harbour, the bar pencil pulled out of her hair. Fade as the lamp goes dark, for the first time in nine years.",
+ "events": [
+  {
+   "id": "josie_e1",
+   "stage": 1,
+   "title": "Ginger beer",
+   "condition": "Come to bar on a town trip, take the ginger beer in good humour, and play her at the back table for the tab — win or lose, pay or collect.",
+   "hint": [
+    "The bartender plays for bar tabs and has not lost one to a first-year in a while.",
+    "Visit the harbour bar and challenge her to a duel for the tab."
+   ]
+  },
+  {
+   "id": "josie_e2",
+   "stage": 2,
+   "title": "Closing time",
+   "condition": "Become a regular who helps stack chairs; bring Viktor or Saoirse into easy company there; ask about the beams, not the jacket.",
+   "hint": [
+    "She built the place with her own hands. That is a safer question than some.",
+    "Keep coming back, help her close up, and ask about how she built the bar."
+   ]
+  },
+  {
+   "id": "josie_e3",
+   "stage": 3,
+   "title": "One question",
+   "condition": "After Day 27, when she is not sleeping, be at the bar late and do NOT ask about the ridge; when she finally asks you what you have seen, answer truthfully. She says 'stay' and means the evening.",
+   "hint": [
+    "There is a subject she allows one question on. The right move may be not to ask it.",
+    "Be there on her bad nights without prying, and tell her honestly what you have seen on campus."
+   ]
+  },
+  {
+   "id": "josie_e4",
+   "stage": 4,
+   "title": "The fifth girl",
+   "condition": "After Day 66 (with Bex, or with Viktor at Friend or higher), earn the story of the night nine years ago — she tells it at the end of the harbour wall after closing; hear it without interrupting; promise nothing you cannot do. Later bring her a truth in return. He turns off the lamp.",
+   "hint": [
+    "She saw something a long time ago and has told no one all of it.",
+    "Earn the story of why she left the Academy, and listen to the whole thing."
+   ]
+  },
+  {
+   "id": "josie_e5",
+   "stage": 5,
+   "title": "Up the hill",
+   "condition": "In Term 2, ask her — do not push her — to close the bar for one night and walk back onto campus (to umbra_house or ruin_gate) in the old jacket with the smoke-grey collar, and walk beside her when she does; afterwards she decides whether she is leaving the island or staying, and tells him which.",
+   "hint": [
+    "She has not set foot on campus in years, and she has not closed the bar for a single night.",
+    "Ask her to return to the Academy with you when the time comes, and go at her pace."
+   ]
+  }
+ ],
+ "bonds": {
+  "saoirse": {
+   "label": "best friends",
+   "text": "The one uphill kid who is welcome behind the bar.",
+   "public": true,
+   "from": 0
+  },
+  "viktor": {
+   "label": "friends",
+   "text": "She knew the name Hale the first time he signed a tab, and has not told him why.",
+   "public": false,
+   "from": 6
+  },
+  "bex": {
+   "label": "distrusts",
+   "text": "The stream girl came asking about the ridge once. Josie nearly talked.",
+   "public": false,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "distrusts",
+   "text": "'She held the line, and then she didn't.'",
+   "public": false,
+   "from": 0
+  },
+  "silas": {
+   "label": "distrusts",
+   "text": "'He held the oars.'",
+   "public": false,
+   "from": 0
+  },
+  "dex": {
+   "label": "friends",
+   "text": "The one man in town who has never asked her a question she did not want.",
+   "public": true,
+   "from": 0
+  },
+  "mika": {
+   "label": "roommates",
+   "text": "Her tenant, her Monday-night bottle, and four strays on the fire escape.",
+   "public": true,
+   "from": 0
+  },
+  "selene": {
+   "label": "friends",
+   "text": "Monday bottle. Selene is the only person who has seen her cry and said nothing about it.",
+   "public": true,
+   "from": 0
+  },
+  "freya": {
+   "label": "friends",
+   "text": "She recognises that kind of drinking. She serves her, waters the third round and sends for the boy in the blanket.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "fish_market",
+   "Midday": "bar",
+   "Afternoon": "bar",
+   "Evening": "bar",
+   "Night": "bar"
+  },
+  "weekend": {
+   "Morning": "harbor",
+   "Midday": "bar",
+   "Afternoon": "bar",
+   "Evening": "bar",
+   "Night": "bar"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "A nine-year-old Umbra House list — creeping decay and one sudden theft — played fast and hard from muscle memory. Would be an 8 if she had not stopped.",
+  "tilt": "A formal Charter challenge. She ran from the last one she was given, in third year, and her hands still go cold. Also any first-print card on the table: Umbra students were chosen for feeling them."
+ }
+}

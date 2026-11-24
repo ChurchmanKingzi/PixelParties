@@ -1,0 +1,222 @@
+{
+ "id": "helical",
+ "name": "Professor Cornelius Helical",
+ "firstName": "Cornelius",
+ "age": 53,
+ "sex": "m",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing; most nights in the hologram plant under the Trial Domes",
+ "romance": false,
+ "deck": "Bench Prototype (turrets; a calibration deck — he barely plays)",
+ "look": "Gaunt and stooped, with a salt-and-pepper beard kept short by neglect rather than care, wire-rimmed glasses mended at one hinge, and a lab coat peppered with small burn holes over a black Auxiliary staff jacket. He has an engineer's long, scarred fingers and a tired, courteous way of inclining his head. He looks like a man who has not slept properly in three years, which is accurate.",
+ "voice": "Quiet, precise and old-fashioned in its courtesy: he thanks students for questions and apologises to equipment. He explains clearly, in order, with small dry understatements, and stops short whenever a subject comes near solid light, the company, or his family. Tiredness lies under every sentence. RARE habit (once in a scene at most; most scenes go without it): 'Forgive me —' before correcting someone, including himself.",
+ "lines": [
+  "What you are looking at is a magic lantern with good manners. Please do not expect more of it; I have asked, and it declined.",
+  "Thank you, Miss Voltage, that is an excellent question, and I would be grateful if you did not pursue it.",
+  "The projectors are thirty years old. So is the principle. So, I sometimes think, is the mistake.",
+  "Forgive me — the surname is not uncommon where I come from. Shall we continue with the lens?"
+ ],
+ "intro": "The professor of Hologram Engineering and Table Tech: a gaunt, courteous, exhausted man in a burnt lab coat who keeps the Academy's flickering holograms running.",
+ "traits": [
+  {
+   "id": "helical_1",
+   "text": "He keeps every holo-table on the island working, largely by hand, and apologises to them when they fail.",
+   "how": "First Table Tech demonstration; any trial dome."
+  },
+  {
+   "id": "helical_2",
+   "text": "He calls the Academy's holograms 'magic lanterns with good manners' and will not say what better ones would need.",
+   "how": "Ask why they flicker."
+  },
+  {
+   "id": "helical_3",
+   "text": "He shares a surname with a first-year in the Commons, and both say it is coincidence.",
+   "how": "Day 1 lists; Maisie asks in class."
+  },
+  {
+   "id": "helical_4",
+   "text": "He worked for twenty years in Kaboom Entertainment's hologram division before he came to teach.",
+   "how": "The staff board in the faculty wing."
+  },
+  {
+   "id": "helical_5",
+   "text": "He leaves a lamp lit in his office all night, though he is seldom in it.",
+   "how": "Faculty wing after dark."
+  },
+  {
+   "id": "helical_6",
+   "text": "He wears a wedding ring and stops speaking when asked about it.",
+   "how": "Notice it; do not press."
+  },
+  {
+   "id": "helical_7",
+   "text": "He will not allow anyone to open the old projector housing in the plant under the Trial Domes.",
+   "how": "Go down there with Maisie."
+  },
+  {
+   "id": "helical_8",
+   "text": "He takes the long way round the campus rather than pass the bungalow row.",
+   "how": "Follow his walk home."
+  }
+ ],
+ "secret": "What he knows and what he did (CORE 9.7 is canon; this expands it). Cornelius Helical was a projection engineer at Kaboom Entertainment and the husband of its most brilliant one. Miriam Helical had been, at twenty, an apprentice at the print works on Caldera Key during the Alpha run; from what she saw of the tile-dust ink she later designed the HELICAL LATTICE, a projector geometry that makes a hologram solid to the touch — but only with tile dust as its medium. She tested it once, on a bench, with a pinch of pigment she had kept in a locket; the thing she projected left a bruise on her hand. She shelved the design as dangerous and never told the company why. In her forties the slow 'print-works cough' that several of the old pigment-room staff shared became something worse. The company's doctors called it asthma. The treatment that might have helped was abroad and ruinous. Cornelius, who had never done a dishonest thing in his life, sold a part of her notes — the outer geometry, not the medium — to the one executive who had ever shown an interest: Lucian Marrow. It bought eleven months. Miriam died three years ago, at fifty, and never knew where the money came from; that is what he tells himself, and he is not certain it is true.\nThe essential work is in three grey linen notebooks. He brought them to the island and hid them, one in each of the three places he could watch: the first inside a gutted oscilloscope in his office in the faculty wing; the second in the sealed housing of the original projector in the plant beneath the Trial Domes, which he lets nobody open (a second padlock; a small helix chalked on the plate); the third — the one with the pigment tables — in Miriam's old apprentice locker, number 14, at the print works, where he leaves sea-pinks. He took the Hologram Engineering post to stand guard over them and because the island is where it began. Marrow has the geometry and knows the rest exists. Their arrangement since has been a courteous extortion: Marrow funds the department's spare parts, and asks, every few months, whether Cornelius has 'found' anything more. From about Day 50 Marrow has a harder hold: Gideon Pryce has found the forged waiver in the admissions register. By default Cornelius pays in paper to keep his daughter on the island — the first notebook on Day 95, the key to locker 14 on Day 160 — and Marrow's engineers find the second for themselves on Day 130. He can be brought to do otherwise: to move the notebooks, to go to the Chancellor about the waiver himself, or to testify. The company's hush money is on record: the Print Works Welfare Fund ledger in the Card Archive, 'no claim' against every name, Miriam's among them.\nLeona, sixteen at the funeral, discovered the bank transfers and has not spoken to him since. On Day 1 he read her name on the Commons list under a faculty dependant's waiver bearing a signature that was nearly his. He stood in the faculty wing for a long minute, and let it stand. He does not know what she is here to do; he suspects, and is at once terrified and proud. He leaves the office lamp on. He cannot make himself knock on the door of bungalow 4.\nWhat he knows of the wider truth: that the first-print ink contained a mineral from the island which does to light what no known material does, that it was killing the people who ground it, and that the company knew enough to stop asking. He does NOT know about the Vault, the Tessellate or Visitors — to him the dust is a material, not a record. He keeps the Academy's holograms deliberately rudimentary. Maisie Voltage, the best student he has ever had, is reinventing his wife's design on a porch with scrap, and when she shows him a hologram that pushes back he sees Miriam's bruise. After Day 40 the instruments in his plant record, on certain nights, solid projection in a dome where no lattice exists: the impossible thing, done without any machine. He understands the physics of a Hollow Duel better than anyone alive and has no idea what is doing it.\nWound and lie: 'I did it for her.' He does not know whether he sold the notes to save his wife or because he could not bear to watch, and so he has never forgiven himself or asked to be forgiven. Arc: to tell his daughter the truth in the room, to refuse Marrow to his face, and to put the notebooks into hands that will read them rather than use them.",
+ "wants": "His daughter to knock on the door — and the notebooks never to become a product.",
+ "fears": "That Miriam knew what he had done, and died knowing.",
+ "crush": "ashdown",
+ "crushNote": "Another scholar who stayed on the island out of guilt for someone she could not save; they recognise it in each other and never speak of it. It shows as two tired people taking the same late walk, and his lending her a lamp that he then does not ask for back.",
+ "crushPace": 0.5,
+ "likes": [
+  "A careful question about how something works",
+  "Students who put the guards back on",
+  "Old equipment kept running",
+  "Being left to work at night",
+  "Small courtesies",
+  "News of the Commons, casually given (he will not ask after her by name)",
+  "Honesty about a mistake"
+ ],
+ "dislikes": [
+  "'Why can't we make them real?'",
+  "Company men",
+  "Anyone near the old projector housing",
+  "Being asked about his wife",
+  "Shortcuts with high voltage",
+  "Lucian Marrow's handshake"
+ ],
+ "gifts": [
+  "Card: Future Tech Battery",
+  "A new hinge screw for his glasses, fitted",
+  "Card: Communication Device",
+  "A flask of proper coffee at two in the morning",
+  "One sentence about how a certain first-year is doing, offered without his asking"
+ ],
+ "events": [
+  {
+   "id": "helical_e1",
+   "stage": 1,
+   "title": "Good manners",
+   "condition": "Attend a Table Tech demonstration at trial_dome and stay behind to help him recalibrate a table; ask a careful question and accept it when he declines to answer one.",
+   "hint": [
+    "The man who keeps the holograms running is always short of a second pair of hands.",
+    "Help the hologram professor with a repair after class."
+   ]
+  },
+  {
+   "id": "helical_e2",
+   "stage": 2,
+   "title": "The lamp",
+   "condition": "Visit the plant beneath the Trial Domes at Night and keep him company while he works; mention, without being asked and without comment, how the quiet first-year in bungalow 4 is getting on.",
+   "hint": [
+    "He leaves a light on in an office he does not sit in. Ask nothing; notice.",
+    "Keep him company at night, and let slip a little news of a certain student."
+   ]
+  },
+  {
+   "id": "helical_e3",
+   "stage": 3,
+   "title": "Forgive me",
+   "condition": "After Day 61, with Leona's trust (Close or better) or Maisie's, tell him what you know of the grey-suited visitor's interest and ask him — as someone who will not repeat it — what the old design costs; then stand in the corridor when the knock on his door finally comes.",
+   "hint": [
+    "He made one bad bargain a long time ago and has been paying it in instalments ever since.",
+    "Earn the trust of the people closest to his work, and ask him honestly what he is guarding."
+   ]
+  }
+ ],
+ "bonds": {
+  "leona": {
+   "label": "family",
+   "text": "His daughter. He found her name on the Day 1 list, and let it stand. He leaves a lamp on in case she knocks.",
+   "public": false,
+   "from": 0
+  },
+  "maisie": {
+   "label": "mentor",
+   "text": "The best student he has ever had, building on a porch what his plant cannot. He is proud of her and uneasy about where it leads.",
+   "public": true,
+   "from": 4
+  },
+  "marrow": {
+   "label": "owes",
+   "text": "He sold him part of Miriam's notes to pay for her last year. Marrow has asked for the rest, politely, every few months since.",
+   "public": false,
+   "from": 0
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "He knows what burnt first-print stock smells like, and it comes from that lab.",
+   "public": false,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "She gave him the post without asking why a company engineer wanted it.",
+   "public": true,
+   "from": 0
+  },
+  "chuck": {
+   "label": "colleagues",
+   "text": "The Founder remembers Miriam as a girl at the print works. They have never spoken of what the pigment room did to her.",
+   "public": false,
+   "from": 0
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Miss Ishikawa asks about the oldest tables as carefully as she handles the oldest cards. He tells her a little more than he should.",
+   "public": false,
+   "from": 0
+  },
+  "blum": {
+   "label": "friends",
+   "text": "Two widowers who do not discuss it. Ezra brings biscuits to the plant on Tuesdays.",
+   "public": true,
+   "from": 0
+  },
+  "camille": {
+   "label": "friends",
+   "text": "She has prescribed him sleep, which he has not filled.",
+   "public": true,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "colleagues",
+   "text": "Another who stayed on the island for someone she could not save. They walk the same late path and say good evening.",
+   "public": true,
+   "from": 0
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "The young archivist is exact and discreet. He is also far too observant, and Cornelius is careful what he requests.",
+   "public": false,
+   "from": 0
+  },
+  "gani": {
+   "label": "mentor",
+   "text": "His stage manager keeps the arena rig alive on tape and patience, and asks good questions he does not answer.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "trial_dome",
+   "Midday": "broadcast_studio",
+   "Afternoon": "trial_dome",
+   "Evening": "faculty_wing",
+   "Night": "trial_dome"
+  },
+  "weekend": {
+   "Morning": "trial_dome",
+   "Midday": "faculty_wing",
+   "Afternoon": "great_arena",
+   "Evening": "faculty_wing",
+   "Night": "trial_dome"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "An engineer's bench deck of turrets and test dummies; he knows exactly what every card's hologram ought to do and very little about winning. Plays test patterns, not games.",
+  "tilt": "A hologram that behaves too well. He stops, takes off his glasses and asks where the card came from."
+ }
+}

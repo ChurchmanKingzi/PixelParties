@@ -1,0 +1,198 @@
+{
+ "id": "dom",
+ "name": "Dominic Achterberg",
+ "firstName": "Dom",
+ "age": 21,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 3,
+ "dorm": "spectral",
+ "room": "Spectral Tower, upper floors",
+ "romance": false,
+ "deck": "Endgame Study (Chess)",
+ "look": "Tall, dark-skinned, close-cropped hair, rimless glasses and a red jacket with a white, gold-edged Spectral collar that looks pressed even at midnight, the Battle Team pin dead level. He carries a slim tablet of match data and a mechanical pencil. He stands with his hands behind his back and looks as though he is two moves into whatever you are about to say.",
+ "voice": "Measured, formal and exact, with Dutch precision; he says nothing he could not defend with a number. His humour is so dry it is usually taken for a statistic. When moved he simply stops talking and adjusts his glasses. RARE habit (once in a scene at most; most scenes go without it): prefacing a judgement with 'Objectively'.",
+ "lines": [
+  "Your win rate on the draw is eleven points lower than on the play. You are losing before the game starts. Fix your mulligans.",
+  "Personally I have no objection to Willas. I have a spreadsheet. The spreadsheet has objections.",
+  "Lilia says he is the floor. A floor does not need a starter's jacket.",
+  "I was wrong. I dislike it. Note the date."
+ ],
+ "intro": "The Battle Team's vice-captain: a precise, immaculate third-year who plays a chess deck and judges everything, including you, on the evidence.",
+ "traits": [
+  {
+   "id": "dom_1",
+   "text": "He keeps statistics on every ranked player in the Academy and will tell you yours.",
+   "how": "Meet him after any ladder match."
+  },
+  {
+   "id": "dom_2",
+   "text": "He thinks Willas Tann's starter slot should go to someone better, and says so in meetings, never in corridors.",
+   "how": "Any Battle Team scene."
+  },
+  {
+   "id": "dom_3",
+   "text": "He irons his own jackets at six in the morning.",
+   "how": "Spectral lobby, early."
+  },
+  {
+   "id": "dom_4",
+   "text": "He plays over-the-board chess as well and is a FIDE master.",
+   "how": "Ask about his deck."
+  },
+  {
+   "id": "dom_5",
+   "text": "He will always tell you the true number even when a kind one would help him.",
+   "how": "Ask him your odds."
+  },
+  {
+   "id": "dom_6",
+   "text": "He and the student council president used to be a couple, and both discuss it like a merger that was called off.",
+   "how": "Bex's stream, or ask either of them."
+  },
+  {
+   "id": "dom_7",
+   "text": "His mother is a judge in Paramaribo and his father a surveyor; he was raised on 'show your working'.",
+   "how": "A calm talk at the Spectral terrace once he is a Friend."
+  },
+  {
+   "id": "dom_8",
+   "text": "He is afraid that being fair is the same as being liked by nobody.",
+   "how": "Only at Trusted."
+  }
+ ],
+ "secret": "Dominic was born in Paramaribo, raised between Suriname and Utrecht, and brought up to believe that the only honest authority is a demonstrable one. He is the second-best player in his year, the natural next captain, and he is right on the numbers about Willas — Priya Raman would win the team more games in that seat. What he cannot compute is why the team has not lost in three years with the 'wrong' line-up, and it bothers him the way a rounding error would. Wound: he has always been respected and never once been anyone's first choice for company; his relationship with Octavia Sterling ended in his first year when she told him, accurately and without malice, that they were 'two people cc'ing each other'. Contradiction: he believes only in evidence and is the one team member who would never, under any pressure, bend a result — he once reported his own missed trigger in a final and lost the match. Fair underneath: when Willas is mocked by outsiders (Brant, North Crown) Dom shuts it down coldly — criticism is for people who have done the analysis. Private joke: he and Lilia exchange one chess move a day on a board in the Spectral lobby; the game is in its second year.\nHe logs the anomaly at once: a Commons first-year whose decision accuracy goes from the 30th percentile to unmeasurable in two weeks. He assumes cheating, investigates rigorously, finds none, and is left with a number that should not exist — the most frightened he has ever been. He correlates Hollowings with the previous night's formal duels before the staff do. On Day 140 he formally challenges Willas for the starter's slot inside the team (Willas keeps it narrowly, or by Lilia's veto). Default timeline: after three weeks of charts he concludes that everything can be solved and sits down opposite '{H}' himself; Lilia finds him at the captain's table in the great arena on the morning of Day 141, his analysis squared beside him, the top sheet reading 'There is always an answer' — crossed through in his own hand before the duel. If he is kept from that, then when Willas takes Lilia's duel on Day 150 and falls, Dom's whole framework breaks: the worst player on the team did the one thing the spreadsheet could never have told him to do; he takes the armband while Lilia is absent and carries Willas's jacket to ward B himself. Arc: 'I was wrong. Note the date.' — he becomes the analyst of the final duel, mapping the Guest's tendencies like an opening book.",
+ "wants": "A team picked on merit, and — though he would not phrase it so — to be someone's first choice.",
+ "fears": "That merit is not actually what holds things together, and he has misunderstood people all his life.",
+ "crush": "octavia",
+ "crushNote": "It ended like a contract and he has never found the clause he got wrong. It shows as her being the only person whose judgement he asks for outside the team, and a daily glance at the council room window as he passes.",
+ "crushPace": 0.5,
+ "likes": [
+  "Data, preparation, shown working",
+  "Being contradicted with evidence",
+  "Players who review their own losses",
+  "Punctuality",
+  "A good chess problem",
+  "Honest numbers asked for and accepted",
+  "Respect for the team as an institution"
+ ],
+ "dislikes": [
+  "'It felt right'",
+  "Sloppy uniforms and sloppy shuffles",
+  "Corridor gossip about teammates",
+  "Being called a robot",
+  "Outsiders mocking Willas",
+  "Results obtained by anything but play"
+ ],
+ "gifts": [
+  "Card: Board of Kings",
+  "A wooden travel chess set from the pawn shop",
+  "Card: Queen of Kings [W]",
+  "Your own match data, properly tabulated",
+  "Mechanical pencil leads"
+ ],
+ "events": [
+  {
+   "id": "dom_e1",
+   "stage": 1,
+   "title": "On the evidence",
+   "condition": "Ask him for your statistics after a ladder match and act on the advice (he checks your next three games).",
+   "hint": [
+    "He has a number for everyone. Few people ask for theirs.",
+    "Ask the vice-captain for your stats and visibly improve on what he tells you."
+   ]
+  },
+  {
+   "id": "dom_e2",
+   "stage": 2,
+   "title": "Show your working",
+   "condition": "At the Day 33 tryouts or later, disagree with one of his assessments — of you or of Willas — with evidence, at spectral_terrace or great_arena; be right, or be wrong and concede cleanly.",
+   "hint": [
+    "He likes being argued with properly.",
+    "Challenge one of his judgements with real evidence and take the outcome gracefully."
+   ]
+  },
+  {
+   "id": "dom_e3",
+   "stage": 3,
+   "title": "Note the date",
+   "condition": "After Day 40, bring him a pattern (Tomi's ledger, your own observations of {H=@near?your study partner|your roommate}'s play) and work through it with him; when the conclusion is impossible, do not let him explain it away. He starts the opening book.",
+   "hint": [
+    "He has found a number that should not exist. He needs someone to tell him it is real.",
+    "Bring him hard data he cannot explain and help him accept what it shows."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "teammates",
+   "text": "The best player he will ever stand next to; he disagrees with exactly one of her decisions.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "rivals",
+   "text": "Holds a seat the numbers do not support. Dom has no personal objection, only data.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "mentor",
+   "text": "Coaches her and believes she should be starting.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "teammates",
+   "text": "Admires the volume, questions the method, shares the data.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "exes",
+   "text": "A couple in his first year. It ended like a contract; he still trusts her judgement.",
+   "public": true,
+   "from": 0
+  },
+  "santangel": {
+   "label": "protégé",
+   "text": "Took his theory seriously before anyone else did.",
+   "public": true,
+   "from": 0
+  },
+  "magnus": {
+   "label": "mentor",
+   "text": "The first-year's data is good. His conclusions are about one person only, which is not analysis.",
+   "public": true,
+   "from": 15
+  },
+  "sebastian": {
+   "label": "rivals",
+   "text": "Thorne plays a sound game and governs by impression. Dom has the numbers on both.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "great_arena",
+   "Midday": "lecture_hall",
+   "Afternoon": "duel_terraces",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_lobby",
+   "Midday": "library",
+   "Afternoon": "great_arena",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 7,
+  "style": "A Chess deck played like the real thing: pawns forward, pieces developed, Kasperov castled, every exchange slightly in his favour. Punishes inaccuracies rather than creating threats.",
+  "tilt": "Genuinely irrational play — a sacrifice with no calculable return. He spends his clock looking for the trap."
+ }
+}

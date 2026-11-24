@@ -1,0 +1,3166 @@
+[
+ {
+  "id": "cp101",
+  "name": "Tempo & Resource",
+  "code": "CP101",
+  "teacher": "santangel",
+  "majors": [
+   "CP"
+  ],
+  "room": "lecture_hall",
+  "sessions": 2,
+  "blurb": "The core course of the major, taught by the head of Competitive Play, a former World Championship finalist. Every turn is a transaction; you will learn to keep the ledger. Cold, exact, brilliant lectures; he calls on people by ladder rank.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "What a turn is worth: actions, Gold and cards as three currencies. Introducing the ledger — every student keeps one for every game played this term."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Tempo defined: who is asking the questions and who is answering them? Initiative, forcing plays, and the price of a wasted action."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Card advantage: one-for-ones, two-for-ones, virtual card advantage, and why hand size lies. (Freshman Cup week: each student submits a ledger of one Cup game.)"
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "The Gold curve: when to bank and when to spend; reading an opponent's unspent Gold as a threat."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Ability levels as a second curve: levelling a Hero versus developing the board; the 'greedy second turn' and how it is punished."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Racing: the hero-damage clock, counting lethal two turns ahead, and knowing when the race is already lost."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: a famous World Final game annotated turn by turn, from both seats, on the big screen — practice for the written midterm (Saturday, Day 48, 09:00, Lecture Hall).",
+    "gm": "The game is the final Santángel himself lost. He teaches the losing turn without once saying 'I'. A student who notices and says nothing earns his respect; one who says it aloud earns a cold week."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Trading tempo for cards and back again: the exchange rate changes with every matchup."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Board presence: Support Zones as real estate; overextending into an Area spell; how many Creatures are enough."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Reactions and Surprises: the cost of playing around a card that is not there, and the cost of not doing so once."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Role assignment — who is the beatdown? Misassigned roles as the commonest cause of losses below ladder rank 60."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Three Heroes, three clocks: focus fire versus spread damage, and which of your Heroes you can afford to lose."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duel preparation: building a one-page match plan against a known opponent and a known list."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals review: ledger drills at the demonstration table, one duel kept live by the whole class. The practical final — one duel, ledger kept live and handed in with the result slip — is sat on Saturday, Day 97, 08:30, Trial Domes."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Term review: each student's worst turn of the term, replayed on the demonstration table in front of the class."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Second term: resource denial — attacking Gold, hands and Ability levels instead of hero HP."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Inevitability: who wins if nothing happens? Building, and recognising, a late-game engine."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open week: match-plan clinics; mulligans and opening-hand decisions under a round clock."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Combo turns: sequencing, counting, holding priority, and when to go off a turn early rather than a turn late."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Attrition: grinding with recursion; the discard pile as a second hand."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "The Potion Deck as hidden information: timing, bluff, and the turn you should have drunk it."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: annotating an unseen game from both seats and naming the single losing decision, as a timed mock. The written midterm is sat on Saturday, Day 153, 08:45, Lecture Hall."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Ascension: the tempo cost and the payoff of an Ascended Hero; when the upgrade is a trap."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup week: scouting reports on the North Crown lists; pacing a team match."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Playing from behind: stabilising, counting outs, finding the one-turn window."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Playing from ahead: closing, denying outs, and the sin of 'winning more'."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Matchup theory: the five postures — rush, control, balance, set-up, disrupt — and what each beats at which point of a game."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals review: match plans and ledger discipline over a best-of-three, rehearsed in pairs. The final — best of three against a drawn classmate, ledger and match plan submitted — is played on Saturday, Day 195, draw 08:15, Trial Domes."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Post-mortems: the season's ladder finals taken apart on the big table."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Closing lecture: 'What you do when the plan is gone.' Professor Santángel on losing.",
+    "gm": "How this lecture goes depends on the story: if his dealings with Marrow are exposed or confessed, it is the only honest hour he gives all year — he finally says 'I' about the final he lost. Otherwise a guarded, excellent talk."
+   }
+  ]
+ },
+ {
+  "id": "cp150",
+  "name": "Table Practicum",
+  "code": "CP150",
+  "teacher": "rox",
+  "majors": [
+   "CP"
+  ],
+  "room": "trial_dome",
+  "sessions": 2,
+  "blurb": "Coach Delgado's lab: real cards, real tables, real spectators. Nothing here is about what you know — only about whether you can do it with people watching. Online prodigies traditionally hate the first month.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Table manners: shuffling, cutting, presenting the deck, sleeves, where your hands rest. Holo-table basics."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Saying it aloud: announcing Actions, passing the turn, confirming hero HP after every change."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Freshman Cup dry run: timed rounds, deck registration, calling a judge without shame."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Playing under eyes: a rotating audience on the witness benches; pulse taken before and after."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Clock management: fifty-minute rounds, slow play, and how to play the last five turns."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Tells — your own first. Each student is filmed for one game and shown their hands, once, privately.",
+    "gm": "Rowan's tape shows the shake plainly. Rox says only: 'Good. Now we know what we are training.' From Day 27 on, the tape of '{H}' made this week (if {H:he} attends) shows hands that do not move at all between actions."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm preparation: recorded practice games against second-years, reviewed for procedure and composure, not for the result. The midterm practical itself is on Friday, Day 47, from 11:30, Trial Domes."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Tilt: losing a Hero early and playing on. Reset rituals between games."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Best-of-three: side-decking at the table, legal note-taking, the two minutes between games."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Hostile rooms: playing through heckling, trash talk and dead silence."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Feature-match rehearsal on the Great Arena stage, lights up, empty stands."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Reading the other side of the table: posture, pace, where the eyes go before a Reaction."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duel simulation: one game, something small at stake, witnesses on the benches."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals preparation: panel etiquette and a dress rehearsal in the Domes. The final practical — a Trial Dome duel before a staff panel — is on Friday, Day 96, from 11:30, Trial Domes."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Open table: play anyone, any deck; the coach circulates and says one sentence to each student."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Reset: what the winter did to your hands. Fundamentals circuit."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Team format: seat order, communication rules, sitting next to a teammate who is losing."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open: the practicum meets at the venue; coaching between rounds."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Long days: nine-round stamina, food, water, the round-seven wall."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "The camera table: playing while a caster describes your mistakes to the room."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Representing a card you do not hold: bluffing within the rules, the legal limits of table talk."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm preparation: reading an unknown deck in ten minutes, drilled twice. The midterm practical — a two-game set with a deck handed to you ten minutes before — is on Friday, Day 152, decks handed over 11:15, Trial Domes."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Unfamiliar matchups: asking to read a card, buying thinking time honestly."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup: observation assignments at the players' rail; one written scouting note each."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Pressure ladders: win-and-in simulations with real ladder points at stake."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Playing a stronger opponent: managing variance, making them have it."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Playing a weaker opponent: no free wins, no cruelty."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals preparation: playing through crowd audio on the arena stage, one rehearsal each. The final practical — an arena-stage duel with full crowd audio — is on Friday, Day 194, 11:15, Great Arena stage."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Stage crew and warm-up partners for the Graduation Exhibition."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Last table: every student plays the coach."
+   }
+  ]
+ },
+ {
+  "id": "rj101",
+  "name": "Rules & Judging",
+  "code": "RJ101",
+  "teacher": "hana",
+  "majors": [
+   "CP",
+   "GD",
+   "CM"
+  ],
+  "room": "classroom",
+  "sessions": 2,
+  "blurb": "The Comprehensive Rules, tournament procedure and the ethics of the floor, taught by the youngest member of staff with a red pen and no mercy. Shared by all three majors. Pass the final and you leave with a Level-1 judge certificate.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "How the Comprehensive Rules are built; the golden rules; card text beats rule text, 'cannot' beats 'can'."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Turn structure and phases; what 'once per turn' is attached to — the card, the Hero or the player."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Card types and subtypes: Heroes and Ascended Heroes, Abilities, Creatures, Spells, Attacks, Artifacts, Potions; Normal, Area, Reaction, Surprise, Attachment, Equipment."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Zones: deck, Potion Deck, hand, Hero zones, Support Zones, Area zone, discard pile, deleted cards. Public and hidden information."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "'Choose' versus 'target'; legal targets; what happens when the target is gone."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Reactions and the chain: priority, order of resolution, responding to a response."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: rulings drill against the chess clock, closed book, and the questions people bring. The written midterm — fifty rulings in fifty minutes — is sat on Saturday, Day 48, 11:30, Seminar Room 2B."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Surprises: setting, trigger conditions, revealing; simultaneous triggers and who orders them."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Damage, healing and defeat; status effects — Poisoned, Burned, Frozen, Stunned — and when each is checked."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Continuous effects and their order: Equipment, Attachments, Areas, 'gains the effects of'."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Replacement effects ('instead'), prevention, and loops — mandatory and optional."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Tournament procedure I: registration, deck checks — and the Academy's own Charter Duel form: what makes a challenge 'formally issued'.",
+    "gm": "Hana reads out the nine articles (CHARTER in the plot file) and drills the first three: a challenge is made aloud, by name, before one who counts; the antes are of equal weight, judged by the one who must give; a challenge formally made may not be refused, only deferred three days, once. A student asks whether any ante is legal. Her answer, true and later terrible: 'The charter sets no upper limit. Nobody ever needed one.' She also covers Article 5 — one who is bound to a party may stand in that party's place (matters on Day 150 and in the finale). After Day 40 she reteaches this lesson unprompted, very carefully: 'Nobody is ever obliged to MAKE a challenge. Think before you say a name in front of a witness.'"
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duel floor rules; sign-up for judge shadowing."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals review: a mock paper, then practice at defending a ruling aloud against the instructor. The final — written paper plus oral — is sat on Saturday, Day 97, written 11:30 and orals from 12:40, Seminar Room 2B."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Ruling of the term: corner cases submitted by students, argued in teams."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Infractions and penalties: warning, game loss, disqualification; intent versus outcome."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Repairing a broken game state: backing up, partial fixes, and when to leave it alone."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open: every student shadows a floor judge for at least two rounds."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Slow play, stalling, outside assistance, bribery and collusion."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Investigations: asking open questions; noticing when two stories do not fit."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Hidden-information errors: extra cards drawn or seen, deck and decklist problems."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: floor procedure walked through at a staged table, infractions called aloud. The midterm practical — judging a staged match containing three planted infractions — is on Saturday, Day 153, 10:45, Trial Domes."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "The hard corner: Ascended Heroes, tokens, copies and cards from outside the game."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup: team rules, permitted communication, appeals to the head judge."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Writing rules text so that only one reading is possible (joint session with Game Design)."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "The Academy Charter read as a rules document: challenges, antes, champions, forfeits, and where a duel may be held.",
+    "gm": "By now the class knows why this matters. Hana walks through the charter clause by clause. Key points the player can take away: Article 6, the result binds BOTH and the ante is paid at once and in full; Article 9, where no one counts, nothing was played; Article 4, the challenger names the place; and Article 7 — what was taken without a game is owed, any who counted it may call the debt, and the debtor may not name the terms (the legal shape of the way to win). Hana calls Article 7 'a fossil nobody has invoked in the school's history'. Noor writes it down twice."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Head judging: running an event, delegating, and making the announcement nobody wants to make."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals review: the Level-1 syllabus, a mock written paper and floor drills in threes. The final — the Level-1 judge certification — is sat on Saturday, Day 195, written 10:45 in the Lecture Hall, floor practical 12:15 in the Trial Domes."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Case studies: famous disqualifications and what the head judge knew at the time."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Closing seminar: 'Rules are a promise.' Why the game only works if both sides are bound."
+   }
+  ]
+ },
+ {
+  "id": "ma101",
+  "name": "Probability & Game Theory",
+  "code": "MA101",
+  "teacher": "blum",
+  "majors": [
+   "CP",
+   "GD"
+  ],
+  "room": "classroom",
+  "sessions": 1,
+  "blurb": "Dr. Blum, chalk in his hair, proves that luck is a number and that you have been keeping the wrong hands for years. Gentle, digressive, and the only course where the problem of the week pays cash.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Sample spaces and the opening hand: the hypergeometric distribution by hand, by table and by feel."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "How many copies? Consistency against dead draws; the 'play the maximum' rule and where it breaks."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "The mulligan as a decision under uncertainty: expected value of keeping versus redrawing."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Conditional probability: what the opponent's last three plays say about their hand. Bayes at the table."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Expected value and variance: when the riskier line is the correct one, and when you are just gambling."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Outs: counting them, weighting them, and playing to the best one rather than the first one."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: old problem sheets at the board; Dr. Blum mentions that a problem may be unsolvable as stated, and that saying so is an answer. The written midterm — six problems — is sat on Sunday, Day 49, 09:00, Seminar Room 2B."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Random packs: rarity tables, the expected value of a booster, the collector's fallacy."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Zero-sum games and the payoff matrix; rock-paper-scissors metagames."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Mixed strategies: how often must you actually hold the Reaction for the bluff to work?"
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Information: hidden, public and derived; the measurable value of seeing one card."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Tournament mathematics: Swiss pairings, tiebreakers, intentional draws, life on the bubble."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Ratings: what a ladder rank predicts and what it does not; upsets and their frequency."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals review: building the formula sheet that is allowed in the paper, and two problems worked in full. The written final — eight problems — is sat on Sunday, Day 98, 09:00, Lecture Hall."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Streaks, luck and the law of small numbers: how long a winning run can chance alone explain?",
+    "gm": "Blum has been privately computing the probability of one first-year winning every ladder game since late September. He does not name the student. He gets a number with too many zeros, says 'so either the model is wrong or the world is', laughs, and wipes the board a little too quickly. If Rowan stays behind, Blum admits he has reported it to the head of department and was told to stop."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Markov chains: modelling a combo deck's chance to win by each turn."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Simulation: goldfishing a thousand hands by script, and reading the histogram honestly."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open metagame forecast: the class builds a field model and stakes a pastry on it."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Nash equilibrium in deck choice; level-zero, level-one and level-two thinking."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Signalling, cheap talk and credible threats."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Risk of ruin: bankrolls, credits, ladder points — and why you never stake what you cannot lose.",
+    "gm": "Blum, mild as ever, on unbounded stakes: 'A wager is only a game if both players can afford the worst case. Otherwise one of you is not playing a game, he is making a mistake very slowly.' The room is quiet. It is the nearest any teacher comes in a lecture to speaking about Ward B."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: mixed problems on Term 2 material, worked in pairs. The written midterm is sat on Sunday, Day 154, 08:45, Lecture Hall."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Draft mathematics: pick orders, reading signals, the odds a card comes back round the table."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Team events: the game theory of seat order — who should face whom?"
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Auctions and trades: pricing a card, the winner's curse; case study, the Commons trade binder."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Repeated games: reputation, grudges and cooperation on a small island."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Decision trees under time pressure: pruning rules that are good enough."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals review: the year's formula sheet, checked line by line; office hours after class. The written final is sat on Sunday, Day 196, 08:45, Lecture Hall."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Paradox afternoon: three face-down cards, two envelopes, one birthday."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Open problems: questions about this game that Dr. Blum cannot answer."
+   }
+  ]
+ },
+ {
+  "id": "lh101",
+  "name": "Lore & History of the Game",
+  "code": "LH101",
+  "teacher": "ashdown",
+  "majors": [
+   "CP",
+   "GD",
+   "CM"
+  ],
+  "room": "lecture_hall",
+  "sessions": 1,
+  "blurb": "The world inside the cards and the world that made them: the Founder's tales, thirty years of organised play, and the island's own past, taught by the Academy's archaeologist. Includes optional Saturday field sections and four visiting lectures by Chuck Kaboom himself.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "What 'lore' means here: card text, flavour lines, the Founder's tales. Sources and how far to trust each."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The founding legend as the Academy tells it: a shipwrecked deckhand, eleven weeks alone, a notebook full of heroes.",
+    "gm": "Public version only: solitude, hunger and the island's old art 'inspired' the game. Ashdown teaches it flat, with no ornament, and takes no questions on where exactly he sheltered."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "The Kaboom Alpha set, thirty years on: print run, rarities, why collectors pay fortunes, how to tell a fake."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "VISITING LECTURE — Chuck Kaboom: 'When Tarleinn and I crossed the Sandlands.'",
+    "gm": "A tile-dream told as a tall tale, every detail true as a record. Hints in passing: the ground 'was warm underfoot at night, as if it remembered the sun' (the tiles are warm); Tarleinn 'never held still for his portrait — took me three nights to get him down' (nights, not sittings: he dreamed him); and, laughing, 'I didn't make any of them up, you know. I'm not that clever. I just wrote down who was there.' This lecture falls on Day 24, two days before the bang."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "The world of the cards I: the Shifting Sandlands, Blackport and the Pixel Seas — a geography assembled from card text."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "The world of the cards II: the schools of magic — Destruction, Decay, Summoning, Support, the Magic Arts — read as cultures."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: how to argue from sources — essay plans on 'Is the lore one story or many?' taken apart in class. The midterm essay is written on Sunday, Day 49, 11:30, Lecture Hall."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Island history I: the pre-contact culture of Caldera Key — the surface mosaics, and what archaeology can and cannot say about a people who left no writing.",
+    "gm": "Public line: an unknown culture, gone before any ship came; the Founder borrowed motifs. She does not say 'Tessellate', 'gate' or 'Hale'. Asked who led the last full survey: 'A colleague.' Next slide. Viktor, if he is in the room for once, stares at her for the whole hour."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "VISITING LECTURE — Chuck Kaboom: 'The night Thorad out-cooled a blizzard.'",
+    "gm": "The blizzard in the story 'was a somebody, not a weather'. True hint: 'You couldn't hit it — axes went through like smoke. So he sat down and offered it a game, and it sat down too, because in that country even the weather keeps house rules. And when it lost, it stayed lost. That's the only way it ever works.' Told on Day 59; listeners after Day 40 may feel their neck prickle."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Island history II: the plantation century, the wreck coast and the making of Port Mulligan."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "A history of organised play: the first tournaments, the first World Championship, the birth of the Ladder."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "The Academy: its founding, its charter, its dorm system and its three houses.",
+    "gm": "If a student asks about the closed fourth house: 'Closed for structural reasons before my appointment.' The second half is a lie — she was Hale's graduate student — and a careful listener (Noor, Pippa) can catch the date not adding up."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Great players I: the first decade — styles, signature decks, feuds."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals review: source critique practised on one of the Founder's tales; essay outlines swapped and marked. The final — essay plus source critique — is written on Sunday, Day 98, 11:30, Lecture Hall."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Field-section reports; handling session with artefacts in the Library."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Archetypes as peoples: Gigantisaurs, Drago, Cybugs, Slimes — how a tribe of cards acquires a history."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "A hero in depth: Tarleinn the Traveler across six printings and thirty years of flavour text."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "The art of the card: illustrators, frames and the visual canon (guest critic: Felix Okoro)."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "VISITING LECTURE — Chuck Kaboom: 'Nicolas and the potion he would not sell me.'",
+    "gm": "True hint about the first prints: 'Nicolas — the Hidden Alchemist, you know him — he ground a certain stone into his colours and the pictures breathed. I tried the trick once myself, long ago. Far too lively! Never again. Changed my ink man the very next year.' Wren, in the third row, stops writing."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Lost and banned cards: recalls, misprints, and the cards that never were."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Mosaic motifs and card motifs: a comparative slide lecture.",
+    "gm": "Ashdown comes closer to the truth than she ever has in public: side by side, a pavement figure and a card hero, the same silhouette. She shows a contest scene — two figures, a grid — and stops one slide short of the one with the spiral. Whether she shows that slide depends on Rowan's standing with her and on how many beds are filled in Ward B."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: comparing two tellings of one tale; outlines for the comparative essay. The midterm essay is written on Sunday, Day 154, 10:15, Lecture Hall."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Great players II: the modern era, up to Lilia Mann."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool history: the North Crown Institute and thirty years of rivalry."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "VISITING LECTURE — Chuck Kaboom: 'The caller who stayed for dinner.'",
+    "gm": "His last lecture before his birthday, and nearly a confession. A traveller 'from further than far' comes to a house and is the most courteous caller it ever had: takes only what is offered, pays every debt, never lies. And empties the house, offer by offer. 'How do you ask a caller like that to leave? Not with a broom. You invite him down to the deepest room of the house, to the old table, and you play him for everything at once — everything he has taken. Piece by piece he will haggle till the stars go out. And mind what he took at the door before anybody offered: that one he OWES, and a debtor does not get to set the terms.' Then he tells a joke about a parrot and leaves early. This is the way to win, stated whole."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Founder's week: oral-history project — interview someone who was on the island in the Academy's first year."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Myth-making: how a community turns its players into legends."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals review: the oral-history files checked for form and consent; essay plans. The final — essay, with the oral-history file handed in — is on Sunday, Day 196, 10:30, Lecture Hall."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Presentations of the oral-history projects."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Closing seminar: 'What do we owe the things we take our stories from?'"
+   }
+  ]
+ },
+ {
+  "id": "pc101",
+  "name": "Physical Conditioning",
+  "code": "PC101",
+  "teacher": "rox",
+  "majors": [
+   "CP"
+  ],
+  "electiveFor": [
+   "GD",
+   "CM"
+  ],
+  "room": "gym",
+  "sessions": 1,
+  "blurb": "Yes, a card school has gym class. Coach Delgado's argument is a heart-rate monitor: your decisions get worse above 140 beats a minute, and a final is played at 150. Required for Competitive Play, open to all.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Baseline tests: resting pulse, grip strength, posture at a table, a timed mile along the cove road."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Why players train: heart rate against decision quality. The heartbeat drill — sprint, sit, solve a board."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Breathing: the box breath, four counts each side, used before a mulligan decision."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Posture and hands: wrist care, shuffle endurance, controlling a tremor instead of hiding it."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Endurance I: the cliff-path run, with a timed hand played at the halfway bench."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Sleep, food and water on tournament days; what not to drink before a final."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm preparation: a walk-through of the heartbeat drill at half pace — track, then a sequencing puzzle at the table. The judged drill itself is on Saturday, Day 48, 14:30, gym."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Strength circuit and partner carries."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Swimming block with the pool lifeguards."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Stress inoculation: cold plunge, then a rules quiz while your teeth chatter."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Reaction and focus drills: the card-flip catch, peripheral vision, ignoring the whistle."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Recovery: stretching, rest days, the spa as a training tool."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Tapering: how to peak for one match on one day (Promotion Duels)."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals preparation: the full circuit at training pace and composed play at the mat tables. The final practical is on Saturday, Day 97, 15:00, gym."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Beach games day at the cove."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Winter rebuild: baseline retest and an honest look at the numbers."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Endurance II: the nine-round day — nine circuits, nine puzzles."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open support: warm-up and cool-down routines between rounds."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Balance and core: paddleboards at the boathouse."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Team conditioning: relays and trust drills."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Stage physiology: adrenaline, dry mouth, shaking hands — and how to spend them instead of fighting them."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm preparation: pulse control under load; the heartbeat drill rehearsed once. The judged drill is on Saturday, Day 153, 14:30, gym."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Hill work on the observatory path."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Cup week: light maintenance and stretching only."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Pack hike to the waterfall and back."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Mental-toughness circuits: the last station is always a duel."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Designing your own summer programme."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals preparation: circuit rehearsal and three sequencing puzzles against the stopwatch. The final practical is on Saturday, Day 195, 15:00, gym."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Staff-versus-students sports day."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Last run: the whole class runs the cove at dawn."
+   }
+  ]
+ },
+ {
+  "id": "gd110",
+  "name": "Card Design Basics",
+  "code": "GD110",
+  "teacher": "chuck",
+  "majors": [
+   "GD"
+  ],
+  "electiveFor": [
+   "CP",
+   "CM"
+  ],
+  "room": "design_lab",
+  "sessions": 1,
+  "blurb": "The Founder's own course, and the most oversubscribed elective on the island. Half design class, half story hour: he arrives late, redesigns a card on a napkin, and tells you what its hero had for breakfast. Wren Ishikawa runs the playtest tables and keeps him roughly on topic.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "'What does this card want?' The one-sentence test. Chuck redesigns a student's first card on a napkin."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The parts of a card: name, type, cost, text box, numbers, art, flavour line — and which the eye reads first."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Costs: Gold, Ability level, actions, and the hidden cost of taking up a slot in a deck."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Simplicity: the eight-word text box. Cut a design in half, then in half again."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Flavour first or mechanics first? Designing a Hero from a story.",
+    "gm": "Chuck 'designs' a hero live by describing someone he met — a tile-dream. Asked how he invents them: 'Oh, don't invent them. Terrible habit. Listen. They were already somebody.' Students take it for a method; it is a statement of fact."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Heroes: HP, attack and starting Abilities — an identity in a handful of numbers."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "No ordinary session this week: Friday's slot is the midterm hand-in (Friday, Day 47, 09:00, Design Lab) — one common Creature and one Spell, with a page of design notes each. The lab is open in the afternoons for last fixes."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Archetypes: a mechanical identity in twenty cards; build-arounds and glue."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Design Contest briefing. Power level: costing by comparison with what is already printed."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Interaction: give the opponent a decision. Reactions and Surprises as conversation."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Fun for the loser: comeback mechanics that do not feel like pity."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Playtesting: grey-box proxies, what to watch for, how not to defend your own card (tables run by Wren Ishikawa)."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Broken cards: a guided tour of the Founder's worst mistakes and what each one taught him.",
+    "gm": "Among the jokes, one sentence about the first set: 'The very first run came out… too lively. Lovely colours. I changed the ink after that. Best decision I ever made and I have regretted it every day since.' He will not expand. Wren writes it down verbatim."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "No ordinary session this week: Friday's slot is the final submission (Friday, Day 96, 08:45, Design Lab) — a five-card mini-archetype with a playtest log. The lab is open in the afternoons for last playtests."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Show and tell: the best student card is printed as a proxy and played against Chuck's own pile."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Second-term brief: design three cards for an existing archetype without breaking it."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Rarity: what belongs at common; complexity budgets."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Templating clinic with Ms. Kirishima: one reading only."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Art direction: writing an art brief; silhouette and colour at thumbnail size (with Felix Okoro)."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Top-down design: a festival, a storm, a person you love — as a card."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Area spells and the shared board: designing for both players at once."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "No ordinary session this week: Friday's slot is the midterm hand-in (Friday, Day 152, hand-in until 09:00, Design Lab) — a banned card redesigned so that it could be legal. The lab is open in the afternoons."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Ascended Heroes: transformation as a story beat.",
+    "gm": "Chuck is distracted this week (it follows Day 150 if Willas has fallen). He says, to nobody: 'Sometimes a person is changed and the card is all that's left to tell you who they were.' Then he sets twice the usual homework and leaves."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Designing for spectators: readable boards and big moments (joint session with Auxiliary)."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Set structure: skeletons, cycles, mirrored pairs."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Founder's week: open workshop — 'The first card I ever drew.'",
+    "gm": "He brings a brown, brittle page: a figure with a staff, drawn with a burnt stick. 'From life,' he says, and laughs as if it were a joke. It is from the north-shore cave. Inya, if she is there, has never seen it before."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Economy and collectability: chase cards and the ethics of reprints."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "No ordinary session this week: Friday's slot is the final (Friday, Day 194, from 08:45, Design Lab) — a ten-card set fragment and a five-minute pitch to a staff panel. The lab is open in the afternoons for rehearsals."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Printing and cutting the class set for the Graduation Exhibition."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Farewell lecture: 'A card is a promise that something happened.'"
+   }
+  ]
+ },
+ {
+  "id": "gd120",
+  "name": "Balance & Cost Curves",
+  "code": "GD120",
+  "teacher": "blum",
+  "majors": [
+   "GD"
+  ],
+  "room": "classroom",
+  "sessions": 2,
+  "blurb": "Dr. Blum again, this time with spreadsheets. What a point of damage is worth, why 'draw a card' is never free, and how to tell a strong card from a broken one before ten thousand players do it for you.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "What 'balanced' means: win rate, play rate and fun are three different numbers."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The vanilla test: baseline stats per Gold and per Ability level."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Spreadsheet lab: deriving a cost curve from the existing card pool."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Pricing riders: what is 'draw a card' worth? 'Deal 30 damage'? 'Search your deck'?"
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Card-advantage engines and why intuition underprices them."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Tempo-positive effects: free actions, cost reduction, and the danger of the number zero."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: costing drills on unseen cards against the printed costs. The midterm (cost twenty unseen cards) is sat on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Removal: efficiency against flexibility; pricing an answer against its best target."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Combo risk: enumerating two-card interactions across a set."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Hero balance: HP and attack budgets, starting Abilities."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Snowballing and comebacks: measuring swing."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Matchup matrices: reading a ten-by-ten win-rate table; is the rock-paper-scissors healthy?"
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Playtest statistics: sample size, confidence, and when twenty games mean nothing."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals workshop: drafts of the balance report on a classmate's mini-archetype, read in pairs. The report is handed in on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Post-mortem of a historical ban."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Power creep: measuring it across ten years of sets."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Limited and constructed: balancing the same card for two formats."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Live data: the Island Open field as a dataset."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Simulation bots: goldfish scripts and their blind spots."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Resource systems compared: Gold, Ability levels, cards in hand."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Randomness budgets: good variance and bad variance."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: reading a data set; the take-home data task is set and is due on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Ban, restrict, errata or reprint? A decision framework."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Cup dataset: what team formats do to deck choice."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Economy balance: rarity, pack value and competitive accessibility."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Costing the uncostable: alternate win conditions and extra turns."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Balancing for skill bands: ladder rank 130 against ladder rank 10."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals workshop: patch proposals rehearsed with their data. The proposal is defended orally on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "The class votes its own patch notes."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Blum's wager: predict next year's best deck; envelopes are sealed until the reunion."
+   }
+  ]
+ },
+ {
+  "id": "gd130",
+  "name": "Templating & Rules Text",
+  "code": "GD130",
+  "teacher": "hana",
+  "majors": [
+   "GD"
+  ],
+  "room": "classroom",
+  "sessions": 1,
+  "blurb": "How to write card text that a tired judge at midnight can rule in one reading. Ms. Kirishima returns every submission with every ambiguity circled; there are always more than you thought.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "One card, one reading: an ambiguity hunt through twelve famous texts."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The house vocabulary: choose, target, defeat, delete, play, summon, equip, attach."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Word order is event order: costs, then conditions, then effects."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "'May', 'must', 'up to', 'if possible'."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "'Once per turn', 'once per game', 'the first time each turn'."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Durations: 'until end of turn', 'as long as', 'while'."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: broken card texts repaired together at the board. The midterm (rewrite ten broken texts) is sat on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Reactions and Surprises: trigger conditions a judge can actually rule."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Referring to cards: by name, by type, by archetype in quotation marks."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Zones and verbs of movement."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Numbers, X, and counting things."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Reminder text: what to trust players with."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Fitting the box: length budgets by rarity; where a line may break."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals workshop: templating a classmate's five-card archetype, first pass. The signed-off rulings are handed in on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Errata clinic: historical errata and what each one cost."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Wording replacement and prevention effects."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Copies and 'gains the effects of'."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open week: write the ruling FAQ for the event's most misplayed cards."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Tokens and created objects."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Wording continuous effects so they layer safely."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Text that survives translation into six languages."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: a mock paper on Term 2 templating. The midterm is sat on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Play conditions for Ascended Heroes."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Wording for team and multiplayer formats."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Joint session with Rules & Judging: rules text as a promise."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Digital and paper: what a client enforces and what a table must remember."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "The class drafts version 0.1 of an Academy style sheet."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals workshop: FAQ and release notes for the class set, drafted in teams. Handed in on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Proofreading the exhibition set."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Contest: the most powerful fair card in eight words or fewer."
+   }
+  ]
+ },
+ {
+  "id": "gd140",
+  "name": "Visual Language of a Card",
+  "code": "GD140",
+  "teacher": "felix",
+  "majors": [
+   "GD"
+  ],
+  "electiveFor": [
+   "CM"
+  ],
+  "room": "design_lab",
+  "sessions": 1,
+  "blurb": "A studio course led by second-year illustrator Felix Okoro under the Founder's sign-off. Thumbnails, silhouettes, frames and limited palettes: how a picture two inches wide tells a player what a card does before they read a word.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Reading a card at arm's length: thumbnail, value, silhouette."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The frame: what every border, gem and corner tells the player."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Colour and school: the palette of each school of magic."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Figure and gesture: a Hero in one pose."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Pixel discipline: limited palettes, readable clusters, no muddy gradients."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Composition inside the art box: where the eye lands first."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm studio: thumbnails pinned up and criticised. The midterm (three thumbnails and one finished common) is handed in on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Masks and faces: a Night of Masks study."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Creatures: scale, threat and charm."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Spells: illustrating a moment instead of a thing."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Artifacts and Equipment: objects with a history."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Areas: landscape as rules."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Rarity treatments: foil, prismatic, and what shine must never hide."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals studio: the matched pair — a Hero and their signature card — at sketch stage. Handed in on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Critique wall."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Style bibles: keeping twenty artists inside one world."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Drawing from description: Felix's dream-sketch method — a classmate tells a dream, you draw it.",
+    "gm": "Since late September the dreams people bring have been converging: a floor of small warm squares, faces in rows, something round and bright sitting down. Felix pins them up in sequence without comment. The wall, read left to right, is the antechamber's long panel as dreamed by twenty teenagers."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Live sketching at the Island Open: players at the table."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Writing and answering art briefs (with Card Design Basics)."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Lantern designs for Lantern Night."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "The old masters: first-print illustrations studied under glass in the Card Archive.",
+    "gm": "Supervised visit. The Alpha art seems to move at the edge of sight. Felix makes two studies of the same card ten minutes apart; in the second the figure's hand is higher. He decides he miscopied. He did not."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm studio: work in progress on the studio piece, which is handed in on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Ascension: the same Hero, twice."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Key art and posters for the Interschool Cup."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Tokens, icons and the sixteen-pixel problem."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Founder's Festival commission: the Founder at seventy-five, as a card."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Building a portfolio."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals studio: portfolios laid out and ordered. The portfolio review before a panel is on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Hanging the Graduation Exhibition."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Sign your work."
+   }
+  ]
+ },
+ {
+  "id": "gd150",
+  "name": "Prototype & Playtest Lab",
+  "code": "GD150",
+  "teacher": "wren",
+  "majors": [
+   "GD"
+  ],
+  "room": "design_lab",
+  "sessions": 2,
+  "blurb": "Scissors, sleeves and humility. Third-year lab lead Wren Ishikawa teaches you to get an idea onto a table in ten minutes and to watch, silently, while a stranger plays it wrong.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Paper, scissors, sleeves: a playable proxy in ten minutes."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "The first playtest: play it wrong on purpose."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Observation sheets: write what the tester did, not what they said."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Iteration speed: three versions in one session."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Blind testing: hand over the rules and leave the room."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Recording games: a notation for this game."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm lab: playtest logs checked — ten games, one change per game. The log is handed in on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Finding the degenerate line: break your neighbour's card."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Contest lab (the Design Contest opens): scope, deadlines, killing your darlings."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Feel: when the numbers are right and it still is not fun."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "First-game experience: testing with volunteers from Port Mulligan who have never played."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Matchup testing against a gauntlet of five reference decks."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Print craft: stock, cutting, registration, ink.",
+    "gm": "Wren puts a modern card and a first-print frame under the magnifier lamp: 'See how this pigment sits ON the paper, like fine sand? That is not any process I know.' If Rowan follows up she shows the spectrum printout. From here the trail leads to the old print works."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals lab: the gold-box prototypes get their last playtests. Prototype and lab notebook are handed in on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Lab clean-up and the ceremonial burning of dead proxies at the bonfire pit."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "New-term project pitches."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Limited environments: building a ninety-card cube."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Field testing at the Island Open side tables."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Feedback forms and what to do with the data."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Testing for the stream: is it watchable?"
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Edge-case hunts with the Judge Circle."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm lab: building the cube. The cube draft night, graded on the spread of results, is on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Accessibility: colour-blind players, small text, unsteady hands."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Demo tables for the Interschool Cup visitors."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "The production pipeline: from lab to press."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "How cards were printed on this island: a talk by the groundskeeper.",
+    "gm": "Silas, coaxed by Wren, gives ten gruff minutes: there was a works 'out east on the old tramway; nothing there now but brick and creeper'. First public mention of the old print works; he regrets it at once if anyone from Santángel's circle is in the room."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Polish: the last ten per cent."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals lab: the class set prototype is assembled and sleeved. It is playtested by staff on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Print run for the Graduation Exhibition."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Post-mortem."
+   }
+  ]
+ },
+ {
+  "id": "cm101",
+  "name": "Casting I: Play-by-Play",
+  "code": "CM101",
+  "teacher": "vivienne",
+  "majors": [
+   "CM"
+  ],
+  "room": "broadcast_studio",
+  "sessions": 2,
+  "blurb": "Ms. Laurent, retired star caster, teaches the two chairs: the one that says what is happening and the one that says why it matters. You will hear your own voice played back more often than is good for anyone.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "The two chairs: play-by-play and colour. What the viewer cannot see and needs to."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Calling a board: naming cards cleanly, hero HP, zones, and 'the thing that matters right now'."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Freshman Cup: shadow-casting into a dead microphone."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Vocabulary and crutch words; the ten-second rule."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Building a story across a match: stakes, history, the turn."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Voice: breath, pace, pitch; the hype call — and when to say nothing."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: solo play-by-play over old footage, two minutes each. The midterm (five recorded minutes, solo) is recorded on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Duo work: handoffs, laying out, not treading on your partner."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Player research: stat cards, pronunciation, the one human detail."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Casting a blowout; filling a ten-minute deck check."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Live reads, sponsors and transitions."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Calling mistakes kindly: criticism on air."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duels: live student casts on The Top Deck."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals rehearsal: casting in pairs over a recorded match. The final (a live Trial Dome match with a partner) is on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Reel review."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "The desk: hosting, throws, timing to the second."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Interviews: winners, losers, and people who do not want to talk."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open: rotating live casts."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Analysis segments: drawing on the screen; 'the play they did not make'."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Planning the Lantern Night broadcast special."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Breaking news on air: what you know, what you do not know, what you never say.",
+    "gm": "Vivienne teaches it straight and everyone knows what it is about. She was told by the Chancellor's office what The Top Deck may not say; she does not repeat the instruction, she teaches the principle and lets the students draw the line themselves. Bex draws it somewhere else."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: live-cast drills with a director in the ear. The midterm live cast is on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Casting decks you have never seen."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup: the international broadcast, co-cast with North Crown students."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Brand, ethics and conflicts of interest."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Founder's Festival: the commentary roast."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Reels and agents."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals rehearsal: desk and camera rehearsal for the main stage. The final main-stage cast is on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Crewing the Graduation Exhibition broadcast."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Sign-off."
+   }
+  ]
+ },
+ {
+  "id": "cm102",
+  "name": "Voice & Stage Presence",
+  "code": "CM102",
+  "teacher": "vivienne",
+  "majors": [
+   "CM"
+  ],
+  "electiveFor": [
+   "CP",
+   "GD"
+  ],
+  "room": "theatre",
+  "sessions": 1,
+  "blurb": "In the Little Theatre, on a bare stage: how to stand, breathe, be looked at and keep talking. Required for casters, quietly recommended to any player whose hands shake.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "Standing still on a stage for sixty seconds while people look at you."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Breath and support: speaking from the ribs, not the throat."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Articulation drills: card names at speed."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Eye contact with a camera lens and with a back row."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Nerves: what they are, where they sit, how to use them."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Improvisation I: 'yes, and' — keeping a scene alive."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: stage pieces run once each, with notes. The midterm (a two-minute piece to a full house of classmates) is on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Mask work for the Night of Masks pageant."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Status: playing high and low with posture alone."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "The microphone: distance, plosives, the off-axis aside."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Storytelling: beginning, turn, landing."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Recovering from a mistake in public without apologising."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Hosting a room: the Promotion Duel announcements."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals rehearsal: cold introductions from a card drawn at the door. The final (introduce, live, a match you know nothing about) is on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Open stage."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Reading a teleprompter as if you were thinking it."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Interview posture: listening visibly."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Crowd work at the Island Open."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Movement: walking and talking, hitting a mark."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "The love scene problem: sincerity without embarrassment (Lantern Night readings)."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Delivering bad news."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: stage pieces with notes. The midterm stage piece is on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Accent, register and code-switching."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Ceremony: anthems, flags, the Interschool Cup opening."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Improvisation II: the heckler."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "The toast: speaking at the Founder's Festival."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Stamina: a six-hour broadcast voice."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals rehearsal: hosting sets run to the clock. The final (a ten-minute solo hosting set) is on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Graduation Exhibition ushering and announcements."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Curtain call."
+   }
+  ]
+ },
+ {
+  "id": "cm110",
+  "name": "Broadcast Production Lab",
+  "code": "CM110",
+  "teacher": "bex",
+  "majors": [
+   "CM"
+  ],
+  "room": "broadcast_studio",
+  "sessions": 2,
+  "blurb": "Learn the stream from the cable up. Second-year producer Bex Calloway runs the lab the way she runs The Top Deck: fast, loud, and live on Tuesday whether you are ready or not.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "The studio tour: signal flow from camera to viewer in one diagram."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Cameras: framing a table, a face, a crowd."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Audio: microphones, levels, the hum you stop hearing."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "The overlay: hero HP, hands, clocks — information without clutter."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Vision mixing: cutting on action."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Replay: marking in, marking out, slow motion."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: every crew role rotated through once. The midterm (a ten-minute live segment in a role drawn from a hat) is on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Outside broadcast: rigging the festival grounds."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Graphics: lower thirds, brackets, the ladder ticker."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Running orders and the clock: backtiming a show."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Talkback etiquette: what the producer says in your ear."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "Archiving: logging tapes so that someone can find a match in ten years."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duels: three days of live production."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals pre-production: the running order for a complete thirty-minute Top Deck episode. The episode is produced on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Strike and maintenance."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Pre-production: planning the Island Open broadcast."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Multi-table coverage and the feature-match switch."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open: live."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Editing: highlight packages by midnight."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Lantern Night special: an outdoor night shoot."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "The uplink: how a signal leaves the island.",
+    "gm": "Bex takes the class through the patch diagram of the relay hut on the north-west ridge. Students can see that one cable carries everything, and that the student uplink has been 'under maintenance' since October. She says: 'I am only teaching you where things are.'"
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm rehearsal: crew drills. The crew practical is on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Remote guests and delay."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup: the international feed."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Sponsorship, music rights and what you may not show."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Founder's Festival: multi-stage live."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Budgets and crew calls."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals pre-production: shot lists for a main-stage match. Directing it is the final, on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Graduation Exhibition broadcast."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Handover: train your successor."
+   }
+  ]
+ },
+ {
+  "id": "cm120",
+  "name": "Analysis & VOD Review",
+  "code": "CM120",
+  "teacher": "santangel",
+  "majors": [
+   "CM"
+  ],
+  "electiveFor": [
+   "CP"
+  ],
+  "room": "broadcast_studio",
+  "sessions": 1,
+  "blurb": "An hour a week in the replay booth with Professor Santángel and a pause button. Analysts learn to explain a decision; players learn that theirs can be explained. Open to Competitive Play students as an extra.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "How to watch: the pause-predict-play method."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Notation and timestamps; building a match sheet from tape."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "The Freshman Cup on tape: each student reviews one of their own games."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Finding the turn: where a game was really decided."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Habit spotting: what a player always does on the second turn."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Explaining a line to someone who does not play."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: breakdowns practised against the clock. The midterm (a five-minute recorded breakdown) is recorded on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Comparing two players' approaches to the same matchup."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Statistics on screen: which numbers help."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Reviewing your own losses without excuses."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Opponent dossiers: three matches are enough."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "The mind game on tape: bluffs that worked and why."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duel reviews, same day."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals workshop: scouting reports in draft. The final (a written scouting report plus an on-air segment) is on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Best plays of the term."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Metagame review: winter results from the world circuit."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Pre-tournament scouting for the Island Open."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open: overnight reviews for top-eight players."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Combo decks on tape: where they are vulnerable."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Control mirrors: watching nothing happen, intelligently."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "Body language at the table, frame by frame."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm review: timed breakdowns. The midterm (a breakdown under time limit) is on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "The Battle Team on tape: three unbeaten years."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "North Crown dossiers for the Interschool Cup."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Unusual players: reviewing a style you cannot classify.",
+    "gm": "If the unbeaten first-year's games are on the tape wall, this is the session where they are put up. Frame by frame: he never looks at his hand after the first draw; he plays the answer before the question is asked; in two games his hologram's shadow falls across the opponent's side. Santángel stops the tape there and ends the class early."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Classic finals revisited."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Building a personal review routine."
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals workshop: dossiers on the assigned players. The dossier is presented live on the exam weekend, Days 194–196 (exam timetable at the job board)."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Review of the Graduation Exhibition match."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "The last tape: each student brings the game that taught them most."
+   }
+  ]
+ },
+ {
+  "id": "cm140",
+  "name": "Hologram Engineering & Table Tech",
+  "code": "CM140",
+  "teacher": "helical",
+  "majors": [
+   "CM"
+  ],
+  "electiveFor": [
+   "CP",
+   "GD"
+  ],
+  "room": "trial_dome",
+  "sessions": 1,
+  "blurb": "Professor Helical's workshop course for the Auxiliary tech track: how a duel table sees a card and throws a picture of it into the air, why the picture is flat and flickers, and how to keep forty tables alive through a tournament weekend with a soldering iron and patience. Hands-on, quiet, exact; he talks to the equipment more than to the class. Open to players and designers as an extra.",
+  "weeks": [
+   {
+    "week": 1,
+    "term": 1,
+    "termWeek": 1,
+    "topic": "What a holo-table is: reader, core, emitter, and the three things that go wrong with each."
+   },
+   {
+    "week": 2,
+    "term": 1,
+    "termWeek": 2,
+    "topic": "Reading a card: frame codes, set marks and why a sleeve can blind a reader."
+   },
+   {
+    "week": 3,
+    "term": 1,
+    "termWeek": 3,
+    "topic": "Freshman Cup week: table checks before a tournament; the class services the arena's eight feature tables.",
+    "gm": "Maisie Voltage has taken a reader apart and put it back better before he has finished explaining it. He says 'Good' and then, more quietly, 'Slow down.' Leona Helical is not in this class and he looks at the door every time it opens."
+   },
+   {
+    "week": 4,
+    "term": 1,
+    "termWeek": 4,
+    "topic": "Light without surface: why a projected figure is flat, and why it flickers at the edges."
+   },
+   {
+    "week": 5,
+    "term": 1,
+    "termWeek": 5,
+    "topic": "Emitters: coils, lenses, alignment; replacing a burnt coil without touching the lens."
+   },
+   {
+    "week": 6,
+    "term": 1,
+    "termWeek": 6,
+    "topic": "Animation libraries: why most creatures slide instead of walking — nobody has drawn them matched cycles."
+   },
+   {
+    "week": 7,
+    "term": 1,
+    "termWeek": 7,
+    "topic": "Midterm review: fault-finding on tables with known faults. The midterm practical (three sabotaged tables in forty minutes) is on the exam weekend, Days 47–49 (exam timetable at the job board)."
+   },
+   {
+    "week": 8,
+    "term": 1,
+    "termWeek": 8,
+    "topic": "Power: the dome circuits, the arena junction, and what a brown-out does to a match in progress."
+   },
+   {
+    "week": 9,
+    "term": 1,
+    "termWeek": 9,
+    "topic": "Calibration day in the Trial Domes (Dome 3 excluded).",
+    "gm": "From Day 40 he will not take students into Dome 3 and will not say why. His own instruments from that night show a field no table on the island can produce."
+   },
+   {
+    "week": 10,
+    "term": 1,
+    "termWeek": 10,
+    "topic": "Field maintenance: the tournament kit, the spares box, the two-minute fix and the honest 'this table is down'."
+   },
+   {
+    "week": 11,
+    "term": 1,
+    "termWeek": 11,
+    "topic": "Scale: the arena rig; big pictures are not better pictures."
+   },
+   {
+    "week": 12,
+    "term": 1,
+    "termWeek": 12,
+    "topic": "History of the hologram core: the first generation (the arcade's pods), the second, the present one.",
+    "gm": "The present core's lead engineer is named once on a slide — M. Helical — and he moves on a little too quickly. Anyone who has seen the coat in his office can put it together."
+   },
+   {
+    "week": 13,
+    "term": 1,
+    "termWeek": 13,
+    "topic": "Promotion Duel week: students run table support for binding duels; a failed table is a ruling matter."
+   },
+   {
+    "week": 14,
+    "term": 1,
+    "termWeek": 14,
+    "topic": "Finals review: the full service routine, step by step. The practical final (full service of one table, signed off) is on the exam weekend, Days 96–98 (exam timetable at the job board)."
+   },
+   {
+    "week": 15,
+    "term": 1,
+    "termWeek": 15,
+    "topic": "Term review: the term's fault log, sorted by cause. Most faults are sleeves."
+   },
+   {
+    "week": 16,
+    "term": 2,
+    "termWeek": 1,
+    "topic": "Second term: optics in depth — folding a beam, and why folding it twice has never been made stable."
+   },
+   {
+    "week": 17,
+    "term": 2,
+    "termWeek": 2,
+    "topic": "Why holograms cannot be touched: the textbook answer.",
+    "gm": "He gives the textbook answer flatly and completely. Maisie puts her hand up and asks what the non-textbook answer is. He says there is none. It is the only time anyone hears him lie, and he does it badly."
+   },
+   {
+    "week": 18,
+    "term": 2,
+    "termWeek": 3,
+    "topic": "Island Open week: forty tables, three days; the support rota and the spares count."
+   },
+   {
+    "week": 19,
+    "term": 2,
+    "termWeek": 4,
+    "topic": "Recording: how a table feed is captured; what a recorder does when it hears nothing."
+   },
+   {
+    "week": 20,
+    "term": 2,
+    "termWeek": 5,
+    "topic": "Materials: lens glass, coil wire, and why pigments matter to a reader."
+   },
+   {
+    "week": 21,
+    "term": 2,
+    "termWeek": 6,
+    "topic": "First prints on a modern table: observed anomalies. Handling rules.",
+    "gm": "He demonstrates with a modern card only. Asked to use a real first print he says the Archive will not lend one. Anyone who has seen Lilia's captain's card played knows what he is not showing."
+   },
+   {
+    "week": 22,
+    "term": 2,
+    "termWeek": 7,
+    "topic": "Midterm workshop: how a service manual page is written. The page for a fault you caused yourself is handed in on the exam weekend, Days 152–154 (exam timetable at the job board)."
+   },
+   {
+    "week": 23,
+    "term": 2,
+    "termWeek": 8,
+    "topic": "Safety: heat, current, eyes — and dust. Wear the mask in the store-room; some old stock is not safe to sand."
+   },
+   {
+    "week": 24,
+    "term": 2,
+    "termWeek": 9,
+    "topic": "Interschool Cup week: hosting a visiting school; table parity and the neutral technician."
+   },
+   {
+    "week": 25,
+    "term": 2,
+    "termWeek": 10,
+    "topic": "Guest session: the Applied Projection Laboratory presents.",
+    "gm": "He is told to host it and does, standing at the back with his arms folded. If Maisie is working there by now, she presents part of it, glowing; he does not applaud. If Marrow holds the lattice, what is shown is no longer flat."
+   },
+   {
+    "week": 26,
+    "term": 2,
+    "termWeek": 11,
+    "topic": "Design for repair: building a table a tired student can fix at midnight."
+   },
+   {
+    "week": 27,
+    "term": 2,
+    "termWeek": 12,
+    "topic": "Student projects: proposals. (One proposal each year is 'a hologram you can touch'. It is always returned ungraded.)"
+   },
+   {
+    "week": 28,
+    "term": 2,
+    "termWeek": 13,
+    "topic": "Finals planning: the support rota for the Graduation Exhibition. Running table support for it as a team is the final (Day 201, with the debrief on the exam weekend, Days 194–196 (exam timetable at the job board))."
+   },
+   {
+    "week": 29,
+    "term": 2,
+    "termWeek": 14,
+    "topic": "Post-mortem of the Exhibition; the fault log again."
+   },
+   {
+    "week": 30,
+    "term": 2,
+    "termWeek": 15,
+    "topic": "Closing session: 'What we do not build.'",
+    "gm": "How this hour goes depends on the story. If he has spoken openly about Miriam Helical's notebooks it is the best lecture of the year: what an engineer owes to the people who will stand next to the machine. If not, he reads the safety rules aloud and dismisses the class early."
+   }
+  ]
+ }
+]

@@ -1,0 +1,21 @@
+{
+ "name": "Windbreak Campsite",
+ "zone": "wild",
+ "bg": "campsite",
+ "night": true,
+ "hike": 1,
+ "hours": "The Outdoor Club's permanent site in a pine hollow on the western ridge; open to any student who signs the book at the gate. Overnight stays ended by the curfew.",
+ "sight": "A grassy hollow ringed by pines and a low dry-stone wall, with six tent platforms, a fire ring of blackened stones, a lean-to full of split wood and a long-drop with a view. Someone has built a duel table from a cable drum. The sea shows through the trunks to the west. At night the fire makes a small room of light, the pines hiss, and the sky is so thick with stars it looks spilled.",
+ "things": [
+  "Pitch a tent and stay the night (before the curfew)",
+  "Build the fire and keep it",
+  "Play cable-drum duels by lantern",
+  "Tell ghost stories — the island has good ones",
+  "Cook something in foil in the embers",
+  "Watch the sunset through the pines, then the stars",
+  "Walk out of the firelight and let your eyes adjust",
+  "Wake at dawn in a wet sleeping bag to the smell of coffee"
+ ],
+ "secret": "Overnight trips (Outdoor Club, Day 24's stargazers who miss the last path down, a Commons camp-out) are bonding scenes with a whole group. The ghost stories told here are the school's folk memory of Umbra House: 'the fourth collar', 'the professor who is still playing', 'the house that marks its own homework' — garbled truth; Viktor walks out of the firelight when they start. Viktor's cache (rope, maps, his father's journal when he does not carry it) is under the third tent platform. The site is on the line of sight between Umbra House and the old observatory. From D27 the campfire's sparks lean north. From D67 camping is forbidden — so this is where students who want to talk without proctors meet in the Afternoon, and where a group breaking curfew would hide.",
+ "access": "Overnight stays forbidden from Day 67."
+}

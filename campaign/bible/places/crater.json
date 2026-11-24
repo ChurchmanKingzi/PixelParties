@@ -1,0 +1,21 @@
+{
+ "name": "The Glass Crater",
+ "zone": "wild",
+ "bg": "crater",
+ "night": true,
+ "hike": 3,
+ "hours": "Three hours' hard hike from campus on the far north slope. Did not exist before the night of Day 26. Cordoned from Day 29.",
+ "sight": "The jungle stops as if cut with a knife. Beyond a ring of flattened, scorched trees lying with their heads all pointing outward, there is a bowl forty metres across lined with fused black glass, smooth as a pupil, still ticking as it cools. Heat shimmers over it though the air is cold. Nothing moves here; no insect, no bird, no leaf. At night the glass holds a faint green light deep down, the way a struck bell holds a note.",
+ "things": [
+  "Stand at the edge of the flattened trees and take it in",
+  "Walk the rim and count your steps",
+  "Touch the glass: warm, humming faintly, and it does not take a fingerprint",
+  "Look for what made it — and find no rock, no metal, nothing",
+  "Find the tracks in the ash: one line of boot prints going in",
+  "Shout, and hear that there is no echo",
+  "Look down through the glass at the centre",
+  "At night: watch the green light under the surface turn slowly, like something rolling over in its sleep"
+ ],
+ "secret": "IMPACT SITE OF THE GUEST (canon): 02:10, night of Day 26. At dawn on Day 27 {H} arrived first and died here; what walked back was the Guest. EVIDENCE BY DATE. D27–28 (before the cordon; Viktor gets here, and Ed Venture with a disposable camera): boot prints going in, heavy; the same boots coming out, placed with inhuman evenness; where they meet the glass is dished as if something knelt; Tomi's good torch, a belt through its strap, still lit at the rim. No meteorite anywhere. D29: cordon (tape, proctors at the rope bridge, a 'geological hazard' notice). D60: the crust cracks from the centre; UNDER IT LIES NATHAN'S BODY (canon), intact, preserved by the cold, eyes open, {H=nathan?one hand raised mid-wave|one hand out}, mouth open mid-word. Whoever finds it knows the {H:mate} is not {H}. D61+: Marrow's camp takes the site (tents, generator, core drills); by about Day 64 his people find the body and hide it in a crate marked laboratory glass (inn stable, then a ferry — Rowan can stop it). The green light is the Guest's landing-trace and rises to meet it when it visits at night. If the first shape is exposed before Day 106, the black glass sand it leaves blows back here grain by grain.",
+ "access": "Reachable from Day 27. From Day 29 cordoned and forbidden; from Day 61 fenced and watched by Marrow's unnamed field staff. Ways in: at night, by the coast from the north shore, or with viktor."
+}

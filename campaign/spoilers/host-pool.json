@@ -1,0 +1,18 @@
+{
+ "_readme": "SPOILER: Wer in der Nacht von Tag 26 zum Host werden kann. Nicht öffnen, wer sich überraschen lassen will. Gelesen wird diese Datei nur von campaign/tools (Compiler, Prüfung) und vom Spiel selbst.",
+ "decideDay": 26,
+ "decideSlot": "Evening",
+ "pool": ["nathan", "baylee", "fiona", "tobias"],
+ "anchor": "baylee",
+ "_anchor": "Der Anker kann in keiner Spielsituation verhindert sein: keine Szene darf unfit_<anchor> setzen. Damit ist der Pool nie leer. Die Prüfung (campaign/tools/validate) erzwingt das und meldet außerdem jede Szene, die mehr als einen Kandidaten gleichzeitig sperrt.",
+ "prior": { "nathan": 1.0, "baylee": 0.8, "fiona": 0.5, "tobias": 0.45 },
+ "weight": "prior * (1 + aff/20 + 0.75*stage + (roommate ? 1.5 : 0) + (seen last 3 days ? 1 : 0))",
+ "roommates": ["nathan", "baylee"],
+ "blockerFlag": "unfit_<id>",
+ "pronouns": {
+  "nathan": { "H": "Nathan", "full": "Nathan Whisper", "he": "he", "He": "He", "him": "him", "his": "his", "His": "His", "himself": "himself", "mate": "roommate" },
+  "baylee": { "H": "Baylee", "full": "Baylee Halvorsen", "he": "he", "He": "He", "him": "him", "his": "his", "His": "His", "himself": "himself", "mate": "roommate" },
+  "fiona": { "H": "Fiona", "full": "Fiona Blackwood", "he": "she", "He": "She", "him": "her", "his": "her", "His": "Her", "himself": "herself", "mate": "neighbour" },
+  "tobias": { "H": "Tobias", "full": "Tobias Crowe", "he": "he", "He": "He", "him": "him", "his": "his", "His": "His", "himself": "himself", "mate": "neighbour" }
+ }
+}

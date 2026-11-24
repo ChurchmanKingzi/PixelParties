@@ -1,0 +1,215 @@
+{
+ "id": "lucas",
+ "name": "Lucas Brennan",
+ "firstName": "Lucas",
+ "age": 21,
+ "sex": "m",
+ "group": "student",
+ "major": "CM",
+ "year": 3,
+ "dorm": "rare",
+ "room": "Rare Hall, upper floor",
+ "romance": false,
+ "deck": "Bamboo Warrior (structure deck, unmodified)",
+ "look": "Very tall and slightly stooped from talking down to tables, with sandy curls, a soft face and a knitted cardigan under his black Auxiliary jacket, blue Rare collar. A referee's whistle hangs on a cord he never blows; there are sticking plasters on two or three fingers from paper cuts and sleeve edges. He crouches to be at eye level with whoever he is ruling on.",
+ "voice": "Soft, slow and careful, an Irish midlands lilt; he explains a ruling as if apologising for the weather and waits until both players have actually understood it. Endlessly patient with beginners, entirely fair, and nearly incapable of a sentence that begins with what he himself would like. RARE habit (once in a scene at most; most scenes go without it): 'No rush' — said to people who are, in fact, holding up the round.",
+ "lines": [
+  "No rush. Put the card back where it was and we'll walk through it together.",
+  "That's a warning, not a penalty. A warning only means somebody noticed. It was me. I'm on your side.",
+  "Bamboo bends, mostly. The deck came in a box and I never changed a card, because I'd have to decide which.",
+  "She said the green in that one was 'tired'. I looked for ten minutes afterwards. It is tired. Nobody else on this island would have told me."
+ ],
+ "intro": "A very tall, soft-spoken third-year in a cardigan, the trainee head floor judge who runs the first-years' practice tables and has never been heard to raise his voice.",
+ "traits": [
+  {
+   "id": "lucas_1",
+   "text": "He runs the first-years' practice tables and has never once given a penalty where a warning would do.",
+   "how": "Duel terraces, most afternoons."
+  },
+  {
+   "id": "lucas_2",
+   "text": "He crouches down to table height before giving a ruling, so that nobody is being loomed over.",
+   "how": "Call a judge."
+  },
+  {
+   "id": "lucas_3",
+   "text": "He carries a referee's whistle on a cord and has not blown it in three years.",
+   "how": "Ask about the whistle."
+  },
+  {
+   "id": "lucas_4",
+   "text": "His deck is a structure deck exactly as it came out of the box.",
+   "how": "Play him; ask why."
+  },
+  {
+   "id": "lucas_5",
+   "text": "There are always plasters on his fingers, from sleeves, paper and other people's staplers.",
+   "how": "Look at his hands."
+  },
+  {
+   "id": "lucas_6",
+   "text": "He is from a village in County Offaly and was the eldest of seven, which is where he learned to referee.",
+   "how": "Ask how he got so patient."
+  },
+  {
+   "id": "lucas_7",
+   "text": "He can settle anybody's argument and cannot order his own lunch without asking what everyone else is having.",
+   "how": "Cafeteria queue."
+  },
+  {
+   "id": "lucas_8",
+   "text": "He listens to a certain first-year's commentary with complete attention and writes down what she says about the art.",
+   "how": "Sit near him during a student stream."
+  },
+  {
+   "id": "lucas_9",
+   "text": "Nobody has ever asked him what he wants in a way that waited for the answer.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Lucas Brennan is the eldest of seven from Kilcormac, County Offaly, and has been arbitrating other people's disputes since he could stand: who had the front seat, whose turn, who started it. He is very good at it — the fairest floor judge in the school, Hana Kirishima's trainee and her likely successor on the floor — and the price was that he never learned to want anything aloud, since in a house of seven the eldest's wants were the first thing put down. He plays the Bamboo Warrior structure deck unaltered because altering it would mean preferring one card to another. Wound: he honestly does not know what he would choose if it were his turn. Contradiction: the man who can make any two people agree cannot make a request. Private joke: the whistle is his grandfather's, from the county hurling pitch; he wears it 'in case of emergency' and has decided nothing so far has qualified.\nHe trains the first-year judges (Noor, whom he thinks will be better than he is, and Anni, whose red pen he is trying to slow down) and steadies the commentary desk when Cas loses his thread. And he is smitten, quietly and completely, with Victoria Capulet. He thinks hers is the only honest commentary on the island — she says what is actually on the card — and he has started a notebook of her remarks about the art. He never pushes: he says good afternoon, asks leave to sit, takes 'not today' as an answer, and brings the round's start times written on a card because he has noticed she likes that. Ophelia watches him like a hawk and has interviewed him twice; he answered every question and thanked her. Whether he can ever say the thing itself is his whole arc — and if Rowan is courting Victoria, Lucas is the gentlest possible rival, who will step back the moment he thinks she prefers it, and must not be allowed to disappear entirely.\nPlot use: as senior student judge he is on the roster for sanctioned first-year tables, and so is one of the few people who can lawfully be 'one who counts' at a formal duel; after Day 40 he is asked to sign off match logs he does not understand, notices that the dome's log has an ante field nobody will read to him, and — being who he is — asks politely, and keeps asking. He would never issue a challenge to anybody. He might, out of sheer fairness, agree to judge one.",
+ "wants": "To say one thing he wants, out loud, to the person it concerns.",
+ "fears": "Being the reason for a quarrel — and reaching thirty without ever having had a turn.",
+ "crush": "victoria",
+ "crushNote": "He thinks hers is the only honest commentary on the island and writes down what she says about the art. It shows as a correct 'good afternoon', start times brought to her on a card, asking leave to sit — and stepping back at once if she seems to prefer it, under her sister's unblinking eye.",
+ "crushPace": 0.5,
+ "likes": [
+  "Players who own up to a mistake",
+  "Being asked what HE would like, and waited for",
+  "Patience with beginners",
+  "Tea, wool, a quiet table",
+  "Kindness to Victoria that asks nothing of her",
+  "A ruling accepted with good grace",
+  "Hurling, explained badly to foreigners"
+ ],
+ "dislikes": [
+  "Shouting at a table",
+  "Rules-lawyering against a novice",
+  "Being asked to choose a restaurant",
+  "Mockery of anyone's commentary",
+  "Staplers",
+  "People who say 'whatever you want' back at him"
+ ],
+ "gifts": [
+  "Card: Xiong, the Bamboo Guardian",
+  "A box of fabric plasters",
+  "Card: Bamboo Shield",
+  "Loose-leaf Irish breakfast tea",
+  "One card for his deck, chosen FOR him, with a reason"
+ ],
+ "events": [
+  {
+   "id": "lucas_e1",
+   "stage": 1,
+   "title": "No rush",
+   "condition": "Play at his first-year practice tables on duel_terraces in the first two weeks, call him over for a ruling, and accept it; thank him by name.",
+   "hint": [
+    "The tall judge at the practice tables is on everybody's side. It is worth being known to him.",
+    "Play at the first-years' practice tables and take one of his rulings well."
+   ]
+  },
+  {
+   "id": "lucas_e2",
+   "stage": 2,
+   "title": "Straight out of the box",
+   "condition": "Ask him why he has never changed a card in his deck, and wait for the real answer; then pick one card for him and give a reason. Ask him what he would like for lunch and do not help.",
+   "hint": [
+    "He can decide anything for other people. Watch what happens when it is his own turn.",
+    "Ask him about his unmodified deck, and make him choose something for himself."
+   ]
+  },
+  {
+   "id": "lucas_e3",
+   "stage": 3,
+   "title": "In case of emergency",
+   "condition": "After Day 40, when he is asked to sign a match log he does not understand, go through it with him and tell him what you know; and whatever your own standing with Victoria, deal with him honestly about her. He tells you what the whistle is for.",
+   "hint": [
+    "He has been handed paperwork that troubles him, and there is something he has never managed to say to anyone.",
+    "Help him with a match record he cannot make sense of, and be straight with him about a certain first-year."
+   ]
+  }
+ ],
+ "bonds": {
+  "victoria": {
+   "label": "crush",
+   "text": "The only honest commentary on the island. He says good afternoon, asks leave to sit, and takes 'not today' for an answer.",
+   "public": true,
+   "from": 6
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "Victoria's sister has interviewed him twice. He answered everything and thanked her for asking.",
+   "public": true,
+   "from": 0
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "Ms Kirishima trained him. She says a penalty is the truth; he keeps trying to tell the truth with a warning.",
+   "public": true,
+   "from": 0
+  },
+  "noor": {
+   "label": "mentor",
+   "text": "She will be a better judge than he is, and he has told her so. He supervises her floor shifts.",
+   "public": true,
+   "from": 4
+  },
+  "anni": {
+   "label": "mentor",
+   "text": "Miss Brandt knows every paragraph. He is trying, very gently, to slow down the red pen.",
+   "public": true,
+   "from": 4
+  },
+  "cas": {
+   "label": "friends",
+   "text": "Steadies the student desk when the commentary runs away with itself.",
+   "public": true,
+   "from": 8
+  },
+  "mika": {
+   "label": "teammates",
+   "text": "They have floor-judged the shop's Saturdays together for two years; she naps, he worries.",
+   "public": true,
+   "from": 0
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Victoria's roommate tells him honestly whether it is a good day to say hello.",
+   "public": true,
+   "from": 6
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Year-mate. He has declined to write her up for bare feet for three years running and takes the complaints himself.",
+   "public": true,
+   "from": 0
+  },
+  "zeynep": {
+   "label": "colleagues",
+   "text": "Year-mates on the judging track; she runs the ladder table, he the floor. They have never disagreed on a ruling.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "classroom",
+   "Midday": "trial_dome",
+   "Afternoon": "duel_terraces",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "card_shop",
+   "Midday": "duel_terraces",
+   "Afternoon": "quad",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Bamboo Warrior exactly as boxed: Xiong behind shields and staves, bending under pressure and springing back. He knows every interaction in the game and plays the gentlest legal line.",
+  "tilt": "An opponent in distress, or any game in which he is asked to choose the stakes."
+ }
+}

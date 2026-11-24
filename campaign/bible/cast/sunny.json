@@ -1,0 +1,251 @@
+{
+ "id": "sunny",
+ "name": "Sunniva \"Sunny\" Aldane",
+ "firstName": "Sunny",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R202",
+ "romance": true,
+ "deck": "Slip 'n Slide",
+ "look": "Tall, with a swimmer's shoulders, sun-bleached hair in a ponytail that is always wet, a deep tan with goggle marks, and a towel slung round her neck like a scarf. She wears her red jacket with the blue Rare collar over a swimsuit more often than over a uniform. She grins with her whole face and stands closer than most people do.",
+ "voice": "Easy, loud and direct, Australian, laughing mid-sentence. She says what she likes about someone to their face within a minute of meeting them and talks about everything as if it were sport. In a real emergency the breeziness goes and she is short, calm and practical. RARE habit (once in a scene at most; most scenes go without it): 'No dramas' to wave off a problem.",
+ "lines": [
+  "You're the wildcard! Nice shoulders for a laundry bloke. That's a compliment, don't make it weird.",
+  "Fall in and I'll fish you out. That's literally the job.",
+  "Everything in my deck slides. Nothing stays where you put it. Drives the control kids mental.",
+  "I like you. There, said it. Your turn — or we can race for it."
+ ],
+ "intro": "A sports-scholarship first-year from Rare Hall and the pool's lifeguard: cheerful, direct, and not remotely shy about flirting.",
+ "traits": [
+  {
+   "id": "sunny_1",
+   "text": "She is on a sports scholarship and lifeguards at the campus pool every afternoon.",
+   "how": "Visit the pool."
+  },
+  {
+   "id": "sunny_2",
+   "text": "She swims two kilometres before breakfast and thinks everyone should.",
+   "how": "Be at the pool or beach cove in the Morning."
+  },
+  {
+   "id": "sunny_3",
+   "text": "She tells people she likes them the moment she decides it — and tells them just as plainly when she has stopped; she dated the rose-carrying Spectral boy for five days in week one.",
+   "how": "Meet her; about ninety seconds. She tells the Ashton story herself."
+  },
+  {
+   "id": "sunny_4",
+   "text": "She picked up the game in physio waiting rooms and plays it like a sport.",
+   "how": "Ask how a swimmer ended up here."
+  },
+  {
+   "id": "sunny_5",
+   "text": "She is teaching Baylee Halvorsen to swim and is fiercely proud of him.",
+   "how": "Pool or beach cove, with Baylee."
+  },
+  {
+   "id": "sunny_6",
+   "text": "She grew up in Cairns and was national-junior level in butterfly before her shoulder went.",
+   "how": "Notice the surgical scar; she tells it as a funny story."
+  },
+  {
+   "id": "sunny_7",
+   "text": "She cannot sit still through a lecture and takes notes standing at the back.",
+   "how": "Share a classroom with her."
+  },
+  {
+   "id": "sunny_8",
+   "text": "She has pulled someone out of the water who did not make it, and never talks about that one.",
+   "how": "Close stage, or a real emergency at the pool or shore."
+  },
+  {
+   "id": "sunny_9",
+   "text": "She is afraid of being the fun one nobody takes seriously.",
+   "how": "Dating stage, after someone dismisses her as 'the lifeguard'."
+  }
+ ],
+ "secret": "Sunny was going to the Olympics; everybody in Cairns said so. A torn labrum at seventeen, two surgeries, and the times never came back. Pixel Parties filled the waiting rooms; the Academy's sports scholarship (they wanted a lifeguard and a face for the brochure) filled the hole. She is exactly as cheerful as she seems, and it is also a discipline: she decided not to be bitter, the way she used to decide to get up at five. Wound: at sixteen, volunteering on a surf patrol, she reached a drowning boy forty seconds too late. She does not do 'too late' any more — which is why she says what she feels at once, flirts at once, acts at once. Contradiction: the most carefree girl on campus is driven by a stopwatch. She is brighter than her grades; she reads people's bodies the way Noor reads rules. Private joke: she rates her roommate Noor's rare moments of rule-bending on a medal table.\nShe flirts first, fast and physically, enjoys it for its own sake, and is entirely fine with a no. What she does not expect is someone taking her seriously — asking what she thinks about a matchup, about the school, about anything — and that is the hook of her route. She is not jealous by temperament but she is honest: she will ask straight out where she stands.\nDark turn: she is the pool's trained first-aider, and it is Sunny, out on her dawn run along the duel terraces, who finds the second Hollowed on Day 52: the Rare Hall ladder shark, sitting at a top-terrace table on the duel terraces with the awning frozen stiff. She does CPR on someone who is breathing perfectly, because she cannot make sense of it, and it shakes her badly — it is 'too late' with a pulse. Camille leans on her as an unofficial orderly in ward B. She cannot stand helplessness and will want to DO something: swim to the islet, hike to the crater, challenge '{H}' to anything at all. Keeping her from a reckless challenge without benching her is the task; she is the one who gets people physically out of places in the finale.",
+ "wants": "To be quick enough, this time, and to be taken seriously while she is at it.",
+ "fears": "Being forty seconds late again.",
+ "crush": "ed",
+ "crushNote": "He is the only one who says yes before she has finished the dare, and she has pulled him out of the water twice. It shows as races, shoving, wet hair shaken over him, and real fright disguised as a telling-off when he goes off alone.",
+ "crushPace": 1.2,
+ "likes": [
+  "Directness — say it or do it",
+  "Any physical activity shared: swimming, running, carrying",
+  "Being asked her opinion and having it used",
+  "People who try something they are bad at",
+  "Compliments returned without awkwardness",
+  "Early mornings, cold water, big breakfasts",
+  "Kindness to Baylee",
+  "Being raced"
+ ],
+ "dislikes": [
+  "Being called 'just' the lifeguard or the fun one",
+  "Dithering and mixed signals",
+  "People who mock beginners",
+  "Recklessness around water",
+  "Being left out of the dangerous part",
+  "Sulking"
+ ],
+ "gifts": [
+  "Card: Slippery Pengu",
+  "Swim goggles with tinted lenses",
+  "A mango from the fish-market fruit stall",
+  "Card: Kit, the Shark Researcher",
+  "Waterproof card sleeves",
+  "Card: Muscle Training"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Open, physical, cheerful.",
+  "text": "Sunny flirts in the first conversation: a frank compliment, a hand on the arm, a dare to race to the buoy. It is real and unpressured — if he blushes she laughs and backs off half a step; if he answers in kind she closes the half step and one more. She wants someone who keeps up: say what you want, show up to the pool, try the thing even if you sink. Being asked for her thoughts, not just her company, is what turns fun into feeling. She will ask where she stands by the second week and wants a straight answer either way."
+ },
+ "intimacy": "Comfortable in her body and quick to closeness: wet hair dripping on his shoulder, a towel shared, her legs across his lap in the lounge without ceremony. She likes heat and motion — a night swim in the cove, the hot springs after a long run, being lifted, being wrestled with — and she likes laughing in the middle of it. Sunlit, salt-skinned, unembarrassed, generous; she is also the one who checks in ('you right?') and means it. Under the ease there is tenderness she is shy about: afterwards she goes quiet and holds on. Fade at the edge of the water, or as the suite door swings shut behind a trail of wet footprints.",
+ "events": [
+  {
+   "id": "sunny_e1",
+   "stage": 1,
+   "title": "Race you",
+   "condition": "Take her up on a physical dare in the first two weeks (a swim at pool or beach_cove, a run on cliff_path) and finish it, however badly.",
+   "hint": [
+    "She respects anyone who gets in the water.",
+    "Accept her challenge to a swim or a run and see it through."
+   ]
+  },
+  {
+   "id": "sunny_e2",
+   "stage": 2,
+   "title": "You right?",
+   "condition": "Ask her opinion on something that matters (a matchup, a decision) and visibly act on it; help with Baylee's swimming lessons at least once.",
+   "hint": [
+    "People like her company. Fewer ask what she thinks.",
+    "Ask her advice seriously, follow it, and help her teach Baylee to swim."
+   ]
+  },
+  {
+   "id": "sunny_e3",
+   "stage": 3,
+   "title": "Where do I stand",
+   "condition": "When she asks straight out (around the Freshman Cup or soon after), give a straight answer; then a night swim at beach_cove or an evening at hot_springs at her invitation.",
+   "hint": [
+    "She will ask a blunt question. She can take either answer but not a mumble.",
+    "Tell her honestly how you feel when she asks, and accept her invitation to the cove."
+   ]
+  },
+  {
+   "id": "sunny_e4",
+   "stage": 4,
+   "title": "Forty seconds",
+   "condition": "Be with her after she finds the second victim on duel_terraces at dawn on Day 52 (or after the next Hollowing she attends) and let her tell you about the boy she did not reach; do not tell her it was not her fault — stay.",
+   "hint": [
+    "Even the cheerful one has bad nights. She will not ask for company.",
+    "Find her after her worst day on duty and stay with her while she talks."
+   ]
+  },
+  {
+   "id": "sunny_e5",
+   "stage": 5,
+   "title": "Something to do",
+   "condition": "In Stage C/D, give her a real task in the plan instead of protecting her from it, and talk her out of a reckless challenge by honesty rather than orders; she chooses him deliberately, slowly, for once.",
+   "hint": [
+    "She cannot bear to stand by. She needs a job, not a warning.",
+    "Trust her with a real part in what you are planning and keep her from doing something rash by levelling with her."
+   ]
+  }
+ ],
+ "bonds": {
+  "ashton": {
+   "label": "exes",
+   "text": "Fun for five days, then all foreground. No hard feelings; she would still hear an apology out, with her arms crossed.",
+   "public": true,
+   "from": 2
+  },
+  "priya": {
+   "label": "friends",
+   "text": "Her favourite person to out-train, because Priya never lets her.",
+   "public": true,
+   "from": 8
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Her surf teacher and favourite bad influence.",
+   "public": true,
+   "from": 6
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "Her proudest pupil; six foot seven and scared of the shallow end.",
+   "public": true,
+   "from": 9
+  },
+  "noor": {
+   "label": "roommates",
+   "text": "Keeps a medal table of Noor's rare moments of rule-bending.",
+   "public": true,
+   "from": 1
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Keeps trying to get Pippa in front of the camera.",
+   "public": true,
+   "from": 7
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "The one coach who talks to her like an athlete.",
+   "public": true,
+   "from": 3
+  },
+  "selene": {
+   "label": "friends",
+   "text": "Pool and spa share a corridor; they swap shifts and gossip about nothing.",
+   "public": true,
+   "from": 4
+  },
+  "ed": {
+   "label": "crush",
+   "text": "Says yes before she has finished the dare. She is more frightened for him than she lets on.",
+   "public": true,
+   "from": 3
+  },
+  "trixie": {
+   "label": "friends",
+   "text": "Finally somebody with the same engine. They do the cliff path flat out and argue about bees the whole way.",
+   "public": true,
+   "from": 6
+  },
+  "baraka": {
+   "label": "protégé",
+   "text": "She lifeguards under his certificate. He times her lengths and never says the number.",
+   "public": true,
+   "from": 3
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "pool",
+   "Midday": "classroom",
+   "Afternoon": "pool",
+   "Evening": "gym",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "beach_cove",
+   "Midday": "boathouse",
+   "Afternoon": "pool",
+   "Evening": "hot_springs",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Slippery creatures that shove everything out of position; her boards are chaos and she is the only one who enjoys it. Plays on instinct and momentum, great when ahead.",
+  "tilt": "Slow, grinding opponents and long waits between turns — she gets restless and overcommits just to make something happen."
+ },
+ "range": "Flirting is her opener, not her whole conversation: training talk, the pool rota, Cairns, blunt advice, racing anyone at anything, honest questions about a game she is still learning. 'No dramas' once a scene at most."
+}

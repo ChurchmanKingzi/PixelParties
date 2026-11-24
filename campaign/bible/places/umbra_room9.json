@@ -1,0 +1,20 @@
+{
+ "name": "Umbra House — Room 9",
+ "zone": "dorms",
+ "bg": "umbra_room9",
+ "night": false,
+ "part": "umbra_house",
+ "hours": "The housemaster's study at the end of the second-floor corridor; locked with its own key.",
+ "sight": "A narrow study under the eaves, grey with nine years of dust. Bookshelves bow under site reports and bound rubbings; a field desk stands by the window with an oil lamp, a cold pipe and a mug with a dried ring in it. Maps of the island cover one wall, stuck with pins and thread. A camp bed is made up. A child's drawing of a man with a shovel is pinned at eye level over the desk.",
+ "things": [
+  "Read the pinned map: thread from campus to the ruins field to a point inside the mountain",
+  "Go through the desk drawers",
+  "Take down the rubbings — squares within squares, figures made of little tiles",
+  "Look at the child's drawing and the name in the corner",
+  "Check the camp bed, the wardrobe, the floor",
+  "Find what the shelves are hiding",
+  "Sit where he sat and look out of his window at the mountain"
+ ],
+ "secret": "Aleksander Hale's study. THE TWELVE TORN PAGES of his field journal (canon) are here: rolled inside the hollow brass base of the oil lamp. Viktor has searched this room twice and missed them; Rowan, Viktor's trust, or a hint from Ashdown ('he never trusted drawers; he trusted things he could carry out of a fire') finds them — not before Day 45 by default. Content, for the GM: (1) the Gate opens to a first print pressed into the central recess; (2) the tiles are records, and 'to take one out is to offer yourself in exchange'; (3) the Tessellate rule, copied from the antechamber wall: what comes from outside cannot be fought, only bound by a contest it accepts, and it is bound by the outcome; (4) his plan to remove one tile for study; (5) a last line: 'If I am wrong, play for me.' The child's drawing is signed VIKTOR, age 12. The wardrobe holds a housemaster's black jacket with a smoke-grey collar. The pinned map is the first reliable route to the Ruin Gate.",
+ "access": "Inside the sealed house; own lock (the key hangs on silas's ring with the rest; the door can also be lifted off its old hinges)."
+}

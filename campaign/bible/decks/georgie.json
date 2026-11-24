@@ -1,0 +1,381 @@
+{
+ "name": "Hatchery",
+ "owner": "georgie",
+ "heroes": [
+  "Rubin, the Dragoneer Champion",
+  "Kit, the Shark Researcher",
+  "Luna Pele, the Flame Dancer"
+ ],
+ "main": [
+  [
+   3,
+   "Black-Thorn Dragon"
+  ],
+  [
+   2,
+   "Blue-Ice Dragon"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   2,
+   "Chosen Sacrifice"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   6,
+   "Destruction Magic"
+  ],
+  [
+   1,
+   "Dragolfin"
+  ],
+  [
+   3,
+   "Fireball"
+  ],
+  [
+   4,
+   "Flaming Dragonegg"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Green Dragoneer"
+  ],
+  [
+   4,
+   "Icy Dragonegg"
+  ],
+  [
+   1,
+   "Magic Hammer"
+  ],
+  [
+   4,
+   "Red Dragoneer"
+  ],
+  [
+   4,
+   "Shimmering Dragonegg"
+  ],
+  [
+   2,
+   "Sorbereus, the Adapting Dragon"
+  ],
+  [
+   8,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Victory Phoenix Cannon"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Rubin, the Dragoneer Champion": "Hero",
+  "Kit, the Shark Researcher": "Hero",
+  "Luna Pele, the Flame Dancer": "Hero",
+  "Black-Thorn Dragon": "Creature L3",
+  "Blue-Ice Dragon": "Creature L3",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Chosen Sacrifice": "Creature L0",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Destruction Magic": "Ability",
+  "Dragolfin": "Creature L3",
+  "Fireball": "Spell (Destruction Magic)",
+  "Flaming Dragonegg": "Creature L0",
+  "Golden Ankh": "Artifact",
+  "Green Dragoneer": "Creature L2",
+  "Icy Dragonegg": "Creature L0",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Red Dragoneer": "Creature L1",
+  "Shimmering Dragonegg": "Creature L0",
+  "Sorbereus, the Adapting Dragon": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Victory Phoenix Cannon": "Spell (Destruction Magic)"
+ },
+ "gist": {
+  "Rubin, the Dragoneer Champion": "Whenever she summons a creature by sacrificing another, Rubin may immediately cast a Destruction spell from hand for free. Hard to affect with anything but damage.",
+  "Icy Dragonegg": "One-health egg, free to summon onto an empty board. If it breaks during her own turn, it freezes any target for a turn.",
+  "Flaming Dragonegg": "Same egg; breaking on her turn it sets any target on fire for good.",
+  "Shimmering Dragonegg": "Same egg; breaking on her turn it pays her gold.",
+  "Red Dragoneer": "Fetches any Drago creature from the deck when summoned; each turn shoots harder for every other Drago creature she controls.",
+  "Green Dragoneer": "Jumps from hand into the slot of a Drago creature that just died; can sacrifice an older creature for a solid shot at anything.",
+  "Black-Thorn Dragon": "Needs Drago creatures sacrificed to appear. Heavy shot every turn, and both the dragon and the hero it stands beside ignore all Spells.",
+  "Blue-Ice Dragon": "Enters by sacrificing two older creatures. Each turn it either freezes a target for two turns or, if the target is already frozen, hits it enormously hard.",
+  "Dragolfin": "Big dragon whose shot is stronger the more cards remain in her deck.",
+  "Sorbereus, the Adapting Dragon": "Hits a hero with that hero's own Attack stat.",
+  "Luna Pele, the Flame Dancer": "Draws a card each time something is set on fire, several times a turn.",
+  "Kit, the Shark Researcher": "Each Ability she gains fetches a creature or makes you take small hits or discard.",
+  "Burning Finger": "Cheap single-target burn; Rubin's usual free follow-up.",
+  "Fireball": "Hits up to two targets.",
+  "Victory Phoenix Cannon": "Heavy shot that chains into a cheap Destruction spell.",
+  "Chosen Sacrifice": "Can be sacrificed from hand in place of a creature on the board, and replaces itself.",
+  "Deepsea Idol": "Cancels a sweep that would hit two or more of her creatures."
+ },
+ "plan": "Eggs first: free, one-health, and worthless unless they break on Georgie's own turn, when they freeze, burn or pay. She breaks them herself by sacrificing them into Green Dragoneer shots and the Black-Thorn Dragon, and every sacrifice-summon lets Rubin fire a Destruction spell on top. Red Dragoneer finds the pieces, Luna Pele turns burns into cards. Once a Black-Thorn Dragon stands beside a hero, neither can be touched by Spells at all. She plays tight and never wastes a trigger. The weak points are the opening turns, when the eggs can be swept on your turn for nothing, and the fact that her heroes other than the dragon's keeper are ordinary.",
+ "looks": {
+  "early": "Two or three one-health eggs and a Red Dragoneer; Georgie arranging them in a neat row.",
+  "mid": "Eggs cracking on her own turn, a Green Dragoneer in the gap, Rubin casting out of turn order; one of your heroes frozen, another burning.",
+  "late": "A Black-Thorn Dragon beside Rubin with spells sliding off both, a Dragolfin next door, and exactly the cards she needs in hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She has a row of one-health Dragoneggs; they only do anything if they break during her own turn.",
+   "why": "Swept on your turn the eggs are simply gone, while an early Gathering Storm ticks at the start of HER turn and lets her feed eggs to it for a free freeze and burn."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "A Black-Thorn Dragon has landed beside Rubin: no Spell affects either of them.",
+   "why": "Your spells and the Storm do nothing to the dragon or its hero, but Dark Gear, The Yeeting, Snow Cannon and Acid Vial are not Spells; one artifact answers what a whole hand of burn cannot (The Yeeting counts as a kill, so a Green Dragoneer may jump into the gap, but it shields no one)."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Only the hero next to the dragon is spell-proof; Kit and Luna Pele stand in the open, already scorched.",
+   "why": "Freeze the dragon for the turn it would kill and put every real spell into the two unshielded heroes; there is no time left to build anything."
+  },
+  "endgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her last hero stands beside the Black-Thorn Dragon, and your hand is mostly spells.",
+   "why": "As long as the dragon is there your spells cannot finish the duel; remove the dragon with The Yeeting or steal it, and the last hero is an ordinary target again."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Georgie lays an Icy Dragonegg and a Flaming Dragonegg side by side and summons a Red Dragoneer, who fetches something from her deck.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the eggs on your own turn so they do nothing"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Red Dragoneer"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm early"
+     }
+    ]
+   },
+   {
+    "board": "Three eggs sit under her heroes; she has kept Destruction Magic back for Rubin.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche on your turn: the eggs give nothing"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Go at Luna Pele while the board is harmless"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up and let the eggs be"
+     }
+    ]
+   },
+   {
+    "board": "She sacrifices an egg to a Green Dragoneer shot; the egg freezes your caster and Rubin adds a Burning Finger for free.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Green Dragoneer"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the remaining eggs now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze back and poke"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Black-Thorn Dragon rises from two sacrificed eggs next to Rubin; your next spell at Rubin simply fizzles.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the dragon"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze it and aim spells at Kit"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche into a spell-proof dragon"
+     }
+    ]
+   },
+   {
+    "board": "Red Dragoneer and two eggs beside the dragon; she is counting her Drago creatures for the Dragoneer's shot.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the dragon, sweep the rest next turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the small ones on your turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Set up The White Eye"
+     }
+    ]
+   },
+   {
+    "board": "Luna Pele draws two cards off a pair of fresh burns on your side.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea a burn across to Luna Pele and keep hitting her"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Luna Pele, the card engine"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Rubin (through the dragon's protection)"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The dragon takes a chunk out of a hero every turn and Rubin follows each sacrifice with a spell; Kit and Luna Pele are both hurt.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the dragon, spells into Kit and Luna Pele"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Acid Vial and Yeeting for the dragon"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild the Storm on a new caster"
+     }
+    ]
+   },
+   {
+    "board": "A Dragolfin joins the dragon; her deck is still thick, so it hits hard.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Dragolfin, its strength comes with it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! ready, finish Kit"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, hitting one of two giants"
+     }
+    ]
+   },
+   {
+    "board": "She holds Deepsea Idol-shaped confidence and four eggs worth of board.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Single shots only, do not feed the Idol"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards to find the Idol"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche into the Idol"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Rubin is alone with the Black-Thorn Dragon; you hold two burn spells, a Yeeting and an Acid Vial.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the dragon, then burn Rubin"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial now, it is not a spell"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Shuffle for more spells"
+     }
+    ]
+   },
+   {
+    "board": "She is on one hero and an egg; you are on one hero and a Storm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish it before the egg becomes a dragon"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the egg on your turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon her last hero so no dragon can be summoned"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh returns Kit for a turn; a Green Dragoneer waits in her hand for the next creature to fall.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Kill heroes, not creatures, so the Dragoneer stays in hand"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang the Ankh turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the board and trigger it"
+     }
+    ]
+   }
+  ]
+ }
+}

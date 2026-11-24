@@ -1,0 +1,384 @@
+{
+ "name": "Smash and Grab",
+ "owner": "tobias",
+ "heroes": [
+  "Andras, the Human Weapon",
+  "Sid, the King of Thieves",
+  "Alex, Trainer of Heroes"
+ ],
+ "main": [
+  [
+   2,
+   "Ancient Tech Infinite Energy Core"
+  ],
+  [
+   4,
+   "Attack"
+  ],
+  [
+   4,
+   "Cloud Pillow"
+  ],
+  [
+   1,
+   "Divine Gift of Coolness"
+  ],
+  [
+   4,
+   "Escape"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   2,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Muscle Training"
+  ],
+  [
+   1,
+   "Phalanx Pike"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   2,
+   "Snow Cannon"
+  ],
+  [
+   3,
+   "Strong Ox Headbutt"
+  ],
+  [
+   2,
+   "Toughness"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Wealth"
+  ],
+  [
+   2,
+   "Wheels"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Andras, the Human Weapon": "Hero",
+  "Sid, the King of Thieves": "Hero",
+  "Alex, Trainer of Heroes": "Hero",
+  "Ancient Tech Infinite Energy Core": "Artifact (Equipment)",
+  "Attack": "Attack",
+  "Cloud Pillow": "Artifact",
+  "Divine Gift of Coolness": "Attack (Attachment)",
+  "Escape": "Attack (Reaction)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Juice": "Artifact (Reaction)",
+  "Magnetic Glove": "Artifact",
+  "Muscle Training": "Attack",
+  "Phalanx Pike": "Artifact (Equipment)",
+  "Quick Attack": "Attack",
+  "Sacred Hammer of the Volcano": "Artifact (Equipment)",
+  "Snow Cannon": "Artifact",
+  "Strong Ox Headbutt": "Attack",
+  "Toughness": "Ability",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability",
+  "Wheels": "Artifact"
+ },
+ "gist": {
+  "Andras, the Human Weapon": "When his attack hits one target and his Fighting is higher than the attack's level, it hits a second target as well.",
+  "Sid, the King of Thieves": "Before the game he looks through your deck, takes two different cards and may use them as if they cost no level at all.",
+  "Alex, Trainer of Heroes": "Spreads Fighting to Andras.",
+  "Heavy Hit": "Attack that stuns; from Andras, two targets.",
+  "Quick Attack": "A free first attack each turn.",
+  "Attack": "A plain hit, doubled by Andras.",
+  "Strong Ox Headbutt": "You discard; better as a second attack.",
+  "Muscle Training": "Fetches and attaches Fighting.",
+  "Ancient Tech Infinite Energy Core": "More Attack for every different card in his discard pile.",
+  "Sacred Hammer of the Volcano": "More Attack, much more against burning targets.",
+  "Phalanx Pike": "More Attack; attacks do not spring traps.",
+  "Escape": "Reaction: discards a card to cancel a lethal attack or spell.",
+  "Cloud Pillow": "Halves damage to one target for a turn.",
+  "Snow Cannon": "Freezes a target.",
+  "Divine Gift of Coolness": "Once: one hero becomes immune to all statuses."
+ },
+ "plan": "Brute force with one unconventional twist. Andras levels Fighting and every cheap attack hits two heroes; Quick Attack makes it four hits a turn. Sid meanwhile starts the game with the two best cards out of your own deck and plays them for free: against this deck that is usually Gathering Storm, attached to Sid on his first turn, and a Chain Lightning. There is no finesse and little defence beyond Escape.",
+ "looks": {
+  "early": "Your own Gathering Storm on Sid on turn one.",
+  "mid": "Andras hitting two heroes twice a turn while your stolen Storm ticks on all three.",
+  "late": "Divine Gift of Coolness on Andras and a Heavy Hit on two targets."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Sid shows you two cards from your own deck before the first draw.",
+   "why": "A stolen Gathering Storm on Sid ticks on your three heroes every turn: The Yeeting removes an attachment cleanly, or Sid, who is small, must fall."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Andras's cheap attacks each hit a second hero.",
+   "why": "Two stuns a turn: Tea one back, freeze Andras for his turn, shield the hero that would fall. There is nothing to sweep."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Andras has Fighting at three and wears the Energy Core.",
+   "why": "Fire Bomb takes a Fighting off him: with lower Fighting his level-one attacks no longer double."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Sid is gone and Andras is hurt.",
+   "why": "Escape needs a discard he no longer has."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Tobias's Sid opens by attaching YOUR Gathering Storm, taken from your deck.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Storm off Sid"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Sid"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build under your own Storm"
+     }
+    ]
+   },
+   {
+    "board": "Sid casts your Chain Lightning for free.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Sid"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Sid"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Muscle Training on Andras.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb his Fighting"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Heavy Hit stuns two of your heroes at once.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea one stun onto Andras"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Andras"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Quick Attack and Attack: four hits this turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the weakest"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang next turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Phalanx Pike: your Firewall stays face-down.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! instead"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Pike"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Fighting three and an Energy Core on Andras.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb a Fighting"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze and shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Coolness: Andras cannot be frozen any more.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang his turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Strong Ox Headbutt empties your hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye his in return"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Andras alone, hurt.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Escape cancels your finisher for his last card.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Again"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Sid.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Andras"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

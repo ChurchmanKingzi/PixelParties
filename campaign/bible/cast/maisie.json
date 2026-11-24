@@ -1,0 +1,263 @@
+{
+ "id": "maisie",
+ "name": "Maisie Voltage",
+ "firstName": "Maisie",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B4",
+ "romance": true,
+ "deck": "Overdraft Mk. III (Debt-O-Trons)",
+ "look": "Freckles, wild copper-brown curls pushed back under a pair of welding goggles, and oil-stained overalls with the black Auxiliary jacket, grey collar, knotted round her waist by the sleeves. A tool belt rides her hip and there is usually a smear of solder flux on her cheek. Her hands are nicked, quick and never empty.",
+ "voice": "Warm, quick and practical, South Yorkshire, thinking aloud in half-sentences while her hands do something else. She explains machines as if they were slightly unreliable friends, and people the same way. Cheerful swearing at inanimate objects. She goes quiet and slow only when an idea is actually arriving. RARE habit (once in a scene at most; most scenes go without it): asking 'hold that a sec' and handing over whatever she is carrying.",
+ "lines": [
+  "It's meant to hum. It's not meant to hum like THAT. Stand a bit further back, love.",
+  "Every hologram on this island is a lantern slide with ambitions. I want one you can shake hands with.",
+  "Robots that run on credit — that's the deck. Brilliant until the bill arrives, same as my dad's van.",
+  "Hold that a sec. No, the hot end's the other end."
+ ],
+ "intro": "A freckled first-year in overalls and welding goggles from bungalow 4, studying table tech, who has built an unauthorised workbench on the porch and wants to make holograms you can touch.",
+ "traits": [
+  {
+   "id": "maisie_1",
+   "text": "She has a workbench of projector parts on her bungalow porch, running off an extension cord nobody approved.",
+   "how": "Walk past bungalow 4."
+  },
+  {
+   "id": "maisie_2",
+   "text": "She fixes anything that is put down near her, including things that were not broken.",
+   "how": "Leave a phone, a lamp or a holo-table within reach."
+  },
+  {
+   "id": "maisie_3",
+   "text": "She wants to make a hologram solid enough to touch, and talks about it as a matter of when.",
+   "how": "Ask what she is building."
+  },
+  {
+   "id": "maisie_4",
+   "text": "Her deck is a row of machines that borrow against the future and has to win before the debt comes due.",
+   "how": "Play her."
+  },
+  {
+   "id": "maisie_5",
+   "text": "She grew up in a Sheffield scrapyard and built her first projector from a car headlamp at eleven.",
+   "how": "Ask about the goggles."
+  },
+  {
+   "id": "maisie_6",
+   "text": "She is the one student allowed into the hologram plant under the Trial Domes, and she earned it in a week.",
+   "how": "Trial dome, Afternoon; Professor Helical grumbles fondly."
+  },
+  {
+   "id": "maisie_7",
+   "text": "Her father lost two fingers to a press when she was nine, and she has been making machines safer ever since.",
+   "how": "Friend stage; she taps the guard on her bench."
+  },
+  {
+   "id": "maisie_8",
+   "text": "She keeps a tin of every component that ever failed on her, labelled with what it taught her.",
+   "how": "Close stage."
+  },
+  {
+   "id": "maisie_9",
+   "text": "She has never once asked whether a thing should be built, only how.",
+   "how": "Dating stage; someone asks her."
+  }
+ ],
+ "secret": "Maisie is the daughter of Derek Voltage (real name; he says it was destiny), scrap dealer and van mechanic of Attercliffe, Sheffield, and grew up among dead televisions. She is a maker in the bone: she thinks with her hands, cannot leave a broken thing broken, and came to the Academy on the Auxiliary tech track because it has the only working holo-tables she could get near. The island's holograms are rudimentary — flat, flickering, the creatures not even properly animated — and she regards that as a personal insult. Her dream is touchable light. She has no idea that it was designed thirty years ago, shelved as dangerous and paid for with a woman's lungs, or that the woman's daughter sleeps three feet from her.\nBy about Day 60, working from scrap, a borrowed table and stubbornness, she rederives the outer half of the HELICAL LATTICE — the geometry, not the medium. Her prototype flickers like every other hologram on the island — until a first-print card happens to lie within a hand's breadth of the coil (Wren's cracked common, on the same bench): then it pushes back against a fingertip for a fraction of a second and burns out a coil; the notes say 'needs a carrier — some mineral additive?'. Professor Helical, shown it, goes grey, calls it promising, and takes the coil away. Lucian Marrow, arriving on Day 61 as judge of the Design Contest, finds her within a week: a lab, a stipend, components she could never afford, and an interest in what 'additive' she has in mind. The offer stands open; by default she demonstrates the rig at the Open Playtest Afternoon on Day 134, it fails in public, and she signs on Day 140. (From about Day 47 her bench is in the design lab, after she blacked out the Commons twice.) Santángel's burnt-card residue is exactly that additive. She is thus on a collision course with all three Helicals — the father who knows what the lattice costs, the daughter hunting her mother's notebooks, the dead engineer whose work she is innocently repeating — and with Wren, who knows what the dust is. She is not a villain's helper by nature; she is somebody who has never been given a reason to stop, and whose father taught her that a machine with no guard is a crime. That is the lever. Wound: the press. Contradiction: she builds guards onto everything and has never thought to put one on an idea. Private joke: she names her prototypes after her aunties, and Auntie Brenda has so far caught fire twice.\nWhy it matters to the main plot: a solid hologram in a Hollow Duel is what the thing {H=@near?on the steps of|in} bungalow 7 already does with no machine at all. She is the one person who will look at that and think 'how?' — and it, asked a direct question about a rule, answers truthfully. Her arc: learning to ask whether, and then building the thing that is actually needed (a table that holds under the cold; a guard).",
+ "wants": "To shake hands with a hologram she built.",
+ "fears": "Being the one who takes the guard off — hurting somebody with a thing she made.",
+ "crush": "junho",
+ "crushNote": "He is the only person who is as exact about a thing as she is hands-on with it, and he says 'this is finished' about nothing, which she takes as a challenge. It shows as her bringing him broken things to be precise about, and building him a stylus holder he did not ask for.",
+ "crushPace": 0.9,
+ "likes": [
+  "Being handed a broken thing",
+  "An extra pair of hands that does what it is told",
+  "Scrap, salvage, a good skip",
+  "Questions about how it works",
+  "People who own up when they break something",
+  "Chips, strong tea, bench-side company",
+  "Being told honestly when an idea is dangerous — with reasons",
+  "Her roommates"
+ ],
+ "dislikes": [
+  "'You can't do that'",
+  "Being told to stop without being told why",
+  "Sealed units and warranty stickers",
+  "Machines with the guards removed",
+  "Anyone touching the bench mid-solder",
+  "Secrecy about how things work",
+  "Being patronised about tools"
+ ],
+ "gifts": [
+  "Card: Debt-O-Tron Model Backup Duplicator",
+  "A reel of good solder from the campus store",
+  "Card: Blueprints",
+  "A dead gadget to take apart",
+  "Burn cream from Camille, wordlessly",
+  "Card: Future Tech Battery"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": true,
+  "style": "Cheerful, practical, hands-on.",
+  "text": "Maisie flirts the way she works: directly, with something in her hands. She will ask him to hold the torch, stand closer than the job needs, call him 'love' (which means nothing) and then make him something (which does) — a fixed phone, a lamp for his bunk, a deck box with a hinge. She says so if she fancies someone, grinning, and is entirely unbothered by a no. She wants someone who will sit by the bench, pass the right spanner and argue with her; the turn from friendly to serious comes when he tells her an idea of hers is dangerous and stays to help her fix it instead of telling her to stop."
+ },
+ "intimacy": "Easy, warm and tactile from early on — she drags people by the wrist to look at things, sits on the bench with her knee against his, wipes flux off his face with her thumb. She likes competence and closeness in the same breath: his hands steadying hers on a fiddly joint, her curls full of the smell of solder and sea air. Laughing, frank, good-humoured, a bit bossy; goggles pushed up, overalls unhooked at one shoulder. The porch after the row is asleep with one work lamp on, or the plant under the domes with the projectors idling. Fade when she reaches across him and clicks the bench lamp off.",
+ "events": [
+  {
+   "id": "maisie_e1",
+   "stage": 1,
+   "title": "Hold that a sec",
+   "condition": "Stop at the porch workbench of bungalow 4 and be useful: hold what you are handed, do as told, and ask how the thing works.",
+   "hint": [
+    "There is a workbench on the row where an extra pair of hands is always wanted.",
+    "Help the girl with the goggles at her porch workbench."
+   ]
+  },
+  {
+   "id": "maisie_e2",
+   "stage": 2,
+   "title": "Auntie Brenda",
+   "condition": "Bring her something broken or some salvage (the pawn shop's junk, a dead table part via Dex), and be there for a prototype test — including the fire — without flinching; she makes you something.",
+   "hint": [
+    "Her prototypes have names. They do not always survive.",
+    "Bring her scrap to work with and stick around when her experiment goes wrong."
+   ]
+  },
+  {
+   "id": "maisie_e3",
+   "stage": 3,
+   "title": "Pushes back",
+   "condition": "Around Day 60, be present in trial_dome's plant when the prototype first resists a fingertip, and afterwards say honestly what worries you about it — with a reason — while helping her make the next one safer. She says she fancies you, as plainly as that.",
+   "hint": [
+    "She is about to get something to work that perhaps should not, and she will want to show someone.",
+    "Be there when her invention first works, and be honest about the risk while helping her."
+   ]
+  },
+  {
+   "id": "maisie_e4",
+   "stage": 4,
+   "title": "The additive",
+   "condition": "After Day 61, when a well-funded visitor offers her a lab, help her find out what the offer is really for (Wren, or Professor Helical, or what you have seen yourself) before she signs; do not decide for her. That night she takes the goggles off.",
+   "hint": [
+    "Someone with money is very interested in what she is missing. She has never asked where a part comes from.",
+    "Help her learn the truth behind a generous offer, and let her make the decision."
+   ]
+  },
+  {
+   "id": "maisie_e5",
+   "stage": 5,
+   "title": "A guard",
+   "condition": "In Term 2, bring her and Leona into the same honest conversation about whose work she has been repeating, and work beside her on the thing that is actually needed; she builds it with a guard, and tells Rowan he is on the bench for good.",
+   "hint": [
+    "Her dream has a history she does not know, and the person who knows it sleeps in her own bungalow.",
+    "Help her and her roommate tell each other the truth, and build what the island really needs with her."
+   ]
+  }
+ ],
+ "bonds": {
+  "fiona": {
+   "label": "roommates",
+   "text": "Bungalow 4. Maisie has set fire to Fiona's lace curtain twice and rewired her candle sconce as an apology.",
+   "public": true,
+   "from": 1
+  },
+  "leona": {
+   "label": "roommates",
+   "text": "Bungalow 4. Leona is the easiest roommate imaginable — she asks good questions about the projector and then somehow is not in the room.",
+   "public": true,
+   "from": 1
+  },
+  "helical": {
+   "label": "protégé",
+   "text": "The Prof let her into the plant under the domes within a week. He is the best teacher she has had, and he changes the subject when she asks why holograms can't be solid.",
+   "public": true,
+   "from": 4
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Ink and hardware: Wren tells her what a card should feel like and Maisie tries to make the table do it.",
+   "public": true,
+   "from": 10
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "They fix the row between them: he does wood, she does wires.",
+   "public": true,
+   "from": 4
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "Rebuilt Mama's oldest stove from pawn-shop parts and has eaten free ever since.",
+   "public": true,
+   "from": 3
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "He came to see her bench, asked which 'additive' she had in mind, and smiled wrong.",
+   "public": false,
+   "from": 62
+  },
+  "marrow": {
+   "label": "owes",
+   "text": "The man from the company offered her a lab, a stipend and parts she could never afford. She has not asked what it is for.",
+   "public": false,
+   "from": 63
+  },
+  "dex": {
+   "label": "friends",
+   "text": "Lets her have the dead display cases and broken card scanners from the back of the shop.",
+   "public": true,
+   "from": 6
+  },
+  "tomi": {
+   "label": "teammates",
+   "text": "He finds parts; she fixes what he sells. They split it straight down the middle.",
+   "public": true,
+   "from": 5
+  },
+  "junho": {
+   "label": "crush",
+   "text": "Brings him broken things to be precise about, and built him a stylus holder he did not ask for.",
+   "public": true,
+   "from": 8
+  },
+  "gani": {
+   "label": "protégé",
+   "text": "The stage manager gave her a headset and one rule: not projector four.",
+   "public": true,
+   "from": 6
+  },
+  "keoni": {
+   "label": "protégé",
+   "text": "The steward ran her porch a proper lead and labelled the fuse instead of reporting it.",
+   "public": true,
+   "from": 5
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "trial_dome",
+   "Afternoon": "commons_beach",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "pawn_shop",
+   "Afternoon": "trial_dome",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Debt-O-Trons that pay for themselves later: a fast, clanking board on borrowed resources that either wins before the damage fees land or falls apart spectacularly. She plays to see the machine run.",
+  "tilt": "A glitching holo-table. She stops playing and starts taking the side panel off."
+ }
+}

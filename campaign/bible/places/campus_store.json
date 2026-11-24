@@ -1,0 +1,18 @@
+{
+ "name": "The Campus Store",
+ "zone": "campus",
+ "bg": "campus_store",
+ "night": false,
+ "hours": "Morning to Evening, closed Sundays; run by a rota of bored student clerks. The mail window at the back is run by Cati Fagundes (Morning and Afternoon; on ferry mornings she is at the dock).",
+ "sight": "A bright shop under the arcade selling everything a student needs and nothing a collector wants: uniform shirts, sleeves by the thousand, plain deck boxes, notebooks, sunscreen, instant noodles, current-set boosters at list price. A glass counter holds dice and counters like sweets. A sign says NO SINGLES — TRY TOWN, and a rack of postcards shows the island without any students on it.",
+ "things": [
+  "Buy sleeves, a deck box, dice (basic supplies for table play)",
+  "Buy current boosters at list price (45 cr)",
+  "Buy study aids: flashcards, the annotated rulebook, Blum's problem book",
+  "Buy a postcard and write to Aunt Dee",
+  "Collect a parcel from the mail window at the back",
+  "Compare prices with what Tomi charges on the terraces",
+  "Pick up a replacement uniform piece — your major's jacket, your dorm's collar only"
+ ],
+ "secret": "Credit sink and the mail window: letters from Aunt Dee arrive roughly fortnightly and are a pacing tool (she is proud; she is not well off; once she sends 40 cr she cannot spare). Rowan needs sleeves and a playmat before his first physical match looks anything but amateur. Mail off the island is slow, and from Day 40 letters mentioning the incidents arrive at their destination with pages missing — the mail goes through the Chancellor's office. The collars sold here (jackets stay with the major) are how dorm changes become visible after Promotion Duels."
+}

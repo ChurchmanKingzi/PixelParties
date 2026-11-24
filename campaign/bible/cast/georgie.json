@@ -1,0 +1,235 @@
+{
+ "id": "georgie",
+ "name": "Georgie Santa",
+ "firstName": "Georgie",
+ "age": 14,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S1",
+ "romance": false,
+ "deck": "Hatchery (Drago: dragons and eggs)",
+ "look": "Small for fourteen, with black hair that stands up in a wild, tousled mane on top and falls in two long straight strands past her shoulders, a single violet ornamental feather pinned into it, dark red eyes, and a uniform one size too big, cuffs turned back twice. A worn green dragon plush hangs from her backpack by one wing. She watches her shoes when she walks and the whole table when she plays — and now and then, mostly over dragons, something small and fierce flashes up in her before she remembers to be shy again.",
+ "voice": "Away from a table: very quiet, hesitant, sentences that trail off, a child being careful not to be a nuisance. At a table the hesitation vanishes and she speaks in clipped, exact game language, with no idea that it is frightening. Polite always; she asks before sitting down. RARE habit (once in a scene at most; most scenes go without it): 'sorry' after winning.",
+ "lines": [
+  "Is this seat — I can sit somewhere else. It's fine.",
+  "In response, I hatch. That's your last Hero. ...Good game.",
+  "Her name's Ember. She's been to nationals twice. Please don't hold her by the wing.",
+  "You should have attacked on turn three. I had nothing. I was really scared you'd notice."
+ ],
+ "intro": "A fourteen-year-old prodigy with national titles, housed in Spectral: painfully shy everywhere except at a card table, where she is the strongest player of the year.",
+ "traits": [
+  {
+   "id": "georgie_1",
+   "text": "She won her first national junior title at eleven.",
+   "how": "Common knowledge; the placement board on Day 1."
+  },
+  {
+   "id": "georgie_2",
+   "text": "Her dragon plush is called Ember and sits on the table edge at every match.",
+   "how": "Play her or sit near her."
+  },
+  {
+   "id": "georgie_3",
+   "text": "She eats lunch in the library because the cafeteria is too loud.",
+   "how": "Be at the library at Midday."
+  },
+  {
+   "id": "georgie_4",
+   "text": "She does her ordinary school lessons by correspondence in the evenings and is behind in French.",
+   "how": "Find her at the library or Spectral lobby with a workbook."
+  },
+  {
+   "id": "georgie_5",
+   "text": "She is only merciless at cards because she does not know any other way to be good at something.",
+   "how": "Ask her, kindly, after a match."
+  },
+  {
+   "id": "georgie_6",
+   "text": "Her father is a long-haul ferry engineer in Gothenburg; she counts the days between his calls.",
+   "how": "She mentions it once she is a Friend; Pippa knows."
+  },
+  {
+   "id": "georgie_7",
+   "text": "She has never had a birthday party with people her own age.",
+   "how": "From Pippa or Jessica; her birthday falls in Term 1."
+  },
+  {
+   "id": "georgie_8",
+   "text": "She keeps every card anyone has ever given her in a separate box and never plays them, so they cannot be lost.",
+   "how": "Give her a card and see where it goes."
+  }
+ ],
+ "secret": "Georgie is a child and is written as one: she is fourteen, far from home, clever in one narrow blinding way and ordinary in every other. She is never flirted with, never sexualised, never put in revealing clothes, and the cast closes ranks around her (Pippa as self-appointed big sister, Jessica from the suite next door, who tries to brush her hair flat every morning and pins her feather straight, Lilia as distant protector, Hana as the teacher who was once this child, Ashton as an unexpectedly decent older-brother figure, Mama Odalys with biscuits). Her mother died when she was seven; her father, loving and mostly at sea, taught her the game over a ship's radio link and it became the language they share. She is merciless at the table because winning is how she earns his calls — nobody ever told her that; she worked it out, wrongly. Her wound is the belief that she is a card-playing machine people are kind to on account of the results. Her contradiction: she will dismantle a twenty-two-year-old without blinking and then cannot ask for the salt. Private joke: she rates the cafeteria puddings out of ten in Ember's voice.\nThe dark turn is hard on her. She is observant in the way prodigies are, and by Day 35 she has noticed from a single casual game that '{H:full} is playing like {H:he} can see my hand, but {H:he} isn't cheating — {H:he}'s just already there.' She tells Pippa, who thinks she is being modest. After Day 40 she has nightmares and stops going out after dark; the adults and older students arrange, without telling her, that she is never alone. The Guest finds her interesting ('small, and very clear'), plays her casually, sometimes LOSES to her, pays its small stakes at once and is quietly proud of her. She is never Hollowed: a school by-law bars students under sixteen from any ante, the Guest has read the by-laws and obeys them, and it would itself refuse — lawfully — if anyone tried to push her into an ante duel. The cast, and Rowan if he has earned her trust, still make sure she is never alone with it. Around Day 33 she may sign herself up for the Battle Team's reserve slot, with Pippa walking her to the arena. Her arc is small and important: she learns that people would keep her if she never won again, and in the finale she contributes the one thing she really has — she can read the Guest's lines and call them, for someone else to play.",
+ "wants": "To be good enough that her father is proud, and — she does not know this yet — to have friends who do not care if she is.",
+ "fears": "Losing, and finding out that losing was all it took for people to stop being kind.",
+ "crush": null,
+ "crushNote": null,
+ "crushPace": null,
+ "likes": [
+  "Being talked to normally, not as a celebrity or a baby",
+  "Help with French homework",
+  "Quiet places",
+  "People who are polite to Ember",
+  "Being asked to explain a line of play",
+  "Pudding",
+  "Dragons, facts about dragons, drawings of dragons"
+ ],
+ "dislikes": [
+  "Being teased about her age or size",
+  "Loud rooms and crowds",
+  "Being used as a mascot",
+  "Adults arguing",
+  "Being left to walk back alone after dark",
+  "Anyone handling Ember without asking"
+ ],
+ "gifts": [
+  "Card: Shimmering Dragonegg",
+  "A French-English pocket dictionary",
+  "A sewing kit to mend Ember's wing",
+  "Card: Dragsparov, the King of Dragons",
+  "A tin of Swedish ginger biscuits from the town cafe",
+  "Glow-in-the-dark star stickers"
+ ],
+ "events": [
+  {
+   "id": "georgie_e1",
+   "stage": 1,
+   "title": "Is this seat taken",
+   "condition": "Find her eating alone at library at Midday and sit with her without making a fuss; or lose to her in a duel and thank her for the game sincerely.",
+   "hint": [
+    "The youngest student eats where it is quiet. She would not mind one calm person.",
+    "Keep her company at lunch in the library, or play her and be a good loser."
+   ]
+  },
+  {
+   "id": "georgie_e2",
+   "stage": 2,
+   "title": "Ember's opinion",
+   "condition": "Help her with something that is not cards (French workbook at library, or walking her back to spectral_lobby before dark at least twice) and ask her to explain one of your lost games; she starts rating your plays in the plush's voice.",
+   "hint": [
+    "She is good at one thing and thinks that is all she is. Ask her for help, and give some.",
+    "Help her with schoolwork or walk her home, and let her teach you something."
+   ]
+  },
+  {
+   "id": "georgie_e3",
+   "stage": 3,
+   "title": "Calling the lines",
+   "condition": "After Day 40, be one of the people she tells about what she noticed in '{H}'s' play; believe her, and promise — and keep the promise — that she will never have to sit across from {H:him}.",
+   "hint": [
+    "She has seen something at a table that she cannot explain and is afraid nobody will believe a kid.",
+    "When she tells you what she noticed about a certain player, take her seriously and keep her safe."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "friends",
+   "text": "One of the few older students who talks to her like a person and plays her like an equal.",
+   "public": true,
+   "from": 0
+  },
+  "lilia": {
+   "label": "protégé",
+   "text": "The captain says hello to her by name. Georgie writes down the days it happens.",
+   "public": true,
+   "from": 12
+  },
+  "ashton": {
+   "label": "friends",
+   "text": "He is silly, and he is polite to Ember.",
+   "public": true,
+   "from": 4
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "Jessica, in the suite next door, tries to brush her hair flat every morning, pins her feather straight and checks her homework.",
+   "public": true,
+   "from": 2
+  },
+  "pippa": {
+   "label": "best friends",
+   "text": "Her self-appointed big sister, and the first friend she has had who is not an opponent.",
+   "public": true,
+   "from": 6
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "He is polite and it feels like being laughed at. She beat him in the placement duel and said sorry.",
+   "public": true,
+   "from": 1
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "The teacher who understands without being told.",
+   "public": true,
+   "from": 5
+  },
+  "victoria": {
+   "label": "friends",
+   "text": "Victoria never says anything she does not mean. Georgie finds that restful.",
+   "public": true,
+   "from": 8
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "He asked for a rematch nicely and told her exactly where she had been lucky. She was not lucky, but it was nice of him.",
+   "public": true,
+   "from": 3
+  },
+  "mikoto": {
+   "label": "friends",
+   "text": "He is scared all the time and still asks for a rematch. Ember likes him.",
+   "public": true,
+   "from": 6
+  },
+  "trixie": {
+   "label": "friends",
+   "text": "Trixie showed her a queen and said she could hold a drone because they don't sting. She did.",
+   "public": true,
+   "from": 9
+  },
+  "anni": {
+   "label": "friends",
+   "text": "Anni says good night properly and looks under the bed if asked.",
+   "public": true,
+   "from": 2
+  },
+  "thandi": {
+   "label": "protégé",
+   "text": "Miss Thandi keeps the green book. She asks whether Georgie has eaten and then checks. Georgie pretends to mind.",
+   "public": true,
+   "from": 1
+  },
+  "baraka": {
+   "label": "friends",
+   "text": "He showed her how to float and did not say 'for your age' once.",
+   "public": true,
+   "from": 3
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "library",
+   "Afternoon": "trial_dome",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_suite",
+   "Midday": "library",
+   "Afternoon": "card_shop",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 8,
+  "style": "Textbook-perfect Drago: eggs set early, hatched as Reactions in response to whatever you commit to, Rubin closing the game on the exact turn she announced to herself five turns ago. Calculates lethal faster than judges.",
+  "tilt": "Opponents who are unkind or shout — she does not play worse, she plays faster and apologises more, and is miserable afterwards. A truly unfamiliar card makes her stop and stare for a full minute."
+ }
+}

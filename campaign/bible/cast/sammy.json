@@ -1,0 +1,204 @@
+{
+ "id": "sammy",
+ "name": "Sammy Counts",
+ "firstName": "Sammy",
+ "age": 18,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B6",
+ "romance": false,
+ "deck": "Denied (counter control, Natas)",
+ "look": "Slight and pale, with a black-dyed fringe combed over one eye and a long black coat worn over the red jacket even in the midday heat, so that he is always faintly damp. A silver cuff sits on one ear. He has a brooding stare he has clearly practised, and it keeps slipping into an anxious, friendly look whenever someone actually meets it.",
+ "voice": "Soft-spoken and careful, aiming for low and ominous and usually arriving at polite. He prepares sentences in advance and delivers them slightly too slowly; when surprised he answers at normal speed in an ordinary, rather sweet Midlands voice and then winces. RARE habit (once in a scene at most; most scenes go without it): a rehearsed dark pronouncement, perhaps one line in five, which he often spoils by checking whether it landed.",
+ "lines": [
+  "Nobody really knows me. That's — I mean, that's deliberate. Did that sound deliberate?",
+  "Counter. And that one. Sorry, that one as well. You can still attack, I think.",
+  "I chose the coat before I knew about the weather here. I'm committed now.",
+  "Do people talk about me at breakfast? You don't have to say. A rough number would be fine."
+ ],
+ "intro": "A slight first-year in a long black coat who stands at the edge of every gathering looking mysterious, and looks relieved when anyone comes over.",
+ "traits": [
+  {
+   "id": "sammy_1",
+   "text": "He wears a long black coat over his uniform in all weathers and has never been seen to take it off outdoors.",
+   "how": "Visible at once; the bonfire mixer on Day 5."
+  },
+  {
+   "id": "sammy_2",
+   "text": "His deck does almost nothing except stop the other player from doing things.",
+   "how": "Play him."
+  },
+  {
+   "id": "sammy_3",
+   "text": "He has covered the mirror in his bungalow with a black cloth, and lifts it to practise an expression.",
+   "how": "Visit bungalow 6; Tobias does an impression."
+  },
+  {
+   "id": "sammy_4",
+   "text": "He keeps a small notebook of mysterious things to say, numbered.",
+   "how": "It falls out of the coat; or Dmitri has read it over his shoulder."
+  },
+  {
+   "id": "sammy_5",
+   "text": "He dyes his hair himself in the laundry sink, and the towels prove it.",
+   "how": "Bungalow 8 on a Sunday."
+  },
+  {
+   "id": "sammy_6",
+   "text": "He was the quiet middle child of five in Leicester, and nobody at his old school could have told you his surname.",
+   "how": "Ask where he is from, twice."
+  },
+  {
+   "id": "sammy_7",
+   "text": "He is frightened of the dark and sleeps with his phone screen on.",
+   "how": "Dmitri knows; or a Night visit to bungalow 6."
+  },
+  {
+   "id": "sammy_8",
+   "text": "He wants, more than anything, to walk into a room and have people be glad.",
+   "how": "Only at Trusted, with the coat off."
+  }
+ ],
+ "secret": "Samuel Counts is the third of five children of two Leicester primary-school teachers, a boy so easy to overlook that a teacher once marked him absent for a week he had attended. He is shy to the point of pain and has decided, with the logic of an eighteen-year-old who has read a lot of comics, that the way to become popular is to be the dark, unknowable one whom everybody wonders about. He chose the Academy as a clean start: nobody here knew the old Sammy. The coat, the fringe, the ear cuff and the numbered notebook ('17. Say nothing. Look at the horizon. Leave.') are a costume he is slightly too kind to wear properly — he holds doors, apologises to his opponents for countering their spells, and blushes when thanked. His deck is the truest thing about him: he has spent his life being told no, and Natas with a hand full of counters is the only way he has ever found of saying it back. Contradiction: the boy performing darkness is afraid of the actual dark. He worships Fiona Blackwood from a distance — he believes she is the real thing he is imitating — and takes social instruction from Ashton, who is amused and unexpectedly generous about it. Private joke: Dmitri, awake all night on the porch, has started numbering his own remarks back at him.\nHis arc is being liked for the ordinary Sammy, which happens to him by accident around midterms and frightens him badly. After Day 27 the thing {H=@near?on the steps of|in} bungalow 7 takes a mild interest: 'You pretend to be dark so that people will come nearer. I am dark, and they do not. Explain the difference.' Sammy has no answer and begins, quietly, to drop the act. The danger: a boy who wants so much to be noticed is exactly the kind who would name a foolish ante to be noticed by the strongest player on the ladder. Not in the default timeline; but if he is laughed at badly in Stage B or C and has nobody, the GM may let him try — and what it would take from him is 'the part of you they would have liked'.",
+ "wants": "To be someone people are glad to see.",
+ "fears": "Being exactly as forgettable here as he was at home.",
+ "crush": "fiona",
+ "crushNote": "He believes she is the real thing he is only pretending to be. It shows as worship from the edge of the firelight, a numbered list of things to say to her, and total silence whenever she actually looks at him.",
+ "crushPace": 0.6,
+ "likes": [
+  "Being greeted by name across a room",
+  "Someone remembering something he said",
+  "Being asked to join without having to ask",
+  "Compliments on the coat",
+  "A duel taken seriously",
+  "Honest advice about people",
+  "Being let off the act for an evening"
+ ],
+ "dislikes": [
+  "Being laughed at rather than with",
+  "Having the notebook read aloud",
+  "Being talked over",
+  "Heat, admitted to",
+  "Anyone mocking Fiona",
+  "Being called 'cute' while brooding"
+ ],
+ "gifts": [
+  "Card: Natas, the Master of Hell",
+  "A proper box of black hair dye from the boutique",
+  "Card: Anti Magic Enchantment",
+  "A battery lantern (give it without comment)",
+  "A light linen coat, black"
+ ],
+ "events": [
+  {
+   "id": "sammy_e1",
+   "stage": 1,
+   "title": "The edge of the firelight",
+   "condition": "At the Day 5 bonfire mixer (or any later evening at bonfire_pit) walk over to where he is standing alone and talk to him normally; let the act slip without remarking on it.",
+   "hint": [
+    "Someone at the edge of the gathering is waiting to be approached and pretending he is not.",
+    "Go and talk to the boy in the black coat at the bonfire, and be easy about it."
+   ]
+  },
+  {
+   "id": "sammy_e2",
+   "stage": 2,
+   "title": "Number seventeen",
+   "condition": "Play him a duel and enjoy it out loud, then invite him to something with other people (cafeteria table, a rehearsal at theatre, a town trip) at least twice; return the notebook unread if it comes your way.",
+   "hint": [
+    "He has a great many things prepared to say and nobody to say them to.",
+    "Include him in a couple of group outings and treat his deck as a real deck."
+   ]
+  },
+  {
+   "id": "sammy_e3",
+   "stage": 3,
+   "title": "Coat off",
+   "condition": "Around or after midterms (Days 47–49), be there when the act collapses in public (he laughs, or someone laughs at him) and stand next to him; later, on a Night at commons_beach, tell him what people actually say about him. After Day 27 this includes talking him out of any plan to impress a certain unbeaten player.",
+   "hint": [
+    "Sooner or later the costume is going to fall off in front of people. It matters who is standing there.",
+    "Stand by him when his image cracks, and tell him the truth about how people see him."
+   ]
+  }
+ ],
+ "bonds": {
+  "tobias": {
+   "label": "roommates",
+   "text": "Bungalow 6. Tobias terrifies him and has twice quietly dealt with people who laughed at the coat.",
+   "public": true,
+   "from": 1
+  },
+  "dmitri": {
+   "label": "roommates",
+   "text": "Bungalow 6. Dmitri is awake all night, which means the porch light is on, which Sammy has never thanked him for.",
+   "public": true,
+   "from": 1
+  },
+  "fiona": {
+   "label": "crush",
+   "text": "He thinks she is the real thing he is only pretending to be, and cannot speak when she looks at him.",
+   "public": true,
+   "from": 5
+  },
+  "ashton": {
+   "label": "protégé",
+   "text": "Takes instruction from him in how to enter a room. Ashton is the first popular person who has ever bothered.",
+   "public": true,
+   "from": 9
+  },
+  "marit": {
+   "label": "friends",
+   "text": "She cast him as the villain in her revue on sight. It is the first thing he has ever been picked for.",
+   "public": true,
+   "from": 10
+  },
+  "bex": {
+   "label": "friends",
+   "text": "She called him 'Count Sammy' on air and he has not decided whether it is the best or worst thing that has happened to him.",
+   "public": true,
+   "from": 12
+  },
+  "nathan": {
+   "label": "distrusts",
+   "text": "On the first day Nathan asked him, at full volume, why he was dressed like a wet umbrella.",
+   "public": true,
+   "from": 2
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "She has a photograph of the stare slipping and has promised never to show it.",
+   "public": true,
+   "from": 15
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "The giant next door mended the hem of the coat without being asked and never mentioned it.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "boutique",
+   "Afternoon": "theatre",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Natas behind a hand of counters: he lets almost nothing resolve and wins, slowly and apologetically, with whatever is left. Well drilled, never proactive.",
+  "tilt": "An audience warming to his opponent. He starts playing to look impressive and counters the wrong spell."
+ }
+}

@@ -1,0 +1,373 @@
+{
+ "name": "Expected Value",
+ "owner": "blum",
+ "heroes": [
+  "Willy, the Valiant Leprechaun",
+  "Codumbus, the Clueless Voyager",
+  "Zwei, the Lucky Thief"
+ ],
+ "main": [
+  [
+   4,
+   "Accidental Dodge"
+  ],
+  [
+   3,
+   "Amazing Finding"
+  ],
+  [
+   4,
+   "Buttap"
+  ],
+  [
+   1,
+   "Cloud Pillow"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Luck"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Scavenging Crane"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "The Oracle of Heaven"
+  ],
+  [
+   3,
+   "Thebinxan War Counselor"
+  ],
+  [
+   4,
+   "Time Tyrant"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Willy, the Valiant Leprechaun": "Hero",
+  "Codumbus, the Clueless Voyager": "Hero",
+  "Zwei, the Lucky Thief": "Hero",
+  "Accidental Dodge": "Attack (Reaction)",
+  "Amazing Finding": "Attack",
+  "Buttap": "Creature L1",
+  "Cloud Pillow": "Artifact",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Heavy Hit": "Attack",
+  "Luck": "Ability",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Quick Attack": "Attack",
+  "Scavenging Crane": "Creature L0",
+  "Smug Coin": "Artifact (Equipment)",
+  "Summoning Magic": "Ability",
+  "The Oracle of Heaven": "Creature L0",
+  "Thebinxan War Counselor": "Creature L2",
+  "Time Tyrant": "Creature L0",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Luck": "Ability: he names a card; whenever you play it before his next turn, he draws several cards.",
+  "Scavenging Crane": "On arrival he arranges the top five cards of his deck, then draws one. This is what makes the rest less of a gamble.",
+  "Buttap": "Reveals his top card each turn and hits a target for its level.",
+  "The Oracle of Heaven": "He names a card and reveals his top card; if he is right he keeps it and draws two more.",
+  "Time Tyrant": "Reveals his top card and draws cards equal to its level.",
+  "Thebinxan War Counselor": "You guess the type of his top card; a wrong guess hurts your whole side.",
+  "Haressassin": "Fragile creature with a hard shot each turn.",
+  "Accidental Dodge": "Reaction: cancels an attack or spell on a hero if its level is no higher than that hero's Luck.",
+  "Amazing Finding": "Flips cards off the top and keeps every artifact in a row.",
+  "Zwei, the Lucky Thief": "Each turn lifts an Ability off one of your heroes and adds it to one of his own.",
+  "Codumbus, the Clueless Voyager": "Turns single draws into a guessing game against you.",
+  "Willy, the Valiant Leprechaun": "Five cards or a pile of gold after his first turn.",
+  "Heavy Hit": "Attack that stuns.",
+  "Pocket Catapult": "A small free shot each turn."
+ },
+ "plan": "Dr. Blum plays the top of his deck. Buttap, the Oracle of Heaven, Time Tyrant and the Thebinxan Counselor all reveal the top card and pay out according to what it is, and Scavenging Crane arranges that top card beforehand, so the gambles are much less random than his rumpled manner suggests. Luck punishes whichever card you play most, Zwei walks off with your Abilities one per turn, and Accidental Dodge cancels cheap spells. The engine is four kinds of small creature; without them he is a man with a Pocket Catapult.",
+ "looks": {
+  "early": "A Scavenging Crane, a Buttap, a named card written on a scrap of paper.",
+  "mid": "Three or four revealers in a row, each paying out; one of your Abilities sitting on Zwei.",
+  "late": "A hand of ten cards, Luck stacked high, and Blum apologising as another of your spells is dodged."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "His board is a row of small revealers: a Crane, a Buttap, an Oracle.",
+   "why": "They are small and they are the entire engine; meanwhile Luck is drawing him cards for every copy of the Ability you keep attaching, so a long setup pays him."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "He has named one of your cards aloud and written it down.",
+   "why": "Luck only pays if you play the named card before his next turn: play around it for a turn and his best draw engine gives nothing, and what he does hold can be discarded by The White Eye."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Zwei has taken a Destruction Magic off your caster and is reaching for another.",
+   "why": "One Ability a turn undoes your levels faster than you can rebuild them; freeze or finish Zwei, the only hero who does it."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "His heroes have Luck stacked high, and Accidental Dodge cancels spells up to that level.",
+   "why": "What is aimed at a hero can be dodged; Storm ticks, potions and artifacts are not attacks or spells cast at him, so let those carry the damage and keep your own caster alive."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Blum summons a Scavenging Crane, tidies the top of his deck and then \"guesses\" it correctly with The Oracle of Heaven.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the little birds and oracles"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Zwei"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up, feeding his Luck"
+     }
+    ]
+   },
+   {
+    "board": "He names \"Destruction Magic\" and looks at you kindly.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Attach something else this turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Buttap"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach it anyway and let him draw"
+     }
+    ]
+   },
+   {
+    "board": "Thebinxan asks you to guess a top card he has just arranged himself.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Counselor"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Guess, take the hit, poke back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Ignore"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Buttap, Time Tyrant and an Oracle pay out every turn off a stacked deck.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Play around the named card and discard his hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build into his Luck"
+     }
+    ]
+   },
+   {
+    "board": "Accidental Dodge cancels a Cataclysm you cast at level zero.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Use level-three spells and artifacts"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Untargeted damage"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "A Haressassin joins the revealers.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before it fires"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Zwei lifts a Destruction Magic off your caster; Gathering Storm is suddenly out of reach.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Zwei, then kill him"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Zwei down"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and re-level"
+     }
+    ]
+   },
+   {
+    "board": "He holds ten cards and has named Leadership.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "No Leadership this turn; White Eye instead"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Play your hand as it is"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Leadership anyway"
+     }
+    ]
+   },
+   {
+    "board": "Codumbus makes you guess before each of his draws.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "He is wasting time: press"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the revealers"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play along"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Willy and Zwei, both with three Luck, dodge every cheap spell.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks and Acid Vial"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Level-three spells only"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild levels"
+     }
+    ]
+   },
+   {
+    "board": "His board is gone; he is drawing one card a turn like anyone else.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Smug Coin leaves Willy on a sliver.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "The next tick takes him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Hold Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle"
+     }
+    ]
+   }
+  ]
+ }
+}

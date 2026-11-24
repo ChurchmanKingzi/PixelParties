@@ -1,0 +1,235 @@
+{
+ "id": "tomi",
+ "name": "Tomás \"Tomi\" Reyes",
+ "firstName": "Tomi",
+ "age": 18,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B5",
+ "romance": false,
+ "deck": "Free Port (Smugglers: takes your gold)",
+ "look": "Small and quick, with a yellow bandana knotted over spiky black hair, a bulging canvas bag of binders at his hip and a pencil stub behind one ear. His red jacket, grey Commons collar, has extra pockets sewn inside it. He is never fully standing still and always knows where the exits are.",
+ "voice": "Fast, friendly patter, Manila by way of Queens, always moving toward a deal; he quotes prices to the credit and never quite says no. The patter stops dead when someone is being cheated, and what is left is quiet and level. RARE habit (once in a scene at most; most scenes go without it): 'Friend price' — which is the same as the price.",
+ "lines": [
+  "Wildcard! You need sleeves. Friend price. Everybody's a friend, the price is the price.",
+  "That's a nine-credit card. Dex'll give you six, Mika'll give you seven if she likes you, I'll give you eight and a favour.",
+  "Odds on your roommate finishing the semester without getting punched: I had it at three to one. I've had to shorten it.",
+  "Cheating's bad business. You only get to do it once."
+ ],
+ "intro": "The Commons' resident hustler: runs the unofficial trade binder and a betting pool from the steps of bungalow 5, and knows what everything is worth.",
+ "traits": [
+  {
+   "id": "tomi_1",
+   "text": "He runs the unofficial Commons trade binder and knows every price on the island.",
+   "how": "Day 1; he finds you."
+  },
+  {
+   "id": "tomi_2",
+   "text": "He takes bets on everything from the Freshman Cup to what Mama Odalys cooks on Friday.",
+   "how": "Ask about odds; or Nathan owes him."
+  },
+  {
+   "id": "tomi_3",
+   "text": "He never cheats a Commons kid and gives first-timers one free bad trade back.",
+   "how": "Make a bad trade with him."
+  },
+  {
+   "id": "tomi_4",
+   "text": "He learned to deal at his uncle's stall in a Queens flea market from the age of eight.",
+   "how": "Ask where he learned it."
+  },
+  {
+   "id": "tomi_5",
+   "text": "He keeps two ledgers: what he is owed, and what he owes, and settles the second one first.",
+   "how": "See the ledgers at the Commons kitchen table."
+  },
+  {
+   "id": "tomi_6",
+   "text": "He sends a money order to his grandmother every second Friday.",
+   "how": "Meet him at the harbor post counter."
+  },
+  {
+   "id": "tomi_7",
+   "text": "Somebody is taking a cut of his binder, and he will not say who.",
+   "how": "Notice a missing page; press him gently before Day 40."
+  },
+  {
+   "id": "tomi_8",
+   "text": "He is afraid of being small in a place where big people take things.",
+   "how": "Only at Trusted."
+  }
+ ],
+ "secret": "Tomi was raised mostly by his lola, Corazon, in Jackson Heights after his mother went back to Manila for work; he has been earning since he was eight and regards money as weather — you read it, you do not fight it. He is scrupulously honest inside his own code (never cheat your own, always pay debts, information is inventory) and entirely flexible outside it. The binder and the pool are the Commons' real economy and he knows it gives him a kind of power, which he uses mostly to see that the poorest kids get playable decks. Wound: at twelve he watched two men take his uncle's whole stall and do nothing because doing something gets you hurt. Brant Kessler takes a 'tax' from the binder — rares, weekly — and Tomi pays, hates himself, and has it priced in. Nathan's loud defence of him in week two mortified and moved him; he has not forgiven himself for letting Nathan take the heat. Contradiction: the island's best-informed person makes a point of not knowing why his roommate Viktor Hale comes home with mud to the knees — he sells the rumour that Hale is a treasure hunter, and privately does not believe it. Private joke: he prices people in 'favours' and Rowan's number keeps going up.\nAfter Day 27 he notices, as a bookmaker would, that '{H}' cannot lose: he closes the book on {H:him} by Day 31 and starts quietly logging every result — a ledger that later shows the exact curve of the Guest's improvement. He is also the conduit through which the Guest learns the word 'ante' in its everyday sense: it paid its debt to the pool on Day 27, to the credit, with interest nobody had asked for, and said 'What is owed is paid. Is that the rule?' Tomi said yes. He thinks about that a lot. After Brant is Hollowed Tomi feels sick relief and then guilt for the relief. He knows what is under the cloth in the pawn shop's covered cabinet (an old first-print Treasure Chest, pawned nine years ago with a ferry-ticket stub: 2,500 cr, or a wager), and from Day 61 Marrow's people try to buy first prints through him at a price that tells him exactly how valuable they are. DEFAULT TIMELINE: Tomi is the third Hollowed and the first of the Commons' own. He lent Nathan the torch on the night of the bang; he cannot leave the cards with no set symbol alone, because he cannot bear not knowing what a thing is worth; and around Day 65 he asks about them once too often and sits down to play for them. Livvie finds him on the morning of Day 66 in the student lounge when she comes to open up for her cleaning shift: binder open, loupe in hand, eyes open. Mama Odalys sets his place at breakfast anyway, and '{H}' lays a small stack of cards beside the plate: 'He asked about these. He may have them now. I lost nothing, but he asked.' Preventable if he has been talked out of taking bets on Charter Duels and out of pricing what should not be priced — or if a truce has been won from the Guest. His arc, if he is saved: from 'information is inventory' to giving it away because people need it.",
+ "wants": "To never again be the one things get taken from — and to get his lola a ground-floor flat.",
+ "fears": "Standing by while someone bigger takes what is his friends'.",
+ "crush": "mika",
+ "crushNote": "Their price war is the best conversation he has all week, and she is the only person who has ever out-haggled him. It shows as undercutting her by one credit, then bringing her snacks to apologise, and inventing errands to the shop.",
+ "crushPace": 0.8,
+ "likes": [
+  "A fair trade haggled properly",
+  "Tips, rumours, information of any kind",
+  "Debts paid on time",
+  "People who stick up for Commons kids",
+  "Being trusted with something valuable",
+  "Snacks",
+  "Being asked what something is 'really' worth"
+ ],
+ "dislikes": [
+  "Being called a crook",
+  "Welching on bets",
+  "Bullies and their 'taxes'",
+  "Spectral kids slumming for cheap cards",
+  "Questions about who takes his cut",
+  "Anyone cheating Livvie"
+ ],
+ "gifts": [
+  "Card: Smuggler's Pier",
+  "A hot rumour nobody else has yet",
+  "Card: Dirty Smuggler",
+  "A box of a hundred penny sleeves",
+  "Dried mango from the night market"
+ ],
+ "events": [
+  {
+   "id": "tomi_e1",
+   "stage": 1,
+   "title": "Friend price",
+   "condition": "Make a trade or place a bet with him in the first week and pay or collect without fuss; bring him one piece of real information.",
+   "hint": [
+    "He deals with everyone. He remembers who dealt straight.",
+    "Trade or bet with him honestly and bring him a useful rumour."
+   ]
+  },
+  {
+   "id": "tomi_e2",
+   "stage": 2,
+   "title": "The missing page",
+   "condition": "Before Day 40, find out who is taxing the binder and do something about it that does not get Tomi hurt (a Charter Duel with Brant for the pages at trial_dome, or getting Willas or Teobalt involved).",
+   "hint": [
+    "Pages keep disappearing from his binder. He has it 'priced in'. That is not the same as fine.",
+    "Discover who is squeezing him and stop it, cleverly."
+   ]
+  },
+  {
+   "id": "tomi_e3",
+   "stage": 3,
+   "title": "The second ledger",
+   "condition": "After Day 31, ask to see what he has been logging about {H=@near?your study partner|your roommate}'s results, and trade him the truth for it; he lets Rowan hold the card nobody is supposed to know he has.",
+   "hint": [
+    "He has stopped taking bets on one particular player. He wrote down why.",
+    "Ask him about the player he stopped taking bets on, and tell him what you know in exchange."
+   ]
+  }
+ ],
+ "bonds": {
+  "viktor": {
+   "label": "roommates",
+   "text": "Bungalow 5. His roommate's bed is made and never slept in, with a rope coiled on it; Tomi sells him batteries and makes a point of not asking about the mud.",
+   "public": true,
+   "from": 1
+  },
+  "livvie": {
+   "label": "teammates",
+   "text": "The only person he lets see both ledgers. He would flatten anyone who cheated her.",
+   "public": true,
+   "from": 4
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "Nathan stood up for him against Brant, loudly, and took the heat. Tomi has not forgiven himself.",
+   "public": true,
+   "from": 5
+  },
+  "dex": {
+   "label": "protégé",
+   "text": "Dex taught him to grade a card and to name a price once.",
+   "public": true,
+   "from": 6
+  },
+  "mika": {
+   "label": "friends",
+   "text": "A running price war that both of them enjoy.",
+   "public": true,
+   "from": 6
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "Brant takes a page from the binder every week. Tomi pays and hates himself.",
+   "public": false,
+   "from": 9
+  },
+  "bex": {
+   "label": "teammates",
+   "text": "Supplies the odds for her stream.",
+   "public": true,
+   "from": 12
+  },
+  "ed": {
+   "label": "roommates",
+   "text": "Bungalow 5. Tomi has opened a book on which limb Ed breaks first and feels bad about how short the odds are.",
+   "public": true,
+   "from": 1
+  },
+  "leona": {
+   "label": "friends",
+   "text": "Best customer on the row for rumours, and the only one he cannot price. Nobody saw her qualify.",
+   "public": true,
+   "from": 8
+  },
+  "maisie": {
+   "label": "teammates",
+   "text": "Anything with a wire in it goes to Maisie. She has never once padded a repair bill.",
+   "public": true,
+   "from": 5
+  },
+  "tobias": {
+   "label": "teammates",
+   "text": "Never asks where Tobias was. Never buys what he would not want traced. They understand each other.",
+   "public": true,
+   "from": 4
+  },
+  "imara": {
+   "label": "friends",
+   "text": "The treasurer is the only person on campus who can out-count him. He has offered her odds and she has offered him a receipt book.",
+   "public": true,
+   "from": 8
+  },
+  "cati": {
+   "label": "friends",
+   "text": "Knows who gets parcels and will only ever tell him about socks.",
+   "public": true,
+   "from": 3
+  },
+  "shirin": {
+   "label": "enemies",
+   "text": "The tutor desk wants a word about 'last year's papers'. He is unavailable.",
+   "public": true,
+   "from": 10
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "student_lounge",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "night_market",
+   "Midday": "card_shop",
+   "Afternoon": "pawn_shop",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Free Port: he takes your gold — thieving on every hero, mimics, pirates and smugglers emptying your purse each turn — and then buys with it. The long economic game; he always has one more card than you thought. Counts everything.",
+  "tilt": "Stakes he cannot afford. He is superb for pocket change and tight as a drum when real money or a friend's card is on the table."
+ },
+ "range": "Not every line is a price: he collects news, remembers who owes whom and whose birthday it is, talks about his lola and the food in Queens, loves long odds, quietly sees that the poorest decks on the row get fixed, and turns careful and still when someone bigger leans on him. 'Friend price' at most once a scene."
+}

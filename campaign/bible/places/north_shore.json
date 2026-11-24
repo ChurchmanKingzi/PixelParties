@@ -1,0 +1,21 @@
+{
+ "name": "The North Shore",
+ "zone": "wild",
+ "bg": "north_shore",
+ "night": false,
+ "hike": 3,
+ "hours": "The far side of the island: a long day there and back on foot, or two hours by boat in calm weather. Nobody goes.",
+ "sight": "A grey shingle beach under black cliffs, hammered by surf from an open ocean with nothing beyond it. Drift logs the size of buses are piled along the storm line; the ribs of a wooden trawler stick out of the stones like a picked carcass. Fog comes in without warning. The cliff face is banded with layers of small dark squares where the sea has cut into something built, and they tumble out one by one into the waves.",
+ "things": [
+  "Walk the shingle to the wreck and put your hand on a rib",
+  "Find the name board, grey and split, half buried",
+  "Look for the cave above the tide line with a smoke-blackened roof",
+  "Pick tiles out of the shingle, worn smooth as sea-glass",
+  "Read the cliff: built layers, cut by the sea",
+  "Watch the fog come in and take the horizon",
+  "Find the cairn with a tobacco tin in it",
+  "Look up the slope — the crater is an hour's climb above you"
+ ],
+ "secret": "WHERE CHUCK WAS WRECKED fifty years ago (canon): the ribs are the Agnieszka. The smoke-blackened cave was his shelter for eleven weeks; scratched tally marks (77) and drawings on the wall — the first sketches of heroes, done with a burnt stick. A fissure at the back, now choked with fallen rock, was his first way into the mountain. The cairn is Chuck's: every birthday he walks here (Silas takes him by boat now) and leaves a card in the tobacco tin for his drowned crewmates — the tin holds fifty years of cards, the bottom few of them Alpha (a last-resort source; taking them is grave-robbing and he will know). Tiles in the shingle are inert fragments. From D27 this is the back door to the crater, avoiding the cordon: an hour's climb. Marrow's grey launch lands equipment here from Day 62. On Day 180 Chuck is not at his own festival at dusk; he is here.",
+ "access": "Not forbidden before Day 29; afterwards counted as part of the closed north slope. By boat with saoirse or silas, or the long way on foot."
+}

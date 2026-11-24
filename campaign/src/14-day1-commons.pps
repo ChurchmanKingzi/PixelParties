@@ -1,0 +1,454 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · NACHMITTAG UND ABEND — Strand, Platzierungsduell, Abendessen, erste Nacht
+#  Kanon: calendar/events (placement_duel, welcome_supper), places/commons_*, cast/*.json
+#  Feste Zeiten: 13:30 Aufruf zum Platzierungsduell · 14:00 Dome · 18:00 Abendessen bei Mama
+# ═══════════════════════════════════════════════════════════════════
+
+@event placement_call scene=placement_call day=1 from=13:30
+@event supper_call scene=supper_call day=1 from=18:00
+
+@place commons_beach
+  travel 3
+  travelFrom commons_kitchen=1 commons_room=1
+  action boardwalk "Walk the boardwalk" scene=row_boardwalk when day=1
+  action hammock "Lie in a hammock" scene=row_hammock when day=1 and not rowan_hammock
+  action b2 "Knock on bungalow 2" scene=row_b2 when day=1 and not met:hedda
+  action b4 "Visit bungalow 4" scene=row_b4 when day=1 and not met:maisie
+  action b6 "Stop at bungalow 6" scene=row_b6 when day=1 and not met:dmitri
+
+@place commons_kitchen
+  travel 1
+  travelFrom commons_beach=1 commons_room=2
+  action lunch "Ask whether there is lunch" scene=row_lunch when day=1 and not had_lunch and time<14:00
+  action mama "Talk to Mama Odalys" scene=row_mama when day=1 and had_lunch and time<18:00
+
+@place commons_room
+  travel 1
+  travelFrom commons_beach=1 commons_kitchen=2
+  action unpack "Unpack your duffel" scene=room_unpack when day=1 and not unpacked_done
+  action goldfish "Goldfish an opening hand on the bed" scene=room_goldfish when day=1
+  action letter "Open Aunt Dee's letter" scene=room_letter when day=1 and unpacked_done and not read_letter
+
+# ───────────────────────────── FREIZEIT AM STRAND ─────────────────────────────
+
+@scene row_boardwalk
+  The boardwalk is a long, patched argument between planks. Some have been replaced, some have been painted over, one has a footprint in it that is plainly older than the school.
+  You walk its whole length, and learn the row the way you learn a coastline: by its details.
+  Bungalow 2 has a megaphone on its porch rail and a line of wet banners drying beside it, the letters running into each other: WHAT IS IN THE SAUSAGE. A bee hotel under its eaves is humming. A row of empty bottles stands along the step like trophies.
+  Bungalow 3 has bunny bunting over the door. Through the screen you glimpse a spreadsheet pinned inside a wardrobe and, in the far corner, a bed hidden behind a sheet someone has hung from the rafters like a wall.
+  Bungalow 4 has a workbench on the porch with an unauthorised soldering iron on it, and next to it, in the shade, a small black parasol and a candle that nobody lit.
+  Bungalow 5 has a hand-painted sign on its step: TRADES — ASK TOMI. Under it, a map of the island has been taped to the railing with every forbidden place circled in red.
+  Bungalow 6 has a thermos and a blanket and a long black coat, hung on a peg, over a pair of very worn hiking boots.
+  Bungalow 8, at the end, is the laundry. It smells of detergent, and of home.
+  ~ Eight little worlds in a row. I'm going to have to learn all of them.
+  @flag walked_boardwalk
+  @time 15
+
+@scene row_hammock
+  A hammock hangs between two palms on the beach side of the boardwalk, in the shade, with a very slight and inviting sag.
+  You lie in it. The rope creaks. The sun makes a lattice of light and shadow on your eyelids. Somewhere, a radio is playing a bolero. Somewhere else, a long way off, a crowd of strangers is laughing at something.
+  Nobody here knows who Best_Tarleinn_NA is. For twenty minutes, nobody here knows who you are at all, and it feels, unexpectedly, like a very large and generous present.
+  @flag rowan_hammock
+  @time 20
+
+@scene row_lunch
+  The kitchen is the biggest bungalow on the row, one open room and one long table under a tin roof, with walls hung with dented pans and strings of garlic and twelve years of group photographs. A blackened range roars in the corner. A radio plays boleros through static.
+  Mama Odalys is at the range with her sleeves rolled to the elbow, singing. She sees you in the doorway and the song stops mid-line.
+  [odalys] "You! Ven acá. You have not eaten."
+  [rowan] "I'm not — "
+  [odalys] "That was not a question. Sit."
+  A bowl appears on the bench in front of you, as if conjured: black beans, rice, fried plantain. It is the best thing you have eaten in a fortnight. It might be the best thing you have eaten in your life.
+  [odalys] "My rules. One, nobody eats alone. Two, nobody skips breakfast. Three, lights out means quiet. Four, if you are sad — "
+  [rowan] "You said. On the quad."
+  [odalys] "Good. You were listening. That is already more than your roommate."
+  [odalys] "And do not make that face about the Commons. Everybody starts somewhere. I have been feeding this somewhere for twelve years."
+  @flag had_lunch
+  @aff odalys +3 | Fed him
+  @time 25
+
+@scene row_mama
+  Mama Odalys is stirring a pot that could comfortably contain a person.
+  @choice
+    > Ask how long she has been here.
+      [odalys] "Twelve years with this stove. The left burner and I are not on speaking terms." She says it with great affection. "Before that, Miami. Before that, Havana, but I do not talk about that before supper."
+      @aff odalys +2 | Asked about her
+    > Offer to help with the cooking.
+      [odalys] "Wash these. And then peel those. And then I will tell you what I think of the way you hold a knife."
+      You wash, and peel, and are told, within two minutes, that you hold the knife like you are angry at the onion. She shows you how. It is a better way.
+      @aff odalys +3 | Helped in the kitchen
+      @time 20
+    > Ask who is on the row.
+      [odalys] "Eighteen. Six bungalows' worth. Every one of them mine." A heavy, fond pause. "Do not let the loud one tell you he is the most trouble. He is the most noise. It is different."
+      @aff odalys +1 | Chatted
+  @time 8
+
+@scene room_unpack
+  You unpack the duffel, slowly, on the thin mattress. It is a short job. There is not much in it.
+  A rain jacket, which you are wearing. A second pair of jeans. Three T-shirts, one of which says LAUNDRY KING in Aunt Dee's hand-painted iron-on letters. One good shirt, folded in tissue. A wire-bound notebook in which you have, over four years, kept a handwritten record of every deck you have faced on the ladder. The cracked phone, face-down, wrapped in a sock. And, at the bottom, tied with a ribbon, a small plastic tub of cinnamon sweets from Aunt Dee, which she must have slipped in when you were not looking.
+  You set the good shirt on a hanger. You set the notebook on the desk. You put the phone on the windowsill, where it picks up exactly one bar.
+  ~ That's everything I own. It fits in a duffel. It also fits in a window.
+  @flag unpacked_done
+  @time 15
+
+@scene room_goldfish
+  You lay Gather That Storm! out on the bed, card by card, in the old pattern: heroes at the top, abilities down the left, the Storm itself centred and facing you.
+  "Goldfishing," the forums call it: playing a deck against nobody, to see if it works. You shuffle sixty cards, deal a seven, and play the hand out against an invisible opponent, turn by turn, all by yourself.
+  It is a comfort. It is the only table in the world where your hands do not shake.
+  Two hours later, a row of cards across the blanket, the phone unlocked, the sea hushing, you realise that it has become the sort of afternoon in which the future is a single, very large, very friendly turn that has not happened yet.
+  @flag goldfished
+  @time 25
+
+@scene room_letter
+  The letter is in a pale blue envelope, soft with folding. Aunt Dee's handwriting, which slopes uphill as if embarrassed by the paper.
+  *Rowan,*
+  *If you are reading this, you are there, and I am very proud, and I have told every customer in the laundromat, including the ones who only came in to use the change machine.*
+  *Don't be scared of the real table. A card on a table is the same card it is on a screen. It is the people who are different. They are scarier and better, and you have the second kind of courage already, you just haven't met the first.*
+  *Call me when you land. Or text, if the signal is bad. Eat something green.*
+  *The dryers are broken again. I am handling it.*
+  *Love, Dee.*
+  *P.S. I put sweets in the bottom of the bag. Don't tell your Uncle Marcus. He thinks they're for him.*
+  You read it twice. The second time, you have to stop partway and look at the ceiling fan for a moment.
+  @flag read_letter
+  @time 10
+
+# ───────────────────────────── BEGEGNUNGEN AUF DER REIHE ─────────────────────────────
+# Nachbarn kann man schon VOR dem Abendessen treffen — oder erst dort.
+
+@scene row_b2
+  The porch of bungalow 2 is a small war zone. Banners. A megaphone on the rail. A pot of lavender. A ceramic bowl of water for gulls. A tall girl with an ice-blonde braid is lying flat on her back across two chairs with a book on her face. A tiny green-haired girl with flowers in her hair is painting a banner in great red letters. And a honey-blonde girl in yellow-striped socks is talking to a bee on the end of her finger.
+  [hedda?] "You! Are you for the sausage or against the sausage?"
+  [rowan] "I — what sausage?"
+  [hedda?] "THE sausage. The one in the stew they're going to serve tonight. Do you know what is in a sausage? Do you? I've brought a leaflet."
+  She has indeed brought a leaflet. It is four pages long.
+  @meet hedda
+  [freya?] "Hedda." The book does not move. "Let the boy sit down first."
+  [freya?] "Freya Nordlicht." The book lifts a quarter of an inch. A pale blue eye regards you. "Good. A face. I like it. We'll talk tonight — I'm wicked by ten."
+  @meet freya
+  [trixie?] "Hello! Sorry, I'm Trixie. This is Belinda. She's on my finger. Don't swat." A gap-toothed grin. "Hold still, there's a lady on your collar. There! Off she goes."
+  @meet trixie
+  @choice
+    > Take the leaflet and read it. @hint Fair hearing
+      You read all four pages. You disagree with one point, honestly, and agree with another.
+      [hedda] "You read it." Almost suspicious. "All of it?"
+      [rowan] "Page two I'm not sure about. The figure for the ratio."
+      [hedda] "That's — okay, that's a fair point. I'll check the source." A beat, as if she did not expect to say it. "…Thanks."
+      @aff hedda +4 | Read the leaflet
+      @flag hedda_leaflet_read
+    > Decline politely. "Maybe after dinner."
+      [hedda] "After dinner. Fine. I'll hold my fire."
+      @aff hedda +1 | Polite
+    > Joke about the sausage. @hint Risky
+      The megaphone comes up. You are very glad it is not switched on.
+      [hedda] "Jokes about veganism! The OLDEST evasion in the book!"
+      [freya] "Hedda. He is nineteen and he is new."
+      @aff hedda -2 | Joked about veganism
+  @add ferry_talked +1
+  @time 15
+
+@scene row_b4
+  A trestle workbench on the porch of bungalow 4 is covered in the entrails of a projector. A girl in oil-stained overalls and welding goggles is leaning over it, tongue between her teeth, with a soldering iron in one fist.
+  [maisie?] "It's meant to hum. It's not meant to hum like THAT. Stand a bit further back, love."
+  @meet maisie
+  [maisie] "Maisie Voltage. Table tech. Don't touch the hot end — it's the other end."
+  Next to her, in the deep shade of the porch, a girl in black lace with a candle and a parasol sits very straight, reading a leather-bound book.
+  [fiona?] "You've a pleasant face." Low, slow, each syllable placed like a candle. "It will make a lovely skull, eventually. That was a compliment."
+  @meet fiona
+  [rowan] "…Thank you?"
+  [fiona] "Fiona Blackwood." And then, a split second too fast, a little too light and clear and high: "I mean — pleased to meet you!" A beat. Her face clenches. She lowers her voice again. "…Pleased to meet you."
+  ~ Was that her real voice? It sounded like a different person.
+  @flag fiona_slip
+  A third girl is sitting on the step, so ordinary that for a second you take her for part of the porch. Medium everything: mousy-brown hair parted in the middle, grey-blue eyes, a canvas satchel on her knee.
+  [leona?] "Hello." An even, mild voice. "I'm Leona."
+  @meet leona
+  [leona] "I got in the same way everyone did. There was a form."
+  @choice
+    > Ask Maisie about the hologram. @hint Tech
+      [maisie] "Oh! Oh, you're a person who asks." She comes alive. "Every hologram on this island is a lantern slide with ambitions. I want one you can shake hands with."
+      @aff maisie +3 | Asked about her work
+    > Ask Fiona about the coffin pin. @hint Aesthetic
+      [fiona] "A gift. From my mother." A very small, very private pause. "She owns a funeral home. It is a family business." A beat. "I know. It's too good."
+      @aff fiona +3 | Asked about the pin
+      @flag fiona_funeral_home
+    > Sit with Leona. @hint Quiet
+      [leona] "Thank you." A small pause. "People rarely do. It isn't a talent. It's a face."
+      @aff leona +3 | Sat with her
+  @add ferry_talked +1
+  @time 15
+
+@scene row_b6
+  On the porch of bungalow 6 a boy in a long black coat is standing at the edge of the shade, brooding at the horizon with the stiffness of someone who has practised it in a mirror. A broad boy with a broken nose is sitting on the step with a grey hoodie under his red jacket and his hands in his pockets. A hollow-eyed boy in a grey beanie is lying in a hammock under a blanket, one eye open.
+  [sammy?] "I am — " Low, slow, ominous. He catches your eye. His voice jumps up an octave into something ordinary and sweet and Midlands: "Oh. Hello. Sorry. I was — never mind." He clears his throat and drops it again. "Sammy Counts."
+  @meet sammy
+  [tobias?] "Tobias." He does not take his hands out of his pockets. He gives you a once-over so smooth you would not know it was a once-over. "Nice jacket. It's new. Standard issue. Thought so."
+  @meet tobias
+  [dmitri?] "…Dmitri." Slow, dry, one word at a time as if each cost something. "Morning is a rumour. It is afternoon. I am keeping my strength."
+  @meet dmitri
+  @choice
+    > Ask Sammy about the coat. @hint Kind
+      [sammy] "I chose it before I knew about the weather here. I'm committed now." A very small, genuine smile, which he immediately tries to hide. "Did that sound deliberate?"
+      @aff sammy +3 | Asked about the coat
+    > Ask Tobias where he is from. @hint Plain
+      [tobias] "Salford." A dry beat. "It's near Manchester. Nobody's heard of it."
+      [rowan] "I've heard of Manchester."
+      [tobias] "Good. That's the first right answer today."
+      @aff tobias +3 | Plain question
+    > Ask Dmitri why he's in the hammock. @hint Curious
+      [dmitri] "Because I am not in the bed." A slow, dry smile. "You will find that the night is more interesting. Come and see, if you like. Bring tea."
+      @aff dmitri +3 | Curious
+  @add ferry_talked +1
+  @time 15
+
+# ───────────────────────────── PLATZIERUNGSDUELL ─────────────────────────────
+
+@scene placement_call
+  A boy in a yellow bandana is hammering up the boardwalk at a dead run.
+  [tomi] "WILDCARD! Placement! Placement duels! They're calling the Commons, it's half one, you're drawn for Dome two, they're doing it in alphabetical order, you're V!"
+  [tomi] "Come ON. I've got ten credits on you not throwing up."
+  ~ I haven't thought about it all day. Not once. Which is exactly why it's here.
+  @goto trial_dome 12
+  @scene placement_duel
+
+@scene placement_duel bg=trial_dome
+  Four small white domes stand in a row like half-buried golf balls, each with a brass number over the door. You are Dome 2.
+  Inside, a single holo-table on a round dais under a lattice of projectors. A judge's chair. A score clock. Two rows of benches, filling with people. The acoustics are odd: a whisper at the table reaches the back wall.
+  The benches fill. Forty strangers. They are, in their way, the first people who have ever looked at your hands.
+  A young woman in a pencil skirt, with a sleek black bob, red-framed glasses and a slim black brace on her right wrist stands at the judge's chair. A small, neat girl with black braids stands behind a table at the side with a stamp the size of her fist and the expression of someone who has never once misfiled anything.
+  [hana] "Mr Vance. I am Ms Kirishima, Rules and Judging. This is a placement duel. It is not an examination. It is a measurement. Please be precise with your terminology and do not narrate your emotions."
+  [hana] "Your opponent."
+  A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Brown curly hair dragged into a high ponytail. Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention.
+  [hana] "Rana Marika. Repeating year. Please be seated."
+  @if met:rana
+    She glances at you. A very flat flicker of recognition goes across her face, followed by an even flatter one of dread.
+    [rana] "…You." Under her breath. "Of course it's you."
+  @else
+    [rana?] "Whatever."
+  A tall man in a black turtleneck has appeared in the doorway, hands in his pockets. Silver temples, a sharp goatee, a world-finalist's ring on his right hand that he is turning slowly with his thumb. He does not enter. He does not speak. He is, you understand, watching you.
+  Beside the door, a compact woman with cropped dark hair and a whistle round her neck is looking at your hands. She has a stopwatch in her fist. She does not click it.
+  ~ Professor Santángel. And the coach. They're watching. Of course they're watching.
+  Your hands begin to shake.
+  You put them on the table. They shake on the table. You put them in your lap. They shake in your lap. The tremor is small, fine, ugly, and entirely your own.
+  @choice
+    > Hide them under the table and breathe. @hint Hide it
+      You lock your fingers in your lap and breathe in for four counts, out for four. It does not work. It does, however, mean nobody can see it.
+      [hana] "Mr Vance, hands where the table may see them. It is a rule."
+      @flag nerve_hid
+    > Admit it. "My hands shake. It'll pass."
+      [hana] "Noted." Not unkindly. She looks at you for a moment longer than the rule requires. "Stating a problem aloud is the first step in resolving it. Please proceed."
+      A quiet murmur goes through the benches. It is not a mocking one.
+      @flag nerve_admitted
+      @aff hana +2 | Honest about nerves
+      @aff rox +2 | Honest about nerves
+    > Look only at the cards.
+      You look at the cards. Not the benches. Not the doorway. The cards are the same cards they have always been. You pick up the deck and your hands, very slowly, begin to do what you have asked them to do.
+      @flag nerve_cards
+  [hana] "Begin."
+  @duel placement_rana deck=rana name="Rana Marika"
+    @win
+      Rana looks at the board for a very long time. It is, you realise, not a defeat. It is an autopsy.
+      [rana] "…You held it." Flat, furious, fast. "You held the Locust for three turns. I didn't — you could have just — whatever."
+      She stands. She does not shake your hand. She does not look at you. At the door she turns, very quickly, and says to nobody:
+      [rana] "It was good. Don't say anything."
+      @set ladder=124
+      @flag placement_won
+      @aff rana +2 | Respected the game
+    @lose
+      The last Hero goes down. The table settles. Your hands are, you notice, still shaking, and it is entirely possible they have been shaking the whole time.
+      [rana] "…Good game." Flat, careful, a reflex. She does not look pleased. She looks, for a moment, like a person who has been given something she does not want to hold. "Whatever."
+      @set ladder=132
+      @flag placement_lost
+      @aff rana +1 | Won without gloating
+  The tall man in the doorway gives you one slow, level look. He turns, once, the ring flashing on his thumb, and walks out. Four minutes, by the score clock. Nobody has said a word.
+  [hana] "Result recorded. Ranking is a measurement, not a verdict, Mr Vance. Zeynep."
+  The girl with the stamp stamps something with a brisk, authoritative thud, and hands you a card.
+  [zeynep?] "Ladder placement. Season one. Congratulations, you exist."
+  @meet zeynep
+  @if placement_won
+    The card reads: RANK 124 OF 144.
+  @else
+    The card reads: RANK 132 OF 144.
+  ~ A hundred and twenty-something. I was top ten in North America a month ago.
+  ~ And I am, for the first time in my life, in a room where that number does not mean what I thought it meant.
+  @meet hana
+  @meet rox
+  The woman with the stopwatch has not moved. She looks at you for a long moment, at your hands, at your shoulders, and then at the rest of you. She says nothing. She makes a very small mark on a clipboard.
+  @flag placement_done
+  @time 90
+
+# ───────────────────────────── ABENDESSEN ─────────────────────────────
+
+@scene supper_call
+  The first sign is the smell. It comes up the beach on the breeze from the end of the row: cumin, garlic, frying plantain, something slow and dark with beans in it. It is warm and loud and unmistakably addressed to you.
+  Then a bell rings, once, with the particular, brassy authority of a woman who has been ringing it for twelve years. The whole boardwalk answers in a murmur of doors.
+  [odalys] "SUPPER!"
+  @goto commons_kitchen 2
+  @scene welcome_supper
+
+@scene welcome_supper bg=commons_kitchen
+  Bungalow one, which is Mama's kitchen, is one long table, one blackened range, and eighteen strangers arriving in clumps.
+  The table is a single slab of dark wood under a tin roof, worn smooth by twelve years of elbows. The benches on both sides have been squeezed together. Dented pans hang from the walls. Twelve years of group photographs look down from the rafters. A radio on the sill plays boleros through static.
+  Mama Odalys is carrying a pot that ought to need two people. She sets it down in the centre of the table, in a cloud of steam, with a clang like the end of a bell.
+  [odalys] "Sit! Sit! Eighteen of you, one bench each, no corners!"
+  Everyone sits. It takes four minutes, three arguments and one mild fire at the end of the table.
+  [odalys] "Names! I want every one of you to say your bungalow, your name and one true thing. Left of me. Go!"
+  [freya] "Freya Nordlicht. Two. Where I come from the sun goes away for three months. You learn to make your own entertainment."
+  [hedda] "Hedda Njord, bungalow two. Nothing in this stew was killed for it. I checked. The answer is 'mostly'."
+  [trixie] "Beatrix! Trixie! Hollis! Two! Bees don't fib!"
+  [inya] "Inya Bell. Three. A rabbit can turn ninety degrees at full speed. Name one of your storm clouds that can do that."
+  [livvie] "Olivia Thana. Livvie. Three. I've eaten. I had a big breakfast." Everyone looks at her. "Yesterday counts."
+  [rana] "Rana. Three." Silence. "That's all you get."
+  [maisie] "Maisie Voltage! Four! It's meant to hum like that, I swear."
+  [fiona] "Fiona Blackwood. Four." Low, slow, a candle placed on every syllable. "Things that are thrown away come back."
+  [leona] "Leona Helical. Four. I got in the same way everyone did. There was a form."
+  [ed] "ED VENTURE! Five! Lazy V Ranch, Wyoming! Is any of this dangerous?"
+  [tomi] "Tomás Reyes. Tomi. Five. Friend price. Everybody's a friend, the price is the price."
+  [sammy] "Sammy Counts. Six." Low, slow, ominous. "Nobody really knows me. That's — I mean, that's deliberate." A beat. "Did that sound deliberate?"
+  [tobias] "Tobias Crowe. Six. Salford." And that, evidently, is all.
+  [dmitri] "Dmitri Volkov. Six. Morning is a rumour. I have never seen evidence."
+  [nathan] "NATHAN WHISPER! SEVEN! WAR COUNSELORS! I SNORE!"
+  [baylee] "Baylee Halvorsen. Seven." A long pause. "…Yup."
+  @meet freya hedda trixie inya livvie rana maisie fiona leona ed tomi sammy tobias dmitri
+  [odalys] "And last, as in the list, the Wildcard. Stand up, mijo. Everybody is looking at you anyway."
+  @choice
+    > "Rowan Vance. Seven. I'm — happy to be here."
+      A polite, warm murmur. Nathan, loudly: "HE'S HAPPY! He said so! Write it down!"
+      @aff nathan +1 | Introduced himself
+    > "Rowan. I fold sheets. Aunt Dee's laundromat."
+      A ripple of laughter, entirely kind. Mama Odalys's spoon bangs the pan once in approval.
+      [odalys] "A man who folds sheets knows how to look after a household. Good."
+      @aff odalys +2 | Honest about home
+      @flag told_row_laundromat
+    > "Best_Tarleinn_NA."
+      For a moment, nothing. And then a whole row of faces tilts.
+      [tomi] "Wait. Wait. Hold on." A pencil appears from behind his ear, as if from nowhere. "The ladder guy. Number five. The NA Tarleinn guy."
+      [rana] "…The Storm deck." Flat. Sharp. Something in her face has shifted very slightly. "That was you."
+      [nathan] "WHAT. WHAT. WHAT!"
+      [inya] "Ranked. Five. I've watched your replays." A very slight, very suspicious narrowing. "You better not be a fraud."
+      @aff tomi +2 | The ladder guy
+      @aff rana +2 | Knew the deck
+      @aff inya +1 | Knew the name
+      @flag row_knows_handle
+  @meet odalys
+  @choice Where do you sit?
+    > Between Nathan and Baylee. @hint Your roommates
+      You take the gap between your roommates. Nathan has already made it, with an elbow.
+      [nathan] "ROWAN! Sit, sit! You're on my right! Baylee's on my left! We're a unit!"
+      [baylee] "…Pass the rice."
+      [nathan] "I'm passing the rice! I'm passing it LOUDLY!"
+      @aff nathan +2 | Sat with him
+      @aff baylee +2 | Sat with him
+      @flag supper_with_roommates
+    > At the end by the mint-green hair. @hint Inya
+      A small girl with long mint-green hair in two tails is sitting cross-legged on a bench, an oversized hoodie round her like a tent. She sees you coming. Her eyes narrow.
+      [inya] "Don't sit here to be nice."
+      [rowan] "I'm sitting here because there's a seat."
+      [inya] "…Fine." A beat. "That's better."
+      Next to her, a pale girl with an ash-blonde bob is eating very fast and very neatly, as if each forkful is a transaction. She looks at your plate, looks at hers, and with a very slight movement pushes the last piece of plantain towards you.
+      [livvie] "Quick thing. You can have that. I've had enough."
+      She has not had enough. Nobody has ever, in the history of the world, had enough on that face.
+      @aff inya +2 | Sat with her
+      @aff livvie +2 | Shared a plate
+      @flag supper_with_inya
+    > At the far end, by the scowl. @hint Rana
+      Rana is at the far end of the long table with her back to the wall and a gap on either side of her that nobody has quite dared fill. She does not look up as you sit down.
+      [rana] "…Why."
+      [rowan] "There's a seat."
+      [rana] "There's a hundred seats."
+      [rowan] "Eighteen. I counted."
+      A very long pause. And then, very slightly, something moves in the corner of her mouth. It is not a smile. It is its cousin.
+      [rana] "…Pass the salt."
+      @aff rana +3 | Sat by her
+      @flag supper_with_rana
+    > At the quiet end. @hint Dmitri, Sammy, Tobias
+      The far corner of the bench is occupied by the three boys from bungalow 6. Sammy, in his coat, is sitting very upright. Tobias, in his hoodie, is eating like someone who counts meals. Dmitri is wrapped in a blanket and entirely, perfectly awake.
+      [dmitri] "The only man at supper with the sun in his eyes. Hello."
+      [tobias] "Shove up, Sam."
+      [sammy] "Counts. It's — fine. Sorry." He shuffles, and the coat catches the stew, and nobody says anything about it.
+      @aff dmitri +2 | Sat with him
+      @aff tobias +1 | Sat with him
+      @aff sammy +2 | Sat with him
+      @flag supper_quiet_end
+  The whole row, bungalow by bungalow, in the steam.
+  At the head of the table, in an upright chair with a high back that is quite clearly hers and nobody else's, Mama Odalys is ladling stew with the grave dispatch of a quartermaster.
+  Down the left side: Freya, very upright, very cool, hair in a pale braid, saying nothing to anyone with great elegance. Next to her Hedda, who is inspecting the stew with a fork and the narrowed eyes of an investigator. Next to her Trixie, who has something alive in a matchbox and is whispering to it. "Don't tell Mama," she tells you. "It's only a beetle."
+  Further down, from bungalow 4: Maisie is taking the pepper mill apart. Fiona, in black lace, is saying grace in a very deep voice. Leona, ordinary, pleasant, forgettable, has chosen the seat nearest the door.
+  From bungalow 5: Ed is leaning back on two legs of his chair asking Mama which part of the island is forbidden. Tomi is already trading something under the table, quietly, with a boy you do not recognise. Viktor Hale is not here.
+  From bungalow 6: Sammy, silent at people. Tobias, eating like someone who counts meals. Dmitri, wide awake when everyone else is fading.
+  ~ Eighteen people. Eighteen names. I'm going to be here for two hundred days.
+  [odalys] "House rules!" The spoon hits a pan. The whole table goes silent. "Nobody eats alone! Nobody skips breakfast! Lights out means quiet! And if you are sad, you tell somebody!"
+  [odalys] "If you cannot tell somebody, tell me! If you cannot tell me — "
+  The whole table, in ragged unison, from the people who have apparently been told this already: "TELL THE SPOON."
+  [odalys] "Good! Eat!"
+  @if not met:viktor
+    The door bangs open.
+    A lean, tanned boy in a red jacket worn like something borrowed, with orange-lensed goggles pushed up into spiky blond hair and mud to both knees, has arrived late. He carries a coil of rope and a brass compass.
+    [viktor?] "Sorry. I was — there's a path past the waterfall. I was exploring. It isn't on the map." A long pause. "Mm."
+    [odalys] "SIT. Wash your hands. You smell of mountain."
+    @meet viktor
+  Ed asks Mama which part of the island is forbidden, and is told, very kindly and very firmly, that she will not be answering that. He seems delighted. He makes a note.
+  [nathan] "So I snore." He says it to the entire table, at his own volume. "I'm telling you all now. So you know. My mom says it's like living next to a chainsaw, but a friendly chainsaw."
+  [baylee] "He does."
+  [rowan] "Noted."
+  [nathan] "HA! 'Noted'! You hear that? He said 'noted'! Very formal! I like him!"
+  A very long, very loud, very good evening follows, in which nothing remotely important happens. Hedda finishes the stew, glares at the empty bowl and says, quietly, "Fine. FINE. The rice is good." Freya laughs for the first time since you sat down, a low warm sound, and says "To the ferry captain's hat." Nobody quite knows why. Everyone drinks. Livvie eats three helpings and does not look at anyone. Mama Odalys, noticing, slides a fourth in front of her without comment.
+  By the time the last plate is dry the stars have come out over the cove and the radio has gone to a slow song that Mama hums, quietly, over the sink.
+  @flag supper_done
+  @time 120
+  @scene first_night
+
+@scene first_night bg=commons_room
+  @goto commons_room 2
+  The row at night is a string of yellow windows. The surf breathes. The geckos chirp under the eaves. Every board of the boardwalk gives a different note under your feet.
+  Back in bungalow 7, the ceiling fan ticks on every fourth turn. Three beds. Three footlockers. One bare bulb that is, at last, switched off.
+  In the dark, a voice from the bed by the door says, quite quietly for him:
+  [nathan] "Rowan. You awake?"
+  [rowan] "…Yeah."
+  [nathan] "Can I ask you something?"
+  [rowan] "Sure."
+  A long, comfortable pause, full of surf.
+  [nathan] "Were you scared? Today? When the little domes thing happened. I was in the back. I couldn't tell."
+  You look at the ceiling. The fan ticks. From the other bed, the very large, very gentle shape of Baylee has gone entirely still, which means, you have already learned, that he is listening.
+  @choice
+    > Tell the truth. "My hands shook the whole time."
+      [nathan] "…Huh." A pause. "I would've said they didn't. I was watching. Honest."
+      [baylee] "Yup. Didn't see it."
+      [nathan] "The thing is, I'm scared all the time. Of everything. I just do it louder."
+      ~ I did not expect that. I did not expect a lot of things today.
+      @aff nathan +3 | Told him the truth
+      @aff baylee +2 | Told them both the truth
+      @flag told_roommates_nerves
+    > Deflect. "It was fine."
+      [nathan] "Cool! Yeah! Cool! I'd have thrown up."
+      [baylee] "He would."
+      [nathan] "I WOULD."
+      @aff nathan +1 | Cheerful night talk
+    > "Were you?"
+      [nathan] "Me? NO." A pause. "…A bit. Nobody here's from anywhere near where I'm from. Everyone's got like, a whole deck of people. I've got my mom and a hamster."
+      [baylee] "I've got a lot of cows."
+      [nathan] "BAYLEE'S GOT COWS!"
+      [baylee] "I've got cows."
+      @aff nathan +2 | Asked him back
+      @aff baylee +2 | Joined in
+  A very long, very comfortable silence follows. The surf hushes. Somewhere on the boardwalk, a gecko chirps twice, as if checking the room.
+  [nathan] "'Night, Wildcard."
+  [baylee] "Night."
+  [rowan] "…Night."
+  Within three minutes, the bed by the door begins to snore.
+  It is a tremendous snore. It is the snore of a chainsaw, a friendly chainsaw, at a very great distance, in a room designed for the purpose. You lie awake and listen to it for a very long time, and discover, somewhere around the fortieth minute, that you are smiling at the ceiling.
+  ~ Day one. I'm still here. I didn't throw up.
+  ~ Tomorrow I'll find out what the colours mean.
+  @flag day1_complete
+  @time 60
+
+@scene sleep
+  @fx fadeout 700
+  You sleep. Somewhere on the island a bell rings. Somewhere on the row, a chainsaw, friendly, goes on.
+  @if day1_complete
+    @wake 07:00
+    @goto commons_room 0
+    @fx fadein 700
+    @gameover END OF THE CURRENT BUILD. Day 1 is complete; Day 2 (Orientation Day) is not written yet. Your save is kept.
+  @else
+    @wake 07:00
+    @goto commons_room 0
+    @fx fadein 700
+    Morning on Caldera Key. Day 2 has not been written yet. You are free to wander the row, but there is nothing waiting for you.

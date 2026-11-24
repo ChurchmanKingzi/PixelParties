@@ -1,0 +1,92 @@
+{
+ "id": "rowan",
+ "name": "Rowan Vance",
+ "firstName": "Rowan",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B7",
+ "romance": false,
+ "deck": "Gather That Storm!",
+ "look": "Lean, a little underfed-looking, dark hair that never quite dries flat, grey-green eyes that watch hands instead of faces. His red Competitive Play jacket, with the plain grey collar of the Commons, is second-hand and one size long in the sleeve; his phone has a crack running corner to corner across the screen.",
+ "voice": "The player writes every word Rowan says. The game master only ever describes what others notice about him: he is dry, he observes before he speaks, and his hands give him away at a table.",
+ "lines": [],
+ "intro": "The Wildcard kid: got in through the online qualifier two weeks after admissions closed, known on the ladder as Best_Tarleinn_NA.",
+ "traits": [
+  {
+   "id": "rowan_1",
+   "text": "Raised by his aunt Dee above her laundromat in a rainy Washington port town.",
+   "how": "Known from the start; the player may bring it up."
+  },
+  {
+   "id": "rowan_2",
+   "text": "Learned the game on a cracked phone between folding shifts.",
+   "how": "Known from the start."
+  },
+  {
+   "id": "rowan_3",
+   "text": "Top ten of his age bracket in North America online, and has never once played on a physical table in front of people.",
+   "how": "Known from the start."
+  }
+ ],
+ "secret": "GM notes only. Rowan's mother left when he was six; nobody says where. Aunt Dee (Deirdre Vance, 51, smoker's laugh, bad knees) never made him feel like a burden, which is exactly why he feels like one. He sends part of his stipend home in an envelope she pretends not to need. He hides poverty by being early (no one sees the walk), by 'not being hungry', by knowing prices. The stage fright is physical: cold fingers, a shuffle that fans cards onto the floor, a voice that goes up half a tone. It eases with every public duel he survives (Nerve). Dee phones on Sundays from the laundromat's back office; the dryers are always audible. Other characters may ask about any of this; none of them know it unless he tells them. Never put words in his mouth.",
+ "wants": "To find out whether he is as good with real cards and real eyes on him as he is behind a screen.",
+ "fears": "Being sent home to the laundromat having proved he only ever belonged on a phone.",
+ "crush": null,
+ "crushNote": null,
+ "crushPace": null,
+ "likes": [],
+ "dislikes": [],
+ "gifts": [],
+ "events": [],
+ "bonds": {
+  "nathan": {
+   "label": "roommates",
+   "text": "Bungalow 7: the loud one in the bed by the door.{H=nathan? From Day 27, see Nathan's guest notes.|}",
+   "public": true,
+   "from": 1
+  },
+  "baylee": {
+   "label": "roommates",
+   "text": "Bungalow 7: the giant in the reinforced cot who is up before dawn.",
+   "public": true,
+   "from": 1
+  },
+  "rex": {
+   "label": "rivals",
+   "text": "Met four times on the online ladder; Rowan took nine points off 'rexlightning' in March. Never met in person before Day 68.",
+   "public": false,
+   "from": 0
+  },
+  "magnus": {
+   "label": "strangers",
+   "text": "Prospero_GG, the handle that was always one rank below. Rowan never gave him a thought until the dock on Day 1.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_kitchen",
+   "Midday": "main_street",
+   "Afternoon": "beach_cove",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Patient storm combo: stalls with cheap removal and potions, counts Gathering Storm turns, ends the game in one weather front. Reads opponents far better than his rank suggests.",
+  "tilt": "A crowd. Being watched makes his hands shake and his sequencing sloppy; a single spectator he trusts steadies him."
+ }
+}

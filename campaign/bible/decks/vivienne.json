@@ -1,0 +1,379 @@
+{
+ "name": "Encore",
+ "owner": "vivienne",
+ "heroes": [
+  "Cute Starlet Megu",
+  "Lilly, the Charming Infiltrator",
+  "Gabby, the Boarding Broad"
+ ],
+ "main": [
+  [
+   2,
+   "Cannon Tower"
+  ],
+  [
+   8,
+   "Charme"
+  ],
+  [
+   2,
+   "Fans in High Positions"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Golden Apple"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Live Show"
+  ],
+  [
+   4,
+   "Love Shot"
+  ],
+  [
+   3,
+   "Lovely Teddy"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Mine! Mine! Mine!"
+  ],
+  [
+   3,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Rosie, the School Idol"
+  ],
+  [
+   3,
+   "Secret Entrance"
+  ],
+  [
+   3,
+   "Singing"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Cute Starlet Megu": "Hero",
+  "Lilly, the Charming Infiltrator": "Hero",
+  "Gabby, the Boarding Broad": "Hero",
+  "Cannon Tower": "Creature L3",
+  "Charme": "Ability",
+  "Fans in High Positions": "Attack (Reaction)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Haressassin": "Creature L2",
+  "Heavy Hit": "Attack",
+  "Live Show": "Spell (Magic Arts)",
+  "Love Shot": "Spell (Magic Arts)",
+  "Lovely Teddy": "Creature L1",
+  "Magic Arts": "Ability",
+  "Mine! Mine! Mine!": "Attack",
+  "Quick Attack": "Attack",
+  "Rosie, the School Idol": "Creature L1",
+  "Secret Entrance": "Spell (Magic Arts)",
+  "Singing": "Ability",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Charme": "Ability. Level one: uses one of YOUR heroes' Abilities as her own each turn. Level two: you hand her a card from your hand each turn. Level three: she takes control of one of your heroes for her turn.",
+  "Love Shot": "Any Charme hero can cast it: she draws from YOUR deck, then makes one of your heroes perform an attack or spell from her hand.",
+  "Live Show": "Looks at your hand and swaps cards with you as she pleases.",
+  "Secret Entrance": "Takes random cards from your hand.",
+  "Mine! Mine! Mine!": "Takes an equipped artifact off one of your heroes.",
+  "Lilly, the Charming Infiltrator": "Draws a card every time she takes a card from your deck or hand.",
+  "Cute Starlet Megu": "Her Singing can make her own creatures use their effects a second time.",
+  "Gabby, the Boarding Broad": "Draws a card whenever she takes a real hit; steals gold.",
+  "Fans in High Positions": "A hero with Charme at level three stands back up at full health when defeated.",
+  "Golden Apple": "Buys control of one of your heroes for a turn.",
+  "Rosie, the School Idol": "Free with enough Charme; lets its hero cast spells above its level.",
+  "Lovely Teddy": "Uses the effects of your creatures.",
+  "Haressassin": "A hard shot each turn, twice with Megu.",
+  "Cannon Tower": "Sturdy creature with a strong shot.",
+  "Heavy Hit": "Attack that stuns, sometimes performed by your own hero."
+ },
+ "plan": "Vivienne performs with your cards. Charme lets her borrow your Abilities at level one, take a card from your hand every turn at level two and take over one of your heroes for her whole turn at level three; Love Shot makes your own hero attack you, Mine! lifts your equipment, Live Show rearranges your hand, and Lilly draws on every theft. Her own contribution is a Haressassin that Megu fires twice. The better your hand and board, the better her deck; against a player with nothing worth taking it is thin. Her heroes are ordinary until Fans in High Positions is online.",
+ "looks": {
+  "early": "Charme stacked two high on Megu and Lilly, a Haressassin, a card of yours already in her hand.",
+  "mid": "Your White Eye on her hero, your own spells cast back at you, Lilly drawing with every theft.",
+  "late": "A Charme-three hero borrowing your Storm caster every turn and blowing kisses to the back row."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "She is stacking Charme and has no board beyond one small creature.",
+   "why": "Her deck does little by itself in the first turns; everything you build (levels, equipment, a full hand) is what she will be using in the middle of the duel, so the patient plan arms her."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Megu has Charme at level two and Vivienne holds a third copy.",
+   "why": "Level three means she takes one of your heroes every turn; Fire Bomb removes a copy from the stack and keeps her at level two, which is the best use that potion will ever have here."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "One of her heroes has Charme three and borrows your Storm caster each turn; she has not shown Fans in High Positions yet.",
+   "why": "The hero doing the borrowing must go down, and if Fans in High Positions brings it back at full health it must go down again; nothing you set up in the meantime stays yours."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "Your hand is nearly empty and so is hers; her own cards are a Haressassin and Heavy Hits.",
+   "why": "With nothing left for her to take, her deck is a few plain attackers: answer the one shot that matters each turn and let the Storm finish."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Ms. Laurent attaches Charme and borrows your Leadership for her own hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Megu before the stack grows"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep your hand small and poke"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build levels she will borrow"
+     }
+    ]
+   },
+   {
+    "board": "Love Shot: she draws from your deck and your own Tarleinn casts her Heavy Hit at Nicolas.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Hit Lilly, who draws on every theft"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun away"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Live Show: she studies your hand and trades you two blanks for your Gathering Storm.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Empty your hand of anything worth taking"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it back out of hers"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Megu while she is busy with your hand"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Charme two on Megu, a third copy in her fingers.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Charme stack"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Megu"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Haressassin"
+     }
+    ]
+   },
+   {
+    "board": "Mine! Mine! Mine! takes The White Eye off your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb it on her hero: it returns to your hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn the thief"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play on without it"
+     }
+    ]
+   },
+   {
+    "board": "Megu sings and the Haressassin fires twice.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Haressassin"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and hit Megu"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Gabby reaches Charme three and takes your Storm caster for her turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Gabby"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang her borrowed turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more for her to use"
+     }
+    ]
+   },
+   {
+    "board": "Gabby falls and Fans in High Positions stands her back up at full health.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Again; it only happens while she has the card"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb her Charme first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Regroup"
+     }
+    ]
+   },
+   {
+    "board": "A Golden Apple takes a second hero of yours for the turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle for what they do to you"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Nothing to disrupt this turn"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Both hands are empty. She has a Haressassin and Megu.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Haressassin, tick Megu down"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Megu"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Look for something to take from her"
+     }
+    ]
+   },
+   {
+    "board": "Lilly alone, Charme one, borrowing your Alchemy each turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Megu for a last song.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the double shot"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Lilly"
+     }
+    ]
+   }
+  ]
+ }
+}

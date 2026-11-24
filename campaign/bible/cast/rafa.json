@@ -1,0 +1,210 @@
+{
+ "id": "rafa",
+ "name": "Rafael \"Rafa\" Okonjo",
+ "firstName": "Rafa",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R103",
+ "romance": false,
+ "deck": "Secret Recipe (Spices)",
+ "look": "Round-faced and broad-shouldered, with warm brown skin, short neat twists and a chef's bandana knotted over them, and a red jacket, blue collar, that smells of frying onions. He is always chewing something — a clove, a stalk of lemongrass, a toothpick. His hands are big, quick and scarred with small burns, and he looks at people the way a cook looks into a pot.",
+ "voice": "Warm, easy and unhurried, Houston by way of Lagos, with a habit of answering feelings rather than words. He talks about food as other people talk about weather and health — as the real news. Teases gently; never raises his voice; goes firm and brief only when someone is not eating. RARE habit (once in a scene at most; most scenes go without it): 'You eaten?' as a greeting.",
+ "lines": [
+  "Sit. I didn't ask if you were hungry, I asked you to sit.",
+  "Too much pepper and you can't taste the pot. Same with my deck, same with most people.",
+  "Mama let me touch the big spoon today. I'm not going to make a thing of it. I am absolutely making a thing of it.",
+  "That face means bad news from home. Okay. Plantain first, then you tell me."
+ ],
+ "intro": "A round-faced first-year from Rare Hall in a chef's bandana who walks down to the Commons kitchen to work shifts nobody asked him to, and feeds anyone who looks unhappy.",
+ "traits": [
+  {
+   "id": "rafa_1",
+   "text": "He cooks for anyone who looks sad, and has an unsettling knack for knowing who that is.",
+   "how": "Look sad."
+  },
+  {
+   "id": "rafa_2",
+   "text": "He lives in Rare Hall but works shifts in the Commons kitchen by choice.",
+   "how": "Commons kitchen, most Mornings."
+  },
+  {
+   "id": "rafa_3",
+   "text": "There is a forbidden hotplate and forty spice jars in his room.",
+   "how": "Rare Hall room 103; follow the smell."
+  },
+  {
+   "id": "rafa_4",
+   "text": "He is always chewing something, and can tell you what it does for the digestion.",
+   "how": "Ask."
+  },
+  {
+   "id": "rafa_5",
+   "text": "His deck is built on secret spices, and he says a good game and a good stew fail in the same ways.",
+   "how": "Play him."
+  },
+  {
+   "id": "rafa_6",
+   "text": "He was born in Lagos and raised over his aunt's restaurant in Houston.",
+   "how": "Ask where the jollof comes from."
+  },
+  {
+   "id": "rafa_7",
+   "text": "His parents believe he is here to become a professional player; he has one year to prove something he does not want.",
+   "how": "Friend stage."
+  },
+  {
+   "id": "rafa_8",
+   "text": "The Commons cook could not say his name for the first two weeks, and he does not know why.",
+   "how": "Ask Willas or Baylee; not her."
+  },
+  {
+   "id": "rafa_9",
+   "text": "He keeps a notebook of what each person on the row actually eats.",
+   "how": "Trusted; Livvie has her own page."
+  }
+ ],
+ "secret": "Rafael Okonjo was born in Lagos and grew up in Houston above Aunty Bisi's Kitchen, where he learned to cook standing on a crate. His father, a petroleum engineer, and his mother, a pharmacist, regard cooking as what one does until one has a profession; when Rafa turned out to be good at a card game with scholarships attached, they struck a bargain — one year at the Academy to become 'someone', and if not, an engineering degree. He agreed, because he could not think how to say that he already is someone and it is a cook. He is a decent Spice player; he uses the deck as he uses everything, to think about food. Wound: being told that the thing he loves is a hobby. Contradiction: he feeds everybody else's sorrow and has never once said aloud what he wants. He does not sit well in Rare Hall, whose ambition he finds thin; within a week he had walked down to the row, asked Mama Odalys for an apron, and been handed a peeler.\nWhat he does not know: Mama Odalys had a son, Rafael — Rafa — who lived for a card game she did not understand and played a Spice deck, and who died at nineteen on a highway coming home from a tournament. On Day 4 a nineteen-year-old called Rafa walked into her kitchen with a Spice deck in his pocket and asked to help. She gave him the peeler without a word, did not use his name for a fortnight ('you, m'ijo, the tall one'), and has been teaching him everything she knows ever since, at a pitch of fierceness he takes for ordinary. Willas and Baylee have worked it out and have agreed, wordlessly, to say nothing. When he finds out — a photograph by the stove; the deck she plays twice a year — the question of his whole year changes shape. It is the best small story on the row and the GM should let it come slowly.\nHe is useful to half the cast: he cooks gluten-free for Livvie without making it a kindness, sends pots up to the infirmary, feeds Wren, and answered Hedda Njord's four-page denunciation of his jollof by cooking her a pot with no animal in it. She said it was 'acceptable'. He has been trying to make her say something better ever since, and has not understood why it matters so much to him.\nAfter Day 27 he is one of the first to know something is wrong, by the only measure he trusts. '{H}' ate eleven of his empanadas — his, made under Mama's eye — and thanked him, and said 'I understand them now.' Nobody says that about food. Then nothing for days; then everything. 'He's not hungry, he's studying.' After the Hollowings he cooks for ward B though none of them eats, because someone ought to. He is in little danger himself: he has no quarrel with anyone, and it has not occurred to the thing that anybody would stake a recipe.",
+ "wants": "A kitchen of his own, and the nerve to tell his father so.",
+ "fears": "Going home an engineer — and, without knowing why, losing his place at Mama's stove.",
+ "crush": "hedda",
+ "crushNote": "She called his jollof a crime and then, tasting the version he made for her, said 'acceptable' — and he has been trying to do better ever since. It shows as a separate, increasingly ambitious pot, and him reading her leaflets all the way through.",
+ "crushPace": 0.7,
+ "likes": [
+  "A clean plate",
+  "Being asked for the recipe",
+  "Help with prep, done properly",
+  "People who say what is actually wrong",
+  "Market mornings, ripe fruit, new spices",
+  "Being asked what HE would like to eat",
+  "Anyone who gets Livvie or Wren to the table"
+ ],
+ "dislikes": [
+  "Skipped meals",
+  "Food wasted",
+  "'It's just cooking'",
+  "People who eat without tasting",
+  "His father's weekly call",
+  "Being rushed at the stove"
+ ],
+ "gifts": [
+  "Card: Secret Red Spice",
+  "A good paring knife from the campus store",
+  "Card: Spice Mortar",
+  "Fresh chillies from the night market",
+  "A recipe from your own home, written out"
+ ],
+ "events": [
+  {
+   "id": "rafa_e1",
+   "stage": 1,
+   "title": "Sit",
+   "condition": "Let him feed you on a bad day and tell him honestly what was wrong; come back to commons_kitchen and do an hour of prep beside him.",
+   "hint": [
+    "If you look unhappy, a plate is going to appear. Whoever brings it will want to know why.",
+    "Accept a meal from the boy in the bandana and tell him what is really the matter."
+   ]
+  },
+  {
+   "id": "rafa_e2",
+   "stage": 2,
+   "title": "The big spoon",
+   "condition": "Work several kitchen shifts alongside him; ask what he would cook if nobody were grading him; hear about the bargain with his father.",
+   "hint": [
+    "He is at the wrong school for the right reasons, and has told nobody.",
+    "Work in the kitchen with him and ask what he actually wants to do with his life."
+   ]
+  },
+  {
+   "id": "rafa_e3",
+   "stage": 3,
+   "title": "I understand them now",
+   "condition": "After Day 27, compare what you have each seen of a certain neighbour's eating; and when he learns why Mama Odalys could not say his name, be there, and help the two of them say it. He cooks you his aunt's dish.",
+   "hint": [
+    "He has noticed something at the table that is not about food. And there is something about this kitchen nobody has told him.",
+    "Talk to him about what he has noticed at mealtimes, and be with him when he learns the cook's secret."
+   ]
+  }
+ ],
+ "bonds": {
+  "cas": {
+   "label": "roommates",
+   "text": "Cas describes his cooking aloud as it happens. Rafa has started plating for the commentary.",
+   "public": true,
+   "from": 1
+  },
+  "hedda": {
+   "label": "crush",
+   "text": "Loudest critic he has ever had. He reads her leaflets to the end and keeps trying to earn a better word than 'acceptable'.",
+   "public": true,
+   "from": 6
+  },
+  "odalys": {
+   "label": "protégé",
+   "text": "Mama gave him a peeler on Day 4 and has been teaching him everything since, at a pitch of fierceness he takes for ordinary.",
+   "public": true,
+   "from": 4
+  },
+  "livvie": {
+   "label": "friends",
+   "text": "He cooks for her in the separate pan and calls it testing a recipe.",
+   "public": true,
+   "from": 7
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "Half past four in Mama's kitchen: Baylee lifts, Rafa chops, nobody talks.",
+   "public": true,
+   "from": 5
+  },
+  "camille": {
+   "label": "friends",
+   "text": "He carries pots up to the infirmary and cooks for the ward even when none of them eats.",
+   "public": true,
+   "from": 24
+  },
+  "willas": {
+   "label": "rivals",
+   "text": "Tann claims to make the best rice in the Commons. He is wrong, and it is settled every Sunday.",
+   "public": true,
+   "from": 12
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "Best eater on the row: finishes everything, says what was wrong with it.",
+   "public": true,
+   "from": 5
+  },
+  "wren": {
+   "label": "friends",
+   "text": "He leaves a covered bowl in the design lab every evening and collects the empty one in the morning.",
+   "public": true,
+   "from": 20
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "commons_kitchen",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "fish_market",
+   "Midday": "commons_kitchen",
+   "Afternoon": "night_market",
+   "Evening": "bonfire_pit",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Spices: seasons his own board a pinch at a time until one creature is suddenly far too hot to handle. Plays a patient, tasting sort of game and talks about dinner throughout.",
+  "tilt": "Something left on the stove. He will concede to save a sauce."
+ },
+ "range": "'You eaten?' is a greeting, once a day at most. Otherwise: Houston and Lagos, market prices, what Mama is teaching him, his own middling duel results, Rare Hall gossip, his roommate Cas, what his parents expect of him; he asks people about the food they grew up with instead of pushing his own."
+}

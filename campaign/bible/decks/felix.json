@@ -1,0 +1,385 @@
+{
+ "name": "Dream Journal",
+ "owner": "felix",
+ "heroes": [
+  "Beato, the Butterfly Witch",
+  "Hulijing, the Foxdemon",
+  "Nomu, Wanderer of Worlds"
+ ],
+ "main": [
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Clausss, the No-Nonsense Cultist"
+  ],
+  [
+   3,
+   "Cool Rescuer Monia"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Dream Dust"
+  ],
+  [
+   4,
+   "Dream World Portal"
+  ],
+  [
+   3,
+   "Dream World Switcheroo"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   2,
+   "Healing Melody"
+  ],
+  [
+   2,
+   "Icy Grave"
+  ],
+  [
+   3,
+   "Klaus, the Cult Leader"
+  ],
+  [
+   4,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Poisoned Well"
+  ],
+  [
+   3,
+   "Rafflesia, the Poison Princess"
+  ],
+  [
+   4,
+   "Smug Mastermind Antonia"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   2,
+   "Training"
+  ],
+  [
+   4,
+   "Wolflesia, the Canine Flower"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Beato, the Butterfly Witch": "Hero",
+  "Hulijing, the Foxdemon": "Hero",
+  "Nomu, Wanderer of Worlds": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Clausss, the No-Nonsense Cultist": "Creature L0",
+  "Cool Rescuer Monia": "Hero",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Dream Dust": "Spell (Magic Arts, Reaction)",
+  "Dream World Portal": "Spell (Magic Arts)",
+  "Dream World Switcheroo": "Spell (Magic Arts, Reaction)",
+  "Golden Ankh": "Artifact",
+  "Heal": "Spell (Support Magic)",
+  "Healing Melody": "Spell (Support Magic)",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Klaus, the Cult Leader": "Hero",
+  "Magic Arts": "Ability",
+  "Poisoned Well": "Spell (Decay Magic)",
+  "Rafflesia, the Poison Princess": "Hero",
+  "Smug Mastermind Antonia": "Creature L0",
+  "Summoning Magic": "Ability",
+  "Thicket": "Artifact",
+  "Training": "Ability",
+  "Wolflesia, the Canine Flower": "Creature L0"
+ },
+ "gist": {
+  "Smug Mastermind Antonia": "Small creature that can tuck a Cool Rescuer Monia hero card under itself; then it is sturdy, and twice a turn, when one of his creatures takes damage, he may discard a card to throw any non-hero card on the board away.",
+  "Clausss, the No-Nonsense Cultist": "Tucks a Klaus hero card under itself; then it is sturdy and can sacrifice an older creature for a second action each turn.",
+  "Wolflesia, the Canine Flower": "Tucks a Rafflesia hero card under itself; then it is sturdy and casts a Decay or Support spell for free each turn.",
+  "Dream World Portal": "Attaches the right hero from hand or deck to a Dream creature at once, as a free action.",
+  "Dream Dust": "Reaction: cancels a card or effect that chooses one of his hero-carrying creatures.",
+  "Dream World Switcheroo": "Reaction: an attack or spell aimed at one of his heroes hits a hero-carrying creature instead.",
+  "Cool Rescuer Monia": "A hero card played in the deck, only as Antonia's passenger.",
+  "Klaus, the Cult Leader": "A hero card in the deck, Clausss's passenger.",
+  "Rafflesia, the Poison Princess": "A hero card in the deck, Wolflesia's passenger.",
+  "Beato, the Butterfly Witch": "Can use any level-one spell or creature; very low health.",
+  "Hulijing, the Foxdemon": "Can become a creature from deck or hand for a turn.",
+  "Nomu, Wanderer of Worlds": "Extra draws and no hand limit.",
+  "Poisoned Well": "Poisons your whole side; usually cast by Wolflesia.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Healing Melody": "Heals his whole side.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures."
+ },
+ "plan": "Felix draws people as creatures. His Dream Landers are weak until the matching hero card is slipped underneath them; then each is a sturdy body with that hero's power turned up: Antonia throws your cards off the board whenever his creatures are damaged, Clausss takes two actions a turn, Wolflesia casts poison or healing for free. Portals assemble them quickly, Dream Dust and Switcheroo steer your removal and your spells into the wrong targets. The assembled creatures are the deck; his actual heroes are frail, and each Dream Lander spends one full turn on the board as a small, harmless creature before its hero can be attached without a Portal.",
+ "looks": {
+  "early": "Small odd creatures with nothing under them yet; a Portal in his hand.",
+  "mid": "Antonia and Wolflesia each sitting on a hero card, sturdy now; your cards leaving the board whenever you damage his side.",
+  "late": "Three finished Dream Landers, poison on all your heroes, Felix sketching between turns."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "His Dream Landers are on the board with no hero cards under them yet.",
+   "why": "A Dream Lander without its passenger is a small, ordinary creature for a full turn; kill them now and the hero cards in his deck have nowhere to go."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Antonia sits on a Monia card, and he discards a card every time one of his creatures takes damage.",
+   "why": "Sweeps and Storm ticks on his creatures now cost YOU a card on the board each time; take Antonia out with one clean removal, leading with a decoy for Dream Dust, or go around her entirely."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "His real heroes stand behind the Dream Landers with little health; he has used his Switcheroos.",
+   "why": "The duel is won on heroes, and Beato in particular is as fragile as they come; the Dream Landers are too sturdy and too well protected to be worth more cards."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Wolflesia casts a free spell every turn and all your heroes are poisoned.",
+   "why": "He is slow to finish but the poison and freezes add up: cure what would kill with Tea and Tarleinn's healing and spend the rest on his last hero."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Felix summons Antonia and Wolflesia; both are bare, with no hero card beneath them.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill them before they are dressed"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the Portal out of his hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Dream World Portal tucks a Rafflesia card under Wolflesia at once.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet Wolflesia while he has no Dream Dust open"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the others that are still bare"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Beato"
+     }
+    ]
+   },
+   {
+    "board": "Hulijing turns into a creature for a turn; Nomu draws two extra.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the bare Dream Landers"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Beato"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Antonia sits on Monia. Your Storm tick hits his creatures and he discards a card to throw your Storm away.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Decoy first, then Dark Gear Antonia"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Aim only at heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Keep sweeping and keep losing cards"
+     }
+    ]
+   },
+   {
+    "board": "Dream Dust cancels your removal on Antonia.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "The second removal gets through"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Forget her, burn Hulijing"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and pay for it"
+     }
+    ]
+   },
+   {
+    "board": "Clausss sacrifices a Town Guard and he takes two actions this turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Clausss"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shields for the double turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Beato and Nomu are low; three sturdy Dream Landers stand in front.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Untargeted damage past them"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze Wolflesia, hit Beato"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Grind the Dream Landers"
+     }
+    ]
+   },
+   {
+    "board": "Switcheroo sends your spell from Beato into Antonia, and you lose a card for damaging her.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and the Storm cannot be redirected"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Acid Vial on Beato"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hit Antonia again"
+     }
+    ]
+   },
+   {
+    "board": "Wolflesia casts Poisoned Well for free; your whole side is poisoned.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea your worst poison onto Nomu"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race, the poison is slow"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal everyone"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Hulijing alone behind Wolflesia; your heroes are poisoned and one is frozen.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea, heal, then one spell a turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the poison"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Healing Melody from Wolflesia undoes a turn of your damage.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Out-damage it with the doubled Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet Wolflesia now that the Dust is gone"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea and a shield this turn, one spell at Hulijing"
+     }
+    ]
+   },
+   {
+    "board": "One hero each.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill a Dream Lander for no reason"
+     }
+    ]
+   }
+  ]
+ }
+}

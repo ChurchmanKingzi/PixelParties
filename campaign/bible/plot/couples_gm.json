@@ -1,0 +1,28 @@
+{
+ "principle": "People on this island fall for each other without consulting Rowan. Every character except Georgie has one person they may slowly grow close to if the player is not there first. Show it as it would really be seen by a classmate: sideways, in passing, a little at a time. The player should be able to miss it for weeks and then realise it has been in front of him the whole time.",
+ "pacing": [
+  "Stage 0 (strangers): nothing. Before a bond exists they do not know each other; almost everyone met on the ferry or on arrival day.",
+  "Stage 1 (noticing; after about two weeks): one small sign per week at most — a saved seat, a name said once too often, someone who is suddenly bad at their own deck when one particular person is on the rail.",
+  "Stage 2 (orbit; after four to six weeks): they turn up in the same places; one waits for the other after class; a borrowed thing is not returned; friends exchange a look.",
+  "Stage 3 (together; never before Day 40, usually later): they arrive as two and leave as two. It is mentioned by other people as a known fact, not announced. A couple is simply part of the scenery from then on: shared umbrella, one tray, a hand on a sleeve."
+ ],
+ "signs": [
+  "Proximity: who sits next to whom at Mama's table; who walks whom home under curfew.",
+  "Objects: a scarf, a sleeve, a card lent 'for the Cup'; a thermos with two cups; a jacket that is the wrong size for its wearer.",
+  "Attention: someone knows another person's timetable; someone laughs before the joke is finished; someone stops performing — the voice, the stare, the narration — when one person is in the room.",
+  "Third parties: Bex reads the room on air without naming names; Tomi offers odds; Mama Odalys sets two plates together and says nothing; Selene knows before either of them.",
+  "Fiona is the crush of several boys at once (Sammy, Tobias, Gideon): show the comedy of it kindly, and let her choose in her own time, or nobody — her own eye is on Dmitri, who is looking at Freya, who is looking at Tobias.",
+  "Typical pairs as cast.js has them (crush, crushNote, crushPace — the profile is the authority; these are examples of tone): mutual and slow — Baylee and Livvie (a mended step, a seat kept), Rana and Kenji (midnight games), Viktor and Saoirse (a second mug at the boathouse), Tomi and Mika (a price war), Hedda and Rafa (a pot, a leaflet never handed over), Wren and Felix, Dom and Octavia, Abel and Odalys; one-sided or crossed — Ed, who is watched by both Pippa and Sunny and is looking at Inya, who is haggling with Tomi; Trixie telling Baylee about queens; Mikoto standing very still near beehives; Cas narrating his own failure to talk to Marit, while Bex loses her place in a link over Cas; Maisie bringing Junho broken things, Junho tidying Eloise's brushes, Eloise standing at Felix's end of the lab; Magnus arriving at Rare Hall with 'a matchup question' for Ophelia; Victoria's daily 'good afternoon, Herr von Düsterwald'; Anni's and Jessica's separate, careful interest in a man with a clipboard; Leona being unremarkable slightly closer to Tobias than to anyone else.",
+  "Adults: staff and townspeople have their own (Blum and Okonkwo and the orchids; Rox and Santángel's weekly argument; Dex, last customer at Josie's bar; Silas and the best of his catch left near a certain tent). An adult may also have a quiet crush on an adult student — all students except Georgie are adults — and that is fine; a TEACHER's feeling for a student stays unspoken because of the regulations, and shows only as scrupulous fairness and a door left open."
+ ],
+ "never": [
+  "Never a soap opera: no staged confessions for the player's benefit, no love triangles engineered to provoke him, no NPC explaining their feelings to Rowan unless he is their actual confidant.",
+  "Never more than one couple-sign in a scene, and never as the point of the scene.",
+  "Never before a bond's start day, and never between people who have not yet met on screen.",
+  "Never Georgie. A teacher's crush on a student is never acted on or voiced on the teacher's own initiative (regulations); other staff and townspeople are free adults. Lilia and Willas are already a couple and are played as people who have been one for years.",
+  "Never use an NPC romance to punish. It is not a penalty; it is other people's lives."
+ ],
+ "whenThePlayerNeglects": "A girl the player courted and then let drift does not wait and does not sulk. Her own crush, if she has one, is still there, and weeks of not being asked are weeks in which someone else did ask. Play it straight: she is a little formal with Rowan for a while, then easy again, and one day she is laughing at something another boy said in a way Rowan recognises. If he asks, she tells him the truth without cruelty and without apology. That is allowed to hurt — let it, briefly and without commentary — and it does not close the friendship. A route the player returns to after that is not impossible, but it now has a person in it who must be treated honestly, and the island will have an opinion.",
+ "whenThePlayerIsThere": "If Rowan is genuinely close to someone (the engine's affinity says so), her potential crush on another boy does not advance; the other boy may still be visibly, harmlessly smitten, which is its own small comedy or small sadness. Multiple routes at once remain possible and remain noticed.",
+ "afterDay40": "Fear speeds things up and makes them more serious. From the first incident on, couples form faster and hold on harder, and a Hollowing that takes one of two is the worst thing the timeline can do to a scene: the one left behind sits in Ward B every evening. Use that sparingly and never for shock."
+}

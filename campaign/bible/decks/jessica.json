@@ -1,0 +1,392 @@
+{
+ "name": "Dowry",
+ "owner": "jessica",
+ "heroes": [
+  "Teocuilatl, the Embodiment of Gods",
+  "Boris, the Guardian of Blackport",
+  "Willy, the Valiant Leprechaun"
+ ],
+ "main": [
+  [
+   2,
+   "Bamboo Shield"
+  ],
+  [
+   1,
+   "Club of Gobbo"
+  ],
+  [
+   6,
+   "Fighting"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Golden Apple"
+  ],
+  [
+   4,
+   "Golden Bananas"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Homerun!"
+  ],
+  [
+   2,
+   "Magic Ruby"
+  ],
+  [
+   3,
+   "Mimic"
+  ],
+  [
+   3,
+   "Play Money"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   2,
+   "Strong Shield"
+  ],
+  [
+   2,
+   "The Hands of Big Gwen"
+  ],
+  [
+   3,
+   "The Sun Sword"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Vampiric Sword"
+  ],
+  [
+   3,
+   "Warhorse"
+  ],
+  [
+   4,
+   "Wealth"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Teocuilatl, the Embodiment of Gods": "Hero",
+  "Boris, the Guardian of Blackport": "Hero",
+  "Willy, the Valiant Leprechaun": "Hero",
+  "Bamboo Shield": "Artifact (Reaction)",
+  "Club of Gobbo": "Artifact (Equipment)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Golden Bananas": "Artifact",
+  "Heavy Hit": "Attack",
+  "Homerun!": "Artifact (Reaction)",
+  "Magic Ruby": "Artifact",
+  "Mimic": "Creature L0",
+  "Play Money": "Artifact",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Quick Attack": "Attack",
+  "Smug Coin": "Artifact (Equipment)",
+  "Strong Shield": "Artifact (Reaction)",
+  "The Hands of Big Gwen": "Artifact (Equipment)",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Treasure Chest": "Artifact",
+  "Vampiric Sword": "Artifact (Equipment)",
+  "Warhorse": "Artifact (Equipment)",
+  "Wealth": "Ability"
+ },
+ "gist": {
+  "Teocuilatl, the Embodiment of Gods": "Tough hero who turns sacrifices into gold: an older creature for a little, or once per game one of her own heroes for a lot (which ends her turn).",
+  "Willy, the Valiant Leprechaun": "At the end of her first turn she takes either five cards or a pile of gold.",
+  "Boris, the Guardian of Blackport": "Her weapon carrier: sturdy, a fighter, and nothing she owns can be stolen or taken over.",
+  "Wealth": "Extra gold at the start of every turn, more per level.",
+  "Treasure Chest": "Free gold.",
+  "Golden Bananas": "Three small gold gains in a row.",
+  "Play Money": "Makes the next artifact much cheaper.",
+  "Vampiric Sword": "Absurdly expensive sword: its hero heals for half of every attack's damage.",
+  "The Sun Sword": "More Attack, everything it hits is set on fire, and her side cannot be frozen.",
+  "The Hands of Big Gwen": "Costly equipment that adds Attack and a card-search rider on hits.",
+  "Warhorse": "Single-target attacks hit harder.",
+  "Pocket Catapult": "A small free shot at anything, every turn.",
+  "Bamboo Shield": "Pricey reaction that cancels one hit on a hero outright.",
+  "Strong Shield": "Reaction that cancels one very large hit.",
+  "Golden Apple": "Buys control of one of your heroes for a turn.",
+  "Magic Ruby": "Stuns one of your heroes for a turn; can be kept by discarding.",
+  "Heavy Hit": "Attack that stuns.",
+  "Mimic": "Small creature that steals gold from you every turn; also sacrifice fodder for Teocuilatl."
+ },
+ "plan": "Jessica out-spends you. Wealth, Willy's windfall, Treasure Chests and Mimics build a gold pile no other student has; it goes into jewellery for Boris (Sun Sword, Warhorse, eventually the Vampiric Sword) and into reactions that simply buy off your best hit. Boris then stuns with Heavy Hit, swings again with Quick Attack and heals off the damage, while Golden Apple borrows your own hero and Pocket Catapults nibble. It is a patient, well-defended deck with one obvious flaw: almost everything she paid for is equipment on a single hero, and her damage is one attack line that a freeze or a stun switches off.",
+ "looks": {
+  "early": "A heap of gold after turn one, a Mimic, Wealth on two heroes; nothing aggressive.",
+  "mid": "Boris glittering with a Sun Sword and a Warhorse, a Pocket Catapult on each side, gold in reserve for a shield.",
+  "late": "Boris with the Vampiric Sword healing back everything you do to him, and Jessica still holding enough gold to say no once more."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "She took Willy's gold and is equipping, not attacking; a Mimic is taking a little of your gold each turn.",
+   "why": "She applies no pressure early and keeps gold ready to cancel exactly one big hit a turn, so racing wastes your best spells; use the calm to build the Storm, whose many small ticks her shields cannot buy off."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Boris wears three pieces of equipment; her other two heroes wear none.",
+   "why": "Fire Bomb destroys any number of equipped artifacts at once: one potion deletes everything she has paid for, while single big spells just walk into Bamboo Shield and Strong Shield."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She has just emptied her purse for the Vampiric Sword; no gold is left on her side.",
+   "why": "Her defence is bought turn by turn; in the one turn cycle after a huge purchase she cannot pay for a shield, and that is when direct damage finally lands."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Boris has a Smug Coin, she has a Golden Ankh in hand and gold for one more Golden Apple.",
+   "why": "Her last tricks each undo exactly one all-in turn, so keep Homerun! and your caster safe from the borrowed-hero turn and let repeated Storm ticks do what a single finisher cannot."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Jessica ends her first turn and Willy showers her side with gold; a Mimic settles beside Teocuilatl.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up, she is not attacking yet"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Mimic"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Throw your first burn at Willy"
+     }
+    ]
+   },
+   {
+    "board": "A Sun Sword goes onto Boris; she keeps a visible stack of gold untouched.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Find the Storm, save Fire Bomb for later"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Boris before he swings"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Magic at Boris, into her shield money"
+     }
+    ]
+   },
+   {
+    "board": "Two Pocket Catapults begin plinking at your caster; she plays Golden Bananas and smiles.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet a catapult"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Set Firewall on the caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Ignore the pinpricks and build"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Boris carries Sun Sword, Warhorse and Club of Gobbo; his Heavy Hit stuns one of your heroes every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb, every piece on Boris at once"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun and the burn back onto Boris"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Biggest spell into Boris"
+     }
+    ]
+   },
+   {
+    "board": "You aim a heavy spell at Willy; she pays for a Bamboo Shield without blinking.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick, it cannot be bought off"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Drain her with a second, lesser threat first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire another big one at once"
+     }
+    ]
+   },
+   {
+    "board": "A Golden Apple: she borrows your Storm caster for the turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle ready for the hit from your own hero"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang her next turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Shrug and rebuild afterwards"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Vampiric Sword arrives on Boris; her gold is gone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Now, while she cannot pay for a shield"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Boris so the sword never swings"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for a Fire Bomb"
+     }
+    ]
+   },
+   {
+    "board": "Boris heals back half of what he deals; your heroes are burning from the Sun Sword.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the burn onto Boris and freeze him"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Teocuilatl and Willy, who have no swords"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep two Mimics"
+     }
+    ]
+   },
+   {
+    "board": "Teocuilatl sacrifices Willy for a mountain of gold and her turn ends on the spot.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Two heroes left and a skipped turn: hit Boris"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb before the gold becomes equipment"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take the breather"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Boris alone, Smug Coin glinting, one Golden Ankh in her hand.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks and small shots to strip the coin first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "One enormous finisher into the coin"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the last Mimic"
+     }
+    ]
+   },
+   {
+    "board": "She has Boris and Teocuilatl, you have two burning heroes and a Storm.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Protect the caster, let the ticks land every turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and everything at Teocuilatl"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-level a second caster"
+     }
+    ]
+   },
+   {
+    "board": "Magic Ruby stuns your caster again; she kept it by discarding.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea it away and keep the pressure"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Attack with the other heroes regardless"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hunt for a sweeper"
+     }
+    ]
+   }
+  ]
+ }
+}

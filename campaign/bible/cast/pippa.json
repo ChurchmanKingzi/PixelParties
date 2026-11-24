@@ -1,0 +1,263 @@
+{
+ "id": "pippa",
+ "name": "Pippa Lund",
+ "firstName": "Pippa",
+ "age": 18,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R203",
+ "romance": true,
+ "deck": "Slimy Infestation (Slimes)",
+ "look": "Freckles everywhere, a strawberry-orange crop that sticks up at the crown, a yellow bow tie, and a heavy old film-bodied camera that lives either around her neck or in the battered leather bag slung across her shoulder. The pockets of her black Auxiliary jacket, blue Rare collar, bulge with lens cloths and spare batteries. She squints one eye at people out of habit, framing them.",
+ "voice": "Chatty, bright and curious, Danish-English, asking real questions and listening to the answers. She describes people the way a photographer would — light, foreground, exposure — and deflects anything said about herself with a joke. RARE habit (once in a scene at most; most scenes go without it): breaking off mid-sentence because she has seen a shot ('hang on — don't move').",
+ "lines": [
+  "Hang on — don't move — okay. Sorry. You do a thing with your hands before you shuffle. I've got eleven of those now.",
+  "Georgie's had lunch, I checked. She says the pudding was a six. That's high for a Tuesday.",
+  "Slimes are great, they split when you hit them. More of them the worse it gets. Oof, I relate.",
+  "I'm not hiding behind the camera. I'm just... better from back here."
+ ],
+ "intro": "The campus photographer: a freckled Rare Hall first-year who sees everything through a lens and has adopted the youngest student as her little sister.",
+ "traits": [
+  {
+   "id": "pippa_1",
+   "text": "She photographs everything for the campus stream and has already filled four memory cards.",
+   "how": "Be anywhere; she is there."
+  },
+  {
+   "id": "pippa_2",
+   "text": "She has appointed herself Georgie Santa's big sister and checks she has eaten.",
+   "how": "See the two of them at the library or card shop."
+  },
+  {
+   "id": "pippa_3",
+   "text": "She never appears in her own photographs.",
+   "how": "Look through her wall of prints in the Rare common room."
+  },
+  {
+   "id": "pippa_4",
+   "text": "Her camera was her grandfather's and takes real film as well as digital; she develops prints herself.",
+   "how": "Ask about the camera."
+  },
+  {
+   "id": "pippa_5",
+   "text": "She notices things nobody else does — a habit, a look, who stands next to whom — and for some reason has more pictures of the Wildcard than of anyone else in the year.",
+   "how": "Ask to see her contact sheets in the first week; she goes pink."
+  },
+  {
+   "id": "pippa_6",
+   "text": "She has three younger brothers at home in Aarhus and misses being needed.",
+   "how": "Ask why she fusses over Georgie."
+  },
+  {
+   "id": "pippa_7",
+   "text": "She dates her negatives and never deletes a frame, even the bad ones.",
+   "how": "Visit her improvised darkroom in the maintenance corridor."
+  },
+  {
+   "id": "pippa_8",
+   "text": "She would like to be looked at, for once, the way she looks at other people.",
+   "how": "Close stage; she hands over the camera."
+  }
+ ],
+ "secret": "Pippa is the eldest of four, the only girl, from a cheerful chaotic house in Aarhus where she was 'the responsible one' at nine. The camera — her morfar Henrik's — arrived the year he died and became both a gift and a place to stand: behind it she is useful, invisible and safe. She is sunny, funny, apparently uncomplicated, and convinced she is the plain supporting character in everyone else's story; she is honestly startled by being wanted. Wound: a boy at sixteen who used her as a route to her prettier friend. Contradiction: the most observant person on the island cannot see herself at all. She mothers Georgie from real love and also because being needed is the one way she knows of being kept. Private joke: she titles her contact sheets with what people were pretending to feel versus what they felt.\nHer photographs are EVIDENCE and the GM should seed them. She does not understand what she has until someone lays the prints side by side: (1) Day 27, bungalow row at midday: '{H}' walking back — in one frame {H:he} casts no shadow at all; in the next {H:he} does. (2) A run of candid frames across Stage A in which he is never mid-blink — not once in sixty. (3) Night of Masks: a long exposure in which every masked dancer is blurred and he is perfectly sharp. (4) Trial Dome 3 on the morning of Day 40, taken for the stream after the cart had gone: the taped door, frosted on the INSIDE. (5) A telephoto of Gideon at the harbour on Day 62, phone to his ear, standing very straight beside a man in a grey suit who is not looking at him. (6) Film frames (not digital) of Alpha cards in which the art differs from frame to frame. After Day 40 she is frightened and keeps shooting, because 'if I'm scared and I have the picture, at least there's a picture'. Gideon and later Marrow will want her negatives; her darkroom in the old meter room is turned over around Day 70, and her room searched around Day 80, unless she has been warned to hide them (the lighthouse is safe). Shown on the stream or at an assembly, the Day-27 frames are enough to expose '{H}' publicly. Arc: steps out from behind the camera — the photograph that matters in the finale is one someone else takes of her.\nPLAYER-CRUSH (CORE 9.8): Pippa has `crush: rowan`. She noticed him on the ferry and liked him by the end of the first week, openly — she keeps 'accidentally' photographing him. Her route is deliberately easier and faster to start than most: her affinity rises readily, her first two steps ask little, and she will make small moves herself. Play it honestly: she is interested, not devoted; she still believes she is the plain friend and still needs to be chosen clearly. Her friendship with Ed Venture stays a friendship.",
+ "wants": "To be seen clearly by someone, and to stop needing to be useful to be kept.",
+ "fears": "Being foreground for exactly as long as she is handy.",
+ "crush": "rowan",
+ "crushNote": "She liked him from the first week — the hands before the shuffle, the way he watches before he speaks — and it shows openly: she keeps 'accidentally' photographing him, has far more frames of him than the stream needs, and goes pink when asked why. It is interest, not devotion: she assumes he could not mean her and needs it said clearly, twice.",
+ "crushPace": 1.3,
+ "likes": [
+  "Being asked to be IN the picture",
+  "Someone taking her camera and photographing her",
+  "Kindness to Georgie",
+  "Noticing small things and saying so",
+  "Help carrying gear or holding a reflector",
+  "Honest reactions to her photos, even critical",
+  "Golden hour, tide pools, anything with texture",
+  "Being chosen first, not as a way to someone else"
+ ],
+ "dislikes": [
+  "Being asked to introduce him to a prettier friend",
+  "People who pose",
+  "Anyone deleting or demanding her photos",
+  "Being called 'the photo girl'",
+  "Georgie being teased",
+  "Flash used without asking"
+ ],
+ "gifts": [
+  "Card: Cute Camera",
+  "A roll of black-and-white film (dear; the campus store orders it)",
+  "Card: Infinitely Reproducing Slime",
+  "A photograph of HER, taken by you and printed",
+  "Liquorice from the boutique",
+  "A lens cloth embroidered by Livvie"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Friendly, openly interested, still half disbelieving.",
+  "text": "Pippa has liked Rowan since the first week and is bad at hiding it: he keeps turning up in her viewfinder 'by accident', she remembers every small thing about him, and she finds reasons to show him contact sheets. She starts things in small ways — a seat saved, a print slipped into his bag — and warms quickly to any friendliness in return. This is one of the easy routes: she meets him more than halfway. It is still interest, not devotion: she assumes she is the friend, deflects a compliment with a joke and a raised camera, and has to hear it plainly, and then plainly again. Take the camera out of her hands; look at her the way she looks at things. Once she believes it she is affectionate, giggly and far bolder than expected."
+ },
+ "intimacy": "Starts as comfortable friendliness — shoulders pressed together over a contact sheet, her chin on his arm to see a screen — and tips over in the red light of her darkroom, where there is not room for two people to stand apart. She loves being looked at once she allows it, and being photographed by him becomes a tender, charged game of trust: a bare shoulder in window light, her laughing with her hands over her face. Playful, warm, giggling, freckles and sunlight; she likes mornings. Fade when she takes the camera from him and sets it lens-down on the shelf.",
+ "events": [
+  {
+   "id": "pippa_e1",
+   "stage": 1,
+   "title": "Eleven of those",
+   "condition": "In the first week, notice that she keeps photographing you and ask to see the pictures (anywhere on campus); say something friendly about one. That is enough.",
+   "hint": [
+    "She has probably already taken your picture. More than once. Ask to see it.",
+    "Ask the campus photographer to show you the photos she has taken of you."
+   ]
+  },
+  {
+   "id": "pippa_e2",
+   "stage": 2,
+   "title": "Big sister",
+   "condition": "Spend time with her twice more in any easy way — carry her gear on a shoot, walk Georgie home with her, or visit the darkroom in maintenance_tunnels — and ask why she is never in a picture herself.",
+   "hint": [
+    "She is glad of company on a shoot, and she is never in her own pictures.",
+    "Keep her company while she works a couple of times, and ask why she stays behind the camera."
+   ]
+  },
+  {
+   "id": "pippa_e3",
+   "stage": 3,
+   "title": "Other side of the lens",
+   "condition": "Take her camera (with permission) and photograph her at tide_pools or beach_cove in the Evening; print it, give it to her, and tell her plainly, twice if needed, that you asked her out because of her.",
+   "hint": [
+    "She is always behind the camera. Someone should take one of her.",
+    "Photograph her yourself at the tide pools and make it unmistakable that she is the one you are interested in."
+   ]
+  },
+  {
+   "id": "pippa_e4",
+   "stage": 4,
+   "title": "Side by side",
+   "condition": "After Day 40, sit with her in the darkroom and lay her prints of '{H}' and of Trial Dome 3 side by side; believe what they show, and help her hide the negatives before her darkroom is searched. She stays close that night.",
+   "hint": [
+    "Her photographs show something. She has not put them next to each other yet.",
+    "Around the middle of the first term, go through her photos with her carefully and help her keep them safe."
+   ]
+  },
+  {
+   "id": "pippa_e5",
+   "stage": 5,
+   "title": "Her picture",
+   "condition": "In Term 2, when someone demands her archive (Gideon, Marrow or the administration), stand with her while she refuses, and help her publish or deliver the evidence on her own terms; she puts a print of the two of them on her wall — the first with her in it.",
+   "hint": [
+    "One day someone powerful will want her pictures. She should not face that alone.",
+    "Back her up when she is pressured to hand over her photos, and help her decide what to do with them."
+   ]
+  }
+ ],
+ "bonds": {
+  "georgie": {
+   "label": "best friends",
+   "text": "Her adopted little sister; Pippa checks she has eaten.",
+   "public": true,
+   "from": 6
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "Best light on the island. Also the other half of Georgie's support staff.",
+   "public": true,
+   "from": 9
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "He never appears relaxed in a single frame — and there is one photo of him she has not shown anyone.",
+   "public": false,
+   "from": 20
+  },
+  "marit": {
+   "label": "friends",
+   "text": "Knowing Marit is like living next to a rehearsal. Pippa has seven thousand photos of it.",
+   "public": true,
+   "from": 3
+  },
+  "bex": {
+   "label": "teammates",
+   "text": "Shoots stills for the Top Deck.",
+   "public": true,
+   "from": 5
+  },
+  "sunny": {
+   "label": "friends",
+   "text": "Pool-side photo shoots and a shared weakness for liquorice.",
+   "public": true,
+   "from": 7
+  },
+  "victoria": {
+   "label": "roommates",
+   "text": "Rare Hall 203. Pippa writes the day's times on a card by the door each night and has learned, quickly, the difference between helping and managing.",
+   "public": true,
+   "from": 1
+  },
+  "sammy": {
+   "label": "friends",
+   "text": "Has forty frames of him brooding and one of him laughing; the one is the good one.",
+   "public": true,
+   "from": 15
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "The scary big sister who is on the landing every evening and has never once told her how to do it.",
+   "public": true,
+   "from": 1
+  },
+  "fiona": {
+   "label": "friends",
+   "text": "Best contrast on the island, and the only real laugh she has caught on film goes up an octave. Pippa has told nobody.",
+   "public": true,
+   "from": 8
+  },
+  "ed": {
+   "label": "friends",
+   "text": "Best action subject she has ever had: always moving, never posing — and he drags her into the frame without noticing she was hiding.",
+   "public": true,
+   "from": 7
+  },
+  "cas": {
+   "label": "friends",
+   "text": "He narrates her taking the picture. She has started timing the shutter to his sentences.",
+   "public": true,
+   "from": 5
+  },
+  "lucas": {
+   "label": "friends",
+   "text": "The only admirer she has ever approved of. She has photographed him waiting, and not shown anyone.",
+   "public": true,
+   "from": 6
+  },
+  "thandi": {
+   "label": "friends",
+   "text": "Signs the book every time she takes Georgie out, and has started bringing the warden a print now and then.",
+   "public": true,
+   "from": 7
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "classroom",
+   "Afternoon": "quad",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "tide_pools",
+   "Midday": "card_shop",
+   "Afternoon": "maintenance_tunnels",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Slimes that split when hit: she lets you do the work and photographs your face when the board doubles. Plays for fun, pays attention to tells rather than odds.",
+  "tilt": "Being watched closely herself — an opponent who studies HER makes her self-conscious and sloppy."
+ }
+}

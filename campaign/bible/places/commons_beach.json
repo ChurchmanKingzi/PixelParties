@@ -1,0 +1,19 @@
+{
+ "name": "The Commons — Bungalow Row",
+ "zone": "dorms",
+ "bg": "commons_beach",
+ "night": true,
+ "hours": "Home. Always open; Mama Odalys does a head count at lights-out and pretends not to notice who is missing. The row's steward, Keoni Kahale (keys, repair slips, lost property), is about every Afternoon and Evening.",
+ "sight": "A crooked row of eight weathered bungalows on stilts along the south cove (the first-year row; the upper years' Old Row begins beyond the rocks, further down the beach), paint flaking in coral, mint and sun-bleached blue, joined by a boardwalk of mismatched planks. Laundry and jackets with plain grey collars flap on lines strung between the palms; a hand-painted sign says THE COMMONS — EVERYBODY STARTS SOMEWHERE. Hammocks, surfboards, a ping-pong table with a duel mat taped on it. At night the row is a string of yellow windows, the surf breathes, and the geckos chirp under the eaves.",
+ "things": [
+  "Walk the boardwalk and learn who lives in which bungalow (yours is number 7; 1 is Mama's kitchen, 8 the laundry)",
+  "Play ping-pong-table duels where the loser does the winner's dishes",
+  "Lie in a hammock and do nothing for a slot",
+  "Swim out to the diving raft",
+  "Browse Tomi's trade binder on the steps of bungalow 5",
+  "Help fix something — a step, a shutter, the outdoor shower that only does cold",
+  "Feed the cove's cats and the fat gulls that own the railings",
+  "At night: sit on your own steps with your feet in the sand and hear the whole row settling"
+ ],
+ "secret": "Rowan's home base. THE ROW (canon, CORE 9.2; three beds each; every first-year here is a named person — never show an unnamed one). B1: Mama Odalys's kitchen and quarters. B2 — Freya, Hedda, Trixie: a megaphone and wet protest banners on the porch rail, a bee hotel under the eaves that Trixie talks to, and Freya's empties lined up on the step like trophies. B3 — Inya, Livvie, Rana: bunny bunting over the door, Livvie's paper spreadsheet pinned inside the wardrobe, and Rana's bed behind a hung sheet (she had a Rare Hall room last year and has built herself a wall). B4 — Maisie, Fiona, Leona: Maisie's workbench of projector parts on the porch on an extension cord nobody authorised, Fiona's black lace over the window and a candle stub on the sill, and Leona's corner, so tidy and blank it looks unoccupied, with a locked suitcase under the bed. B5 — Viktor, Tomi, Ed: Viktor's bed is made and unslept in, rope coiled on it; Tomi's trade binder lives on the steps; Ed has pinned a hand-drawn map of the island over his bunk with red crosses on everything marked DANGER. B6 — Sammy, Tobias, Dmitri: a black cloth over the mirror where Sammy practises his stare, a floorboard by Tobias's bed that does not sit flat, and Dmitri's chair on the porch, where he is awake under a blanket with a thermos every night of the year. B7 — Rowan, Nathan, Baylee. B8: laundry and storage — washing lines, the row's one iron, a spare cot. Upper-year Commons students live on the Old Row beyond the rocks and appear only as distant figures; Rowan has no reason to go there. The warmth of the Commons is the emotional baseline the story later threatens. D27+: the gulls and the cats leave within a week; the geckos stop chirping; the night is noticeably too quiet, and people start sleeping badly without knowing why. The sand under the window of number 7 shows bare footprints going down to the water and standing there, none coming back, every night. D67: Mama's head count becomes real and she sits up on her porch with the wooden spoon. After Promotion Duels (effect from Day 106) the row's population changes; if Rowan is promoted he may choose to stay only by petition. Dmitri in B6, awake on his porch every night, is the row's natural witness to what {H=@near?stands below|leaves} bungalow 7 after midnight."
+}

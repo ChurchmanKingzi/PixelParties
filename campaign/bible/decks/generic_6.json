@@ -1,0 +1,426 @@
+{
+ "name": "Venom Swamp",
+ "owner": null,
+ "heroes": [
+  "Medea, the Swamp Witch",
+  "Zsos'Ssar, the Serpent Warlord",
+  "Fiona, the Princess of Blackport"
+ ],
+ "main": [
+  [
+   4,
+   "Alchemic Journal"
+  ],
+  [
+   2,
+   "Coffee"
+  ],
+  [
+   6,
+   "Decay Magic"
+  ],
+  [
+   1,
+   "Divine Gift of Sacrifice"
+  ],
+  [
+   2,
+   "Divine Punishment"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   2,
+   "Pet Snake"
+  ],
+  [
+   2,
+   "Poison Pollen"
+  ],
+  [
+   2,
+   "Poisoned Well"
+  ],
+  [
+   4,
+   "Rap Harpyformer"
+  ],
+  [
+   3,
+   "Rusty Touch"
+  ],
+  [
+   2,
+   "Shamanic Curse"
+  ],
+  [
+   4,
+   "Sickly Cheese"
+  ],
+  [
+   1,
+   "Silence"
+  ],
+  [
+   1,
+   "Stinky Stables"
+  ],
+  [
+   2,
+   "Tea"
+  ],
+  [
+   4,
+   "The Master's Plan"
+  ],
+  [
+   4,
+   "The Warlord's Bite"
+  ],
+  [
+   1,
+   "Toxic Fumes"
+  ],
+  [
+   3,
+   "Venom Infusion"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Poison Vial"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Medea, the Swamp Witch": "Hero",
+  "Zsos'Ssar, the Serpent Warlord": "Hero",
+  "Fiona, the Princess of Blackport": "Hero",
+  "Alchemic Journal": "Artifact",
+  "Coffee": "Artifact",
+  "Decay Magic": "Ability",
+  "Divine Gift of Sacrifice": "Spell (Decay Magic)",
+  "Divine Punishment": "Spell (Decay Magic, Reaction)",
+  "Golden Ankh": "Artifact",
+  "Magnetic Glove": "Artifact",
+  "Pet Snake": "Creature L0",
+  "Poison Pollen": "Spell (Decay Magic)",
+  "Poisoned Well": "Spell (Decay Magic)",
+  "Rap Harpyformer": "Creature L0",
+  "Rusty Touch": "Spell (Decay Magic, Reaction)",
+  "Shamanic Curse": "Spell (Decay Magic, Reaction)",
+  "Sickly Cheese": "Artifact",
+  "Silence": "Spell (Decay Magic, Reaction)",
+  "Stinky Stables": "Area (Decay Magic)",
+  "Tea": "Artifact",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "The Warlord's Bite": "Spell (Decay Magic)",
+  "Toxic Fumes": "Spell (Decay Magic)",
+  "Venom Infusion": "Spell (Decay Magic)",
+  "Wheels": "Artifact",
+  "Acid Vial": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion",
+  "Poison Vial": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Medea, the Swamp Witch": "Your targets take double damage from poison.",
+  "Zsos'Ssar, the Serpent Warlord": "Poisons one of his own heroes with every Decay spell; his single-target damage grows with every poisoned target on the table.",
+  "Fiona, the Princess of Blackport": "Gains gold whenever she is afflicted by a status; she is the one who gets poisoned on purpose.",
+  "The Warlord's Bite": "Several stacks of poison on an unpoisoned target.",
+  "Venom Infusion": "A stack of poison; at high Decay Magic it can never be removed.",
+  "Poisoned Well": "Poisons your whole side.",
+  "Poison Pollen": "Stuns every poisoned target, poisons every stunned one.",
+  "Pet Snake": "Adds a stack to a poisoned target every turn.",
+  "Rap Harpyformer": "Free summon that fetches Decay Magic and can discard one to poison a target.",
+  "Stinky Stables": "Area: poisoned targets cannot be healed or cured.",
+  "The Master's Plan": "Cancels one card you play from hand.",
+  "Rusty Touch": "Cancels an artifact you play.",
+  "Shamanic Curse": "Raises the level of a spell you cast, often beyond your reach.",
+  "Silence": "Once per game: cancels a spell and stops you casting more that turn.",
+  "Tea": "Moves its own poison onto your heroes.",
+  "Sickly Cheese": "Self-poison to search a Decay spell."
+ },
+ "plan": "Poison, stacked, and doubled by Medea. Each stack ticks at the start of your turn, and the deck keeps adding stacks while cancelling the one card a turn that would let you get ahead. Poison Pollen turns the stacks into stuns, Stinky Stables stops any cure, and Zsos'Ssar's spells grow with every poisoned target, his own included. It is slow and reactive and poisons itself with every search and cast; Tea, which moves a hero's whole pile of stacks to another target, cuts both ways.",
+ "looks": {
+  "early": "A stack of poison on your caster and one on its own Fiona.",
+  "mid": "Three or four stacks on each of your heroes, ticking double, one card always held apart.",
+  "late": "Stables overhead, everyone poisoned, Pollen stunning your side every other turn."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "It has poisoned its own heroes to search and cast; Medea stands unhurt.",
+   "why": "Poison is slow at one or two stacks, and it is Medea who doubles it: early direct damage, on her first, wins the race it is trying to set up."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "One of your heroes carries a tall pile of poison stacks.",
+   "why": "Tea moves the whole pile onto one of its heroes in one card; lead with a lesser play to draw out The Master's Plan first."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "All your heroes are poisoned and it has already cast one Poison Pollen.",
+   "why": "Pollen stuns everything poisoned, so keep one hero clean, or keep Tea, to have a turn at all; your Storm keeps ticking through the stuns."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Its own heroes are as poisoned as yours and nothing can cure them under the Stables.",
+   "why": "The Stables hold its side down as well; the Storm added to its own poison ends it first."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "The Warlord's Bite puts poison on your caster; Zsos'Ssar poisons Fiona to cast it and she collects gold.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Medea"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea it back when it is worth it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Harpyformer"
+     }
+    ]
+   },
+   {
+    "board": "Sickly Cheese: another of its heroes is poisoned.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning three heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the searched spell"
+     }
+    ]
+   },
+   {
+    "board": "One card is held apart.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks cannot be cancelled once attached"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Lesser spell first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Commit the Storm into it"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Four stacks of poison on your caster, ticking double.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Bait the Plan, then Tea the pile onto Medea"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal it off slowly"
+     }
+    ]
+   },
+   {
+    "board": "Shamanic Curse pushes your Gathering Storm out of reach as you cast it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Next time bait it; meanwhile freeze Medea"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cast something cheaper"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait a turn"
+     }
+    ]
+   },
+   {
+    "board": "A Pet Snake adds a stack every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Snake, Tea the pile over"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Poison Pollen: every poisoned target is stunned, on both sides.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea one hero free and act with it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "The Storm ticks anyway"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Stinky Stables: no more cures.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Yeet the Stables, then Tea"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race under it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Zsos'Ssar aims a spell boosted by six poisoned targets.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill him first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One hero each, both with deep poison.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Add the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea yours across"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "It is out of cancels.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Medea.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

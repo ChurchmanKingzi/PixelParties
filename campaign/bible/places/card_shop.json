@@ -1,0 +1,19 @@
+{
+ "name": "The Sleeve & Binder",
+ "zone": "town",
+ "bg": "card_shop",
+ "night": false,
+ "hours": "Open Morning to Evening, closed Mondays; Friday Night Draft in the Evening; owner Dex Quill, clerk Mika Tanabe.",
+ "sight": "A deep, narrow shop halfway up Main Street, its window a mosaic of single cards in stands. Inside: glass counters of singles sorted by colour and price, a wall of binders, long boxes of bulk at one credit a card, and at the back eight scarred tournament tables under strip lights. A bell jingles, a sleepy voice says hi, and the whole place smells of new cardboard and old carpet. The prices are written in two hands: his tidy, hers with small drawn faces.",
+ "things": [
+  "Buy boosters (45 cr, list price — the same as on campus) and singles — the only place on the island with a real selection",
+  "Dig the one-credit bulk boxes for overlooked gems",
+  "Sell cards over the counter (Dex pays 50% of list value; Mika pays 60% once she counts you a friend)",
+  "Enter Friday Night Draft (135 cr: three boosters at list price, keep what you pick) or a weekend pre-release",
+  "Ask Mika what is being bought this week and by whom",
+  "Admire the display case of things not for sale",
+  "Take a paid shift sorting bulk and running events",
+  "Get a deck checked: Dex will tell you exactly which five cards are wrong"
+ ],
+ "secret": "Mika's route; job site; the island's price and rumour exchange. Pre-releases Day 34 ('Tidebreak') and Day 132 ('Ashfall Crown'); Open Trial (the Island Open Qualifier) Day 123. Dex was a Commons student in the Academy's second year and a mediocre pro; he is honest and will not buy stolen cards — which is why Brant's hangers-on get thrown out on Day 41 trying to sell 'his collection'. Dex keeps one Kaboom Alpha common in the back, won in a tournament 20 years ago, and a ledger of every Alpha sale he has heard of. Marrow's buyers offer absurd money from Day 62; whether Dex sells, lends it (to Wren's lamp for half an hour, or to Rowan for the Gate), or has it stolen depends on Rowan's standing with him and Mika. Mika notices the Cosmic Depths cards first as a pricing problem: 'Your roommate asked me to value something. It is not in any set list. It is not fake either. I gave it back.'"
+}

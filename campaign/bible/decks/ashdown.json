@@ -1,0 +1,390 @@
+{
+ "name": "Field Collection",
+ "owner": "ashdown",
+ "heroes": [
+  "Legendary Explorer Dajan",
+  "Xiong, the Bamboo Guardian",
+  "Taio, the Sun Fencer"
+ ],
+ "main": [
+  [
+   3,
+   "Amazing Finding"
+  ],
+  [
+   3,
+   "Cool Repair"
+  ],
+  [
+   3,
+   "Earth-Shattering Hammer, Relic of Deri"
+  ],
+  [
+   5,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Hammer Throw"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Legendary Sword of a Barbarian King"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Relic in the Sky"
+  ],
+  [
+   3,
+   "Shattered Trident, Treasure of the Deepsea"
+  ],
+  [
+   3,
+   "Sky Archeologist"
+  ],
+  [
+   2,
+   "Spirit of the Barbarian Sword"
+  ],
+  [
+   2,
+   "Spirit of the Super-Killing Knife"
+  ],
+  [
+   2,
+   "Super-Killing Knife, the Tool of Liquidation"
+  ],
+  [
+   2,
+   "The Sun Sword"
+  ],
+  [
+   2,
+   "Thieving Strike"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Treasure Hunter's Backpack"
+  ],
+  [
+   3,
+   "Wealth"
+  ],
+  [
+   3,
+   "Weapon Collecting Wight"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Legendary Explorer Dajan": "Hero",
+  "Xiong, the Bamboo Guardian": "Hero",
+  "Taio, the Sun Fencer": "Hero",
+  "Amazing Finding": "Attack",
+  "Cool Repair": "Artifact",
+  "Earth-Shattering Hammer, Relic of Deri": "Artifact (Equipment)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Heavy Hit": "Attack",
+  "Legendary Sword of a Barbarian King": "Artifact (Equipment)",
+  "Quick Attack": "Attack",
+  "Relic in the Sky": "Artifact",
+  "Shattered Trident, Treasure of the Deepsea": "Artifact (Equipment)",
+  "Sky Archeologist": "Creature L0",
+  "Spirit of the Barbarian Sword": "Creature L0",
+  "Spirit of the Super-Killing Knife": "Creature L0",
+  "Super-Killing Knife, the Tool of Liquidation": "Artifact (Equipment)",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Thieving Strike": "Attack",
+  "Treasure Chest": "Artifact",
+  "Treasure Hunter's Backpack": "Artifact",
+  "Wealth": "Ability",
+  "Weapon Collecting Wight": "Creature L0"
+ },
+ "gist": {
+  "Legendary Explorer Dajan": "Spends his action to play any artifact straight from the deck at a discount.",
+  "Xiong, the Bamboo Guardian": "High Attack; when he defeats a target with an attack he takes a card from either discard pile.",
+  "Taio, the Sun Fencer": "A fighter whose Attack rises with every artifact equipped to him.",
+  "Earth-Shattering Hammer, Relic of Deri": "When its hero hits one of your heroes, a card in that hero's support zones may be destroyed.",
+  "Legendary Sword of a Barbarian King": "When its hero attacks, it may summon a creature as a free action.",
+  "Spirit of the Barbarian Sword": "Creature only the Sword's bearer can summon; clears all Areas when it arrives.",
+  "Super-Killing Knife, the Tool of Liquidation": "Creatures hit by its hero's attacks simply die.",
+  "Shattered Trident, Treasure of the Deepsea": "Can be spent on one single-target attack to add its hero's Attack again; it breaks afterwards.",
+  "The Sun Sword": "More Attack; everything it hits burns for good.",
+  "Cool Repair": "Re-equips an artifact from the discard pile for a fraction of its cost.",
+  "Weapon Collecting Wight": "Each turn re-equips a cheap artifact from the discard pile for free.",
+  "Sky Archeologist": "Free creature for a discarded expensive artifact; digs the top of the deck.",
+  "Amazing Finding": "Flips cards off the top and keeps the artifacts.",
+  "Relic in the Sky": "Returns the bottom card of her discard pile.",
+  "Heavy Hit": "Attack that stuns.",
+  "Hammer Throw": "Attack that makes your next artifacts cost you cards."
+ },
+ "plan": "Professor Ashdown collects relics and then hits you with them. Dajan fetches the right weapon from the deck each turn, and each relic changes what an ordinary attack does: the Hammer of Deri knocks an attachment or equipment off the hero it hits, the Sun Sword burns, the Barbarian King's sword summons its own spirit and wipes Areas. Cool Repair and the Weapon Collecting Wight put broken relics straight back on. The deck is methodical rather than fast: Dajan spends his actions shopping, the damage is one or two attacks a turn, and all of it depends on fighters getting to swing.",
+ "looks": {
+  "early": "Dajan fetching a relic a turn, Wealth on two heroes, no attacks yet.",
+  "mid": "Xiong with the Hammer of Deri, Taio with the Sun Sword, a Wight polishing something in the back.",
+  "late": "Every hero armed, relics returning from the discard pile as fast as you break them."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "SETUP",
+   "trap": "CONTROL",
+   "tell": "Dajan is spending his action each turn fetching an artifact instead of attacking.",
+   "why": "A hero who shops does not fight: her first turns apply no pressure at all, and her fighters are still bare-handed and open."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Xiong carries the Earth-Shattering Hammer, and each hit on a hero breaks a card in that hero's support zones.",
+   "why": "Every swing of the Hammer takes Gathering Storm or The White Eye with it, so the wielder must be frozen or the Hammer broken before you attach anything else."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "DISRUPT",
+   "tell": "A Weapon Collecting Wight and a Cool Repair have already put back what you destroyed.",
+   "why": "Breaking relics only buys a turn now; the fighters carrying them have ordinary health, and a dead fighter does not re-equip."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Her last fighter swings once a turn with a Heavy Hit and the Sun Sword.",
+   "why": "It is one stun and one burn per turn: Tea returns both, a shield takes the hit, and the Storm does the rest."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Dajan spends his action pulling a Sun Sword out of the deck; nobody attacks.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Xiong while he is bare-handed"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build alongside"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "A Sky Archeologist digs the top of her deck for more relics.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning the heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye a relic out of her hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "The Legendary Sword goes onto Taio; its Spirit arrives with his first attack and your Floating Island is gone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Taio is the smallest: burn him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Replay the Island later"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Xiong's Hammer hits your caster and Gathering Storm falls off into the discard pile.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Xiong before re-attaching"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall first, then re-attach"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach straight away"
+     }
+    ]
+   },
+   {
+    "board": "Fire Bomb clears her equipment for a turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Use the turn on her fighters"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the Wight that will fetch it back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Relax"
+     }
+    ]
+   },
+   {
+    "board": "The Sun Sword leaves two of your heroes burning.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea a burn onto Taio"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Sun Sword and the Hammer together"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Wight re-equips the Hammer for free; Cool Repair brings back the Sun Sword.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Xiong"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze him and tick"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Break them again"
+     }
+    ]
+   },
+   {
+    "board": "Super-Killing Knife: irrelevant to you, and she knows it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "She wasted a turn: press"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep shields"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Xiong defeats your hero and takes Gathering Storm from your discard pile for himself.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Xiong before he can use it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it away"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Regroup"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Taio alone with the Sun Sword.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the burn back, shield, tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Wight"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Xiong for one last Hammer swing.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Taio"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; hers is burning from your Firewall.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

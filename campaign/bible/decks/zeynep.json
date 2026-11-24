@@ -1,0 +1,396 @@
+{
+ "name": "Letter of the Law",
+ "owner": "zeynep",
+ "heroes": [
+  "Idej Lord Daiyo",
+  "Idej Lord Nobunakin",
+  "Idej Lord Todugawin"
+ ],
+ "main": [
+  [
+   6,
+   "Idej Projection"
+  ],
+  [
+   2,
+   "Idej Blade - Hakai"
+  ],
+  [
+   2,
+   "Idej Blade - Naosu"
+  ],
+  [
+   1,
+   "Idej Blade - Gensui"
+  ],
+  [
+   1,
+   "Idej Blade - Manabi"
+  ],
+  [
+   1,
+   "Idej Sword - Kogarasu"
+  ],
+  [
+   1,
+   "Idej Sword - Muras"
+  ],
+  [
+   1,
+   "Idej Sword - Onima"
+  ],
+  [
+   3,
+   "Idej Projector"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Hammer Throw"
+  ],
+  [
+   3,
+   "Thieving Strike"
+  ],
+  [
+   2,
+   "Whirlwind Strike"
+  ],
+  [
+   2,
+   "Magic Hammer"
+  ],
+  [
+   2,
+   "Fireball"
+  ],
+  [
+   2,
+   "Heal"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   2,
+   "Wisdom"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Cloud Pillow"
+  ],
+  [
+   2,
+   "Homerun!"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Idej Lord Daiyo": "Hero",
+  "Idej Lord Nobunakin": "Hero",
+  "Idej Lord Todugawin": "Hero",
+  "Idej Projection": "Spell (Magic Arts, Attachment)",
+  "Idej Blade - Hakai": "Artifact (Equipment)",
+  "Idej Blade - Naosu": "Artifact (Equipment)",
+  "Idej Blade - Gensui": "Artifact (Equipment)",
+  "Idej Blade - Manabi": "Artifact (Equipment)",
+  "Idej Sword - Kogarasu": "Artifact (Equipment)",
+  "Idej Sword - Muras": "Artifact (Equipment)",
+  "Idej Sword - Onima": "Artifact (Equipment)",
+  "Idej Projector": "Artifact (Reaction)",
+  "Quick Attack": "Attack",
+  "Heavy Hit": "Attack",
+  "Hammer Throw": "Attack",
+  "Thieving Strike": "Attack",
+  "Whirlwind Strike": "Attack",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Heal": "Spell (Support Magic)",
+  "Fighting": "Ability",
+  "Wisdom": "Ability",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Cloud Pillow": "Artifact",
+  "Homerun!": "Artifact (Reaction)"
+ },
+ "gist": {
+  "Idej Projection": "Attached to a lord: when he would take ANY damage she may discard it to cancel that hit and everything that comes with it. One Projection, one hit, however small. Six in the deck.",
+  "Idej Lord Daiyo": "A hundred health. Starts the game with three Projections attached. His sword Kogarasu (free for him) lowers every spell he uses by his Fighting level, one spell a turn.",
+  "Idej Lord Nobunakin": "A hundred health. Starts with two Projections and a blade. With his sword Muras (free for him) his first Attack each turn is an extra Action.",
+  "Idej Lord Todugawin": "A hundred health. Starts with three blades equipped. With his sword Onima (free for him) an Attack that hits exactly one hero sends up to two of that hero's Abilities back to your hand.",
+  "Idej Projector": "Reaction, costly: when you use an Attack, Spell or creature effect, a Projection from her hand, deck or discard pile goes back onto a lord.",
+  "Idej Blade - Hakai": "Equipment for a lord: his Destruction spells count one level lower. The other blades do the same for other schools.",
+  "Heavy Hit": "An attack that also stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Thieving Strike": "An attack that takes a random card from your hand.",
+  "Hammer Throw": "An attack; for a turn every artifact you play costs you a card.",
+  "Whirlwind Strike": "Hits two of your heroes and everything in their support zones.",
+  "Magic Hammer": "One very large hit, which Daiyo casts through his sword."
+ },
+ "plan": "Three lords with a hundred health each, which would be absurd except that nothing lands: every Projection cancels one hit outright, and the lords begin the game already wearing them. Behind that Zeynep plays by the book and fast — Nobunakin attacks twice a turn with Muras, Todugawin's Onima sends your Destruction Magic back to your hand, Daiyo casts a Magic Hammer through his sword. A Projection answers one hit however small, so three Storm zaps or one Chain Lightning strip them in a turn or two; after that anything at all kills a lord, and the deck has no way to heal a hero back up that matters.",
+ "looks": {
+  "early": "Three lords hung with Projections and blades before the first draw.",
+  "mid": "Projections flickering out one per hit; Nobunakin attacking twice; your Abilities coming back to your hand.",
+  "late": "A lord with no Projection left, and an Idej Projector held back for him."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Before a card is drawn her three lords already wear Idej Projections and blades.",
+   "why": "A Projection cancels one hit however small: Flame Avalanche and Chain Lightning take one off every lord at once. She attacks twice a turn from the start, so there is no quiet time to build in."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Most Projections are gone; Todugawin's Onima has sent two of your Destruction Magic back to your hand.",
+   "why": "A hundred health: any hit that lands kills a lord. Do not rebuild levels into Onima; count Projections and spend one hit more than she has."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Nobunakin, sword in hand, lines up two attacks on your caster; she has the gold for an Idej Projector.",
+   "why": "Two big single hits a turn are what Homerun!, Cloud in a Bottle and Firewall answer. The Projector only matters if you swing into it: make her spend it on a zap."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "One lord left, and no Projections.",
+   "why": "A hundred health and nothing in the way."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Before a card is drawn, Daiyo wears three Idej Projections and Todugawin three blades.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: one Projection off every lord"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning does the same and starts the race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Stack Destruction Magic while she watches"
+     }
+    ]
+   },
+   {
+    "board": "Nobunakin equips Idej Sword - Muras for nothing and attacks twice.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, to strip his Projections"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial: it cannot be cancelled"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up and hope the hits miss your caster"
+     }
+    ]
+   },
+   {
+    "board": "Todugawin's Onima lands on Tarleinn: two Destruction Magic go back to your hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Re-attach one and sweep with what you have"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial into Todugawin"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach both, slowly, into the next Onima"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "One Projection left on each lord.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning now and a second spell after it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche, and let the Storm finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for The White Eye"
+     }
+    ]
+   },
+   {
+    "board": "Daiyo, through Kogarasu, casts a Magic Hammer he has no business casting.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "He has no Projection left: kill him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal and rebuild"
+     }
+    ]
+   },
+   {
+    "board": "She pays for an Idej Projector: a Projection goes back on as your spell resolves.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "A second spell this turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Let the Storm's zaps eat it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Heavy Hit stuns your caster; Nobunakin still has his second attack.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle now, Tea next turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade: Acid Vial on Nobunakin"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach and pray"
+     }
+    ]
+   },
+   {
+    "board": "Whirlwind Strike across two of your heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! on the one that would fall"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race her last Projection"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild afterwards"
+     }
+    ]
+   },
+   {
+    "board": "Thieving Strike takes a card out of your hand as it lands.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Firewall face-down on the next target"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Todugawin alone, bare of Projections.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Any spell at all"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh stands Nobunakin up for two more attacks.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the last lord instead"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Her last card is an Idej Projector, and she has the gold.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Two hits: the Projector stops one"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Zap first, spell second"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

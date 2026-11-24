@@ -1,0 +1,227 @@
+{
+ "id": "tariq",
+ "name": "Tariq Aziz",
+ "firstName": "Tariq",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "GD",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, upper floor",
+ "romance": false,
+ "deck": "Grand Rebellion (Rebelliokai)",
+ "look": "Lean, brown-skinned, with a sharp fade and one deliberate curl on top, a gold Game Design jacket worn with the cuffs rolled and the blue collar open. A pair of white cotton archive gloves sticks out of one pocket and a fountain pen is clipped in the other. He leans on shelving as if he owned it and looks at people with one eyebrow already raised.",
+ "voice": "Quick, amused and teasing, London with his mother's Lahore vowels on the long words; he asks questions he already knows the answer to and enjoys watching people work it out. Too clever by half and aware of it. When something has actually gone missing the banter stops and he becomes exact, quiet and rather formidable. RARE habit (once in a scene at most; most scenes go without it): giving a shelf mark for something, as if everyone knew the catalogue.",
+ "lines": [
+  "Gloves on, pencils only, and if you breathe on case four I'll know. Welcome to the archive.",
+  "You've asked for the same box three times this month. Either you love production records or you're looking for something. Which is more interesting?",
+  "Spirits who've had enough of being told where to stand — that's my deck. I find it relatable in a filing job.",
+  "Somebody moved this ledger two inches to the left on Tuesday night. I'm not angry. I'm fascinated."
+ ],
+ "intro": "A sharp, teasing second-year Game Design student who works shifts as the card archive's student archivist and seems to know exactly where everything is — and when it has moved.",
+ "traits": [
+  {
+   "id": "tariq_1",
+   "text": "He is the card archive's work-study archivist and knows its shelves better than the staff.",
+   "how": "Card archive, most afternoons."
+  },
+  {
+   "id": "tariq_2",
+   "text": "He keeps cotton gloves in his pocket and makes everyone else wear a pair too.",
+   "how": "Ask to see anything old."
+  },
+  {
+   "id": "tariq_3",
+   "text": "He notices when anything in the archive has been moved, borrowed or put back wrong.",
+   "how": "Put something back wrong."
+  },
+  {
+   "id": "tariq_4",
+   "text": "He teases everybody and is hardest on people he likes.",
+   "how": "Be liked."
+  },
+  {
+   "id": "tariq_5",
+   "text": "His deck is a rebellion of minor spirits, and he designed three of its fan cards himself.",
+   "how": "Play him; he will show the drafts."
+  },
+  {
+   "id": "tariq_6",
+   "text": "He grew up over his uncle's second-hand bookshop in Walthamstow and was cataloguing at nine.",
+   "how": "Ask how he got the job."
+  },
+  {
+   "id": "tariq_7",
+   "text": "He writes everything in fountain pen, in a small ledger hand, including shopping lists.",
+   "how": "See his reading-room register."
+  },
+  {
+   "id": "tariq_8",
+   "text": "He has a private list of things in the archive that do not add up, and it has been getting longer.",
+   "how": "Friend stage; after the middle of Term 1."
+  },
+  {
+   "id": "tariq_9",
+   "text": "He would rather be let in on a secret than be the one who catches it, and nobody has ever given him the choice.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Tariq Aziz is the son of a Lahore-born pharmacist mother and a Walthamstow minicab-owner father, raised mostly in his uncle Imran's second-hand bookshop, where he learned two things: how to catalogue, and that every collection is a story about what somebody wanted kept. He is at the Academy on a work-study place — twelve hours a week in the Card Archive under Professor Ashdown's nominal supervision — and he is very good at it: the reading-room register is in his hand, the shelf list is his revision, and he can tell from a hair's breadth of dust that a box has been opened. He is curious, teasing and too clever by half, which he uses to keep people at exactly the distance he chooses. Wound: he has always been the bright boy who catches things — the shoplifter, the mis-shelved first edition — and has never once been the person someone trusted BEFORE he found out. Contradiction: the archive's watchdog would much rather be an accomplice. Private joke: he files his own diary under a shelf mark in the production records, on the theory that nobody reads them. He is wrong about that.\nWhat he knows and has noticed (consistent with the plot file's M9 and M5/M7 threads). (1) The production records include a tall ledger, PRINT WORKS WELFARE FUND: eleven names, thirty years of quarterly payments, 'no claim' countersigned yearly, rows ending in 'deceased'; initialled C.K. for twenty years and L.M. for the last ten. He shelved it himself, has read it, and has understood about half: that it is hush money, not for what. He has noticed that one name is 'M. Helical (née Vane)' and that a first-year called Helical has asked for that range of shelf marks three times. (2) That same first-year sits in the reading room far more than her rank explains, never signs for anything she does not then look at, and once left a box two inches out of true. He has said nothing to Ashdown. He has started arranging to be on shift when she comes. (3) The Alpha case: twenty-two cards on the brass plate; he logs the case thermometer on every shift because it reads warm and he has never been told why. On the night of Day 70 somebody enters on Professor Santángel's credential; from his next shift one card in the case is, to his eye and his thermometer, wrong — an excellent modern reprint — and there is a white cotton thread in the hinge. His own archive gloves are white cotton. He is therefore both the first person to know and the most convenient person to blame, and he knows that too. (4) Requests: Santángel's 'conservation loans', Gideon Pryce's interest in the admissions register and the case count, Octavia Sterling's pull of three years of summary accounts, a grey-suited visitor who asked, pleasantly, how one would go about 'deaccessioning'.\nHe is smitten with Leona Helical: the one reader who is as careful as he is, and plainly up to something. That puts him squarely in her way. If she tries to remove or copy the fund ledger without him, he will notice the same night; what he does then — report it, confront her, or quietly leave the right box on the right table — depends on whether anyone has shown him he can be let in. He is an obstacle or an ally, and the difference is being asked. If Rowan is close to Leona, Tariq is a rival with a sense of humour about it and a real claim: he can give her the one thing she came for by the front door.\nAfter Day 40 he does what an archivist does: he looks for precedent, and finds that the oldest file on Charter Duels has a nine-year gap. Arc: from catching people out to choosing a side before he has all the facts.",
+ "wants": "To be told a secret instead of having to find it.",
+ "fears": "Being the obvious culprit: the clever boy with the keys and the gloves, when something goes missing on his watch.",
+ "crush": "leona",
+ "crushNote": "She is the only reader as careful as he is, and she is obviously after something in his shelves. It shows as his being on shift whenever she comes, the right box 'happening' to be out already, teasing that is really a question — and saying nothing at all to his supervisor.",
+ "crushPace": 0.8,
+ "likes": [
+  "Being let in on a plan",
+  "A question he cannot answer from the catalogue",
+  "People who put things back properly",
+  "Being teased back with equal wit",
+  "Old paper, good ink, marginalia",
+  "Honesty about what one is really looking for",
+  "Strong tea in the reading room (strictly forbidden; he makes it)"
+ ],
+ "dislikes": [
+  "Bare hands on old stock",
+  "Being lied to about a request slip",
+  "Being treated as the help",
+  "Anything removed without a signature",
+  "Professors who 'borrow'",
+  "Being the last to know"
+ ],
+ "gifts": [
+  "Card: Rebelliokai Kind Kitsune",
+  "A bottle of blue-black fountain-pen ink",
+  "Card: Secret Spell Book",
+  "A second-hand book with someone else's notes in the margins",
+  "The truth about what you are looking for"
+ ],
+ "events": [
+  {
+   "id": "tariq_e1",
+   "stage": 1,
+   "title": "Pencils only",
+   "condition": "Use the reading room of card_archive properly at least twice (gloves, register, everything put back), and hold your own when he teases you about what you are reading.",
+   "hint": [
+    "The student archivist decides how helpful the archive is going to be. He likes readers who put things back.",
+    "Become a careful regular in the card archive and give as good as you get."
+   ]
+  },
+  {
+   "id": "tariq_e2",
+   "stage": 2,
+   "title": "Two inches to the left",
+   "condition": "Bring him something that does not add up (a card that reads warm, an odd request you overheard) and ask to see his own list; tell him honestly one thing you are looking for.",
+   "hint": [
+    "He keeps a list of things in the archive that do not add up. He would like to compare notes.",
+    "Trade an honest puzzle with him and ask about the oddities he has noticed."
+   ]
+  },
+  {
+   "id": "tariq_e3",
+   "stage": 3,
+   "title": "Let in",
+   "condition": "After Day 70, tell him what you know about the wrong card in the case BEFORE he is accused, and — with Leona's consent, if her route or trust allows — bring him into what she is looking for instead of working round him. He takes a ledger off the shelf and leaves the room for ten minutes.",
+   "hint": [
+    "Something will go missing on his watch, and he is the obvious person to blame. He has also been waiting a long time to be asked for help rather than permission.",
+    "Warn him before suspicion falls on him, and trust him with the real reason for your interest in the archive."
+   ]
+  }
+ ],
+ "bonds": {
+  "leona": {
+   "label": "crush",
+   "text": "The only reader as careful as he is, and plainly looking for something on his shelves. He arranges to be on shift when she comes.",
+   "public": false,
+   "from": 12
+  },
+  "wren": {
+   "label": "friends",
+   "text": "She is in the archive every afternoon with a lamp and a tuning fork. He lets her stay past closing and pretends he has not.",
+   "public": true,
+   "from": 0
+  },
+  "eloise": {
+   "label": "friends",
+   "text": "Brings her the original art proofs and stands guard over them while she stares. He has had to take the turpentine rag off her twice.",
+   "public": true,
+   "from": 9
+  },
+  "junho": {
+   "label": "mentor",
+   "text": "A first-year who reads the errata files for pleasure. Tariq sets him puzzles from the rejected-design boxes.",
+   "public": true,
+   "from": 6
+  },
+  "helical": {
+   "label": "friends",
+   "text": "The professor asks for the old table schematics and, once, for a box he then did not open. Tariq logged it and did not ask.",
+   "public": false,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "protégé",
+   "text": "His supervisor on paper. She lets him run the reading room and has asked him, oddly, to tell her if anyone asks for nine-year-old files.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "friends",
+   "text": "The council president pulls accounts from the stacks and returns them in order. He respects that and reads what she asked for.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "White gloves that are not archive issue, and too many questions about the case count and the admissions register.",
+   "public": false,
+   "from": 20
+  },
+  "chuck": {
+   "label": "protégé",
+   "text": "The Founder wanders in, tells him a card's 'real' story and leaves. Tariq has started filing them, and they cross-reference.",
+   "public": true,
+   "from": 0
+  },
+  "felix": {
+   "label": "friends",
+   "text": "Year-mate in Game Design; Felix draws on his request slips.",
+   "public": true,
+   "from": 0
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "Signs out first prints on 'conservation loan' and returns the forms late. Tariq keeps copies.",
+   "public": false,
+   "from": 0
+  },
+  "imara": {
+   "label": "friends",
+   "text": "The treasurer returns every volume to the right shelf mark and argues with him about ink. He likes her a good deal and has not looked up from the catalogue long enough to see more.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "card_archive",
+   "Evening": "card_archive",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "card_archive",
+   "Midday": "library",
+   "Afternoon": "card_shop",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Rebelliokai: small yokai that hide, swap and transform, then turn on whatever was bossing them about. He plays tricky, teasing lines and talks through all of them.",
+  "tilt": "Being out-teased, or learning mid-game that something has been kept from him. He stops playing the board and starts interrogating."
+ }
+}

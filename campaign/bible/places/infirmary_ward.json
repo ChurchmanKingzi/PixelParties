@@ -1,0 +1,20 @@
+{
+ "name": "Ward B",
+ "zone": "campus",
+ "bg": "infirmary_ward",
+ "night": false,
+ "part": "infirmary",
+ "hours": "A back ward opened on Day 40 and kept closed to visitors 'for the patients' rest'; Camille or a hired night nurse is always present.",
+ "sight": "A long room with drawn blinds and a row of iron beds. In each occupied one, someone lies or sits propped on pillows with open eyes, breathing slowly, looking at nothing. Drips tick. A deck box stands on each bedside table like a get-well card, because nobody knew what else to bring. It is very clean and very quiet, and you find yourself walking on the sides of your feet.",
+ "things": [
+  "Sit with a patient and talk, in case it helps",
+  "Read the chart at the foot of a bed",
+  "Watch a patient's eyes when someone riffles a deck nearby",
+  "Bring flowers, a card, or the thing they loved",
+  "Help Camille turn and wash patients on an orderly shift",
+  "Count the empty beds, already made up",
+  "Notice the small things: the frost-burn on a fingertip, the hand that keeps the shape of a held fan of cards"
+ ],
+ "secret": "Does not exist as a visitable place before Day 40. Occupants by default (plot timeline; each preventable): Brant (D40), the ladder shark (D52), Tomi (D66), a Spectral student (D84), Brant's friend (D100: Ward B full, Ward A opens), Kenji (D118), Priya (D131), Dom (D141), Willas (D150), Rex Tanaka (D168); on Day 172 they are to be shipped to the mainland unless that is stopped. The Hollowed are not sick: each responds faintly to one thing only, the thing that was taken (per patient: `responds` in the plot file's GUEST.hollowings), and all of them to true first-print cards (the pupils track the card, the skin warms). Each lacks exactly what was wagered — Brant's ante can be worked out here (he answers to no name; his gold chain was taken off because he kept trying to give it away). Camille's wall chart correlates each case with a Charter Register entry — she gets there on her own by about Day 70 if Rowan has not helped. D27+ '{H}' visits once, politely, stands at the foot of Brant's bed and says 'He is keeping very well' — if Rowan witnesses it, it is a major clue. All of them wake at once if the Guest loses the final duel.",
+ "access": "Closed to students. Entry as orderly (job), with camille's trust, as the roommate/friend of a patient after Day 67, or by slipping in."
+}

@@ -1,0 +1,227 @@
+{
+ "id": "gideon",
+ "name": "Gideon Pryce",
+ "firstName": "Gideon",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S5",
+ "romance": false,
+ "deck": "Guardians of the Treasure Cave (Guardian Beasts)",
+ "look": "Pale, with slicked black hair, a thin smile that does not reach grey eyes, and white cotton gloves he removes only to shuffle. His red jacket is spotless, the white, gold-edged Spectral collar starched. He has a way of standing at the edge of a group so that he can see everyone's hands.",
+ "voice": "Soft, clipped and courteous to the point of insult; he lowers his voice where others would raise it. He asks casual questions that are not casual and files the answers, and his compliments leave a mark. RARE habit (once in a scene at most; most scenes go without it): a silken 'How resourceful.'",
+ "lines": [
+  "Vance. The Wildcard. How resourceful of the admissions office. I'm sure the bungalows are charming at low tide.",
+  "Cards are assets. One doesn't put fingerprints on assets — hence the gloves.",
+  "Where did you say he goes at night? I only ask because I take an interest.",
+  "Everyone here is being evaluated by someone. I simply prefer to know by whom."
+ ],
+ "intro": "A Spectral first-year in white gloves who looks down on the Commons with exquisite politeness and seems to take an interest in everybody's business.",
+ "traits": [
+  {
+   "id": "gideon_1",
+   "text": "He wears white gloves at all times except when shuffling.",
+   "how": "Visible at once."
+  },
+  {
+   "id": "gideon_2",
+   "text": "He refers to the Commons as 'the cove' and has never set foot in it.",
+   "how": "First conversation."
+  },
+  {
+   "id": "gideon_3",
+   "text": "He lost the first-year representative election by eleven votes and congratulated the winner flawlessly.",
+   "how": "Around Day 12."
+  },
+  {
+   "id": "gideon_4",
+   "text": "He asks a great many questions about other students and remembers every answer.",
+   "how": "Talk to him twice."
+  },
+  {
+   "id": "gideon_5",
+   "text": "His deck is a row of guardians that punish whoever attacks first; he never attacks first.",
+   "how": "Play him."
+  },
+  {
+   "id": "gideon_6",
+   "text": "His family's firm makes licensed Pixel Parties sleeves and deck boxes; half the school is using his surname without knowing it.",
+   "how": "Read the small print on a pack of sleeves, or a slip from Ashton."
+  },
+  {
+   "id": "gideon_7",
+   "text": "He speaks about his father with a stiff, careful pride, as if describing someone who has been ill.",
+   "how": "Only if he is cornered or, unexpectedly, shown kindness."
+  },
+  {
+   "id": "gideon_8",
+   "text": "He keeps a small black notebook in his inside pocket and writes in it after conversations.",
+   "how": "Watch him leave a room."
+  }
+ ],
+ "secret": "Gideon is not what he dresses as. Pryce & Hallam, his family's firm, has made licensed Pixel Parties accessories — sleeves, playmats, deck boxes — for twenty years, and it is hollow: the company is in debt to an investment fund controlled by Lucian Marrow, who holds his father's note and could call it tomorrow. Gideon was sixteen when he sat in a car beside his father, Howard, a proud man, and watched him cry after a meeting with 'the fund'. He learned the lesson whole: loyalty is for people who cannot afford anything else; be the one holding the file. Marrow keeps him, in his own phrase, 'on a leash of debt' and has promised a guaranteed pro contract at the end of it. The job: be eyes and ears. He reports by a prepaid phone, calling Marrow 'sir' — Viktor Hale's maps (kept in the left pannier), Inya's Thursday visits to her grandfather's workshop, Chuck's sea-chest, the count of first prints in the Archive case, and what Professor Santángel's lab is really doing (Marrow does not trust Santángel either). He worked out who 'Inya Bell' is by himself and told Marrow on Day 14, and could not resist hinting at it to her face days before the roster was printed. The elitism is camouflage laid on with a trowel by a boy terrified of anyone learning that the money is gone; the gloves are because his hands sweat. Contradiction: he despises the Commons kids for being exactly as precarious as he is. He likes Ashton more than he intends to — Ashton is kind to him without wanting anything, which Gideon cannot parse — and he is unsettled by Georgie, who beat him in the placement duel and said 'sorry'. Private habit: he writes his reports twice, once true and once as sent.\nAfter the bang Marrow wants the crater; Gideon gets him the cordon schedule. On the night of Day 72 he walks into the Card Archive on Santángel's credential and swaps one Alpha for an excellent modern reprint (a white cotton thread stays in the case hinge); he turns over Pippa's darkroom around the same time and searches her room around Day 80 if nobody has stopped him. He is clever enough to notice '{H}' early and afraid of it in a way he cannot explain — it looked at him once and said 'You have two faces as well. Are you polite?' If {H}'s shape is publicly exposed before Day 106, the Guest takes Gideon over the winter break (he stays on the island alone at Marrow's instruction; nobody would notice a change in a boy who never showed himself to anyone): from Day 106 'Gideon' is the Guest, better dressed, with Marrow's secrets as well. If not, his arc is the choice between Marrow and the first people who were ever decent to him. He turns if he is shown that Marrow's fund has ALREADY called in his father's note (Octavia can find that in the accounts): then his true reports are devastating evidence.",
+ "wants": "To be the one who holds the file, so that nobody can ever do to him what was done to his father.",
+ "fears": "Being found out as a debtor's son and a spy — and, worse, as someone nobody would miss.",
+ "crush": "fiona",
+ "crushNote": "Everything he has built says a Pryce does not look twice at a girl from the bungalows in black lace, and he cannot stop. It shows as him being on the same path too often, an exquisite rudeness to her admirers, and gloves taken off to shuffle when she is watching.",
+ "crushPace": 0.5,
+ "likes": [
+  "Being underestimated and then acknowledged",
+  "Information offered freely",
+  "Good manners, pressed clothes",
+  "Being beaten by better play (he respects it and hates that he does)",
+  "Being treated decently when he has given no reason",
+  "Discretion"
+ ],
+ "dislikes": [
+  "Being asked how the family business is doing",
+  "Sloppiness",
+  "Georgie's 'sorry'",
+  "Anyone reading over his shoulder",
+  "Loud loyalty",
+  "Being pitied"
+ ],
+ "gifts": [
+  "Card: Mao, the Vengeful Guardian",
+  "A pair of fine cotton gloves from the boutique",
+  "Card: Guard Duty",
+  "A plain black notebook",
+  "Earl Grey tea"
+ ],
+ "events": [
+  {
+   "id": "gideon_e1",
+   "stage": 1,
+   "title": "How resourceful",
+   "condition": "Beat him in a duel (or lose narrowly) and decline to gloat; answer one of his casual questions with a question of your own.",
+   "hint": [
+    "He looks down on you. He is also watching you more carefully than anyone.",
+    "Play him well and do not rise to his sneers."
+   ]
+  },
+  {
+   "id": "gideon_e2",
+   "stage": 2,
+   "title": "By whom",
+   "condition": "Catch him out once (a phone call at harbor in which he calls someone 'sir', around Day 62, or the truth about the family firm) and keep it to yourself instead of exposing him; tell him so.",
+   "hint": [
+    "He has something to hide that is not what you would guess. What you do with it matters to him.",
+    "Find out one of his secrets and do not use it against him."
+   ]
+  },
+  {
+   "id": "gideon_e3",
+   "stage": 3,
+   "title": "The true copy",
+   "condition": "After Day 66, offer him a way out that does not require humiliation, with Ashton or Georgie having shown him kindness; he hands over the uncensored version of his notebook and warns Rowan about what is planned for the crater.",
+   "hint": [
+    "He writes everything down twice. One of the two copies could change a great deal.",
+    "Give him a decent way to change sides, and he will give you what he really knows."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "rivals",
+   "text": "He worked out who 'Inya Bell' really is by the second week, reported it, and could not resist hinting at it to her face.",
+   "public": false,
+   "from": 14
+  },
+  "ashton": {
+   "label": "friends",
+   "text": "Kind to him without wanting anything, which Gideon cannot work out. Useful cover, and more than that.",
+   "public": true,
+   "from": 3
+  },
+  "georgie": {
+   "label": "rivals",
+   "text": "A child beat him and apologised. He has not got over either half.",
+   "public": true,
+   "from": 1
+  },
+  "teobalt": {
+   "label": "rivals",
+   "text": "Lost the first-year rep election to him by eleven votes and shook his hand flawlessly.",
+   "public": true,
+   "from": 10
+  },
+  "pippa": {
+   "label": "distrusts",
+   "text": "She points that camera at everything. He would like to know what is on it.",
+   "public": false,
+   "from": 20
+  },
+  "marrow": {
+   "label": "owes",
+   "text": "Marrow pays his fees and his tailor. Gideon reports to him weekly.",
+   "public": false,
+   "from": 0
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "Watches the professor's lab on Marrow's behalf; Marrow does not trust Santángel either.",
+   "public": false,
+   "from": 8
+  },
+  "brant": {
+   "label": "distrusts",
+   "text": "Holds two of Brant's IOUs and uses him for errands; thinks him a blunt instrument.",
+   "public": false,
+   "from": 15
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "Useful, tireless and incapable of discretion. Gideon lets him talk and takes notes.",
+   "public": true,
+   "from": 2
+  },
+  "fiona": {
+   "label": "crush",
+   "text": "Everything he has built says a Pryce does not look twice at lace from the bungalows. He cannot stop.",
+   "public": false,
+   "from": 10
+  },
+  "tobias": {
+   "label": "enemies",
+   "text": "A thug in a hood who has been seen on the Spectral stairs. Gideon has reported it and been ignored.",
+   "public": true,
+   "from": 6
+  },
+  "anni": {
+   "label": "distrusts",
+   "text": "A floor monitor with a red pen and a notebook of who is in the corridor at night. Inconvenient.",
+   "public": true,
+   "from": 5
+  },
+  "tariq": {
+   "label": "distrusts",
+   "text": "A work-study archivist who writes down who asks for what. An obstacle — and, if needed, a scapegoat with gloves of his own.",
+   "public": false,
+   "from": 20
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "council_room",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_terrace",
+   "Midday": "harbor",
+   "Afternoon": "cafe",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Guardian Beasts lined up to punish the first attacker; he never commits first and wins on the counter-swing. Plays the opponent's file, not the board.",
+  "tilt": "An opponent who simply does not attack — or who knows something about him and lets it show."
+ }
+}

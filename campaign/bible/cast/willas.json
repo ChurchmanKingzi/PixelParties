@@ -1,0 +1,216 @@
+{
+ "id": "willas",
+ "name": "Willas Tann",
+ "firstName": "Willas",
+ "age": 22,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 4,
+ "dorm": "spectral",
+ "room": "Spectral Tower, upper floors",
+ "romance": false,
+ "deck": "Hot-Blood Overdrive (Destruction recoil, Tazune)",
+ "look": "Stocky, with red-brown spiky hair, a heavy dusting of freckles and a scar through his left eyebrow from a bunk bed in first year. His sleeves are always rolled to the elbow and his jacket is usually tied round his waist. He takes up more room than his size explains.",
+ "voice": "Loud, fast and blunt, with broad Yorkshire vowels that get broader with temper. Insults arrive before thought and apologies about ninety seconds later, clumsier and twice as sincere; he goes quiet and careful only around Lilia and around anyone in tears. RARE habit (once in a scene at most; most scenes go without it): an absurd household insult ('you absolute teaspoon').",
+ "lines": [
+  "Who taught you to shuffle, a cement mixer? Give it here. Like that. See? Not hard.",
+  "I know what they say about me. I can read. I'm standing right here, Achterberg.",
+  "Sorry. That came out wrong — most things do. You all right? I'm making tea.",
+  "She could've had anyone on that team and she picked me. I'm not handing the seat back because it'd be polite."
+ ],
+ "intro": "Battle Team starter and the captain's boyfriend: a fourth-year hothead who will insult your shuffle and then carry your luggage up the hill.",
+ "traits": [
+  {
+   "id": "willas_1",
+   "text": "He started in the Commons and still turns up at Mama Odalys's kitchen most Sundays.",
+   "how": "Be in the Commons kitchen on a weekend."
+  },
+  {
+   "id": "willas_2",
+   "text": "He carries first-years' boxes on arrival day every year and pretends it is a punishment detail.",
+   "how": "Day 1 at the ferry dock."
+  },
+  {
+   "id": "willas_3",
+   "text": "He loses his temper in seconds and apologises within two minutes, every time.",
+   "how": "Any scene with him lasting longer than two minutes."
+  },
+  {
+   "id": "willas_4",
+   "text": "He knows he is the weakest starter on the team and has read every thread that says so.",
+   "how": "Overhear Dom or Priya, or catch him scrolling at the student lounge."
+  },
+  {
+   "id": "willas_5",
+   "text": "His father is a bus mechanic in Hull; Willas can strip and rebuild the Commons generator.",
+   "how": "A power cut at the bungalows, or ask Baylee who fixed it last year."
+  },
+  {
+   "id": "willas_6",
+   "text": "His deck hurts him as much as his opponent, and he says that is the only honest way to play.",
+   "how": "Play him or watch him at the great arena."
+  },
+  {
+   "id": "willas_7",
+   "text": "He practises three hours a night after Lilia is asleep so she will not see how hard it is for him.",
+   "how": "Find him at the trial dome at Night."
+  },
+  {
+   "id": "willas_8",
+   "text": "He once walked a crying first-year the whole way back to the Commons in the rain and never told anyone, including her name.",
+   "how": "From Mama Odalys or Rana, once you are a Friend."
+  }
+ ],
+ "secret": "Willas knows, precisely and without self-pity, that he is an average player on a team of monsters. What nobody credits is that he is there for a reason beyond love: in three years he has never once tilted in a team match, because nothing an opponent says is worse than what he has already read about himself. Lilia calls him her floor. His wound is older than the Academy — a kid who was told he was thick so often that he made being loud his whole personality so nobody would test it. The insults are a flinch. The heart of gold is not a contradiction; it is the same reflex pointed outward: he cannot stand to see anyone else feel small. Private habit: he keeps a list on his phone titled 'sorry', of people he has snapped at and not yet apologised to, and clears it every Sunday.\nHe does not believe in ghost stories and shrugs off the bang. After Day 40 he is the one who physically carries Brant — whom he loathes — to the infirmary. By Stage C he has watched '{H}' play and understood two things before anyone else on the team: that it is better than Lilia, and that Lilia wants to play it. On Day 150 the Guest issues its challenge to her. Willas learns the hour and place, goes to the great arena alone that night and stands in her place under Article 5 of the Charter ('one who is bound to a party may stand in that party's place' — Noor could explain it); the Guest, scrupulous, asks him three times whether he understands and accepts a willing proxy. He plays the best game of his life and it is not close. Lilia finds him at dawn at her own table. It is the one clever thing he ever does and it is done out of love and terror. Preventable only if Rowan has his trust and offers a real alternative, or if Lilia is told in time. Hollowed, he lies in ward B with his sleeves still rolled.",
+ "wants": "To deserve the seat she gave him, just once, in front of everybody.",
+ "fears": "Being the reason Lilia loses something that matters.",
+ "crush": "lilia",
+ "crushNote": "Already his, and he still cannot quite believe it. It shows as volume dropping by half when she walks in, and as three hours of secret practice a night so that she never has to defend him.",
+ "crushPace": 1,
+ "likes": [
+  "Being asked for help carrying, fixing or lifting anything",
+  "People who shout back and then laugh",
+  "Strong tea with too much sugar",
+  "Loyalty to friends in public",
+  "Commons food and Commons kids",
+  "Being asked to teach something practical",
+  "Anyone standing up to bullies"
+ ],
+ "dislikes": [
+  "Whispering about his team place",
+  "Smugness, cravats and people who say 'actually'",
+  "Anyone making a first-year cry",
+  "Being managed or handled",
+  "Flirting with Lilia",
+  "Being thanked too much"
+ ],
+ "gifts": [
+  "Card: Tea",
+  "A proper adjustable spanner",
+  "A bag of Yorkshire-style toffee from the cafe",
+  "Card: Elixir of Rage",
+  "A Hull City scarf found at the pawn shop"
+ ],
+ "events": [
+  {
+   "id": "willas_e1",
+   "stage": 1,
+   "title": "Luggage detail",
+   "condition": "On Day 1 at ferry_dock let him carry your box (or carry someone else's with him), take the insult about your shuffle and give one back.",
+   "hint": [
+    "The loud one on the dock is not as unfriendly as he sounds.",
+    "Accept his help on arrival day and don't be precious about being insulted."
+   ]
+  },
+  {
+   "id": "willas_e2",
+   "stage": 2,
+   "title": "Three hours a night",
+   "condition": "Find him practising alone at trial_dome at Night (after Day 33), offer to be his sparring partner for at least three sessions, and never mention it to anyone on the team.",
+   "hint": [
+    "He works hardest when nobody is looking. He could use someone across the table.",
+    "Catch him training late at the Trial Dome and become his regular practice partner — quietly."
+   ]
+  },
+  {
+   "id": "willas_e3",
+   "stage": 3,
+   "title": "The sorry list",
+   "condition": "After Day 106, having defended his team seat out loud in front of Dom or Priya at least once, tell him what you believe '{H}' is before Day 150; he makes Rowan promise something and shows him the list on his phone.",
+   "hint": [
+    "He is carrying a decision alone. He would share it with someone who has stood up for him.",
+    "Stand up for him publicly, then share what you know with him honestly before mid-term of the second semester."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "dating",
+   "text": "The best thing that ever happened to him, and the reason he knows what people say.",
+   "public": true,
+   "from": 0
+  },
+  "dom": {
+   "label": "rivals",
+   "text": "'Achterberg and his spreadsheet.' Knows exactly what Dom thinks and that he says it only in meetings.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "rivals",
+   "text": "She wants his seat and tells him so to his face. He respects that more than he shows.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "teammates",
+   "text": "Brings the Grinder tea he does not drink.",
+   "public": true,
+   "from": 0
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Gets on with her easily; she teases him and it never stings.",
+   "public": true,
+   "from": 0
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "Coach has never once made him feel like the weak link.",
+   "public": true,
+   "from": 0
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "He started in the Commons; her kitchen is still home on Sundays.",
+   "public": true,
+   "from": 0
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "Has thrown him out of the Commons twice and would do it a third time.",
+   "public": true,
+   "from": 0
+  },
+  "eberhart": {
+   "label": "friends",
+   "text": "Called him a wardrobe with a haircut. The lad didn't blink. Willas likes him.",
+   "public": true,
+   "from": 1
+  },
+  "rafa": {
+   "label": "rivals",
+   "text": "A first-year from RARE HALL telling him about rice. In Mama's kitchen. They cook side by side like two cats.",
+   "public": true,
+   "from": 12
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Tavi is the one proctor he has never argued with. Slipped him once, mind. Fair enough, it was a fair slip.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "great_arena",
+   "Midday": "gym",
+   "Afternoon": "duel_terraces",
+   "Evening": "spectral_terrace",
+   "Night": "trial_dome"
+  },
+  "weekend": {
+   "Morning": "commons_kitchen",
+   "Midday": "boathouse",
+   "Afternoon": "main_street",
+   "Evening": "spectral_terrace",
+   "Night": "trial_dome"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "All-in Destruction Magic that burns his own heroes to burn yours faster; games are over, one way or the other, by the crisis phase. Never tilts in a team match, plays worse in casuals.",
+  "tilt": "Calm, patient opponents who let him hurt himself; and anyone who mentions Lilia mid-game in a friendly setting."
+ }
+}

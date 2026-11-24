@@ -1,0 +1,426 @@
+{
+ "name": "Crystal Gifts",
+ "owner": "livvie",
+ "heroes": [
+  "Cooldin, King of Coolness",
+  "Mary Crestmas",
+  "Arthor, the King of Blackport"
+ ],
+ "main": [
+  [
+   2,
+   "Accusation"
+  ],
+  [
+   2,
+   "Crystal Well"
+  ],
+  [
+   6,
+   "Decay Magic"
+  ],
+  [
+   4,
+   "Destruction Magic"
+  ],
+  [
+   1,
+   "Distracting Crystal"
+  ],
+  [
+   1,
+   "Divine Gift of Biseria"
+  ],
+  [
+   4,
+   "Intrude"
+  ],
+  [
+   4,
+   "Laser Volley"
+  ],
+  [
+   5,
+   "Leadership"
+  ],
+  [
+   4,
+   "Letter of Misinformations"
+  ],
+  [
+   2,
+   "Loot the Leftovers"
+  ],
+  [
+   3,
+   "Magic Amber"
+  ],
+  [
+   1,
+   "Mana Absorbing Crystal"
+  ],
+  [
+   2,
+   "No Retreat!"
+  ],
+  [
+   2,
+   "Performance"
+  ],
+  [
+   1,
+   "Rain of Spores"
+  ],
+  [
+   1,
+   "Silence"
+  ],
+  [
+   4,
+   "Slow"
+  ],
+  [
+   4,
+   "Spike Trap"
+  ],
+  [
+   2,
+   "Spreading Rumor"
+  ],
+  [
+   3,
+   "The Master's Plan"
+  ],
+  [
+   2,
+   "Weakening Crystal"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Bottled Flame"
+  ],
+  [
+   2,
+   "Bottled Lightning"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Potion of Greed"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cooldin, King of Coolness": "Hero",
+  "Mary Crestmas": "Hero",
+  "Arthor, the King of Blackport": "Hero",
+  "Accusation": "Spell (Decay Magic)",
+  "Crystal Well": "Area (Magic Arts)",
+  "Decay Magic": "Ability",
+  "Destruction Magic": "Ability",
+  "Distracting Crystal": "Artifact",
+  "Divine Gift of Biseria": "Spell (Decay Magic)",
+  "Intrude": "Spell (Decay Magic, Attachment)",
+  "Laser Volley": "Spell (Destruction Magic)",
+  "Leadership": "Ability",
+  "Letter of Misinformations": "Artifact",
+  "Loot the Leftovers": "Spell (Decay Magic, Reaction)",
+  "Magic Amber": "Artifact",
+  "Mana Absorbing Crystal": "Artifact",
+  "No Retreat!": "Spell (Decay Magic, Reaction)",
+  "Performance": "Ability",
+  "Rain of Spores": "Spell (Decay Magic)",
+  "Silence": "Spell (Decay Magic, Reaction)",
+  "Slow": "Spell (Decay Magic)",
+  "Spike Trap": "Spell (Decay Magic, Surprise)",
+  "Spreading Rumor": "Spell (Decay Magic)",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Weakening Crystal": "Artifact",
+  "Bottled Flame": "Potion",
+  "Bottled Lightning": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Potion of Greed": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Crystal Well": "Area (Cooldin plays it from the deck on turn one): once per turn each player may hand the other a card they own and draw one.",
+  "Mary Crestmas": "Draws a card for every card Livvie hands you; once per turn cancels damage to herself by making you discard one of Livvie's cards from your hand. Very low health.",
+  "Arthor, the King of Blackport": "Whenever he casts a spell you discard a card.",
+  "Mana Absorbing Crystal": "Sits revealed in your hand and makes every spell you hold one level harder to cast. You can smash it by badly hurting one of your own heroes, or pay a steep price to play it away.",
+  "Distracting Crystal": "While it is in your hand you cannot shuffle cards back into your deck.",
+  "Weakening Crystal": "While it is in your hand the effects of all your heroes are off.",
+  "Letter of Misinformations": "Useless to play; when it is handed to you she looks at your hand and takes up to two cards.",
+  "Laser Volley": "Heavy damage to every target you control unless you discard cards to spare them one by one.",
+  "Slow": "You discard several cards of your choice.",
+  "Magic Amber": "Cheap repeatable discard.",
+  "Spreading Rumor": "She names a card; you discard every copy of it in hand.",
+  "Accusation": "She names a card, sees your hand and discards the copies.",
+  "The Master's Plan": "Reaction: cancels any one card you play from hand, once per turn.",
+  "Silence": "Once per game: cancels a spell and stops you casting more that turn.",
+  "Spike Trap": "Face-down trap: cancels an attack or spell on its hero and hurts the attacker.",
+  "Intrude": "Attachment: when you draw by an effect she gets something out of it too."
+ },
+ "plan": "Livvie gives her deck away. Cooldin opens Crystal Well on turn one, and through it she hands you one card a turn: Crystals that sit revealed in your hand and break something (your spell levels, your shuffling, your hero effects) until you pay dearly to get rid of them, or a Letter of Misinformations that steals your best two cards. Mary draws for every gift and hides behind the very cards you are holding. Slow, Magic Amber, Spreading Rumor and Arthor strip the rest of your hand, Laser Volley asks for what is left, The Master's Plan and Silence guard it. She has no board and very fragile heroes; the whole deck is a wager that you never get to cast.",
+ "looks": {
+  "early": "Crystal Well overhead from turn one and an unwelcome Crystal already face-up in your hand.",
+  "mid": "Your hand half made of her cards; Mary untouched, Arthor casting discard spells, Livvie drawing two for every one she plays.",
+  "late": "Both hands nearly empty, her potions spent, a Spike Trap and one last Master's Plan between you and three weak heroes."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Crystal Well is out and a Mana Absorbing Crystal lies revealed in your hand.",
+   "why": "The Well is the only way she can hand cards over: remove it (The Yeeting, or Cataclysm, which her Area makes free) and pay the Crystal out of your hand; setting up under it is exactly what the Crystals jam."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Mary Crestmas is on low health and Livvie controls no creatures at all.",
+   "why": "Her heroes are the frailest in the school and there is nothing to sweep; every turn spent on anything but hero damage is another gift and another discard."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Arthor has Decay Magic stacked high and she keeps one card apart from the rest of her hand.",
+   "why": "The Master's Plan cancels one card a turn, so lead with a lesser threat and keep the important one for second; anything slow and precious is what the Plan is waiting for."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "She has given away or discarded most of her cards and is living off the top of her deck.",
+   "why": "What remains is a Spike Trap at most, and Storm ticks and Chain Lightning are not aimed at anyone."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Cooldin plays Crystal Well from the deck; next turn she trades you a Mana Absorbing Crystal and draws.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free under her Well"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Mary before the gifts pile up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep levelling around it"
+     }
+    ]
+   },
+   {
+    "board": "A Distracting Crystal arrives through the Well and your Leadership stops working.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Well, pay the Crystal away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mary, cheaply"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for a better hand"
+     }
+    ]
+   },
+   {
+    "board": "A Letter of Misinformations lands in your hand and she takes two of your cards for it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye pressure: strip her hand back"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Play out what you hold before the next letter"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sculpt as if nothing happened"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Mary stands in front with almost no health; two of Livvie's Crystals sit in your hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Pay the Crystals away and burn Mary down"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Chain Lightning: it lands on her heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Look for something to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Laser Volley: every target you control will be hit unless you discard.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Take it and hit back with a full hand"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Discard only for the hero that would die"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Discard your hand to save everyone"
+     }
+    ]
+   },
+   {
+    "board": "Spreading Rumor names Gathering Storm and both copies leave your hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "She spent her turn: burn Arthor"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye her hand in return"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold cards for a sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Arthor has cast twice and you are down to three cards; she holds one card apart.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Lesser spell first, real one second"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks need no cards: defend the caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach Gathering Storm first thing"
+     }
+    ]
+   },
+   {
+    "board": "A Spike Trap waits face-down on Arthor; Mary is nearly dead.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Finish Mary and Cooldin, leave Arthor alone"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the trap"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold cards for a sweep"
+     }
+    ]
+   },
+   {
+    "board": "A Weakening Crystal in your hand has switched off Tarleinn and Nicolas.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Pay it out, then one spell"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fight on with spells alone"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait until you can afford everything"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "She tops, plays, passes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "End it: nothing stops untargeted damage"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard the last card with a White Eye hit"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Keep sweepers for a board that is not coming"
+     }
+    ]
+   },
+   {
+    "board": "Arthor alone behind a Spike Trap; you have a Storm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Let the Storm and Chain Lightning do it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the trap, then cast"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reload your hand"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Biseria freezes your caster for three turns.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Fight with the other two heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze onto Arthor"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait it out"
+     }
+    ]
+   }
+  ]
+ }
+}

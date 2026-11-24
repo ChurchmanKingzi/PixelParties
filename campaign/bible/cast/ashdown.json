@@ -1,0 +1,197 @@
+{
+ "id": "ashdown",
+ "name": "Prof. Imogen Ashdown",
+ "firstName": "Imogen",
+ "age": 38,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": false,
+ "deck": "Field Collection (relics and weapons, Dajan)",
+ "look": "Auburn hair in a practical knot with a pencil through it, a sun-faded field vest with too many pockets over a linen shirt, and boots that have been resoled twice. There is a pale scar across the back of her left hand. She looks at the volcano often and never for long.",
+ "voice": "Brisk, dry and well-organised, Cambridge; a good lecturer and a better deflector, who speaks about the ruins in the careful passive of someone used to being quoted. Under strain her sentences break off. When she forgets herself she talks about the tile-makers with open love. RARE habit (once in a scene at most; most scenes go without it): 'That's outside the syllabus.'",
+ "lines": [
+  "The surface mosaics are decorative. Probably. That's the published view, and it's the one in the exam.",
+  "That's outside the syllabus, Mr Vance. And outside the fence. I'd stay inside both.",
+  "They didn't draw their heroes. They kept them. There's a difference, and I'm afraid I can't — it isn't on the reading list.",
+  "I was twenty-nine and I was told to hold the line. I've been holding it ever since."
+ ],
+ "intro": "Professor of Lore & History of the Game, and the island's archaeologist: brisk, knowledgeable, and oddly reluctant to discuss the ruins outside the syllabus.",
+ "traits": [
+  {
+   "id": "ashdown_1",
+   "text": "She teaches the history of the game and leads the only permitted field trips to the surface mosaics.",
+   "how": "Lore class; first field trip around Day 10."
+  },
+  {
+   "id": "ashdown_2",
+   "text": "She says 'that's outside the syllabus' more than any other sentence.",
+   "how": "Ask her anything interesting."
+  },
+  {
+   "id": "ashdown_3",
+   "text": "She has worked on the island longer than almost any other member of staff.",
+   "how": "Ask how long she has been here."
+  },
+  {
+   "id": "ashdown_4",
+   "text": "She has a scar across her left hand and changes the subject when asked.",
+   "how": "Notice it when she points at a slide."
+  },
+  {
+   "id": "ashdown_5",
+   "text": "She knows every trail on the mountain and which ones the school has taken off the map.",
+   "how": "Meet her on the jungle trail."
+  },
+  {
+   "id": "ashdown_6",
+   "text": "She came here as a graduate student and never left.",
+   "how": "Friend stage."
+  },
+  {
+   "id": "ashdown_7",
+   "text": "She keeps one drawer in her office locked and has a shard of patterned stone as a paperweight.",
+   "how": "Visit her office in the faculty wing."
+  },
+  {
+   "id": "ashdown_8",
+   "text": "She avoids one first-year in particular and watches him when he is not looking.",
+   "how": "Notice her and Viktor in the same corridor."
+  }
+ ],
+ "secret": "What she knows, exactly. Nine years ago Imogen Ashdown, twenty-nine, was Aleksander Hale's graduate assistant and — it is relevant — in love with him, unspoken. She translated most of the surface inscriptions. She knows: the people Hale called the tile-makers (she uses 'Tessellate' in her private notes) left no weapons and no graves, only game pieces; that each tile is described as 'a keeping' — a record of a real being or deed, not an image; that their pictures always include a third, non-playing figure who counts on a knotted cord; that the contest was made 'for those who fall', and that an outcome 'holds both sides'. She did not, then, understand 'those who fall' as literal. Hale had already been as far as the antechamber and copied its wall. On the day, he pressed a first-print card — The Master's Key — into the recess of the Ruin Gate, took four Umbra House students in (his best; they volunteered) and told Imogen to hold the line at the threshold. She held it for hours. Then the screaming started, the students came running out — 'he's flat, he looked at me and he's flat' — and she did the thing she has never forgiven herself for: she pulled the card out of the recess. Within a minute the Gate had folded shut with Aleksander inside; the scar on her hand is from trying to push the card back in as the stone leaves closed. She still carries that card, one corner crushed where her hand closed on it, in the inner pocket of her field vest; the lining has worn pale around it. She told Okonkwo everything that evening, signed what she was asked to sign, and accepted a lectureship that has been a comfortable cell ever since. A photograph of the five of them at the Gate lies face down in her office.\nShe believes Aleksander died behind that door because of her. She does NOT know that he was already a tile before she touched the card, or that he is aware — though 'he's flat' has cost her nine years of sleep and she has a theory she will not write down. She does not know about the twelve pages he tore from his journal the night before and hid in his study. She knows nothing certain about Visitors, but after the bang she rereads 'those who fall' and goes cold. Three years ago she posted Hale's field jacket, compass and journal to his son, anonymously — they had sat in her office since the settlement — because she could not bear either to keep them or to burn them. She recognised Viktor on Day 1. She avoids him out of shame and watches him out of fear. She 'knows more about the ruins than she admits' to everyone, including Santángel (who fishes) and Marrow (who will offer her a research chair from Day 61).\nWound and lie: she tells herself that she only obeyed, and then that she only panicked. Arc: from 'that's outside the syllabus' to walking back to that gate with the card that opens it, as the only living person who can read what is written inside — and telling Viktor, to his face, who shut the door.",
+ "wants": "To be forgiven by a boy who does not know there is anything to forgive, and to read the inside of the gate she closed.",
+ "fears": "That Aleksander is not dead, and that she has left him there for nine years.",
+ "crush": "blum",
+ "crushNote": "He is kind, asks her nothing about the ruins and is the only man on the staff with whom she can sit in silence. It shows as her bringing him field pressings for his notebook, and lingering after faculty meetings to help him find his glasses.",
+ "crushPace": 0.6,
+ "likes": [
+  "Careful observation in the field",
+  "Students who look at a mosaic before photographing it",
+  "Questions asked in private rather than in class",
+  "Respect for sites: nothing taken, nothing moved",
+  "Strong tea in a tin mug",
+  "Honesty about fear"
+ ],
+ "dislikes": [
+  "Souvenir-hunters",
+  "The name Hale said casually",
+  "Santángel's curiosity",
+  "Being asked about her hand",
+  "Students past the fence",
+  "Marrow's 'research chair'"
+ ],
+ "gifts": [
+  "Card: Soul Shard Ka",
+  "A rubbing of a surface mosaic done properly (charcoal, no pressure)",
+  "A tin mug",
+  "Card: Sarcophagus of Sealed Magic",
+  "Lapsang tea from the boutique"
+ ],
+ "events": [
+  {
+   "id": "ashdown_e1",
+   "stage": 1,
+   "title": "On the reading list",
+   "condition": "Go on a Lore field trip to ruins_field and behave like a scholar — take nothing, notice something real about the tiles and ask her about it privately afterwards.",
+   "hint": [
+    "She watches how students behave at the ruins more than what they say in class.",
+    "Join her field trip, respect the site, and ask her a thoughtful question in private."
+   ]
+  },
+  {
+   "id": "ashdown_e2",
+   "stage": 2,
+   "title": "Outside the syllabus",
+   "condition": "After Day 27, bring her something from beyond the fence (a description of the crater glass, a mosaic not on the map) and admit you went; ask what 'a keeping' means. She answers one question truthfully.",
+   "hint": [
+    "She says things are outside the syllabus. She knows precisely how far outside.",
+    "Tell her honestly where you have been on the island and ask her about the tile-makers."
+   ]
+  },
+  {
+   "id": "ashdown_e3",
+   "stage": 3,
+   "title": "Holding the line",
+   "condition": "With Viktor at Friend or higher, bring the two of them into the same room (her office in faculty_wing, or ruin_gate) and stay while she tells him what she did at the Gate; do not let either of them leave before it is said.",
+   "hint": [
+    "There is a conversation she has owed someone for years.",
+    "Help her finally speak to the student she has been avoiding."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "distrusts",
+   "text": "She is sure he knows more about what is under the mountain than he has ever told her.",
+   "public": false,
+   "from": 0
+  },
+  "viktor": {
+   "label": "owes",
+   "text": "Aleksander's son. She sent him the journal; she owes him the rest and cannot make herself say it.",
+   "public": false,
+   "from": 1
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "She signed what the Chancellor put in front of her. They are careful with each other.",
+   "public": false,
+   "from": 0
+  },
+  "silas": {
+   "label": "colleagues",
+   "text": "He guides her field trips and knows which trails she will not take.",
+   "public": false,
+   "from": 0
+  },
+  "josie": {
+   "label": "owes",
+   "text": "Josie was the youngest in that house. Ashdown has never been into the bar.",
+   "public": false,
+   "from": 0
+  },
+  "helical": {
+   "label": "colleagues",
+   "text": "The engineer looks the way she feels. She has never asked him why.",
+   "public": true,
+   "from": 0
+  },
+  "junho": {
+   "label": "friends",
+   "text": "The one student who asked what the pieces meant before asking what they did.",
+   "public": true,
+   "from": 10
+  },
+  "tariq": {
+   "label": "mentor",
+   "text": "The best archive assistant she has had. She has given him the keys to everything but one cabinet.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "ruins_field",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "jungle_trail",
+   "Midday": "ruins_field",
+   "Afternoon": "card_archive",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Collects relics like a dig and then hits you with them: a different weapon fetched each turn, each changing what an ordinary attack does. Scholarly, slow, more interested in the cards than the result.",
+  "tilt": "Alpha cards on the table, and any formal ante — her hands shake and she stops."
+ }
+}

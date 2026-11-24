@@ -1,0 +1,174 @@
+{
+ "id": "blum",
+ "name": "Dr. Ezra Blum",
+ "firstName": "Ezra",
+ "age": 51,
+ "sex": "m",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": false,
+ "deck": "Expected Value (top-of-deck odds)",
+ "look": "A rumpled oatmeal cardigan with chalk on both cuffs, wild grey-brown curls, and spectacles pushed up into them and forgotten. He pats his pockets for the glasses several times an hour. There is usually a die in his hand and a biscuit somewhere on his person.",
+ "voice": "Gentle, rambling and delighted by tangents, New York Jewish cadences worn soft with age; he is never sarcastic and treats every wrong answer as an interesting place to have arrived. Vague about objects, exact about numbers. RARE habit (once in a scene at most; most scenes go without it): losing his thread and deciding the new one is better.",
+ "lines": [
+  "Suppose the deck is shuffled by a very lazy angel. Now — where was I? Doesn't matter, this is better.",
+  "Luck is just the part of the maths you haven't met yet.",
+  "Mr Watanabe, that is your sixth. Hand it over. I'll trade you a biscuit and eight hours.",
+  "I have misplaced my glasses, my chalk and the eighteenth of the month. One of them is on my head."
+ ],
+ "intro": "The Probability & Game Theory lecturer: chalk-dusted, kind, and permanently looking for his glasses.",
+ "traits": [
+  {
+   "id": "blum_1",
+   "text": "His glasses are always on his head.",
+   "how": "First lecture."
+  },
+  {
+   "id": "blum_2",
+   "text": "He gives a biscuit for every good wrong answer.",
+   "how": "Give one."
+  },
+  {
+   "id": "blum_3",
+   "text": "He confiscates Kenji Watanabe's sixth energy drink daily.",
+   "how": "Any class with Kenji."
+  },
+  {
+   "id": "blum_4",
+   "text": "He plays backgammon with the founder on Thursday evenings and loses happily.",
+   "how": "Chuck's workshop, Thursday Evening."
+  },
+  {
+   "id": "blum_5",
+   "text": "He was a quant on Wall Street for six years and walked out one morning.",
+   "how": "Ask why he teaches."
+  },
+  {
+   "id": "blum_6",
+   "text": "He keeps a notebook of 'things that should not have happened' — improbable results, with odds.",
+   "how": "Friend stage."
+  },
+  {
+   "id": "blum_7",
+   "text": "His wife Ruth died four years ago; he still sets the board for two.",
+   "how": "Trusted; faculty wing, late."
+  }
+ ],
+ "secret": "Ezra Blum left a hedge fund at thirty-five after realising he had spent six years calculating how to take money from people who did not understand the bet. He teaches so that fewer people will not understand the bet. He came to the island with his wife Ruth, a botanist (the greenhouse orchids are hers; Okonkwo keeps them going and neither of them mentions it). She died of cancer four years ago and absent-mindedness, which had been a trait, became a place to live. He is the kindest adult on campus and not as vague as he seems: he knows which students do not eat, do not sleep, cannot pay. Contradiction: a man who believes everything is probability and who talks to his dead wife every evening. He knows nothing of the island's secrets and that is his value: he is the honest outsider.\nHis 'should not have happened' notebook is the plot hook. Since Day 27 one student's results have left the distribution entirely: he computes the odds of 'Mr {H:last}'s' unbeaten run by Day 45 and gets a number with forty zeros. He assumes an error in his model, then cheating, then — being intellectually honest — writes 'not chance, not skill as I understand skill'. He also notices that Hollowings are not randomly distributed in time or person. He brings it to the Chancellor, who thanks him and files it; he is troubled for the first time by a colleague he likes. He will help any student who asks, will hide a frightened one in his office, and can give Rowan the one piece of maths that matters: the Guest does not gamble — it only plays games it has already seen the end of — so the only edge is a decision it cannot model.",
+ "wants": "For his students to understand the bet they are making.",
+ "fears": "A world in which the odds genuinely do not apply.",
+ "crush": "okonkwo",
+ "crushNote": "She keeps his wife's orchids alive and has never mentioned it, and he has never mentioned that he knows. It shows as biscuits left in her pigeonhole and a Sunday walk to the greenhouse that he calls checking the humidity.",
+ "crushPace": 0.5,
+ "likes": [
+  "A good wrong answer",
+  "Students who look after each other",
+  "Dice, biscuits, backgammon",
+  "Being reminded where his glasses are, kindly",
+  "Honest uncertainty",
+  "Anyone who gets Kenji to sleep"
+ ],
+ "dislikes": [
+  "Cruelty passed off as rigour",
+  "Gambling with other people's stakes",
+  "Certainty",
+  "Being lied to by colleagues",
+  "Students going hungry",
+  "Energy drinks"
+ ],
+ "gifts": [
+  "A tin of shortbread",
+  "Card: Liquid Luck",
+  "A set of bone dice from the pawn shop",
+  "Card: Tea",
+  "A pressed orchid"
+ ],
+ "events": [
+  {
+   "id": "blum_e1",
+   "stage": 1,
+   "title": "A good wrong answer",
+   "condition": "Attend Probability and offer an answer you are not sure of; visit his office hours in faculty_wing with a real odds question about your own deck.",
+   "hint": [
+    "He rewards people for being wrong out loud.",
+    "Speak up in his class and take him a probability question."
+   ]
+  },
+  {
+   "id": "blum_e2",
+   "stage": 2,
+   "title": "Set for two",
+   "condition": "Play him at backgammon or cards on a Thursday in chuck_workshop, or help him find something he has lost; let him ramble about Ruth.",
+   "hint": [
+    "He loses things. Not all of them can be found.",
+    "Spend a Thursday evening with him and the founder, and listen."
+   ]
+  },
+  {
+   "id": "blum_e3",
+   "stage": 3,
+   "title": "Forty zeros",
+   "condition": "After Day 45, ask to see the notebook of improbable things and tell him what you know; accept his analysis of what cannot be beaten by calculation.",
+   "hint": [
+    "He has done a sum that frightened him.",
+    "Ask him about the calculation that troubles him and tell him what you know."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "friends",
+   "text": "Thursday backgammon and tall stories; he loses to Chuck happily.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "mentor",
+   "text": "A boy working himself to pieces; he prescribes proofs by hand and sleep.",
+   "public": true,
+   "from": 0
+  },
+  "hana": {
+   "label": "colleagues",
+   "text": "Too young to be so tired; he leaves biscuits in her pigeonhole.",
+   "public": true,
+   "from": 0
+  },
+  "helical": {
+   "label": "friends",
+   "text": "Cornelius does not sleep and does not eat. Blum sits with him and talks about dice until he does one or the other.",
+   "public": true,
+   "from": 0
+  },
+  "shirin": {
+   "label": "mentor",
+   "text": "Runs the tutor desk; he sends her whoever is frightened of his chalk.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "faculty_wing",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "greenhouse",
+   "Midday": "cafe",
+   "Afternoon": "library",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "He plays the top of his deck: every payoff reveals the top card, and he has arranged that card beforehand, so the gambles are far less random than they look. Knows every percentage; loses to variance cheerfully and wins more than he should.",
+  "tilt": "Forgetting whose turn it is. Truly: remind him."
+ }
+}

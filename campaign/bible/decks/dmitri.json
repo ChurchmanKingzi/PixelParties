@@ -1,0 +1,383 @@
+{
+ "name": "Sleepless",
+ "owner": "dmitri",
+ "heroes": [
+  "Tsu'Ki, the Lunatic Princess",
+  "Shu'Chaku, the Blood Moon Projection",
+  "Fern, the Ship Slave"
+ ],
+ "main": [
+  [
+   3,
+   "Adventurousness"
+  ],
+  [
+   3,
+   "Cool Repair"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Lunar Eclipse"
+  ],
+  [
+   3,
+   "Lunatic Cycle - Crescent Moon"
+  ],
+  [
+   3,
+   "Lunatic Cycle - Full Moon"
+  ],
+  [
+   3,
+   "Lunatic Cycle - Gibbous Moon"
+  ],
+  [
+   3,
+   "Lunatic Cycle - Half Moon"
+  ],
+  [
+   4,
+   "Lunatic Cycle - New Moon"
+  ],
+  [
+   3,
+   "Lunatic Golem"
+  ],
+  [
+   3,
+   "Lunatic Hawk"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Play Money"
+  ],
+  [
+   3,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Support Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   4,
+   "Wealth"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tsu'Ki, the Lunatic Princess": "Hero",
+  "Shu'Chaku, the Blood Moon Projection": "Hero",
+  "Fern, the Ship Slave": "Hero",
+  "Adventurousness": "Ability",
+  "Cool Repair": "Artifact",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Heal": "Spell (Support Magic)",
+  "Heavy Hit": "Attack",
+  "Lunar Eclipse": "Spell (Magic Arts, Surprise)",
+  "Lunatic Cycle - Crescent Moon": "Artifact (Equipment)",
+  "Lunatic Cycle - Full Moon": "Artifact (Equipment)",
+  "Lunatic Cycle - Gibbous Moon": "Artifact (Equipment)",
+  "Lunatic Cycle - Half Moon": "Artifact (Equipment)",
+  "Lunatic Cycle - New Moon": "Artifact (Equipment)",
+  "Lunatic Golem": "Creature L3",
+  "Lunatic Hawk": "Creature L3",
+  "Magic Arts": "Ability",
+  "Play Money": "Artifact",
+  "Quick Attack": "Attack",
+  "Support Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability"
+ },
+ "gist": {
+  "Lunatic Cycle - New Moon": "First equipment of the chain: discards a card each turn to search the next Moon.",
+  "Lunatic Cycle - Crescent Moon": "Needs a New Moon out. Its hero reshuffles cards whenever it acts.",
+  "Lunatic Cycle - Half Moon": "Needs a Crescent. Its hero cannot lose more than half its health to one hit.",
+  "Lunatic Cycle - Gibbous Moon": "Needs a Half Moon. Its hero ignores status effects.",
+  "Lunatic Cycle - Full Moon": "Needs a Gibbous. A very large Attack bonus.",
+  "Lunatic Golem": "Creature that hits harder for every different Moon on the board.",
+  "Lunatic Hawk": "Creature that gains abilities with each different Moon.",
+  "Lunar Eclipse": "Trap: gives up a Moon to cancel and delete a card you play.",
+  "Tsu'Ki, the Lunatic Princess": "Summons Lunatic creatures at any level; Moons on her are much cheaper.",
+  "Shu'Chaku, the Blood Moon Projection": "Returns artifacts to hand to discount the next one.",
+  "Fern, the Ship Slave": "Halves equipment costs.",
+  "Play Money": "A big discount on one artifact.",
+  "Cool Repair": "Re-equips a Moon from the discard pile.",
+  "Heavy Hit": "The attack that the Full Moon makes lethal."
+ },
+ "plan": "Five Moons in a fixed order, each only playable while the one before it is on the board, each expensive. Dmitri spends the whole early game paying for them; with every phase the Golem and the Hawk grow, and at Full Moon the equipped hero cannot be stunned, cannot be one-shot and hits like a falling tower. The chain is equipment: break an early link and the later Moons cannot be replayed until it is rebuilt.",
+ "looks": {
+  "early": "A New Moon on Tsu'Ki and an empty purse.",
+  "mid": "Three phases out, a Golem counting them.",
+  "late": "Full Moon: one hero immune to statuses, swinging."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He has a single New Moon and no gold left.",
+   "why": "The cycle costs him four or five turns of gold; nothing defends his heroes meanwhile."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Three different Moons are out and a Golem counts them.",
+   "why": "Fire Bomb destroys every Moon at once and each needs the previous one to return; the Golem shrinks with them."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Full Moon is up: that hero ignores stuns and freezes.",
+   "why": "It is one attack a turn: Homerun! and Cloud in a Bottle, or Fire Bomb if you still hold it; a freeze no longer works."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "The Moons are broken and his gold is gone.",
+   "why": "He cannot afford the cycle twice."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Dmitri pays for a New Moon and yawns.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Tsu'Ki"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Keep Fire Bomb for three Moons"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "He discards to search the Crescent.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "Play Money makes the Half Moon cheap.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Fern"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the New Moon under it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "New, Crescent, Half; a Lunatic Golem.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Golem"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Golem"
+     }
+    ]
+   },
+   {
+    "board": "Lunar Eclipse cancels your Fire Bomb at the cost of a Moon.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "He lost a link anyway: Yeet the next"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Cool Repair returns a Moon.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Break the lowest link"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Full Moon on Tsu'Ki; Heavy Hit incoming.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "The Hawk has gained its last ability.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Hawk"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Half Moon caps every hit you land on her.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Many ticks beat one cap"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Break it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No Moons, no gold.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Fern alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Tsu'Ki.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Shu'Chaku"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

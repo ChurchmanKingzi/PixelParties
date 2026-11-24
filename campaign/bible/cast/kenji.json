@@ -1,0 +1,215 @@
+{
+ "id": "kenji",
+ "name": "Kenji Watanabe",
+ "firstName": "Kenji",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor",
+ "romance": false,
+ "deck": "Future Tech v9 (Future Tech)",
+ "look": "Undercut, big over-ear headphones round his neck, an energy drink in his hand and grey smudges under his eyes that he regards as a qualification. His red jacket, blue Rare collar, has the Battle Team pin on slightly crooked. He taps rhythms on any surface, counting something.",
+ "voice": "Quick, clipped and distracted, half his attention always on a game somewhere else; he talks in ladder shorthand and percentages and trails off into calculation. Polite in an absent way. One subject wakes him up completely: an interaction nobody has found yet. RARE habit (once in a scene at most; most scenes go without it): 'GG' to end a conversation as well as a match.",
+ "lines": [
+  "Can't. Queue pops in four minutes. Talk while I side-deck?",
+  "Fourteen hours yesterday. Thirteen and a half. I ate, so.",
+  "If the Drone carries the Battery — has anyone tried that? Nobody's tried that.",
+  "Sleep's just a long mulligan."
+ ],
+ "intro": "A second-year Battle Team starter from Rare Hall who practises fourteen hours a day and measures his life in games played.",
+ "traits": [
+  {
+   "id": "kenji_1",
+   "text": "He plays about fourteen hours a day and logs every game.",
+   "how": "Find him at the trial dome at any hour."
+  },
+  {
+   "id": "kenji_2",
+   "text": "He made the Battle Team as a first-year by sheer volume of practice.",
+   "how": "Common knowledge; Bex calls him 'the Grinder'."
+  },
+  {
+   "id": "kenji_3",
+   "text": "He drinks five energy drinks a day and Dr Blum confiscates the sixth.",
+   "how": "Probability class, or the campus store."
+  },
+  {
+   "id": "kenji_4",
+   "text": "He has an online nemesis at a rival school and they have never met in person.",
+   "how": "Ask who he is always queueing against."
+  },
+  {
+   "id": "kenji_5",
+   "text": "He still scrims late at night with Rana Marika, who started the same year he did.",
+   "how": "Trial dome at Night."
+  },
+  {
+   "id": "kenji_6",
+   "text": "His parents run a twenty-four-hour ramen counter in Osaka; nobody in the family has ever kept normal hours.",
+   "how": "Ask why he never sleeps."
+  },
+  {
+   "id": "kenji_7",
+   "text": "He has not taken a full day off since he was fifteen and is not sure what he would do with one.",
+   "how": "Friend stage; ask him to do something that is not cards."
+  },
+  {
+   "id": "kenji_8",
+   "text": "He is afraid that without the hours he is ordinary.",
+   "how": "Only at Trusted."
+  }
+ ],
+ "secret": "Kenji is not a prodigy and knows it. Lilia has it; Georgie has it; he has a work ethic inherited from two parents who have stood behind a counter for twenty years. He decided at fifteen that if talent was a lottery he would simply buy every ticket: 40,000 logged games. It worked — starter as a first-year — and it is eating him: tremor in the hands, a heart that skips, no friends outside a queue. Wound: his older sister Aya was the gifted one, burned out at a conservatory and came home; he took from that only that you must not stop. Contradiction: the hardest worker on the island is the one most afraid of finding out what he is like when he rests. Dr Blum, who sees it, makes him do proofs by hand 'to slow the clock' and is the nearest thing he has to a guardian. He and Rana came up together; he still plays her at midnight because she is the best deck-builder he knows and because he thinks what was done to her was unjust — he has never said either. His nemesis is North Crown's Rex Tanaka (handle 'rexlightning'); they have played 600 games and exchanged eleven words. Private joke: his log has a column called 'vibes' that is always blank.\nHe plays '{H}' in a casual on Day 34 and loses in a way his log cannot classify — he replays it sixty times. He becomes obsessed: to a grinder, an opponent who is simply ALREADY there is both horror and holy grail. This makes him a Stage D target (the Guest challenges team members; Kenji would accept for the data) — default: he is found by Priya in the trial dome on the morning of Day 118, headphones still playing, the first Battle Team member to fall; the ante was 'your hours'. Preventable if someone has taught him he is allowed to stop. His log of the Guest's games, kept with Dom's analysis, is the raw material of the final opening book.",
+ "wants": "To earn by hours what others were handed.",
+ "fears": "Stopping, and finding there is nobody there.",
+ "crush": "rana",
+ "crushNote": "She is the best deck-builder he knows and the only opponent he looks forward to rather than logs. It shows as midnight games he will not count toward his fourteen hours, and a list he has never used because she would recognise her own work in it.",
+ "crushPace": 0.6,
+ "likes": [
+  "A new interaction or tech card",
+  "Practice partners who will play ten in a row",
+  "Being brought actual food",
+  "Precise post-game analysis",
+  "People who treat Rana as a real player",
+  "Being dragged outside (he resists and is grateful)"
+ ],
+ "dislikes": [
+  "'It's only a game'",
+  "Wasted queue time",
+  "Talk of natural talent",
+  "Being told to sleep by anyone but Blum",
+  "Slow rolls and bad manners",
+  "Losing to something he cannot explain"
+ ],
+ "gifts": [
+  "Card: Future Tech Drone",
+  "A decent meal in a box",
+  "Card: Blueprints",
+  "Barley tea instead of an energy drink",
+  "Card: Coffee"
+ ],
+ "events": [
+  {
+   "id": "kenji_e1",
+   "stage": 1,
+   "title": "Ten in a row",
+   "condition": "Play a ten-game set with him at trial_dome (Night works best) and talk through at least one game afterwards.",
+   "hint": [
+    "He is always looking for someone who will just keep playing.",
+    "Grind a long practice set with him at the Trial Dome."
+   ]
+  },
+  {
+   "id": "kenji_e2",
+   "stage": 2,
+   "title": "A day off",
+   "condition": "After the Day 33 tryouts, get him to do one non-card thing — a meal at commons_kitchen, a swim, a walk to town — and bring Rana or Dr Blum into it.",
+   "hint": [
+    "He has not had a day off in years. He does not know how to ask for one.",
+    "Talk him into an afternoon away from the tables."
+   ]
+  },
+  {
+   "id": "kenji_e3",
+   "stage": 3,
+   "title": "The blank column",
+   "condition": "After Day 34, go through his replay of the game he cannot classify and tell him the truth about his opponent; make him promise not to challenge — or provoke a challenge from — that opponent for the sake of the data.",
+   "hint": [
+    "He lost a game he cannot stop replaying. He would do anything to play it again. Somebody should talk to him first.",
+    "Review the loss he cannot explain with him, be honest, and get his word that he will not seek a rematch for stakes."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "teammates",
+   "text": "Captain. He has logged every game she has played and still cannot see how she does it.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "teammates",
+   "text": "The only teammate who never talks about ratings.",
+   "public": true,
+   "from": 0
+  },
+  "dom": {
+   "label": "teammates",
+   "text": "Dom's analysis and Kenji's logs: the team's two archives.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "teammates",
+   "text": "A standing bet on which of them collapses first.",
+   "public": true,
+   "from": 0
+  },
+  "rana": {
+   "label": "friends",
+   "text": "Came up in the same intake; he still scrims with her at midnight because she is the best builder he knows.",
+   "public": true,
+   "from": 0
+  },
+  "rex": {
+   "label": "rivals",
+   "text": "Six hundred online games against 'rexlightning' and eleven words exchanged.",
+   "public": true,
+   "from": 0
+  },
+  "blum": {
+   "label": "protégé",
+   "text": "The only adult allowed to confiscate his energy drinks.",
+   "public": true,
+   "from": 0
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "The one classmate who brings him food and tells him to eat it. He does.",
+   "public": true,
+   "from": 0
+  },
+  "magnus": {
+   "label": "rivals",
+   "text": "A net-decker with no hours on any list. Annoyingly, he keeps the numbers honest.",
+   "public": true,
+   "from": 5
+  },
+  "mikoto": {
+   "label": "friends",
+   "text": "A first-year who can watch forty games without speaking and then name the misplay. Kenji lets him keep the log some nights.",
+   "public": true,
+   "from": 10
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "Someone else who is up. He watches a set without talking, which is the ideal audience.",
+   "public": true,
+   "from": 15
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "great_arena",
+   "Midday": "lecture_hall",
+   "Afternoon": "trial_dome",
+   "Evening": "trial_dome",
+   "Night": "trial_dome"
+  },
+  "weekend": {
+   "Morning": "trial_dome",
+   "Midday": "trial_dome",
+   "Afternoon": "arcade",
+   "Evening": "trial_dome",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 7,
+  "style": "Future Tech played from 40,000 games of memory: gadgets assembled in the optimal order, every common line already known. Rarely surprised, rarely creative.",
+  "tilt": "Fatigue late in long events, and anything truly off-book — he trusts the log over the board."
+ }
+}

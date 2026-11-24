@@ -1,0 +1,380 @@
+{
+ "name": "Night Watch",
+ "owner": "tavita",
+ "heroes": [
+  "Diamond, the Keeper of Peace",
+  "Broghan, the Frozen Guardian of the North",
+  "Xal, the Animated Armor"
+ ],
+ "main": [
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Cloud Pillow"
+  ],
+  [
+   4,
+   "Dead Guardian"
+  ],
+  [
+   2,
+   "Doomed Pirate"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Hardy Slime"
+  ],
+  [
+   4,
+   "Heal"
+  ],
+  [
+   3,
+   "Homerun!"
+  ],
+  [
+   3,
+   "Regeneration"
+  ],
+  [
+   3,
+   "Shield of Death"
+  ],
+  [
+   3,
+   "Shield of Life"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   2,
+   "Spiky Armor"
+  ],
+  [
+   2,
+   "Stoneskin"
+  ],
+  [
+   2,
+   "Strong Shield"
+  ],
+  [
+   5,
+   "Support Magic"
+  ],
+  [
+   6,
+   "Toughness"
+  ],
+  [
+   4,
+   "Trade"
+  ],
+  [
+   3,
+   "Training"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Diamond, the Keeper of Peace": "Hero",
+  "Broghan, the Frozen Guardian of the North": "Hero",
+  "Xal, the Animated Armor": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Cloud Pillow": "Artifact",
+  "Dead Guardian": "Artifact",
+  "Doomed Pirate": "Creature L0",
+  "Golden Ankh": "Artifact",
+  "Hardy Slime": "Creature L0",
+  "Heal": "Spell (Support Magic)",
+  "Homerun!": "Artifact (Reaction)",
+  "Regeneration": "Spell (Support Magic, Attachment)",
+  "Shield of Death": "Artifact (Equipment)",
+  "Shield of Life": "Artifact (Equipment)",
+  "Smug Coin": "Artifact (Equipment)",
+  "Spiky Armor": "Artifact (Reaction)",
+  "Stoneskin": "Spell (Support Magic, Attachment)",
+  "Strong Shield": "Artifact (Reaction)",
+  "Support Magic": "Ability",
+  "Toughness": "Ability",
+  "Trade": "Ability",
+  "Training": "Ability"
+ },
+ "gist": {
+  "Broghan, the Frozen Guardian of the North": "Cannot be frozen. Once per turn he hits a target for an enormous amount, reduced for every card still in her deck: a scratch early, lethal once the deck is thin, at its full size with an empty deck. It is ordinary attack damage, so shields, halving and your face-down traps all apply.",
+  "Diamond, the Keeper of Peace": "Once per turn takes a little damage herself to cancel a hit on all her small creatures; they ignore burn and poison.",
+  "Xal, the Animated Armor": "Can carry up to six different Abilities, some of them in his support zones.",
+  "Trade": "Ability: deletes the top five cards of her own deck for gold, every turn.",
+  "Dead Guardian": "Sends the top three cards of her deck to the discard pile.",
+  "Toughness": "Ability: a large block of extra health per level; cannot be negated.",
+  "Hardy Slime": "On arrival forces your attacks, spells and creature effects onto itself where possible.",
+  "Doomed Pirate": "Sets one hero's Attack to nothing while it stands.",
+  "Cloud Pillow": "Halves the damage one target takes for a turn.",
+  "Shield of Life": "Heals a team-mate the first time its hero is hit each turn.",
+  "Shield of Death": "Hits back the first time its hero is hit each turn.",
+  "Strong Shield": "Cancels one very large hit.",
+  "Homerun!": "Cancels a hit that would take out a hero.",
+  "Regeneration": "Heals its hero at the start of every turn.",
+  "Stoneskin": "Its hero takes much less from attacks and cannot be poisoned, burned or stunned.",
+  "Heal": "A large heal."
+ },
+ "plan": "A wall with a clock inside it. Tavita stacks Toughness, shields, pillows and healing until nothing gets through, and all the while she throws her own deck away with Trade and Dead Guardian, because Broghan's once-per-turn hit is only held back by the number of cards left in her deck. Early it does nothing; by the time the deck is a dozen cards thick it removes a hero every turn, and he cannot be frozen. She has no other way to win, her defences answer hits one at a time, and the thinning is done by Ability cards and a cheap artifact.",
+ "looks": {
+  "early": "Toughness on every hero, a Hardy Slime, cards going from her deck to the deleted pile.",
+  "mid": "Shields and Regeneration everywhere; her deck visibly half its size.",
+  "late": "A deck a finger thick and Broghan pointing."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "She is stacking Toughness and her deck is still thick; Broghan's hit barely scratches.",
+   "why": "Racing a wall of health is hopeless and she is no threat yet: build the Storm, whose many small ticks her one-hit shields cannot answer."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Trade deletes five cards of her own deck every turn and Broghan's hit is growing.",
+   "why": "Her win condition is the size of her deck: Fire Bomb takes the Trade off, a frozen Xal cannot use it, and every card she keeps is damage Broghan does not deal."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Her deck is thin and Broghan cannot be frozen.",
+   "why": "It is one enormous hit a turn: Homerun! and Cloud in a Bottle each turn, and everything else into Broghan himself, who is the only hero that hurts you."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Broghan is down, or her shields are spent.",
+   "why": "Without Broghan the wall has no way to win."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Tavita attaches Toughness to all three heroes and sets down a Hardy Slime.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up and attach the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb Xal's Trade"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn into a wall"
+     }
+    ]
+   },
+   {
+    "board": "Trade deletes five cards from the top of her own deck; she seems pleased.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build, counting her deck"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Xal"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Broghan's hit lands for almost nothing.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Use the quiet turns"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Start on Broghan"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spend burn into Toughness"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Her deck is half gone; Broghan's hit now takes a real bite.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Trade stack"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the wall"
+     }
+    ]
+   },
+   {
+    "board": "Dead Guardian mills three more.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Xal, focus Broghan"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Shield of Life heals Broghan whenever you hit Diamond.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the shields with the rest"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "A dozen cards left in her deck; Broghan aims at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Broghan this turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more"
+     }
+    ]
+   },
+   {
+    "board": "Your Snow Cannon does nothing to Broghan.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle instead"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Acid Vial and spells into him"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Strong Shield cancels your finisher on Broghan.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield your side, tick his"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "A second spell the same turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Broghan has fallen.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish at leisure"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Broghan for one more hit.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other two"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Xal alone under six Abilities.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

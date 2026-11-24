@@ -1,0 +1,20 @@
+{
+ "name": "The Mulligan",
+ "zone": "town",
+ "bg": "bar",
+ "night": false,
+ "hours": "Evening and Night, closed Tuesdays; owner and bartender Josie Hart. Students are served soft drinks, strong coffee and, if she knows them, the truth.",
+ "sight": "A low harbour-front bar with a ship's figurehead over the door and a sign of seven cards being thrown back into a deck. Inside it is all dark wood, rope, brass and candle stubs in bottles; a dartboard, a jukebox, and one corner table with a felt top worn through to the wood. The woman behind the bar rolls her sleeves over tattooed forearms and looks at a new face for exactly one second longer than is comfortable.",
+ "things": [
+  "Order the house ginger beer and sit at the bar",
+  "Play at the felt table — house rule: no holograms, no spectators' advice",
+  "Put a coin in the jukebox (it only has sad songs and sea shanties)",
+  "Read the wall of pinned photographs of regulars, wrecks and one very old dorm picture",
+  "Talk to Josie when the bar is quiet",
+  "Listen to fishermen and off-duty staff talk about the school as a place they do not belong to",
+  "Take a shift washing glasses (22 cr; Evening, and Night before the curfew)",
+  "Ask why she dropped out and be told to drink up"
+ ],
+ "secret": "Josie's route; job site; the adults' side of the island. JOSIE was an Umbra House first-year nine years ago (canon: she saw something). What she saw, for the GM: the four students coming down the ridge raving without their professor ('he's flat'), and at midnight Chuck going up the ridge path alone, without a torch, and coming back at dawn looking twenty years older. She gave the statement the Chancellor has, lasted two more years, and could neither stay nor leave. The old dorm picture on the wall is Umbra's last intake; her own face is under a beer mat pinned over it. Her old jacket with the smoke-grey collar hangs behind the bottles. She will not tell this before real trust (not before Day 50 by default) or unless Rowan arrives with something from room 9. Staff drink here: Blum on Thursdays; Santángel alone, more often after Day 61. Viktor comes here early on; she recognises his surname and his father's jaw and serves him without a word.",
+ "access": "From Day 67 students must leave by the end of the Evening slot."
+}

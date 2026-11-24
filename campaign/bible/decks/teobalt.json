@@ -1,0 +1,381 @@
+{
+ "name": "Order of Tusca",
+ "owner": "teobalt",
+ "heroes": [
+  "Hatusbal, the Leader of Tusca",
+  "Klaus, the Cult Leader",
+  "Natas, the Master of Hell"
+ ],
+ "main": [
+  [
+   2,
+   "Decay Magic"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Forbidden Zone"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Icy Grave"
+  ],
+  [
+   4,
+   "Leadership"
+  ],
+  [
+   3,
+   "Mr. Jiggles"
+  ],
+  [
+   3,
+   "Off Duty"
+  ],
+  [
+   2,
+   "Rusty Touch"
+  ],
+  [
+   3,
+   "Sickly Cheese"
+  ],
+  [
+   3,
+   "Slow"
+  ],
+  [
+   3,
+   "Staff of the Teleporter"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "The Master's Plan"
+  ],
+  [
+   4,
+   "Tuscan Aristocrat"
+  ],
+  [
+   4,
+   "Tuscan Artist"
+  ],
+  [
+   4,
+   "Tuscan Mystic"
+  ],
+  [
+   4,
+   "Tuscan Prisoner"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Hatusbal, the Leader of Tusca": "Hero",
+  "Klaus, the Cult Leader": "Hero",
+  "Natas, the Master of Hell": "Hero",
+  "Decay Magic": "Ability",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Forbidden Zone": "Spell (Decay Magic)",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Leadership": "Ability",
+  "Mr. Jiggles": "Creature L2",
+  "Off Duty": "Spell (Decay Magic, Reaction)",
+  "Rusty Touch": "Spell (Decay Magic, Reaction)",
+  "Sickly Cheese": "Artifact",
+  "Slow": "Spell (Decay Magic)",
+  "Staff of the Teleporter": "Artifact",
+  "Summoning Magic": "Ability",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Tuscan Aristocrat": "Creature L2",
+  "Tuscan Artist": "Creature L2",
+  "Tuscan Mystic": "Creature L2",
+  "Tuscan Prisoner": "Creature L2"
+ },
+ "gist": {
+  "Hatusbal, the Leader of Tusca": "While he is active you cannot shuffle cards back into your deck with effects at all; he draws whenever Teobalt shuffles two or more back.",
+  "Natas, the Master of Hell": "May skip his normal draw to take a fresh copy of The Master's Plan instead, every turn.",
+  "Klaus, the Cult Leader": "When he casts a Decay spell he puts a smaller creature from hand onto the board for free.",
+  "Tuscan Mystic": "You cannot use Potions while it stands.",
+  "Tuscan Artist": "Cancels any effect that would let you draw two or three cards.",
+  "Tuscan Aristocrat": "You gain no gold outside your normal income.",
+  "Tuscan Prisoner": "Nothing can end his turn early.",
+  "The Master's Plan": "Reaction: cancels any one card you play from hand, once per turn.",
+  "Slow": "Makes you discard several cards.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Forbidden Zone": "Light damage to your whole side; your heroes cannot act and your creatures go blank for a turn.",
+  "Off Duty": "Reaction: cancels a creature you summon and shuffles it away.",
+  "Rusty Touch": "Reaction: cancels an artifact you play; you still pay for it.",
+  "Mr. Jiggles": "His damage: hits two of your targets every turn.",
+  "Haressassin": "A second, harder single shot per turn.",
+  "Staff of the Teleporter": "Reshuffles his hand for new cards and triggers Hatusbal's draw.",
+  "Sickly Cheese": "Poisons one of his own heroes to search a Decay spell."
+ },
+ "plan": "A rulebook made of creatures. Hatusbal forbids you to shuffle cards back from the first turn, and each Tuscan adds another clause: no Potions, no multi-card draws, no extra gold. Behind them Natas produces a Master's Plan every turn to cancel the one card that mattered, and Slow, Icy Grave and Forbidden Zone take the rest of your turn away. The actual damage is modest (Mr. Jiggles and a Haressassin grinding you down) and takes a long time. The lock is only as good as its pieces: the Tuscans are plain mid-sized creatures, The Master's Plan stops one card per turn and no more, and a frozen or stunned Hatusbal stops forbidding anything.",
+ "looks": {
+  "early": "Hatusbal in the middle, a Sickly Cheese eaten, one card set apart in Teobalt's hand; your Leadership already does nothing.",
+  "mid": "Two or three Tuscans in a tidy row, Mr. Jiggles behind them, your potions and reshuffles useless in your hand.",
+  "late": "A complete set of Tuscans, a Master's Plan every turn, and two creatures slowly doing the damage."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Hatusbal stands in the centre and your Leadership fizzles when you try to shuffle.",
+   "why": "Half your setup tools are switched off by one hero's text, so turn it off instead: a frozen Hatusbal has no effect, and the turn he is frozen is the turn to reshuffle for the Storm."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "A Tuscan Mystic and a Tuscan Artist stand side by side with ordinary health; Teobalt keeps one card apart.",
+   "why": "The lock pieces are plain creatures that one sweep kills together; lead with a lesser spell to draw out The Master's Plan, which only works once a turn, and sweep with the second."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Natas takes a Master's Plan instead of drawing every turn, and Teobalt has rebuilt only one Tuscan.",
+   "why": "He will always have exactly one cancel, so make two real plays a turn and let him pick; a second big sweep is the card he is holding the Plan for."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His damage is still only Mr. Jiggles and a Haressassin, and his heroes have absorbed many Storm ticks.",
+   "why": "The deck locks far better than it kills; once the heroes are low it cannot stop repeated untargeted damage, and a cancel a turn does not answer ticks."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Teobalt notes something on his clipboard; Hatusbal is in play and your Leadership cannot shuffle anything back.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Hatusbal and reshuffle this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Natas before the Plans start"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play on without Leadership"
+     }
+    ]
+   },
+   {
+    "board": "Klaus eats a Sickly Cheese, searches a Decay spell and passes with one card held apart.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Bait the held card with a throwaway play"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit the poisoned Klaus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Commit your key card into it"
+     }
+    ]
+   },
+   {
+    "board": "Slow: you must discard two cards.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Discard the dead Leaderships and keep fighting"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye him back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep the Leaderships for later"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Tuscan Mystic and a Tuscan Artist stand in a row: no potions, no triple draw.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Bait the Plan, then Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Mystic to free your potions"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep attaching and hope"
+     }
+    ]
+   },
+   {
+    "board": "Forbidden Zone shuts your heroes down for a turn; Mr. Jiggles hits two of them.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Artifacts still work: Dark Gear Mr. Jiggles"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Wait it out with Firewall set"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Nothing to race with this turn"
+     }
+    ]
+   },
+   {
+    "board": "The Master's Plan cancels your Chain Lightning.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "It is used up for the turn: sweep now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cast a second spell at heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold the rest for next turn"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Natas takes another Plan instead of a card; one Tuscan Aristocrat is all that is left of the row.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Two threats a turn, lesser one first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Natas, the source of the Plans"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Aristocrat into the Plan"
+     }
+    ]
+   },
+   {
+    "board": "Icy Grave freezes your Storm caster for two turns.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze onto Hatusbal"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Carry on with the Storm ticking anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Move to another caster"
+     }
+    ]
+   },
+   {
+    "board": "Off Duty and Rusty Touch sit in his hand; you can tell by how calmly he waits.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Spells, not artifacts, this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards first"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Lead with your key artifact"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Klaus and Natas are down; Hatusbal has a Haressassin and little else.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Hatusbal, the lock dies with him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Haressassin and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild your hand at leisure"
+     }
+    ]
+   },
+   {
+    "board": "He has a Plan every turn but nothing to protect; the Storm ticks regardless.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Add a spell a turn to the ticks"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Just keep the caster alive"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Go looking for The White Eye"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh brings Natas back for one more Master's Plan.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Play your lesser card first, then finish"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the last creatures"
+     }
+    ]
+   }
+  ]
+ }
+}

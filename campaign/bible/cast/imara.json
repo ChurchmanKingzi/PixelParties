@@ -1,0 +1,262 @@
+{
+ "id": "imara",
+ "name": "Imara Adeyemi",
+ "firstName": "Imara",
+ "age": 21,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 3,
+ "dorm": "rare",
+ "room": "Rare Hall, fourth floor",
+ "romance": true,
+ "deck": "Double Entry (search-and-value engine: Krates, the Smartass; Koperniko, the Stargazer; Kassaran, Seer of Everything)",
+ "look": "Medium height (about 5'6\") with a soft, full-figured build, deep brown skin, and thick natural black hair worn up in a high round puff held by a band of gold-threaded cloth. Large dark-brown eyes behind round tortoiseshell glasses, full cheeks, a small mole above the right eyebrow and a gap between her front teeth that shows when she laughs properly. She wears the gold Game Design jacket with the blue Rare collar, sleeves pushed neatly to mid-forearm, the dark council sash (deep royal blue with a thin gold edge) worn from the right shoulder to the left hip, a small brass cash-box key on a green ribbon round her neck, a bracelet of wooden abacus beads on the left wrist, and a permanent smudge of purple stamp ink on her right thumb. A hardback ledger is always under one arm.",
+ "voice": "Warm, level and exact, Manchester with her mother's Yoruba music on the long vowels; she speaks in whole sentences, checks a figure aloud before she commits to it, and has a dry, deadpan humour that she delivers while writing. Kind to anyone short of money and immovable about a missing receipt. When something does not add up she goes quiet and starts again from the top. RARE habit (once in a scene at most; most scenes go without it): 'Show me the receipt.'",
+ "lines": [
+  "Sign there, and there. That's twenty credits, paid today, because a job done today is owed today.",
+  "I like you, so I'll say it kindly: without a receipt this never happened, and I can't pay for things that never happened.",
+  "Show me the receipt. No? Then show me the person who saw you spend it, and I'll write THEM down.",
+  "My deck never draws a card it didn't already have a line for. People call that dull. People are welcome to audit me."
+ ],
+ "intro": "The student council's treasurer: a warm, exact third-year Game Design student with a ledger under her arm, who pays every campus job and signs for every credit the clubs spend.",
+ "traits": [
+  {
+   "id": "imara_1",
+   "text": "She is the council's treasurer: club grants, fines, event budgets and every paid posting on the job board go through her ledger.",
+   "how": "Collect pay for any job-board shift; the council room, Afternoon."
+  },
+  {
+   "id": "imara_2",
+   "text": "She pays out on the day the work is done, in exact change, and makes you sign twice.",
+   "how": "Do a paid job."
+  },
+  {
+   "id": "imara_3",
+   "text": "She will not release one credit without a receipt, and it has killed more than one good idea.",
+   "how": "Ask Hedda, Marit or any club secretary."
+  },
+  {
+   "id": "imara_4",
+   "text": "She wears the cash-box key round her neck and has never once taken it off in public.",
+   "how": "Notice the green ribbon."
+  },
+  {
+   "id": "imara_5",
+   "text": "She knows from the stipend lists exactly who on campus is short of money, and has never told a soul.",
+   "how": "Be short of money in front of her; watch what she does not say."
+  },
+  {
+   "id": "imara_6",
+   "text": "She is studying Game Design to build resource systems, and thinks most cards cost the wrong amount.",
+   "how": "Design lab; ask about her own designs."
+  },
+  {
+   "id": "imara_7",
+   "text": "Her mother kept the books for a market stall in Ibadan and then for half a street in Manchester.",
+   "how": "Ask where she learned double-entry."
+  },
+  {
+   "id": "imara_8",
+   "text": "She re-adds a column three times when she is upset, and has been doing it a great deal lately.",
+   "how": "Council room, late; Close stage."
+  },
+  {
+   "id": "imara_9",
+   "text": "She is here on a company bursary that has to be renewed every year, and she hates how careful that makes her.",
+   "how": "Close stage; said looking at the ledger."
+  },
+  {
+   "id": "imara_10",
+   "text": "She found a number in the Academy's accounts that she was told to leave alone.",
+   "how": "Dating stage, or after Day 70 with the president's trust."
+  }
+ ],
+ "secret": "OFFICE. Treasurer of the Student Council. She keeps the council ledger and the strongbox; she costs and pays out club grants and event budgets; she collects the fines the proctors and the vice-president hand down; and — the part that matters most to a Commons first-year — she runs the money side of the JOB BOARD: every paid posting is priced by her, and every credit for a shift, a scorekeeping evening or a day as Cup crew is counted into the student's hand at her table. She also sees, once a term, the Academy's summary accounts on the council's behalf. How she uses the office: scrupulously and, where she can, kindly. She pays the same day, pays Commons work at the same rate as anyone's, quietly routes the better-paid postings toward students she knows are short (she sees the stipend lists), and has never mentioned anyone's balance to anyone. She is a natural ally for Rowan: straight with him, fair, and able to put real paid work in his way. Her flaw is the mirror of her virtue: she cannot sign without a receipt, cannot round a number, and has let more than one good cause die at her table for want of a form (Hedda's bird survey, half of Marit's revue). People who need a favour go to Sebastian; people who need the truth about a budget go to Imara.\nWHO SHE IS. Born in Ibadan, raised in Longsight, Manchester, by her mother Folasade, a market bookkeeper who built a small accounts business for the shops of one street and lost it when a partner emptied the client account. Imara, twelve, was the one who found the discrepancy — in a column her mother had trusted. 'Numbers don't lie; people round.' Wound: she caught the theft too late to save anything, and has audited the world ever since. Contradiction: the most honest officer on the council is the only one who is, in the plainest sense, on somebody's payroll. She is at the Academy on the Kaboom Entertainment Design Bursary, renewable each year at the discretion of the board — which since Day 61 has a face, a grey suit and a soft voice. She has never done anything improper for it. She has, however, become careful, and she knows precisely what careful is the first payment of. Private joke: she keeps a column in the back of the council ledger headed 'Things I Was Told Not To Count', and it has entries.\nTHE NUMBER. It was Imara, preparing the council's copy of the summary accounts, who first saw the line 'Legacy obligations (4)': paid quarterly for nine years, never itemised, larger than the Commons' whole food budget. She took it to Octavia, as procedure requires. Octavia put a silver clip on the page, said 'Noted', and told her to leave it. That is the running quarrel between them: Imara wants to ask the bursar openly and in writing; Octavia is sitting on it for reasons she will not give — and when the president later wants the matter looked into, she uses a runner 'who is not on anybody's payroll', which Imara understands perfectly and has not forgiven. From Day 61 Marrow asks her, pleasantly, for small things: the council's copy of the accounts back 'for audit', the job-board payroll, which students have asked for hardship advances. She has so far handed over only what he could get anyway. She does not know what the four obligations are. If she is shown, she will add it up in one evening: nine years, four families, one professor missing from a yearbook.\nCOUNCIL AND AFTER. She fights Sebastian over the discretionary fund he wants and she will not create; she pays for Tavita's lanterns out of the fines and accepts his receipts in a shoebox; she and Pilar have a standing war over event overruns that both secretly enjoy. She mentors Teobalt in budgets and tells him things about the accounts that the president has not. She likes Tariq Aziz, the student archivist — another person who notices when a ledger has moved — more than she has let on. After Day 40 the fines dry up and the infirmary line triples, and she is the first officer to put a figure on what the school is not saying. Her arc: from keeping the books straight to deciding who is entitled to read them — at the possible cost of the bursary and her final year.\nROUTE: medium-slow. She warms to honesty about money above all things; a Commons boy who is poor and does not pretend otherwise is, to her, restful. She will not start anything while she holds his payslip, and says so.",
+ "wants": "Books that balance, and to owe nobody anything she cannot enter in a column.",
+ "fears": "Finding the discrepancy too late again — and discovering that her own name is in it.",
+ "crush": "tariq",
+ "crushNote": "He is the only other person on the island who notices when a ledger has been moved two inches, and he teases her about her handwriting. It shows as accounts she fetches from the archive in person, slowly, and a new habit of asking what else has gone missing this week.",
+ "crushPace": 0.7,
+ "likes": [
+  "Receipts, kept",
+  "Honesty about being short of money",
+  "Work done properly and claimed promptly",
+  "Being asked to explain a budget and listened to",
+  "Jollof arguments, ginger tea, a quiet room and a full column",
+  "People who repay a small loan before being asked",
+  "Being made to stop counting",
+  "Good card design discussed as economics"
+ ],
+ "dislikes": [
+  "Rounded numbers",
+  "'Just this once'",
+  "Favours in place of procedure",
+  "Being told to leave a line alone",
+  "Waste",
+  "Charm aimed at the cash box",
+  "Anyone gossiping about who is poor"
+ ],
+ "gifts": [
+  "Card: Krates, the Smartass",
+  "A good fountain pen that does not blot",
+  "Card: Treasure Chest",
+  "A receipt for something kind, itemised",
+  "Ginger tea from the night market",
+  "Card: Koperniko, the Stargazer"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Dry, warm, conducted as an audit.",
+  "text": "Imara flirts in book-keeping: she tells him his account is 'in credit with her', itemises what he did right this week, pays him a credit short to see whether he will say so. She does not start anything — she is the one counting his wages and thinks that matters — but she makes room: a chair pulled up to the ledger, the last ginger tea. She wants plain dealing: admit when you are broke, pay back what you borrow, turn up when the work is posted. Flattery near the cash box is the fastest way to be shown the door. When she has decided, she closes the ledger first, and then says it in one balanced sentence."
+ },
+ "intimacy": "Unhurried, warm and good-humoured, and strict about one thing: nothing begins while she is still his paymaster for that week's work — she will hand the payslip to Noor to sign first, and that small formality is itself rather charged. Closeness starts at the council table after hours: shoulders together over a column, her glasses pushed up into her hair, her ink-stained thumb leaving a purple print on his wrist. She likes to be made to stop counting — the pen taken out of her hand, the puff unpinned, a slow dance to a radio in the empty common room. Soft, generous, laughing, unembarrassed about her figure and pleased to be admired. Her room on the fourth floor, the ledger shut and face down. Fade as she lifts the key on its ribbon over her head and puts it in the drawer.",
+ "events": [
+  {
+   "id": "imara_e1",
+   "stage": 1,
+   "title": "Sign there, and there",
+   "condition": "Do a paid shift from job_board and collect at her table in council_room; count the money in front of her and, if it is a credit short, say so — or if it is a credit over, hand it back.",
+   "hint": [
+    "The treasurer pays in exact change. She notices who counts it.",
+    "Do a job-board shift, collect your pay from her, and be honest about the amount."
+   ]
+  },
+  {
+   "id": "imara_e2",
+   "stage": 2,
+   "title": "In credit",
+   "condition": "Be straight with her about money: admit you are short rather than hide it, repay or refuse a small advance properly, and help her through one long evening of receipts (an event close-out after the Freshman Cup or the Night of Masks). Ask where she learned it.",
+   "hint": [
+    "She knows who is poor and never says. She respects people who say it themselves.",
+    "Be honest with her about your finances and help her balance the books after an event."
+   ]
+  },
+  {
+   "id": "imara_e3",
+   "stage": 3,
+   "title": "Told not to count",
+   "condition": "After Day 61, when she is asked for council papers by a visitor, be the person she can say it to; do not tell her what to do. She shows you the column at the back of the ledger, hands your payslips to another officer to sign, and asks whether you would like to walk into town.",
+   "hint": [
+    "Someone has started asking her for small things. She has started writing down what she was told to leave alone.",
+    "Be someone she can confide in when she is pressured over the accounts, and let her decide."
+   ]
+  },
+  {
+   "id": "imara_e4",
+   "stage": 4,
+   "title": "The fourth obligation",
+   "condition": "After Day 70, bring her and the president into the same room over the unexplained line in the accounts (with Octavia's trust, or with what you have learned about the sealed dormitory), and stay while they have it out. She adds it up that night. You stay too.",
+   "hint": [
+    "She found a number she was told to leave. She has never been wrong about a number.",
+    "Help her finally get an answer about the line in the accounts she was ordered to drop."
+   ]
+  },
+  {
+   "id": "imara_e5",
+   "stage": 5,
+   "title": "Open books",
+   "condition": "In Term 2, stand with her when she decides who is entitled to read the accounts — at the cost of her bursary — and help her find another way to pay for her final year (her own designs, the Island Open desk, a written loan she audits herself). She writes your name in the ledger, in ink, under 'assets'.",
+   "hint": [
+    "Doing the right sum may cost her the thing that pays for her being here.",
+    "Back her when she opens the books, and help her find a way to stay that she can respect."
+   ]
+  }
+ ],
+ "bonds": {
+  "sebastian": {
+   "label": "rivals",
+   "text": "He wants a fund with no column. She has told him, kindly, that it would be called theft in any other building.",
+   "public": true,
+   "from": 0
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Brings her his receipts in a shoebox, every one of them, and has never once asked her to round up.",
+   "public": true,
+   "from": 0
+  },
+  "pilar": {
+   "label": "rivals",
+   "text": "Every event comes in beautiful and eleven per cent over. They have had the same argument for a year and both look forward to it.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "colleagues",
+   "text": "She took the unexplained line to the president, as procedure requires, and was told to leave it. She has not forgiven the silver clip.",
+   "public": false,
+   "from": 0
+  },
+  "noor": {
+   "label": "friends",
+   "text": "A clerk whose register balances. They check each other's totals for pleasure.",
+   "public": true,
+   "from": 8
+  },
+  "teobalt": {
+   "label": "mentor",
+   "text": "Teaches him to read a budget, and has told him things about the accounts that the president has not.",
+   "public": true,
+   "from": 12
+  },
+  "tariq": {
+   "label": "crush",
+   "text": "The only other person who notices when a ledger has moved. She fetches the accounts from the archive herself, slowly.",
+   "public": true,
+   "from": 0
+  },
+  "livvie": {
+   "label": "mentor",
+   "text": "A first-year who works every posting on the board. Imara pays her the same day and routes the better shifts her way without saying so.",
+   "public": true,
+   "from": 6
+  },
+  "tomi": {
+   "label": "distrusts",
+   "text": "An unlicensed betting pool is a ledger nobody audits. She has asked him, pleasantly, to show her his.",
+   "public": true,
+   "from": 8
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Year-mates in Game Design. Imara brings her food and a costed argument about why her newest card is underpriced.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "owes",
+   "text": "Her bursary is renewed each year at the board's discretion, and the board now has a face. He asks for small things.",
+   "public": false,
+   "from": 0
+  },
+  "keoni": {
+   "label": "friends",
+   "text": "A sixth of her studio set and most of her patience. He built the shelf her ledgers stand on.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "council_room",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "job_board",
+   "Midday": "council_room",
+   "Afternoon": "card_archive",
+   "Evening": "night_market",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "A search-and-value engine: Koperniko fetches two cards where one was offered, Kassaran copies what she named before the game began, and Krates makes every search of yours a guessing game. She is never short of the right card and wins by having budgeted for everything.",
+  "tilt": "A card she did not account for. One truly unexpected play and she re-counts her whole hand while the clock runs."
+ }
+}

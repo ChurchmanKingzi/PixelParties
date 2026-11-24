@@ -1,0 +1,19 @@
+{
+ "name": "The Duel Terraces",
+ "zone": "campus",
+ "bg": "duel_terraces",
+ "night": false,
+ "hours": "Open air, always accessible; busiest in the Afternoon slot — this is where casual and ladder challenges are actually made. In the Evening the ladder registrar, Zeynep Arslan, has her table at the foot of the steps.",
+ "sight": "Broad stone steps descend the hillside like a rice paddy, each terrace set with weatherproof duel tables under striped awnings. Small flat holograms flicker everywhere, no bigger than chess pieces, and the air is full of the click of dice and people calling 'response?'. Below, the sea; above, the white domes. A chalkboard on each level lists who is waiting for a game.",
+ "things": [
+  "Chalk your name on a 'looking for game' board",
+  "Play a casual duel — no rank at stake, good for nerves",
+  "Issue or accept a ranked ladder challenge",
+  "Watch the top terrace, where upper-years hold court and newcomers get farmed",
+  "Railbird a match and learn an opponent's habits before you face them",
+  "Trade from binders on the shaded bottom terrace, Tomi's unofficial marketplace",
+  "Bet (or refuse to bet) in the Commons pool on a grudge match",
+  "Sit on the wall with a mango ice and the whole south coast in view"
+ ],
+ "secret": "Core location of the ladder loop. Railbirding gives 'read' on a specific opponent. Tomi's betting pool pays real credits and is against regulations. Brant and his two upper-year hangers-on work the middle terrace in September, 'trading' Commons first-years (Sammy, Trixie and Mikoto from Rare among them) out of their rares; standing up to him before Day 40 is a possible early Charter Duel{H=nathan? — and it is one of the things Nathan loudly did, which is how the Guest learned who Brant was| — and it is one of the things Nathan loudly did}. D27–39: '{H}' sits here for hours winning every casual game without seeming to enjoy or dislike it. Second incident (Day 52, plot timeline, preventable): the Rare Hall ladder shark is found at a top-terrace table at dawn by Sunny on her run, awning frozen stiff. D67: tables are chained after the Afternoon slot."
+}

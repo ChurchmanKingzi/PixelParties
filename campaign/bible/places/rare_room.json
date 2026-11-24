@@ -1,0 +1,19 @@
+{
+ "name": "A Room in Rare Hall",
+ "zone": "dorms",
+ "bg": "rare_room",
+ "night": true,
+ "part": "rare_lobby",
+ "hours": "Private twin rooms; whoever lives there decides.",
+ "sight": "A tidy twin room with two desks, two beds, a sink and a window over the campus roofs — small, but every surface belongs to somebody. The details change with the occupants: fairy lights and theatre posters, or a rulebook with a hundred page markers, or a drying swimsuit and a towel on the radiator. At night the clock tower's blue face looks in like a moon.",
+ "things": [
+  "Visit a friend who lives here",
+  "Study together at facing desks",
+  "Test decks on the floor between the beds",
+  "Look at what a person keeps on their shelf",
+  "Stay talking until the resident advisor knocks",
+  "Help someone pack, or unpack",
+  "Borrow a book, a card, a jacket"
+ ],
+ "secret": "Generic interior used for whichever Rare Hall room Rowan visits; dress it by its residents. R101 (Eberhart, Mikoto): one half bare — dumbbells, a training regimen pinned square to the wall; the other half a nest of worry-lists and little skeleton figurines, and a strip of floor between them that Mikoto has learned not to cross before six. R102 (Teobalt, Junho): a whiteboard on one side, a wall of colour-coded sleeves on the other, and a shared sheet headed ROOM — PATCH NOTES. R103 (Cas, Rafa): a forbidden hotplate and forty spice jars; a clip-on microphone on the bedpost; it always smells of something frying and someone is always describing it. R201 (Marit, Eloise): fairy lights and theatre posters facing stacked canvases; the window is open in every weather because of the turpentine. R202 (Noor, Sunny): a rulebook with a hundred page markers and a quiet corner kept clear, against a drying swimsuit and a towel on the radiator; they get on better than either expected. R203 (Pippa, Victoria): lens cloths and contact sheets on one side; ribbons, a parasol stand and a row of dresses on the other, and by the door a card in Pippa's handwriting with the day's times on it, which Victoria reads every morning. Upper-year rooms (third and fourth floors): Bex's is half studio; Noor's friend Priya has archery tackle on the wall. It is also Rowan's own room from Day 106 if he is promoted — an upper-floor twin whose other bed is empty (its owner did not come back from the break), and the strange guilt of a room with a door that locks. Brant's room on the third floor is sealed with tape from Day 40; his upper-year roommate sleeps in the common room."
+}

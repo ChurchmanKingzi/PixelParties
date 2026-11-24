@@ -1,0 +1,370 @@
+{
+ "name": "Pew-Pew!",
+ "owner": "priya",
+ "heroes": [
+  "Kazena, the Storming Rebel",
+  "Bow Sniper Darge",
+  "Treasure Huntress Semi"
+ ],
+ "main": [
+  [
+   4,
+   "Angelfeather Arrow"
+  ],
+  [
+   4,
+   "Archer"
+  ],
+  [
+   3,
+   "Arrow Slit"
+  ],
+  [
+   2,
+   "Bomb Arrow"
+  ],
+  [
+   2,
+   "Ferocious Tiger Kick"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   4,
+   "Flame Arrow"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Golden Arrow"
+  ],
+  [
+   4,
+   "Hammer Throw"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   5,
+   "Leadership"
+  ],
+  [
+   4,
+   "Poisoned Arrow"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   1,
+   "Racket Arrow"
+  ],
+  [
+   4,
+   "Rainbow's Arrow"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Kazena, the Storming Rebel": "Hero",
+  "Bow Sniper Darge": "Hero",
+  "Treasure Huntress Semi": "Hero",
+  "Angelfeather Arrow": "Artifact (Reaction)",
+  "Archer": "Creature L0",
+  "Arrow Slit": "Artifact (Reaction)",
+  "Bomb Arrow": "Artifact (Reaction)",
+  "Ferocious Tiger Kick": "Attack",
+  "Fighting": "Ability",
+  "Flame Arrow": "Artifact (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Golden Arrow": "Artifact (Reaction)",
+  "Hammer Throw": "Attack",
+  "Heavy Hit": "Attack",
+  "Leadership": "Ability",
+  "Poisoned Arrow": "Artifact (Reaction)",
+  "Quick Attack": "Attack",
+  "Racket Arrow": "Artifact (Reaction)",
+  "Rainbow's Arrow": "Artifact (Reaction)",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Bow Sniper Darge": "Each Arrow she plays in reaction to his single-target attack adds a large bonus on top of the Arrow's own effect.",
+  "Kazena, the Storming Rebel": "Once per turn draws her hand back up to seven cards.",
+  "Treasure Huntress Semi": "Extra gold every turn, which pays for the Arrows.",
+  "Angelfeather Arrow": "Reaction to her own attack: plain extra damage.",
+  "Flame Arrow": "A little damage and the target burns for good.",
+  "Poisoned Arrow": "A little damage and a stack of poison.",
+  "Bomb Arrow": "A little damage and a solid hit on a creature.",
+  "Rainbow's Arrow": "A little damage and two cards.",
+  "Golden Arrow": "Free: pays gold in proportion to the attack's damage, but locks her gold for the turn.",
+  "Racket Arrow": "Bounces a creature to hand.",
+  "Arrow Slit": "Makes an Arrow she just played happen twice.",
+  "Archer": "Free creature (for a discarded Arrow) that stings a target for each Arrow played, up to three a turn.",
+  "Quick Attack": "A free first attack each turn: a second volley.",
+  "Heavy Hit": "Attack that stuns.",
+  "Hammer Throw": "Attack that makes your next artifacts cost you cards.",
+  "Ferocious Tiger Kick": "Attack that stuns; as the second attack of a turn it also heals."
+ },
+ "plan": "One arrow at a time, very hard. Priya attacks with Darge and answers her own attack with a fan of Arrow artifacts: each adds an effect, each adds Darge's bonus, Arrow Slit doubles one. Quick Attack gives a second volley the same turn, an Archer adds stings, Kazena refills the hand every turn and Semi pays for it. A well-fed Darge shot removes a hero. The deck is disciplined and narrow: the damage is single-target and announced, the Arrows cost gold she has to budget, and everything depends on a fragile sniper getting to attack.",
+ "looks": {
+  "early": "An Archer, a little stack of gold, Darge with Fighting levelled.",
+  "mid": "Darge with four Arrows fanned behind him; one of your heroes burning and poisoned; Kazena drawing back to seven.",
+  "late": "Gold spent, Darge exposed after a huge volley."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "She is saving gold and Arrows; only an Archer is on the board.",
+   "why": "Her first real volley is a few turns away and her damage will be one announced attack per turn: level up now and put Firewall face-down on the hero she must shoot."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Darge has a full fan of Arrows behind him and gold to play them all.",
+   "why": "A frozen Darge cannot attack at all, and Kazena, who refills that fan every turn, has ordinary health; waiting only lets the volley come at full size."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "She has just spent her gold on one enormous shot and Darge has very little health.",
+   "why": "After a volley she cannot pay for another this turn cycle; the sniper is the smallest hero on the table and there is nothing to sweep."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her last attacker gets one swing a turn, with whatever Arrows she can still afford.",
+   "why": "A single announced hit per turn is what Homerun!, Cloud in a Bottle and a freeze are for; blunt it and the Storm finishes."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Priya summons an Archer by discarding an Arrow and banks her gold.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up and set Firewall"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Darge early"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Archer"
+     }
+    ]
+   },
+   {
+    "board": "Kazena draws her back to seven; she attaches Fighting to Darge and passes.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Find the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Kazena"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     }
+    ]
+   },
+   {
+    "board": "A first Quick Attack with a Poisoned Arrow tests your caster.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Ignore it and build"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the poison back"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Archer"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Darge draws his bow with four Arrows ready and gold to match.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Darge"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held for the shot"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep setting up"
+     }
+    ]
+   },
+   {
+    "board": "The volley lands on your Firewall hero: Darge is burned and hurt, your hero nearly gone.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Burn Kazena so the fan does not refill"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, answer on Darge"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Arrow Slit doubles a Flame Arrow: two of your heroes burn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Darge, Tea a burn onto him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Semi"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "One of your heroes is gone to a single shot; her gold is spent and Darge is wounded.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Darge now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield up and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep Archers"
+     }
+    ]
+   },
+   {
+    "board": "Golden Arrow refunds her gold but she cannot spend it this turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "This turn she cannot answer anything: strike"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Darge for the next"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Heavy Hit stuns your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks through the stun; burn Darge with the others"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Darge"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Kazena is her last attacker, swinging once a turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the hit, tick her down"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn her first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; she needs one more volley.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon now, Flashbang next turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Storm tick plus Acid Vial"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   },
+   {
+    "board": "Darge returns on a Golden Ankh for one last shot.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the target"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him on arrival"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill the other hero"
+     }
+    ]
+   }
+  ]
+ }
+}

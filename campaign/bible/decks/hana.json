@@ -1,0 +1,405 @@
+{
+ "name": "Rules Check",
+ "owner": "hana",
+ "heroes": [
+  "Alleria, the Queen of Spiders",
+  "Fiedel, the Mercenary Mage",
+  "Sabrina, the Psychic Witch"
+ ],
+ "main": [
+  [
+   1,
+   "Boots of Hermes"
+  ],
+  [
+   3,
+   "Box Spider"
+  ],
+  [
+   2,
+   "Brain Spider"
+  ],
+  [
+   3,
+   "Crimson Skull Spider"
+  ],
+  [
+   3,
+   "Decay Magic"
+  ],
+  [
+   3,
+   "Diamond Spider"
+  ],
+  [
+   2,
+   "Flooding"
+  ],
+  [
+   2,
+   "Frost Rune"
+  ],
+  [
+   1,
+   "Glass Wall"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Jumper Spider"
+  ],
+  [
+   1,
+   "Jumpscare"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Masterpiece"
+  ],
+  [
+   2,
+   "See through the Ruse"
+  ],
+  [
+   4,
+   "Spider Avalanche"
+  ],
+  [
+   2,
+   "Spider Dance"
+  ],
+  [
+   2,
+   "Spider Hive"
+  ],
+  [
+   3,
+   "Spider Silk Bridge"
+  ],
+  [
+   4,
+   "Spike Trap"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Master's Plan"
+  ],
+  [
+   2,
+   "Toxic Trap"
+  ],
+  [
+   3,
+   "Trapping"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Alleria, the Queen of Spiders": "Hero",
+  "Fiedel, the Mercenary Mage": "Hero",
+  "Sabrina, the Psychic Witch": "Hero",
+  "Boots of Hermes": "Artifact (Reaction)",
+  "Box Spider": "Creature L1",
+  "Brain Spider": "Creature L1",
+  "Crimson Skull Spider": "Creature L1",
+  "Decay Magic": "Ability",
+  "Diamond Spider": "Creature L1",
+  "Flooding": "Spell (Magic Arts, Surprise)",
+  "Frost Rune": "Spell (Decay Magic, Surprise)",
+  "Glass Wall": "Spell (Magic Arts, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Jumper Spider": "Creature L1 (Surprise)",
+  "Jumpscare": "Spell (Decay Magic, Surprise)",
+  "Magic Arts": "Ability",
+  "Masterpiece": "Spell (Magic Arts)",
+  "See through the Ruse": "Spell (Decay Magic, Reaction)",
+  "Spider Avalanche": "Spell (Destruction Magic, Surprise)",
+  "Spider Dance": "Spell (Magic Arts)",
+  "Spider Hive": "Area (Decay Magic)",
+  "Spider Silk Bridge": "Spell (Support Magic, Surprise)",
+  "Spike Trap": "Spell (Decay Magic, Surprise)",
+  "Summoning Magic": "Ability",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Toxic Trap": "Spell (Decay Magic, Surprise)",
+  "Trapping": "Ability"
+ },
+ "gist": {
+  "Alleria, the Queen of Spiders": "Sets a trap from the deck every turn, draws when her own trap fires, and once per turn pulls a single-target hit onto whichever of her heroes has a trap waiting.",
+  "Fiedel, the Mercenary Mage": "Sturdy; uses reaction spells as if they were a level cheaper.",
+  "Sabrina, the Psychic Witch": "Sacrifices a creature to fetch a trap from the deck and spring it at once.",
+  "Spike Trap": "Trap: cancels an attack or spell on its hero and hits the attacker very hard.",
+  "Frost Rune": "Trap: cancels what chose its hero and freezes the attacker.",
+  "Flooding": "Trap: cancels an attack or spell on its hero.",
+  "Spider Avalanche": "Trap: when its hero is hit, your whole side is hurt, more for every creature she controls.",
+  "Spider Silk Bridge": "Trap: springs when you end a turn without damaging her side; draws two and keeps drawing until you do.",
+  "Jumper Spider": "Trap creature: draws two when its hero is hit, then changes sides every turn.",
+  "Crimson Skull Spider": "All damage her traps deal grows with each Spider she controls.",
+  "Diamond Spider": "Draws two whenever any trap is sprung.",
+  "Box Spider": "Refills its hero's empty trap slot from the deck at the end of her turn, unseen.",
+  "Brain Spider": "Lets any of her heroes spring traps set on the others.",
+  "The Master's Plan": "Cancels one card you play from hand.",
+  "See through the Ruse": "Cancels a trap of yours.",
+  "Spider Hive": "Area: face-down traps are cheaper to spring for each Spider on the board."
+ },
+ "plan": "Hana's deck is a rules exam. Every hero has a face-down card and every card answers a precise kind of play: an attack or spell that chooses the hero is cancelled and punished, a hit that lands sets off an Avalanche on your whole side, and a turn in which you prudently do nothing springs the Silk Bridge and draws her two. Alleria steers your single shots into the worst trap available. The Spiders arrive by trading in used traps, and then every trap hurts more and draws more. She deals almost no damage of her own accord; the traps are finite, each fires once, and the Spiders that amplify them are small creatures.",
+ "looks": {
+  "early": "Three heroes, three face-down cards, and a silence that invites you to attack.",
+  "mid": "Diamond and Crimson Skull Spiders beside fresh traps; each of your spells either cancelled or answered across your whole side.",
+  "late": "Her last two traps, a Master's Plan held apart, and a hand kept full by the Silk Bridge."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Each of her heroes has a face-down card and Alleria sets a new one from the deck every turn.",
+   "why": "Each trap answers one kind of play exactly once: spring them with your cheapest spells or remove them with The Yeeting before anything important is cast; racing sends your best cards straight into Spike Trap."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "A Crimson Skull Spider and a Diamond Spider have come out, so her traps now hurt more and draw her cards.",
+   "why": "The Spiders are small creatures and a sweep chooses no target; kill them and Spider Avalanche, which counts her creatures, shrinks back to a scratch."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Spider Silk Bridge lies face-up: it draws for her after every turn in which you dealt no damage to her side.",
+   "why": "Passing is no longer safe, so every turn needs at least a little damage (a Storm tick counts), led by a probing spell so that The Master's Plan and the last traps are spent on the wrong card."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Her face-down cards are down to one and her heroes have never been healed.",
+   "why": "Traps fire once, and she has no other defence and no real damage; once they are used up the rest is arithmetic."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Ms. Kirishima sets three cards face-down and waits, pen in hand, for you to do something.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Send your cheapest spell at a hero to see what it is"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Chain Lightning, which chooses nothing itself"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Open with your best spell"
+     }
+    ]
+   },
+   {
+    "board": "Your probe is cancelled by a Spike Trap and your caster takes a heavy hit; Alleria draws.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "One known: Yeet the next"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks only for a turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire again at the same hero"
+     }
+    ]
+   },
+   {
+    "board": "Alleria pulls your shot onto Fiedel, who has a Frost Rune waiting; your caster is frozen.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the freeze onto Alleria"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Use spells that pick no target"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for the thaw"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "She trades two used traps for a Diamond Spider and a Crimson Skull Spider.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the Spiders"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Crimson Skull"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Aim at heroes through the traps"
+     }
+    ]
+   },
+   {
+    "board": "A Spider Avalanche answers your hit: your whole side is hurt, more for each Spider.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Spiders first next time"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and carry on"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit again"
+     }
+    ]
+   },
+   {
+    "board": "A Jumper Spider crosses to your side for a turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "It leaves again: sweep while it is hers"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Use the turn to Yeet a trap"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Enjoy the spider"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Spider Silk Bridge is face-up after your quiet turn; she draws two.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "A little damage every turn from now on"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Spiders, which also counts"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Another quiet turn"
+     }
+    ]
+   },
+   {
+    "board": "One card held apart: The Master's Plan.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Lesser spell first, real one second"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discard"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Commit the Storm into it"
+     }
+    ]
+   },
+   {
+    "board": "Sabrina sacrifices a Spider to spring a trap from the deck on you.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Fewer Spiders, fewer of those: sweep"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun!"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One face-down card left on Sabrina; Alleria and Fiedel are low.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the two without traps"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm do it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for certainty"
+     }
+    ]
+   },
+   {
+    "board": "Box Spider refills a trap slot at the end of her turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Box Spider"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it and end the duel"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Her last trap is sprung.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Go"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep a shield anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ]
+ }
+}

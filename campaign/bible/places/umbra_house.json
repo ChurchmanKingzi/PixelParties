@@ -1,0 +1,20 @@
+{
+ "name": "Umbra House",
+ "zone": "dorms",
+ "bg": "umbra_house",
+ "night": true,
+ "hours": "Sealed for nine years. Officially: structural damage. Nobody goes there.",
+ "sight": "On the north ridge, forty minutes above campus where the pines give way to jungle, stands a dark three-storey house of volcanic stone with a slate roof and tall shuttered windows. A chain-link fence leans around it, hung with rusted DANGER — UNSAFE STRUCTURE signs; vines have taken the porch. Over the door a fifth dorm crest, a black gem, has been chiselled almost flat. Nothing about the walls looks unsafe. At night it is a block of deeper dark with the volcano behind it, and no insects sing near it.",
+ "things": [
+  "Walk the fence line and count the signs",
+  "Look for the place where the chain-link has been cut and wired shut again",
+  "Study the house from the tree line: which shutters are loose, which chimney has a bird's nest",
+  "Read the chiselled crest by touch",
+  "Find the overgrown path that continues north from the back gate toward the ruins",
+  "Inside (if you get in): a hall with five rows of coat hooks, a duel room with the tables still set, dust sheets, a wall calendar stopped in October",
+  "Inside: the stair to the upper corridor and the numbered rooms",
+  "At night: see a lamp move behind a second-floor shutter"
+ ],
+ "secret": "The fourth dorm, for students of 'the deep game' — a small house Chuck founded for those who showed sensitivity to the first prints; Aleksander Hale was its housemaster. Sealed after the expedition; the structure is sound. Inside it is a time capsule of an October nine years ago: half-played duels on the tables, a kitchen rota (one name on it: J. Hart, first year), jackets with smoke-grey collars on hooks. The duel room's tables are stone, inlaid with real tile fragments — a Charter Duel played here has 'too real' holograms even without an Alpha card. The moving lamp is Viktor, who has been breaking in since week 2 and is searching room by room. Ashdown comes once a year and stands at the fence. From D27 the house's shutters on the north side are found open every morning. D61+: Marrow wants in and applies pressure for the keys. Late game: a safe house outside the proctors' rounds.",
+ "access": "Sealed and forbidden: chained front door, padlocked fence. KEYS: silas (he will open it only for someone he trusts completely or to stop worse people getting in first). Other ways in: the cut fence and a loose scullery shutter (viktor), or the bricked tunnel. Being caught here is a hearing before the Chancellor."
+}

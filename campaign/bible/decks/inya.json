@@ -1,0 +1,390 @@
+{
+ "name": "Hop & Pop",
+ "owner": "inya",
+ "heroes": [
+  "Bubbles, the Bouncy Bunny",
+  "Cute Annoyance Mini",
+  "Maya, the Nature Fairy"
+ ],
+ "main": [
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Bunny Bombs"
+  ],
+  [
+   2,
+   "Cannon Tower"
+  ],
+  [
+   3,
+   "Cheering Rabbit"
+  ],
+  [
+   2,
+   "Cloud Pillow"
+  ],
+  [
+   4,
+   "Cute Bunny"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Friendship"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Harpyformer Choir"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   3,
+   "Skull Necklace"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Support Magic"
+  ],
+  [
+   2,
+   "Teal Fishing Rod"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   2,
+   "Toughness"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Winged Haressassin"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Bubbles, the Bouncy Bunny": "Hero",
+  "Cute Annoyance Mini": "Hero",
+  "Maya, the Nature Fairy": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Bunny Bombs": "Creature L0",
+  "Cannon Tower": "Creature L3",
+  "Cheering Rabbit": "Creature L0",
+  "Cloud Pillow": "Artifact",
+  "Cute Bunny": "Creature L0",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Friendship": "Ability",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Harpyformer Choir": "Creature L0",
+  "Heal": "Spell (Support Magic)",
+  "Juice": "Artifact (Reaction)",
+  "Skull Necklace": "Artifact",
+  "Summoning Magic": "Ability",
+  "Support Magic": "Ability",
+  "Teal Fishing Rod": "Artifact",
+  "Thicket": "Artifact",
+  "Toughness": "Ability",
+  "Treasure Chest": "Artifact",
+  "Winged Haressassin": "Creature L0"
+ },
+ "gist": {
+  "Bubbles, the Bouncy Bunny": "A very tough hero who can take any damage aimed at Inya's creatures herself. If she goes down that way, Inya refills her hand.",
+  "Bunny Bombs": "A tiny creature that collects a Bomb Counter at the end of every turn (both players'). When it dies it blasts every target on the board, harder for each counter. If that blast would end the game in a draw, its controller loses.",
+  "Haressassin": "Fragile creature that shoots one target hard every turn, starting the turn after it arrives.",
+  "Winged Haressassin": "Once per turn Inya may discard a card to pull a hit aimed at one of her other targets onto this creature; if it dies that way it strikes back hard at any target.",
+  "Cute Bunny": "Hops onto the board for free whenever Inya discards two cards at once, and draws her a card each time that happens.",
+  "Cute Annoyance Mini": "Discards a card to fetch a Cute creature, a second card to summon it at once. Her discard outlet.",
+  "Maya, the Nature Fairy": "Every creature that enters makes one of Inya's targets a bit sturdier.",
+  "Cheering Rabbit": "Its hero's first attack or spell each turn hits harder.",
+  "Aggressive Town Guard": "Free first summon of the turn; pings one target each turn.",
+  "Harpyformer Choir": "Free first summon that fetches a Summoning Magic and can shield a creature from one hit.",
+  "Cannon Tower": "Sturdy late creature that fires a strong shot every turn.",
+  "Skull Necklace": "Does nothing when played; when Mini discards it, it stings a target.",
+  "Teal Fishing Rod": "Returns a small creature (Bunny Bombs, Cute Bunny) from the discard pile to the board.",
+  "Deepsea Idol": "Reaction that cancels a sweep hitting two or more of her creatures.",
+  "Thicket": "Makes one creature untargetable for a turn.",
+  "Heal": "Patches Bubbles up after she has soaked a turn of damage."
+ },
+ "plan": "Inya goes wide with cheap creatures and lets Haressassins shoot while Bubbles absorbs whatever is thrown at them. In the back a Bunny Bombs ticks; Inya decides when it goes off, because Bubbles can keep it alive, and a late blast flattens a board she is happy to trade away. Deepsea Idol and Thicket protect the shooters, Heal keeps Bubbles standing. The deck is fast but thin: every point Bubbles soaks is real, and once she falls the creatures die to a breeze and the bomb is as dangerous to Inya as to you.",
+ "looks": {
+  "early": "A Town Guard and a Harpyformer Choir out for free, Bunny Bombs set down with its first counter, Bubbles untouched.",
+  "mid": "Several Haressassins spread across the heroes, the bomb ticking in the back row, Bubbles visibly chewed up from catching hits meant for them.",
+  "late": "A swollen Bunny Bombs, a Cannon Tower, a tired Bubbles being healed; Inya counting counters out loud."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "SETUP",
+   "trap": "RUSH",
+   "tell": "A fresh Haressassin has just landed and cannot shoot until next turn; the Bunny Bombs has barely a counter on it.",
+   "why": "Freezing or stealing the first Haressassin (Snow Cannon, Dark Gear) or setting the bomb off yourself with The Yeeting while it has a counter or two (The Yeeting counts as a kill, and so early the blast only hurts her own small creatures) costs her the tempo the whole deck lives on; racing into Bubbles, the fattest hero in the room, does not."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She is wide with fragile creatures and Bubbles already looks worn from soaking; the bomb still has only a few counters.",
+   "why": "A sweep now (Flame Avalanche) forces Bubbles to either eat a whole board's worth of damage or let the Haressassins die, and a bomb popped early is harmless; waiting just adds counters and shots."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "The Bunny Bombs is loaded with counters and sits next to your Storm caster's line of fire.",
+   "why": "Anything that kills the bomb now, a sweeper or The Yeeting alike, sets the full blast off on your own heroes; Chain Lightning and Acid Vial hit only heroes, so finish Bubbles and leave the bomb exactly where it is."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Both sides are low and the bomb is still on her board; a draw caused by Bunny Bombs counts as a loss for its controller.",
+   "why": "With heroes this low the bomb can no longer save her: if it would take everyone down, she loses, so every card should go at her last heroes."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Inya opens with an Aggressive Town Guard and a Harpyformer Choir for free and sets a Bunny Bombs behind Bubbles.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Detonate the Bunny Bombs with The Yeeting while it has one counter"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Ignore it and stack Destruction Magic towards the Storm"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning straight into her heroes"
+     }
+    ]
+   },
+   {
+    "board": "A first Haressassin lands under Maya; it cannot fire yet. Mini discards a Skull Necklace to nick one of your heroes.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the Haressassin and keep it out of the game"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche her three small creatures"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Mini, her smallest hero, with everything"
+     }
+    ]
+   },
+   {
+    "board": "Cute Bunnies hop in as Mini discards two cards; Inya's hand refills, her board is all tiny bodies.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the best creature with Dark Gear"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Use the quiet turn to find Gathering Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Set Firewall and poke Mini"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "She has gone wide with several Haressassins while a Bunny Bombs ticks in the back row; Bubbles has been catching every stray hit.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the whole board and make Bubbles choose"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Detonate the bomb with The Yeeting while the blast is still small"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep building, the Storm will handle it"
+     }
+    ]
+   },
+   {
+    "board": "Two Haressassins and a Cheering Rabbit; Inya holds a Deepsea Idol-sized grin and two cards.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep twice: the Idol only stops the first"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze one shooter and hit Bubbles"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything at Mini and hope"
+     }
+    ]
+   },
+   {
+    "board": "Bubbles has soaked a full turn of your Storm and Inya spends her action on Heal.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Keep sweeping, Bubbles cannot soak forever"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear a Haressassin and turn it on her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for The White Eye instead of pressing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Bunny Bombs is fat with counters and Inya is smiling at it; your heroes are in blast range.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and Acid Vial at heroes; touch nothing else"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle ready in case she pops it herself"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep or Yeet the bomb and take the blast"
+     }
+    ]
+   },
+   {
+    "board": "Bubbles is one good hit from falling, and if she drops from soaked damage Inya redraws a full hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Aim past the creatures and kill a different hero"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the bomb with Dark Gear so its timing is yours"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm and take the blast"
+     }
+    ]
+   },
+   {
+    "board": "A Cannon Tower has joined the Haressassins; the bomb keeps ticking; you hold Dark Gear and Tea.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Hero damage only: Chain Lightning, then Acid Vial on Bubbles"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Tower, hit the weakest hero"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Cannon Tower and point it at Bubbles"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One hero each is nearly gone and the loaded Bunny Bombs still sits there; if it levels everything, its controller loses.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and Chain Lightning at her last healthy hero"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Protect your lowest hero and let the Storm tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle for a better hand"
+     }
+    ]
+   },
+   {
+    "board": "Inya fishes a Bunny Bombs back with Teal Fishing Rod; Bubbles is gone, her creatures have no shield left.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore the new bomb and end it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the unprotected creatures"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild your Storm caster first"
+     }
+    ]
+   },
+   {
+    "board": "She is down to Mini and a Haressassin; you have one hero and a ticking Storm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "All in on Mini"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Haressassin, then hit Mini"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the Haressassin and wait"
+     }
+    ]
+   }
+  ]
+ }
+}

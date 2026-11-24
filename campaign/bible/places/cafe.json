@@ -1,0 +1,19 @@
+{
+ "name": "Café Cantrip",
+ "zone": "town",
+ "bg": "cafe",
+ "night": false,
+ "hours": "Morning to Afternoon, every day; busiest on Saturday when the school comes down the hill.",
+ "sight": "A sunny corner café at the top of Main Street with blue shutters, a tiled terrace and tables just big enough for two cups and two decks. The pastry case is a small exhibition; the chalkboard menu lists drinks named after spells. From the terrace you look down the whole street to the masts. It smells of espresso, orange peel and warm butter, and the cups are thick and white.",
+ "things": [
+  "Take someone here — the island's recognised first-date spot",
+  "Order a Counterspell (iced coffee, 4 cr) or a Fireball (chilli chocolate, 5 cr)",
+  "Share the famous guava pastry",
+  "Study on the terrace on a quiet weekday",
+  "Play a slow game of best-of-one with the cups in the way",
+  "Watch who walks past with whom",
+  "Read the mainland newspapers, three days old",
+  "Leave a tip you can or cannot afford"
+ ],
+ "secret": "Default date location for most routes (Jessica expects it done properly: a reserved terrace table, punctuality, the bill handled without fuss; Livvie will try to order only water). Who is seen here together is public knowledge by dinner — the multiple-routes consequence engine starts here. The three-day-old mainland papers never mention the island; from Day 70 a small paragraph does ('Students hospitalised at card-game academy; school cites exhaustion') and the Chancellor's office buys every copy off the ferry the following week."
+}

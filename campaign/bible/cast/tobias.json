@@ -1,0 +1,233 @@
+{
+ "id": "tobias",
+ "name": "Tobias Crowe",
+ "firstName": "Tobias",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B6",
+ "romance": false,
+ "deck": "Smash and Grab (Andras, with Sid)",
+ "look": "Broad, with a nose that has been broken at least twice, a hard square face, short brown hair standing up in spikes and a grey hoodie worn under the red jacket, its hood down over the plain collar. His knuckles are scarred and he keeps his hands in his pockets. He looks at a room the way other people look at a menu: exits first, then what is worth having.",
+ "voice": "Low, unhurried, Salford; few words and a dry, level humour. He is courteous to people with nothing and insolent, in a quiet way, to people with a lot. Never raises his voice — the calm is the warning. He talks about taking things as a matter of plain economics. RARE habit (once in a scene at most; most scenes go without it): pricing an object aloud as he looks at it.",
+ "lines": [
+  "Nice watch. Not yours, was it — your dad's. Thought so. Wears different.",
+  "I've never took a thing off anyone who'd miss it. That's not a boast. That's the whole rule.",
+  "Andras hits it till it stops, and Sid has your best card off you while you're watching Andras. Honest work.",
+  "Six hundred quid of school up that hill for every one of us down here. You do the sum. I already have."
+ ],
+ "intro": "A broad, broken-nosed first-year from bungalow 6 with a hoodie under his jacket, who is perfectly polite to the Commons and looks at the richer students as if working out their resale value.",
+ "traits": [
+  {
+   "id": "tobias_1",
+   "text": "He has a way of looking a room over that makes people check their pockets.",
+   "how": "Meet him; watch Ashton's hand go to his cravat pin."
+  },
+  {
+   "id": "tobias_2",
+   "text": "He is unfailingly decent to anyone poor, small or picked on, and has never taken so much as a sleeve from the Commons.",
+   "how": "Ask Tomi; or see him with Sammy."
+  },
+  {
+   "id": "tobias_3",
+   "text": "His deck batters you with one fighter while a thief lifts the best card out of your deck.",
+   "how": "Play him."
+  },
+  {
+   "id": "tobias_4",
+   "text": "He calls the Academy 'a club for fat cats' and says so in class.",
+   "how": "First week, any lecture."
+  },
+  {
+   "id": "tobias_5",
+   "text": "There is a floorboard by his bed that does not sit flat.",
+   "how": "Visit bungalow 6 and step in the wrong place."
+  },
+  {
+   "id": "tobias_6",
+   "text": "Things that went missing from the bully of Rare Hall have a way of turning up back on their owners' pillows.",
+   "how": "After Day 9; ask the first-years, not him."
+  },
+  {
+   "id": "tobias_7",
+   "text": "He grew up in care in Salford and learned to box at a church club.",
+   "how": "Ask about the nose."
+  },
+  {
+   "id": "tobias_8",
+   "text": "He sends money every month to a younger sister who is still in the system.",
+   "how": "Friend stage; a postal order at the harbor counter."
+  },
+  {
+   "id": "tobias_9",
+   "text": "He has brought a crowbar to a card school, and has a list of doors.",
+   "how": "Trusted; or catch him at one."
+  }
+ ],
+ "secret": "Tobias Crowe went into care in Salford at seven with his sister Keeley, then three, and came out of it at eighteen alone, because the system separated them at her second placement. He boxed, he thieved, he did four months in a young offenders' unit for a warehouse job, and he has a code as rigid as Eberhart's regimen: never from the weak, never with violence against someone who cannot hit back, and a share always goes to somebody worse off — beginning, he says with a straight face, with himself, since he is poor. He sees himself as a modern Robin Hood and is honest enough to grin at the description. He qualified at an open regional with a deck built entirely from stolen cards and regards the Academy as the richest building he has ever been let into by the front door: 'a club for fat cats', with a founder who keeps sixty cards worth a street of houses in a sea-chest. He is here to rob it. He has smuggled in a crowbar (under the floorboard, with a roll of credits, a set of picks and Keeley's school photograph), and he has a list: Ashton Beaumont-Lyle's cufflinks and cravat pins; Jessica Montclair's three caskets; the campus store's cash box; and, as the season's real prize, the Card Archive.\nComplications, in the order he meets them. Jessica: he cases her suite within a fortnight, follows her into town, and sees her come out of the pawn shop with a ticket — and understands at once, as only someone who has pawned things can, that the caskets are all she has. He crosses her off the list and tells no one; it is the first crack in his theory about the rich. Brant Kessler: a bully who robs the poor is, to Tobias, the lowest thing alive; from about Day 9 the cards Brant extorts start reappearing on their owners' pillows, and Brant never works out how. Leona Helical: he knows a professional's walk when he sees one and has kept quiet about hers. Fiona Blackwood: he leaves flowers lifted from the Spectral terrace planters on her porch and cannot think of a single thing to say to her. Marrow: from Day 61 a man in a grey suit lets it be known, through intermediaries, that first prints from the Archive would be bought with no questions; Tobias is exactly the tool Marrow would use, and exactly the one who would enjoy robbing Marrow more.\nAfter Day 40: he took Brant's hoard back from him card by card, and then saw what was done to him in a single night — everything taken, by the rules, with the owner's consent. It is the purest robbery he has ever heard of, and it turns his stomach. 'That's not thieving. A thief leaves you yourself.' He is a Hollowing risk because he would stake anything on a job, and an asset because the Card Archive, the print works safe and Umbra House are all doors, and he opens doors. Arc: from robbing the school to robbing FOR it.",
+ "wants": "Enough to get his sister out and set up — and to take it from people who will not feel the loss.",
+ "fears": "Being the kind of thief who takes from someone with nothing; and Keeley learning what he does.",
+ "crush": "fiona",
+ "crushNote": "She talks about death the way the church boxing coach did — plainly — and she looked at his knuckles and asked a sensible question. It shows as flowers lifted from the Spectral planters and left on her porch, and him having, for once, nothing to say.",
+ "crushPace": 0.7,
+ "likes": [
+  "Straight dealing",
+  "People who share what little they have",
+  "A lock worth the trouble",
+  "Standing up to bullies",
+  "Boxing, done properly",
+  "Being trusted with something valuable (he will not take it)",
+  "Tea with three sugars"
+ ],
+ "dislikes": [
+  "Wealth worn as a right",
+  "Bullies who pick down",
+  "Being watched by staff",
+  "Snitches",
+  "Charity with a speech attached",
+  "Questions about where something came from"
+ ],
+ "gifts": [
+  "Card: Sid, the King of Thieves",
+  "Hand wraps for boxing",
+  "Card: Andras, the Human Weapon",
+  "A stamped envelope and a postal order form",
+  "A padlock he has not seen before (he will have it open in a minute and be delighted)"
+ ],
+ "events": [
+  {
+   "id": "tobias_e1",
+   "stage": 1,
+   "title": "Do the sum",
+   "condition": "Be straight with him as one Commons kid to another: share something (food, sleeves, a job from job_board) and do not flinch when he prices your belongings aloud.",
+   "hint": [
+    "He is rude to money and polite to everyone else. It is clear which side of that line you live on.",
+    "Treat him as a neighbour and share what you have."
+   ]
+  },
+  {
+   "id": "tobias_e2",
+   "stage": 2,
+   "title": "The whole rule",
+   "condition": "Before Day 39, find out who is returning the extorted cards and keep it quiet — or help him do it once; spar with him at gym.",
+   "hint": [
+    "Somebody on the row has been righting a wrong at night, and would rather it were not discussed.",
+    "Work out who is giving the stolen cards back, and say nothing — or lend a hand."
+   ]
+  },
+  {
+   "id": "tobias_e3",
+   "stage": 3,
+   "title": "A thief leaves you yourself",
+   "condition": "After Day 40, learn what is under the floorboard and what the list is, and do not report him; give him a better door to open (umbra_house, old_print_works or the truth about a visitor's offer). He tells you about Keeley.",
+   "hint": [
+    "He came here for a reason that would get him expelled. After what happened in the dome, he is no longer sure of it.",
+    "Discover what he is planning, keep his secret, and offer him a cause worth his skills."
+   ]
+  }
+ ],
+ "bonds": {
+  "sammy": {
+   "label": "roommates",
+   "text": "The kid with the stare is harmless and trying too hard. Nobody touches him while Tobias is about.",
+   "public": true,
+   "from": 1
+  },
+  "dmitri": {
+   "label": "roommates",
+   "text": "Bungalow 6. The one roommate who sees what time he comes in and through which window, and has never said a word.",
+   "public": true,
+   "from": 1
+  },
+  "leona": {
+   "label": "friends",
+   "text": "She walks like someone counting doors. Not his business; he has kept it that way.",
+   "public": false,
+   "from": 12
+  },
+  "fiona": {
+   "label": "crush",
+   "text": "She talks about death the way the boxing coach did. He lifts flowers from the Spectral planters and cannot find a sentence.",
+   "public": true,
+   "from": 6
+  },
+  "freya": {
+   "label": "friends",
+   "text": "Good laugh, hollow legs, no questions. He has carried her home once and locked her door from the outside.",
+   "public": true,
+   "from": 5
+  },
+  "ashton": {
+   "label": "distrusts",
+   "text": "Cufflinks worth a term's stipend, and he leaves them on the terrace wall.",
+   "public": true,
+   "from": 3
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "He cased her suite, followed her to the pawn shop and understood. She is off the list, and he has told nobody what he saw.",
+   "public": false,
+   "from": 14
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "A bully who robs the poor is the lowest thing alive. What Brant takes has been reappearing on its owners' pillows.",
+   "public": false,
+   "from": 9
+  },
+  "tomi": {
+   "label": "teammates",
+   "text": "The row's honest dealer. Tobias brings him nothing hot and expects fair weight; he gets it.",
+   "public": true,
+   "from": 4
+  },
+  "livvie": {
+   "label": "friends",
+   "text": "He left forty credits in her cardigan pocket once. She worked out whose they were and gave them back with a look he has not forgotten.",
+   "public": true,
+   "from": 10
+  },
+  "gideon": {
+   "label": "enemies",
+   "text": "White gloves. Says 'the cove'. Top of the list.",
+   "public": true,
+   "from": 6
+  },
+  "silas": {
+   "label": "distrusts",
+   "text": "The old man caught him looking at the padlock on the sealed house and only said 'not that one, lad'.",
+   "public": false,
+   "from": 20
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "The only person on the island he calls 'ma'am'. Nothing has ever gone missing from her kitchen and nothing will.",
+   "public": true,
+   "from": 2
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "gym",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "pawn_shop",
+   "Afternoon": "main_street",
+   "Evening": "bonfire_pit",
+   "Night": "spectral_lobby"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Andras hits whatever is in front of him until it stops moving, while Sid quietly takes the best card out of your deck and plays it. Direct, physical, cleverer than it looks.",
+  "tilt": "A rich opponent being gracious about losing. He would rather be sneered at, and plays worse when he cannot hate them."
+ }
+}

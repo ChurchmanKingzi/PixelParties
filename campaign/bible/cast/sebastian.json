@@ -1,0 +1,228 @@
+{
+ "id": "sebastian",
+ "name": "Sebastian Thorne",
+ "firstName": "Sebastian",
+ "age": 21,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 3,
+ "dorm": "spectral",
+ "room": "Spectral Tower, upper floors",
+ "romance": false,
+ "deck": "Realpolitik (Diplomacy control: Von Pixmarck, the Iron Chancellor; George, the Mad Tyrant King; Nero Zira, the Mastermind)",
+ "look": "Tall (about 6'1\") and lean with a fencer's shoulders, warm olive skin, and dark-brown wavy hair parted on the left and combed back, one lock always falling over the right temple. Hazel-green eyes under straight dark brows, a straight nose, a single dimple in the left cheek when he smiles, which is often and evenly. He wears the red Competitive Play jacket fully buttoned with the white, gold-edged Spectral collar, the dark council sash (deep royal blue with a thin gold edge) worn from the right shoulder to the left hip, a silver vice-president's star pin on the sash, a gold signet ring on the right little finger and a slim brass stamp case in his breast pocket. He stands very still, hands loosely clasped in front, head tilted a few degrees as if granting an audience.",
+ "voice": "Warm, unhurried and reassuring, a diplomat's baritone with every sentence sanded smooth; he agrees with you first and refuses you second, and you are halfway down the corridor before you notice which it was. Never raises his voice and never says 'no' — he says 'not this term'. The warmth is real in small matters and vanishes without a ripple when a rule can do his refusing for him. RARE habit (once in a scene at most; most scenes go without it): 'Let's keep this calm.'",
+ "lines": [
+  "Let's keep this calm. Nobody is refusing you a permit. The form simply hasn't the right collar on it yet.",
+  "You're the Wildcard. I read your file with real interest, and then I read the bungalow list, and I thought: well, there's a man with room to rise.",
+  "Order isn't unkind. It only looks that way from underneath.",
+  "My deck never fights anybody. It makes them an offer, and by the end of the turn your own creatures are working for me."
+ ],
+ "intro": "The student council's vice-president: a handsome, soft-spoken Spectral third-year whose stamp is on every permit, pass and ladder penalty, and who has never been seen to lose his temper.",
+ "traits": [
+  {
+   "id": "sebastian_1",
+   "text": "He is vice-president of the student council and chairs its permits and sanctions desk: club charters, event permits, late passes and ladder-conduct penalties all need his stamp.",
+   "how": "Try to get anything approved; the council room, Midday."
+  },
+  {
+   "id": "sebastian_2",
+   "text": "He never says no. He says 'not this term'.",
+   "how": "Ask him for something."
+  },
+  {
+   "id": "sebastian_3",
+   "text": "He is quicker to find the rule that applies to a grey collar than the one that applies to a white one.",
+   "how": "Compare notes with a Spectral first-year; or watch him rule on a ladder complaint."
+  },
+  {
+   "id": "sebastian_4",
+   "text": "He carries his own brass stamp in his breast pocket and lets nobody else use it.",
+   "how": "Watch him sign a form."
+  },
+  {
+   "id": "sebastian_5",
+   "text": "He is very good at talking two angry people down, and does it for first-years at midnight without being asked.",
+   "how": "A corridor quarrel in any dorm; later, on the night rounds."
+  },
+  {
+   "id": "sebastian_6",
+   "text": "He has been heir apparent to the president for two years and has stopped pretending not to mind.",
+   "how": "Any council session; ask Noor."
+  },
+  {
+   "id": "sebastian_7",
+   "text": "His father was a diplomat who left the service abruptly, and Sebastian does not use the word 'scandal'.",
+   "how": "Friend stage; a letter with an embassy crest."
+  },
+  {
+   "id": "sebastian_8",
+   "text": "He rehearses difficult conversations aloud, alone, in the empty council room.",
+   "how": "Council room, early Morning."
+  },
+  {
+   "id": "sebastian_9",
+   "text": "He is more frightened than anyone on the council and has decided that nobody will ever see it.",
+   "how": "Trusted; late in Term 1."
+  }
+ ],
+ "secret": "OFFICE. Vice-President of the Student Council and chair of its Permits & Sanctions desk. In practice that is most of a first-year's paperwork: every club charter and event permit needs his countersignature; late passes, off-campus overnight passes and (from Day 67) curfew passes are his to stamp; and he hears ladder-conduct complaints — when someone files a dodged challenge as a refusal of ranked play, it is Sebastian who rules whether the ten-rank penalty stands. He cannot touch the Charter register (Octavia, Noor and Teobalt hold those keys) and resents it. How he uses the office: correctly on paper, and unequally in fact. He has never taken a bribe and would be insulted by one. What he trades in is favour and precedent: a Spectral first-year's late form is 'an oversight', a Commons first-year's is 'out of time'; a complaint against a grey collar is heard on Monday, one against a white collar is 'under review'. He sincerely believes this is order rather than bias — people should rise by the proper ladder, in the proper sequence, and the Wildcard came in through a side door. He is therefore an obstacle to Rowan in ordinary school life: permits that stall, a penalty upheld to the letter, a pass that needs one more signature, all delivered with a warm hand on the shoulder. He is not a villain and the GM should not play him as one: beat him on the rules (Noor can), embarrass him in open session (Hedda tries weekly), or simply out-wait him, and he yields gracefully, because being seen to lose his composure is the one thing he cannot afford.\nWHO HE IS. Son of Julian Thorne, a career diplomat who, when Sebastian was fourteen, told a parliamentary committee an inconvenient truth and was retired to a cottage in Dorset within the month. The lesson the boy drew was not 'tell the truth'. It was 'never be the one making the scene'. He has built himself into a calm surface: the level voice, the still hands, the smile that arrives on time. Wound: he watched his father, who was right, be ruined by people who were merely smooth, and chose to be one of the smooth. Contradiction: the cowardice is real and so is the skill — he is honestly gifted at de-escalation, and frightened first-years find him a comfort at one in the morning; the same instinct that makes him bury a complaint makes him the best person on the council to stand between two people about to do something stupid. He is a good player (Battle Team trialist in second year, cut at the last table) and plays a Diplomacy deck that wins with the opponent's own creatures, which he considers a philosophy.\nTHE COUNCIL QUARREL. He is the heir who has waited two years. Octavia runs everything herself, gives him the desk work and tells him nothing — in particular nothing about her dinners with the visitor from the board. With Imara Adeyemi he fights over the discretionary fund (he wants one; she will not sign a payout without a receipt); with Tavita Leota it is open war — Sebastian orders 'targeted' room inspections of the bungalows and Tavita refuses to carry out an inspection he would not also run in the Tower; Pilar Estévez he flatters and uses, since whoever writes the council bulletin decides how a ruling sounds. He blocks Hedda Njord's stalls on principle and is Teobalt Ferrant's opposite in every respect: he is the unnamed Spectral third-year of the calendar who stands for president at the hustings on a platform of 'calm and confidence', and by default loses narrowly to Teobalt on Day 173.\nTHE DARK TURN. From Day 61 Lucian Marrow, finding the president harder to steer than he expected, cultivates the vice-president as his reserve: a word about 'modern governance', a promise of a reference. If Octavia refuses to deliver the council's endorsement for the board vote, Sebastian is the one who will try to move it from the floor (and can be stopped by a quorum call, by Noor on procedure, or by being shown what he is endorsing). He knows nothing true about the island and wants to know nothing: after Day 40 he repeats the Chancellor's word 'seizure' in exactly her cadence, stamps the curfew passes, and walks the night rounds with a lantern held perfectly steady. He is terrified. The thing in bungalow 7 has filed every one of its challenges correctly, and Sebastian, who reads the register summaries, has noticed that the most orderly student in the school is the one after whose duels people do not get up. He has decided not to have noticed. His arc is his father's choice, offered again: make the scene, or keep the surface. He admires Anni Brandt — the one first-year who cites HIM, to his face, with the paragraph — and has no idea what to do about a person he cannot charm.",
+ "wants": "The president's chair, handed to him as his due, with no scene.",
+ "fears": "Being the one who stands up in the room and says the true, ruinous thing — like his father.",
+ "crush": "anni",
+ "crushNote": "She is the one first-year who cites him to his face, with the paragraph number, and cannot be charmed. It shows as her proctor slips being countersigned unusually fast, a habit of walking the Spectral corridor at ten himself, and a politeness toward the Wildcard she keeps citing that is a shade too perfect.",
+ "crushPace": 0.6,
+ "likes": [
+  "Composure under pressure",
+  "Being asked for his advice before a decision, not after",
+  "A form filled in correctly the first time",
+  "Deference that is not grovelling",
+  "Chess problems, fencing, well-cut clothes",
+  "Being beaten on the rules, privately",
+  "Anyone who calms a room"
+ ],
+ "dislikes": [
+  "Public scenes",
+  "Megaphones",
+  "Being told nothing by the president",
+  "Shortcuts taken by people 'below the line'",
+  "Being called a snob (he prefers 'traditional')",
+  "Sweat, mud, raised voices",
+  "Having his stamp borrowed"
+ ],
+ "gifts": [
+  "Card: Von Pixmarck, the Iron Chancellor",
+  "A bar of sealing wax, dark blue",
+  "Card: George, the Mad Tyrant King",
+  "A correctly completed form, in triplicate, with no errors",
+  "Good shoe polish from the boutique"
+ ],
+ "events": [
+  {
+   "id": "sebastian_e1",
+   "stage": 1,
+   "title": "Not this term",
+   "condition": "Bring him a request at council_room (a permit, a pass, an appeal against a ladder penalty) and take the smooth refusal without a scene; come back with the missing signature or the correct clause and make him stamp it.",
+   "hint": [
+    "The vice-president refuses nobody. Count how many people leave his desk with what they came for.",
+    "Take a request to the vice-president, accept his refusal calmly, and return with the paperwork put right."
+   ]
+  },
+  {
+   "id": "sebastian_e2",
+   "stage": 2,
+   "title": "Keep this calm",
+   "condition": "Beat him — in a duel at duel_terraces or on a point of procedure in open session (Noor or Teobalt can supply the clause) — and do not gloat; or be present when he talks a frightened student down on the night rounds after Day 67, and say so to him afterwards.",
+   "hint": [
+    "He respects two things: a rule correctly quoted, and a person who does not make a scene about winning.",
+    "Get the better of him fairly and quietly, or notice the one thing he is truly good at."
+   ]
+  },
+  {
+   "id": "sebastian_e3",
+   "stage": 3,
+   "title": "The scene",
+   "condition": "In Term 2, before the hustings (Day 172) or the board vote, show him plainly what he is being asked to endorse and what the register summaries mean, in private, and ask about his father; give him a way to do the right thing that does not require him to do it alone.",
+   "hint": [
+    "He has seen something in the paperwork that he has chosen not to see. He will need company to look at it.",
+    "Bring him the truth in private, with evidence, and stand beside him if he decides to say it aloud."
+   ]
+  }
+ ],
+ "bonds": {
+  "imara": {
+   "label": "rivals",
+   "text": "The treasurer will not create the discretionary fund he wants, and asks for his receipts like anyone else's.",
+   "public": true,
+   "from": 0
+  },
+  "tavita": {
+   "label": "enemies",
+   "text": "A head proctor who reads the inspection list aloud in session to embarrass him. Immovable, and popular, which is worse.",
+   "public": true,
+   "from": 0
+  },
+  "pilar": {
+   "label": "friends",
+   "text": "Whoever writes the bulletin decides how a ruling sounds. He is charming to her and it works.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "rivals",
+   "text": "The president he has waited two years to succeed. She gives him the desk work and tells him nothing.",
+   "public": true,
+   "from": 0
+  },
+  "noor": {
+   "label": "colleagues",
+   "text": "The first-year clerk knows the Charter better than he does and has twice returned his rulings with the clause marked.",
+   "public": true,
+   "from": 12
+  },
+  "teobalt": {
+   "label": "rivals",
+   "text": "A first-year delegate with a clipboard who answers procedure with numbers. Sebastian was amused in September and is not amused now.",
+   "public": true,
+   "from": 12
+  },
+  "anni": {
+   "label": "crush",
+   "text": "The one first-year who cites him to his face with the paragraph. He countersigns her slips unusually fast.",
+   "public": true,
+   "from": 10
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "A Spectral first-year who files every dodged challenge correctly. Sebastian upholds them to the letter.",
+   "public": true,
+   "from": 10
+  },
+  "dom": {
+   "label": "rivals",
+   "text": "Year-mates in the Tower. Dom made the team at the last table of the trial where Sebastian was cut, and has never mentioned it.",
+   "public": true,
+   "from": 0
+  },
+  "hedda": {
+   "label": "enemies",
+   "text": "Three unlicensed stalls and a megaphone in open session. Not this term.",
+   "public": true,
+   "from": 9
+  },
+  "marrow": {
+   "label": "protégé",
+   "text": "The visitor from the board asks his opinion, which the president never does, and has mentioned a reference.",
+   "public": false,
+   "from": 61
+  },
+  "ashton": {
+   "label": "friends",
+   "text": "Terrace evenings: Beaumont-Lyle's parties have never once needed a second signature.",
+   "public": true,
+   "from": 4
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "council_room",
+   "Afternoon": "council_room",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_terrace",
+   "Midday": "council_room",
+   "Afternoon": "duel_terraces",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Diplomacy control: Von Pixmarck trades creatures across the table at the end of his turn and George recruits yours at a discount, while Nero Zira grows on every recruit. He never attacks first and usually wins with your board.",
+  "tilt": "Losing his composure in front of an audience — one visible flinch and he starts playing to look calm instead of to win. An opponent with no creatures to take also leaves him oddly helpless."
+ }
+}

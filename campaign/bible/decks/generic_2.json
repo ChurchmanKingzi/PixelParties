@@ -1,0 +1,405 @@
+{
+ "name": "Great Weapon Master",
+ "owner": null,
+ "heroes": [
+  "Arthor, the King of Blackport",
+  "Toras, Master of all Weapons",
+  "Fiona, the Princess of Blackport"
+ ],
+ "main": [
+  [
+   2,
+   "Blade of the Frostbringer"
+  ],
+  [
+   2,
+   "Blade of the Swamp Witch"
+  ],
+  [
+   1,
+   "Controlled Attack"
+  ],
+  [
+   2,
+   "Cool Cheese"
+  ],
+  [
+   4,
+   "Critical Strike"
+  ],
+  [
+   1,
+   "Divine Gift of Sacrifice"
+  ],
+  [
+   2,
+   "Earth-Shattering Hammer, Relic of Deri"
+  ],
+  [
+   4,
+   "Fighting"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Hammer Throw"
+  ],
+  [
+   2,
+   "Loot the Leftovers"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Metal Harpyformer"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   1,
+   "Shield of Death"
+  ],
+  [
+   1,
+   "Shield of Life"
+  ],
+  [
+   4,
+   "Sickly Cheese"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   2,
+   "The Master's Sword"
+  ],
+  [
+   2,
+   "The Sun Sword"
+  ],
+  [
+   3,
+   "Thieving Strike"
+  ],
+  [
+   1,
+   "Vampiric Sword"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Arthor, the King of Blackport": "Hero",
+  "Toras, Master of all Weapons": "Hero",
+  "Fiona, the Princess of Blackport": "Hero",
+  "Blade of the Frostbringer": "Artifact (Equipment)",
+  "Blade of the Swamp Witch": "Artifact (Equipment)",
+  "Controlled Attack": "Spell (Decay Magic)",
+  "Cool Cheese": "Artifact",
+  "Critical Strike": "Attack",
+  "Divine Gift of Sacrifice": "Spell (Decay Magic)",
+  "Earth-Shattering Hammer, Relic of Deri": "Artifact (Equipment)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Loot the Leftovers": "Spell (Decay Magic, Reaction)",
+  "Magnetic Glove": "Artifact",
+  "Metal Harpyformer": "Creature L0",
+  "Quick Attack": "Attack",
+  "Sacred Hammer of the Volcano": "Artifact (Equipment)",
+  "Shield of Death": "Artifact (Equipment)",
+  "Shield of Life": "Artifact (Equipment)",
+  "Sickly Cheese": "Artifact",
+  "Smug Coin": "Artifact (Equipment)",
+  "The Master's Sword": "Artifact (Equipment)",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Thieving Strike": "Attack",
+  "Vampiric Sword": "Artifact (Equipment)",
+  "Wheels": "Artifact"
+ },
+ "gist": {
+  "Toras, Master of all Weapons": "Very high Attack that rises for every differently named artifact he wears; only ever hits one target; little health.",
+  "Arthor, the King of Blackport": "Makes extra gold; when he casts, you discard.",
+  "Fiona, the Princess of Blackport": "Gains gold whenever she is afflicted by a status (Sickly Cheese poisons her on purpose).",
+  "Critical Strike": "An attack for twice the hero's Attack.",
+  "The Master's Sword": "While its hero is at full health, single-target attacks add his Attack again.",
+  "Blade of the Frostbringer": "Its hero's single-target attacks freeze the target.",
+  "Blade of the Swamp Witch": "Its hero's attacks poison.",
+  "Earth-Shattering Hammer, Relic of Deri": "Hitting a hero knocks a card out of that hero's support zones.",
+  "The Sun Sword": "More Attack and a permanent burn on everything hit.",
+  "Vampiric Sword": "Very expensive: heals its hero for half the damage dealt.",
+  "Quick Attack": "A free first attack each turn.",
+  "Thieving Strike": "Attack that takes a card from your hand.",
+  "Hammer Throw": "Makes your next artifacts cost you cards.",
+  "Metal Harpyformer": "Free summon that fetches Fighting.",
+  "Cool Cheese": "Searches an attack.",
+  "Magnetic Glove": "Searches any card."
+ },
+ "plan": "One fighter, every weapon in the shop. Toras gains Attack for each differently named artifact he carries, so Arthor's and Fiona's gold goes into hanging five or six of them on him; each adds a rider (freeze, poison, burn, a broken attachment). Then Critical Strike and Quick Attack each remove most of a hero. It is fast for a weapons deck and has no depth: Toras has little health, all the gold is on him, and one Fire Bomb or a freeze undoes several turns.",
+ "looks": {
+  "early": "Toras with two weapons after two turns.",
+  "mid": "Toras bristling with five different weapons; your heroes frozen, poisoned and burning by turns.",
+  "late": "Either a bare Toras after a Fire Bomb, or one Critical Strike that ends things."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Every artifact so far has gone onto Toras.",
+   "why": "He is the only threat and has little health: a freeze on him or early burn costs the deck its tempo, while a slow setup is what his first attacks take apart."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Toras carries four or five differently named weapons and the other two heroes carry nothing.",
+   "why": "One Fire Bomb destroys every piece at once and his Attack falls back to its printed value; there are no creatures worth a sweeper."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "He holds Critical Strike and Toras is at full health under The Master's Sword.",
+   "why": "The deck ends in one enormous attack on one hero: keep Homerun! and a freeze for that turn; even a scratch on Toras switches the Master's Sword off."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "The weapons are gone and its remaining heroes swing for ordinary numbers.",
+   "why": "After a Fire Bomb or without Toras it is two bankers with no cards; the Storm finishes that."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Two blades go onto Toras; his first Quick Attack freezes your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Toras in return"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him, he is fragile"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit frozen and build"
+     }
+    ]
+   },
+   {
+    "board": "Cool Cheese finds Critical Strike; gold goes into a Sun Sword.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Keep Fire Bomb for one more weapon; freeze him now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Thieving Strike takes a card from your hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the statuses back, freeze Toras"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Punish Toras"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Five different weapons on Toras.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze him, Tea the statuses back"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Harpyformer"
+     }
+    ]
+   },
+   {
+    "board": "The Hammer of Deri knocks Gathering Storm off your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb before re-attaching"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze Toras first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach at once"
+     }
+    ]
+   },
+   {
+    "board": "The Vampiric Sword arrives; Toras heals as he hits.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Break it with everything else"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and burn him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Critical Strike under The Master's Sword is aimed at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon before he swings"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Toras is low but armed; Smug Coin glints on him.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "A Storm tick strips the coin; shield this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Two hits: coin, then kill"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Arthor casts and you discard; Fiona poisons herself for gold.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep the shield cards, discard the rest"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No weapons left on the table.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Toras, bare-handed.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Fiona alone, rich and sturdy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and the Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ]
+ }
+}

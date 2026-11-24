@@ -1,0 +1,386 @@
+{
+ "name": "Steam Dwarf Mines",
+ "owner": "dex",
+ "heroes": [
+  "Cute Nerd Magenta",
+  "Layn, Defender of Deri",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   4,
+   "Glass of Marbles"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Juice"
+  ],
+  [
+   5,
+   "Leadership"
+  ],
+  [
+   4,
+   "Mystery Box"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "Ska Harpyformer"
+  ],
+  [
+   1,
+   "Steam Dwarf Brewer"
+  ],
+  [
+   4,
+   "Steam Dwarf Diver"
+  ],
+  [
+   4,
+   "Steam Dwarf Dragon Pilot"
+  ],
+  [
+   2,
+   "Steam Dwarf Engineer"
+  ],
+  [
+   4,
+   "Steam Dwarf Exterminator"
+  ],
+  [
+   4,
+   "Steam Dwarf Miner"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Bottled Flame"
+  ],
+  [
+   2,
+   "Bottled Lightning"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cute Nerd Magenta": "Hero",
+  "Layn, Defender of Deri": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Cute Cheese": "Artifact",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Glass of Marbles": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Leadership": "Ability",
+  "Mystery Box": "Artifact",
+  "Performance": "Ability",
+  "Ska Harpyformer": "Creature L0",
+  "Steam Dwarf Brewer": "Creature L1",
+  "Steam Dwarf Diver": "Creature L1",
+  "Steam Dwarf Dragon Pilot": "Creature L1",
+  "Steam Dwarf Engineer": "Creature L1",
+  "Steam Dwarf Exterminator": "Creature L1",
+  "Steam Dwarf Miner": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Bottled Flame": "Potion",
+  "Bottled Lightning": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Steam Dwarf Exterminator": "Like every Steam Dwarf it gains health whenever Dex discards cards. Each turn it hits a target for its own current health, up to a cap.",
+  "Steam Dwarf Miner": "At the end of his turn draws a card for every large block of health it has.",
+  "Steam Dwarf Diver": "Gives up a block of health to search any card.",
+  "Steam Dwarf Dragon Pilot": "Enters by sacrificing two grown Dwarfs; then hits a target whenever he discards, up to three times a turn.",
+  "Steam Dwarf Engineer": "Sacrifices itself to bring out any creature no bigger than itself.",
+  "Steam Dwarf Brewer": "Sets another creature's health to its own.",
+  "Layn, Defender of Deri": "Creatures he summons start much sturdier.",
+  "Cute Nerd Magenta": "Discards a card each turn to put any card from the deck into the discard pile.",
+  "Alice, the Puppeteer Girl": "Once per turn hits a target, harder for every creature that has stayed on his board.",
+  "Glass of Marbles": "Draws two when it is discarded.",
+  "Mystery Box": "Draws two when it is discarded or deleted.",
+  "Ska Harpyformer": "Free summon that fetches Performance and can discard one for value.",
+  "Performance": "Ability that raises the one beneath it a level.",
+  "Bottled Flame": "Potion: a discard duel he is happy to lose cards in; the side that stops first burns.",
+  "Bottled Lightning": "Potion: the same duel; the loser's side takes three hits.",
+  "Divine Gift of Fire": "Once per game: your whole side burns for good."
+ },
+ "plan": "An old shop favourite. Every Steam Dwarf gains health each time Dex discards, and he discards constantly and profitably: Magenta, Glasses of Marbles and Mystery Boxes that draw when thrown away, and potion duels in which every card he throws grows his board. Summoned through Layn the Dwarfs start sturdy and are out of sweeper range within a couple of turns; then Exterminators shoot for their own health, Miners refill his hand, the Dragon Pilot fires on every discard and Alice counts the crowd. It needs a few quiet turns to grow, its heroes are small, and it has no answer to a creature simply changing sides.",
+ "looks": {
+  "early": "Two fresh Dwarfs, a Ska Harpyformer, a discard pile already ten cards deep.",
+  "mid": "Exterminators and Miners several times their printed size; whole hands thrown away and redrawn.",
+  "late": "Dwarfs as big as heroes, a Dragon Pilot firing on every discard."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "His Steam Dwarfs have just been summoned and are still near their printed size.",
+   "why": "They grow with every discard and will be out of reach of Flame Avalanche in two turns; now they are not, and they are the entire deck."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "An Exterminator has grown as large as a hero and shoots for its own health.",
+   "why": "It is far too big to burn down, but Dark Gear takes it, size and all, and Snow Cannon silences it for a turn."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Magenta and Alice have little health; everything he draws is thrown to the Dwarfs.",
+   "why": "The heroes behind the Dwarfs never grew at all, and the board in front of them is too big to be worth another card."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "One Exterminator still fires its capped shot each turn at your last healthy hero.",
+   "why": "A single large, predictable hit per turn is what Homerun!, Cloud in a Bottle and Snow Cannon are for; blunt it and finish Layn."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Dex summons a Miner and an Exterminator through Layn and discards a Glass of Marbles with Magenta.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep now, before they grow"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Magenta"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Bottled Lightning: he starts discarding cheerfully and every Dwarf swells.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Stop at once, take the hits, sweep on your turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Discard only dead cards"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Throw your hand away to win the duel"
+     }
+    ]
+   },
+   {
+    "board": "A Ska Harpyformer and a Town Guard join; the discard pile grows.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the small ones"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "An Exterminator the size of a hero shoots your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon it, burn Magenta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Try to burn it down"
+     }
+    ]
+   },
+   {
+    "board": "A Miner draws him three at the end of his turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Miner"
+     },
+     {
+      "stance": "RUSH",
+      "text": "His heroes are small: go"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and bounce off"
+     }
+    ]
+   },
+   {
+    "board": "Two grown Dwarfs are sacrificed for a Dragon Pilot.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal or freeze the Pilot"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shields"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Alice and Magenta are both low; four giant Dwarfs stand in front.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Untargeted damage past them"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the biggest"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm for a scratch"
+     }
+    ]
+   },
+   {
+    "board": "A Diver gives up health to search him a card.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "The Dragon Pilot fires three times as he discards.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Magenta, his discard outlet"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the Pilot"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Layn alone behind one Exterminator.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Blunt the shot, burn Layn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Layn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "He is out of cards to discard; the Dwarfs have stopped growing.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill a Dwarf"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Magenta for one more discard.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, kill Layn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

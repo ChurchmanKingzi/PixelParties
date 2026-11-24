@@ -1,0 +1,269 @@
+{
+ "id": "livvie",
+ "name": "Olivia \"Livvie\" Thana",
+ "firstName": "Livvie",
+ "age": 18,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B3",
+ "romance": true,
+ "deck": "Crystal Gifts (Crystals)",
+ "look": "Very pale and thin, with an ash-blonde bob she cuts herself and grey eyes with permanent shadows under them. Her cardigan has been mended at both elbows in slightly different wool. She carries a clipboard of trade lists and always seems to be on her way to somewhere that pays.",
+ "voice": "Soft, quick and practical, Midlands English, apologetic in form and stubborn in substance. She turns every personal question into a price or a schedule, and her humour is so dry it takes a second to land — delivered flat, eyes down, with a small sideways look to see if it did. RARE habit (once in a scene at most; most scenes go without it): opening with 'Quick thing —' when she wants a favour that pays.",
+ "lines": [
+  "Are you using that rare? I've got a buyer at fourteen and I'll split it eight-six. Seven-seven. Fine. Seven-seven.",
+  "I've eaten. I had a big breakfast. Yesterday counts.",
+  "My deck gives people presents. They hate it. It's the nicest thing I own.",
+  "Nine thousand by June. I've done the sums eleven ways. Ten need a miracle and the other one needs me not to sleep."
+ ],
+ "intro": "A pale, tireless Game Design first-year from bungalow 3 who trades, enters and works every paying thing on campus.",
+ "traits": [
+  {
+   "id": "livvie_1",
+   "text": "She is on every sign-up sheet on the job board, sometimes twice.",
+   "how": "Check the job board; her handwriting is everywhere."
+  },
+  {
+   "id": "livvie_2",
+   "text": "She is here on a one-year scholarship and has to find next year's tuition herself.",
+   "how": "She says it plainly if asked why she works so much."
+  },
+  {
+   "id": "livvie_3",
+   "text": "She knows the trade value of every card in the Commons binder to the credit.",
+   "how": "Trade with her or with Tomi."
+  },
+  {
+   "id": "livvie_4",
+   "text": "She designs cards on the backs of old receipts and they are startlingly good.",
+   "how": "Sit next to her in Card Design or at the design lab."
+  },
+  {
+   "id": "livvie_5",
+   "text": "She mends her own clothes and will mend yours if you leave them near her.",
+   "how": "Tear something; or notice Baylee's sleeve."
+  },
+  {
+   "id": "livvie_6",
+   "text": "She has a little brother, Danny, who is nine and sends her drawings of her cards.",
+   "how": "See the drawings pinned above her bed; ask."
+  },
+  {
+   "id": "livvie_7",
+   "text": "She says she has already eaten far more often than she has.",
+   "how": "Watch her at the Commons kitchen for a few days."
+  },
+  {
+   "id": "livvie_8",
+   "text": "Her deck works by handing her own cards to the opponent, and she says giving things away is the only strategy she ever trusted.",
+   "how": "Play her and ask."
+  },
+  {
+   "id": "livvie_9",
+   "text": "She has never been further from home than this and has not told her mum how hard it is.",
+   "how": "A Close evening; she is writing a cheerful letter."
+  },
+  {
+   "id": "livvie_10",
+   "text": "She is frightened of doctors' bills more than of being ill.",
+   "how": "Any scene at the infirmary."
+  }
+ ],
+ "secret": "Livvie is from a damp terrace in Stoke-on-Trent: mum Carol does nights as a care assistant, dad left, brother Danny is nine and asthmatic. The scholarship (the 'Founder's Bursary', one year, non-renewable — a rule Okonkwo wrote and Chuck has never read) is the only door that ever opened, and she is going through it at a dead run: 9,000 cr by the end of Term 2 or the ferry home. She arrived with 1,150 cr saved and has a spreadsheet, on paper. She saves by not eating: stipend food vouchers traded for credits, the cheapest thing in the cafeteria once a day — bread rolls, instant noodles, toast.\nThe real condition: undiagnosed coeliac disease with the iron-deficiency anaemia it has caused. The cheap food she lives on (bread, noodles, pastry) is literally what is making her ill — damaged gut, poor absorption, hence the pallor, the shadows, the thinness, the mouth ulcers she hides, the bone-tiredness she thinks is laziness. Skipping meals on top of the anaemia gives her dizzy spells and, twice in Term 1, a faint (first on Day 23 at her bench in the design lab unless someone has got her eating Mama Odalys's seconds by then — Camille logs 'undernourished, refuses meal vouchers'; and, if nothing changes, a far worse collapse in Term 2, Day 143, in the broadcast studio, with five days in the infirmary). Nurse Camille suspects within one conversation, runs the bloods the island can do (iron and blood count: very low), and starts her on iron and a strict gluten-free trial; confirmation needs a mainland lab. It is entirely manageable: a proper diet (Mama Odalys takes this as a personal crusade — rice, beans, fish, plantain, a separate pan with an L painted on it), iron, regular meals, and she is visibly a different person within six to eight weeks — colour, energy, even a little weight. Left alone and starved, it gets steadily worse and she collapses out of the Design Contest. She resists treatment because gluten-free food costs more and because being ill feels like a luxury.\nWound: she believes she is a cost. Everything she does is to stop being one. Her lie: 'I'm fine, I've eaten.' Contradiction: she plays a deck about giving and cannot accept a sandwich. She hates charity with real anger — she will take a fair trade, a job, a loan with written terms, never a gift of money. Private joke: she keeps a column in the spreadsheet called 'miracles' with a running total of zero; if Rowan matters to her she one day pencils in a one.\nDark turn: curfew (Day 67) kills her evening jobs and nearly breaks the plan; she takes riskier work — including, if not stopped, Marrow's offer: her full tuition, 9,000 cr, for information about old cards, night hikers and access to the Archive — or considering a wager with '{H}', who has heard that she needs something badly and thinks an ante would be a kindness. She is the one who finds Tomi on the morning of Day 66 when she opens the student lounge for her cleaning shift, and she does not really sleep after that. She is a prime Hollowing risk in Stage B/C precisely because she is desperate. She is also a designer who notices things: her contest entry (due Day 75) accidentally reinvents a Tessellate rule, and Chuck goes white when he sees it.",
+ "wants": "To stay — to earn next year with her own hands and owe nobody.",
+ "fears": "Being sent home as proof that people like her do not get to keep things.",
+ "crush": "baylee",
+ "crushNote": "He is the one person who helps without making it charity — he just fixes the thing and looks at his boots. It shows as his sleeves getting mended, a seat kept at the kitchen table, and her doing sums more slowly when he is carrying something nearby.",
+ "crushPace": 0.7,
+ "likes": [
+  "Fair trades with the maths shown",
+  "Being offered paid work or a split, not charity",
+  "Food shared casually ('I made too much') rather than given",
+  "Praise for her designs",
+  "People who are careful with other people's things",
+  "Being walked home after a late shift",
+  "Honesty about money",
+  "Quiet"
+ ],
+ "dislikes": [
+  "Gifts of money or anything that smells of pity",
+  "Being told to rest",
+  "Waste and showing off wealth",
+  "Being lied to 'for her own good'",
+  "Anyone going through her spreadsheet",
+  "Being called fragile",
+  "Unpunctual trade partners"
+ ],
+ "gifts": [
+  "Card: Crystal Well",
+  "A meal you cooked 'too much' of",
+  "Wool in the right grey for her cardigan",
+  "Card: Cool Presents",
+  "A ream of proper design paper from the campus store",
+  "A second-hand thermos"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Sideways and practical; affection disguised as logistics.",
+  "text": "Livvie does not flirt so much as slowly stop running. She shows interest by making time she does not have: a seat saved, a trade tilted in his favour by one credit and denied, a mended sleeve. She will not start anything — she cannot afford (her word) to want something. Approach her through work and food: help with a job, split a profit honestly, cook and share without comment. Direct compliments make her suspicious; noticing her designs or her dry jokes disarms her. Never pay for her; trade with her. Once she trusts that he is not being kind out of pity she is unexpectedly brave, in a small matter-of-fact voice."
+ },
+ "intimacy": "Very gradual, and closely tied to her health and trust: early on she is too tired and too guarded for much more than leaning on a shoulder over a spreadsheet. She likes warmth above everything — a shared blanket on the bungalow steps, cold hands tucked into his pockets, being fed a spoonful of something from the pot. She is shy about being thin and about being looked at; she relaxes when touch is patient and unremarkable, as if it had always been allowed. As she gets well she gets bolder: she initiates her first real kiss herself, abruptly, as though closing a deal before she can change her mind. When they finally share a bed it is slow, quiet and astonished, with the window open to the sound of the cove; fade on her saying, deadpan, that this is going in the miracles column.",
+ "events": [
+  {
+   "id": "livvie_e1",
+   "stage": 1,
+   "title": "Seven-seven",
+   "condition": "Do one honest deal or one shared paid job with her in the first three weeks (trade through the Commons binder, or a job_board shift together) and split it exactly evenly without trying to give her the bigger share.",
+   "hint": [
+    "She trusts people who keep the numbers straight.",
+    "Work a job or make a trade with her and split it fairly — not generously."
+   ]
+  },
+  {
+   "id": "livvie_e2",
+   "stage": 2,
+   "title": "I made too much",
+   "condition": "Notice she is not eating and, instead of confronting her, share food at commons_kitchen at least three times in a way she can accept; either get her eating regularly before Day 23, or be the one who gets her to infirmary when she faints at her design-lab bench that day, and stay until Camille has seen her.",
+   "hint": [
+    "She says she has eaten. Look more closely, and be careful how you help.",
+    "Share meals with her without making it charity, and be there when her health gives out."
+   ]
+  },
+  {
+   "id": "livvie_e3",
+   "stage": 3,
+   "title": "Terms in writing",
+   "condition": "Help her make the tuition plan real: enter the Design Contest with her or back her entry (opens Day 61, due Day 75) under an agreement she writes herself, and keep her on Camille's and Mama Odalys's regimen through it. When results come (Day 82) she asks him, awkwardly, if they are 'a thing'.",
+   "hint": [
+    "She will accept a partner. She will not accept a patron.",
+    "Team up with her for the Design Contest on terms she sets, and help her stick to her treatment."
+   ]
+  },
+  {
+   "id": "livvie_e4",
+   "stage": 4,
+   "title": "The miracles column",
+   "condition": "Keep her out of dangerous money (Marrow's 9,000 cr for information and Archive access, or any wager with '{H}') during the curfew weeks, without lying to her about why; at the Promotion Duels or after finals (Days 89–98) she shows him the spreadsheet — all of it.",
+   "hint": [
+    "When money gets tight she will be offered easy ways out. She should hear the truth from someone she trusts.",
+    "When her evening jobs dry up, stop her taking a dangerous offer by being honest with her, and she will show you what she has never shown anyone."
+   ]
+  },
+  {
+   "id": "livvie_e5",
+   "stage": 5,
+   "title": "Next year",
+   "condition": "By the Island Open (Days 124–126) or the end of Term 2, the 9,000 cr exists by means she can live with (her earnings, prizes, a written loan from friends — never a gift), and Rowan has met her family by phone or letter at her request. She pays the bursar herself and asks him to come with her.",
+   "hint": [
+    "There is a number she has to reach. How it is reached matters as much as whether.",
+    "Help her reach her tuition goal in a way that leaves her pride intact, and be there when she pays it."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "roommates",
+   "text": "The radio stays on all night. Livvie minds less than she says; it is company.",
+   "public": true,
+   "from": 1
+  },
+  "rana": {
+   "label": "roommates",
+   "text": "Bungalow 3. Rana pretends not to see the skipped meals and leaves crackers on Livvie's bunk 'by mistake'.",
+   "public": true,
+   "from": 1
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "The kindest person in the Commons. She has not noticed where the windowsill food comes from.",
+   "public": false,
+   "from": 10
+  },
+  "tomi": {
+   "label": "teammates",
+   "text": "Trade partners: he fronts the deals, she does the sums.",
+   "public": true,
+   "from": 4
+  },
+  "wren": {
+   "label": "protégé",
+   "text": "The third-year who looked at her receipt-back sketches and said 'this one is real'.",
+   "public": true,
+   "from": 8
+  },
+  "teobalt": {
+   "label": "teammates",
+   "text": "Design-class project partners; his schedules keep her afloat.",
+   "public": true,
+   "from": 6
+  },
+  "camille": {
+   "label": "owes",
+   "text": "The nurse keeps asking when she last ate. Livvie avoids the infirmary because of what it might cost.",
+   "public": false,
+   "from": 23
+  },
+  "odalys": {
+   "label": "owes",
+   "text": "Second helpings appear on her plate and she cannot work out how to refuse.",
+   "public": true,
+   "from": 2
+  },
+  "tobias": {
+   "label": "friends",
+   "text": "He means well and she will not take it. He carries her boxes instead, which she allows.",
+   "public": true,
+   "from": 10
+  },
+  "eloise": {
+   "label": "teammates",
+   "text": "Brilliant, vague, and breathing things she shouldn't. Livvie writes the due dates on her hand for her.",
+   "public": true,
+   "from": 5
+  },
+  "rafa": {
+   "label": "friends",
+   "text": "He feeds her without it being charity — he says it is practice. She pays him in mending.",
+   "public": true,
+   "from": 7
+  },
+  "junho": {
+   "label": "rivals",
+   "text": "He corrects her costs and is usually right. She would like to beat him in the Design Contest by exactly one place.",
+   "public": true,
+   "from": 5
+  },
+  "imara": {
+   "label": "protégé",
+   "text": "The treasurer counts the money into her hand and never comments on how often she is there. Livvie would work for her for nothing, and Imara would not allow it.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "job_board",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "night_market",
+   "Midday": "card_shop",
+   "Afternoon": "job_board",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Hands you her own Crystals as 'presents' that rust, weaken and distract your side, then wins a small careful game against whatever is left. Every card in her deck was chosen because it was cheap.",
+  "tilt": "Long matches on an empty stomach — her play falls off sharply after the midgame — and opponents who refuse her gifts with anger."
+ },
+ "range": "Money is her pressure, not her only subject: card designs she is proud of, sharp remarks about other people's cards, Stoke, her little brother, dry jokes, a tiredness she denies. A 'Quick thing —' favour comes once a scene at most."
+}

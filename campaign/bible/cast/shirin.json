@@ -1,0 +1,284 @@
+{
+ "id": "shirin",
+ "name": "Shirin Daneshvar",
+ "firstName": "Shirin",
+ "age": 21,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 3,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor, room 312",
+ "romance": true,
+ "deck": "Pop Quiz (toolbox attacks and multiple-choice spells — Great Detective Doq; Timeless King Zi; Friedhelm, the Misled Avenger)",
+ "look": "Average height (about 5'5\") and slight, with quick hands and a habit of leaning forward, light-brown skin, and long dark-brown hair in loose curls, half of it caught up at the back in a big tortoiseshell claw clip, the rest falling past her shoulders. Large dark eyes under strong arched brows, a narrow face, a dimple in the right cheek only; round gold-rimmed reading glasses pushed up into her hair more often than on her nose. A turquoise silk scarf is tied as a headband. She wears the red Competitive Play jacket with the sleeves pushed to the elbow and the blue Rare collar, three highlighters (yellow, pink, green) in the breast pocket, a lanyard reading TUTOR DESK, and a steel ring of colour-coded index cards clipped to her belt. Highlighter on her fingertips; a slim book of poems in the jacket pocket. She talks with both hands and sits on tables rather than at them.",
+ "voice": "Fast, warm and bossy, Toronto English with Persian endearments ('azizam', 'joonam'); she explains by asking three questions in a row and answering the first herself. Laughs easily, interrupts, apologises, interrupts again. Sharp with anyone who is 'just bad at it'; brisk and elsewhere when the subject is her own ranking. Quoting poetry embarrasses her and she does it anyway. RARE habit (once in a scene at most; most scenes go without it): 'Okay — so what do we know?'",
+ "lines": [
+  "Okay — so what do we know? Not what you feel. What do we know?",
+  "My tahdig came out in one piece once. I took a photograph. It's my lock screen.",
+  "Twenty-ninth on the ladder is a perfectly respectable place to be stuck, thank you.",
+  "Nobody is bad at probability. People are bad at being wrong in front of Dr Blum.",
+  "Carrel six is always booked. I book it. For whoever cries first.",
+  "I open Hafez for people in exam week. It isn't fortune-telling. It's permission.",
+  "I'll shoot hoops with you, but I travel, I foul, and I keep my own score.",
+  "The deck asks you questions. Get one wrong and it hurts. That's pedagogy.",
+  "Everyone I tutor passes. I'd like that written down somewhere for when I don't."
+ ],
+ "intro": "The tutor desk: a quick, bossy, kind third-year who runs the Library's peer-tutoring rota and exam-week study groups, and can get anyone through Probability except, by her own account, herself.",
+ "traits": [
+  {
+   "id": "shirin_1",
+   "text": "She runs the Tutor Desk on the Library's ground floor: she matches students to tutors, books the carrels and study rooms, and runs the study groups before midterms and finals.",
+   "how": "The Library at Midday or in the Afternoon; ask for help with any course."
+  },
+  {
+   "id": "shirin_2",
+   "text": "She keeps an index card on everyone she has tutored, colour-coded by what they are afraid of rather than what they got wrong.",
+   "how": "Be tutored; look at the ring on her belt."
+  },
+  {
+   "id": "shirin_3",
+   "text": "She will not let anyone say 'I'm just bad at it' at her desk.",
+   "how": "Say it."
+  },
+  {
+   "id": "shirin_4",
+   "text": "In exam week she opens a pocket Hafez at random for nervous students and reads them the line.",
+   "how": "The days before the midterms (Days 44–46)."
+  },
+  {
+   "id": "shirin_5",
+   "text": "She plays pick-up basketball in the gym on Saturday afternoons, badly and with total commitment.",
+   "how": "The gym, weekend Afternoon."
+  },
+  {
+   "id": "shirin_6",
+   "text": "She cooks Persian rice on the Rare Hall hotplate and photographs the crust when it survives.",
+   "how": "Rare Hall common room on a weekend Evening."
+  },
+  {
+   "id": "shirin_7",
+   "text": "Her parents left Shiraz with two suitcases and a set of encyclopaedias; she grew up above their copy shop in North York.",
+   "how": "Ask where the books come from."
+  },
+  {
+   "id": "shirin_8",
+   "text": "She is stuck near twenty-ninth on the ladder, and her third-year ranked thesis needs a top-sixteen finish.",
+   "how": "Friend stage; the ladder sheet, or Zeynep, or herself."
+  },
+  {
+   "id": "shirin_9",
+   "text": "Her own room is a landslide of unread set texts; she tutors the first-year courses from memory.",
+   "how": "Close stage; room 312."
+  },
+  {
+   "id": "shirin_10",
+   "text": "She has not told the people she tutors that she may not be here next year.",
+   "how": "Close stage; before the Island Open."
+  }
+ ],
+ "secret": "FUNCTION (use her instead of a nameless library assistant or tutor): TUTOR DESK coordinator in the Library. She matches students to peer tutors in every first-year course, books carrels and study rooms, runs the study groups before midterms (Days 47–49, 152–154) and finals (96–98, 194–196), and knows who is failing what before the grades go up. After Day 66, when nobody studies alone, the buddy tables are hers.\nWHO SHE IS. Toronto, North York; daughter of a couple from Shiraz who run a copy shop and brought one set of encyclopaedias out of Iran. She learned by explaining homework to the customers' children. Brilliant at seeing WHY someone is stuck; unable to leave a confused person alone. Wound: at sixteen she coached her best friend into a scholarship that she herself then missed by one place. Contradiction: she can get anyone over a wall she cannot climb.\nSECRET. She is failing in the only way she cares about. A Competitive Play third-year must take her own deck to a top-sixteen finish as a ranked thesis; she has been stuck near twenty-ninth for a year, because at a real table she explains the position to herself instead of playing it. If the Island Open (Days 124–126) goes badly she does not progress to fourth year. The desk's reputation is her; nobody she tutors knows, and she has begun to resent, a little, every student she gets through. She would never ask for help. She needs someone to do for her what she does for everyone: sit down and ask what she actually knows.\nAFTER DAY 49 a request slip arrives from {H:sig}: tutoring in Casting, 'I did not understand what the audience is for.' No tutor takes a second session with {H:him}.\nDRAWN TO Keoni Kahale. ROUTE: affectionate with everyone, hard to actually reach.",
+ "wants": "Sixteenth place, earned at a table with people watching — and to stop being the one who is fine.",
+ "fears": "'Those who can't, teach' — said kindly, by someone she got through.",
+ "crush": "keoni",
+ "crushNote": "The Commons steward has never knowingly opened a set text, cannot be tutored, and mended her hotplate with a teaspoon. He is the one person on campus she cannot improve, and she finds that restful. It shows as things in room 312 that were working yesterday, and repair slips filled in with unusual care.",
+ "crushPace": 0.5,
+ "likes": [
+  "A wrong answer said out loud",
+  "People who come back after failing",
+  "Being asked what SHE is stuck on",
+  "Crisp rice, sour cherries, cardamom tea",
+  "Pick-up basketball, old poems, new stationery",
+  "Someone else booking the carrel for once",
+  "Being beaten and shown why"
+ ],
+ "dislikes": [
+  "'I'm just bad at it'",
+  "Being called a natural teacher",
+  "Tomi's 'last year's papers'",
+  "Whispering",
+  "Students who thank her and then out-rank her",
+  "Unasked advice about her deck",
+  "Pity"
+ ],
+ "gifts": [
+  "Card: Great Detective Doq",
+  "A pack of index cards in a colour she does not have",
+  "Card: Timeless King Zi",
+  "Sour-cherry jam from the Saturday market",
+  "A second-hand book of poems, in any language",
+  "An hour of tutoring, the other way round"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Bossy, warm, deflecting.",
+  "text": "Shirin is affectionate with everyone and hides behind it: endearments, a seat at her table, his notes corrected unasked. None of it is flirting. She starts nothing and must be won: turn the desk round — ask what SHE is stuck on, test her deck, beat her and show her why. Pity, or praise for her teaching, ends it."
+ },
+ "intimacy": "It starts at the tutor desk after the lamps go to half: her feet on the rung of his chair, one line of Hafez read aloud and the second refused. She talks through nerves and has to be kissed mid-sentence, which she later claims to have planned. Quick, laughing, bossy and then not. She likes hands in her hair once the clip is out and being told to stop explaining. Carrel six with the lamp off; room 312, books swept off the bed. Fade as she hangs the lanyard on the outside of the door.",
+ "events": [
+  {
+   "id": "shirin_e1",
+   "stage": 1,
+   "title": "What do we know?",
+   "condition": "Ask for help at the Tutor Desk in library (any course you are behind in, or Probability before Day 47) and do the work; come back for the second session.",
+   "hint": [
+    "There is a desk in the Library where it is forbidden to say you are bad at something.",
+    "Get tutoring at the Library's tutor desk, and go back a second time."
+   ]
+  },
+  {
+   "id": "shirin_e2",
+   "stage": 2,
+   "title": "Carrel six",
+   "condition": "Join one of her study groups before the midterms (Days 44–46) and help somebody else at the table; or find her at gym on a Saturday and survive her basketball. Ask why she tutors the first-year courses from memory.",
+   "hint": [
+    "She runs the exam-week study groups, and on Saturdays she commits fouls.",
+    "Join her study group and help someone else there, or play basketball with her."
+   ]
+  },
+  {
+   "id": "shirin_e3",
+   "stage": 3,
+   "title": "Twenty-ninth",
+   "condition": "Learn where she stands on the ladder (the sheet, Zeynep, or herself) and offer to test her deck — then really play her at duel_terraces, more than once, and tell her plainly what you see: she explains instead of playing. She is furious for a day. Then she books carrel six for two.",
+   "hint": [
+    "The best teacher on the island is stuck, and nobody has thought to ask where.",
+    "Find out her ladder problem, practise with her, and tell her the truth about her play."
+   ]
+  },
+  {
+   "id": "shirin_e4",
+   "stage": 4,
+   "title": "The other chair",
+   "condition": "Before the Island Open (Days 124–126), be HER tutor: sit across from her, ask what she knows, make her play it out. Hear about the scholarship she coached someone else into. She opens the Hafez for herself and lets you read the line. She stays.",
+   "hint": [
+    "Nobody has ever sat on the other side of her desk.",
+    "Tutor the tutor before the Island Open."
+   ]
+  },
+  {
+   "id": "shirin_e5",
+   "stage": 5,
+   "title": "Sixteenth",
+   "condition": "Be on the rail for her matches at the Island Open whatever the result; afterwards, help her tell the people she tutors the truth about her year. She keeps the desk or gives it up on her own terms, and writes your name on a card with no colour.",
+   "hint": [
+    "Her year is decided at the Island Open, and she has told no one.",
+    "Be there for her matches at the Open, and for the conversation after."
+   ]
+  }
+ ],
+ "bonds": {
+  "blum": {
+   "label": "protégé",
+   "text": "Dr Blum sends her the ones who cry. She sends him back people who can do the hypergeometric by hand.",
+   "public": true,
+   "from": 0
+  },
+  "santangel": {
+   "label": "protégé",
+   "text": "Her thesis supervisor has been saying 'again' to her for a year.",
+   "public": true,
+   "from": 0
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "The archive's student archivist and the tutor desk share a kettle and a low opinion of whispering.",
+   "public": true,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "colleagues",
+   "text": "The professor keeps a west carrel on standing order and has never once returned the key on time.",
+   "public": true,
+   "from": 0
+  },
+  "viktor": {
+   "label": "distrusts",
+   "text": "Books a west carrel under three different names and has never asked for a tutor.",
+   "public": true,
+   "from": 9
+  },
+  "tomi": {
+   "label": "enemies",
+   "text": "He sells 'last year's papers' on the terraces. Two of them were hers, with her corrections still on them.",
+   "public": true,
+   "from": 10
+  },
+  "baylee": {
+   "label": "mentor",
+   "text": "Probability, back table. He writes the right answer before she has finished asking and is certain it is wrong.",
+   "public": true,
+   "from": 9
+  },
+  "mikoto": {
+   "label": "mentor",
+   "text": "Laughs when he is frightened, so he laughs through every worked example. She has stopped taking it personally.",
+   "public": true,
+   "from": 8
+  },
+  "rana": {
+   "label": "colleagues",
+   "text": "Somebody tutors the bungalows at midnight better than her desk does. Shirin has a fair idea who, and has sent her three students without a word.",
+   "public": false,
+   "from": 10
+  },
+  "noor": {
+   "label": "friends",
+   "text": "The first-year who returns a borrowed past paper with an erratum sheet.",
+   "public": true,
+   "from": 8
+  },
+  "priya": {
+   "label": "friends",
+   "text": "The practice partner who will not go easy on her. Shirin asks for it and then sulks.",
+   "public": true,
+   "from": 0
+  },
+  "zeynep": {
+   "label": "friends",
+   "text": "Floor-mates since first year, and the one person who knows her exact rank and has never said it aloud.",
+   "public": true,
+   "from": 0
+  },
+  "keoni": {
+   "label": "crush",
+   "text": "He cannot be tutored and he mends her hotplate. It breaks more often than a hotplate should.",
+   "public": true,
+   "from": 0
+  },
+  "baraka": {
+   "label": "friends",
+   "text": "He brings cardamom tea to the desk in exam week and falls asleep at the next table. She has filed this under 'kind'.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "mentor",
+   "text": "Got through Probability last year on index cards and threats; still brings the desk its post first.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "library",
+   "Afternoon": "library",
+   "Evening": "student_lounge",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "cafe",
+   "Midday": "library",
+   "Afternoon": "gym",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "A deck of questions: Doq guesses a card in your hand, Zi makes you choose which of three spells hits you, Friedhelm plays the right attack from the deck.",
+  "tilt": "An audience: she explains the position to herself and plays a turn late."
+ }
+}

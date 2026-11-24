@@ -1,0 +1,246 @@
+{
+ "id": "gani",
+ "name": "Isagani \"Gani\" Villaluz",
+ "firstName": "Gani",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "CM",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, upper floor, room 501",
+ "romance": false,
+ "deck": "Standing Ovation (Fun-Fun Circus applause engine — Cute Starlet Megu; Hulijing, the Foxdemon; Silent Water Mizune)",
+ "look": "Slight and narrow-shouldered (about 5'6\"), light tan skin, and straight black hair parted in the middle and cut to the jaw, tucked behind both ears. Dark, quick, down-turned eyes, a slit shaved through the right eyebrow, a small flat nose, a mouth that smiles on one side only. He wears the black Auxiliary jacket zipped to the throat with the blue Rare collar, black fingerless rigging gloves, and a single-ear headset with a boom microphone pushed up onto his temple; two rolls of gaffer tape, one black and one glow-yellow, hang from a belt loop on a cord beside a small torch and a folding multitool. A laminated crew pass on a retractable reel reads STAGE. Black trousers with knee patches, soft black shoes. He stands half turned away with his weight on the back foot, like a man at the edge of a stage looking in.",
+ "voice": "Low and clipped on the headset, quick and funny off it, Cebuano-accented English with an 'uy' when startled; he counts under his breath — seconds, lamps, people in a row. Passes praise to the crew and keeps blame himself. Looser in the dark and in small rooms; in a crowd he finds a wall. Superstitious about stages, fond of arcades, his lola and bad jingles. Never does impressions. RARE habit (once in a scene at most; most scenes go without it): 'Standing by.'",
+ "lines": [
+  "Standing by on lights. Standing by on sound. Standing by on you not touching that.",
+  "My lola prays for my lamps. I've told her they're LEDs. She prays anyway.",
+  "Arcade, Saturday. I've the high score on the dancing one. Nobody can prove it's me.",
+  "No whistling on my stage. Sailors rigged the first theatres. A whistle drops a sandbag.",
+  "Flat and flickering is what a hologram is. My job is making you forget it.",
+  "Best show is the one where nobody knows I exist.",
+  "I was on television once. No. You can't see it.",
+  "Projector four is sulking. It gets like that when weather's coming.",
+  "My deck's a circus. It only works if somebody claps. Usually that's you, by accident."
+ ],
+ "intro": "The stage manager: a slight, watchful second-year on the hologram-tech track who runs the Great Arena's projector rig, lights the theatre and builds every festival stage, and prefers to be a voice on a headset.",
+ "traits": [
+  {
+   "id": "gani_1",
+   "text": "He is stage manager and projection chief for the Great Arena and the festival stages: the rig, the lights, the sound and the cue sheet are his.",
+   "how": "Work an event crew shift; or be in the arena before a feature match."
+  },
+  {
+   "id": "gani_2",
+   "text": "He will not let anyone whistle on a stage, and can explain why.",
+   "how": "Whistle."
+  },
+  {
+   "id": "gani_3",
+   "text": "He knows each of the arena's projectors by its fault and logs every flicker and lamp-hour in a pocket notebook.",
+   "how": "Ask why projector four has a name."
+  },
+  {
+   "id": "gani_4",
+   "text": "He hires his deck hands from Pilar Estévez's crew lists and remembers who coiled a cable properly.",
+   "how": "Coil one properly."
+  },
+  {
+   "id": "gani_5",
+   "text": "He holds an anonymous high score on the dance machine at Coin-Op Cove.",
+   "how": "The arcade, weekend Afternoon."
+  },
+  {
+   "id": "gani_6",
+   "text": "His grandmother in Cebu sends prayer cards for the lamps; they are taped inside the dimmer rack.",
+   "how": "Look inside the rack when he opens it."
+  },
+  {
+   "id": "gani_7",
+   "text": "He can strike the Little Theatre's set alone in forty minutes and would rather.",
+   "how": "Stay after a show."
+  },
+  {
+   "id": "gani_8",
+   "text": "He leaves by the fly gallery to avoid a curtain call.",
+   "how": "Look for him at the end of any show."
+  },
+  {
+   "id": "gani_9",
+   "text": "At nine he was on a Philippine noontime television show, with a catchphrase the whole country could do.",
+   "how": "Trusted stage; he tells it himself, in the dark."
+  }
+ ],
+ "secret": "FUNCTION (use him instead of a nameless technician or stage hand): STAGE MANAGER and projection chief. He runs the Great Arena's hologram projector rig and scoreboard for feature matches and Battle Team practice, checks the Trial Dome tables each Morning, lights and mixes the Little Theatre, and builds and strikes every festival stage. Pilar Estévez hires the crew; Gani runs it on a headset and signs the cue sheet. Professor Helical is his teacher and nominal chief; Bex Calloway takes her arena feeds from his desk. The holograms are flat and flickering, as good as the technology gets, and he is good at hiding it.\nWHO HE IS. Cebu City; a jeepney mechanic's grandson raised by his lola. At nine he was 'Batang Gani' on a noontime variety show, with a catchphrase the whole country could do; at twelve the show dropped him, and children did the voice at him in the street for years. He learned lighting in a parish hall because a lighting booth has a door. Wound: he was looked at until he was no use, then laughed at. Contradiction: he lives for a perfect show and cannot bear to be in one.\nSECRET. The clip exists, and Bex has found it. She has not used it and has let him know she has it; he runs her feeds a little faster than anyone else's and hates that he does.\nAFTER DAY 40 (if Dome 3 is sealed). He trusts no single copy of anything; his pocket log of lamp-hours covers every dome. Sent to recalibrate Dome 3, he cannot — its pictures lean north whatever he does; the job ticket stays open and the Chancellor's office tells him to leave it. If the visitor's prototype is shown at the Cup (Day 168), his people take the arena rig and tell Gani to stand by.\nDRAWN TO Zeynep Arslan, who has never noticed.",
+ "wants": "One show from start to finish without a dropped cue — seen by four thousand people who never learn his name.",
+ "fears": "The lights coming up on him; a laugh he recognises.",
+ "crush": "zeynep",
+ "crushNote": "The ladder registrar checks a thing three times and never raises her voice on a channel, which he considers the most attractive quality a person can have. It shows as her scoreboard being the one screen in the arena that never flickers, a spare headset left at the scorer's table, and his cue calls getting shorter when she is on the floor. She has thanked the rig, once.",
+ "crushPace": 0.5,
+ "likes": [
+  "A cable coiled over-under",
+  "People who are early for the call",
+  "Being thanked on a headset, not on a stage",
+  "Nervous performers",
+  "Arcades, halo-halo, old noontime jingles he will not sing",
+  "A cue that lands",
+  "Someone who asks how it works"
+ ],
+ "dislikes": [
+  "Whistling on stage",
+  "'Can you just do the voice'",
+  "Being pulled out for a bow",
+  "Drinks on the dimmer rack",
+  "'It's only a hologram'",
+  "Cameras pointed backstage",
+  "Last-minute 'small' changes"
+ ],
+ "gifts": [
+  "Card: Fun-Fun Circus Clown",
+  "A roll of glow tape",
+  "Card: Fun-Fun Circus Director",
+  "Arcade tokens",
+  "Card: Cute Starlet Megu",
+  "A properly coiled cable, handed back"
+ ],
+ "events": [
+  {
+   "id": "gani_e1",
+   "stage": 1,
+   "title": "Standing by",
+   "condition": "Work a crew shift he is running (the club fair set-up, a feature match at great_arena, a strike at theatre) and follow the cues; coil a cable the way he shows you.",
+   "hint": [
+    "Every show on the island is run by a voice nobody in the audience has heard.",
+    "Work one of his crew shifts and do exactly what the headset says."
+   ]
+  },
+  {
+   "id": "gani_e2",
+   "stage": 2,
+   "title": "No whistling",
+   "condition": "Stay for the strike after a show and get him talking in the empty theatre or the arena with the work lights on; or find him at arcade on a Saturday and do not ask whose high score it is. Thank him where nobody can hear.",
+   "hint": [
+    "He talks more when the house is empty.",
+    "Stay behind after a show, or run into him at the arcade."
+   ]
+  },
+  {
+   "id": "gani_e3",
+   "stage": 3,
+   "title": "House lights",
+   "condition": "Hear about the clip from him, not from Bex, and never ask for the voice; if Bex is about to use it, or when the visitor's people take his rig (Day 168), stand at the desk with him. At the last show of the year he takes one bow, at the side, with the crew.",
+   "hint": [
+    "Somebody on the stream has a recording that he would give a great deal to keep off the air.",
+    "Earn the story he does not tell, and stand with him when it counts."
+   ]
+  }
+ ],
+ "bonds": {
+  "helical": {
+   "label": "protégé",
+   "text": "His professor and nominal chief, who signs the rig sheets unread and looks worse every month.",
+   "public": true,
+   "from": 0
+  },
+  "pilar": {
+   "label": "colleagues",
+   "text": "She hires the crew and changes the running order at ten to. He says 'standing by' in a tone she has learned to fear.",
+   "public": true,
+   "from": 0
+  },
+  "bex": {
+   "label": "owes",
+   "text": "She takes her arena feeds from his desk, and keeps something of his in a folder. Her feeds have never once dropped.",
+   "public": false,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "Ms Laurent says the stage manager is the one honest person in a theatre, and expects him to prove it weekly.",
+   "public": true,
+   "from": 0
+  },
+  "maisie": {
+   "label": "mentor",
+   "text": "The first-year in welding goggles asks better questions than the second-years. He has given her a headset and forbidden her projector four.",
+   "public": true,
+   "from": 6
+  },
+  "marit": {
+   "label": "friends",
+   "text": "Theatre club. She hits every mark and thanks the booth by name.",
+   "public": true,
+   "from": 5
+  },
+  "cas": {
+   "label": "friends",
+   "text": "Wears a clip-on microphone connected to nothing. Gani connected it once, as a kindness, and has regretted it since.",
+   "public": true,
+   "from": 8
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Shoots from his catwalk and has never dropped a lens cap on anybody.",
+   "public": true,
+   "from": 6
+  },
+  "felix": {
+   "label": "friends",
+   "text": "Paints the backdrops and delivers them wet. Gani lights them so that it looks deliberate.",
+   "public": true,
+   "from": 0
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Does the doors at every event and can lift a truss alone, which is against the rules and very useful.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "friends",
+   "text": "Wants the practice tables' latency in milliseconds, weekly, in writing.",
+   "public": true,
+   "from": 0
+  },
+  "zeynep": {
+   "label": "crush",
+   "text": "Her scoreboard is the one screen in the arena that never flickers. That is not luck.",
+   "public": true,
+   "from": 0
+  },
+  "keoni": {
+   "label": "friends",
+   "text": "Borrows his multitool, returns a better one, will not explain.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "distrusts",
+   "text": "The visitor's assistants have measured his rig twice and asked him nothing.",
+   "public": false,
+   "from": 61
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "trial_dome",
+   "Midday": "broadcast_studio",
+   "Afternoon": "great_arena",
+   "Evening": "theatre",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "great_arena",
+   "Midday": "theatre",
+   "Afternoon": "arcade",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "A circus that runs on applause: every creature defeated on either side puts a counter on the Strongman. Builds quietly, then one huge number.",
+  "tilt": "People watching HIM instead of the board: he hurries his cues and miscounts."
+ }
+}

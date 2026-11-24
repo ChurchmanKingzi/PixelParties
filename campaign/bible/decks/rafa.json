@@ -1,0 +1,450 @@
+{
+ "name": "Secret Recipe",
+ "owner": "rafa",
+ "heroes": [
+  "Zamorin, the Spice Rajah",
+  "Nicolas, the Hidden Alchemist",
+  "Kerthwack, the Reality Breaker"
+ ],
+ "main": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   4,
+   "Alchemy"
+  ],
+  [
+   3,
+   "Barkeeper"
+  ],
+  [
+   3,
+   "Beer"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Healing Potion"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   1,
+   "Magnetic Potion"
+  ],
+  [
+   3,
+   "Philosopher's Stone"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   2,
+   "Poison Vial"
+  ],
+  [
+   3,
+   "Potion Juggler"
+  ],
+  [
+   3,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Secret Blue Spice"
+  ],
+  [
+   2,
+   "Secret Golden Spice"
+  ],
+  [
+   2,
+   "Secret Green Spice"
+  ],
+  [
+   2,
+   "Secret Red Spice"
+  ],
+  [
+   2,
+   "Secret Spice Jar"
+  ],
+  [
+   3,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Wealth"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Bottled Flame"
+  ],
+  [
+   2,
+   "Bottled Lightning"
+  ],
+  [
+   2,
+   "Elixir of Recovery"
+  ],
+  [
+   2,
+   "Cloud in a Bottle"
+  ],
+  [
+   2,
+   "Horn in a Bottle"
+  ],
+  [
+   2,
+   "Monster in a Bottle"
+  ],
+  [
+   1,
+   "Planet in a Bottle"
+  ],
+  [
+   1,
+   "Potion of Greed"
+  ],
+  [
+   1,
+   "Flashbang"
+  ]
+ ],
+ "types": {
+  "Zamorin, the Spice Rajah": "Hero",
+  "Nicolas, the Hidden Alchemist": "Hero",
+  "Kerthwack, the Reality Breaker": "Hero",
+  "Acid Vial": "Potion",
+  "Alchemy": "Ability",
+  "Barkeeper": "Creature L0",
+  "Beer": "Artifact",
+  "Elixir of Immortality": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Healing Potion": "Potion",
+  "Heavy Hit": "Attack",
+  "Magnetic Potion": "Potion",
+  "Philosopher's Stone": "Artifact (Reaction)",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Poison Vial": "Potion",
+  "Potion Juggler": "Creature L1",
+  "Quick Attack": "Attack",
+  "Secret Blue Spice": "Artifact",
+  "Secret Golden Spice": "Artifact",
+  "Secret Green Spice": "Artifact",
+  "Secret Red Spice": "Artifact",
+  "Secret Spice Jar": "Artifact",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability",
+  "Bottled Flame": "Potion",
+  "Bottled Lightning": "Potion",
+  "Elixir of Recovery": "Potion",
+  "Cloud in a Bottle": "Potion (Reaction)",
+  "Horn in a Bottle": "Potion",
+  "Monster in a Bottle": "Potion",
+  "Planet in a Bottle": "Potion",
+  "Potion of Greed": "Potion",
+  "Flashbang": "Potion"
+ },
+ "gist": {
+  "Zamorin, the Spice Rajah": "Each Secret Spice in his deck counts double towards the potions it lets him run.",
+  "Secret Red Spice": "A blank card whose presence in the deck allows Acid Vials and Healing Potions in the main deck.",
+  "Secret Blue Spice": "Blank; allows Elixir of Quickness and Poison Vial.",
+  "Secret Golden Spice": "Blank; allows Elixir of Immortality and Magnetic Potion.",
+  "Secret Spice Jar": "Blank; allows the bottled potions.",
+  "Nicolas, the Hidden Alchemist": "Cheap draws from the Potion Deck; at most two potions a turn.",
+  "Kerthwack, the Reality Breaker": "A third alchemist.",
+  "Acid Vial": "A clean, unpreventable hit.",
+  "Poison Vial": "Two stacks of poison.",
+  "Bottled Lightning": "A discard duel; the loser's side takes three hits.",
+  "Bottled Flame": "A discard duel; the loser's side burns.",
+  "Potion Juggler": "Plays potions off the top of the Potion Deck.",
+  "Philosopher's Stone": "Turns a potion draw into a search.",
+  "Barkeeper": "Fills his hand with Beer.",
+  "Elixir of Immortality": "Placed openly: the next target of his that falls stands back up."
+ },
+ "plan": "Rafa cooks with potions, far more of them than the rules normally allow, because the Secret Spices in his deck permit them. So he draws potions from two decks at once and plays two a turn: vials, bottled duels, heals. The price is ten spice cards that do nothing in his hand, and a deck with no engine beyond the next bottle. Potions are used once and deleted.",
+ "looks": {
+  "early": "Alchemy on three heroes, a spice card held like a dead fish.",
+  "mid": "Two potions a turn, a Juggler flipping more.",
+  "late": "An Elixir of Immortality on the table and a thin Potion Deck."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "He is buying potions with gold and holding blank spice cards.",
+   "why": "He is slow and half his draws are blanks; nothing he has stops Ability attachments."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Bottled Lightning: he starts discarding spices and waits for you.",
+   "why": "His blanks win him discard duels for free: stop at once, take the hits on your sturdiest heroes, and keep your real cards."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "A Potion Juggler flips two potions a turn off the Potion Deck.",
+   "why": "The Juggler and Nicolas are the supply: steal one, freeze the other."
+  },
+  "endgame": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "An Elixir of Immortality stands openly on his side and a Barkeeper is his only creature.",
+   "why": "It saves the next target that falls: kill the Barkeeper first, then the hero."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Rafa pays for a potion and shows you a Secret Red Spice with a shrug.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Zamorin"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb an Alchemy"
+     }
+    ]
+   },
+   {
+    "board": "A Barkeeper hands him a fistful of Beer.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill it"
+     }
+    ]
+   },
+   {
+    "board": "A Poison Vial on your caster.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Tea it back later"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Nicolas"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Bottled Lightning: he discards a spice and looks at you.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Stop; take it on the sturdy heroes"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Refuse and race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Discard your hand to win"
+     }
+    ]
+   },
+   {
+    "board": "Bottled Flame, the same game.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Discard only dead cards"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Throw everything"
+     }
+    ]
+   },
+   {
+    "board": "Acid Vial on your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Juggler flips two potions a turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Juggler"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shields"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Philosopher's Stone searches the Potion Deck.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Nicolas"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "His own Flashbang ends your turn early.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the alchemist who drew it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "One spell first next turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Elixir of Immortality out; one Barkeeper.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Barkeeper, then Zamorin"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Zamorin and watch him rise"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Elixir is spent.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Juggler too"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "He is drawing spices.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Clear his creatures"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

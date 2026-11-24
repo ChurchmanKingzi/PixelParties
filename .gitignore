@@ -61,3 +61,6 @@ bot/data/moniabot.db-*
 *.trail.json
 *_report.csv
 electron/dist/
+
+# Kampagne: erzeugte Dateien (aus campaign/src gebaut mit node campaign/tools/build.js)
+campaign/dist/

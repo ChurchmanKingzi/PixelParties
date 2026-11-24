@@ -1,0 +1,18 @@
+{
+ "name": "The Job Board",
+ "zone": "campus",
+ "bg": "job_board",
+ "night": false,
+ "hours": "An alcove in the arcade by the campus store, always accessible; new slips go up Monday mornings.",
+ "sight": "A deep alcove tiled in blue and white with a cork wall three metres wide, bristling with slips of coloured paper: yellow for campus jobs, green for town, red for urgent. Tear-off tabs flutter in the draught. Beside it hang the official glass cases: exam schedules, event rosters, results. A pencil on a string has been chewed by a decade of students doing sums.",
+ "things": [
+  "Take a job slip (see the jobs list) and report to whoever posted it",
+  "Read the event rosters and results in the glass cases",
+  "Check the exam timetable",
+  "Find the handwritten 'will tutor for credits' and 'will trade tutoring for cards' notes",
+  "Read the red slips — the urgent, the odd, the oddly specific",
+  "Work out on the back of a slip how many shifts make 9,000 credits",
+  "Post a notice of your own"
+ ],
+ "secret": "Entry point of the job system and the place rosters are posted: the Freshman Cup roster with LEGAL NAMES goes up on the morning of Day 19, here and on the arena doors — 'Kaboom, Inya' — and the crowd around the glass case is how Rowan learns it if Inya has not told him herself. Livvie checks the board before breakfast every Monday; her arithmetic is on the back of half the slips. Red slips worth noticing: 'Lost: one cat, grey, answers to Mulligan — last seen Commons beach' (Day 28; animals are fleeing the Commons); 'Field assistants wanted, north slope survey, 40 cr/slot, discretion required' (Day 62; Marrow's crater camp, signed by Santángel)."
+}

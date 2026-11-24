@@ -1,0 +1,411 @@
+{
+ "name": "Elven Vanguard",
+ "owner": "guest",
+ "heroes": [
+  "Barker, the Monster Tamer",
+  "Maya, the Nature Fairy",
+  "Tharx, the Never-Losing General"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   1,
+   "Beer"
+  ],
+  [
+   2,
+   "Boots of Hermes"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   4,
+   "Elven Archer"
+  ],
+  [
+   4,
+   "Elven Druid"
+  ],
+  [
+   4,
+   "Elven Forager"
+  ],
+  [
+   4,
+   "Elven Leader"
+  ],
+  [
+   3,
+   "Elven Rider"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   3,
+   "Magnetic Glove"
+  ],
+  [
+   6,
+   "Necromancy"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   3,
+   "Psychic Scout"
+  ],
+  [
+   1,
+   "Snow Cannon"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Toughness"
+  ],
+  [
+   4,
+   "Wheels"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Barker, the Monster Tamer": "Hero",
+  "Maya, the Nature Fairy": "Hero",
+  "Tharx, the Never-Losing General": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Beer": "Artifact",
+  "Boots of Hermes": "Artifact (Reaction)",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Elven Archer": "Creature L1",
+  "Elven Druid": "Creature L2",
+  "Elven Forager": "Creature L1",
+  "Elven Leader": "Creature L2",
+  "Elven Rider": "Creature L1 (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Magnetic Glove": "Artifact",
+  "Necromancy": "Ability",
+  "Performance": "Ability",
+  "Psychic Scout": "Creature L1",
+  "Snow Cannon": "Artifact",
+  "Summoning Magic": "Ability",
+  "Toughness": "Ability",
+  "Wheels": "Artifact",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Elven Leader": "Pings a target once for itself and once more for every other creature she controls.",
+  "Elven Druid": "Summons an Elven creature straight from the deck each turn.",
+  "Elven Forager": "Makes every Elven creature a level cheaper.",
+  "Elven Archer": "Free with another Elf out; pings each turn.",
+  "Elven Rider": "Jumps from hand into the slot of an Elf that just left the board.",
+  "Maya, the Nature Fairy": "Each creature that lands makes one of her targets sturdier.",
+  "Tharx, the Never-Losing General": "Draws per surviving creature.",
+  "Barker, the Monster Tamer": "Starts with a small creature in play.",
+  "Necromancy": "Ability: returns a creature from the discard pile each turn.",
+  "Psychic Scout": "Summons a level-0 creature for free each turn.",
+  "Aggressive Town Guard": "Free summon with a ping.",
+  "Boots of Hermes": "Cancels a trap of yours and draws.",
+  "Snow Cannon": "Freezes a target.",
+  "Deepsea Idol": "Cancels a sweep.",
+  "Magnetic Glove": "Searches any card.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Elves multiply. A Forager makes the rest cheap, a Druid pulls one from the deck every turn, Riders fill any gap, and Maya toughens them as they land. Then the Elven Leader pings once per creature, Archers add their own, and Tharx draws for the crowd. It is a wide board of small creatures and nothing else, with Necromancy to rebuild. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "A Forager and an Archer. And an unfamiliar Area with a starfield on it.",
+  "mid": "Seven Elves, a Leader pinging eight times a turn.",
+  "late": "A rebuilt board and Tharx drawing five."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Forager and a Druid are out; no Leader yet.",
+   "why": "The Druid and Forager are the engine and tiny; killed now, the crowd never forms."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "An Elven Leader stands among six other creatures.",
+   "why": "The Leader's pings count her creatures: one sweep takes the damage to zero, where racing takes eight pings a turn."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "She rebuilds through Necromancy and the Druid each turn; Tharx is drawing.",
+   "why": "Stop the refill: freeze or kill Tharx and Maya, the Necromancers, and steal the Druid."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Few Elves and no cards.",
+   "why": "Her heroes are ordinary."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Hedda summons a Forager, then an Archer for free.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Maya"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Druid pulls a second Druid from the deck.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "Boots of Hermes cancels your Firewall.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep instead"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Tharx"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Leader pings seven times.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Leader"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into the pings"
+     }
+    ]
+   },
+   {
+    "board": "A Rider leaps into a dead Elf's slot.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Second sweep"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Druid"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Deepsea Idol saves the row.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm right behind it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Tharx"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Maya's Necromancy brings the Leader back.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Maya"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Tharx draws five.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Tharx"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Her Snow Cannon freezes your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea it onto Tharx"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep with potions"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two Elves, no hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Barker alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Maya.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Tharx"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

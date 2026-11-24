@@ -1,0 +1,20 @@
+{
+ "name": "Mulligan Point Light",
+ "zone": "town",
+ "bg": "lighthouse",
+ "night": true,
+ "hours": "Kept by Silas Grieve; the lamp is lit at dusk every night. Visitors climb by his leave.",
+ "sight": "A white tower with a red lantern gallery stands on the rocks at the eastern arm of the bay, a keeper's cottage crouched at its foot among sea-pinks. Inside, an iron stair spirals up through the smell of brass polish and paraffin to a great lens like a glass beehive. From the gallery you can see the whole south of the island and the ferry's course to the horizon. At night the beam walks over the water, the town and the campus, and once each turn across the dark flank of the mountain.",
+ "things": [
+  "Climb to the gallery with Silas and be handed a polishing rag",
+  "Watch the lamp being lit at dusk",
+  "Read the keeper's log — weather, ships, wrecks — back through sixty years",
+  "Look at the photographs in the cottage: a young boatman, a thinner man wrapped in a blanket",
+  "Drink black tea so strong the spoon stands up",
+  "Watch a storm come in from the gallery rail",
+  "Ask about the keys on the big iron ring by the door",
+  "At night: time the beam and see what it lights on the north ridge"
+ ],
+ "secret": "Silas's home and the keeper's log. SILAS was the boatman who pulled Chuck off the north shore fifty years ago (canon) and has kept his secret, his island and the Umbra House keys since. The log entry for the rescue: 'Took off one man, N shore, eleven weeks ashore by his count. Would not let go of a sack of notebooks. Kept saying the squares were warm. Did not charge him.' The log for the night of Day 26: 'Light from the sky, 02:10, green-white, N slope. It slowed. God help us, it slowed.' The iron ring holds: Umbra front door, room 9, the fence padlock, the clock tower, the tunnel gates, and one key of black stone that fits nothing on campus (a Tessellate latch-key for the antechamber's inner door; he found it in the boat after the rescue). He gives keys only for trust built over time (clock winding, groundskeeping shifts, never lying to him) or in extremity. The beam does catch Umbra House once per turn; on some nights after D27 it also catches a figure standing on the ridge.",
+ "access": "By silas's leave; the gallery is locked in gales."
+}

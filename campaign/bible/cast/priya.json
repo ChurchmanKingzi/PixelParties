@@ -1,0 +1,238 @@
+{
+ "id": "priya",
+ "name": "Priya Raman",
+ "firstName": "Priya",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, fourth floor",
+ "romance": true,
+ "deck": "Pew-Pew! (Arrows)",
+ "look": "Athletic and upright, with a long black braid down her back, a leather archery guard on her left wrist and the reserve's grey-rimmed Battle Team pin on her red jacket with the blue Rare collar. She has an archer's stillness — shoulders down, breath slow — and dark, steady eyes that do not look away first.",
+ "voice": "Even, direct and economical, London with a trace of Chennai. She says what she thinks is right and then does it; she rarely jokes, and when she does it is so level that people miss it. She breathes before answering anything that matters. RARE habit (once in a scene at most; most scenes go without it): 'Fair.' — her highest praise.",
+ "lines": [
+  "Again. You rushed the release. I don't mean the arrow, I mean the turn.",
+  "I want the seat because I beat him for it. Anything else isn't the seat.",
+  "Fair. I was wrong about you — I'd assumed the online rank was soft.",
+  "Cold is something else. This is aiming."
+ ],
+ "intro": "A second-year Battle Team reserve and competitive archer: disciplined, fair-minded, and openly after a starter's pin.",
+ "traits": [
+  {
+   "id": "priya_1",
+   "text": "She is the Battle Team's first reserve and wants a starting seat, won fairly.",
+   "how": "Any team scene; she says it herself."
+  },
+  {
+   "id": "priya_2",
+   "text": "She shoots at the range behind the gym at dawn and treats duels the same way: breath, anchor, release.",
+   "how": "Gym, Morning."
+  },
+  {
+   "id": "priya_3",
+   "text": "She believes Willas Tann is holding the seat she has earned, and tells him so to his face.",
+   "how": "See them in the same room."
+  },
+  {
+   "id": "priya_4",
+   "text": "She was roommates with Rana Marika last year and still saves her a seat she never takes.",
+   "how": "Rare common room; ask about the empty chair."
+  },
+  {
+   "id": "priya_5",
+   "text": "She has never missed a training session, a class or a deadline.",
+   "how": "Rox or Dom mentions it; she finds it unremarkable."
+  },
+  {
+   "id": "priya_6",
+   "text": "Her mother is an army surgeon and her father a schoolteacher; 'fair' was the household's highest praise.",
+   "how": "Ask why that word matters so much."
+  },
+  {
+   "id": "priya_7",
+   "text": "She fletches her own arrows and gives one to people she respects.",
+   "how": "Friend stage; or notice the single arrow on Dom's shelf."
+  },
+  {
+   "id": "priya_8",
+   "text": "She has never done anything just because she wanted to, and is starting to notice.",
+   "how": "Close stage."
+  },
+  {
+   "id": "priya_9",
+   "text": "She feels guilty every day about wearing the team pin and the blue collar while Rana wears the grey one.",
+   "how": "Dating stage, or bring up Rana gently."
+  }
+ ],
+ "secret": "Priya is the daughter of Colonel Dr Meera Raman, RAMC, and Suresh, a maths teacher; she was raised on duty, timetables and the idea that you earn the thing or you do not have it. Archery at national-squad level, then the Academy on a merit place. She is the best reserve the team has had and is — Dom's spreadsheet agrees — better than Willas. She wants the seat cleanly and has formally requested a seat-challenge from Rox three times; Lilia has declined on the captain's prerogative each time. Priya thinks this is favouritism, says so to Lilia's face, and trains harder. Wound: she and Rana were inseparable in first year; Priya made the team and promoted while Rana was held back and demoted, and Priya — who believes results are justice — has no framework for a result that felt like theft. She saves Rana a chair. Rana will not sit in it. Contradiction: the fairest person on the island is living off an outcome she privately thinks was unfair, and she cannot aim her way out of it. She has never had a relationship that was not scheduled around training, and is a little alarmed to find she would like one. Private joke: she and Kenji have a standing bet on who collapses first; neither will.\nRoute: medium pace by temperament, formal about beginnings (she will ask him to train before she asks him to dinner), deeply loyal once decided, and physically more confident than her reserve suggests.\nOn Day 33 the open tryouts fill the second reserve slot; she runs the first-years through drills and is the fairest assessor there. After Day 40 discipline is her refuge — she organises escorted walks and a training rota. Around Day 120 she is tempted to file a formal complaint about Willas's seat. Default timeline: she is the one who finds Kenji on Day 118, and thirteen days later she does the fair thing — she challenges '{H}' properly, with a judge's form filled in, for Kenji's hours, and is found by Coach Rox on the morning of Day 131. If she is kept from that, Day 150 breaks her certainty another way: the man she said did not deserve the seat used it to take a duel no one else could have survived losing with dignity, and she is handed the starter's pin she wanted over his Hollowed body. She will not wear it until he wakes. Her one technical flaw, which a friend should name to her face: she always holds the Golden Arrow one turn too long.",
+ "wants": "To earn her place beyond any argument, and to be forgiven by Rana for something that was not her fault.",
+ "fears": "That 'fair' was never how any of it worked.",
+ "crush": "dom",
+ "crushNote": "He backs her on the evidence, which is the only backing she has ever wanted. It shows as extra film study at his table, an arrow she fletched for him standing on his shelf, and her being unusually interested in chess.",
+ "crushPace": 0.7,
+ "likes": [
+  "Training together: drills, range, rematches",
+  "Punctuality and kept commitments",
+  "Being challenged directly",
+  "Honest assessment, given and taken",
+  "Anyone kind to Rana",
+  "Quiet competence",
+  "Being asked to do something for no reason at all",
+  "A fair fight for something that matters"
+ ],
+ "dislikes": [
+  "Favouritism and shortcuts",
+  "Being called cold",
+  "Unreliability",
+  "Mockery of Rana's record",
+  "Excuses",
+  "Being handed something she did not win"
+ ],
+ "gifts": [
+  "Card: Rainbow's Arrow",
+  "Fletching glue and feathers from the campus store",
+  "Card: Bow of the Hunt Goddess",
+  "Masala chai from the night market",
+  "A target face signed by the Commons kids",
+  "Card: Golden Arrow"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Straightforward, earnest, through shared effort.",
+  "text": "Priya shows interest by investing time: she corrects his form, books a table for practice, asks him to the range. She does not play games and does not initiate romance — but once she has decided she likes someone she will not pretend otherwise if asked plainly. She wants to be approached honestly and as an equal: challenge her, keep your word, show up on time, do not make excuses. Teasing confuses her for a second and then pleases her. What undoes her is being invited to do something pointless and lovely — skipping a session for a sunrise — by someone she trusts enough to say yes."
+ },
+ "intimacy": "Disciplined does not mean distant: once she has chosen, she is direct and physically assured — an archer who knows her own body. Closeness begins in training, with her hands setting his shoulders and stance at the range, breath counted together, and the stillness before a release turning into something else. She likes strength and steadiness, being held from behind with his chin on her shoulder, her braid being undone slowly. She is serious and intent, and then, to her own surprise, laughs. She keeps the wrist guard on until last. Fade when she unbuckles it and sets it on the sill.",
+ "events": [
+  {
+   "id": "priya_e1",
+   "stage": 1,
+   "title": "Again",
+   "condition": "Train with her: a morning at the range behind gym or a drill set at great_arena, taking correction without excuses, at least twice.",
+   "hint": [
+    "She respects people who turn up and do the work.",
+    "Join her morning training and take her corrections seriously."
+   ]
+  },
+  {
+   "id": "priya_e2",
+   "stage": 2,
+   "title": "The empty chair",
+   "condition": "Do well enough at the Day 33 tryouts that she remembers your name, and treat Rana as a serious player in front of her; ask about the chair she keeps in rare_common_room.",
+   "hint": [
+    "She saves a seat for someone who never sits in it.",
+    "Impress her at team tryouts and ask about the friend she keeps a chair for."
+   ]
+  },
+  {
+   "id": "priya_e3",
+   "stage": 3,
+   "title": "For no reason",
+   "condition": "After midterms (Days 47–49), ask her to skip one scheduled session for something with no purpose (sunrise at summit_shrine, the orchard); she agrees, and afterwards asks, formally, whether this is a date. Say yes.",
+   "hint": [
+    "She has never done anything simply because she wanted to.",
+    "Ask her to skip training once for something beautiful and useless."
+   ]
+  },
+  {
+   "id": "priya_e4",
+   "stage": 4,
+   "title": "Fair",
+   "condition": "Help bring her and Rana into the same room and let them have the argument they need (before the Promotion Duels, Days 89–91); do not take a side. That night she stays.",
+   "hint": [
+    "There is something between her and an old friend that discipline cannot fix.",
+    "Help her and Rana finally talk, without choosing between them."
+   ]
+  },
+  {
+   "id": "priya_e5",
+   "stage": 5,
+   "title": "The pin",
+   "condition": "After Kenji is found (Day 118), keep her from playing for his hours alone — go with her, plan with her, or win them back first; if Willas falls on Day 150, be with her when she is handed the starter's pin and stand by her decision about it. She gives Rowan the arrow she fletched in first year.",
+   "hint": [
+    "When a teammate is hurt she will want to put it right alone, by the book. And she may yet get what she wanted in the worst possible way.",
+    "Do not let her take on a teammate's burden alone, and be beside her if she is ever given the seat she wanted."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "teammates",
+   "text": "Respects her play completely and thinks one of her decisions is plain favouritism.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "rivals",
+   "text": "He is in the seat she has earned.",
+   "public": true,
+   "from": 0
+  },
+  "dom": {
+   "label": "protégé",
+   "text": "The vice-captain backs her on the evidence, which is the only backing she wants.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "teammates",
+   "text": "The only person whose training hours she cannot match.",
+   "public": true,
+   "from": 0
+  },
+  "rana": {
+   "label": "friends",
+   "text": "Her roommate and best friend last year; she saves her a chair that stays empty.",
+   "public": true,
+   "from": 0
+  },
+  "sunny": {
+   "label": "friends",
+   "text": "Dawn regulars at the gym; a friendly argument about whether swimming or archery is harder.",
+   "public": true,
+   "from": 8
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "Coach has put her seat-challenge request forward three times.",
+   "public": true,
+   "from": 0
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "Good enough for the reserves and chose not to try. Priya does not understand it and respects it.",
+   "public": true,
+   "from": 0
+  },
+  "eberhart": {
+   "label": "friends",
+   "text": "The first-year who is at the gym before her. He never talks. She approves.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "gym",
+   "Midday": "lecture_hall",
+   "Afternoon": "great_arena",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "gym",
+   "Midday": "great_arena",
+   "Afternoon": "orchard",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Arrows: one precise shot per turn at exactly the right target, heroes whittled down from range behind a thin line of archers. No wasted damage, no flourishes.",
+  "tilt": "A sense that the match is unfair — a bad ruling, a lucky topdeck — makes her rigid; and Rana in the audience."
+ }
+}

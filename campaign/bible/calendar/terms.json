@@ -1,0 +1,20 @@
+[
+ {
+  "id": 1,
+  "name": "Autumn Term",
+  "from": 1,
+  "to": 105,
+  "starts": "Monday, September 1",
+  "ends": "Sunday, December 14",
+  "weeks": 15
+ },
+ {
+  "id": 2,
+  "name": "Spring Term",
+  "from": 106,
+  "to": 210,
+  "starts": "Monday, January 12",
+  "ends": "Sunday, April 26",
+  "weeks": 15
+ }
+]

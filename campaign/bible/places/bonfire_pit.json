@@ -1,0 +1,20 @@
+{
+ "name": "The Bonfire Pit",
+ "zone": "dorms",
+ "bg": "bonfire_pit",
+ "night": true,
+ "part": "commons_beach",
+ "hours": "Lit on Friday nights and any night someone has wood and a reason; a Commons tradition older than the boardwalk.",
+ "sight": "A ring of sea-smoothed logs around a pit of black stones at the east end of the cove, where the sand is firm and the palms lean out to listen. By day it is just ash and driftwood. Lit, it throws sparks at the stars and paints every face the same orange; someone has a guitar, someone has marshmallows, and the tide draws a silver line just beyond the light.",
+ "things": [
+  "Come to a Friday bonfire and meet people outside their jackets",
+  "Play firelight duels with real cards and no holograms, the way the game started",
+  "Tell a story when the talking shell comes round",
+  "Toast something on a stick",
+  "Walk someone down the dark beach, away from the light",
+  "Gather driftwood in the afternoon for the evening",
+  "Burn your worst decklist in the traditional ceremony",
+  "Stay until it is only embers and two people"
+ ],
+ "secret": "Day 5 mixer: first big social scene, where most routes can be opened — the whole first year is there by name (Freya has found the drinks, Hedda the argument, Sammy the edge of the firelight, Cas is narrating it, Rafa is feeding it); nobody yet knows anybody for longer than five days. Firelight duels (no holograms) are Rowan's gentlest introduction to playing in front of people (+Nerve). Tradition: the talking shell — whoever holds it tells a true story. On Day 5 Nathan tells an embarrassing one about himself and nobody can shut him up. After D27, when the shell reaches '{H}' {H:he} tells, in complete detail and in the first person, a memory of {H}'s seventh birthday — and then asks the circle, puzzled, 'Was that the kind you meant?' From D27 the fire burns with a green edge when {H:he} sits close, and sparks drift toward {H:him} against the wind. Farewell bonfire Day 104, senior send-off Day 199. D67: fires need staff permission and end before Night."
+}

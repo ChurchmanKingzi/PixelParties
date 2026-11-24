@@ -1,0 +1,19 @@
+{
+ "name": "Tarleinn's Falls",
+ "zone": "wild",
+ "bg": "waterfall",
+ "night": false,
+ "hike": 1,
+ "hours": "Open; an hour up the jungle trail. Deserted on weekdays.",
+ "sight": "The stream that feeds the campus drops thirty metres here over a lip of black basalt into a round green pool, and the whole clearing breathes spray. Rainbows stand in it on sunny mornings. Ferns grow out of the cliff sideways; a flat rock in the middle of the pool is warm as a cat. The noise wipes your head clean.",
+ "things": [
+  "Swim in the plunge pool, which is cold enough to make you shout",
+  "Sit on the flat rock and dry off",
+  "Climb the wet path up the side to the lip",
+  "Go behind the curtain of water into the hollow at the back",
+  "Fill a bottle — it is the best water on the island",
+  "Bring a deck and play on the flat rock with the spray curling the cards",
+  "Come at the right hour for the rainbow"
+ ],
+ "secret": "Romantic and restful (several routes' 'first real day out'). Named by Chuck after his favourite hero; behind the curtain, the back wall of the hollow is a mosaic panel two metres high, bright because the spray keeps it clean: a traveller with a staff and a pack walking a road of squares. Rowan, whose deck is led by Tarleinn the Traveler, will recognise the silhouette at once — the first moment the player may suspect the cards depict someone. Viktor has rubbed it; Chuck will only say 'Good likeness, isn't it? He never did hold still.' After D27 the plunge pool is a degree warmer each week."
+}

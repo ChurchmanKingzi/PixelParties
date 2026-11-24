@@ -1,0 +1,21 @@
+{
+ "name": "The Old Print Works",
+ "zone": "wild",
+ "bg": "old_print_works",
+ "night": false,
+ "hike": 2,
+ "hours": "Abandoned for 25 years; an hour and a half east along the old plantation tramway.",
+ "sight": "A long brick building with a sawtooth roof stands in a clearing the jungle is taking back, its chimney wrapped in creeper. Inside, in green underwater light, sit the hulks of two offset presses, a paper guillotine with a blade like a ship's rudder, and drying racks collapsed into each other. Misprinted sheets lie in drifts, uncut, the same hero's face repeated a hundred times across each. Rust, mildew and a ghost of printer's ink.",
+ "things": [
+  "Walk the press floor and work out how a card was made thirty years ago",
+  "Pull an uncut sheet from a drift and see the registration marks",
+  "Find the ink room: stone mullers, crusted tins, shelves of pigment jars",
+  "Read the last job dockets on the foreman's spike",
+  "Climb to the manager's office with its wall calendar and a safe standing open",
+  "Look in the yard at the crushing trough and the pile of pale gravel beside it",
+  "Take a misprint as a souvenir",
+  "Notice that the creeper has not grown over the ink room door"
+ ],
+ "secret": "WHERE THE KABOOM ALPHA SET WAS PRINTED (30 years ago; canon: ink mixed with ground tile dust). Chuck built the works on the island so the first run would be made 'at home', and closed it after one more set when he understood what the dust did. The ink room still holds a sealed jar of the dust-pigment mix and the crushing trough has tile fragments in it — proof of the Alpha process, worth billions to Marrow and exactly what Wren's analysis points to. Dockets: 'KA run 1 — pigment per C.K.'s own mix — DO NOT SUBSTITUTE.' The manager's office safe holds the payroll book and sick list of 'K.A. run 1' (nine ink-room workers, one 'M. Vane — apprentice'; seven with 'cough'; 'do NOT record cause'); off the ink room, apprentice locker 14, marked M.V., has oiled hinges, a new padlock and dried sea-pinks on top (the third grey notebook; plot file, M9). The uncut drifts are from the later ordinary set (worthless but pretty); one half-sheet of true Alpha rejects, nine cards miscut, lies under the collapsed rack — nine damaged first prints (they still open the Gate; they also make holograms 'too real'). Plants avoid the ink room. Wren, if brought here, becomes essential and endangered. Marrow's people find the works around Day 80 by following old supply invoices unless the dockets are removed first. If the dust jar reaches his lab, his 'living hologram' prototype works on Day 168 in front of the Interschool Cup crowd, with consequences.",
+ "access": "Not forbidden, just forgotten; the tramway is overgrown (viktor, silas and chuck know it). East of the cordon line."
+}

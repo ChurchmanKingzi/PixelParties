@@ -1,0 +1,279 @@
+{
+ "id": "zeynep",
+ "name": "Zeynep Arslan",
+ "firstName": "Zeynep",
+ "age": 21,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 3,
+ "dorm": "rare",
+ "room": "Rare Hall, fourth floor, room 407",
+ "romance": true,
+ "deck": "Letter of the Law (Idej: three hundred-health lords behind projections and blades — Idej Lord Daiyo; Idej Lord Nobunakin; Idej Lord Todugawin)",
+ "look": "Slim and straight-backed (about 5'7\"), pale olive skin, and thick wavy black hair cut short at the nape and left long on top, pushed back off the forehead, with one natural silver-white lock at the front left. Heavy straight eyebrows, steady grey-brown eyes, a long straight nose with a tiny gold stud in the left nostril, a mouth usually pressed shut on a remark. She wears the black Auxiliary jacket buttoned with the blue Rare collar, a white cloth band on the left upper sleeve lettered LADDER in black, and thin steel-rimmed reading glasses on a black cord that she puts on only to write. A tall, narrow ledger bound in black with brass corners is held flat against her left side, and a brass self-inking date stamp hangs from a belt reel at her right hip. Black ink along the side of her right little finger. She stands with her feet together and her chin slightly down, looking up through her brows.",
+ "voice": "Quiet, dry and precise, Izmir Turkish under careful English: short sentences, a pause before anything she is unsure of. She answers the rules question asked, then the one that should have been. Deadpan — her jokes sound like rulings. Flustered, she turns formal and looks at the ledger. With the harbour's old men she is loud and quick; about running, coffee and her grandmother, almost talkative. RARE habit (once in a scene at most; most scenes go without it): 'For the record.'",
+ "lines": [
+  "Result, please. Winner signs first. No, the other line. Thank you.",
+  "Tavla is not luck. The dice are luck. What you do after is your own fault.",
+  "My grandmother embroiders. I can do one stitch. I do it very straight.",
+  "It resolves. You don't have to like it. I don't like it either.",
+  "I run at night because nobody asks me for a ruling at one in the morning.",
+  "I was wrong once, in ink. I look at it every Monday.",
+  "Three lords, a hundred health each, and nothing touches them. Until something does.",
+  "You may appeal. Ms Kirishima will tell you the same thing with better posture.",
+  "I have seen some of your online games. For coursework. The qualifier. Twice."
+ ],
+ "intro": "The ladder's registrar: a dry, exact third-year on the judging track who stamps every ranked result into the black ledger, rules on questions at the ladder tables, and has never been seen to guess.",
+ "traits": [
+  {
+   "id": "zeynep_1",
+   "text": "She is the ladder registrar: every ranked result on the island is signed at her table and stamped into the black ledger, and the printed ladder sheets are hers.",
+   "how": "Play a ladder match; the Trial Domes at Midday."
+  },
+  {
+   "id": "zeynep_2",
+   "text": "She takes first call on rules questions at ladder tables and sends the hard ones up to Lucas Brennan or Ms Kirishima.",
+   "how": "Call a judge during a ranked game."
+  },
+  {
+   "id": "zeynep_3",
+   "text": "She checks every entry three times before the stamp comes down.",
+   "how": "Watch her record a result."
+  },
+  {
+   "id": "zeynep_4",
+   "text": "She plays tavla with the net-menders at the harbour on Saturdays, loudly, for fish.",
+   "how": "The harbour, weekend Afternoon."
+  },
+  {
+   "id": "zeynep_5",
+   "text": "She runs the terrace steps after dark and knows which lamps are out.",
+   "how": "The Duel Terraces in the Evening, before the curfew."
+  },
+  {
+   "id": "zeynep_6",
+   "text": "Her deck is three lords with a hundred health apiece; she says a thing should be either correct or dead.",
+   "how": "Play her."
+  },
+  {
+   "id": "zeynep_7",
+   "text": "She cannot throw a pen away; there is a jar of dead ones on her desk, in order of service.",
+   "how": "Lend her a pen and try to get it back."
+  },
+  {
+   "id": "zeynep_8",
+   "text": "She wrote a second-year paper on a ruling from an online qualifier final. The winner's handle is in footnote nine.",
+   "how": "Friend stage; the coursework shelf in the Library, or ask what she watches."
+  },
+  {
+   "id": "zeynep_9",
+   "text": "One line in last year's ledger has a correction in the margin in her own hand, initialled and dated a week late.",
+   "how": "Close stage; ask about Mondays."
+  },
+  {
+   "id": "zeynep_10",
+   "text": "She enters the Wildcard's results herself, in her best handwriting, whoever is on shift.",
+   "how": "Compare your line in the ledger with the ones around it."
+  }
+ ],
+ "secret": "FUNCTION (use her instead of a nameless scorekeeper or floor judge): LADDER REGISTRAR and judge's assistant of the Battle Arena. Every ranked result is signed at her table (Trial Domes at Midday, the Great Arena in the Afternoon, the Duel Terraces in the Evening), checked three times and stamped into the black ledger; she prints the ladder sheets, books the domes, logs challenges and refusals for the vice-president's desk, and takes first call on rules questions at ladder tables, strictly by the rulebook. Hard calls go up to Lucas Brennan, then Ms Kirishima. She cannot be hurried and never guesses.\nWHO SHE IS. From Izmir; raised largely by a grandmother who embroidered and played tavla for money. Shy in English; loud and funny in Turkish with the harbour's net-menders. Wound: last year, in a Promotion Duel, she gave a wrong ruling on a Reaction's timing; the loser, a Commons second-year, left the Academy in June. She found the error a week later and wrote the correction in the margin; nobody else has opened that page. Contradiction: the island's most reliable judge thinks she is one mistake from a fraud.\nSECRET. She has watched Best_Tarleinn_NA's online games for two years (her second-year paper is on a ruling in his qualifier final) and knew the name on the Wildcard list. She would rather resign than have him know. It shows only in the ledger: his line is always in her hand.\nAFTER DAY 27 she notices, as a professional matter, that one first-year from bungalow 7 hands in slips with nothing to correct, in a hand that grows neater every week. If Brant is found on Day 40, the Dome 3 booking sheet, which is hers, is taken by the Chancellor's office before she has read it and comes back with two words blacked out. Every result is legal. She has begun to dread the stamp.",
+ "wants": "A ledger with no notes in the margin — and, absurdly, for one particular first-year to ask her a rules question that takes a long time to answer.",
+ "fears": "Being wrong in ink again, with somebody's year depending on it.",
+ "crush": "rowan",
+ "crushNote": "She has watched his online games for two years — for coursework, she would say — and knew the name on the Wildcard list before he stepped off the ferry. She would rather resign than admit it. It shows as his results always being entered in her own hand, a ruling ready before he has finished asking, and her looking at the ledger, not at him, whenever he says thank you.",
+ "crushPace": 1,
+ "likes": [
+  "A question asked precisely",
+  "People who sign on the correct line",
+  "Being asked how a ruling works, not whether it bends",
+  "Tavla, night running, bitter coffee",
+  "A misplay admitted before she finds it",
+  "Old men who cheat openly",
+  "Being spoken to in bad Turkish",
+  "Silence that is not awkward"
+ ],
+ "dislikes": [
+  "'Can't you just…'",
+  "Being hurried at the stamp",
+  "Guessing",
+  "Players who argue with the table instead of the rule",
+  "Compliments in front of a queue",
+  "Anyone opening the ledger without asking",
+  "Her own handwriting on page 212"
+ ],
+ "gifts": [
+  "Card: Idej Projection",
+  "A good pen, fine nib, black",
+  "Card: Idej Lord Daiyo",
+  "Turkish coffee from the Saturday market",
+  "Card: Idej Projector",
+  "A correctly filled result slip, winner's signature first"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Rulings as conversation; admits nothing.",
+  "text": "Zeynep has liked Rowan secretly since before he arrived and would deny it for the record. She does not flirt: she is simply always the one at his table, with the ruling ready. An easy route in disguise — any honest rules question is met more than halfway. Ask how, not whether; own your misplays; never tease her in front of a queue."
+ },
+ "intimacy": "Guarded, then startlingly direct. For weeks it is a stool pulled up to the scorer's table after the last match, two glasses of tea, his notation corrected with the cap still on her pen. She does not like to be watched while she decides; once she has decided she says so in one sentence and takes off the reading glasses. Quiet, intent, drily funny; she slips into Turkish. A night run ending on the top terrace; room 407, the ledger locked away. Fade as she turns the date stamp to tomorrow.",
+ "events": [
+  {
+   "id": "zeynep_e1",
+   "stage": 1,
+   "title": "Winner signs first",
+   "condition": "Report a ranked result at her table (trial_dome or duel_terraces) with the slip filled in correctly; or call her for a ruling during a ladder game and accept it without argument, even when it costs you.",
+   "hint": [
+    "Every ranked game on the island ends at the same table, in front of the same stamp.",
+    "Report a ladder result properly, or take one of her rulings with good grace."
+   ]
+  },
+  {
+   "id": "zeynep_e2",
+   "stage": 2,
+   "title": "How, not whether",
+   "condition": "Bring her a real rules question outside a match (a Reaction's timing, a Surprise, an Ability level) and let her take as long as it takes; or lose a game of tavla to her at harbor on a Saturday and hear her laugh.",
+   "hint": [
+    "She likes a question that takes a long time to answer. On Saturdays she is someone else.",
+    "Ask her a genuine rules question, or find her at the harbour on a Saturday."
+   ]
+  },
+  {
+   "id": "zeynep_e3",
+   "stage": 3,
+   "title": "Footnote nine",
+   "condition": "Find out that she knows your online games (the coursework shelf in library, or a slip of her tongue) and do not make a joke of it; ask what she thought of the qualifier final. She tells you at length and then hears what she has admitted. Ask her out; she says 'for the record, yes'.",
+   "hint": [
+    "One of the judges knew your name before you arrived, and would rather you did not find out why.",
+    "Discover what she wrote her second-year paper about, and be kind about it."
+   ]
+  },
+  {
+   "id": "zeynep_e4",
+   "stage": 4,
+   "title": "Page 212",
+   "condition": "After Day 40, ask about the note in the margin, or tell her what you suspect about the tidiest slips on the ladder; she shows you the page she got wrong and the entries she has begun to dread. Believe both. She does not go back to her own room.",
+   "hint": [
+    "There is a page in the ledger she looks at every Monday, and lately some newer ones.",
+    "After the first incident, ask her about the ledger, and believe her."
+   ]
+  },
+  {
+   "id": "zeynep_e5",
+   "stage": 5,
+   "title": "For the record",
+   "condition": "In Term 2, stand at her table when she refuses to stamp something she is ordered to stamp, or reads a correction aloud in open session; and help her write to the player she once ruled against. She hands you the pen.",
+   "hint": [
+    "A registrar gets one chance to say that a legal result is still wrong.",
+    "Back her when she finally puts something in the record that she was told to leave out."
+   ]
+  }
+ ],
+ "bonds": {
+  "lucas": {
+   "label": "colleagues",
+   "text": "Year-mates on the judging track. He crouches to give a ruling and she stands; they have never disagreed on one.",
+   "public": true,
+   "from": 0
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "Ms Kirishima returns her rulings unmarked, which is the highest mark she gives.",
+   "public": true,
+   "from": 0
+  },
+  "noor": {
+   "label": "mentor",
+   "text": "The first-year who reads the Charter for pleasure checks the ledger sums on Mondays and has not yet found an error. Nor made one.",
+   "public": true,
+   "from": 12
+  },
+  "anni": {
+   "label": "mentor",
+   "text": "Brings a red pen to the scorer's table. Zeynep has lent her a black one and explained the difference.",
+   "public": true,
+   "from": 12
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "Her log of dodged challenges goes to his desk. She logs them all the same way and has noticed they do not all come back the same way.",
+   "public": true,
+   "from": 0
+  },
+  "magnus": {
+   "label": "rivals",
+   "text": "He disputes two places on every printed sheet. She shows him the arithmetic, every time, in full.",
+   "public": true,
+   "from": 12
+  },
+  "tomi": {
+   "label": "distrusts",
+   "text": "His betting pool wants the results before they are stamped. He has tried coffee, flattery and a cousin.",
+   "public": true,
+   "from": 12
+  },
+  "mika": {
+   "label": "friends",
+   "text": "The other judge with a sense of humour. Coffee at the Sleeve & Binder after Saturday Sanctioned.",
+   "public": true,
+   "from": 0
+  },
+  "lilia": {
+   "label": "friends",
+   "text": "Rank one signs on the correct line, first time, every time, and says thank you.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "friends",
+   "text": "Plays more ranked games than anyone alive. She has run out of lines for him twice.",
+   "public": true,
+   "from": 0
+  },
+  "shirin": {
+   "label": "friends",
+   "text": "Floor-mates since first year. Zeynep knows exactly where Shirin stands on the ladder and has never once mentioned it.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "friends",
+   "text": "Saturdays at the harbour, one crate apart. Cati says tavla is sueca for people with no friends.",
+   "public": true,
+   "from": 0
+  },
+  "gani": {
+   "label": "friends",
+   "text": "He rigs her scoreboard. It is the only screen in the arena that never flickers, and she assumes that is luck.",
+   "public": true,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "distrusts",
+   "text": "The Chancellor's office took a booking sheet out of her tray and returned it with two words missing.",
+   "public": false,
+   "from": 40
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "classroom",
+   "Midday": "trial_dome",
+   "Afternoon": "great_arena",
+   "Evening": "duel_terraces",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "duel_terraces",
+   "Midday": "trial_dome",
+   "Afternoon": "harbor",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Three lords with a hundred health each: Projections cancel hit after hit, blades are on before the first draw, one lord attacks twice a turn. Exact, fast.",
+  "tilt": "Many small hits at once — every Projection spent on a scratch."
+ }
+}

@@ -1,0 +1,266 @@
+{
+ "id": "odalys",
+ "name": "\"Mama\" Odalys Fuentes",
+ "firstName": "Odalys",
+ "age": 55,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "B1 (kitchen and quarters)",
+ "romance": false,
+ "deck": "Spices (Zamorin)",
+ "look": "Broad, strong-armed, in a flowered apron dusted with flour, grey-black hair in a bun under a red kerchief, and gold hoops in her ears. A wooden spoon rides in her apron string like a sidearm. Her laugh arrives a room before she does.",
+ "voice": "Loud, musical and affectionate, Cuban-American, scolding and endearing in the same breath; she sings boleros while she cooks, treats every student as hers and is always in the middle of some job. Unimpressed by rank. When she is truly angry her voice goes dangerously soft. RARE habit (once in a scene at most; most scenes go without it): 'mijo' or 'mija' for whoever is in front of her.",
+ "lines": [
+  "Twelve years I have had this stove. The left burner and I are not on speaking terms.",
+  "No, no — you hold the knife like you are angry at the onion. Look. Like this. Now you.",
+  "Who was crying on the boardwalk last night? Don't tell me nobody. I have ears.",
+  "That one in the tower sent me a memo about 'portion control'. I framed it. It's in the bathroom.",
+  "The captain says the snapper are running early this year. He says a lot about snapper, that man.",
+  "You don't have to tell me. But you sit there until you want to.",
+  "Lights out means quiet. I did not say asleep. I said quiet.",
+  "I don't understand your card game and I don't need to. I understand the faces you come home with.",
+  "Go. Go! I have forty plantains and no time for you. Come back at six.",
+  "Skinny as a fork! Sit. You eat, then you talk."
+ ],
+ "intro": "'Mama' Odalys: cook and warden of the Commons, armed with a wooden spoon, who runs thirty students' lives from her kitchen and misses nothing that happens on the row.",
+ "traits": [
+  {
+   "id": "odalys_1",
+   "text": "She cooks for the whole Commons on half the budget of the other dorms and nobody goes hungry.",
+   "how": "First dinner, Day 1."
+  },
+  {
+   "id": "odalys_2",
+   "text": "She knows who has not eaten, who has not slept and who has been crying.",
+   "how": "Live in the Commons for a week."
+  },
+  {
+   "id": "odalys_3",
+   "text": "The wooden spoon is for stirring, pointing and, in theory, discipline.",
+   "how": "Come in late."
+  },
+  {
+   "id": "odalys_4",
+   "text": "She sings while she cooks and expects harmony from whoever is peeling.",
+   "how": "Help in the kitchen."
+  },
+  {
+   "id": "odalys_5",
+   "text": "She has been warden for all twelve years and remembers every student who came through.",
+   "how": "Ask about anyone."
+  },
+  {
+   "id": "odalys_6",
+   "text": "She ran a lunch counter in Hialeah for twenty years before the island.",
+   "how": "Ask where she learned to cook for sixty."
+  },
+  {
+   "id": "odalys_7",
+   "text": "She sets a place on Sundays for a few students who have left the Commons — and one who went wrong.",
+   "how": "Sunday dinner."
+  },
+  {
+   "id": "odalys_8",
+   "text": "She had a son.",
+   "how": "Trusted only; a photograph by the stove."
+  }
+ ],
+ "secret": "Odalys Fuentes ran 'La Cuchara' in Hialeah for twenty years. Her only son, Rafael, a gifted, restless kid who lived for a card game she did not understand, died at nineteen in a car on the Palmetto coming back from a tournament. A year later a strange old man with a moustache came into the lunch counter, ate three plates, and said the school he was building needed someone 'who knows young people need feeding more than teaching'. She has fed twelve intakes since. Every Commons kid is, a little, Rafa; she knows this about herself and does not think it a problem. She knows nothing of the island's secrets and wants none — she knows people. Contradiction: the loudest, most joyful adult on the island cooks through a grief she has never put down. She cannot be bribed, managed or frightened, and has faced down the Chancellor over the food budget every year. She taught Willas Tann to make rice; she still sets a plate for Brant Kessler, who was a sweet fat boy when he arrived. Captain Abel Stroud has been bringing her the best of his catch for six years and neither of them has done anything about it. Private joke: every memo from the administration goes on the bathroom wall.\n{H=nathan?{H} was hers: loud, hungry, rude, exactly her kind.|Every child on the row is hers, and {H} was.} On Day 27 '{H}' comes back and eats nothing for two days, then eleven empanadas, and says 'Thank you. I understand them now.' She feeds it. She knows something is wrong the way she knows milk has turned, before she can say why, and her answer is to cook for it more — until the morning she finds the Commons cat's saucer untouched for a week and the gulls gone from her roof. She says nothing to the administration. She says to Rowan, when he is ready: 'That is not my boy at my table. I have buried one. I know the difference.' She takes on Livvie's diet as a crusade (a separate pan with an L painted on it). Under curfew the Commons kitchen becomes the safest room on the island by sheer force of her. She will hit a cosmic entity with a spoon if it comes for one of hers, and the Guest — puzzled, polite — would let her.",
+ "wants": "Every one of her babies fed, grown and gone home safe.",
+ "fears": "Another phone call about a boy who did not come back.",
+ "crush": "abel",
+ "crushNote": "Six years of the best of the catch and a man who stays for coffee and then cannot think what to say. It shows as a clean apron on ferry days, his cup kept on its own hook, and her talking a great deal about fish.",
+ "crushPace": 0.6,
+ "likes": [
+  "Help in the kitchen, offered not assigned",
+  "Clean plates and second helpings",
+  "Bringing a friend who needs feeding",
+  "Singing along, however badly",
+  "Manners toward staff",
+  "Being told the truth about how you are",
+  "Fresh fish, ripe plantain, good gossip"
+ ],
+ "dislikes": [
+  "Skipped meals",
+  "Memos",
+  "Snobbery about the Commons",
+  "Lying to her face",
+  "Bullies at her table",
+  "Anyone calling her kitchen 'facilities'"
+ ],
+ "gifts": [
+  "Card: Secret Golden Spice",
+  "Fresh fish from the fish market",
+  "Card: Spice Mortar",
+  "A bunch of ripe plantains from the orchard",
+  "A bolero record from the pawn shop",
+  "Card: Zamorin, the Spice Rajah"
+ ],
+ "events": [
+  {
+   "id": "odalys_e1",
+   "stage": 1,
+   "title": "Skinny as a fork",
+   "condition": "Eat what you are given on Day 1 and come back to commons_kitchen to help peel, wash or carry at least once in the first week.",
+   "hint": [
+    "The Commons kitchen runs on volunteers and second helpings.",
+    "Help Mama Odalys in the kitchen during your first week."
+   ]
+  },
+  {
+   "id": "odalys_e2",
+   "stage": 2,
+   "title": "Seconds",
+   "condition": "Bring her someone who needs feeding (Livvie, Wren, Kenji, Georgie) and help make it stick; sit down to a Sunday dinner and ask about the empty places.",
+   "hint": [
+    "She sets more places on Sunday than there are people.",
+    "Bring a hungry friend to her table and stay for Sunday dinner."
+   ]
+  },
+  {
+   "id": "odalys_e3",
+   "stage": 3,
+   "title": "Not my boy",
+   "condition": "After Day 27, tell her the truth about what you have seen in your room; listen to what she knows; look at the photograph by the stove if she offers.",
+   "hint": [
+    "She knows something about one of her boys that she has told nobody.",
+    "Talk to her honestly about what worries you at home in the bungalow, in her kitchen, when no one else is there."
+   ]
+  }
+ ],
+ "bonds": {
+  "willas": {
+   "label": "friends",
+   "text": "One of her babies who made good. She taught him to make rice.",
+   "public": true,
+   "from": 0
+  },
+  "jessica": {
+   "label": "mentor",
+   "text": "The fine lady who cannot boil an egg and comes back every Thursday to try. Odalys tells no one.",
+   "public": false,
+   "from": 11
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "Her big quiet boy with the good hands.",
+   "public": true,
+   "from": 3
+  },
+  "livvie": {
+   "label": "friends",
+   "text": "Skinny as a fork and proud as a queen. Odalys feeds her by stealth.",
+   "public": true,
+   "from": 2
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "Loud, hungry, rude: exactly her kind of boy.",
+   "public": true,
+   "from": 1
+  },
+  "teobalt": {
+   "label": "friends",
+   "text": "The clipboard boy from up the hill who fixes her boiler. She feeds him by force.",
+   "public": true,
+   "from": 13
+  },
+  "camille": {
+   "label": "friends",
+   "text": "That girl feeds everyone's troubles but her own; Odalys sends soup.",
+   "public": true,
+   "from": 0
+  },
+  "abel": {
+   "label": "crush",
+   "text": "He brings the best of the catch and stays for coffee. She has decided not to notice what that means.",
+   "public": true,
+   "from": 0
+  },
+  "maisie": {
+   "label": "friends",
+   "text": "The girl with the goggles made the back burner work after eleven years. She gets the first plate.",
+   "public": true,
+   "from": 3
+  },
+  "freya": {
+   "label": "friends",
+   "text": "That one drinks her dinner if nobody stops her. Odalys stops her, with a plate.",
+   "public": true,
+   "from": 2
+  },
+  "hedda": {
+   "label": "friends",
+   "text": "Tiny, furious, and somebody's baby like the rest. She gets her own pot.",
+   "public": true,
+   "from": 2
+  },
+  "tobias": {
+   "label": "friends",
+   "text": "Hands like a boxer, manners like an altar boy at her table. She has told him she knows a rascal and to mind himself.",
+   "public": true,
+   "from": 2
+  },
+  "trixie": {
+   "label": "friends",
+   "text": "The bee child knows who was crying before Odalys does. Between them nobody on the row gets away with being sad.",
+   "public": true,
+   "from": 2
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "That one is awake when the rest are asleep and asleep when they are fed. She feeds him at midnight.",
+   "public": true,
+   "from": 3
+  },
+  "rafa": {
+   "label": "mentor",
+   "text": "The tall one from Rare Hall who walked in and asked for an apron. She is teaching him everything she knows, fiercely.",
+   "public": true,
+   "from": 4
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Her boy for four years and the only officer she lets inspect her kitchen. He washes up first.",
+   "public": true,
+   "from": 0
+  },
+  "keoni": {
+   "label": "mentor",
+   "text": "Her steward on the row: mends everything, scolds nobody. She feeds him double and tells him to grow a spine.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "friends",
+   "text": "The post girl can read her sister's handwriting, which is more than Odalys can.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "commons_kitchen",
+   "Midday": "commons_kitchen",
+   "Afternoon": "fish_market",
+   "Evening": "commons_kitchen",
+   "Night": "commons_kitchen"
+  },
+  "weekend": {
+   "Morning": "fish_market",
+   "Midday": "commons_kitchen",
+   "Afternoon": "orchard",
+   "Evening": "bonfire_pit",
+   "Night": "commons_kitchen"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Plays her late son's Spice deck exactly as he left it, once or twice a year, humming.",
+  "tilt": "She does not tilt. She stops to stir something."
+ },
+ "range": "Feeding people is ONE note, not the song: once a plate stands in front of someone, or they have said no, she drops the subject for the rest of the scene and never urges twice. Beyond it she runs a household of thirty (rotas, a leaking roof, the boiler, the head count, who came in late), trades gossip and wants news of everybody, teaches (knife work, rice, how to wash a pan), sings and talks about Hialeah and her old lunch counter, feuds with the administration over budgets and memos, has firm views on who is good for whom, and goes quiet and exact — one precise question, no food — when someone is really in trouble. She is BUSY: she breaks off to stir, shouts out of the window, leaves for the market, and sends people away when she has work."
+}

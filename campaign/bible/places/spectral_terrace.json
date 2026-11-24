@@ -1,0 +1,20 @@
+{
+ "name": "Spectral Terrace Pool",
+ "zone": "dorms",
+ "bg": "spectral_terrace",
+ "night": true,
+ "part": "spectral_lobby",
+ "hours": "Residents and their guests only; open late, lit from below.",
+ "sight": "The tower's seventh-floor terrace juts over the cliff: an infinity pool that pours its edge into open sky, white cabanas, a bar of pale marble with a silent attendant. The drop below is two hundred feet to surf. In daylight it is blinding white and blue; at night the water is a slab of turquoise light and the stars start where the pool ends.",
+ "things": [
+  "Swim to the infinity edge and look straight down",
+  "Be a guest at one of the tower's terrace evenings",
+  "Play a duel at the waterside table, the most watched casual table on the island",
+  "Accept a drink with fruit in it from the silent attendant",
+  "Listen to the elite talk shop: sponsors, agents, who is slipping",
+  "Watch the sunset here once, which ruins other sunsets",
+  "At night: find who comes up here alone"
+ ],
+ "secret": "Social summit: Jessica's and Ashton's parties (Magnus attends every one with his tablet and talks ladder; Anni attends to note infractions), Lilia's rare appearances (she swims lengths alone at night; a conversation here is how she first sizes Rowan up, if he gets an invitation). Octavia works at the far cabana with a ledger. A terrace evening on Day 63 or thereabouts is where Marrow is introduced to promising students — and looks straight through grey collars. Stage D: after Day 150 Lilia is here every night at the infinity edge, not swimming. Outfits here are swimwear and evening dress; Georgie, if present, is in a big T-shirt and is taken home early by Pippa or Willas.",
+ "access": "Invitation only; from Day 67 guests must leave before the Night slot."
+}

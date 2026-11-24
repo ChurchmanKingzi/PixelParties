@@ -1,0 +1,18 @@
+{
+ "name": "The Fish Market",
+ "zone": "town",
+ "bg": "fish_market",
+ "night": false,
+ "hours": "Morning only, loudest at dawn; hosed down by Midday. The night market shelters under its roof when it rains.",
+ "sight": "An open iron-roofed hall on the quay where the catch is laid on crushed ice: silver heaps, red crabs, an octopus the colour of a bruise. Auctioneers rattle in a dialect you half follow; cats patrol; wet stone and scales glitter. Women in rubber aprons gut fish with terrifying speed and play cards at a crate between customers. The smell is tremendous and honest.",
+ "things": [
+  "Watch the dawn auction and try to follow the bidding",
+  "Buy fish for Mama's kitchen at her say-so (and be scolded for what you paid)",
+  "Carry crates for coin when a boat is short-handed (10 cr a slot, no questions)",
+  "Play the gutting women at the crate table — fastest game on the island",
+  "Feed a scrap to the market cats",
+  "Ask what is running and what is not",
+  "See what else comes up in the nets and gets sold off the end stall"
+ ],
+ "secret": "Casual cash and town colour. The end stall sells 'bycatch': sea-glass, bottles, and now and then small black square stones worn smooth — Tessellate tiles washed out of the north-shore cliffs, sold as paperweights at 2 cr each (inert fragments; Ashdown buys every one she sees; a handful held together feels faintly warm). After D27 the market cats refuse fish caught on the Commons side of the bay. After D29 the boats bring news the school is not telling: lights on the north slope at night, a grey launch going round. The gutting women are the first townspeople to say aloud that the hollow-eyed children 'have been played'."
+}

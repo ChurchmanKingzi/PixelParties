@@ -1,0 +1,19 @@
+{
+ "name": "The Quad",
+ "zone": "campus",
+ "bg": "quad",
+ "night": true,
+ "hours": "Always open; fullest between classes and in the Afternoon slot, when half the school plays on the grass.",
+ "sight": "A wide lawn framed by white colonnades and red-tiled roofs, cut by gravel paths that meet at a fountain: a bronze Chuck Kaboom, moustache and all, flinging a spray of bronze cards from which the water jumps. Students sprawl on blankets with playmats, argue over rulings, trade out of binders. The ladder board — a tall split-flap display that clatters whenever a rank changes — stands under the clock tower arcade. At night the colonnade lamps make gold pools and the fountain talks to itself.",
+ "things": [
+  "Read the ladder board and find your own rank among 144 names",
+  "Watch a pick-up duel on the grass and guess the winner before they do",
+  "Challenge someone to a casual game on a blanket",
+  "Sit on the fountain rim; throw a credit chip in for luck before an exam",
+  "Read the notice pillars: club posters, lost cards, roommate complaints, handwritten trade offers",
+  "Listen to the day's gossip pass from blanket to blanket",
+  "Find the brass compass rose set in the paving, pointing at each dorm",
+  "At night: cross it alone and notice how far a single voice carries"
+ ],
+ "secret": "Hub of the campus; most chance meetings happen here. The split-flap ladder board is how the player sees '{H:sig}' climb from about 120 to about 40 during Days 27–39 and into the top 10 by Day 105 — let it clatter in the background. The compass rose has five arms; the north one, pointing at Umbra House, has had its inlaid letter chiselled out. Club Fair Day 3, assemblies' overflow, rose stall Day 138 (deliveries Day 139), yearbook photo Day 198. D40: the quad goes quiet for a day, then louder than ever. D67: empty at night except for proctors' lanterns — and, if Rowan is out, sometimes a figure by the fountain looking at the water as though it were new."
+}

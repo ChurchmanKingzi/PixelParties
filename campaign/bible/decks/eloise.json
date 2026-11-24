@@ -1,0 +1,387 @@
+{
+ "name": "Vernissage",
+ "owner": "eloise",
+ "heroes": [
+  "Tushu, the Knowledge Keeper",
+  "Atta, Speaker of Desires",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   2,
+   "3-Headed Giant"
+  ],
+  [
+   3,
+   "Aurora Borealis"
+  ],
+  [
+   3,
+   "Cannon Tower"
+  ],
+  [
+   4,
+   "Create Illusion"
+  ],
+  [
+   4,
+   "Creativity"
+  ],
+  [
+   2,
+   "Field Cannon"
+  ],
+  [
+   3,
+   "Flooding"
+  ],
+  [
+   2,
+   "Glass Wall"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Living Illusion"
+  ],
+  [
+   8,
+   "Magic Arts"
+  ],
+  [
+   4,
+   "Masterpiece"
+  ],
+  [
+   3,
+   "Spike Trap"
+  ],
+  [
+   2,
+   "Staff of Illusions"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Teleportal"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tushu, the Knowledge Keeper": "Hero",
+  "Atta, Speaker of Desires": "Hero",
+  "Silent Water Mizune": "Hero",
+  "3-Headed Giant": "Creature L3",
+  "Aurora Borealis": "Spell (Magic Arts)",
+  "Cannon Tower": "Creature L3",
+  "Create Illusion": "Spell (Magic Arts)",
+  "Creativity": "Ability",
+  "Field Cannon": "Creature L3",
+  "Flooding": "Spell (Magic Arts, Surprise)",
+  "Glass Wall": "Spell (Magic Arts, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Living Illusion": "Spell (Summoning Magic)",
+  "Magic Arts": "Ability",
+  "Masterpiece": "Spell (Magic Arts)",
+  "Spike Trap": "Spell (Decay Magic, Surprise)",
+  "Staff of Illusions": "Artifact",
+  "Summoning Magic": "Ability",
+  "Teleportal": "Spell (Magic Arts)"
+ },
+ "gist": {
+  "Create Illusion": "Puts a creature straight from the deck into play.",
+  "Living Illusion": "Does the same as a free action, for Pollution Tokens.",
+  "Staff of Illusions": "Pays gold to place a creature from deck or hand.",
+  "Masterpiece": "Searches a trap and sets it face-down, unseen.",
+  "Aurora Borealis": "Searches spells.",
+  "Cannon Tower": "Sturdy creature with a strong shot.",
+  "Field Cannon": "Fragile creature with an enormous shot.",
+  "3-Headed Giant": "Three medium shots a turn.",
+  "Haressassin": "One hard shot a turn.",
+  "Spike Trap": "Trap: cancels and punishes what chose its hero.",
+  "Flooding": "Trap: cancels an attack or spell on its hero.",
+  "Glass Wall": "Trap: cancels a cheap hit, and can stay.",
+  "Tushu, the Knowledge Keeper": "Keeps a played spell on the board as a scroll to use again.",
+  "Wet Canvas": "Invented card: new creatures enter as copies of ones already on the board.",
+  "Self-Portrait in Vermilion": "Invented card: copies its neighbour's effect.",
+  "Varnish": "Invented card: protects one creature once."
+ },
+ "plan": "Eloise composes a picture. Illusion spells place big shooters straight from the deck, Wet Canvas and the Self-Portrait repeat the best one, and Masterpiece hangs an unseen trap in front of each hero. She plays for how the board looks, and it happens to look like three cannons behind three traps. It is slow, the creatures placed by illusions are few and precious, and she rarely holds more than one protection.",
+ "looks": {
+  "early": "A face-down card on each hero, one Cannon Tower.",
+  "mid": "Tower, Giant and a Self-Portrait copying the Tower; Wet Canvas overhead.",
+  "late": "A finished composition firing six times a turn."
+ },
+ "custom": [
+  {
+   "name": "Wet Canvas",
+   "type": "Area",
+   "text": "The first creature each player puts into play each turn enters as a copy of any creature already on the board."
+  },
+  {
+   "name": "Self-Portrait in Vermilion",
+   "type": "Creature L1",
+   "text": "Fragile; has the active effect of the creature next to it."
+  },
+  {
+   "name": "Varnish",
+   "type": "Spell (Reaction)",
+   "text": "A creature of hers ignores one card or effect; the creature cannot act next turn."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "She spends her turns setting traps and placing a single creature.",
+   "why": "She is slower than you: build, and send only untargeted damage, because every hero has a trap for a spell that chooses it."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "RUSH",
+   "tell": "A Cannon Tower stands under Wet Canvas with a Self-Portrait beside it.",
+   "why": "One real creature is being copied twice: steal the original with Dark Gear, or remove the Area, and the copies are nothing."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Three shooters, and she has just used her Varnish.",
+   "why": "With the protection spent, one sweep takes the whole picture down; most of them are fragile."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Her traps are sprung and her illusions are in the discard pile.",
+   "why": "Three small heroes with nothing in front of them."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Eloise hangs a face-down card before each hero and steps back to look.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build; send only Storm ticks"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet a trap"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire a spell into one"
+     }
+    ]
+   },
+   {
+    "board": "Create Illusion places a Cannon Tower from the deck.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Finish your levels"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Tower"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Atta"
+     }
+    ]
+   },
+   {
+    "board": "Wet Canvas goes up.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free under it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Self-Portrait copies the Tower; a second creature enters as a third Tower.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the real Tower"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into the traps"
+     }
+    ]
+   },
+   {
+    "board": "Varnish saves the Tower from your Yeeting.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "It is used up: Dark Gear now"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Tushu keeps Create Illusion as a scroll.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Tushu"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Tower, Giant, Field Cannon; no cards in her hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Field Cannon aims at your caster.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Any sweep kills it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "She holds no protection at all and the board is open.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Three heroes, no board.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and ticks"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Atta alone behind a Glass Wall.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks are not aimed"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Mizune.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Tushu"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

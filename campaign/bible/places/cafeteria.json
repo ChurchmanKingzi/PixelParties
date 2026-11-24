@@ -1,0 +1,19 @@
+{
+ "name": "The Mess (Central Cafeteria)",
+ "zone": "campus",
+ "bg": "cafeteria",
+ "night": false,
+ "hours": "Breakfast in the Morning slot, lunch at Midday, dinner in the Evening; meal plan included for Rare and Spectral, 4 cr a meal for Commons students who do not eat at Mama's.",
+ "sight": "A vaulted hall of long tables under hanging dorm banners, loud as a railway station. The serving line steams with rice, grilled fish, noodles and something the menu calls 'Chef's Gamble'. Seating is unofficially by collar: white-and-gold-edged on the mezzanine, blue in the middle, a scatter of plain grey near the doors — red, gold and black jackets mixed at every table. Trays clatter, someone is shuffling at every table, and the smell of frying garlic gets into your clothes.",
+ "things": [
+  "Eat (restores energy; skipping meals has consequences)",
+  "Choose where to sit — every table is a statement",
+  "Try the Chef's Gamble and see what you get",
+  "Read the daily menu board and the rulings question someone always scrawls under it",
+  "Overhear three tables of gossip at once",
+  "Notice who eats alone, who eats nothing, who pockets bread rolls",
+  "Play a lunch-break game with dessert as the ante",
+  "Carry a tray up to the mezzanine uninvited and see what happens"
+ ],
+ "secret": "Social map of the school at a glance. Livvie comes for the free tea and takes the bread rolls; noticing and not embarrassing her is an early route key. Jessica holds a mezzanine table and expects to be joined properly. D27+: '{H}' eats six trays one day and nothing for three, and asks the serving staff what the food 'is for'. D40: the Brant rumours start here within the hour. D61+: Marrow sometimes lunches on the mezzanine with Octavia and Gideon in plain view. D67: dinner moves forward into the late Afternoon so that everyone is in dorm by dark; the hall is half empty and people sit closer together regardless of collar."
+}

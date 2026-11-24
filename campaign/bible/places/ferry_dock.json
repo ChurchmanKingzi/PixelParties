@@ -1,0 +1,19 @@
+{
+ "name": "Academy Ferry Dock",
+ "zone": "campus",
+ "bg": "ferry_dock",
+ "night": false,
+ "hours": "Busy on ferry days (Wednesday and Saturday mornings), otherwise empty except for anglers and Silas Grieve checking the mooring lines. ARRIVAL DAY (Day 1): the Second Chance ties up at 10:40. Upper-year students in red, gold and black jackets wait under the arch with luggage carts and call out dorm names; the new intake walks up the avenue to the Quad (ten minutes), where the welcome address begins at 11:00. A wager made aboard about carrying luggage is paid from here (see DUE NOW). On ferry mornings Cati Fagundes takes the lines and the mail sack.",
+ "sight": "A long timber jetty on barnacled piles, half an hour's walk from Port Mulligan along the harbour road and five minutes below the main gate. A painted arch reads WELCOME, DUELISTS in sun-faded letters, with a hand-cranked luggage cart rail running up the slope behind it. The water under the planks is so clear you can see crabs arguing on the bottom. It smells of tar, kelp and wet rope.",
+ "things": [
+  "Read the ferry timetable board and the chalked weather flag code",
+  "Push a luggage cart up the rail for a returning student (and get tipped, or not)",
+  "Watch crates of booster displays being unloaded for the campus store and the Sleeve & Binder",
+  "Fish off the end of the jetty with a borrowed hand line",
+  "Find the row of initials and ladder ranks carved into the last pile by graduating classes",
+  "Meet whoever is arriving or leaving today",
+  "Sit on a bollard and watch the Commons kids swim out to the diving raft",
+  "Help Silas coil lines and hear him not answer questions"
+ ],
+ "secret": "Job site (unloading with Abel on ferry days). The carved pile carries the initials of nine graduating classes; one year, nine years back, has four initials scratched out and a fifth — A.H. — cut deeper than all the others, added later by another hand (Ashdown did it). Day 61: Marrow steps off here; Okonkwo meets him in person, which she does for nobody else. Day 68 and Day 164: the North Crown delegation lands here. If the Guest's first shape has been exposed, in Term 2 a faint drift of black glass sand collects against the seaward piles every morning; Silas sweeps it into the water and says nothing."
+}

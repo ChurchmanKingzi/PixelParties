@@ -1,0 +1,388 @@
+{
+ "name": "Iron Parade",
+ "owner": "eberhart",
+ "heroes": [
+  "Toras, Master of all Weapons",
+  "Boris, the Guardian of Blackport",
+  "Alex, Trainer of Heroes"
+ ],
+ "main": [
+  [
+   3,
+   "Attack"
+  ],
+  [
+   2,
+   "Blade of the Frostbringer"
+  ],
+  [
+   2,
+   "Breaking Strike"
+  ],
+  [
+   3,
+   "Club of Gobbo"
+  ],
+  [
+   2,
+   "Cool Repair"
+  ],
+  [
+   4,
+   "Critical Strike"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   2,
+   "Glass Sword"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Muscle Training"
+  ],
+  [
+   2,
+   "Phalanx Pike"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   2,
+   "Shield of Death"
+  ],
+  [
+   2,
+   "The Sun Sword"
+  ],
+  [
+   2,
+   "Toughness"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Warhorse"
+  ],
+  [
+   3,
+   "Wealth"
+  ],
+  [
+   2,
+   "Whirlwind Strike"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Toras, Master of all Weapons": "Hero",
+  "Boris, the Guardian of Blackport": "Hero",
+  "Alex, Trainer of Heroes": "Hero",
+  "Attack": "Attack",
+  "Blade of the Frostbringer": "Artifact (Equipment)",
+  "Breaking Strike": "Attack",
+  "Club of Gobbo": "Artifact (Equipment)",
+  "Cool Repair": "Artifact",
+  "Critical Strike": "Attack",
+  "Fighting": "Ability",
+  "Glass Sword": "Artifact (Equipment)",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Muscle Training": "Attack",
+  "Phalanx Pike": "Artifact (Equipment)",
+  "Quick Attack": "Attack",
+  "Sacred Hammer of the Volcano": "Artifact (Equipment)",
+  "Shield of Death": "Artifact (Equipment)",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Toughness": "Ability",
+  "Treasure Chest": "Artifact",
+  "Warhorse": "Artifact (Equipment)",
+  "Wealth": "Ability",
+  "Whirlwind Strike": "Attack"
+ },
+ "gist": {
+  "Toras, Master of all Weapons": "Very high Attack that rises for every differently named artifact he wears; hits one target only; little health.",
+  "Alex, Trainer of Heroes": "Spreads Fighting to the others.",
+  "Boris, the Guardian of Blackport": "Sturdy second fighter.",
+  "Critical Strike": "An attack for twice the hero's Attack.",
+  "Breaking Strike": "Discards his weapons for one attack multiplied by their number.",
+  "Heavy Hit": "Attack that stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Warhorse": "Single-target attacks hit harder.",
+  "Club of Gobbo": "More Attack; cannot be reduced or cancelled.",
+  "Phalanx Pike": "More Attack; his attacks do not spring your traps.",
+  "Blade of the Frostbringer": "His hits freeze.",
+  "The Sun Sword": "His hits burn for good.",
+  "Cool Repair": "Re-equips a broken weapon cheaply.",
+  "Muscle Training": "Fetches and attaches Fighting."
+ },
+ "plan": "Every weapon goes onto Toras, each different one raising his Attack, and then Critical Strike or Breaking Strike removes a hero per swing. Phalanx Pike walks past Firewall and Club of Gobbo past shields. It is blunt and quick and has nothing else: Toras is fragile, all the gold sits on him, and a freeze or one Fire Bomb undoes it.",
+ "looks": {
+  "early": "Toras with two weapons.",
+  "mid": "Toras with five, on a Warhorse.",
+  "late": "One Breaking Strike or a bare Toras."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Every artifact so far has gone onto Toras.",
+   "why": "A frozen Toras is the whole deck switched off, and he is fragile; a slow setup is what his first swings break."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Five weapons on Toras, among them a Phalanx Pike.",
+   "why": "Fire Bomb takes them all; with the Pike your Firewall will not trigger, so do not rely on it."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "He holds Critical Strike; the Club of Gobbo makes it unreducible.",
+   "why": "Homerun! still cancels a lethal hit outright, and a freeze stops the swing."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "The weapons are gone.",
+   "why": "Three fighters with no cards."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Eberhart hangs a Warhorse and a Frostbringer blade on Toras.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Toras"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Quick Attack freezes your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the freeze onto Toras"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Toras with the others"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Alex hands Fighting to Toras.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb a Fighting"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Five weapons, one a Phalanx Pike.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze, Homerun!"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Cool Repair returns the Sun Sword.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Toras instead"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Your Firewall did not trigger.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Break the Pike with the rest"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Critical Strike is aimed at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Toras first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Breaking Strike: every weapon for one blow.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! or a freeze"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hope"
+     }
+    ]
+   },
+   {
+    "board": "Whirlwind Strike hits two heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal and shield"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Toras bare-handed.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Boris alone, sturdy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Toras.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Boris"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ]
+ }
+}

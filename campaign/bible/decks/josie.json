@@ -1,0 +1,421 @@
+{
+ "name": "House Special",
+ "owner": "josie",
+ "heroes": [
+  "Sparrow, the Bumbling Buffoon",
+  "Xiong, the Bamboo Guardian",
+  "Pes'zet, the Plague Bringer"
+ ],
+ "main": [
+  [
+   5,
+   "Alchemy"
+  ],
+  [
+   3,
+   "Barkeeper"
+  ],
+  [
+   4,
+   "Beer"
+  ],
+  [
+   4,
+   "Biomancy"
+  ],
+  [
+   3,
+   "Blow of the Venom Snake"
+  ],
+  [
+   5,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Hammer Throw"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   3,
+   "Philosopher's Stone"
+  ],
+  [
+   3,
+   "Potion Juggler"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Stranglehold"
+  ],
+  [
+   3,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Brewer's Blade"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Waitress"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   2,
+   "Poison Vial"
+  ],
+  [
+   2,
+   "Healing Potion"
+  ],
+  [
+   2,
+   "Life Serum"
+  ],
+  [
+   2,
+   "Sword in a Bottle"
+  ],
+  [
+   2,
+   "Elixir of Strength"
+  ],
+  [
+   1,
+   "Smoke Vial"
+  ],
+  [
+   1,
+   "Flashbang"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ]
+ ],
+ "types": {
+  "Sparrow, the Bumbling Buffoon": "Hero",
+  "Xiong, the Bamboo Guardian": "Hero",
+  "Pes'zet, the Plague Bringer": "Hero",
+  "Alchemy": "Ability",
+  "Barkeeper": "Creature L0",
+  "Beer": "Artifact",
+  "Biomancy": "Ability",
+  "Blow of the Venom Snake": "Attack",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Heavy Hit": "Attack",
+  "Juice": "Artifact (Reaction)",
+  "Philosopher's Stone": "Artifact (Reaction)",
+  "Potion Juggler": "Creature L1",
+  "Quick Attack": "Attack",
+  "Stranglehold": "Attack",
+  "Summoning Magic": "Ability",
+  "The Brewer's Blade": "Artifact (Equipment)",
+  "Treasure Chest": "Artifact",
+  "Waitress": "Creature L1",
+  "Acid Vial": "Potion",
+  "Poison Vial": "Potion",
+  "Healing Potion": "Potion",
+  "Life Serum": "Potion",
+  "Sword in a Bottle": "Potion",
+  "Elixir of Strength": "Potion",
+  "Smoke Vial": "Potion",
+  "Flashbang": "Potion",
+  "Elixir of Immortality": "Potion"
+ },
+ "gist": {
+  "Alchemy": "Ability: pay gold (less at higher levels) to draw from the Potion Deck.",
+  "Biomancy": "Ability: once per turn a potion she plays also stays on the board as a small token that shoots a target every turn.",
+  "Pes'zet, the Plague Bringer": "Poisons a target whenever a creature (a Biomancy token included) lands on her side.",
+  "Xiong, the Bamboo Guardian": "Her fighter: high Attack, and takes a card from either discard pile when he kills.",
+  "Sparrow, the Bumbling Buffoon": "Her alchemist; hard to target with cheap cards.",
+  "The Brewer's Blade": "Equipment: draws a potion whenever its hero attacks.",
+  "Philosopher's Stone": "Reaction: turns a potion draw into a search.",
+  "Elixir of Strength": "Potion: the next single-target attack hits far harder and cannot be reduced or cancelled.",
+  "Sword in a Bottle": "Potion: a free hit for a hero's Attack.",
+  "Acid Vial": "Potion: a clean, unpreventable hit.",
+  "Poison Vial": "Potion: two stacks of poison.",
+  "Elixir of Immortality": "Potion, once per game: placed openly; the next target of hers that is defeated stands back up at half health.",
+  "Barkeeper": "Small creature that fills her hand with Beer.",
+  "Beer": "Cures status effects on her side.",
+  "Potion Juggler": "Free creature for a deleted potion; plays potions off the top of the Potion Deck.",
+  "Stranglehold": "Attack that grows with the statuses on its target."
+ },
+ "plan": "A bartender's deck: everything comes out of a bottle. Alchemy and the Brewer's Blade keep the potions flowing, and through Biomancy each potion also becomes a small token that shoots every turn and, thanks to Pes'zet, poisons something as it lands. Xiong does the heavy lifting with Elixir of Strength and Sword in a Bottle, Beer washes off whatever you inflict, and the Elixir of Immortality sits on the bar for the moment you think you have won. Potions cost gold to draw early and are deleted after use, so the deck starts slowly and cannot repeat itself; the tokens are small.",
+ "looks": {
+  "early": "Alchemy on Sparrow, a Barkeeper, a hand full of Beer.",
+  "mid": "Little potion tokens along the support zones, each shooting once a turn; your heroes poisoned; Xiong holding a bottle.",
+  "late": "An Elixir of Immortality standing openly on her side, and Xiong winding up."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "She is paying gold for every potion and has only a Barkeeper out.",
+   "why": "Her early turns are spent buying, not fighting, so this is free time for your own levels; her heroes will not be easier to race later, and there is nothing to sweep yet."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Three small Biomancy tokens line her support zones, each shooting once a turn.",
+   "why": "The tokens are small, and each one that dies is deleted for good; one sweep removes several turns of her work, while waiting lets Pes'zet poison you again with every bottle."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Xiong has drunk an Elixir of Strength: his next single hit cannot be reduced or cancelled.",
+   "why": "No shield works against that attack, so it has to be prevented: freeze Xiong, or cut her turn short before he swings."
+  },
+  "endgame": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "An Elixir of Immortality stands openly on her side, and a small token still sits in a support zone.",
+   "why": "The Elixir saves the NEXT target of hers that is defeated, whatever it is: kill the little token first to use it up, and only then finish the hero."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Josie pays for a potion with Alchemy and summons a Barkeeper, who hands her a fistful of Beer.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up; she is busy buying"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Sparrow"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Barkeeper"
+     }
+    ]
+   },
+   {
+    "board": "A Poison Vial on your caster, played through Biomancy: the vial stays on her board as a little token.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Tea the poison back later; build now"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the token"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Pes'zet"
+     }
+    ]
+   },
+   {
+    "board": "The Brewer's Blade goes onto Xiong.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Xiong before the first swing"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Set Firewall on the hero he will hit"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Three potion tokens shoot each turn and Pes'zet has poisoned all your heroes.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: the tokens are deleted for good"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb her Biomancy"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for a better sweep"
+     }
+    ]
+   },
+   {
+    "board": "She washes your burn off Xiong with a Beer.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the tokens instead"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Hit Sparrow"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-apply it"
+     }
+    ]
+   },
+   {
+    "board": "Philosopher's Stone: she searches the Potion Deck instead of drawing.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discard"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Tokens"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Xiong drinks an Elixir of Strength and looks at your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Xiong"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Flashbang is also a potion you own: use it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Trust Homerun!, which will not help"
+     }
+    ]
+   },
+   {
+    "board": "Smoke Vial: your heroes are blinded and cannot choose her targets.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks and Flame Avalanche choose nothing"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the blindness away"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Pass"
+     }
+    ]
+   },
+   {
+    "board": "Xiong kills your hero and takes a spell from your discard pile.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him down"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Regroup"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Elixir of Immortality on the bar; Xiong nearly dead; one token left.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the token first, then Xiong"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Xiong and watch him stand up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Elixir is used up. Two heroes each.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield the Sword in a Bottle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep her last tokens, then finish"
+     }
+    ]
+   },
+   {
+    "board": "She is out of gold and potions.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "End it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep nothing"
+     }
+    ]
+   }
+  ]
+ }
+}

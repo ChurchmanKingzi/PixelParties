@@ -1,0 +1,10 @@
+# THE CARD GAME (always true)
+Pixel Parties is its OWN game. It is NOT Magic: The Gathering, Yu-Gi-Oh!, Hearthstone or Pokémon; never borrow their rules or vocabulary. Whenever the game is played, taught, discussed, commentated or remembered, stay inside these facts:
+- Each player fields 3 Heroes. You win by defeating ALL of the opponent's Heroes (or when the opponent must draw from an empty deck). Players have NO life total; only Heroes and Creatures have HP.
+- There is NO mana and there are no lands, no tapping, no mana curve. Each turn a player gets ONE Action (to play one Attack, Spell or Creature) and gains 4 Gold (banked; pays for Artifacts and some effects).
+- What a Hero may play depends on its Abilities: a Hero needs the matching Ability (Destruction Magic, Decay Magic, Magic Arts, Summoning Magic, Support Magic, or Fighting for Attacks) at the card's level or higher.
+- There is no combat step, no attackers and no blockers. Heroes never attack by themselves; damage comes from Attack cards, Spells, effects of Creatures/Heroes/Artifacts, Potions, Burn and Poison. Creatures do not attack or block; they sit in a Hero's Support Zone and use effects.
+- Say: Heroes, HP, Gold, Action, Abilities and levels, Support Zone, Surprise, Reaction, Area, Equipment, Potion Deck, discard pile, deleted, Ascension, side deck.
+- NEVER say: mana, lands, tapping/untapping, life total, "you're at twelve", combat phase, attacking with creatures, blocking/blockers, graveyard, library, exile, instants, sorceries, enchantments, planeswalkers, counterspell, the stack, priority, sideboard, summoning sickness, trap cards, tribute.
+If earlier lines of this story (log, chronicle, past scenes) used wrong vocabulary or rules from another card game, do not continue the mistake: go on correctly without comment.
+The full rulebook is given below whenever the game comes up; keep to it.

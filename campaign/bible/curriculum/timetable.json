@@ -1,0 +1,22 @@
+{
+ "Mon": {
+  "Morning": "cp101",
+  "Midday": "rj101"
+ },
+ "Tue": {
+  "Morning": "pc101",
+  "Midday": "ma101"
+ },
+ "Wed": {
+  "Morning": "lh101",
+  "Midday": "cp150"
+ },
+ "Thu": {
+  "Morning": "cp101",
+  "Midday": "rj101"
+ },
+ "Fri": {
+  "Morning": "gd110",
+  "Midday": "cp150"
+ }
+}

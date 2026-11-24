@@ -1,0 +1,19 @@
+{
+ "name": "The Design Lab",
+ "zone": "campus",
+ "bg": "design_lab",
+ "night": false,
+ "hours": "Open all day and, unofficially, all night — Wren Ishikawa sleeps on the sofa under the print rack.",
+ "sight": "A long north-lit loft that smells of fresh ink, cutting mats and instant noodles. Pinboards are shingled with card frames at every stage: pencil scribble, grey-box prototype, proof sheet. A guillotine cutter, a wide-format printer and a wall of tiny labelled drawers stand along one side; along the other, playtest tables scarred with marker. A lab coat hangs over a sleeping bag in the corner.",
+ "things": [
+  "Read the 'graveyard wall' of rejected card designs and the brutal comments under each",
+  "Sit in as a playtester for someone's prototype (12 cr a session)",
+  "Sketch a card of your own on the blank proof stock",
+  "Look through the drawer wall: one drawer per keyword, full of failed wordings",
+  "Watch the big printer lay down a proof sheet line by line",
+  "Ask Wren what she is working on and lose an hour",
+  "Compare a first-print frame with a modern one under the magnifier lamp",
+  "Enter the Design Contest (from Day 61)"
+ ],
+ "secret": "Home of Game Design; Card Design Basics meets here on Fridays. Junho rebalances things at the corner bench; Eloise's canvases lean against the print rack; from about Day 47 Maisie Voltage has a bench by the fuse box for her touchable-hologram rig (Teobalt arranged it after she blacked out the Commons) — next to a first-print card its flat, flickering test figure stops flickering and pushes back (plot file, M9). Wren's route, Livvie's contest storyline (Days 61–82) and Felix's dream drawings live here. Under the magnifier lamp Wren keeps a single damaged Alpha common in a glassine sleeve: the ink is raised, faintly granular and — she will only say it when she trusts Rowan — warmer than the room. Her notebook has a spectrum printout she ran after hours with a note: 'pigment carrier = mineral, not in any supplier catalogue'. From D27 Felix's pinned dream sketches change: people on campus start dreaming of a floor made of small squares. From D61 Santángel's assistants borrow the lab's microscope and return it with the stage wiped too clean. ACCESS NOTE: Open to all students; the print rack and the wide-format printer need a Game Design student or staff to sign for them."
+}

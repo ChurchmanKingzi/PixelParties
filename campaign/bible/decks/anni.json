@@ -1,0 +1,395 @@
+{
+ "name": "Man's Best Friends",
+ "owner": "anni",
+ "heroes": [
+  "Ingo, Investor of Evil",
+  "Orthos, the Loyal Guard Dog",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   6,
+   "Alchemy"
+  ],
+  [
+   3,
+   "Beer"
+  ],
+  [
+   4,
+   "Book of Doom"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   4,
+   "Dark Gear"
+  ],
+  [
+   1,
+   "Divine Gift of the Guardian"
+  ],
+  [
+   4,
+   "Loyal Bone Dog"
+  ],
+  [
+   4,
+   "Loyal Hountriever"
+  ],
+  [
+   2,
+   "Loyal Labradoodle"
+  ],
+  [
+   4,
+   "Loyal Pinpom"
+  ],
+  [
+   3,
+   "Loyal Rottweiler"
+  ],
+  [
+   1,
+   "Loyal Shepherd"
+  ],
+  [
+   4,
+   "Loyal Terrier"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "The Yeeting"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Monster in a Bottle"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Ingo, Investor of Evil": "Hero",
+  "Orthos, the Loyal Guard Dog": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Alchemy": "Ability",
+  "Beer": "Artifact",
+  "Book of Doom": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Dark Gear": "Artifact",
+  "Divine Gift of the Guardian": "Spell (Summoning Magic, Reaction)",
+  "Loyal Bone Dog": "Creature L1",
+  "Loyal Hountriever": "Creature L1",
+  "Loyal Labradoodle": "Creature L1",
+  "Loyal Pinpom": "Creature L1",
+  "Loyal Rottweiler": "Creature L1",
+  "Loyal Shepherd": "Creature L1",
+  "Loyal Terrier": "Creature L1",
+  "Magnetic Glove": "Artifact",
+  "Performance": "Ability",
+  "The Yeeting": "Artifact",
+  "Wheels": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion",
+  "Monster in a Bottle": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Orthos, the Loyal Guard Dog": "When he summons a Loyal creature he summons a second from hand for free.",
+  "Ingo, Investor of Evil": "Gold for every creature that lands.",
+  "Alice, the Puppeteer Girl": "Hits per creature that stayed on her board.",
+  "Loyal Labradoodle": "All damage to her creatures is reduced, more for each Loyal creature on the board.",
+  "Loyal Shepherd": "When you kill a Loyal creature, a different one from the deck takes its place.",
+  "Loyal Terrier": "When a Loyal creature dies, it bites one of your targets.",
+  "Loyal Bone Dog": "Discarded from hand to revive a Loyal creature that just died.",
+  "Loyal Hountriever": "Draws a card for each Loyal creature summoned.",
+  "Loyal Pinpom": "Brings another Loyal creature with it.",
+  "Loyal Rottweiler": "Swaps itself for any Loyal creature from the deck.",
+  "Book of Doom": "Gold for small hits on many targets.",
+  "Dark Gear": "Steals a creature.",
+  "The Yeeting": "Removes a non-hero card.",
+  "Cute Cheese": "Searches a creature.",
+  "Alchemy": "Ability: draws from her Potion Deck."
+ },
+ "plan": "A pack. Orthos and the Pinpom put two or three dogs down a turn, the Hountriever draws for each, and once a Labradoodle is among five dogs a sweeper barely scratches them. The Shepherd replaces what you kill, the Terrier bites when a dog dies, the Bone Dog brings it back, and Alice counts the pack every turn. The dogs are individually tiny; the Labradoodle is the card that makes the pack hard to remove.",
+ "looks": {
+  "early": "Three dogs on turn two.",
+  "mid": "Seven dogs around a Labradoodle; Alice hitting hard.",
+  "late": "A pack you have swept twice, still seven strong."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Three small dogs and no Labradoodle yet.",
+   "why": "Before the Labradoodle one sweep kills the pack outright; after it, sweepers do a fraction."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Labradoodle stands in a pack of six.",
+   "why": "Take the Labradoodle with Dark Gear (The Yeeting is a kill and lets the Shepherd replace it) and the sweep works again."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "Alice hits for seven dogs each turn and a Terrier bites for every dog that dies.",
+   "why": "Shield Alice's hit and freeze her; killing dogs one by one only feeds Terrier and Shepherd."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Her hand is empty and the pack is four.",
+   "why": "Her heroes are ordinary."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Anni lays out three dogs in a straight line.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Orthos"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Hountriever draws her two.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "A Shepherd joins.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill them together"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Labradoodle in a pack of six: your sweep would scratch them.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Labradoodle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "You Yeet the Labradoodle; the Shepherd fetches another dog and a Bone Dog revives it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it next time; freeze Orthos"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Two sweeps"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Her own Dark Gear finds nothing to steal.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "A dead card for her: take the Labradoodle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Alice counts seven dogs.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!, Snow Cannon Alice"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Labradoodle and sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the pack"
+     }
+    ]
+   },
+   {
+    "board": "A Terrier bites each time a dog dies.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Kill none, or all at once"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Terrier"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Book of Doom pings your three heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Ingo"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Four dogs, no hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Orthos alone with two dogs.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Resuscitation Potion on Alice.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Any tick takes her"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,203 @@
+{
+ "name": "Gather That Storm!",
+ "owner": "rowan",
+ "heroes": [
+  "Nicolas, the Hidden Alchemist",
+  "Tarleinn the Traveler",
+  "Treasure Huntress Semi"
+ ],
+ "main": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   1,
+   "Cataclysm"
+  ],
+  [
+   2,
+   "Chain Lightning"
+  ],
+  [
+   2,
+   "Cloud in a Bottle"
+  ],
+  [
+   2,
+   "Dark Gear"
+  ],
+  [
+   9,
+   "Destruction Magic"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   2,
+   "Fire Bomb"
+  ],
+  [
+   2,
+   "Firewall"
+  ],
+  [
+   2,
+   "Flame Avalanche"
+  ],
+  [
+   2,
+   "Flashbang"
+  ],
+  [
+   4,
+   "Gathering Storm"
+  ],
+  [
+   2,
+   "Homerun!"
+  ],
+  [
+   8,
+   "Leadership"
+  ],
+  [
+   1,
+   "Lifeforce Howitzer"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ],
+  [
+   2,
+   "Snow Cannon"
+  ],
+  [
+   1,
+   "Tarleinn's Floating Island"
+  ],
+  [
+   3,
+   "Tea"
+  ],
+  [
+   1,
+   "The White Eye"
+  ],
+  [
+   4,
+   "The Yeeting"
+  ],
+  [
+   1,
+   "Treasure Hunter's Backpack"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   1,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ]
+ ],
+ "types": {
+  "Nicolas, the Hidden Alchemist": "Hero",
+  "Tarleinn the Traveler": "Hero",
+  "Treasure Huntress Semi": "Hero",
+  "Acid Vial": "Potion",
+  "Cataclysm": "Spell (Destruction Magic)",
+  "Chain Lightning": "Spell (Destruction Magic)",
+  "Cloud in a Bottle": "Potion (Reaction)",
+  "Dark Gear": "Artifact",
+  "Destruction Magic": "Ability",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Elixir of Immortality": "Potion",
+  "Fire Bomb": "Potion",
+  "Firewall": "Spell (Destruction Magic, Surprise)",
+  "Flame Avalanche": "Spell (Destruction Magic)",
+  "Flashbang": "Potion",
+  "Gathering Storm": "Spell (Destruction Magic, Attachment)",
+  "Homerun!": "Artifact (Reaction)",
+  "Leadership": "Ability",
+  "Lifeforce Howitzer": "Artifact (Equipment)",
+  "Magnetic Glove": "Artifact",
+  "Resuscitation Potion": "Potion",
+  "Snow Cannon": "Artifact",
+  "Tarleinn's Floating Island": "Area (Support Magic)",
+  "Tea": "Artifact",
+  "The White Eye": "Artifact (Equipment)",
+  "The Yeeting": "Artifact",
+  "Treasure Hunter's Backpack": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion"
+ },
+ "gist": {
+  "Gathering Storm": "The win condition. A Destruction spell that stays attached to the caster; at the start of every enemy turn the opponent must pick three of their own targets and each gets zapped. Needs Destruction Magic at level three.",
+  "The White Eye": "Equipment. Doubles the Storm when it sits on the same hero, and every single-target spell that hero lands rips a random card out of the enemy hand. Comes back to hand when destroyed.",
+  "Destruction Magic": "The ability the deck levels up: one copy per hero per turn, three copies on one hero unlock Gathering Storm, Firewall and Cataclysm.",
+  "Leadership": "Hand filter: shuffle unwanted cards back and redraw, more at higher levels. The way the deck digs for the Storm.",
+  "Chain Lightning": "The opponent chooses three of their own targets, undefeated heroes first; the first takes a heavy hit, the next two lighter ones. In practice it is damage on all three heroes, and it never has to aim.",
+  "Flame Avalanche": "Scorches every enemy target at once, but you may deal no other damage that turn. The real sweeper.",
+  "Cataclysm": "Hits everything on both sides and wipes all Areas. Normally very expensive, free to cast while any Area (even your own Floating Island) is in play.",
+  "Firewall": "Face-down trap on a hero: whoever hits that hero gets burned back and is set on fire for the rest of the game.",
+  "The Yeeting": "Pay with a chunk of your own hero's health to send any one non-hero card on the board to the discard pile. Used on a creature it counts as defeating it, so explode-on-death and come-back effects still happen; against everything else it is the universal answer.",
+  "Dark Gear": "Permanently steals an enemy creature, as long as you hold no stolen creature yet. Its gold cost rises with the creature's level, so the big ones are expensive.",
+  "Snow Cannon": "Freezes one enemy target for a turn: a frozen hero cannot act and its effects switch off.",
+  "Tea": "Cleans all negative status effects off one of your targets and dumps them onto another target instead.",
+  "Homerun!": "Reaction: cancels a hit that would take out a hero in one blow.",
+  "Magnetic Glove": "Searches the deck for any one card. Usually fetches Gathering Storm or the missing Destruction Magic.",
+  "Acid Vial": "Potion: a clean, unpreventable hit on one target.",
+  "Flashbang": "Potion: the opponent's next turn ends right after their first action.",
+  "Tarleinn's Floating Island": "Area, free for Tarleinn: once per turn, when a player heals something, that player draws a card. Tarleinn heals whenever a two-school hero casts.",
+  "Lifeforce Howitzer": "Equipment: when its hero is healed, the same amount is fired at an enemy target."
+ },
+ "plan": "A slow-burning spell deck. It spends the first turns stacking Destruction Magic on one caster (usually Tarleinn) and filtering with Leadership and Magnetic Glove until Gathering Storm is attached; from then on the opponent bleeds on three targets at the start of every one of their turns, twice as hard once The White Eye joins the Storm. Sweepers (Flame Avalanche, Cataclysm), Chain Lightning for the heroes and one-card answers (The Yeeting, Dark Gear, Snow Cannon, Tea) buy the time, Nicolas feeds potions. Its weakness is the setup: it plays no creatures, the caster carrying the Storm is a lightning rod, and anything that removes attachments, blocks spells or punishes shuffling hits it hard.",
+ "looks": {
+  "early": "Three heroes and almost nothing else: a Destruction Magic stack growing on Tarleinn, maybe a face-down Firewall, a hand being reshuffled with Leadership.",
+  "mid": "Gathering Storm crackling on the caster, the Floating Island overhead, potions cycling through Nicolas; the enemy board shrinks a little at the start of each of their turns.",
+  "late": "Storm plus The White Eye on one hero, a discard pile full of spent sweepers, and a handful of potions held back for the last push or the last save."
+ },
+ "pilot": {
+  "engine": "Destruction Magic to level three on one hero, then Gathering Storm attached to that hero; The White Eye on the same hero doubles it. Leadership, Magnetic Glove and Nicolas's Alchemy (potion draws) find the pieces; Tarleinn heals whenever a hero with two spell schools casts, which draws a card under the Floating Island and can fire the Lifeforce Howitzer.",
+  "keyCards": [
+   "Gathering Storm",
+   "The White Eye",
+   "Destruction Magic",
+   "Chain Lightning",
+   "Flame Avalanche",
+   "The Yeeting",
+   "Dark Gear",
+   "Firewall",
+   "Snow Cannon",
+   "Acid Vial"
+  ],
+  "stances": {
+   "RUSH": "Skip the long setup: Chain Lightning, Acid Vial and every tick of an early Gathering Storm go at the weakest enemy hero; Flashbang or Snow Cannon are spent only to keep the race ahead.",
+   "CONTROL": "Flame Avalanche and Cataclysm sweep the board, Chain Lightning softens the heroes behind it, Dark Gear steals the best creature, The Yeeting removes the one card that matters (a creature removed this way counts as defeated); Leadership rebuilds the hand between sweeps.",
+   "BALANCE": "Firewall face-down on the threatened hero, Homerun! and Cloud in a Bottle held for the one big hit, Snow Cannon on whatever would kill this turn; everything else (Storm ticks, Chain Lightning) goes into heroes.",
+   "SETUP": "Attach Destruction Magic every turn, Leadership and Magnetic Glove for Gathering Storm, Treasure Hunter's Backpack for The White Eye, Floating Island for the extra cards; fight only once the Storm is up.",
+   "DISRUPT": "The Yeeting on their key card or Area (clean against Areas, attachments, equipment and traps; on a creature it is a kill, so it sets off death effects on your timing and does not stop revivals: Dark Gear is the clean answer there), Fire Bomb on an Ability stack or their equipment, Dark Gear on the engine creature, Snow Cannon on the hero the deck runs through, White Eye discards, Flashbang to cut a combo turn short, Tea to throw a status back."
+  },
+  "weaknesses": "No creatures, so nothing blocks or absorbs. Everything hangs on one caster and one attachment; attachment removal, spell lock, anti-shuffle effects and potion bans gut it. The Yeeting costs its own hero health.",
+  "tempo": "Slow start, inevitable late game."
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "name": "The Clock Tower",
+ "zone": "campus",
+ "bg": "clock_tower",
+ "night": false,
+ "hours": "The arcade at its foot is public; the stair to the clock room and the bell is kept by Silas Grieve and opened on request.",
+ "sight": "A square white tower with four blue clock faces rises over the quad, each face ringed with the twelve card symbols instead of numerals. Inside, a wooden stair winds up past the slow brass works to a belfry open on all sides. The bell is green with age and has a ship's name cast into it. The wind up there smells of rain from somewhere else.",
+ "things": [
+  "Climb the 143 steps for the best view on campus",
+  "Watch the escapement tick and the weights descend",
+  "Read the name on the bell",
+  "Set your watch by it, like everyone on the island",
+  "Listen for the bell that marks each slot — and the long toll for an emergency assembly",
+  "Leave a coin on the beam with the others, an exam superstition",
+  "Help Silas wind the clock on a Sunday"
+ ],
+ "secret": "The bell is the ship's bell of the Agnieszka, recovered from the north shore; Silas hung it himself when the school was built. The clock is the island's time; on the night of Day 26 it stops at 02:10 and Silas restarts it before breakfast without comment (a sharp-eyed Rowan can see the wrong time at dawn on Day 27). From D27 the north face loses about a minute a day and has to be corrected. The emergency toll is first heard on Day 40. Silas winding the clock on Sundays is the easiest way to get him talking. ACCESS NOTE: Stair locked; ask silas (he says yes to anyone who offers to carry the oil can)."
+}

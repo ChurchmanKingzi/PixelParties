@@ -1,0 +1,20 @@
+{
+ "name": "Gull Rock",
+ "zone": "wild",
+ "bg": "islet",
+ "night": false,
+ "hike": 2,
+ "hours": "A quarter-mile off the south-west point; by boat only (boathouse), in calm weather.",
+ "sight": "A hump of rock and salt grass the size of a football pitch, with one wind-bent tree, a ruined stone hut and a beach of crushed white shell. Seals haul out on the seaward ledges and regard you with enormous dark eyes. From here the island looks whole and small: the tower, the roofs, the mountain with its cap of cloud. The water between is so clear the boat seems to hang in air.",
+ "things": [
+  "Sail or row out (needs a boat and someone who can handle it)",
+  "Picnic on the shell beach with the whole day to yourselves",
+  "Watch the seals",
+  "Explore the ruined hut: a hermit's, a lookout's, a smuggler's — stories differ",
+  "Swim off the ledge in deep clear water",
+  "See the island entire and say what you see",
+  "Stay too long and row back against the tide"
+ ],
+ "secret": "The 'away from everything' date and confession location (Saoirse sails; so does Jessica, to general surprise; Silas will row a couple out for a favour). The hut was the plantation's quarantine station and later the place the four Umbra students were kept for two nights before the ferry took them, so that nobody on campus would hear them — scratched into the plaster by the bunk: 'he is still in the game' and a grid of squares. After D27 the seals and, soon, every bird that left the main island are HERE: the rock is crowded with gulls, frigatebirds, the Commons cats' prey and predators side by side, all facing the island, silent. It is the one place on the map that feels safe, and late in the story the place to hide someone (or something: Alpha cards, Wren, the journalist).",
+ "access": "Boat only; not covered by the cordon, but out of bounds after the Afternoon slot from Day 67."
+}

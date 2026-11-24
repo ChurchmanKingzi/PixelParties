@@ -1,0 +1,287 @@
+{
+ "id": "camille",
+ "name": "Nurse Camille Moreau",
+ "firstName": "Camille",
+ "age": 24,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "A small room above the infirmary",
+ "romance": true,
+ "deck": "Heal Burn (barely plays)",
+ "look": "Long soft brown waves gathered in two loose bunches and escaping a small pink clip, a pale green scrub top worn with a cream skirt, and warm amber-brown eyes with a night shift's shadows under them. She wears comfortable clogs and a fine chain at her throat. She smells faintly of antiseptic and lavender hand cream.",
+ "voice": "Gentle, practical and unhurried, with a Marseille accent; she explains what she is doing as she does it and has a tired, kind, medical sense of humour. When she is worried she becomes very calm and very exact. RARE habit (once in a scene at most; most scenes go without it): asking when someone last ate — and not accepting the first answer.",
+ "lines": [
+  "Sit. When did you last eat? No — truly. I can tell, you know. It's my whole job.",
+  "Paper cuts, sprained wrists, one boy who swallowed a die. It was a peaceful practice.",
+  "They are not sick. I don't have a word for what they are, but I know sick, and this is not it.",
+  "I'm fine. I slept on Tuesday."
+ ],
+ "intro": "The Academy's nurse: young, kind, overworked, and the only medical professional on campus most days of the week.",
+ "traits": [
+  {
+   "id": "camille_1",
+   "text": "She runs the infirmary alone except for a doctor who comes on the Thursday ferry.",
+   "how": "Visit the infirmary."
+  },
+  {
+   "id": "camille_2",
+   "text": "She asks everyone when they last ate, and can tell if they lie.",
+   "how": "Any visit."
+  },
+  {
+   "id": "camille_3",
+   "text": "She keeps a jar of boiled sweets for students who cry.",
+   "how": "Cry; or bring someone who does."
+  },
+  {
+   "id": "camille_4",
+   "text": "She came to the island for a quiet posting after a hard hospital year.",
+   "how": "Ask why a nurse would choose here."
+  },
+  {
+   "id": "camille_5",
+   "text": "She plays the game badly and cheerfully with patients to pass the time.",
+   "how": "Be laid up for a day."
+  },
+  {
+   "id": "camille_6",
+   "text": "She has Friday wine with the two youngest teachers, and falls asleep first.",
+   "how": "Bar or faculty wing, Friday Evening."
+  },
+  {
+   "id": "camille_7",
+   "text": "She trained in an emergency department in Marseille and left after one particular night.",
+   "how": "Close stage."
+  },
+  {
+   "id": "camille_8",
+   "text": "She writes down everything she observes in a private notebook, separate from the official files.",
+   "how": "Friend stage, after Day 40."
+  },
+  {
+   "id": "camille_9",
+   "text": "She has not had a real day off since October.",
+   "how": "Notice; say so."
+  }
+ ],
+ "secret": "Camille Moreau did two years in the urgences of La Timone in Marseille. The night she left medicine-at-speed behind was a multiple-casualty bus crash in which she, twenty-two, triaged a teenager into the wrong colour and he died in a corridor. She was exonerated; she has not exonerated herself. A school infirmary on a faraway island — sprains, homesickness, contraception advice, one swallowed die — was meant to be a place where nothing she missed could kill anyone. She is very good: observant, unshockable, tender without being soft. Contradiction: she fled responsibility for life and death and is the most responsible person on the island. She catches Livvie Thana's condition in one conversation (pallor, mouth ulcers, the particular tiredness; bloods confirm severe iron-deficiency anaemia; she suspects coeliac disease, starts a gluten-free trial with Mama Odalys's help and iron supplements, and fights for a mainland referral). Staff-student relationships are 'frowned upon, not forbidden' for non-teaching staff: with her it means the Chancellor's raised eyebrow, gossip, and her own professional conscience — she cannot be his nurse and his lover without care, and says so.\nTHE HOLLOWED: she is the first to understand. Brant Kessler on Day 40 presents as a seizure aftermath for about an hour and then as nothing in her training: normal vitals, normal reflexes, normal bloods, pupils reactive, sleep-wake cycles on the monitor — and no one there. Not coma, not catatonia, not locked-in. He swallows if fed. He does not answer to his own name, and he holds out whatever is put into his hand, as if nothing were his. Her official chart shows no abnormality at all; her second, private chart records one stimulus per patient — each responds faintly to something different — and one thing common to all: shown a true first-print card, the pupils track it and the skin warms. The visiting doctor writes 'post-ictal state, observe'. The Chancellor forbids 'coma' in writing. By the third (Day 66) ward B is full of beds she cannot empty, and she is doing it alone on four hours' sleep with Sunny and Felix as volunteers. She is the one who says, to whoever has earned it: 'They are not sick. Something was taken.' She will give the Hollowed's medical truth to students before she gives it to the board, and from Day 67 she fights the order to ship her patients to the mainland — rightly: off the island they could never be restored. Her fear, growing: that she is back in the corridor, sorting people into the wrong colour. Her arc: staying — and in the finale being the one in ward B when, if the Guest loses, they all breathe in at once.\nRoute: medium-slow. She flirts a little, tiredly and warmly, when she has a moment to sit; mostly she needs someone to notice that the person who looks after everybody has nobody.",
+ "wants": "For everyone in her ward to walk out of it, and for one night's sleep without listening for monitors.",
+ "fears": "Missing the thing that matters, again.",
+ "crush": "dmitri",
+ "crushNote": "He is the only other person awake at three in the morning, and he brings tea to the ward and asks nothing. It shows as her saving him the good biscuits, sitting down when he arrives — which she does for no one — and worrying about his sleep in a not entirely clinical way.",
+ "crushPace": 0.8,
+ "likes": [
+  "Being brought food or coffee on a long shift",
+  "People who follow medical advice",
+  "Help that does not need supervising (folding, fetching, sitting with patients)",
+  "Honest answers to 'when did you last eat'",
+  "Being asked how SHE is — and waiting for the real answer",
+  "Lavender, boiled sweets, quiet",
+  "Kindness to Livvie",
+  "Students who visit the Hollowed"
+ ],
+ "dislikes": [
+  "'I'm fine' from someone who is not",
+  "Being told what to write in a chart",
+  "Recklessness with one's own health",
+  "Being flirted with while she is taking a pulse",
+  "The word 'seizure' used as an order",
+  "Marrow's people asking for patient files"
+ ],
+ "gifts": [
+  "Card: Coffee",
+  "Lavender hand cream from the boutique",
+  "Card: Healing Melody",
+  "A hot meal carried to the infirmary at Night",
+  "A jar of boiled sweets to refill hers",
+  "Card: Guardian Angel"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Warm, tired, gently teasing bedside manner.",
+  "text": "Camille's flirting is hard to tell from her kindness until it is not: a teasing 'you again?', a hand that rests on his forearm a moment after the pulse is counted, a boiled sweet 'for bravery'. She does not really initiate — she has no time — but she will answer warmth with warmth at once, and if she likes him she finds reasons for him to stay and fold bandages. She wants to be approached as a woman who happens to be a nurse: ask about her, bring her dinner, make her sit down. She is frank and unembarrassed about bodies and will name the professional line herself and decide, like an adult, how to walk it."
+ },
+ "intimacy": "Unhurried, tender, practical and frank. She is at ease with bodies and entirely unshockable, which makes her gentle teasing disarming. Closeness begins with care reversed: him making her sit, taking her shoes off, her falling asleep against him on the infirmary cot mid-sentence. She likes warmth and slowness, hands that are careful, a bath drawn for her, being looked after for once; she laughs softly and says exactly what she likes. Her own small room above the infirmary, a lamp with a scarf over it, rain. She is the one who makes sure he has eaten afterwards. Fade when she unpins the watch from her scrubs and puts it face down, off duty.",
+ "events": [
+  {
+   "id": "camille_e1",
+   "stage": 1,
+   "title": "When did you last eat",
+   "condition": "Visit infirmary (for yourself, or bringing someone) and answer her questions honestly; come back once just to bring her coffee.",
+   "hint": [
+    "The nurse looks after everyone. Notice whether anyone looks after her.",
+    "Be honest with her at the infirmary and return with something for her."
+   ]
+  },
+  {
+   "id": "camille_e2",
+   "stage": 2,
+   "title": "Folding bandages",
+   "condition": "Help with Livvie's diagnosis and regimen (get Livvie to her; carry instructions to Mama Odalys) or volunteer in infirmary_ward after Day 40 for several shifts.",
+   "hint": [
+    "She needs hands more than sympathy.",
+    "Volunteer regularly at the infirmary and help her with a patient she is worried about."
+   ]
+  },
+  {
+   "id": "camille_e3",
+   "stage": 3,
+   "title": "Not sick",
+   "condition": "After Day 52, be the one she shows her private notebook; believe her, and do not spread it without her leave. She asks him to stay for the tea she never has time to drink.",
+   "hint": [
+    "She has been writing down what she really sees. The official file says something else.",
+    "Earn her trust enough to read her private notes, and keep them safe."
+   ]
+  },
+  {
+   "id": "camille_e4",
+   "stage": 4,
+   "title": "Off duty",
+   "condition": "After curfew begins (Day 67), make her take one real night off (cover the ward with Sunny and Felix; walk her to hot_springs or her room); she names the professional line herself and steps over it.",
+   "hint": [
+    "She has not had a night off in weeks. She will not take one unless someone makes it possible.",
+    "Arrange cover for the ward and give her an evening away from it."
+   ]
+  },
+  {
+   "id": "camille_e5",
+   "stage": 5,
+   "title": "All at once",
+   "condition": "In Term 2, back her when she refuses to hand patient files to Marrow or falsify a chart, and hear about Marseille; be with her in ward B on the night it matters.",
+   "hint": [
+    "She came here to be safe from one kind of night. She is going to have to face another.",
+    "Stand with her when she is told what to write in a chart, and stay with her through her hardest shift."
+   ]
+  }
+ ],
+ "bonds": {
+  "livvie": {
+   "label": "friends",
+   "text": "A patient she is worried about and determined not to lose track of.",
+   "public": false,
+   "from": 23
+  },
+  "okonkwo": {
+   "label": "distrusts",
+   "text": "Was told to write 'seizure' and has not written it with a clear conscience since.",
+   "public": false,
+   "from": 0
+  },
+  "hana": {
+   "label": "friends",
+   "text": "Keeps telling her that the wrist is treatable.",
+   "public": true,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "friends",
+   "text": "Exhausting, generous, and the only one who makes her laugh after a double shift.",
+   "public": true,
+   "from": 0
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "Soup arrives at the infirmary without being asked for.",
+   "public": true,
+   "from": 0
+  },
+  "selene": {
+   "label": "friends",
+   "text": "They trade remedies and complaints about students who will not rest.",
+   "public": true,
+   "from": 0
+  },
+  "victoria": {
+   "label": "friends",
+   "text": "Keeps the side room dark and free for her on loud days, and has told the staff why.",
+   "public": true,
+   "from": 10
+  },
+  "mikoto": {
+   "label": "friends",
+   "text": "Panic, not illness. She has given him a breathing drill, a quiet chair and a standing invitation.",
+   "public": false,
+   "from": 9
+  },
+  "fiona": {
+   "label": "friends",
+   "text": "The undertaker's daughter is the one volunteer who does not flinch. Camille leans on her more than she should.",
+   "public": true,
+   "from": 41
+  },
+  "freya": {
+   "label": "friends",
+   "text": "Twenty years old and already drinking like her own father. Camille has said so once, kindly, and left the door open.",
+   "public": false,
+   "from": 10
+  },
+  "ed": {
+   "label": "friends",
+   "text": "Her most frequent patient. Nothing serious yet. She has started a separate file.",
+   "public": true,
+   "from": 4
+  },
+  "eloise": {
+   "label": "friends",
+   "text": "Solvent exposure, daily headaches, a tremor she hides. Reversible, if someone keeps at her.",
+   "public": false,
+   "from": 20
+  },
+  "helical": {
+   "label": "friends",
+   "text": "Exhaustion, grief, and a cough he says is nothing. She checks on him without making an appointment of it.",
+   "public": true,
+   "from": 0
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "He arrives when the ward is quietest and asks nothing. She sits down for him. She does not sit down for anyone.",
+   "public": true,
+   "from": 30
+  },
+  "rafa": {
+   "label": "friends",
+   "text": "He feeds her staff of one. She has cried over his soup, once, and he pretended not to see.",
+   "public": true,
+   "from": 24
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "The big proctor brings her the hurt ones and the leftovers, and holds the lantern while she works. She relies on him more than she has noticed.",
+   "public": true,
+   "from": 0
+  },
+  "baraka": {
+   "label": "colleagues",
+   "text": "He takes the evening desk and wakes her only for what he cannot mend. She sleeps because of him.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "infirmary",
+   "Midday": "infirmary",
+   "Afternoon": "infirmary_ward",
+   "Evening": "infirmary",
+   "Night": "infirmary_ward"
+  },
+  "weekend": {
+   "Morning": "infirmary",
+   "Midday": "cafe",
+   "Afternoon": "infirmary_ward",
+   "Evening": "bar",
+   "Night": "infirmary"
+  }
+ },
+ "duel": {
+  "skill": 2,
+  "style": "Heals her own heroes and chips at yours; plays to keep a bored patient company and forgets her triggers.",
+  "tilt": "A pager, a cough from the next bed, anything. She is never fully at the table."
+ },
+ "range": "'When did you last eat' is a clinical question, asked once and only with a reason. Otherwise: dry ward humour, Marseille and the sea there, the paperwork and stock she is behind on, things she overhears and keeps to herself, a novel she never finishes, teasing students about sunburn; she likes being asked about anything that is not medicine."
+}

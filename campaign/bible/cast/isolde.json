@@ -1,0 +1,216 @@
+{
+ "id": "isolde",
+ "name": "Isolde Varga",
+ "firstName": "Isolde",
+ "age": 22,
+ "sex": "f",
+ "group": "visitor",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "The inn (visiting)",
+ "romance": true,
+ "deck": "Bone Rush (Skeletons)",
+ "look": "A long white braid over one shoulder, a blunt fringe with a single black streak through it, dark lipstick, pale grey eyes and the teal-and-grey uniform coat of North Crown Institute with epaulettes and a captain's crown pin. She stands like a fencer and looks at the Academy's sunny campus as if it were slightly under-dressed. A thin white scar runs along her jaw.",
+ "voice": "Formal, clipped and courteous in an old-fashioned way, Hungarian-accented, with steel under it; she gives her word as a thing with weight and delivers criticism as plain observation. Pleasure shows as one corner of her mouth. RARE habit (once in a scene at most; most scenes go without it): 'Acceptable.' — meaning magnificent.",
+ "lines": [
+  "Isolde Varga, North Crown. You are the Wildcard. I have read your games. They are patient. I dislike patience; it usually wins.",
+  "Your captain has not lost in three years. I intend to be the reason that sentence needs a footnote.",
+  "My word is given. That is the end of the discussion, not the beginning.",
+  "Acceptable. ...You may tell people I said 'very good'. I shall deny it."
+ ],
+ "intro": "Captain of the rival school North Crown Institute: proud, formal, honourable, and visiting the island to beat its unbeaten team.",
+ "traits": [
+  {
+   "id": "isolde_1",
+   "text": "She captains North Crown Institute's team and arrives for a friendly on Day 68.",
+   "how": "Day 68; Bex's preview."
+  },
+  {
+   "id": "isolde_2",
+   "text": "She has lost to Lilia Mann three times and counts them aloud.",
+   "how": "Ask her why she came."
+  },
+  {
+   "id": "isolde_3",
+   "text": "She bows before and after every duel, including casual ones.",
+   "how": "Play her."
+  },
+  {
+   "id": "isolde_4",
+   "text": "She plays a skeleton deck in which nothing stays dead, and says it is a philosophy.",
+   "how": "Ask about Bone Rush."
+  },
+  {
+   "id": "isolde_5",
+   "text": "She once dated a certain rose-carrying first-year for a month and beat him in a duel over who should apologise.",
+   "how": "Ashton goes pale when she arrives."
+  },
+  {
+   "id": "isolde_6",
+   "text": "She fences sabre, and the scar on her jaw is from a bout she won.",
+   "how": "Ask about the scar."
+  },
+  {
+   "id": "isolde_7",
+   "text": "North Crown's students do not choose their captain; the outgoing one names her, and it is a burden for life.",
+   "how": "Close stage."
+  },
+  {
+   "id": "isolde_8",
+   "text": "She has never been anywhere warm before and does not know what to do with a beach.",
+   "how": "Take her to one."
+  }
+ ],
+ "secret": "Isolde Varga is the daughter of a Budapest fencing master and was raised on the idea that a promise is a blade: draw it rarely, never sheathe it dirty. North Crown Institute (an austere mountain school in the Carpathians; black coats, cold halls, a cult of the captaincy) made her captain at twenty by the word of her predecessor, and she has carried the school's forty-year grudge against Chuck Kaboom's 'holiday camp' ever since. Privately she does not hate the Academy; she envies it — the sun, the laughter, the fact that its captain has a boyfriend who brings her tea. Wound: she has never done anything that was not for the coat. Contradiction: the proudest person in the cast is the most scrupulously fair; she once forfeited a match because her opponent's deck had been tampered with by a North Crown reserve, and then expelled the reserve herself. With Ashton it was a month at a junior invitational: he amused her, then lied about something small, and she duelled him for the apology and left. Her rivalry with Lilia is the central relationship of her life and is almost entirely respect. Private joke: she rates climates. Caldera Key is 'indecent'.\nLIMITED WINDOWS: she is on the island Days 68–70 (the friendly — she loses to Lilia and bows to her in front of the whole arena; she stays at the inn; curfew has just begun), reachable by letter or the broadcast studio's link during the winter interlude and Term 2 if a correspondence has been opened, and back for the Interschool Cup, roughly Days 163–170, staying through the Founder's Festival (Day 180) if given a reason. The route therefore compresses: a duel and a walk in window one; letters (she writes superbly, formally, with one unguarded line per letter); and everything else in window two. She does not flirt in a way Rowan would recognise — she issues challenges, and an invitation to duel at dawn on the cliff is, from her, a declaration.\nDark turn: she arrives two days after the third Hollowing, is told 'a seizure cluster' and does not believe it — North Crown has its own old stories about 'games one does not play twice'. Walking the harbour that first evening she asks what is wrong with this island's birds. In the Cup window (Days 166–167) she makes Rowan an offer and asks to be told the rules of what is happening; if he tells her honestly, she muzzles Rex and offers to stand as second at the Gate. If he does not, the default runs: Rex mouths off at '{H}', is formally challenged, and she finds him in the trial dome on the morning of Day 168 — after which her honour leaves her only one road, to play for what was taken from him. Under the Charter a formal challenge may not be refused, only deferred three days; persuading her that a deferral used well is not cowardice, and that her word given to Rowan binds her too, is the crux. In the finale she is a second worthy rival, and her team are forty disciplined pairs of hands.",
+ "wants": "To beat Lilia Mann once — and, though it shames her a little, to be asked to stay somewhere warm.",
+ "fears": "Breaking her word; and being nothing but the coat.",
+ "crush": "dom",
+ "crushNote": "He is the one opponent's analyst who has ever described her play correctly, and he is courteous to the point of formality. It shows as a bow a fraction lower than protocol, a request for his notes on her own match, and correspondence about chess.",
+ "crushPace": 0.7,
+ "likes": [
+  "A formal challenge, properly made",
+  "Courtesy: bows, punctuality, kept promises",
+  "Being beaten cleanly",
+  "Letters",
+  "Opponents who do not flatter",
+  "Being shown something she has never done (a beach, a bonfire)",
+  "Respect for Lilia",
+  "Black coffee, cold mornings"
+ ],
+ "dislikes": [
+  "Discourtesy, gloating",
+  "Lies, however small",
+  "Roses",
+  "Being called 'goth'",
+  "Pity for North Crown",
+  "Excessive sunshine",
+  "Anyone suggesting she break her word or dodge a challenge without giving a reason"
+ ],
+ "gifts": [
+  "A letter, hand-written, in ink",
+  "Card: Skeleton Death Knight",
+  "A shell from the cove (she has never had one)",
+  "Card: Heart of Ice",
+  "Black coffee in a flask at dawn",
+  "Card: Loyal Bone Dog"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Formal challenge; courtship as duel.",
+  "text": "Isolde does not flirt; she duels. Her interest is expressed as rigor: she studies his games, critiques them, requests a match at an inconvenient hour, bows a fraction lower than protocol requires. She will not initiate anything she would call romance, but she issues the invitations that make it possible and waits to see whether he has the nerve. She wants courtesy, honesty and an opponent: beat her or make her work, keep every small promise, write back. Compliments must be earned and precise. Show her something warm and unserious — sand, a bonfire, bad cafeteria pudding — and the corner of her mouth goes up. Given the short windows, the GM should let each scene with her count double."
+ },
+ "intimacy": "Compressed by distance and intensified by it. In the first window, almost nothing physical: a gloved hand offered after a duel and held one breath too long; her coat round his shoulders on the cliff at dawn. Then letters, in which she is braver than in person. In the second window it moves quickly because she has decided: she takes off the coat — the collar, the crown pin laid on the table — like someone laying down a weapon, and under the armour she is intent, serious, fierce and startlingly shy about being warm. She likes the braid being unbound; she likes the sea at night because it is nothing like home. The inn's top room with the shutters open to the harbour, or the cove after the Cup. Fade as the last silver button is undone and she says his name without the surname for the first time.",
+ "events": [
+  {
+   "id": "isolde_e1",
+   "stage": 1,
+   "title": "You honour me",
+   "condition": "During Days 68–70, challenge her (or accept her challenge) to a duel at duel_terraces or great_arena and bow properly before and after; do not flatter.",
+   "hint": [
+    "The visiting captain respects one thing in a stranger. It is done at a table.",
+    "Play North Crown's captain during her visit, with full courtesy."
+   ]
+  },
+  {
+   "id": "isolde_e2",
+   "stage": 2,
+   "title": "Indecent",
+   "condition": "Before she leaves on Day 70, show her something of the island she has never done (beach_cove, bonfire_pit) despite the curfew, and ask leave to write to her. She gives an address and her word to answer.",
+   "hint": [
+    "She has never been anywhere warm. She will not ask to be shown.",
+    "Walk the harbour with her, take her to the beach before her ferry leaves, and ask if you may write."
+   ]
+  },
+  {
+   "id": "isolde_e3",
+   "stage": 3,
+   "title": "One unguarded line",
+   "condition": "Keep up the correspondence through the winter interlude and Term 2 (at least three letters, each honest about what is happening on the island); she replies; in the last she writes one line with no formality in it.",
+   "hint": [
+    "She writes better than she speaks. You have to write first.",
+    "Exchange letters with her over the winter and tell her the truth in them."
+   ]
+  },
+  {
+   "id": "isolde_e4",
+   "stage": 4,
+   "title": "Dawn on the cliff",
+   "condition": "When she returns for the Interschool Cup (Days 166–168), accept her invitation to duel at dawn on cliff_path; afterwards answer her offer honestly and tell her the rules of what is happening on the island. She gives her word on something Rowan asks. That night she lays down the coat.",
+   "hint": [
+    "When she comes back she will issue an invitation that is not really about cards.",
+    "Meet her at dawn when she returns for the Cup, and trust her with the whole truth."
+   ]
+  },
+  {
+   "id": "isolde_e5",
+   "stage": 5,
+   "title": "A footnote",
+   "condition": "Before Day 180, hold her to her word (or release her from it) when her honour demands she play for someone who was taken, and stand with her and Lilia as rivals turned allies; after the Founder's Festival ask her to stay — or ask where North Crown is.",
+   "hint": [
+    "Her honour and her safety will point in opposite directions. Her word to you may be the only thing that outweighs both.",
+    "Use the promise she made you wisely when she is challenged, and afterwards ask her what comes next for the two of you."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "rivals",
+   "text": "The central rivalry of her life, and almost entirely respect.",
+   "public": true,
+   "from": 0
+  },
+  "saoirse": {
+   "label": "rivals",
+   "text": "The barefoot one. Undisciplined, discourteous about shoes, and dangerous.",
+   "public": true,
+   "from": 0
+  },
+  "ashton": {
+   "label": "exes",
+   "text": "He lied about something small. She duelled him for the apology and left.",
+   "public": false,
+   "from": 0
+  },
+  "rex": {
+   "label": "teammates",
+   "text": "Her ace: a nuisance she chose to keep.",
+   "public": true,
+   "from": 0
+  },
+  "eberhart": {
+   "label": "rivals",
+   "text": "A scar from the Mensur and a correct bow, on this island of all places. She gave him both matches and enjoyed them.",
+   "public": true,
+   "from": 68
+  },
+  "mikoto": {
+   "label": "mentor",
+   "text": "The nervous boy plays Skeletons better than he knows. She corrected three habits and told him to stop apologising to his own minions.",
+   "public": true,
+   "from": 68
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "great_arena",
+   "Midday": "duel_terraces",
+   "Afternoon": "library",
+   "Evening": "inn",
+   "Night": "inn"
+  },
+  "weekend": {
+   "Morning": "cliff_path",
+   "Midday": "great_arena",
+   "Afternoon": "harbor",
+   "Evening": "inn",
+   "Night": "inn"
+  }
+ },
+ "duel": {
+  "skill": 9,
+  "style": "Bone Rush: skeletons that die, return and die again, each cycle leaving her a little further ahead; fenced rather than played — feint, parry, riposte. The only active player with a real chance against Lilia.",
+  "tilt": "Discourtesy and deceit make her cold and over-aggressive. A teammate in danger unsettles her badly: she stops fencing and starts charging."
+ }
+}

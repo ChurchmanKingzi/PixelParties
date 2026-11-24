@@ -1,0 +1,36 @@
+{
+ "CP": {
+  "name": "Competitive Play",
+  "head": "santangel",
+  "description": "The players' major, and the largest. Competitive Play treats Pixel Parties as a discipline: tempo and resources, rules mastery, probability, physical and mental conditioning, and above all hours at a real table in front of real people. Students live on the Ladder; their ranking decides their dorm, their events and, in the end, their careers.",
+  "graduates": "A handful each year turn professional (sponsored players, national team members). Most become coaches, team analysts, judges, organisers, streamers or testers for Kaboom Entertainment's organised-play division. The Academy is honest about the numbers: everyone learns the game here; few become pros.",
+  "years": [
+   "Year 1 — Foundations: Tempo & Resource, Rules & Judging, Probability & Game Theory, Lore & History, Physical Conditioning, Table Practicum, one shared elective. Freshman Cup, first Ladder seasons, first Promotion Duels.",
+   "Year 2 — Formats and Matchups: advanced deck construction and side-decking, limited formats, metagame analysis, team play. Eligible for the Battle Team reserve.",
+   "Year 3 — The Circuit: students travel to sanctioned events as an Academy squad; sports psychology, coaching practice, scouting; a ranked season thesis (a deck taken from idea to a top-16 finish, documented).",
+   "Year 4 — Mastery: Battle Team or coaching placement, the Graduation Exhibition, and the professional licence examination."
+  ]
+ },
+ "GD": {
+  "name": "Game Design",
+  "description": "The makers' major, housed in the Design Lab. Students learn to design, cost, word, illustrate, print and playtest cards — and to hear 'this is not fun' without flinching. Small, intense, sleepless; the Founder himself gives the first-year course and reads every final submission.",
+  "graduates": "Card and set designers, developers and balance leads, rules managers and templating editors, illustrators and art directors — at Kaboom Entertainment or at the studios that compete with it. The annual Design Contest winner traditionally sees their card printed.",
+  "years": [
+   "Year 1 — Basics: Card Design Basics, Balance & Cost Curves, Templating & Rules Text, Visual Language of a Card, Prototype & Playtest Lab, plus Rules & Judging, Probability and Lore shared with the other majors. Design Contest in Term 1.",
+   "Year 2 — Archetypes: a full twenty-card archetype from pitch to print proof; limited environment design; digital implementation.",
+   "Year 3 — Sets: students work in a studio of six on a 120-card set; development, balance data, production.",
+   "Year 4 — Thesis Set: an original set or format, playtested by the Competitive Play majors and shown at the Graduation Exhibition."
+  ]
+ },
+ "CM": {
+  "name": "Auxiliary",
+  "description": "The Auxiliary major (code CM): everyone a tournament needs who is not a player or a designer. Four tracks — commentary, judging and refereeing, table and hologram tech, event staff; black jackets. The commentary track is the voices' track. Casting, analysis, production and performance: how to make a card game legible, dramatic and honest for people who are not sitting at the table. Students staff the campus stream 'The Top Deck' and cast every Academy event from the Freshman Cup to the Graduation Exhibition.",
+  "graduates": "Play-by-play and colour casters, analysts, desk hosts, producers and directors for tournament broadcasts, journalists, content creators and community managers. A good caster outlasts three generations of players.",
+  "years": [
+   "Year 1 — Voice: Casting I, Voice & Stage Presence, Broadcast Production Lab, Analysis & VOD Review, plus Rules & Judging and Lore. Live student casts from the Promotion Duels onward.",
+   "Year 2 — The Desk: hosting, interviewing, analysis segments, writing; each student produces a regular Top Deck slot.",
+   "Year 3 — The Truck: directing, replay, graphics, remote production at circuit events.",
+   "Year 4 — The Show: students run the full broadcast of the Interschool Cup and the Graduation Exhibition and graduate with a professional reel."
+  ]
+ }
+}

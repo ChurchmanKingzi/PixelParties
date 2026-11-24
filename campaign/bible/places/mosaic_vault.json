@@ -1,0 +1,22 @@
+{
+ "name": "The Mosaic Vault",
+ "zone": "wild",
+ "bg": "mosaic_vault",
+ "night": false,
+ "hike": 2,
+ "part": "ruin_gate",
+ "hours": "Under the volcano, beyond the antechamber's inner door. No living person has been here in nine years; before that, one man in fifty.",
+ "sight": "The passage opens into a space too large to see across: a domed cavern whose floor, walls and roof are one continuous mosaic of millions of hand-sized tiles, each a portrait — heroes, beasts, storms, cities, faces — glowing faintly from within like embers under ash. They are warm. The air smells of rain on hot stone. When you move, the nearest tiles brighten, as if turning to look; and in the centre of the floor a great bare board of black squares waits, with two worn places where players have knelt.",
+ "things": [
+  "Walk among the records and recognise them: that is Tarleinn; that is Thorad; that is a bunny mid-bounce",
+  "Kneel and look closely at one tile — and see it look back",
+  "Find the tiles that are not heroes: a whole people, row on row, each face different",
+  "Find the newest tile, its glaze still sharp, a man in a field jacket with one hand raised",
+  "Lie down among them, as a shipwrecked deckhand once did, and dream",
+  "Approach the central board",
+  "Listen: a sound like an enormous game being played very slowly, very far away",
+  "Do not, under any circumstances, pick one up"
+ ],
+ "secret": "THE VAULT (canon). Every tile is a record of a real being or event; the Tessellate recorded themselves at the end and are the rows of faces along the north wall. Sleeping here gives tile-dreams (true, half-kept on waking; the source of every card). The newest tile is THE TRESPASSER: Aleksander Hale, aware and unageing; a hand held near hears a tired, dry whisper. He can be released only if someone plays for him and wins (at the central board; the Vault itself answers with a deck of its own records — hard but fair; lawful by the proxy panel). Taking a tile out = being recorded in exchange. THE CENTRAL BOARD is the only place the Guest can be undone: a Charter Duel, ante 'everything you have taken', against someone it considers a worthy rival — or called as a debt under Article 7 by one who has seen what it took without a game. Here the duel is the Tessellate contest itself: the heroes rise from the floor as themselves, not as holograms. If the Guest has won at the gate on Day 180 it is here, 'playing the island' — tiles going dark in rows — and can still be challenged for a short window (see plot file). If it loses: every Hollowed wakes; it pays its ante exactly; what becomes of it, and of the record of {H} it carries, is the player's choice (plot file: GUEST.finale and ENDINGS) — by default the record becomes a single new tile, {H:tile}. Marrow wants this room chipped out and shipped.",
+ "access": "Only through the antechamber's inner door (silas's stone key, or already opened)."
+}

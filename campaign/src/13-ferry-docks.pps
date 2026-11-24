@@ -1,0 +1,242 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · MITTAG · ANLEGEN, MOLE, QUAD, ZUTEILUNG, ANKUNFT AM STRAND
+#  Kanon: calendar/events (ferry_docks, dorm_assignment), plot/timeline (t_ferry_debt_*)
+#  Zeitplan: 09:50 Tisch läuft von allein ab · 10:25 Horn · 10:40 Anlegen · 11:00 Begrüßung auf dem Quad
+# ═══════════════════════════════════════════════════════════════════
+
+@event table_default scene=table_default day=1 from=09:50 when not table_resolved and (at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge)
+@event ferry_horn scene=ferry_horn day=1 from=10:25 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
+@event ferry_docks scene=ferry_docks day=1 from=10:40 when at:ferry_deck or at:ferry_lounge or at:ferry_stern or at:ferry_bridge
+
+@scene table_default
+  @scene table_play_default
+
+@scene ferry_horn
+  A horn sounds, long and flat and enormous, so deep that the deck plates sing with it. The ship's fixtures rattle in their brackets.
+  People abandon whatever they were doing and head for the rails. Bags are shouldered. Somebody calls "Island!" and somebody else, from the stern, calls "We KNOW."
+  The captain's voice on the loudspeaker, unhurried: "Fifteen minutes, folks. Mind your luggage and your elbows."
+  The volcano has stopped being a picture. It has trees on it now.
+  @time 0
+
+@scene ferry_docks bg=ferry_dock
+  @goto ferry_dock 0
+  The horn sounds again, once, short. The engine note drops, steps down through three tones and fades to a thrum, and then there is a bump so gentle you would hardly feel it if you were not holding a rail.
+  Ten-forty, on the nose.
+  The gangway comes down with a rattle. The decks empty at once, the way a bath empties: a few big gulps, a swirl, and then the whole crowd is flowing down the plank in two columns, duffels bumping, deck boxes clutched, voices rising.
+  A long timber jetty on barnacled piles stretches ahead of you, five minutes below a gate you cannot yet see. At its head stands a painted arch. Sun-faded letters read WELCOME, DUELISTS. Under it, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders.
+  "Spectral! Spectral first-years, this way, mind the step!"
+  "Rare! Rare Hall over here, blue collars!"
+  "Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!"
+  The water under the planks is so clear you can see crabs arguing on the bottom. The air smells of tar, kelp and wet rope.
+  At the mooring bollard an old man with a face like driftwood is checking the lines with the minute, unhurried care of someone who has done it every day for forty years. A girl with a mail sack, bright-eyed, hair in a braid, is catching the bow rope as it sails across from the deck above.
+  [?Cati] "Got it! Got it, Captain! You've got the aim of a retired postman!"
+  [abel] "I AM a retired postman!"
+  ~ Everyone on this island seems to have been doing this a very long time.
+  @if has_snapper
+    Behind you, Captain Stroud comes down the gangway with a small crate of fish under one arm, and a face that is trying very hard to look like nobody's business.
+  @flag arrived_dock
+  @lock ferry_deck
+  @lock ferry_lounge
+  @lock ferry_stern
+  @lock ferry_bridge
+  @scene dock_consequences
+
+# Die Folgen des Tisches von heute Morgen, wie die Zeitleiste sie vorsieht.
+@scene dock_consequences
+  @if ferry_table_lost
+    @scene dock_cases_lost
+  @elif ferry_inya_won
+    Down the jetty a pale boy in white gloves is walking behind a very small girl with mint-green hair and a single rucksack, which he is carrying. She is eating a cinnamon roll. He has the look of a man who has lost a bet and intends never to mention it. Tomi, passing, pays somebody out of a pocket binder.
+  @elif ferry_table_won
+    Gideon, ahead of you on the jetty, is looking at his four cases with the grave disinterest of a man who has been told he owes somebody a duffel and is deciding when to start. Three of his things are being rolled on a cart by an upper-year in a gold jacket. The fourth, you notice, is not.
+  @elif ferry_table_settled
+    Gideon, a dozen paces ahead, glances back once. He inclines his head a quarter of an inch, as one does to an equal. Beside him, Inya walks with her deck box tucked under her arm and a spring in her step.
+  @else
+    Down the jetty a very small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks. She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her.
+    @if lounge_seen
+      She sees you watching. Her chin comes up. She does not say anything, and neither do you.
+      ~ I could have said something. I know I could.
+  @scene dock_to_quad
+
+@scene dock_cases_lost
+  [gideon] "Four cases, Vance. To the Spectral Tower, which is at the top of the hill. I will lead the way."
+  He does not carry anything. He does not need to. He has just turned the dock into a stage, and the whole jetty is the audience.
+  The cases are matched, dark leather with brass corners, heavier than they have any right to be. You lift one. You lift two. Your back remembers the laundromat.
+  @choice
+    > Take two and come back for the rest.
+      You do it in two trips. The first is fine. The second is not. By the top of the avenue your arms are burning and your shirt is stuck to you and you understand, a little late, that the Spectral Tower is genuinely at the top of a hill.
+      @flag carried_two_trips
+    > Try to carry all four at once. @hint Bad idea
+      You do not make it to the foot of the jetty. The third case slips. The fourth, which was balanced precariously on the top, falls into your arms in a way that is technically carrying. Behind you somebody gasps. Somebody else, Nathan, says very loudly: "He's doing it! He's CARRYING them ALL!"
+      You do not drop a case. You do, however, discover muscles you did not know you had, and they are all in agony.
+      @flag carried_all_four
+    > Accept Nathan's offer of help. @if flag_prologue_done
+      [nathan] "I'll take two! Give me two! Gimme gimme gimme!" He has already grabbed a case in each hand, shouting to the jetty at large: "HE LOST! HE LOST FAIR AND SQUARE! He's paying! I'm helping!"
+      [gideon] "I do not recall asking for a second carrier."
+      [nathan] "It wasn't in the terms!"
+      Gideon looks at Nathan. Nathan looks at Gideon. It is, for a moment, a contest of two different species of confidence, and the loser, you suspect, is whoever has to sit next to either of them at lunch.
+      [gideon] "…Very well. The terms did not forbid it."
+      @aff nathan +3 | Helped carry
+      @flag nathan_carried
+    > Accept Baylee's quiet help. @if flag_prologue_done
+      Baylee has not said a word. He has simply picked up the heaviest case in one hand, as if it were a loaf of bread, and is waiting, politely, for you to say it is all right.
+      [baylee] "…Okay?"
+      [gideon] "I do not recall asking for a second carrier."
+      Baylee looks at him for a long moment, from a considerable height.
+      [baylee] "Wasn't in the rules. Was it."
+      [gideon] "…No."
+      @aff baylee +3 | Helped carry
+      @flag baylee_carried
+  The Spectral Tower stands on the hill above the Quad, a white spire with gold at the lip of its balconies and a doorman who has plainly seen better luggage. Gideon gives the concierge your name so that you are let in. The atrium floor is marble, the staircase is lined with portraits of previous year-captains, and you set four cases down in a neat row beside a very large, very silent potted palm.
+  [gideon] "Thank you, Vance. That will be all."
+  He says it quite courteously. He does not gloat. He does not need to.
+  @if not carried_all_four
+    @if not nathan_carried and not baylee_carried
+      Beside you, a very small girl with mint-green hair has been walking all the way up the avenue as well, a few steps behind, with her hands in her hoodie pockets. She stops at the tower door.
+      [inya] "I'd have been carrying those." Quietly. "If you hadn't asked."
+      [rowan] "I know."
+      [inya] "Rude. Accurate. Thank you."
+      @aff inya +3 | Carried them instead
+  @time 40
+
+# ───────────────────────────── DER WEG HOCH UND DIE BEGRÜSSUNG ─────────────────────────────
+
+@scene dock_to_quad
+  @goto main_gate 8
+  The avenue climbs from the pier through an avenue of tall, unfamiliar trees, their trunks painted white to head height so the dusk, when it falls, will not eat them. At its top a main gate stands open: two stone posts, a wrought-iron arch, and beyond it, the edge of the Academy.
+  People flow through it in knots. Nobody speaks very loudly. It is the kind of silence that comes over a crowd entering a church or an exam hall, only here it is not reverence but plain, shared, delighted terror.
+  @scene quad_address
+
+@scene quad_address bg=quad
+  @goto quad 3
+  @if ferry_table_lost
+    You come up through the rear colonnade at a stagger, soaked in sweat, arms trembling, just as a tall woman on the steps is finishing her first sentence. Nobody turns round. You slide into the back of the crowd like a coat onto a hook.
+  The Quad opens before you like a held breath.
+  A wide lawn framed by white colonnades and red-tiled roofs, cut by gravel paths that meet at a fountain: a bronze man with a moustache, flinging a spray of bronze cards from which the water jumps. Students lie on blankets with playmats, argue over rulings, trade out of binders. Under the clock tower arcade, a tall split-flap display clatters as a rank changes: the ladder board, 144 names long.
+  ~ There I am. Somewhere on the bottom of that board, in about an hour.
+  The thirty-six new faces collect on the gravel at the foot of the main steps, in uneasy clumps, each according to its collar, the way oil gathers on water.
+  On the steps, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds.
+  [okonkwo] "Good morning."
+  A hundred new heartbeats, all in tempo.
+  [okonkwo] "I am Dr Marguerite Okonkwo. I am Chancellor of Pixel Academy, and I have been for a very long time."
+  [okonkwo] "You have been admitted to this school out of two thousand, one hundred and fourteen applicants. That is not a boast. It is a statistic, and I distrust everything else I might say about it."
+  [okonkwo] "Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well."
+  A ripple of nervous laughter, instantly suppressed.
+  [okonkwo] "There is one law on this island above all the others. Every conflict here may be settled at a table. Every one. You will be given the Charter tomorrow. Read it. The position is that there are no exceptions."
+  [okonkwo] "For today, you will be assigned a dormitory. The lists will be read in rank order. Do not take your assignment as a verdict. It is merely an arrangement. Verdicts, on this island, are earned at the table."
+  [okonkwo] "Miss Sterling."
+  She steps aside. The woman who takes her place is taller, silver-blonde in a flawless chignon, with a dark council sash worn over a gold jacket like a rank. She opens a leather folio with the air of someone opening a ledger.
+  [octavia] "Spectral Tower." A single, crisp, unhurried syllable at a time. "Santa, Georgie. Montclair, Jessica. Brandt, Anneliese. Beaumont-Lyle, Ashton. Pryce, Gideon. Prospero, Magnus."
+  @if met:gideon
+    From somewhere to your left, a thin, courteous voice murmurs, "Here." You do not turn round.
+  The names go on. Each one is a small door closing behind a face in the crowd, and each face crosses the gravel to join an older student in a white-and-gold collar and vanishes up the hill.
+  [octavia] "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Ferrant, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
+  It is a long list. You start counting, and stop, and start again, because it is easier than thinking about what it means that your name has not been read.
+  The Spectral cluster is gone. The Rare cluster is gone. The lawn has a hole in it where thirty-six people used to be, and the remainder are all clutching their bags a little tighter.
+  [octavia] "The Commons."
+  The word lands with a small, flat, administrative thud.
+  [octavia] "Bungalows one through eight. Bungalow two: Nordlicht, Freya. Njord, Hedda. Hollis, Beatrix."
+  [octavia] "Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana."
+  [octavia] "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona."
+  [octavia] "Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor."
+  [octavia] "Bungalow six: Counts, Sammy. Crowe, Tobias. Volkov, Dmitri."
+  A pause. She turns a page.
+  [octavia] "Bungalow seven. Halvorsen, Baylee. Whisper, Nathan."
+  Another pause, a precise one.
+  [octavia] "Vance, Rowan. Late admission. The Wildcard entrant."
+  Somebody, near the back, says "oh," in the way people say it when they have just worked something out. A girl in a ruffled dress turns her head. A boy with a clipboard looks at his clipboard.
+  ~ Last. Of course I'm last.
+  @if ferry_table_won
+    Nathan, at your elbow, whispers with a volume that is not, in any sense, a whisper: "You BEAT the glove guy and they read you out LAST? That's criminal!"
+  @elif ferry_table_lost
+    Nathan, at your elbow, whispers with a volume that is not, in any sense, a whisper: "Four cases up a HILL and they read you out LAST? That is a CRIME."
+  @else
+    Nathan, at your elbow, whispers with a volume that is not, in any sense, a whisper: "LAST. You're LAST. That's the best spot, Wildcard, that's the closing act!"
+  @flag heard_lists
+  @scene quad_jacket
+
+@scene quad_jacket
+  The crowd breaks up. A young woman with a clipboard of her own, black-haired and brisk, points you towards a large wooden crate set at the foot of the steps, from which a jacket is being issued with grim ceremony to each of the Commons. A senior in a gold jacket is reading names off a list and pulling out jackets by size.
+  [?Upper-year] "Vance. Medium. Hold your arms out."
+  The jacket is red, stiff and smells of new fabric. It has a plain grey collar. The sleeves are exactly the right length, which feels like a small personal insult.
+  A shadow falls across the crate.
+  [okonkwo] "Mr Vance."
+  She does not offer a hand. Her glasses swing on their silver chain.
+  [okonkwo] "The Wildcard entrant. You arrived by the back door. See that you leave by the front."
+  @choice
+    > "Yes, ma'am."
+      [okonkwo] "Good." A single, dry inclination of the head. "I find that you may be the only person today who has said that without being asked."
+      @aff okonkwo +2 | Respectful
+    > "I'll do my best." @hint Honest
+      [okonkwo] "You will do better than that, or you will do something else." She does not smile. Something in the line of her mouth, however, has moved a millimetre. "We shall see."
+      @aff okonkwo +1 | Honest
+    > Say nothing and nod.
+      [okonkwo] "Quite."
+  She moves on. The crate has gone quiet.
+  ~ I'm wearing the jacket. I'm actually wearing the jacket. I'm one of them now.
+  @meet okonkwo
+  @scene commons_march
+
+# ───────────────────────────── DIE NEUEN BUNGALOWS ─────────────────────────────
+
+@scene commons_march
+  A large woman in a flowered apron, with grey-black hair under a red kerchief and gold hoops swinging from her ears, has planted herself at the foot of the steps and is calling out, over the din, in a voice that arrives a full room before she does:
+  [odalys?] "COMMONS! Commons, over here! Eighteen of you, I counted, don't make me count again! Every one of you has a stomach, and I have a stove!"
+  There is a wooden spoon in her apron string like a sidearm. She raises it. Eighteen new first-years drift towards her as if drawn by gravity.
+  [odalys?] "I am Mama Odalys! Mrs Fuentes to the staff, Mama to everyone with sense! I run the kitchen, I run the row, and I run you! Rules!"
+  [odalys] "One! Nobody eats alone! Two! Nobody skips breakfast! Three! Lights out means quiet! Four! If you are sad, tell somebody! If you cannot tell somebody, tell me! If you cannot tell me, tell the spoon! Come!"
+  @meet odalys
+  She turns and sets off down the hill at a pace that belies her age. The Commons follow her down towards the sea, in a loose, gaggling river of grey collars, with Nathan somewhere at its head, already asking her what is for lunch.
+  @if has_snapper and not snapper_delivered
+    You are still carrying a small crate of snapper. It smells, increasingly, of snapper. You catch up with her at the head of the line.
+    @choice
+      > "Mrs Fuentes? The captain sent this."
+        She stops walking so abruptly that three people walk into her.
+        [odalys] "Captain — Abel? He sent—"
+        She looks into the crate. For a long moment she does not say anything at all. The wooden spoon, for once, hangs entirely still.
+        [odalys] "…He always sends the good lot." Very quietly, to the fish. "Twenty-two years, and he's never once said a thing. Not one word."
+        [odalys] "Thank you, mijo. You have a face like a good man. Come eat."
+        @aff odalys +5 | Brought the snapper
+        @flag snapper_delivered
+        @flag odalys_snapper
+      > Keep quiet about it and carry on. @hint Awkward
+        The snapper stays in your arms. It gets heavier with every step.
+  @learn commons_kitchen
+  @learn commons_room
+  @goto commons_beach 15
+  @scene commons_arrival
+
+@scene commons_arrival bg=commons_beach
+  The path drops through a stand of wind-bent palms and ends, abruptly, on sand.
+  A crooked row of eight weathered bungalows stands on stilts along the curve of a cove, paint flaking in coral, mint and sun-bleached blue, joined by a boardwalk of mismatched planks. Laundry flaps on lines strung between the palms. A hand-painted sign above the first step says THE COMMONS — EVERYBODY STARTS SOMEWHERE.
+  Hammocks, surfboards, a ping-pong table with a duel mat taped across it. Geckos on the eaves. The surf breathing, in and out. It is the most beautiful place you have ever seen, and it has a washing line.
+  ~ Well. It's not the ferry.
+  [odalys] "Number one is my kitchen! Number eight is the laundry!" A sweep of the spoon. "Your numbers are on the doors! Dinner is at six! Go!"
+  @if ferry_table_won
+    From the path behind you comes the measured crunch of a man who is not hurrying. Gideon Pryce, gloves on, a single duffel in his hand, passes through the crowd of grey collars like a dagger through silk, to the step of bungalow 7. He sets the duffel down on the boards beside it.
+    The whole row watches a white collar do it.
+    [gideon] "Vance. A small courtesy, paid in full. I congratulate you on a well-played game."
+    He pauses. A quarter-inch smile.
+    [gideon] "I should dislike it very much if it were an accident."
+    He turns and goes back up the path without hurrying, having looked, you notice, at absolutely everything on the way.
+    [nathan] "He CARRIED it. The glove guy CARRIED IT. Baylee, did you see that, he —"
+    [baylee] "I saw it."
+    @aff nathan +2 | Saw you beat Gideon
+  @if odalys_snapper
+    Mama Odalys has taken the snapper to the kitchen, and the whole row, by some magic of smell, is already drifting towards it.
+  @scene bungalow_seven_first
+
+@scene bungalow_seven_first bg=commons_room
+  @goto commons_room 3
+  Bungalow 7 is the last one on the row, a narrow box of weathered boards on stilts, with a single step and a screen door that squeaks. You push it open.
+  One long plank room with three iron beds, three footlockers and a ceiling fan that ticks on every fourth turn. Baylee's bed, reinforced with a door laid under the mattress, is made with military corners. Nathan's is an explosion of socks, booster wrappers and a poster of the War Counselors. Your corner has the window on the sea, a wobbly desk and one bare bulb.
+  [nathan] "I took the bed by the door! I'm the first line of defence! Also I snore! So you know!"
+  [baylee] "He does."
+  [nathan] "I DO! My mom says it's like living next to a chainsaw. A friendly chainsaw!"
+  You put your duffel down on your bed. The mattress gives a small, sullen creak. The sea hushes at the window.
+  There is a footlocker. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet.
+  ~ I live here now. This is where I live.
+  @flag unpacked_started
+  @aff nathan +1 | Roommate
+  @aff baylee +1 | Roommate
+  @time 15

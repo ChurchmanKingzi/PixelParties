@@ -1,0 +1,215 @@
+{
+ "id": "junho",
+ "name": "Park Jun-ho",
+ "firstName": "Jun-ho",
+ "age": 18,
+ "sex": "m",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R102",
+ "romance": false,
+ "deck": "Parts of the Soul (Soul Shards)",
+ "look": "Neat to the last detail: an undercut with a soft fringe, a tablet stylus tucked behind one ear, a gold Game Design jacket with the blue collar pressed flat, and card sleeves colour-coded by function in a row of identical boxes. He straightens whatever is on the table in front of him before he speaks.",
+ "voice": "Measured, earnest and mildly corrective: he speaks in observations followed by proposed adjustments, as if every conversation were a design review. Polite, precise, entirely without sarcasm, and unaware of how it lands until someone's face tells him. When he is moved he becomes shorter and stiffer, not softer. RARE habit (once in a scene at most; most scenes go without it): announcing a small change in his own behaviour as a numbered 'patch'.",
+ "lines": [
+  "That card is fine. It's the card next to it that makes it unfair.",
+  "I've adjusted how I say good morning. The previous version was testing as cold.",
+  "Teobalt and I have a shared document for the room. It's on version nine. We're both quite happy.",
+  "You're upset. I think I caused it. I don't yet know which line it was — would you tell me?"
+ ],
+ "intro": "A neat, earnest Game Design first-year from Rare Hall with a stylus behind his ear, a perfectionist who cannot see anything — a card, a timetable, a friendship — without suggesting a small improvement.",
+ "traits": [
+  {
+   "id": "junho_1",
+   "text": "He rebalances the common-room cube every week and posts the changes.",
+   "how": "Rare common room noticeboard."
+  },
+  {
+   "id": "junho_2",
+   "text": "His sleeves are colour-coded by what the card does, and he will explain the system.",
+   "how": "Sit across from him."
+  },
+  {
+   "id": "junho_3",
+   "text": "He and his roommate keep a shared sheet on the door headed ROOM — PATCH NOTES.",
+   "how": "Rare Hall room 102."
+  },
+  {
+   "id": "junho_4",
+   "text": "He announces changes to his own behaviour as numbered patches, sincerely.",
+   "how": "Know him for a week."
+  },
+  {
+   "id": "junho_5",
+   "text": "He cannot leave a thing that is ninety-nine per cent right alone.",
+   "how": "Show him a design."
+  },
+  {
+   "id": "junho_6",
+   "text": "He is from Seoul, where his mother runs a cram school and his report cards were read aloud at dinner.",
+   "how": "Ask about the perfectionism."
+  },
+  {
+   "id": "junho_7",
+   "text": "He has redrawn the same card of his own forty times and has never submitted it.",
+   "how": "Design lab, late; a folder he closes."
+  },
+  {
+   "id": "junho_8",
+   "text": "He gives people feedback because he believes it is the kindest thing one person can do for another.",
+   "how": "Friend stage; ask why."
+  },
+  {
+   "id": "junho_9",
+   "text": "He does not know how to tell whether someone likes him as he is, and would like to.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Park Jun-ho is the only son of Park Min-seo, who owns and runs a hagwon in Daechi-dong, Seoul, and of a father who signs the cheques. He was raised on the principle that love is attention to error: a score of ninety-nine produced a calm, thorough conversation about the one. He has taken the lesson to heart with total sincerity. He believes that telling someone how they might be better is the highest form of regard, applies it first and most mercilessly to himself, and is honestly puzzled when a friend to whom he has given three thoughtful notes on their laugh stops sitting with him. The 'patch notes' are not a joke. They are how he tries: 'v1.4 — will ask before giving feedback. v1.5 — will wait for the answer.' Wound: he has never been told that something he made was finished. Contradiction: a boy who would rebalance a friendship has the steadiest loyalty in the year — he simply expresses it as a changelog. He is a seriously good designer, the most rigorous in the first year, with an instinct for where a card is unfair that even Chuck respects, and a private folder containing forty versions of one card of his own that he cannot bring himself to hand in. Chuck's maxim — 'not balanced: FAIR' — is the first thing anyone has said to him that he cannot patch, and it has been bothering him since week one.\nHe rooms with Teobalt Ferrant in what is either the best-run room on the island or a small bureaucracy. He idolises Wren Ishikawa, studies Octavia Sterling's Hell Circles as scripture, and is quietly losing his composure over Eloise Lafayette, whose canvases break every rule he owns and are obviously right. Maisie Voltage brings him broken things to be precise about, and he has not noticed why.\nPlot use: he reads rules text the way Noor reads the Charter. Shown one of the unprinted Cosmic Depths cards he will say, at once and with distress, that the card is 'not balanced against anything — it isn't costed in our numbers at all; it's as if it were designed for a different game and translated'. Asked by the thing {H=@near?on the steps of|in} bungalow 7 to improve it, he tried, and it thanked him gravely for 'the patch'. After Day 40 he does what he always does with something broken: he starts a document. It is titled 'Known Issues' and it is one of the clearest records of the term.",
+ "wants": "To make one card he can call finished — and to be liked in his current version.",
+ "fears": "That 'good enough' is something other people are allowed to be and he is not.",
+ "crush": "eloise",
+ "crushNote": "Her canvases break every rule he owns and are obviously right; he has no patch for that. It shows as him tidying her brushes, timing her appointments for her, and a note in his private file that reads 'no changes'.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being asked for feedback",
+  "Being given feedback, specific and kind",
+  "Clean systems, labelled boxes",
+  "Someone saying 'this is finished' and meaning it",
+  "Design talk at length",
+  "Being told plainly when he has hurt someone",
+  "Barley tea, sharp pencils"
+ ],
+ "dislikes": [
+  "Sloppy templating",
+  "'It's fine, leave it'",
+  "Sarcasm he has to decode",
+  "Being called a robot",
+  "Unlabelled things",
+  "His mother's Sunday call"
+ ],
+ "gifts": [
+  "Card: Soul Shard Ba",
+  "A set of coloured sleeve dividers",
+  "Card: Blueprints",
+  "A design of yours with a request for his notes",
+  "A note that says only 'no changes needed'"
+ ],
+ "events": [
+  {
+   "id": "junho_e1",
+   "stage": 1,
+   "title": "The card next to it",
+   "condition": "Ask him for feedback on a deck or a design and take it without bristling; then give him one piece of honest feedback in return, kindly.",
+   "hint": [
+    "He offers corrections to everything. Almost nobody offers him one back.",
+    "Ask the neat designer from Rare Hall for his notes, and give him one of your own."
+   ]
+  },
+  {
+   "id": "junho_e2",
+   "stage": 2,
+   "title": "Version nine",
+   "condition": "Spend time with him and Teobalt in rare_common_room or design_lab; when he 'patches' something about how he treats you, tell him which earlier version you actually preferred. He shows you the folder.",
+   "hint": [
+    "He revises himself as he revises cards. Someone might tell him which draft was good.",
+    "Get to know him well enough to tell him what he should not change."
+   ]
+  },
+  {
+   "id": "junho_e3",
+   "stage": 3,
+   "title": "Known issues",
+   "condition": "After Day 40, read his document and add what you know; around the Design Contest (due Day 75) sit with him until he submits the card he has redrawn forty times, unchanged. He writes a patch note with your name in it.",
+   "hint": [
+    "He has started a list of things that are wrong with the term, and there is one thing of his own he cannot finish.",
+    "Help him with his record of the strange events, and make him hand in his own design at last."
+   ]
+  }
+ ],
+ "bonds": {
+  "teobalt": {
+   "label": "roommates",
+   "text": "Teobalt accepts feedback in writing and returns it numbered. Jun-ho has never been so content.",
+   "public": true,
+   "from": 1
+  },
+  "maisie": {
+   "label": "friends",
+   "text": "Her tolerances are appalling and everything she makes works. He has started a document about it.",
+   "public": true,
+   "from": 8
+  },
+  "eloise": {
+   "label": "crush",
+   "text": "Her canvases break every rule he owns and are obviously right. He tidies her brushes and has no patch for it.",
+   "public": true,
+   "from": 6
+  },
+  "wren": {
+   "label": "protégé",
+   "text": "The designer he came here to learn from. She told him one of his cards was 'correct and dead', and he has thought about it every day.",
+   "public": true,
+   "from": 6
+  },
+  "octavia": {
+   "label": "protégé",
+   "text": "He has diagrammed Hell Circles card by card and asked her three questions she had to think about.",
+   "public": true,
+   "from": 15
+  },
+  "livvie": {
+   "label": "rivals",
+   "text": "Her receipt-back sketches are unbalanced and better than his finished cards. He has told her both halves of that.",
+   "public": true,
+   "from": 5
+  },
+  "chuck": {
+   "label": "protégé",
+   "text": "'Not balanced — fair.' It is the first note anyone has given him that he cannot implement.",
+   "public": true,
+   "from": 4
+  },
+  "ashdown": {
+   "label": "friends",
+   "text": "She plays the same deck and once explained what the soul shards were before they were cards.",
+   "public": true,
+   "from": 10
+  },
+  "felix": {
+   "label": "friends",
+   "text": "Felix illustrates his prototypes and ignores every note on colour.",
+   "public": true,
+   "from": 8
+  },
+  "tariq": {
+   "label": "protégé",
+   "text": "Tariq can find any card's first draft in under a minute. Jun-ho has asked him how the system works and received a forty-minute answer.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "design_lab",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rare_common_room",
+   "Midday": "card_shop",
+   "Afternoon": "design_lab",
+   "Evening": "student_lounge",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Soul Shards assembled in the mathematically correct order; plays slowly and exactly, and will point out your misplay as a courtesy while punishing it.",
+  "tilt": "A card he considers badly designed. He cannot stop thinking about how to fix it and loses track of the game."
+ }
+}

@@ -1,0 +1,385 @@
+{
+ "name": "War Room",
+ "owner": "guest",
+ "heroes": [
+  "Tharx, the Never-Losing General",
+  "Layn, Defender of Deri",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   4,
+   "Censpartan War Counselor"
+  ],
+  [
+   4,
+   "Cykyran War Counselor"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Gorinthian War Counselor"
+  ],
+  [
+   4,
+   "Harpthenean War Counselor"
+  ],
+  [
+   4,
+   "Harpyformer Choir"
+  ],
+  [
+   1,
+   "Invader from the Cosmic Depths"
+  ],
+  [
+   3,
+   "Leadership"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Magic Arts"
+  ],
+  [
+   4,
+   "Minocrete War Counselor"
+  ],
+  [
+   10,
+   "Summoning Magic"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   4,
+   "Thebinxan War Counselor"
+  ],
+  [
+   4,
+   "War Chest"
+  ],
+  [
+   2,
+   "War Council Gathering Place"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tharx, the Never-Losing General": "Hero",
+  "Layn, Defender of Deri": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Censpartan War Counselor": "Creature L2",
+  "Cykyran War Counselor": "Creature L2",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Golden Ankh": "Artifact",
+  "Gorinthian War Counselor": "Creature L2",
+  "Harpthenean War Counselor": "Creature L2",
+  "Harpyformer Choir": "Creature L0",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Leadership": "Ability",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "Magic Arts": "Ability",
+  "Minocrete War Counselor": "Creature L2",
+  "Summoning Magic": "Ability",
+  "The Cosmic Depths": "Area (Summoning Magic)",
+  "Thebinxan War Counselor": "Creature L2",
+  "War Chest": "Artifact",
+  "War Council Gathering Place": "Area (Magic Arts)"
+ },
+ "gist": {
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits.",
+  "Censpartan War Counselor": "Makes his other Counselors untargetable and destroys any surplus creatures you have.",
+  "Cykyran War Counselor": "With three Counselors, doubles his heroes' base Attack; shoots for a hero's Attack each turn.",
+  "Gorinthian War Counselor": "With two Counselors, stuns a target for two turns.",
+  "Harpthenean War Counselor": "Makes gold per Counselor or fires a shot that scales with his gold.",
+  "Minocrete War Counselor": "Doubles other Counselors' damage and repeats damage already dealt this turn.",
+  "Thebinxan War Counselor": "A guessing game on his top card that hurts your whole side when you guess wrong.",
+  "War Chest": "Gold for every Counselor.",
+  "War Council Gathering Place": "Area: new Counselors may pay to act at once.",
+  "Tharx, the Never-Losing General": "Draws a card per creature he kept since last turn.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures."
+ },
+ "plan": "It is still the War Counselor deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher, an Invader) let it fetch the exact Counselor it is missing every turn, and the pilot now holds creatures back, baits sweepers and keeps Deepsea Idol for the right moment. The council's strengths and its weakness to mass removal are unchanged; what has changed is that the mistakes are gone. Now and then it places one of its own creatures on your side of the table, and its Invader Tokens take a card or a little health from you at the end of every turn, unless that gifted creature is still yours and carrying Change Counters.",
+ "looks": {
+  "early": "One Counselor, an unfamiliar Area with a starfield on it, and a hand he does not show.",
+  "mid": "Three Counselors on the board and two more visibly kept in hand; an Analyzer sitting on YOUR side of the table, and now and then an Invader Token that costs you a card or a little health each turn.",
+  "late": "A council rebuilt for the third time, card for card the right one, without a word said."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "SETUP",
+   "trap": "RUSH",
+   "tell": "An Area you have never seen him play, The Cosmic Depths, is out, and he searches a Counselor with it every turn.",
+   "why": "The Area is what makes this version consistent: remove it (The Yeeting, or a Cataclysm made free by it) and the deck is back to drawing Counselors the honest way."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Three Counselors are out; he tutors the fourth each turn instead of drawing into it.",
+   "why": "The council still dies to one sweep, but waiting for the perfect one no longer works because he now adds exactly what he lacks each turn; sweep as soon as three are down. If Invader Tokens appear, keep the gifted Cosmic creature on your side alive: while it carries Change Counters the tokens take nothing from you."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "He commits only two Counselors and keeps two more in hand, with a Deepsea Idol he does not flash.",
+   "why": "He no longer over-extends, so a second sweeper only catches half and runs into the Idol; answer the Gorinthian stun or the Harpthenean shot that actually threatens and put the rest into Tharx and Mizune."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His heroes carry all the Storm damage he could not put elsewhere; the board is two Counselors.",
+   "why": "However well it is played, the deck has no healing and no hero protection; with two Counselors the council is switched off and the heroes can be raced."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "{H} plays an Area called The Cosmic Depths, shuffles a card away and summons the exact Counselor {H:he} was missing. {H:He} does not gloat.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Area"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold your sweeper and build"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mizune"
+     }
+    ]
+   },
+   {
+    "board": "Arrival from the Cosmic Depths sets an Analyzer on your side of the table and a Gatherer on his.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Area; keep the gifted Analyzer alive, its Change Counters shield you from Invader Tokens"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep the gift and keep levelling"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Tharx and watch"
+     }
+    ]
+   },
+   {
+    "board": "He guesses nothing, says nothing, and passes with a full hand and one Counselor.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up, sweeper in hand"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye into that quiet hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spend burn on a full-health hero"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Censpartan, Cykyran and Minocrete stand together; {H:he} has kept two cards back, which the old {H} never did.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche now, three is enough"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove The Cosmic Depths so the fourth never comes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for all four"
+     }
+    ]
+   },
+   {
+    "board": "Your Flame Avalanche meets a Deepsea Idol played without hesitation.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "The Idol is gone: Cataclysm now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick with the Storm, save the sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Abandon the board"
+     }
+    ]
+   },
+   {
+    "board": "The Life-Searcher shuffles itself away and an Invader slides into its place with two Invader Tokens: a card or a small hit from you every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the Area that keeps feeding him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep whatever arrived"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild your hand first"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Two Counselors on the table, two in his hand, the Gorinthian's stun aimed at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea for the stun, spells at Mizune"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Force discards with White Eye hits"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep for half value"
+     }
+    ]
+   },
+   {
+    "board": "The Harpthenean has a full war chest behind it and he is in no hurry.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Harpthenean, damage to Tharx"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm into a held Idol"
+     }
+    ]
+   },
+   {
+    "board": "He replaces a fallen Counselor with the same Counselor, immediately, from the deck.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Stop trading with the board, hit heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the Area at last"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Draw cards and think"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Tharx and Mizune are both nearly gone; two Counselors remain.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Protect your caster, let the Storm finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Fish for a flourish"
+     }
+    ]
+   },
+   {
+    "board": "He Golden Ankhs Tharx and draws precisely one card, which he keeps.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "End it before that card matters"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the Counselors"
+     }
+    ]
+   },
+   {
+    "board": "One hero each. He looks at your hand rather than at his own.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Everything now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held, Storm tick to finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle"
+     }
+    ]
+   }
+  ]
+ }
+}

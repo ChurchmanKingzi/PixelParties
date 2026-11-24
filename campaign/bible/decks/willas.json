@@ -1,0 +1,385 @@
+{
+ "name": "Hot-Blood Overdrive",
+ "owner": "willas",
+ "heroes": [
+  "Tazune, the Angry Hot-Blood",
+  "Bomb Berserker Bartas",
+  "Luna, the Flame Fairy"
+ ],
+ "main": [
+  [
+   2,
+   "Adventurousness"
+  ],
+  [
+   4,
+   "Angry Cheese"
+  ],
+  [
+   3,
+   "Booby Trap"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   2,
+   "Cloud Pillow"
+  ],
+  [
+   8,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Explosion"
+  ],
+  [
+   3,
+   "Fireball"
+  ],
+  [
+   3,
+   "Fireshield"
+  ],
+  [
+   3,
+   "Firewall"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   2,
+   "Last Resort"
+  ],
+  [
+   3,
+   "Magic Hammer"
+  ],
+  [
+   2,
+   "Phoenix Bombardment"
+  ],
+  [
+   4,
+   "Phoenix Tackle"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Unreasonable Anger"
+  ],
+  [
+   4,
+   "Victory Phoenix Cannon"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tazune, the Angry Hot-Blood": "Hero",
+  "Bomb Berserker Bartas": "Hero",
+  "Luna, the Flame Fairy": "Hero",
+  "Adventurousness": "Ability",
+  "Angry Cheese": "Artifact",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Cloud Pillow": "Artifact",
+  "Destruction Magic": "Ability",
+  "Explosion": "Spell (Destruction Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Firewall": "Spell (Destruction Magic, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Last Resort": "Spell (Destruction Magic)",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Phoenix Bombardment": "Spell (Destruction Magic)",
+  "Phoenix Tackle": "Spell (Destruction Magic)",
+  "Smug Coin": "Artifact (Equipment)",
+  "Treasure Chest": "Artifact",
+  "Unreasonable Anger": "Spell (Destruction Magic, Reaction)",
+  "Victory Phoenix Cannon": "Spell (Destruction Magic)"
+ },
+ "gist": {
+  "Tazune, the Angry Hot-Blood": "The first two times each turn he would hurt himself with his own cards, nothing happens. Every recoil card in the deck is free on him and painful on anyone else.",
+  "Phoenix Tackle": "Big single-target burn that grows with Destruction Magic and hits its caster with recoil.",
+  "Phoenix Bombardment": "Drops a target to its last sliver of health, deals the same amount to the caster and ends the turn. On Tazune the price is waived.",
+  "Last Resort": "The caster deals twice its remaining health to one target and then dies. If that leaves no hero standing on either side, Willas wins.",
+  "Angry Cheese": "Hurts one of his heroes to search any Destruction spell.",
+  "Victory Phoenix Cannon": "Heavy single shot that lets him chain a cheap Destruction spell right after.",
+  "Burning Finger": "Plain single-target burn, stronger at higher Destruction Magic.",
+  "Fireball": "Hits up to two targets.",
+  "Magic Hammer": "One very heavy single-target hit.",
+  "Bomb Berserker Bartas": "His cheap single-target spells may hit a second target afterwards. Low health.",
+  "Luna, the Flame Fairy": "Can use Firewall at any level, and her Firewall hits harder and burns your whole side, not just the attacker.",
+  "Firewall": "Face-down trap that burns whoever hits its hero; on Luna it sets your entire board on fire.",
+  "Fireshield": "Reaction: throws part of the damage back at the attacker.",
+  "Unreasonable Anger": "Reaction when hit: his next single-target hit is stronger.",
+  "Booby Trap": "Face-down trap that punishes the attacker.",
+  "Golden Ankh": "Revives a hero for one turn, usually Tazune for one more barrage."
+ },
+ "plan": "All gas. Willas levels Destruction Magic on Tazune and fires the biggest recoil spells in the game through him for free: Phoenix Tackle, Victory Phoenix Cannon into Burning Finger, Phoenix Bombardment to drop a hero to nothing. Angry Cheese finds whatever he wants. It is the fastest damage in the school for three or four turns, and it has no plan B: the deck has no creatures, no card draw worth the name, and when Tazune is frozen, stunned or dead the same spells chew up his other two heroes. Luna's Firewall is the one real trap he sets.",
+ "looks": {
+  "early": "Destruction Magic stacking on Tazune, an Angry Cheese already eaten, one face-down card on Luna.",
+  "mid": "Tazune casting twice a turn with smoke coming off him, Bartas and Luna hanging back at reduced health from paying for cheese.",
+  "late": "An exhausted hand, heroes scorched by their own recoil, Willas glaring at the top of his deck."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Tazune already wears two Destruction Magic; Bartas paid for an Angry Cheese with his own health.",
+   "why": "Everything runs through Tazune: a Snow Cannon on him or a hit that makes Willas spend a turn defending wastes cards that are worthless on his other heroes, whereas a slow setup just gives the fastest burn deck free turns."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "He controls no creatures; Tazune is the only hero without self-inflicted damage.",
+   "why": "There is no board to clear, and his other two heroes have already been softened by his own costs, so focusing Tazune down ends the free recoil and with it the deck."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "SETUP",
+   "trap": "RUSH",
+   "tell": "Tazune is down or frozen and Luna has a card face-down; he is casting recoil spells from Bartas anyway.",
+   "why": "Now every big spell costs him his own health, so staying alive (Cloud in a Bottle, Homerun!) wins by itself; charging into Luna's face-down Firewall is the one way to lose, because hers burns your whole side."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "His last heroes are low and he keeps fingering a card: Last Resort deals twice the caster's remaining health.",
+   "why": "Last Resort is weak from a nearly dead hero but wins him a mutual wipe-out, so the answer is to finish the lowest hero now rather than give him a turn to line it up."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Willas slams a second Destruction Magic on Tazune and eats an Angry Cheese with Bartas, who winces.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Tazune before the barrage starts"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit the already damaged Bartas"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Quietly level your own Destruction Magic"
+     }
+    ]
+   },
+   {
+    "board": "A Phoenix Tackle from Tazune takes a bite out of your caster; the recoil does nothing to him.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him and make Willas cast from someone it hurts"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Set Firewall on your caster and return fire"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle for the Storm, ignoring it"
+     }
+    ]
+   },
+   {
+    "board": "He sets a card face-down on Luna and passes with a full, angry hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Go for Tazune while the trap sits elsewhere"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards from that full hand"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for later"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Victory Phoenix Cannon into Burning Finger: Tazune has just removed half of one of your heroes in a single turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Everything at Tazune, now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! ready, Chain Lightning back"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the empty board"
+     }
+    ]
+   },
+   {
+    "board": "Tazune is wounded; Bartas and Luna both carry damage from their own cheese. No creatures anywhere.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning, he has to pick three hurt heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze Tazune, tick with the Storm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Find The White Eye first"
+     }
+    ]
+   },
+   {
+    "board": "He Golden Ankhs Tazune back for one turn and is clearly about to unload.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and Homerun! held, survive the turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang, his revived turn ends after one spell"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Luna instead"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Tazune is frozen. Willas casts Phoenix Tackle from Bartas anyway and Bartas takes the recoil in full.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Defend and let him burn himself down"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm, it finishes scorched heroes"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Charge Luna and her face-down card"
+     }
+    ]
+   },
+   {
+    "board": "Phoenix Bombardment has left your caster on a sliver; Willas's turn ended on the spot.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn and protect the caster"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade it off: kill Tazune back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Move the plan to a second caster"
+     }
+    ]
+   },
+   {
+    "board": "Luna, untouched, sits behind a face-down card; Tazune and Bartas are nearly gone.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Finish the two wounded heroes, leave Luna alone"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the face-down card first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Blast Luna and find out"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One hero each plus his battered Luna; he is holding Last Resort and doing the maths out loud.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the low hero before it can cast"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the would-be caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take a turn to heal"
+     }
+    ]
+   },
+   {
+    "board": "He is out of cards and top-decking; you have the Storm running.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Help the Storm along with every spell"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Just protect the Storm caster"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Save Flame Avalanche for no one"
+     }
+    ]
+   },
+   {
+    "board": "Tazune, revived by Golden Ankh for the turn, is his last real threat.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang the turn away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore him, he dies at end of turn; kill the others"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ]
+ }
+}

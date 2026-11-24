@@ -1,0 +1,441 @@
+{
+ "name": "Full House",
+ "owner": "pilar",
+ "heroes": [
+  "Pinta, the Singing Ship",
+  "Tempeste Moana, the Rain Singer",
+  "Alice, the Transfer Student"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Angler Angel"
+  ],
+  [
+   3,
+   "Cute Cheese"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Harpyformer Choir"
+  ],
+  [
+   8,
+   "Infinitely Reproducing Slime"
+  ],
+  [
+   4,
+   "Pocket Catapult"
+  ],
+  [
+   3,
+   "Psychic Scout"
+  ],
+  [
+   4,
+   "Rain of Arrows"
+  ],
+  [
+   4,
+   "Sentient Bomb Golems"
+  ],
+  [
+   2,
+   "Soul Transmigration Ritual"
+  ],
+  [
+   7,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Great Wall of Deri"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [
+  [
+   1,
+   "Scavenging Crane"
+  ],
+  [
+   1,
+   "Sky Shaman"
+  ],
+  [
+   1,
+   "Mimic"
+  ],
+  [
+   1,
+   "Gravedigger"
+  ],
+  [
+   1,
+   "Informant"
+  ],
+  [
+   1,
+   "Pinaxolotl"
+  ],
+  [
+   1,
+   "Wise Village Elder"
+  ],
+  [
+   1,
+   "Golden Ladybug"
+  ],
+  [
+   1,
+   "Cheering Rabbit"
+  ],
+  [
+   1,
+   "Spearman"
+  ],
+  [
+   1,
+   "Doomed Pirate"
+  ],
+  [
+   1,
+   "Time Tyrant"
+  ],
+  [
+   1,
+   "The Oracle of Heaven"
+  ],
+  [
+   1,
+   "Assault Eagle"
+  ],
+  [
+   1,
+   "Bomb Mite"
+  ]
+ ],
+ "types": {
+  "Pinta, the Singing Ship": "Hero",
+  "Tempeste Moana, the Rain Singer": "Hero",
+  "Alice, the Transfer Student": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Angler Angel": "Creature L0",
+  "Cute Cheese": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Destruction Magic": "Ability",
+  "Golden Ankh": "Artifact",
+  "Harpyformer Choir": "Creature L0",
+  "Infinitely Reproducing Slime": "Creature L0",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Psychic Scout": "Creature L1",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Sentient Bomb Golems": "Creature L0",
+  "Soul Transmigration Ritual": "Spell (Magic Arts)",
+  "Summoning Magic": "Ability",
+  "The Great Wall of Deri": "Artifact (Equipment)",
+  "Treasure Chest": "Artifact",
+  "Scavenging Crane": "Creature L0",
+  "Sky Shaman": "Creature L0",
+  "Mimic": "Creature L0",
+  "Gravedigger": "Creature L0",
+  "Informant": "Creature L0",
+  "Pinaxolotl": "Creature L0",
+  "Wise Village Elder": "Creature L0",
+  "Golden Ladybug": "Creature L0",
+  "Cheering Rabbit": "Creature L0",
+  "Spearman": "Creature L0",
+  "Doomed Pirate": "Creature L0",
+  "Time Tyrant": "Creature L0",
+  "The Oracle of Heaven": "Creature L0",
+  "Assault Eagle": "Creature L0",
+  "Bomb Mite": "Creature L0"
+ },
+ "gist": {
+  "Alice, the Transfer Student": "Creatures with the same name share a single support zone on her side, so any number of copies fit; this cannot be switched off, even if she falls.",
+  "Pinta, the Singing Ship": "Her Potion Deck is fifteen different creatures; each turn she reveals the top one and summons it for free if she could summon it normally. She has no Summoning Magic of her own, so all fifteen are level 0.",
+  "Tempeste Moana, the Rain Singer": "The first two equipment artifacts or attachment spells put on ANY hero each turn, yours included, also become fragile creatures. Once per turn she hits a target for every such piece on the whole board, both sides counted.",
+  "Infinitely Reproducing Slime": "One-health filler with no copy limit; another crawls out of hand or deck every turn.",
+  "Sentient Bomb Golems": "Each turn another copy arrives from the deck; three in one hero's zones at the end of her turn blow up for a hit that kills anything.",
+  "Rain of Arrows": "Hits your whole side, harder for every creature she controls.",
+  "Angler Angel": "Her other creatures' effects hit harder.",
+  "Pocket Catapult": "Equipment with a small shot; under Moana it is also a creature.",
+  "Aggressive Town Guard": "Free summon with a ping.",
+  "Psychic Scout": "Summons a small creature for free each turn.",
+  "The Great Wall of Deri": "Shaves a little off each hit on her creatures.",
+  "Soul Transmigration Ritual": "Sacrifices three small creatures to revive a hero at full health.",
+  "Deepsea Idol": "Cancels a sweep.",
+  "Cute Cheese": "Searches a creature.",
+  "Assault Eagle": "One of Pinta's fifteen: hits up to three targets each turn, after which you may answer in kind.",
+  "Bomb Mite": "One of Pinta's fifteen: if it survives to the end of her next turn it blows up on all your heroes."
+ },
+ "plan": "Everyone is invited. Alice lets identical creatures pile into one support zone, so Slimes and Bomb Golems stack without limit while Pinta adds a different creature from her second deck every turn and Moana counts even the catapults as guests. Under Moana your own Gathering Storm and The White Eye become fragile creatures too when you put them on, so her Rain of Arrows can knock them off. A crowd that size makes Rain of Arrows brutal, and three Sentient Bomb Golems in one place at the end of her turn remove whatever she points at. Nearly every body has a single point of health or little more, and the crowd has to survive your turn to count.",
+ "looks": {
+  "early": "Slimes stacked three deep in one zone, a first Bomb Golem.",
+  "mid": "A dozen small creatures, two Golems waiting for a third, a different stranger from Pinta each turn.",
+  "late": "Rain of Arrows over a full house."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her board is a pile of one-health Slimes and a single Sentient Bomb Golems.",
+   "why": "Everything she owns dies to any sweep and only counts if it survives your turn; the Golems need three turns to assemble."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "Two Sentient Bomb Golems share a zone; a third arrives at the end of her next turn.",
+   "why": "Three Golems at the end of her turn kill a hero outright: they have almost no health, so the sweep has to come now, and it shrinks Rain of Arrows as well."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "She has shown a Deepsea Idol and three Golems will be complete this turn.",
+   "why": "If the sweep may be cancelled, the hero the Golems will hit needs Homerun!; a second sweep the same turn gets past the Idol."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Her hand is empty and Pinta's second deck is nearly used up.",
+   "why": "Her heroes do not fight at all; Pinta has no Attack."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Pilar stacks three Infinitely Reproducing Slimes in one zone and waves a Bomb Golem in.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Pinta sings and a Scavenging Crane steps off the top of her second deck.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the lot"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "You attach Gathering Storm and, under Moana, it becomes a fragile creature that her next Rain of Arrows would destroy.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep her crowd first so the Rain does nothing"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Moana"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm and hope"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Two Bomb Golems in one zone; the third comes at the end of her turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear one Golem"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race and lose a hero"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Arrows counts eleven creatures.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before the next one"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the second copy"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "An Angler Angel makes every ping sting.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Angel"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Three Golems will be complete this turn and she is holding a Deepsea Idol.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! on the hero she is eyeing"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Two sweeps: the Idol stops one"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more"
+     }
+    ]
+   },
+   {
+    "board": "The Golems go off: one of your heroes is simply gone.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the next target; sweep the new Golem"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Soul Transmigration Ritual revives Alice for three Slimes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun!; burn Moana"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the rest"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No hand; a few Slimes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Pinta alone, summoning one stranger a turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Moana.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Pinta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

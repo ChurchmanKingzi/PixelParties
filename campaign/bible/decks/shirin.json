@@ -1,0 +1,406 @@
+{
+ "name": "Pop Quiz",
+ "owner": "shirin",
+ "heroes": [
+  "Great Detective Doq",
+  "Timeless King Zi",
+  "Friedhelm, the Misled Avenger"
+ ],
+ "main": [
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Hammer Throw"
+  ],
+  [
+   2,
+   "Thieving Strike"
+  ],
+  [
+   2,
+   "I Found You!"
+  ],
+  [
+   2,
+   "Surefire Shot"
+  ],
+  [
+   1,
+   "Whirlwind Strike"
+  ],
+  [
+   1,
+   "Massacre"
+  ],
+  [
+   2,
+   "Magic Hammer"
+  ],
+  [
+   2,
+   "Fireball"
+  ],
+  [
+   2,
+   "Icy Grave"
+  ],
+  [
+   2,
+   "Burning Finger"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   1,
+   "Poisoned Well"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Premonition"
+  ],
+  [
+   2,
+   "Hunting"
+  ],
+  [
+   2,
+   "Trade"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Cool Cheese"
+  ],
+  [
+   1,
+   "Idol of Crestina"
+  ],
+  [
+   3,
+   "Cloud Pillow"
+  ],
+  [
+   2,
+   "Homerun!"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Great Detective Doq": "Hero",
+  "Timeless King Zi": "Hero",
+  "Friedhelm, the Misled Avenger": "Hero",
+  "Quick Attack": "Attack",
+  "Heavy Hit": "Attack",
+  "Hammer Throw": "Attack",
+  "Thieving Strike": "Attack",
+  "I Found You!": "Attack",
+  "Surefire Shot": "Attack",
+  "Whirlwind Strike": "Attack",
+  "Massacre": "Attack",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Heal": "Spell (Support Magic)",
+  "Poisoned Well": "Spell (Decay Magic)",
+  "Fighting": "Ability",
+  "Magic Arts": "Ability",
+  "Premonition": "Ability",
+  "Hunting": "Ability",
+  "Trade": "Ability",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Cool Cheese": "Artifact",
+  "Idol of Crestina": "Artifact (Reaction)",
+  "Cloud Pillow": "Artifact",
+  "Homerun!": "Artifact (Reaction)"
+ },
+ "gist": {
+  "Great Detective Doq": "When he attacks she takes a random card from your hand and names a card type. If she is right the attack hits much harder and she draws two.",
+  "Timeless King Zi": "Spends the Action to show three different spells from her deck; YOU choose which one he casts, whatever its level. The other two are deleted.",
+  "Friedhelm, the Misled Avenger": "Spends the Action to play an Attack or Spell straight out of the deck as though from hand. He can never do more than one thing a turn.",
+  "I Found You!": "Discards a random card from your hand: a spell or attack means a hit, an artifact or potion she keeps, an Ability she attaches to her own hero. Free while you hold six or more cards.",
+  "Surefire Shot": "An attack that can aim at anything and cannot be reduced, cancelled or reacted to.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Magic Hammer": "One very large hit.",
+  "Poisoned Well": "A stack of poison on everything you control.",
+  "Heavy Hit": "An attack that also stuns.",
+  "Thieving Strike": "An attack that takes a random card from your hand.",
+  "Hammer Throw": "An attack; for a turn every artifact you play costs you a card.",
+  "Premonition": "Ability: puts chosen cards on top of her deck and ends her turn — so Friedhelm and Zi know what is coming."
+ },
+ "plan": "Every turn Shirin sets a question. Doq guesses what is in your hand — and a hand like Rowan's is mostly spells and Abilities, so she guesses well. Zi lays out three spells and makes you choose which one hits you. Friedhelm takes whichever attack answers the board straight out of the deck, so she never draws badly. There is no engine, no creature, and no defence beyond a few shields: three honest heroes doing one thing a turn. A full hand makes her better, a small or mixed one makes her ordinary, and she has nothing that deals with an attachment already in play.",
+ "looks": {
+  "early": "Fighting going onto Doq and Friedhelm; Zi fanning three spells for you to pick from.",
+  "mid": "Doq naming a card type before each swing; an Icy Grave on your caster.",
+  "late": "Friedhelm reaching into the deck for exactly the attack that finishes."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "She attaches Fighting and takes one modest action a turn; there is nothing on her board.",
+   "why": "No engine to stop and nothing to sweep: the turns she spends on single hits are the turns the Storm needs. Keep your hand small and mixed so that Doq guesses badly."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Zi fans three spells for you to choose from: Magic Hammer, Icy Grave, Poisoned Well.",
+   "why": "You pick the least bad answer every time and deal with the one real hit a turn; a frozen caster is worse than a damaged one."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Friedhelm fetches Surefire Shot out of the deck for a hero on its last legs.",
+   "why": "It cannot be cancelled or reacted to, so shields do nothing: heal the target out of range first, or freeze Friedhelm, who only ever has the one Action."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Doq is down; she is choosing between two heroes with one Action each.",
+   "why": "One action a turn against three zaps: the arithmetic is yours."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Shirin attaches Fighting to Friedhelm and asks, pleasantly, how many cards you are holding.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level Destruction Magic and play your hand down"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for a board that is not there"
+     }
+    ]
+   },
+   {
+    "board": "Zi fans three spells — Heal, Burning Finger, Icy Grave — and you choose.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Give her the Heal and keep building"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Take the Burning Finger and burn back"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Take the freeze and sweep an empty table"
+     }
+    ]
+   },
+   {
+    "board": "I Found You! pulls a Destruction Magic out of your hand and onto Doq.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Re-level with Leadership"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Doq"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Doq names 'Spell' and is right: the hit is brutal and she draws two.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle; play spells out, hold artifacts"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade into Doq"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Refill your hand"
+     }
+    ]
+   },
+   {
+    "board": "Zi offers Magic Hammer, Icy Grave or Poisoned Well.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Take the poison and Tea it away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Take the Hammer on a healthy hero and race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take the freeze on your caster"
+     }
+    ]
+   },
+   {
+    "board": "Hammer Throw: for a turn every artifact you play costs you a card.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Hold the artifacts for one turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spells only: Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play the Glove anyway"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Friedhelm pulls Surefire Shot out of the deck: no shield answers it.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal the target out of range first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Friedhelm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach and hope"
+     }
+    ]
+   },
+   {
+    "board": "Whirlwind Strike through Doq at two of your heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! on the weaker one"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Doq before he swings"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild afterwards"
+     }
+    ]
+   },
+   {
+    "board": "Icy Grave has your Storm caster frozen for two turns.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea thaws him and hands the ice to Zi"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Acid Vial on Zi while you wait"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit it out"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Doq has fallen; two heroes, one Action each.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Zi"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh, for one last guess from Doq.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Friedhelm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Empty your hand first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Zi has three spells left to offer, and all of them are Heals.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Out-damage it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

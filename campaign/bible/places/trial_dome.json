@@ -1,0 +1,18 @@
+{
+ "name": "The Trial Domes",
+ "zone": "campus",
+ "bg": "trial_dome",
+ "night": false,
+ "hours": "Four small domed duel rooms (Dome 1–4), bookable for ranked ladder matches, exams and practicums; open Morning to Evening. Ranked results are signed at the ladder registrar's table (Zeynep Arslan, Midday); Gani Villaluz checks the tables each Morning.",
+ "sight": "Four white geodesic domes stand in a row like half-buried golf balls, each with a brass number over the door. Inside, a single holo-table stands on a round dais under a lattice of projectors, with a judge's chair, a score clock and two rows of benches for witnesses. The acoustics are odd: a whisper at the table reaches the back wall. It smells of ozone and floor polish.",
+ "things": [
+  "Book a dome for a ranked ladder duel at the terminal by Dome 1",
+  "Sit on the witness bench for someone else's match",
+  "Play your Placement Duel (Day 1) or a practical exam here",
+  "Read the booking sheet to see who has been grinding",
+  "Watch the projector lattice warm up: a drizzle of test pixels falling onto the table",
+  "Take the Table Practicum on Wednesdays and Fridays",
+  "Check the 'matches of the week' clips looping on the screen outside"
+ ],
+ "secret": "Placement Duel Day 1; Table Practicum (cp150); ranked ladder matches; Promotion Duels Days 89–91. DOME 3: Brant Kessler is found here at dawn on Day 40, sitting upright at the table, eyes open. The school says seizure. Details for an attentive player: the score clock is stopped at 02:10; the dais is rimed with a ring of melting frost; Brant's deck box is open and the cards he extorted from Commons kids are stacked neatly on the opponent's side, sorted by owner. The booking sheet shows a formal challenge entry in very tidy handwriting, ante column filled in with two words that have been blacked out by the Chancellor's office before lunch. From D40 Dome 3 is closed 'for recalibration'; its door seal is tape, not a lock. Holograms projected in Dome 3 afterwards flicker toward the north. ACCESS NOTE: Dome 3 sealed from Day 40. All domes locked at night; from Day 67 bookings end with the Afternoon slot."
+}

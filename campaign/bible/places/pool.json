@@ -1,0 +1,19 @@
+{
+ "name": "The Pool",
+ "zone": "campus",
+ "bg": "pool",
+ "night": false,
+ "hours": "Lane swimming in the Morning, open swim Midday to Evening; lifeguard on duty (often Sunny Aldane). Closed at night. Pool safety in the Afternoon: Baraka Otieno.",
+ "sight": "A fifty-metre outdoor pool of hard blue water set into a terrace above the sea, ringed with white loungers and a rank of flags that snap in the trade wind. The lane ropes are in dorm colours. Light wobbles on the underside of the changing-room awning, and the tannoy plays whatever the lifeguard likes. It smells of chlorine and sunscreen and hot concrete.",
+ "things": [
+  "Swim lengths (fitness; clears the head before study)",
+  "Lounge and people-watch — the whole school passes through in a week",
+  "Race someone for a stake and lose to anyone from the swim squad",
+  "Play 'float duel' on the foam mat with waterproof proxy cards",
+  "Climb the lifeguard chair when invited and see the pool from Sunny's seat",
+  "Join the Wednesday swim meet as a competitor or a timekeeper",
+  "Take a paid shift as assistant lifeguard (needs the swim test)",
+  "Dive for the brass token someone always throws into the deep end"
+ ],
+ "secret": "Sunny's territory and route start; job site (assistant lifeguard, needs swim test). Swim meet Day 17. The pool is the casual meeting place across dorm lines; Jessica holds court on the loungers on Saturday middays, Ashton prowls. D27+: '{H}' can sit on the bottom of the deep end for a very long time; {H=sunny?Baraka, laughing, times her at four minutes once and stops laughing at seven.|Sunny, laughing, times {H:him} at four minutes once and stops laughing at seven. That is a soft clue she will mention only if asked about {H:him}.} D67: closes with the Afternoon slot."
+}

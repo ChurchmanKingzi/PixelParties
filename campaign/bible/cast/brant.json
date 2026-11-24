@@ -1,0 +1,197 @@
+{
+ "id": "brant",
+ "name": "Brant Kessler",
+ "firstName": "Brant",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor",
+ "romance": false,
+ "deck": "Pyre (Chaorcs)",
+ "look": "Big, shaved head, thick neck, a gold chain over his red jacket with the blue Rare collar and rings on three fingers that he taps on the table while you think. He leans in doorways so that people have to ask to get past. His deck box is new; most of what is in it is not his.",
+ "voice": "Flat, grinning and heavy, Ohio; he leans on words the way he leans in doorways, and laughs a beat early so that others will join in. Menace passed off as banter. He goes sullen and monosyllabic the instant someone bigger arrives. RARE habit (once in a scene at most; most scenes go without it): 'Relax, it's a joke.'",
+ "lines": [
+  "Hey, One-Thirty. Nice binder. Be a shame if it had a page missing. Relax, it's a joke.",
+  "Call it a loan. Call it tuition — I'm teaching you how things work here.",
+  "Tann's a mascot. Captain's dog. Somebody should say it.",
+  "I'll play anybody for anything. I don't lose to grey collars."
+ ],
+ "intro": "A second-year from Rare Hall with a gold chain and a habit of 'borrowing' cards from Commons first-years who do not get them back.",
+ "traits": [
+  {
+   "id": "brant_1",
+   "text": "He takes cards from Commons first-years and calls it a loan.",
+   "how": "Week one; Tomi or Livvie warns you."
+  },
+  {
+   "id": "brant_2",
+   "text": "He calls younger students by their ladder rank.",
+   "how": "Meet him in a doorway."
+  },
+  {
+   "id": "brant_3",
+   "text": "He backs down fast from Willas Tann and anyone on the Battle Team.",
+   "how": "See them in the same corridor."
+  },
+  {
+   "id": "brant_4",
+   "text": "He washed out of team tryouts last year in the first round.",
+   "how": "Kenji or Priya mentions it."
+  },
+  {
+   "id": "brant_5",
+   "text": "He was a Commons kid himself in first year and had his own cards taken.",
+   "how": "From Mama Odalys, who remembers him differently."
+  },
+  {
+   "id": "brant_6",
+   "text": "His gold chain was his older brother's.",
+   "how": "Only if someone gets a real conversation out of him, which is rare."
+  },
+  {
+   "id": "brant_7",
+   "text": "He boasts he will play anyone for anything, and once zip-tied a first-year's plush toy to the quad flagpole for a laugh.",
+   "how": "He says it loudly at the trial dome, more than once; Pippa has a photograph of the flagpole."
+  }
+ ],
+ "secret": "Brant arrived two years ago as a scared, pudgy Commons first-year from Youngstown and was stripped of his best cards in week three by a fourth-year who has since graduated. He learned the wrong lesson thoroughly. He promoted to Rare by grinding, shaved his head, bought the chain's twin to the one his brother Kyle wore (Kyle is doing four years in Mansfield Correctional; Brant tells people he is 'in logistics'), and became the thing that had frightened him. He is not a mastermind: he bullies down, cringes up, and does small errands for Gideon Pryce — who holds two of his IOUs and once paid a fine for him — without knowing who Gideon answers to. He takes a weekly page from Tomi's binder. Mama Odalys still sets a plate for him some Sundays and he still, sometimes, comes; it is the only place he does not perform. Contradiction: he is at his most vicious toward kids who remind him of himself. He is not beyond reaching before Day 40, but it takes someone beating him fairly in public and then not humiliating him.\nDay 39–40: on the evening of Day 39 Brant, shaking down a first-year (by default Trixie Hollis), quarrels with '{H}' in public. '{H}' says, quietly: 'Brant Kessler, I challenge you under the Charter. The ante is what you call yours.' Brant says 'my what?', laughs, and says fine. 'Then mine is the same weight. If I lose you may have what I call mine. It is not much yet.' They agree on Trial Dome 3 that night; she heard every word (clue). Silas finds him at dawn on Day 40, sitting upright at the table with the lost game laid out — and on the opponent's side every card he ever extorted, stacked and labelled by owner. The dome dropped to three degrees for eleven minutes; its clock stopped at 02:10; its recorder captured silence. The school says seizure. Hollowed, he answers to no name and holds out whatever is put into his hand, as if nothing were his. His mother arrives on the Day 44 ferry and sits in ward B for a week holding the hand that keeps trying to give hers back; his hangers-on are thrown out of the card shop on Day 41 trying to sell 'his collection'; Mama Odalys visits on Sundays with a plate nobody eats. If the Guest is beaten, or someone plays it for 'what Brant Kessler called his' and wins, he wakes within the hour remembering the duel — and what he is like with the taking part given back is an ending detail for the plot file.",
+ "wants": "To never be the one who gets taken from again.",
+ "fears": "Being that first-year again, with everyone watching.",
+ "crush": "sunny",
+ "crushNote": "She laughed at him once, kindly, and fished him out of the pool when he pretended to drown, and treated him like anyone else. It shows as showing off on the diving board and, uniquely, not 'borrowing' from anyone while she is in sight.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being feared",
+  "Easy wins",
+  "Anyone who laughs at his jokes",
+  "Being treated as a real player",
+  "Mama Odalys's Sunday rice (he would deny it)",
+  "A rematch offered without mockery"
+ ],
+ "dislikes": [
+  "Willas Tann",
+  "Being stood up to in public",
+  "Loud Commons kids — Nathan above all",
+  "Being reminded of his first year",
+  "Questions about his brother",
+  "Losing to a lower dorm"
+ ],
+ "gifts": [
+  "Card: Chaorc Rider Warg",
+  "His own first-year card, recovered from the pawn shop (a Chaorc Ruin Mourner with his initials)",
+  "A plate from Mama Odalys carried up to Rare Hall",
+  "Card: Chaorc Pyre Grill Master"
+ ],
+ "events": [
+  {
+   "id": "brant_e1",
+   "stage": 1,
+   "title": "One-Thirty",
+   "condition": "Stand your ground the first time he blocks a doorway or 'borrows' from someone in front of you, without throwing a punch.",
+   "hint": [
+    "He leans on people who step back. Find out what happens if you do not.",
+    "Refuse to be pushed around by him, calmly."
+   ]
+  },
+  {
+   "id": "brant_e2",
+   "stage": 2,
+   "title": "Play anybody for anything",
+   "condition": "Before Day 39, beat him in a public duel at trial_dome or duel_terraces for the return of taken cards — and then offer him a rematch instead of gloating.",
+   "hint": [
+    "He boasts he will play for anything. Somebody could take him up on it the right way.",
+    "Win back what he took in a duel, and be decent in victory."
+   ]
+  },
+  {
+   "id": "brant_e3",
+   "stage": 3,
+   "title": "Sunday plate",
+   "condition": "Learn from Mama Odalys what he was like as a first-year and either get him to commons_kitchen once before Day 39, or visit him in infirmary_ward after Day 40 and talk to him as if he can hear. (Completes fully only if he wakes.)",
+   "hint": [
+    "Someone on the island remembers him as a different boy. Ask her.",
+    "Find out who he used to be, and treat him as that person, before or after what happens to him."
+   ]
+  }
+ ],
+ "bonds": {
+  "willas": {
+   "label": "enemies",
+   "text": "Calls him the captain's dog — from a safe distance.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "owes",
+   "text": "Owes Gideon money and a favour, and does not know who Gideon answers to.",
+   "public": false,
+   "from": 15
+  },
+  "nathan": {
+   "label": "enemies",
+   "text": "The loud Commons kid who embarrassed him in public.",
+   "public": true,
+   "from": 12
+  },
+  "rana": {
+   "label": "enemies",
+   "text": "An easy target who bites back.",
+   "public": true,
+   "from": 0
+  },
+  "tomi": {
+   "label": "enemies",
+   "text": "A walking card shop with no lock on the door.",
+   "public": false,
+   "from": 9
+  },
+  "ophelia": {
+   "label": "enemies",
+   "text": "The Capulet who looks like a lad. She had him against a wall in first year and he has kept his distance.",
+   "public": true,
+   "from": 0
+  },
+  "freya": {
+   "label": "enemies",
+   "text": "The Commons blonde who made a fool of him. He keeps well away.",
+   "public": true,
+   "from": 8
+  },
+  "tobias": {
+   "label": "enemies",
+   "text": "Someone is getting into his room. He suspects the Commons kid with the nose and cannot prove it.",
+   "public": false,
+   "from": 9
+  },
+  "trixie": {
+   "label": "enemies",
+   "text": "Stripy socks. Easy.",
+   "public": true,
+   "from": 20
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "classroom",
+   "Midday": "cafeteria",
+   "Afternoon": "trial_dome",
+   "Evening": "student_lounge",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "arcade",
+   "Midday": "main_street",
+   "Afternoon": "trial_dome",
+   "Evening": "bar",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Chaorcs that eat their own to get bigger; aggressive, mean, front-loaded. Much of the deck is other people's best cards and does not fit together.",
+  "tilt": "Falling behind in front of an audience — he gets reckless — and any reminder of Willas."
+ }
+}

@@ -1,0 +1,236 @@
+{
+ "id": "teobalt",
+ "name": "Teobalt Ferrant",
+ "firstName": "Teobalt",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R102",
+ "romance": false,
+ "deck": "Order of Tusca (Tuscans, control)",
+ "look": "Neat brown side parting, square glasses, a clipboard that seems to be part of his arm, and shirt sleeves freckled with pen marks. He stands very straight and looks slightly over people's heads, as if counting them. There is always a spare pen behind his ear.",
+ "voice": "Brisk, courteous and organised, in very correct English with Swiss-French precision; he thinks in lists and speaks in them. Dry little jokes about procedure, which delight him when someone gets them. Long-winded only when apologising. RARE habit (once in a scene at most; most scenes go without it): numbering his points aloud ('Three things.').",
+ "lines": [
+  "Three things. One: the Commons boiler. Two: who has my stapler. Three is confidential until I've solved one and two.",
+  "I've drawn up a rota. It's colour-coded. You are teal. Please don't swap with orange — orange has a history.",
+  "Power doesn't interest me. Accurate minutes do. People underestimate how much of one is the other.",
+  "Your notes were distressing me, so I've organised them. I know I wasn't asked."
+ ],
+ "intro": "A Game Design first-year from Rare Hall with a clipboard and a rota for everything: if something on campus is broken, he already has a list.",
+ "traits": [
+  {
+   "id": "teobalt_1",
+   "text": "He has a colour-coded rota for the Rare common room and it works.",
+   "how": "Visit Rare Hall."
+  },
+  {
+   "id": "teobalt_2",
+   "text": "He ran for first-year representative in week two and campaigned with a repair list.",
+   "how": "Election posters on the quad around Day 10."
+  },
+  {
+   "id": "teobalt_3",
+   "text": "He organises volunteer repair days for the Commons bungalows, which are not even his dorm.",
+   "how": "A Saturday at the Commons beach."
+  },
+  {
+   "id": "teobalt_4",
+   "text": "He designs board states on graph paper and plays a deck that wins by patiently running things properly.",
+   "how": "Play him or sit beside him in the design lab."
+  },
+  {
+   "id": "teobalt_5",
+   "text": "He is the eldest of six and ran the household calendar from the age of ten.",
+   "how": "Ask how he got like this."
+  },
+  {
+   "id": "teobalt_6",
+   "text": "He cannot leave a crooked picture alone and has been thrown out of the faculty wing for it.",
+   "how": "Walk through any corridor with him."
+  },
+  {
+   "id": "teobalt_7",
+   "text": "He has never asked anyone for help with anything of his own.",
+   "how": "Notice, once you are a Friend, that the lists never have his name on them."
+  },
+  {
+   "id": "teobalt_8",
+   "text": "He keeps a private list titled 'things I could not fix' and it is longer than he lets on.",
+   "how": "Only at Trusted."
+  }
+ ],
+ "secret": "Teobalt is from Fribourg, eldest of six in a loud, loving, permanently overstretched family; his mother has multiple sclerosis and he has been the family's project manager since he was ten. Organising is how he loves people and how he keeps panic at arm's length: if there is a list, there is a future. Wound: when he was fifteen his mother had a relapse on a day he had 'everything under control', and he has never trusted a plan fully since — he just makes more of them. Contradiction: a natural leader who does not believe he is allowed to need anything. He has a quiet, respectful, completely unvoiced crush on Noor Al-Sayed (the rulebook and the clipboard; he thinks she is the only other person who understands that procedure is a form of kindness). Private joke: his rota colours are named after his siblings' temperaments; orange is his brother Luc.\nHe wins the first-year rep election over Gideon Pryce by eleven votes, joins Octavia Sterling's council and admires her efficiency until he notices who she dines with. When the school calls the first Hollowing a seizure he believes it — institutions are supposed to tell the truth. By the third, he has a private incident log (dates, places, who found them, what the official notice said) that is the best timeline anyone has; it is evidence. Curfew logistics, buddy systems, a sign-out sheet for the Commons: all his. His crisis comes when he realises Octavia is suppressing what the council knows on Marrow's advice: he has to choose between the minutes and the truth, and the first time in his life he breaks procedure — leaks the log to Bex — is his arc. He is not a fighter; he is the reason forty other people are where they need to be on the night it matters.",
+ "wants": "For things to work, and for the people in his care to be all right.",
+ "fears": "The thing that cannot be scheduled around.",
+ "crush": "noor",
+ "crushNote": "She is the only other person who understands that procedure is a form of kindness. It shows as her name appearing first on every rota he draws, a chair held at the Thursday reading group, and a sudden inability to number his points.",
+ "crushPace": 0.6,
+ "likes": [
+  "Punctuality and people who do what they signed up for",
+  "Being asked to organise something difficult",
+  "Volunteers",
+  "Accurate information, even unwelcome",
+  "Stationery",
+  "Anyone who helps the Commons",
+  "Being told to sit down and eat by someone who means it"
+ ],
+ "dislikes": [
+  "Chaos for its own sake",
+  "Promises not kept",
+  "Being called bossy",
+  "Secrets kept from the student body by people in charge",
+  "Gideon's smirk",
+  "Waste of volunteers' time"
+ ],
+ "gifts": [
+  "A four-colour pen",
+  "Card: Tuscan Artist",
+  "Graph paper pads",
+  "Swiss chocolate from the boutique",
+  "Card: Blueprints",
+  "A label maker (he will weep)"
+ ],
+ "events": [
+  {
+   "id": "teobalt_e1",
+   "stage": 1,
+   "title": "You are teal",
+   "condition": "Sign up for and actually attend one of his volunteer things (Commons repair Saturday at commons_beach, or election leafleting on quad around Day 10).",
+   "hint": [
+    "There is a sign-up sheet. People who turn up are remembered.",
+    "Volunteer for one of his projects and show up on time."
+   ]
+  },
+  {
+   "id": "teobalt_e2",
+   "stage": 2,
+   "title": "Action item: Teobalt",
+   "condition": "Notice he never asks for anything, and do one thing for him unasked (bring food to council_room when he works late; cover a rota slot); then ask about home.",
+   "hint": [
+    "His lists have everybody's name on them but one.",
+    "Do him a small favour he would never ask for, and ask about his family."
+   ]
+  },
+  {
+   "id": "teobalt_e3",
+   "stage": 3,
+   "title": "Off the minutes",
+   "condition": "After Day 66, bring him something the council is not being told (Pippa's photos, Camille's doubts) and stand with him when he decides whether to break procedure; he shares the incident log.",
+   "hint": [
+    "He is keeping careful records of something. He needs a reason to stop keeping them to himself.",
+    "Late in the first term, bring him evidence and back him when he has to choose between the rules and the truth."
+   ]
+  }
+ ],
+ "bonds": {
+  "gideon": {
+   "label": "rivals",
+   "text": "The one opponent whose courtesy he does not trust.",
+   "public": true,
+   "from": 10
+  },
+  "livvie": {
+   "label": "teammates",
+   "text": "Reliable, brilliant, and plainly overstretched. He has put her on a rota without telling her.",
+   "public": true,
+   "from": 6
+  },
+  "octavia": {
+   "label": "protégé",
+   "text": "The council president he admires for getting things done.",
+   "public": true,
+   "from": 12
+  },
+  "noor": {
+   "label": "crush",
+   "text": "The only other person who understands that procedure is a kindness. He has not said a word.",
+   "public": false,
+   "from": 4
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "Organises repair Saturdays for her bungalows though it is not his dorm.",
+   "public": true,
+   "from": 13
+  },
+  "felix": {
+   "label": "friends",
+   "text": "The second-year upstairs whose paints he once alphabetised without being asked. He was distressed by them.",
+   "public": true,
+   "from": 5
+  },
+  "junho": {
+   "label": "roommates",
+   "text": "Rare Hall 102. The best-run room on the island: a shared sheet on the door headed ROOM — PATCH NOTES, now on version nine.",
+   "public": true,
+   "from": 1
+  },
+  "eberhart": {
+   "label": "friends",
+   "text": "Never volunteers, always turns up, lifts what nobody else can. Teobalt has him down as 'reliable — do not chat'.",
+   "public": true,
+   "from": 4
+  },
+  "hedda": {
+   "label": "teammates",
+   "text": "Forty signatures a week, every week. He has had to give her a clipboard quota.",
+   "public": true,
+   "from": 10
+  },
+  "anni": {
+   "label": "friends",
+   "text": "The most reliable volunteer on the list, and the only one who fills in the form correctly.",
+   "public": true,
+   "from": 10
+  },
+  "sebastian": {
+   "label": "rivals",
+   "text": "The vice-president refuses nobody and approves nothing. Teobalt has started keeping a list of what 'not this term' has cost.",
+   "public": true,
+   "from": 12
+  },
+  "imara": {
+   "label": "protégé",
+   "text": "The treasurer showed him how the council's money actually moves. He writes down everything she says.",
+   "public": true,
+   "from": 12
+  },
+  "tavita": {
+   "label": "protégé",
+   "text": "The head proctor is what Teobalt thinks an officer should be. He has copied the 'first one's free' rule into his own notes.",
+   "public": true,
+   "from": 13
+  },
+  "pilar": {
+   "label": "friends",
+   "text": "Her events are chaos until the minute they begin. He has learned not to ask and to bring spare pens.",
+   "public": true,
+   "from": 3
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "council_room",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "campus_store",
+   "Afternoon": "council_room",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Tuscan control: answers each threat with the correct, slightly boring card and wins on turn fifteen with everything accounted for. Never bluffs.",
+  "tilt": "Disorder — opponents who play fast, messy and unpredictably make him over-check and run out of clock."
+ },
+ "range": "Lists are how he copes, not all he says: Fribourg and five younger siblings, real curiosity about how people are, card-design ideas, embarrassment at being thanked, dry jokes against himself. He numbers his points once a scene at most."
+}

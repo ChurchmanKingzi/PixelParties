@@ -1,0 +1,430 @@
+{
+ "ADULT_ONLY": [
+  "swim",
+  "sleep",
+  "underwear",
+  "evening"
+ ],
+ "DRESS": {
+  "pool": "swim",
+  "spa": "swim",
+  "hot_springs": "swim",
+  "beach_cove": "swim",
+  "spectral_terrace": "swim",
+  "gym": "sport",
+  "gala_ballroom": "formal"
+ },
+ "DUEL_LENGTH": {
+  "casual": 3,
+  "exam": 3,
+  "ladder": 4,
+  "tournament": 4,
+  "charter": 5,
+  "hollow": 5
+ },
+ "EVENING_PLACES": [
+  "bar",
+  "night_market",
+  "cafe",
+  "main_street",
+  "harbor",
+  "festival_grounds",
+  "boutique",
+  "inn",
+  "spectral_terrace",
+  "rooftop_garden"
+ ],
+ "FINAL_DAYS": [
+  98,
+  196
+ ],
+ "FRIEND_STAGES": [
+  {
+   "name": "Stranger",
+   "cap": 25
+  },
+  {
+   "name": "Friendly",
+   "cap": 50
+  },
+  {
+   "name": "Friend",
+   "cap": 75
+  },
+  {
+   "name": "Trusted",
+   "cap": 100
+  }
+ ],
+ "HINT_PRICE": [
+  1,
+  2
+ ],
+ "MIDTERM_DAYS": [
+  49,
+  154
+ ],
+ "NERVE_NEEDED": {
+  "casual": 0,
+  "exam": 2,
+  "ladder": 3,
+  "tournament": 5,
+  "charter": 6,
+  "hollow": 8
+ },
+ "NO_SKIN": [
+  "georgie"
+ ],
+ "PACK_PRICE": 45,
+ "PACK_STAGES": [
+  {
+   "uncommon": 60,
+   "rare": 30,
+   "prismatic": 5,
+   "super": 3,
+   "storm": 1,
+   "spectral": 0.5,
+   "stained": 0.35,
+   "umbra": 0.15
+  },
+  {
+   "uncommon": 50,
+   "rare": 30,
+   "prismatic": 10,
+   "super": 5,
+   "storm": 3,
+   "spectral": 1,
+   "stained": 0.65,
+   "umbra": 0.35
+  },
+  {
+   "rare": 50,
+   "prismatic": 25,
+   "super": 10,
+   "storm": 6,
+   "spectral": 4,
+   "stained": 3,
+   "umbra": 2
+  }
+ ],
+ "PHASES": {
+  "3": [
+   "opening",
+   "midgame",
+   "endgame"
+  ],
+  "4": [
+   "opening",
+   "midgame",
+   "crisis",
+   "endgame"
+  ],
+  "5": [
+   "opening",
+   "midgame",
+   "midgame",
+   "crisis",
+   "endgame"
+  ]
+ },
+ "RARITY_LABEL": {
+  "common": "Common",
+  "uncommon": "Uncommon",
+  "rare": "Rare",
+  "prismatic": "Prismatic",
+  "super": "Super Rare",
+  "storm": "Storm Rare",
+  "spectral": "Spectral",
+  "stained": "Stained Rare",
+  "umbra": "Umbra"
+ },
+ "RARITY_VALUE": {
+  "common": 1,
+  "uncommon": 4,
+  "rare": 12,
+  "prismatic": 30,
+  "super": 70,
+  "storm": 140,
+  "spectral": 280,
+  "stained": 520,
+  "umbra": 1000
+ },
+ "ROMANCE_STAGES": [
+  {
+   "name": "Stranger",
+   "cap": 20
+  },
+  {
+   "name": "Friend",
+   "cap": 40
+  },
+  {
+   "name": "Close",
+   "cap": 60
+  },
+  {
+   "name": "Dating",
+   "cap": 80
+  },
+  {
+   "name": "Lovers",
+   "cap": 95
+  },
+  {
+   "name": "Partner",
+   "cap": 100
+  }
+ ],
+ "SLEEP_PLACES": [
+  "commons_room",
+  "rare_room",
+  "spectral_suite"
+ ],
+ "SLOTS": [
+  "Morning",
+  "Midday",
+  "Afternoon",
+  "Evening",
+  "Night"
+ ],
+ "START_AFFINITY": {
+  "default": 8,
+  "nathan": 14,
+  "baylee": 12,
+  "odalys": 12,
+  "gideon": 3,
+  "brant": 3,
+  "ashton": 6,
+  "lilia": 8,
+  "chuck": 10,
+  "cati": 10,
+  "keoni": 10
+ },
+ "START_CREDITS": 140,
+ "START_INSIGHTS": 2,
+ "START_STATS": {
+  "technique": 6,
+  "reads": 6,
+  "nerve": 2,
+  "knowledge": 4,
+  "fitness": 3,
+  "charm": 4
+ },
+ "STIPEND": {
+  "commons": 120,
+  "rare": 180,
+  "spectral": 260
+ },
+ "TUITION": 9000,
+ "X": {
+  "flag": "guest_arrived",
+  "day": 27,
+  "who": "nathan",
+  "alt": "nathan_alt",
+  "late": 76,
+  "decks": [
+   "guest_early",
+   "guest"
+  ],
+  "kind": "hollow",
+  "barName": "HOLLOW DUEL",
+  "won": "hollow_duel_won",
+  "lost": "hollow_duel_lost",
+  "dark": [
+   "hollow_field",
+   "crater"
+  ],
+  "sheetNote": "!!! THIS IS NO LONGER {H:U}. Play the replacement:",
+  "duelNote": "THIS IS A HOLLOW DUEL: the air is cold, sound has dropped away, the holograms cast real shadows and bleed when struck. Dread, not spectacle.",
+  "duelEnd": " and what the stakes now do",
+  "rulesTitle": "Rules of a Hollow Duel"
+ },
+ "SELL_RATE": 0.5,
+ "SINGLE_MARKUP": 1.6,
+ "DRAFT_PRICE": 135,
+ "SELLERS": [
+  "dex",
+  "mika",
+  "tomi",
+  "livvie"
+ ],
+ "SHOPS": {
+  "card_shop": {
+   "name": "The Sleeve & Binder",
+   "keeper": "Dex Quill, Mika Tanabe",
+   "who": [
+    "dex",
+    "mika"
+   ],
+   "slots": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "closed": [
+    0
+   ],
+   "packs": true,
+   "singles": 10,
+   "markup": 1.6,
+   "buys": 0.5,
+   "friend": {
+    "who": "mika",
+    "rate": 0.6,
+    "stage": 1
+   },
+   "note": "Bulk boxes: plain Commons at 1 cr a card. Friday Night Draft: three boosters at list price.",
+   "noteDe": "Wühlkisten: einfache Commons für 1 cr das Stück. Friday Night Draft: drei Booster zum Listenpreis."
+  },
+  "campus_store": {
+   "name": "The Campus Store",
+   "keeper": "a student clerk",
+   "keeperDe": "studentische Aushilfe",
+   "who": [],
+   "slots": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "closed": [
+    6
+   ],
+   "packs": true,
+   "singles": 0,
+   "buys": 0,
+   "noSingles": "NO SINGLES — TRY TOWN. The store does not buy cards either.",
+   "noSinglesDe": "KEINE EINZELKARTEN — VERSUCH ES IN DER STADT. Der Laden kauft auch keine Karten an."
+  },
+  "student_lounge": {
+   "name": "Lounge Vending Machine",
+   "nameDe": "Automat in der Lounge",
+   "keeper": "the vending machine",
+   "keeperDe": "der Automat",
+   "who": [],
+   "slots": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "packs": true,
+   "singles": 0,
+   "buys": 0,
+   "noSingles": "The machine sells boosters and soda. It buys nothing.",
+   "noSinglesDe": "Der Automat verkauft Booster und Limo. Er kauft nichts an."
+  },
+  "night_market": {
+   "name": "The Night Market",
+   "keeper": "the stallholders",
+   "keeperDe": "die Standleute",
+   "who": [],
+   "slots": [
+    3,
+    4
+   ],
+   "days": [
+    6,
+    20,
+    34,
+    48,
+    62,
+    76,
+    90,
+    104,
+    111,
+    125,
+    139,
+    153,
+    167,
+    181,
+    195,
+    209
+   ],
+   "packs": false,
+   "singles": 6,
+   "markup": 1.3,
+   "buys": 0,
+   "tiers": [
+    "uncommon",
+    "rare",
+    "rare",
+    "prismatic",
+    "super",
+    "storm"
+   ],
+   "singlesTitle": "Foreign printings and oddities tonight",
+   "singlesTitleDe": "Fremdsprachige Drucke und Kurioses heute Abend",
+   "note": "Cheaper than the shop, and nobody here buys cards. A booster can only be won at the carnival stall.",
+   "noteDe": "Günstiger als im Laden, und niemand hier kauft Karten an. Einen Booster kann man nur an der Wurfbude gewinnen."
+  },
+  "pawn_shop": {
+   "name": "Second Draw Pawn & Loan",
+   "keeper": "the pawnbroker",
+   "keeperDe": "der Pfandleiher",
+   "who": [],
+   "slots": [
+    2,
+    3
+   ],
+   "packs": false,
+   "singles": 6,
+   "markup": 1.2,
+   "buys": 0.35,
+   "tiers": [
+    "uncommon",
+    "rare",
+    "rare",
+    "prismatic",
+    "prismatic",
+    "super"
+   ],
+   "singlesTitle": "In the card trays (played, bent)",
+   "singlesTitleDe": "In den Kartenschalen (bespielt, geknickt)",
+   "note": "He pays less than the truth and asks no questions.",
+   "noteDe": "Er zahlt weniger, als die Karte wert ist, und stellt keine Fragen."
+  }
+ },
+ "GIFT": {
+  "minRarity": "rare",
+  "points": {
+   "common": 0,
+   "uncommon": 1,
+   "rare": 2,
+   "prismatic": 3,
+   "super": 4,
+   "storm": 5,
+   "spectral": 6,
+   "stained": 7,
+   "umbra": 8
+  },
+  "hero": 1.5,
+  "key": 1.25,
+  "fav": 2,
+  "perGiftMax": 9,
+  "perDayMax": 9,
+  "repeat": [
+   1,
+   0.5,
+   0.25
+  ],
+  "keepers": {
+   "georgie": "georgie_8"
+  }
+ },
+ "EXAM_DAYS": [
+  47,
+  48,
+  49,
+  96,
+  97,
+  98,
+  152,
+  153,
+  154,
+  194,
+  195,
+  196
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "name": "Maison Topdeck",
+ "zone": "town",
+ "bg": "boutique",
+ "night": false,
+ "hours": "Morning to Afternoon, closed Sunday and Monday; fittings by appointment before the Gala.",
+ "sight": "A narrow shop with a bow window, a bell that sings two notes and racks of things too good for an island: gowns, linen suits, hats, gloves, one wall of masks. A long mirror in a gilded frame makes everyone look taller. The elderly proprietress measures you with her eyes before you have shut the door. It smells of cedar, pressed cloth and lavender water.",
+ "things": [
+  "Buy or hire something to wear to the Gala or the Night of Masks (hire from 30 cr)",
+  "Choose a mask from the mask wall",
+  "Be fitted, pinned and sighed over",
+  "Go along while someone else tries things on, and be asked your opinion",
+  "Buy a small present: a ribbon, cufflinks, a silk card pouch",
+  "Look at the price tags and do the laundromat arithmetic",
+  "Ask about the old dress in the window that is never for sale"
+ ],
+ "secret": "Gates the formal events: turning up to the Winter Gala (Day 103) in the wrong clothes has social cost; there are cheap routes (hire, Marit's costume rail, Baylee's cousin's suit that fits nobody, Jessica quietly paying — which Rowan's pride may refuse). Gala fittings Day 100. Jessica is the shop's best customer and its unpaid consultant; an afternoon here is a key scene of her route. The mask wall supplies Day 54; '{H}' looks at every mask on the wall for a long time and buys none; the one {H:he} wears on the night is a printed photograph of {H:his} own face, cut out and tied on with string. The dress in the window was ordered nine years ago by an Umbra girl for a winter ball and never collected."
+}

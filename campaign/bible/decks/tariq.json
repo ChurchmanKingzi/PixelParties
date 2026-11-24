@@ -1,0 +1,365 @@
+{
+ "name": "Grand Rebellion!",
+ "owner": "tariq",
+ "heroes": [
+  "Johanna, Crusader of Light",
+  "Champion, the Stormbringer",
+  "Cute Nerd Magenta"
+ ],
+ "main": [
+  [
+   2,
+   "Giga Steroids"
+  ],
+  [
+   4,
+   "Glass of Marbles"
+  ],
+  [
+   4,
+   "Inventing"
+  ],
+  [
+   4,
+   "Kappa Sword Slash"
+  ],
+  [
+   4,
+   "Kirin Firebreath"
+  ],
+  [
+   4,
+   "Mystery Box"
+  ],
+  [
+   3,
+   "Rebelliokai Backup Bakus"
+  ],
+  [
+   4,
+   "Rebelliokai Camouflaged Kappa"
+  ],
+  [
+   4,
+   "Rebelliokai Courtly Kirin"
+  ],
+  [
+   3,
+   "Rebelliokai Kind Kitsune"
+  ],
+  [
+   4,
+   "Rebelliokai Oblivious Oni"
+  ],
+  [
+   4,
+   "Rebelliokai Terror Tengu"
+  ],
+  [
+   4,
+   "Rebelliokai Timid Tanuki"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Tanuki Escape"
+  ],
+  [
+   4,
+   "Tengu Windstorm"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Johanna, Crusader of Light": "Hero",
+  "Champion, the Stormbringer": "Hero",
+  "Cute Nerd Magenta": "Hero",
+  "Giga Steroids": "Artifact",
+  "Glass of Marbles": "Artifact",
+  "Inventing": "Ability",
+  "Kappa Sword Slash": "Attack",
+  "Kirin Firebreath": "Spell (Destruction Magic)",
+  "Mystery Box": "Artifact",
+  "Rebelliokai Backup Bakus": "Creature L1",
+  "Rebelliokai Camouflaged Kappa": "Creature L1",
+  "Rebelliokai Courtly Kirin": "Creature L1 (Reaction)",
+  "Rebelliokai Kind Kitsune": "Creature L1",
+  "Rebelliokai Oblivious Oni": "Creature L1",
+  "Rebelliokai Terror Tengu": "Creature L1",
+  "Rebelliokai Timid Tanuki": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Tanuki Escape": "Spell (Support Magic)",
+  "Tengu Windstorm": "Spell (Decay Magic)"
+ },
+ "gist": {
+  "Champion, the Stormbringer": "Spends his action to discard up to five cards and redraw; you must then do the same.",
+  "Cute Nerd Magenta": "Discards a card to put any card from the deck into the discard pile.",
+  "Johanna, Crusader of Light": "Keeps the other two immune to statuses and shares their damage.",
+  "Kappa Sword Slash": "A very heavy single hit, cheaper for every different Rebelliokai in his discard pile; costs a Kappa from that pile.",
+  "Kirin Firebreath": "A small hit repeated once for every different Rebelliokai in his discard pile; costs a Kirin from it.",
+  "Tengu Windstorm": "Puts any non-hero card on the board on top or bottom of its owner's deck; costs a Tengu from the pile.",
+  "Tanuki Escape": "Swaps hand cards for searched ones; costs a Tanuki from the pile.",
+  "Rebelliokai Terror Tengu": "On arrival summons up to three different Rebelliokai from the discard pile, then ends his turn.",
+  "Rebelliokai Oblivious Oni": "Sturdy; only playable with five different Rebelliokai in the discard pile; then hits widely every turn.",
+  "Rebelliokai Timid Tanuki": "Draws a card per different Rebelliokai in the discard pile.",
+  "Rebelliokai Camouflaged Kappa": "Sacrifices itself to search a card and discard it.",
+  "Rebelliokai Courtly Kirin": "Jumps in when you use a hero's effect, by discarding another Rebelliokai.",
+  "Rebelliokai Kind Kitsune": "Discarded by a Rebelliokai effect, returns a non-creature card from the discard pile.",
+  "Rebelliokai Backup Bakus": "Returns from the discard pile to hand when another Rebelliokai is discarded.",
+  "Glass of Marbles": "Draws two when discarded.",
+  "Mystery Box": "Draws two when discarded."
+ },
+ "plan": "A rebellion run from the discard pile. Tariq throws his Rebelliokai away on purpose (Champion, Magenta, Inventing), and every different one lying there makes his four signature cards stronger: a sword slash that removes a hero, a fire breath that hits once per name, a windstorm that puts your attachment back into your deck, a card swap. Each use deletes one creature from the pile, and Terror Tengu brings three back at once. Killing his creatures only fills the pile; his heroes and his discard outlets are the way in.",
+ "looks": {
+  "early": "Creatures going straight from hand to discard pile.",
+  "mid": "Five names in the pile; a Firebreath in five hits, your Storm blown back into your deck.",
+  "late": "An Oni on the board and a Sword Slash every turn."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "He is discarding his own creatures and has almost no board.",
+   "why": "The pile is harmless for the first turns and his heroes are open; killing what little he summons only adds names to it."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Five different Rebelliokai lie in his discard pile and Champion discards five more each turn.",
+   "why": "Freeze Champion, the outlet; his forced redraw also throws away your hand, so play it out first. Sweeping feeds the pile."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Kappa Sword Slash now costs him nothing and Tengu Windstorm is aimed at your Storm.",
+   "why": "One slash a turn on one hero: Cloud in a Bottle and Homerun!; keep a second Storm in hand rather than on the table."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Each of his spells has deleted a creature and the pile is thin.",
+   "why": "His finishers eat their own fuel."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Tariq discards three Rebelliokai with Magenta and Inventing and summons nothing.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Magenta"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Champion"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Champion discards five and redraws; you must do the same.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning with the new hand"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Champion"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "A Kappa sacrifices itself to put a card in the pile.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye his hand"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the next one"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Five names in the pile; Kirin Firebreath hits five times.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Champion; play your hand out"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Magenta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and add names"
+     }
+    ]
+   },
+   {
+    "board": "Terror Tengu brings three back at once and his turn ends.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill a discarder, not the creatures"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep them home"
+     }
+    ]
+   },
+   {
+    "board": "The Oni lands.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Oni"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep at a sturdy Oni"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Kappa Sword Slash, free, aimed at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze the fighter"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more"
+     }
+    ]
+   },
+   {
+    "board": "Tengu Windstorm puts your Storm on the bottom of your deck.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep the next one in hand; tick with spells"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye his hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach at once"
+     }
+    ]
+   },
+   {
+    "board": "Courtly Kirin jumps in when Tarleinn heals.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shields; ignore it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two names left in the pile.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, safely now"
+     }
+    ]
+   },
+   {
+    "board": "Johanna alone, sharing nobody's damage.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Champion redraws one last hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ]
+ }
+}

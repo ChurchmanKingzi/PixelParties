@@ -1,0 +1,279 @@
+{
+ "id": "cati",
+ "name": "Catarina \"Cati\" Fagundes",
+ "firstName": "Cati",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 2,
+ "dorm": "commons",
+ "room": "The Old Row (upper-year Commons bungalows), bungalow 11",
+ "romance": true,
+ "deck": "Signed For (Paraseed parcels and poison that end up on your side of the table — Bloom, the Maniacal Botanist; Pes'zet, the Plague Bringer; Klaus, the Cult Leader)",
+ "look": "Medium height (about 5'5\") and sturdily built, with strong forearms and a sailor's planted stance, sun-browned olive skin freckled across the nose, and thick dark-brown curls to the shoulder, half of them twisted up and skewered with a blue wax pencil. Grey-green eyes that crinkle before she speaks, a chipped upper canine that shows when she grins, a small silver anchor stud in the left ear only. She wears the red Competitive Play jacket open, sleeves shoved above the elbow, with the plain grey Commons collar, over a blue-and-white striped sailor's jersey; a broad canvas mail satchel is slung across her body, its flap stencilled CALDERA KEY POST, with a loop of parcel string tied to the strap. A rubber-banded bundle of letters in her left hand, purple ink-pad smudges on the heel of her right. She leans in doorways on one hip and grins as if she has already read your postcard.",
+ "voice": "Quick, warm and salty, Azorean Portuguese under good English, the odd 'pá'; she teases first and asks afterwards, and laughs at her own jokes before the end. News comes out of her as a question. Quiet and practical when something is truly wrong, flat when asked about home, unreasonable about football. She never repeats what was inside a letter. RARE habit (once in a scene at most; most scenes go without it): reading a postcard aloud to its owner.",
+ "lines": [
+  "Postcard for the Wildcard. Your aunt says eat something. I agree with your aunt.",
+  "On Faial you paint your boat's name on the harbour wall or the sea keeps you.",
+  "Benfica lost. Don't speak to me until Thursday.",
+  "I know who got a parcel. I never know what's in a letter. That's the whole job, pá.",
+  "Ferry's twenty minutes late. Captain says headwind. Captain had a second breakfast.",
+  "Sueca: four players, forty cards, cheating expected. The net-menders owe me a fish.",
+  "My deck delivers. Everything in it ends up on your side of the table, signed for.",
+  "Nothing in my pigeonhole again. Fine. Less to carry.",
+  "You shuffle like you're apologising to the cards. Stop that. It's sweet, but stop."
+ ],
+ "intro": "The campus post: a salty, quick-laughing second-year from the Azores who runs the mail window behind the Campus Store, meets every ferry with a satchel, and knows who got a parcel before they do.",
+ "traits": [
+  {
+   "id": "cati_1",
+   "text": "She runs the mail window at the back of the Campus Store and carries the sack up from every Wednesday and Saturday ferry.",
+   "how": "Collect a letter; or be on the ferry dock on a ferry morning."
+  },
+  {
+   "id": "cati_2",
+   "text": "She reads every postcard and says so. She has never opened a letter.",
+   "how": "Receive a postcard from Aunt Dee."
+  },
+  {
+   "id": "cati_3",
+   "text": "She works the ferry's lines and gangway for Captain Stroud and can say who came off the boat and with what luggage.",
+   "how": "Unload the ferry beside her."
+  },
+  {
+   "id": "cati_4",
+   "text": "She plays sueca with the net-menders at the harbour on Saturdays and cheats as well as they do.",
+   "how": "The harbour, weekend Midday."
+  },
+  {
+   "id": "cati_5",
+   "text": "She grew up in Horta, on Faial in the Azores, where her family keeps the ferry-ticket kiosk on the quay.",
+   "how": "Ask why she is the only student who enjoys the crossing."
+  },
+  {
+   "id": "cati_6",
+   "text": "She follows Benfica on a bad radio and is unbearable or unreachable according to the score.",
+   "how": "A match evening on the Commons shore."
+  },
+  {
+   "id": "cati_7",
+   "text": "She weighs every outgoing letter on a brass scale and writes the grams in a notebook nobody asked her to keep.",
+   "how": "Post a letter and watch her."
+  },
+  {
+   "id": "cati_8",
+   "text": "Her own pigeonhole, F, has been empty for fourteen months.",
+   "how": "Friend stage; be at the window while the sack is sorted."
+  },
+  {
+   "id": "cati_9",
+   "text": "She keeps a middling ladder rank on purpose and says a rank is only an address.",
+   "how": "Play her; or ask Zeynep where she stands."
+  },
+  {
+   "id": "cati_10",
+   "text": "She keeps a drawer of letters that cannot be delivered and cannot bring herself to send back.",
+   "how": "Close stage, after Day 40; the drawer under the window."
+  }
+ ],
+ "secret": "FUNCTION (use her instead of a nameless clerk or deckhand): the Academy's student POSTMISTRESS and ferry hand. She runs the mail window at the back of the Campus Store (Morning and Afternoon), meets the Second Chance on Wednesday and Saturday mornings, works its lines and gangway for Captain Stroud and carries the sack up the hill: letters, parcels, telegrams, Aunt Dee's fortnightly post for Rowan. She knows who received what, from where, and who came off the boat with which luggage — the island's best honest gossip. Her rule: she says who got a parcel, never what was in a letter; postcards she reads aloud.\nWHO SHE IS. Catarina Fagundes of Horta, Faial; daughter of the ferry-ticket kiosk on the quay. She left after a screaming quarrel with her mother, who wanted her to keep the kiosk; no letter has come from home in fourteen months, and she sorts everyone's post with her own pigeonhole last. Wound: the girl who delivers everybody's news gets none. Contradiction: an incurable gossip who is, where it matters, the most discreet person on the island.\nSECRET. She weighs outgoing letters from habit and writes the grams down. From Day 40 the mail goes up to the Chancellor's office before the ferry, and she carries it up and down: letters that mention the incidents come back lighter. Her notebook of weights shows that the school reads and cuts its students' mail; she has told nobody. Asked the right way, she will say that the cupboard post office in town is not hers and not the Chancellor's. In a drawer she keeps what cannot be delivered — after Day 40, letters for students in Ward B; the youngest correspondents she answers herself, signed 'the Post'.\nPLAYER-CRUSH: likes the Wildcard openly from his first postcard, by teasing.",
+ "wants": "A letter with a Horta postmark — and, lately, a reason to stop carrying the sack up the hill.",
+ "fears": "That the pigeonhole stays empty because of what she said on the quay the day she left.",
+ "crush": "rowan",
+ "crushNote": "She took to him over his first postcard — a boy whose aunt tells him in writing to eat — and makes no secret of it: his post is hand-delivered wherever he happens to be, read aloud if it is a postcard, and he has a nickname and a seat on the mail trolley by the second week. It is liking, not devotion: she teases everyone, and needs to see that he can tease back and keep his mouth shut.",
+ "crushPace": 1.2,
+ "likes": [
+  "Being teased back",
+  "People who can keep a thing to themselves",
+  "Help with the sack on ferry mornings",
+  "Grilled limpets, strong coffee, salt wind",
+  "Football on a bad radio",
+  "Postcards with real news on them",
+  "Card games with cheating in them",
+  "Being asked about Faial, once"
+ ],
+ "dislikes": [
+  "Anyone asking what was in someone else's letter",
+  "'Any post for me?' eleven times a day",
+  "Seasick jokes",
+  "Being called 'the mail girl'",
+  "Sealed things she must carry and may not ask about",
+  "Benfica losing",
+  "Questions about her mother"
+ ],
+ "gifts": [
+  "Card: Paraseed",
+  "A postcard actually posted to her, with a stamp",
+  "Card: Bloom, the Maniacal Botanist",
+  "A tin of sardines or limpets from the fish market",
+  "Card: Plant Golem",
+  "A new blue wax pencil"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Open, teasing, hand-delivered.",
+  "text": "Cati flirts with Rowan from the first postcard: reads it aloud, gives him a nickname, saves him the trolley seat. It costs her nothing and she means it. She starts things; she wants to be teased back and to see he can keep a secret. Interest, not devotion — she goes flat if asked about home too soon. Send her a postcard."
+ },
+ "intimacy": "Easy, physical and unembarrassed: a shoulder bumped on the dock, his collar straightened with inky fingers, her feet in his lap on the mail-room sacks while rain drums on the tin roof. She kisses first, laughing, tasting of coffee and salt, and is shy afterwards for about four seconds. She likes the ferry rail at dusk and being read to from other people's postcards. Bungalow 11 on the Old Row, the satchel hung on the door. Fade as she pulls the wax pencil out of her hair.",
+ "events": [
+  {
+   "id": "cati_e1",
+   "stage": 1,
+   "title": "Postcard for the Wildcard",
+   "condition": "Collect your first post from Aunt Dee at the mail window in campus_store (or have her hand it to you on the Quad) and take the teasing well; give some back.",
+   "hint": [
+    "Somebody on this island has read your postcard before you have.",
+    "Collect your mail at the window behind the Campus Store and be a good sport about it."
+   ]
+  },
+  {
+   "id": "cati_e2",
+   "stage": 2,
+   "title": "The sack",
+   "condition": "Meet a Wednesday or Saturday ferry at ferry_dock and carry the sack up the hill with her; do not ask what anyone else received. Play a hand of sueca at harbor if she offers.",
+   "hint": [
+    "The mail comes up the hill twice a week on one pair of shoulders.",
+    "Help her with the mail sack on a ferry morning, and ask no questions about other people's post."
+   ]
+  },
+  {
+   "id": "cati_e3",
+   "stage": 3,
+   "title": "Posted",
+   "condition": "Send her a real postcard through her own window (bought at campus_store, stamped, addressed to pigeonhole F). She finds it while sorting and comes looking for you. She kisses you on the dock before the next ferry.",
+   "hint": [
+    "One pigeonhole behind the mail window is always empty.",
+    "Post her a postcard of her own."
+   ]
+  },
+  {
+   "id": "cati_e4",
+   "stage": 4,
+   "title": "Grams",
+   "condition": "After Day 40, notice the brass scale and the notebook, or tell her that a letter of yours arrived with pages missing; she shows you the weights. Keep it between you and help her decide what to do with it. Hear about the quay at Horta. She stays.",
+   "hint": [
+    "She writes a number down for every letter that leaves the island. Lately she writes two.",
+    "After the first incident, ask her about the letter scale, and keep what she tells you."
+   ]
+  },
+  {
+   "id": "cati_e5",
+   "stage": 5,
+   "title": "Return to sender",
+   "condition": "In Term 2, help her do one of the two things she has put off: empty the drawer of undeliverable letters properly, or write the letter home; go with her to post it in town. Whatever comes back, be at the window when the sack is sorted.",
+   "hint": [
+    "There is a drawer she does not open and a letter she has not written.",
+    "Help her deal with the undelivered letters, or with her own."
+   ]
+  }
+ ],
+ "bonds": {
+  "abel": {
+   "label": "protégé",
+   "text": "Captain Stroud lets her take the stern line and tells her the same six jokes. She laughs at four.",
+   "public": true,
+   "from": 0
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "Mama's spice parcels come addressed in three alphabets. Cati has learned to read two of them.",
+   "public": true,
+   "from": 0
+  },
+  "livvie": {
+   "label": "colleagues",
+   "text": "Livvie takes the till shifts nobody wants at the store; Cati keeps her a chair and half a sandwich.",
+   "public": true,
+   "from": 3
+  },
+  "tomi": {
+   "label": "friends",
+   "text": "He wants to know who is getting money from home. She tells him who got socks.",
+   "public": true,
+   "from": 3
+  },
+  "bex": {
+   "label": "friends",
+   "text": "Bex wants everything she knows. Cati gives her arrivals and departures and not a line more.",
+   "public": true,
+   "from": 0
+  },
+  "dex": {
+   "label": "friends",
+   "text": "His booster crates come on the Wednesday boat. She has never dropped one and reminds him weekly.",
+   "public": true,
+   "from": 0
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Two people who would rather be on the water. They swap tide tables and say very little.",
+   "public": true,
+   "from": 0
+  },
+  "silas": {
+   "label": "friends",
+   "text": "He checks the mooring lines after her and has never had to retie one.",
+   "public": true,
+   "from": 0
+  },
+  "keoni": {
+   "label": "friends",
+   "text": "Two doors down the Old Row. He mends her roof before it leaks; she pretends not to see why.",
+   "public": true,
+   "from": 0
+  },
+  "zeynep": {
+   "label": "friends",
+   "text": "Saturdays at the harbour: tavla at one crate, sueca at the next, and an argument about which is the real game.",
+   "public": true,
+   "from": 0
+  },
+  "shirin": {
+   "label": "protégé",
+   "text": "Shirin dragged her through Probability last year with index cards and threats.",
+   "public": true,
+   "from": 0
+  },
+  "thandi": {
+   "label": "colleagues",
+   "text": "Telegrams for the child in the Tower go up the hill at once, by hand.",
+   "public": true,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "distrusts",
+   "text": "The sack goes up to the Chancellor's office before the ferry now, and comes down lighter.",
+   "public": false,
+   "from": 40
+  },
+  "josie": {
+   "label": "friends",
+   "text": "The Mulligan's post goes over the bar, with the island's news coming back the other way.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "campus_store",
+   "Midday": "cafeteria",
+   "Afternoon": "campus_store",
+   "Evening": "commons_shore",
+   "Night": "commons_shore"
+  },
+  "weekend": {
+   "Morning": "ferry_dock",
+   "Midday": "harbor",
+   "Afternoon": "main_street",
+   "Evening": "bonfire_pit",
+   "Night": "commons_shore"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Hands you things: Paraseeds that move into whichever hero kills them and poison it for good, a Plant Golem that stops your caster. Then she waits.",
+  "tilt": "An opponent who refuses delivery and goes for her heroes; she overextends."
+ }
+}

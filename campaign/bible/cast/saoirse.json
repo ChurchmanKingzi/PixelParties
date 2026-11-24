@@ -1,0 +1,268 @@
+{
+ "id": "saoirse",
+ "name": "Saoirse Flynn",
+ "firstName": "Saoirse",
+ "age": 21,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 3,
+ "dorm": null,
+ "room": "The boathouse, Port Mulligan",
+ "romance": true,
+ "deck": "Deepsea Terror",
+ "look": "Copper curls stiff with salt, sea-green eyes, a deep surf tan and a thin silver anklet above a permanently bare foot. She wears her red jacket open, Battle Team pin and all, over a green rash vest and has sand on her somewhere at all times. She leans on things as if the world were a bar.",
+ "voice": "Lazy, musical and unhurried, west-of-Ireland; she teases everyone, authority first, and never finishes a sentence faster than she has to. She speaks of the sea as of a slightly unreliable friend. At a card table the voice goes flat and exact without her posture changing at all. RARE habit (once in a scene at most; most scenes go without it): 'pet' for anyone she is winding up.",
+ "lines": [
+  "You're the wildcard, so. Storm deck. I like a man who brings his own weather.",
+  "Shoes are a rule, pet, and I've a sort of an allergy.",
+  "It's only a monster from the bottom of the sea. Have you an answer? No? That's a pity for you.",
+  "I don't chase waves. I sit where they're going to be. Works on people, too."
+ ],
+ "intro": "The Battle Team's number two: a barefoot third-year surfer who lives in the boathouse, ignores most rules, and is terrifying at a card table.",
+ "traits": [
+  {
+   "id": "saoirse_1",
+   "text": "She lives in the boathouse in Port Mulligan instead of a dorm, and nobody has managed to make her move.",
+   "how": "Visit the boathouse."
+  },
+  {
+   "id": "saoirse_2",
+   "text": "She has not worn shoes on campus in three years.",
+   "how": "Visible; Hana writes her up for it monthly."
+  },
+  {
+   "id": "saoirse_3",
+   "text": "She surfs at dawn and naps through morning lectures.",
+   "how": "Beach cove at Morning; lecture hall, asleep."
+  },
+  {
+   "id": "saoirse_4",
+   "text": "She is the second-best player in the school and treats it as a mildly funny accident.",
+   "how": "Watch her play at the great arena."
+  },
+  {
+   "id": "saoirse_5",
+   "text": "She grew up in Lahinch, County Clare, and learned the game on a lifeboat-station table.",
+   "how": "Ask where she is from."
+  },
+  {
+   "id": "saoirse_6",
+   "text": "She crews for the ferry captain on rough days and knows the water around the island better than the charts.",
+   "how": "See her on the ferry dock in bad weather."
+  },
+  {
+   "id": "saoirse_7",
+   "text": "She keeps a jar of sea glass from every beach she has surfed and will tell you about any piece.",
+   "how": "Boathouse windowsill."
+  },
+  {
+   "id": "saoirse_8",
+   "text": "She has been offered the captaincy for next year and has not answered.",
+   "how": "From Rox or Lilia."
+  },
+  {
+   "id": "saoirse_9",
+   "text": "Her father went out with the lifeboat one January and the boat came back without him; she has never been afraid of the sea, only of waiting on a shore.",
+   "how": "Dating stage, at the boathouse at Night."
+  }
+ ],
+ "secret": "Saoirse is the daughter of a lifeboat coxswain, Donal Flynn, lost off Lahinch on a callout when she was thirteen. She spent that night on a pier with her mother, waiting. Her whole philosophy — no shoes, no plans, no rules, take the wave that is here — is a refusal ever to stand on a shore waiting again. She is genuinely laid-back and genuinely kind, and she is also running: from the captaincy (which means being the one who waits for the others), from graduation, from anyone who might ask her to stay still. Contradiction: the least rule-bound person on the island is the team's steadiest hands under pressure, because nothing at a card table has ever been as frightening as that pier. She is Lilia's closest friend because she is the only person who has never wanted anything from her, and she sees clearly that Lilia is 'drowning standing up'. Private joke: she names big waves after faculty members; 'a Santángel' is one that looks impressive and closes out.\nShe flirts first, fast and lazily — it is an invitation to come and sit, not a pursuit. She likes people, likes bodies, likes mornings; she has had easy flings and no one she let matter. Her route is the slow discovery that she wants to be the one someone comes back to, and the terror that comes with it.\nShe knows the island's edges: sea caves, the islet, the north shore. Her dinghy (bought from Silas for a crate of beer; the half-repainted name reads UMBRA II and she has no idea what that means) takes Viktor round the coast without questions, and she has a secret place on the west cliffs she calls the Singing Cave. '{H}' likes to sit on the boathouse slip and ask her about tides; she answers; it can find no quarrel with her, and she is the one person besides Rowan who is not afraid of it and does not know why she should be. She was on the water at dawn on Day 27 and saw the green-white light under the sea — the meteor's glow carried through the lava tubes to a sea cave mouth — and she noticed the fish. There have been none on the north side since. After Day 40 she keeps the boathouse as a place where people can simply turn up, no questions. When Willas falls on Day 150 she is the one who moves into the Spectral suite and feeds Lilia, and it is waiting on the pier all over again; the question of her arc is whether she waits, or goes out. In the finale she is the one who can get people to the Ruin Gate's sea approach by boat when the paths are closed.",
+ "wants": "To keep moving, and — underneath — someone worth staying put for.",
+ "fears": "Standing on the shore while someone she loves is out there.",
+ "crush": "viktor",
+ "crushNote": "He is as allergic to explaining himself as she is to shoes, and he always comes back from wherever he went. It shows as her waiting for his lantern on the cliff without admitting she is waiting, and a second mug kept on the boathouse nail.",
+ "crushPace": 0.8,
+ "likes": [
+  "Coming out on the water with her",
+  "Being teased back",
+  "People who are easy in silence",
+  "Rule-bending done with style",
+  "Honesty without drama",
+  "Sea glass, driftwood, found things",
+  "Anyone who is good to Lilia",
+  "Early mornings and late fires"
+ ],
+ "dislikes": [
+  "Being pinned to a plan too soon",
+  "Possessiveness",
+  "Lectures about shoes, attendance or potential",
+  "People who are careless at sea",
+  "Fuss",
+  "Being made to wait without word"
+ ],
+ "gifts": [
+  "A piece of sea glass you found yourself",
+  "Card: Deepsea Siren",
+  "Surf wax",
+  "Card: Shattered Trident, Treasure of the Deepsea",
+  "A flask of hot whiskey-and-lemon mix from Josie",
+  "Card: Teal Fishing Rod"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Lazy, teasing, unhurried and immediate.",
+  "text": "Saoirse flirts the way she surfs: she sits where things are going to happen and smiles. A slow look, 'pet', an invitation to the boathouse or onto a board on the first or second meeting — warm, amused, utterly without pressure. She likes to be met with the same ease: tease her back, get in the water, do not make it heavy. She is quick to closeness and slow to anything with a name on it; the moment he tries to pin her down early she drifts. What draws her in is steadiness without demand — someone who comes out with her in the grey dawn and is still there, uncomplaining, when she comes back in."
+ },
+ "intimacy": "Easy and early by temperament: a salt-rough hand pulling him up onto the slip, wet curls against his neck, sharing a blanket and a mug on the boathouse step as naturally as breathing. She is sensual in an unselfconscious, outdoors way — sun-warm skin, sea-cold fingers, the smell of wax and woodsmoke — and likes things slow, laughing, unhurried, with the doors open to the tide. The hammock, the loft, a beach fire burning down. What comes harder for her is the morning after as a habit: letting him stay, leaving him a key. Fade as the lantern is hooked on its nail and the boathouse door is pushed to with her foot.",
+ "events": [
+  {
+   "id": "saoirse_e1",
+   "stage": 1,
+   "title": "Bring your own weather",
+   "condition": "Go to boathouse or beach_cove at her invitation in the first three weeks and get on a board or into her boat; fall off without complaint.",
+   "hint": [
+    "She invites people down to the water. Most do not go.",
+    "Accept her invitation to the boathouse and try surfing or sailing with her."
+   ]
+  },
+  {
+   "id": "saoirse_e2",
+   "stage": 2,
+   "title": "Where they're going to be",
+   "condition": "Play her in a real duel (after Day 12) and afterwards come out with her at dawn at least twice more; ask about a piece of sea glass.",
+   "hint": [
+    "She is easy to be around and hard to know. Mornings help.",
+    "Duel her seriously, keep her company on the water at dawn, and ask about her jar of sea glass."
+   ]
+  },
+  {
+   "id": "saoirse_e3",
+   "stage": 3,
+   "title": "No name on it",
+   "condition": "Let things with her become what they are without asking her to define them before she is ready (through the Night of Masks, Day 54); when she is the one to bring it up — a key left on the nail — take it.",
+   "hint": [
+    "She drifts from anyone who holds on too soon. She notices who does not.",
+    "Do not press her for a label; wait until she offers you a key."
+   ]
+  },
+  {
+   "id": "saoirse_e4",
+   "stage": 4,
+   "title": "The pier",
+   "condition": "After Day 66, be at the boathouse on a Night when she is waiting for word of someone (a missing student, or later Lilia) and wait with her; hear about her father.",
+   "hint": [
+    "There is one thing she cannot stand to do. One night she will have to.",
+    "Keep her company on a night she has to wait for news, and let her talk about home."
+   ]
+  },
+  {
+   "id": "saoirse_e5",
+   "stage": 5,
+   "title": "Going out",
+   "condition": "In Term 2, after Day 150, support her taking the armband or the boat — the choice to act rather than drift — and go with her on the sea approach to the north shore or sea_cave; she asks him, in so many words, to be there when she comes back in.",
+   "hint": [
+    "She has been offered something she keeps not answering. The answer is about more than a team.",
+    "Stand with her when she finally decides to lead, and go out on the water with her when it counts."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "best friends",
+   "text": "Thinks Lilia is 'drowning standing up' and stays close.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "friends",
+   "text": "Likes him better than anyone on the team expects.",
+   "public": true,
+   "from": 0
+  },
+  "rox": {
+   "label": "owes",
+   "text": "Rox has kept her on the team through a hundred write-ups.",
+   "public": true,
+   "from": 0
+  },
+  "isolde": {
+   "label": "rivals",
+   "text": "Took a game off her at last year's Cup and enjoys reminding her.",
+   "public": true,
+   "from": 0
+  },
+  "sunny": {
+   "label": "friends",
+   "text": "Dawn water people; Saoirse is teaching her to surf.",
+   "public": true,
+   "from": 6
+  },
+  "josie": {
+   "label": "best friends",
+   "text": "The Mulligan is her second home; Josie is the nearest thing to an older sister she has.",
+   "public": true,
+   "from": 0
+  },
+  "abel": {
+   "label": "friends",
+   "text": "Crews for him when the weather turns; he reminds her of the lifeboat men at home.",
+   "public": true,
+   "from": 0
+  },
+  "viktor": {
+   "label": "friends",
+   "text": "Runs him round the coast in her boat and does not ask why.",
+   "public": false,
+   "from": 15
+  },
+  "noor": {
+   "label": "friends",
+   "text": "Loves winding up the judge; breaks small rules in front of her on purpose.",
+   "public": true,
+   "from": 14
+  },
+  "freya": {
+   "label": "friends",
+   "text": "Someone else who thinks this sea is warm. Good company at a fire; Saoirse counts her drinks without comment.",
+   "public": true,
+   "from": 5
+  },
+  "hedda": {
+   "label": "friends",
+   "text": "The small one shouts at fishermen and can handle a tiller better than half of them. Saoirse likes her.",
+   "public": true,
+   "from": 30
+  },
+  "ed": {
+   "label": "friends",
+   "text": "No fear at all, which at sea is not a compliment. She keeps him in the shallows and likes him enormously.",
+   "public": true,
+   "from": 21
+  },
+  "anni": {
+   "label": "enemies",
+   "text": "The wee policewoman. Saoirse signs the slips with a flourish and has started collecting them.",
+   "public": true,
+   "from": 9
+  },
+  "lucas": {
+   "label": "friends",
+   "text": "The one judge who looks at her feet, sighs, and asks if she'd like a cup of tea.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "beach_cove",
+   "Midday": "lecture_hall",
+   "Afternoon": "great_arena",
+   "Evening": "boathouse",
+   "Night": "boathouse"
+  },
+  "weekend": {
+   "Morning": "beach_cove",
+   "Midday": "boathouse",
+   "Afternoon": "bar",
+   "Evening": "bonfire_pit",
+   "Night": "boathouse"
+  }
+ },
+ "duel": {
+  "skill": 8,
+  "style": "Deepsea Terror: quiet early turns, then something enormous surfaces and the board is suddenly hers. She plays loose and looks half asleep; her reads are the best on the team after Lilia's.",
+  "tilt": "Almost unflappable. But slow, procedural opponents who call every infraction (Noor, Dom) irritate her into careless speed, and she plays badly when someone she cares about has not come back yet."
+ }
+}

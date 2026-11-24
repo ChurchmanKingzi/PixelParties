@@ -1,0 +1,132 @@
+[
+ {
+  "id": "kitchen",
+  "name": "Kitchen shift at Mama's",
+  "offeredBy": "odalys",
+  "place": "commons_kitchen",
+  "pay": 20,
+  "slots": [
+   "Morning",
+   "Evening"
+  ],
+  "requirement": "None. Commons residents only; turn up before the meal.",
+  "text": "Peel, chop, stir, wash up — the breakfast shift is the one Mama most needs covered. Comes with a plate and with whatever Mama has noticed about the row this week."
+ },
+ {
+  "id": "card_shop",
+  "name": "Counter and bulk sorting at the Sleeve & Binder",
+  "offeredBy": "dex",
+  "place": "card_shop",
+  "pay": 25,
+  "slots": [
+   "Afternoon",
+   "Evening"
+  ],
+  "requirement": "Dex or Mika must know Rowan (one visit and an honest trade). Running event tables on Friday nights pays 40 instead but needs the Level-1 mock judge exam.",
+  "text": "Sort ten thousand commons into long boxes, price singles, sweep under the tournament tables. You see what the island buys and sells before anyone else."
+ },
+ {
+  "id": "grounds",
+  "name": "Groundskeeping with Silas",
+  "offeredBy": "silas",
+  "place": "greenhouse",
+  "pay": 18,
+  "slots": [
+   "Morning",
+   "Afternoon"
+  ],
+  "requirement": "None, but he sends away anyone who talks too much on the first day. Sunday shifts include winding the tower clock.",
+  "text": "Rake paths, pot seedlings, carry the oil can, check a fence line. Slow work beside a man who knows every key on the island."
+ },
+ {
+  "id": "bar",
+  "name": "Glass-washing at The Mulligan",
+  "offeredBy": "josie",
+  "place": "bar",
+  "pay": 22,
+  "slots": [
+   "Evening",
+   "Night"
+  ],
+  "requirement": "Josie has to have decided Rowan is not a nuisance. From Day 67 only the Evening slot is legal for students; the Night slot is a curfew breach (and pays 30).",
+  "text": "Wash glasses, change barrels, keep quiet. Fishermen, off-duty staff and strangers in good shoes talk across you as if you were furniture."
+ },
+ {
+  "id": "spa",
+  "name": "Towel attendant at the Campus Spa",
+  "offeredBy": "selene",
+  "place": "spa",
+  "pay": 16,
+  "slots": [
+   "Afternoon",
+   "Evening"
+  ],
+  "requirement": "None. From Day 67 Afternoon only.",
+  "text": "Fold towels into exact pyramids, scrub tubs, top up the cedar buckets. People forget you are there. Selene does not."
+ },
+ {
+  "id": "lifeguard",
+  "name": "Assistant lifeguard at the Pool",
+  "offeredBy": "sunny",
+  "place": "pool",
+  "pay": 18,
+  "slots": [
+   "Midday",
+   "Afternoon"
+  ],
+  "requirement": "Pass the swim test (fitness 4 or better, or two weeks of Physical Conditioning attended). Weekends and free middays only.",
+  "text": "Sit under the second umbrella, watch the shallow end, blow the whistle at the people Sunny likes too much to whistle at herself."
+ },
+ {
+  "id": "stream_crew",
+  "name": "Crew shift on The Top Deck",
+  "offeredBy": "bex",
+  "place": "broadcast_studio",
+  "pay": 25,
+  "slots": [
+   "Evening"
+  ],
+  "requirement": "Broadcast nights only (Tuesday and Friday; late Afternoon from Day 67). Bex takes anyone who can coil a cable; an on-air guest spot (40 cr) needs her trust and a steady voice.",
+  "text": "Pull cable, ride a camera, log tapes. You are in the room when the island's news is made — and when it is not allowed to be."
+ },
+ {
+  "id": "playtest",
+  "name": "Playtester in the Design Lab",
+  "offeredBy": "wren",
+  "place": "design_lab",
+  "pay": 12,
+  "slots": [
+   "Afternoon",
+   "Evening",
+   "Night"
+  ],
+  "requirement": "None. Wren pays a little extra in prototypes and noodles; during the Design Contest (Days 61–75) Livvie needs testers too and cannot pay.",
+  "text": "Play other people's unfinished cards, say what you did rather than what you think, and watch a designer's face while you do it."
+ },
+ {
+  "id": "ferry",
+  "name": "Unloading the ferry",
+  "offeredBy": "abel",
+  "place": "ferry_dock",
+  "pay": 30,
+  "slots": [
+   "Morning"
+  ],
+  "requirement": "Ferry days only (Wednesday and Saturday). A Wednesday shift means skipping a class. Heavy work: fitness 3 or better.",
+  "text": "Crates of boosters, sacks of rice, visiting parents' luggage, the mail. The best-paid honest slot on the island, and you see everything and everyone that arrives."
+ },
+ {
+  "id": "orderly",
+  "name": "Volunteer orderly at the Infirmary",
+  "offeredBy": "camille",
+  "place": "infirmary",
+  "pay": 15,
+  "slots": [
+   "Afternoon",
+   "Evening",
+   "Night"
+  ],
+  "requirement": "Available from Day 41, when the nurse can no longer manage alone. She takes people she trusts to be quiet and kind. Night shifts are exempt from the curfew with her signed pass.",
+  "text": "Change sheets, carry trays, sit with people who cannot ask for anything. It pays badly and it is the only job that takes you through the door of the back ward."
+ }
+]

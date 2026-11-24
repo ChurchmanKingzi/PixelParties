@@ -1,0 +1,21 @@
+{
+ "name": "The Ruins Field",
+ "zone": "wild",
+ "bg": "ruins_field",
+ "night": false,
+ "hike": 2,
+ "hours": "Open to supervised field sections (Professor Ashdown, alternate Saturdays in Term 1); otherwise officially restricted as an archaeological site.",
+ "sight": "North of the Split the jungle opens on a plateau of knee-high grass studded with black stones: low walls, toppled pillars, pavements of small square tiles showing through the turf like scales. Nothing stands higher than your shoulder. Survey pegs and string grids mark Ashdown's trenches. The volcano's flank rises directly behind, and the wind in the grass sounds like cards being riffled, endlessly.",
+ "things": [
+  "Walk the string grid and look into the open trenches",
+  "Brush soil from a pavement and watch a picture come up tile by tile",
+  "Take a rubbing or a sketch for Lore & History field credit",
+  "Find the avenue: two lines of stumps leading toward the mountain",
+  "Pick out figures in the mosaics you could swear you have seen on cards",
+  "Listen to Professor Ashdown lecture on site, crisp and guarded",
+  "Sit on a wall with a sandwich in the oldest place you have ever been",
+  "Follow the avenue to where it ends at a rock face"
+ ],
+ "secret": "The public face of the Tessellate: the school teaches that an unknown 'pre-contact culture' lived here and that Chuck, inspired by their art, borrowed motifs for the game — true as far as it goes. The pavements show contest scenes: two figures at a grid of squares, an audience of spirals. One pavement, kept under a tarpaulin in trench C, shows a falling star, a figure offering it a tile, and the star sitting down opposite — Ashdown covers it when students come. Field sections: Days 13, 41 (cancelled after Day 29 unless she gets them reinstated; in Term 2 she takes a hand-picked few). Tiles here are inert fragments, but a Charter Duel played on the central pavement behaves like one in Umbra House. Hale's camp was at the avenue's end; tent pegs and a rusted lantern are still there. D61+: Santángel's assistants survey here openly under Marrow's permit and start lifting tiles; the wind's riffling sound stops on the days they do.",
+ "access": "Restricted site: supervised sections only; beyond the cordon from Day 29 (pass from ashdown)."
+}

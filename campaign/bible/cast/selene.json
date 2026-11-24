@@ -1,0 +1,233 @@
+{
+ "id": "selene",
+ "name": "Selene Vasquez",
+ "firstName": "Selene",
+ "age": 23,
+ "sex": "f",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Staff cottage by the hot springs",
+ "romance": true,
+ "deck": "Lunatic Cycle (moon phases)",
+ "look": "Long black hair worn loose to her waist, bronze skin, dark amused eyes and the unhurried walk of someone who is never cold. She wears the spa's white linen wrap uniform with a hibiscus behind one ear, and silver rings on her toes. She looks at people as if she already knows where they hold their tension, because she does.",
+ "voice": "Soft, slow and teasing, with Filipino-Spanish music in it; she lets pauses do the work and says what she sees without embarrassment. She never gossips — she mentions. Her laugh is low in the throat. RARE habit (once in a scene at most; most scenes go without it): a quiet 'Mm' of appraisal before she speaks.",
+ "lines": [
+  "Shoulders like a clenched fist. Sit. You are first-year, Commons, and you sleep on your left side. Am I wrong?",
+  "I don't gossip. I listen. People put their secrets down in warm water and forget to pick them up again.",
+  "The moon is the only thing that leaves and always comes back. I built a deck round something reliable.",
+  "You may look — I'd be offended if you didn't. Touching, you ask for. Nicely."
+ ],
+ "intro": "The attendant at the campus spa and hot springs: serene, teasing, and rumoured to know every secret anyone has ever sighed out in the steam.",
+ "traits": [
+  {
+   "id": "selene_1",
+   "text": "She runs the campus spa and the hot-springs bathhouse, and students get one free session a term.",
+   "how": "Spa; orientation leaflet."
+  },
+  {
+   "id": "selene_2",
+   "text": "She can tell what someone is worried about from how they sit down.",
+   "how": "Sit down."
+  },
+  {
+   "id": "selene_3",
+   "text": "She hears everything people say when they relax and repeats almost none of it.",
+   "how": "Ask her something; watch her decide."
+  },
+  {
+   "id": "selene_4",
+   "text": "She swims in the hot springs alone at night once the students are gone.",
+   "how": "Hot springs, Night."
+  },
+  {
+   "id": "selene_5",
+   "text": "She trained as a physiotherapist in Cebu and was working cruise ships when she stepped off here.",
+   "how": "Ask how she came to the island."
+  },
+  {
+   "id": "selene_6",
+   "text": "She plays a deck built on moon phases and always knows what the real moon is doing.",
+   "how": "Play her; ask about the moon."
+  },
+  {
+   "id": "selene_7",
+   "text": "She and the nurse trade remedies, and she and the pool lifeguard trade shifts.",
+   "how": "See them together."
+  },
+  {
+   "id": "selene_8",
+   "text": "She had a brief summer fling with a certain rose-carrying first-year and found it very funny.",
+   "how": "Close stage; or Ashton lets it slip."
+  },
+  {
+   "id": "selene_9",
+   "text": "She has been leaving places since she was seventeen and this is the first one she has not wanted to leave.",
+   "how": "Dating stage."
+  }
+ ],
+ "secret": "Selene Vasquez grew up in a fishing barangay on Cebu, eldest daughter, and has been sending money home since she was seventeen: physiotherapy diploma, then four years on cruise ships as a spa therapist, a life of ports and no addresses. Two years ago her ship put in at Caldera Key for a donors' gala; she walked up to the hot springs at night, got in, and did not go back aboard. Chuck, who found her there at dawn and mistook her — he said — for a water spirit from the Aquatic set, gave her the bathhouse to run. She is exactly as serene as she looks and it is partly professional: people need her to be still water. Wound: she has been everyone's rest stop and no one's destination; men talk to her with their eyes closed. Contradiction: she knows everyone's secrets and nobody on the island knows her mother's name. She is sensual, frank, playful, entirely unashamed of pleasure, and she flirts first and openly — it is partly sport and partly a test: who talks to her with his eyes open?\nShe is the island's confessional. In the steam people say things: Santángel mutters about 'the fellowship' and 'the scorch'; Octavia, once, about a dinner she regrets; Gideon never relaxes at all, which she notes; Jessica has cried there about a piece of jewellery; Ashdown has the nightmares of someone who drowned a long time ago; Marrow, from Day 61, books the private pool and takes phone calls in it as though she were furniture. She does not gossip. She WILL, for someone she trusts, mention. Her ethics are her own and careful: she will not betray a client's pain, but a client's plan to hurt someone is another matter. The hot springs themselves are a clue she has noticed: since the night of Day 26 the north spring runs two degrees colder and tastes of metal, and on Hollow Duel nights it stops steaming altogether for an hour. She was in the water at 02:10 on Day 27 and felt the whole pool ring like a struck bowl. After that she no longer swims at night alone — and, for the first time, wishes she were not alone.",
+ "wants": "To be someone's destination, not their rest stop.",
+ "fears": "That she is only loved with eyes closed.",
+ "crush": "ashton",
+ "crushNote": "He was a ridiculous summer and he still makes her laugh; she suspects there is a decent man under the roses and is curious whether he will ever arrive. It shows as teasing sharper than she gives anyone else, and his free session lasting rather longer than a session.",
+ "crushPace": 0.8,
+ "likes": [
+  "Being looked at and spoken to at the same time",
+  "Honest desire, stated plainly and politely",
+  "Questions about HER life",
+  "People who can be still",
+  "Night swimming, moonrise, ripe mangoes",
+  "Being teased back",
+  "Discretion returned",
+  "Hands that ask first"
+ ],
+ "dislikes": [
+  "Being treated as part of the facilities",
+  "Men who talk at her while she works",
+  "Prudishness dressed as virtue",
+  "Being pumped for gossip",
+  "Roughness, hurry",
+  "Jealous scenes",
+  "Shoes in the bathhouse"
+ ],
+ "gifts": [
+  "Card: Lunatic Cycle - Full Moon",
+  "A ripe mango from the fish-market stall",
+  "Card: Moonlight Butterfly",
+  "Coconut oil from the night market",
+  "A letter posted for her, with the stamp paid (to Cebu)",
+  "Card: Aquatic Shield"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Serene, direct, teasing — an invitation stated out loud.",
+  "text": "Selene flirts from the first session: an appraising look, a low 'mm', an accurate and slightly indecent guess about how he sleeps. She says what she sees and what she likes, enjoys his blush, and makes the terms plain — looking is welcome, touching is asked for. She is in no hurry at all; she likes the long slow build of someone coming back to the springs week after week. She wants to be approached with open eyes: talk to her, ask about her, want her frankly and courteously. She will happily share and is not possessive, but she notices everything, and being one more stop on someone's round is the one thing that makes her go cool and professional."
+ },
+ "intimacy": "The most openly sensual route, and the most unhurried. Her element is warm water and lamplight: the hot springs after closing, steam, the sound of the jungle; her hands, which are trained and very sure, working the knots out of his shoulders while she talks; her hair loose on the water. She teases, instructs, laughs low; she likes to be asked and to be told; she takes delight in his pleasure and plainly in her own, without embarrassment or performance. What is new for her is being held afterwards by someone who asks about Cebu. Keep scenes lush and slow — skin, heat, breath, the slip of water — and fade as she draws him down into the pool and the lantern on the rock gutters.",
+ "events": [
+  {
+   "id": "selene_e1",
+   "stage": 1,
+   "title": "Shoulders",
+   "condition": "Use the free session at spa in the first three weeks; keep your eyes open and ask her one question about herself.",
+   "hint": [
+    "Everyone gets one free session. Most people spend it talking about themselves.",
+    "Visit the spa and take an interest in the attendant herself."
+   ]
+  },
+  {
+   "id": "selene_e2",
+   "stage": 2,
+   "title": "Eyes open",
+   "condition": "Come back to hot_springs several times; play her a duel on the bathhouse step and ask what the moon is doing; never ask her for gossip.",
+   "hint": [
+    "She hears everyone's secrets. Do not ask for them.",
+    "Become a regular at the hot springs and never press her for other people's secrets."
+   ]
+  },
+  {
+   "id": "selene_e3",
+   "stage": 3,
+   "title": "Asked nicely",
+   "condition": "After the Freshman Cup (Days 19–20), accept her invitation to the springs after closing (hot_springs, Night) and ask — in words — for what you want. Be honest about any other routes; she will know anyway.",
+   "hint": [
+    "She has stated her terms plainly. All that remains is to meet them.",
+    "Accept her invitation to the springs at night and be straightforward with her."
+   ]
+  },
+  {
+   "id": "selene_e4",
+   "stage": 4,
+   "title": "Struck bowl",
+   "condition": "After Day 27, ask what she felt in the water that night and what the north spring has done since; when she 'mentions' something a client intends, act on it without exposing her. She asks him not to leave her alone there after dark.",
+   "hint": [
+    "The springs have changed, and so has what she overhears in them.",
+    "Ask her what she has noticed in the water lately and protect her as a source."
+   ]
+  },
+  {
+   "id": "selene_e5",
+   "stage": 5,
+   "title": "Destination",
+   "condition": "In Term 2, ask about Cebu and post the letter; when Marrow or the administration leans on her to report what students say, back her refusal; on Lantern Night (Day 139) take her somewhere that is not the spa.",
+   "hint": [
+    "She has been everyone's rest stop. Lantern Night is for somewhere else.",
+    "Learn about her home, defend her discretion, and spend Lantern Night with her away from her work."
+   ]
+  }
+ ],
+ "bonds": {
+  "ashton": {
+   "label": "exes",
+   "text": "A summer fling she ended laughing; she still finds him funny.",
+   "public": false,
+   "from": 0
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "A favourite client, and one whose confidences she keeps most carefully.",
+   "public": true,
+   "from": 10
+  },
+  "sunny": {
+   "label": "friends",
+   "text": "The loud one from the pool, whose company she finds restful anyway.",
+   "public": true,
+   "from": 4
+  },
+  "camille": {
+   "label": "friends",
+   "text": "The one person on campus more tired than her clients.",
+   "public": true,
+   "from": 0
+  },
+  "mika": {
+   "label": "friends",
+   "text": "Sleepy, sharp, and the best listener in town after herself.",
+   "public": true,
+   "from": 0
+  },
+  "josie": {
+   "label": "friends",
+   "text": "Josie carries something heavy. Selene does not ask; she pours.",
+   "public": true,
+   "from": 0
+  },
+  "fiona": {
+   "label": "friends",
+   "text": "A performer who needs somewhere to stop performing. Selene keeps the small pool free on Tuesdays.",
+   "public": true,
+   "from": 12
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "He keeps her hours. They play on the bathhouse step when the students have gone, and neither hurries.",
+   "public": true,
+   "from": 20
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "spa",
+   "Midday": "spa",
+   "Afternoon": "hot_springs",
+   "Evening": "spa",
+   "Night": "hot_springs"
+  },
+  "weekend": {
+   "Morning": "hot_springs",
+   "Midday": "spa",
+   "Afternoon": "beach_cove",
+   "Evening": "bar",
+   "Night": "hot_springs"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Lunatic Cycle: artifacts waxing from new moon to full, slow and inevitable; she plays as if the outcome were tidal.",
+  "tilt": "Aggression. A hard early rush before the full moon simply runs her over, and she does not mind."
+ }
+}

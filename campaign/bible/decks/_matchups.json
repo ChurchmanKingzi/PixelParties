@@ -1,0 +1,366 @@
+{
+ "inya": {
+  "score": 1,
+  "reason": "The Storm and sweepers punish a wide board of tiny creatures and drain Bubbles, but a mistimed sweep or Yeeting sets off a loaded Bunny Bombs on your own heroes; popped early with The Yeeting it is harmless."
+ },
+ "willas": {
+  "score": 1,
+  "reason": "He is faster for a few turns, but the deck is one hero deep: freeze or kill Tazune and the recoil does the Storm's work for it."
+ },
+ "georgie": {
+  "score": -1,
+  "reason": "The Black-Thorn Dragon and its hero ignore Spells entirely, the Storm feeds her eggs on her own turn, and she rarely misplays; only the artifact answers and potions keep it close."
+ },
+ "jessica": {
+  "score": 1,
+  "reason": "Fire Bomb undoes her whole investment and her shields cannot buy off Storm ticks, but Boris with the Sun Sword hits a creatureless deck very hard."
+ },
+ "nathan": {
+  "score": 2,
+  "reason": "Mid-sized creatures that all come down together are what Flame Avalanche, Cataclysm and the Storm were made for, and he never plays around them."
+ },
+ "guest_early": {
+  "score": 1,
+  "reason": "Still a board of mid-sized creatures in front of a sweeper deck, but it is now tutored and played without errors, and it holds Deepsea Idol for the right sweep."
+ },
+ "rana": {
+  "score": -1,
+  "reason": "Her traps punish exactly what this deck does every turn (Ability activations, attachments, equipment); patience, untargeted damage and counting her fuel win it back."
+ },
+ "teobalt": {
+  "score": -2,
+  "reason": "Hatusbal switches off eight Leaderships, the Mystic switches off the potions and Natas cancels the key spell every turn; only the frailty of the Tuscans to a sweep keeps a door open."
+ },
+ "viktor": {
+  "score": 0,
+  "reason": "His traps tax the deck's constant drawing and attaching, but they flip into small creatures the sweepers love and he gives away turns."
+ },
+ "noor": {
+  "score": -1,
+  "reason": "She alone can turn the Clock back and she counts better than anyone; but the Clock makes Cataclysm free and every creature the Storm kills puts a counter on her account."
+ },
+ "brant": {
+  "score": 0,
+  "reason": "He needs creatures to survive a turn, which the sweepers deny, but kills feed the Rider Warg and his two hero shots race the Storm well."
+ },
+ "dom": {
+  "score": 0,
+  "reason": "Before the Board his one-health army is the best target the Storm could ask for; after the black pieces pair up, sweepers, hero effects and deck searches all stop working."
+ },
+ "kenji": {
+  "score": 0,
+  "reason": "He gives the Storm all the setup time it wants and has no healing, but a fully armed Toras kills a hero a turn and Fire Bomb, normally the answer to equipment, feeds him."
+ },
+ "octavia": {
+  "score": -1,
+  "reason": "No creatures to sweep, Circles that punish Area removal, and a hero who taxes exactly the long, busy turns this deck likes; but her heroes are unprotected against the Storm."
+ },
+ "bex": {
+  "score": 0,
+  "reason": "Freezes on the Storm caster hurt, but the Storm ticks even while its caster is frozen, Tea turns her count against her and her hitters are small."
+ },
+ "wren": {
+  "score": 1,
+  "reason": "Sweepers hit the shared puppet pool four times over and The Yeeting deletes puppets for good; her search engine and the card-removing puppet keep it from being easy."
+ },
+ "felix": {
+  "score": 0,
+  "reason": "Catch the Dream Landers bare and the sweepers win easily; once Antonia is assembled, damaging his board costs this deck its attachments."
+ },
+ "chuck": {
+  "score": 1,
+  "reason": "A pile with two real heroes and no defence; only its sheer unpredictability and the Howitzer turns make it dangerous."
+ },
+ "santangel": {
+  "score": -1,
+  "reason": "A creatureless deck gives Reiza her double turns almost at once and every stun lands on the Storm caster; Tea, three copies of it, is the card that keeps this playable."
+ },
+ "hana": {
+  "score": -1,
+  "reason": "Nearly everything this deck casts chooses or hits a hero, which is what her traps wait for; untargeted Storm ticks, The Yeeting and patience are the way through."
+ },
+ "blum": {
+  "score": 1,
+  "reason": "His whole engine is a row of small creatures in front of a sweeper deck; Luck, Zwei and Accidental Dodge tax the Ability stacking but cannot stop the Storm."
+ },
+ "vivienne": {
+  "score": 0,
+  "reason": "A deck that wins by stacking Abilities, equipment and a full hand is the best audience she could have; her own damage is thin and her heroes burn like anyone's."
+ },
+ "rox": {
+  "score": -1,
+  "reason": "Huge health pools blunt the Storm and a stun on the caster every turn is hard to carry; Firewall, Tea, Snow Cannon and Flashbang all line up well against one-attack-at-a-time damage."
+ },
+ "ashdown": {
+  "score": 0,
+  "reason": "Slow enough to set up against, but the Hammer of Deri knocks the Storm off its caster with every hit and broken relics keep coming back."
+ },
+ "josie": {
+  "score": 1,
+  "reason": "Slow, gold-hungry and built on small tokens that sweepers delete for good; Elixir of Strength turns and the open Elixir of Immortality are the traps to respect."
+ },
+ "lilia": {
+  "score": -2,
+  "reason": "No creatures for the sweepers, traps for single hits, a stack that grows by itself from turn one and deletes the Storm at six, and four Golden Ankhs: the strongest deck on the island. Only repeated removal aimed at Wowhalla gives an opening."
+ },
+ "ashton": {
+  "score": 1,
+  "reason": "Slower than the Storm, with an engine of small creatures; Eraser Beam, Rain of Death and Magic Mirror are the cards that can steal it."
+ },
+ "baylee": {
+  "score": 0,
+  "reason": "Slow enough for the Storm to come online and helpless against Dark Gear, but his creatures shrug off sweepers and the Stomps and the Chimera hit hard."
+ },
+ "livvie": {
+  "score": -1,
+  "reason": "A setup deck that reshuffles and levels spells is what the Crystals, the discard and The Master's Plan prey on; her fragile heroes, the single Area she depends on and Rowan's extra gold keep it winnable."
+ },
+ "marit": {
+  "score": 0,
+  "reason": "Her heroes are small and slow to defend, but the Phoenix laughs at burn-based removal; even The Yeeting only makes it come back; the duel turns on Dark Gear, the size of her hand and tempo."
+ },
+ "pippa": {
+  "score": 1,
+  "reason": "A deck that needs a wide board of tiny creatures to survive a turn, against Flame Avalanche, Cataclysm and the Storm; the burns and the freeze loop are what she fights back with."
+ },
+ "sunny": {
+  "score": 1,
+  "reason": "Small creatures that must survive a turn to matter, and a fragile hub hero: the sweepers and the Storm are well placed, though Deepsea Idol, her potions and the freeze lane can steal a game."
+ },
+ "gideon": {
+  "score": 1,
+  "reason": "His Beasts feed on the spells this deck throws away, but they all die to one sweep and then block their own replacements; a discard from The White Eye does the same."
+ },
+ "saoirse": {
+  "score": 0,
+  "reason": "Her creatures must sit for a turn before they can swap, which suits the Storm and sweepers; her stuns, gold theft and the Sandy Blob cost this deck tempo."
+ },
+ "priya": {
+  "score": 0,
+  "reason": "A single announced attack per turn is what Firewall, Snow Cannon and Homerun! are for, but each volley that does land removes a hero from a deck with only three."
+ },
+ "isolde": {
+  "score": 1,
+  "reason": "Rows of small Skeletons are sweeper food and each rebuild costs her cards; the Hammer Skeleton, the Demon that taxes draws and Vacarn's instant raises are what she fights back with."
+ },
+ "dex": {
+  "score": 0,
+  "reason": "Caught early the Dwarfs die to one sweep; given two turns they outgrow every sweeper and only Dark Gear and the race against his small heroes remain."
+ },
+ "mika": {
+  "score": 1,
+  "reason": "A hive of small creatures that needs a quiet turn is what the sweepers punish; if the Queen does land behind an Attendant, the deck this plan depends on starts disappearing."
+ },
+ "guest": {
+  "score": -1,
+  "reason": "It ends long turns and is paid for every reshuffle, search and potion draw, which is how this deck normally plays; the Storm ticking without plays and a sweep on the collectors are the way through."
+ },
+ "rex": {
+  "score": -1,
+  "reason": "Chain Lightning from turn one is at its very best against three heroes and no creatures, and his Snow Cannons freeze the Storm caster; Sol Rym's frailty and Firewall keep it close."
+ },
+ "generic_1": {
+  "score": 0,
+  "reason": "A mutual burn race that the Storm should win, unless Luna Kiai, Dichotomy and Goff make the fire one-sided."
+ },
+ "generic_2": {
+  "score": 1,
+  "reason": "Everything it owns sits on one fragile hero in front of a deck with Fire Bomb, Snow Cannon and Homerun!."
+ },
+ "generic_3": {
+  "score": -1,
+  "reason": "Steady healing out-paces Storm ticks and every heal shoots back; Fire Bomb on the Howitzers is the whole matchup."
+ },
+ "generic_4": {
+  "score": -1,
+  "reason": "Tempeste blanks Storm ticks and the Demons punish a long game; kill her early and sweep the Demons young and it turns around."
+ },
+ "generic_5": {
+  "score": -1,
+  "reason": "A creatureless deck loses every tie and cannot burn the Ifrits; killing Damus early or removing Ifrits with artifacts is the only route."
+ },
+ "generic_6": {
+  "score": 0,
+  "reason": "Slow and self-poisoning in front of a deck with three Tea and an untargeted clock, but Medea doubles every tick and its cancels and Shamanic Curse hit the setup."
+ },
+ "generic_7": {
+  "score": 0,
+  "reason": "Small shooters that need a turn to wake are sweeper food and the Storm ticks even from a frozen caster; Divine Gift of Forgetting, the Web and the Plan all hit an Ability-stacking spell deck."
+ },
+ "generic_8": {
+  "score": 0,
+  "reason": "Null halves the sweepers and shared Storm ticks and darkens the caster's effects, but he is one fighter in front of Snow Cannon, Tea and single-target burn."
+ },
+ "ed": {
+  "score": 0,
+  "reason": "Logan is easy to burn and a single Snow Cannon cancels his payout, but one unanswered shot removes the Storm caster and his other two heroes are very tough."
+ },
+ "sammy": {
+  "score": -1,
+  "reason": "A reaction for every card this deck plays, but nothing against Abilities already attached or a Storm already ticking."
+ },
+ "leona": {
+  "score": 0,
+  "reason": "Her deck is as good as what she steals, and this deck has plenty worth stealing; her heroes are ordinary and slow to hurt you."
+ },
+ "victoria": {
+  "score": 2,
+  "reason": "A collection, not a deck."
+ },
+ "ophelia": {
+  "score": -1,
+  "reason": "A creatureless deck cannot burn Ifrits and loses every tie; it has to kill Damus early or strip Ifrits with its artifacts."
+ },
+ "eberhart": {
+  "score": 1,
+  "reason": "One fragile attacker carrying everything, in front of Fire Bomb, Snow Cannon and Homerun!; the Pike takes Firewall away."
+ },
+ "magnus": {
+  "score": 0,
+  "reason": "One announced attacker against Tea, Snow Cannon and Flashbang, but the stuns land on the Storm caster every turn. His later decks follow the rotation."
+ },
+ "maisie": {
+  "score": 1,
+  "reason": "Small machines in front of a sweeper deck and a hero who gives up her action to go into debt; the Scrap Plow and Missing Parts are the real threats."
+ },
+ "mikoto": {
+  "score": 1,
+  "reason": "A grinding Skeleton build with little damage; only The Bonegrinder makes sweeping it a mistake."
+ },
+ "fiona": {
+  "score": -2,
+  "reason": "Sweepers, Storm ticks on creatures and The Yeeting all turn her wheel for her; only hero damage, freezes and Dark Gear are safe."
+ },
+ "freya": {
+  "score": 0,
+  "reason": "She freezes heroes, not the Storm: attached early it ticks through everything, but an Iceage before that costs whole turns."
+ },
+ "hedda": {
+  "score": 2,
+  "reason": "A wide board of very small creatures and nothing else."
+ },
+ "tobias": {
+  "score": -1,
+  "reason": "Sid starts with this deck's own win condition and plays it at once, and Andras stuns two heroes a turn."
+ },
+ "tomi": {
+  "score": 0,
+  "reason": "He prices this deck's artifact answers out of reach, but its spells, potions and Storm cost nothing and his damage is small."
+ },
+ "eloise": {
+  "score": 1,
+  "reason": "Slow, pretty and built on a few precious creatures; only her traps punish a spell deck, and the Storm does not aim."
+ },
+ "helical": {
+  "score": 1,
+  "reason": "A slow machine made of equipment and creatures, in front of Fire Bomb, Dark Gear and sweepers."
+ },
+ "trixie": {
+  "score": 1,
+  "reason": "A swarm of small creatures that needs something of yours to die; a creatureless deck gives it only heroes and her own Kegs."
+ },
+ "dmitri": {
+  "score": 1,
+  "reason": "An expensive chain of equipment against a deck with Fire Bomb, and plenty of time to find it."
+ },
+ "rafa": {
+  "score": 1,
+  "reason": "A pile of single-use potions with ten blanks in it; the discard duels and the open Elixir are its only traps."
+ },
+ "cas": {
+  "score": 1,
+  "reason": "Three expensive artifacts and a crew of small creatures that all have to survive."
+ },
+ "junho": {
+  "score": 0,
+  "reason": "His creatures want to be killed, which blunts the sweepers; his three frail heroes do not."
+ },
+ "anni": {
+  "score": 0,
+  "reason": "A pack of tiny creatures would be ideal for the sweepers if the Labradoodle did not shrink them to nothing."
+ },
+ "lucas": {
+  "score": 1,
+  "reason": "One attacker and one cancel a turn against three ticks a turn; his recycling loop needs kills this deck is slow to give him."
+ },
+ "tariq": {
+  "score": 0,
+  "reason": "Sweepers feed his pile and the Windstorm undoes the Storm, but his heroes are open and his spells burn their own fuel."
+ },
+ "sebastian": {
+  "score": 1,
+  "reason": "A deck that wins with the opponent's creatures finds none here; only the hero locks, the gold drain and Nero Zira are real, and Von Pixmarck's swap does nothing."
+ },
+ "imara": {
+  "score": 0,
+  "reason": "She assembles a perfect burn hand faster than the Storm comes online and taxes every search this deck makes, but has no board, no defence and no healing."
+ },
+ "tavita": {
+  "score": 0,
+  "reason": "Her shields answer single hits, not three ticks a turn, but Broghan cannot be frozen and his late hit removes a hero each turn."
+ },
+ "pilar": {
+  "score": 1,
+  "reason": "A crowd of one-health creatures in front of sweepers; the Bomb Golems punish a slow turn, and under Moana the Storm itself is a fragile creature her Rain of Arrows can remove."
+ },
+ "thandi": {
+  "score": 0,
+  "reason": "A clock with no board: the sweepers find nothing and Tempeste blunts the Storm's small hits for her other heroes, but those heroes are frail, the count is public, and White Eye discards take the Trials out of her hand."
+ },
+ "keoni": {
+  "score": 1,
+  "reason": "His engine wants things to defeat and this deck offers no creatures; he is slow, gold-hungry and built round one attacker who can be frozen. Late, Club of Gobbo makes that attacker's hits impossible to cancel, and every removed tool comes back."
+ },
+ "zeynep": {
+  "score": 1,
+  "reason": "A Projection cancels one hit however small, and this deck deals many small hits to all three heroes at once; Acid Vial cannot be cancelled at all. But she is fast, attacks twice a turn, and Onima sends the Storm's Destruction Magic back to hand."
+ },
+ "shirin": {
+  "score": 0,
+  "reason": "Three honest heroes doing one thing a turn give the Storm time, and there is nothing to sweep; but Doq guesses well against a hand full of spells, Icy Grave freezes the caster for two turns, and Surefire Shot ignores every shield."
+ },
+ "baraka": {
+  "score": 1,
+  "reason": "Food with one health that must survive a turn to be eaten, in front of Flame Avalanche and three Storm zaps a turn; Rakah starts with no Attack and little health. If a Siren sticks and the sweeps run out, his one hit becomes lethal."
+ },
+ "cati": {
+  "score": -1,
+  "reason": "Every sweeper and every Storm zap that kills a Paraseed moves it into the caster's support zone and poisons him for good: the deck's usual plan is exactly what she wants. Only aiming at heroes, The Yeeting and Tea get round it."
+ },
+ "gani": {
+  "score": 0,
+  "reason": "A paper troupe in front of sweepers, but once a Strongman is out every creature this deck kills is another Applause Counter: won by removing the Strongman alone and hitting the heroes, lost by sweeping on reflex."
+ },
+ "guest_early_baylee": {
+  "score": 0,
+  "reason": "Slow enough for the Storm to come online and helpless against Dark Gear, but his creatures shrug off sweepers and the Stomps and the Chimera hit hard."
+ },
+ "guest_early_ed": {
+  "score": 0,
+  "reason": "Logan is easy to burn and a single Snow Cannon cancels his payout, but one unanswered shot removes the Storm caster and his other two heroes are very tough."
+ },
+ "guest_early_tobias": {
+  "score": -1,
+  "reason": "Sid starts with this deck's own win condition and plays it at once, and Andras stuns two heroes a turn."
+ },
+ "guest_early_sammy": {
+  "score": -1,
+  "reason": "A reaction for every card this deck plays, but nothing against Abilities already attached or a Storm already ticking."
+ },
+ "guest_early_fiona": {
+  "score": -2,
+  "reason": "Sweepers, Storm ticks on creatures and The Yeeting all turn her wheel for her; only hero damage, freezes and Dark Gear are safe."
+ },
+ "guest_early_freya": {
+  "score": 0,
+  "reason": "She freezes heroes, not the Storm: attached early it ticks through everything, but an Iceage before that costs whole turns."
+ },
+ "guest_early_hedda": {
+  "score": 2,
+  "reason": "A wide board of very small creatures and nothing else."
+ },
+ "guest_early_sunny": {
+  "score": 1,
+  "reason": "Small creatures that must survive a turn to matter, and a fragile hub hero: the sweepers and the Storm are well placed, though Deepsea Idol, her potions and the freeze lane can steal a game."
+ }
+}

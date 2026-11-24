@@ -1,0 +1,18 @@
+{
+ "name": "Broadcast Studio",
+ "zone": "campus",
+ "bg": "broadcast_studio",
+ "night": false,
+ "hours": "Classes for Auxiliary in the Midday slot; 'The Top Deck' goes live Tuesday and Friday evenings (from the curfew: late Afternoon).",
+ "sight": "A black-walled room behind a red ON AIR lamp. A two-seat casters' desk faces three cameras and a wall of monitors showing arena feeds, ladder tickers and a chat scrolling too fast to read. Cables are taped to the floor in careful rivers. Through the glass a mixing desk glows like a small city, and the whole place hums and smells of warm electronics and hairspray.",
+ "things": [
+  "Sit in the audience chairs during a live Top Deck broadcast",
+  "Try the caster's chair and read a teleprompter line without your voice cracking",
+  "Watch old finals in the replay booth with slow motion and overlays",
+  "Help Bex pull cable and learn which cameras actually record",
+  "Record a thirty-second player profile for the ladder ticker",
+  "Browse the tape wall: twelve years of Academy finals, labelled by hand",
+  "Take a paid crew shift on broadcast nights (25 cr)"
+ ],
+ "secret": "Bex's and Vivienne's ground. Job site (stream crew). The Top Deck is the island's news: Bex is first with the bang (special broadcast Day 27), the crater, and each incident — and the first to be told by the Chancellor's office to stop. The tape wall has a gap: the year nine years back runs only to its October. The studio records all arena and dome feeds for 30 days. The Trial Dome 3 recording of the night before Day 40 exists: the picture is intact but the sound drops to nothing for eleven minutes and the holograms on the tape throw shadows across the floor. Whoever finds it (Bex, Pippa or Rowan on a crew shift) holds the first hard evidence. After Day 61 somebody with a staff key tries to wipe the archive. ACCESS NOTE: The archive booth is locked; Bex has a key, Vivienne has a key."
+}

@@ -1,0 +1,382 @@
+{
+ "name": "Signed For",
+ "owner": "cati",
+ "heroes": [
+  "Bloom, the Maniacal Botanist",
+  "Pes'zet, the Plague Bringer",
+  "Klaus, the Cult Leader"
+ ],
+ "main": [
+  [
+   4,
+   "Paraseed"
+  ],
+  [
+   3,
+   "Paraseed Greenhouse"
+  ],
+  [
+   2,
+   "Paraseed Zombie"
+  ],
+  [
+   2,
+   "Paraseed Control"
+  ],
+  [
+   3,
+   "Plant Golem"
+  ],
+  [
+   3,
+   "Stowaway"
+  ],
+  [
+   3,
+   "The Warlord's Bite"
+  ],
+  [
+   3,
+   "Venom Infusion"
+  ],
+  [
+   2,
+   "Poison Pollen"
+  ],
+  [
+   3,
+   "Toxic Fumes"
+  ],
+  [
+   2,
+   "Poisoned Well"
+  ],
+  [
+   3,
+   "Klaus' Mom"
+  ],
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   2,
+   "Idol of Crestina"
+  ],
+  [
+   3,
+   "Sickly Cheese"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   6,
+   "Decay Magic"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Inventing"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Bloom, the Maniacal Botanist": "Hero",
+  "Pes'zet, the Plague Bringer": "Hero",
+  "Klaus, the Cult Leader": "Hero",
+  "Paraseed": "Creature L0",
+  "Paraseed Greenhouse": "Area (Summoning Magic)",
+  "Paraseed Zombie": "Spell (Decay Magic, Reaction)",
+  "Paraseed Control": "Spell (Decay Magic, Reaction)",
+  "Plant Golem": "Creature L1",
+  "Stowaway": "Creature L1",
+  "The Warlord's Bite": "Spell (Decay Magic)",
+  "Venom Infusion": "Spell (Decay Magic)",
+  "Poison Pollen": "Spell (Decay Magic)",
+  "Toxic Fumes": "Spell (Decay Magic)",
+  "Poisoned Well": "Spell (Decay Magic)",
+  "Klaus' Mom": "Creature L1",
+  "Aggressive Town Guard": "Creature L0",
+  "Idol of Crestina": "Artifact (Reaction)",
+  "Sickly Cheese": "Artifact",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Decay Magic": "Ability",
+  "Summoning Magic": "Ability",
+  "Inventing": "Ability"
+ },
+ "gist": {
+  "Paraseed": "A small creature. When one of your heroes or creatures defeats it, it moves into that hero's support zone instead of dying: that hero is poisoned for as long as it sits there, the poison cannot be healed, and it eats maximum health.",
+  "Bloom, the Maniacal Botanist": "Poison on any hero that carries Paraseeds hurts far more, for each Paraseed on it.",
+  "Pes'zet, the Plague Bringer": "Every time a creature lands in one of her heroes' support zones she adds a stack of poison to any target on the board.",
+  "Klaus, the Cult Leader": "When he casts a Decay spell a lower-level creature drops from her hand into his zone for free.",
+  "Paraseed Greenhouse": "Area: once a turn she discards a card to plant a Paraseed from the deck on one of her own heroes, or moves any number of Paraseeds on the board onto other heroes — yours included.",
+  "Plant Golem": "Summoned into YOUR hero's support zone: that hero cannot act. You control it and may spend your Action and a discard to destroy it.",
+  "Stowaway": "Summoned into any hero's support zone: that hero's effect and Abilities are off, as a curable status. Nothing else touches the Stowaway; cure the status and it is deleted.",
+  "Paraseed Control": "When a hero of yours dies of poison with a Paraseed on it, she revives it on her side of the table for good.",
+  "Paraseed Zombie": "When one of her heroes would be defeated, a Paraseed is planted on it and it stays at one health.",
+  "The Warlord's Bite": "Several stacks of poison at once on a target that has none.",
+  "Poison Pollen": "Stuns everything that is poisoned.",
+  "Poisoned Well": "A stack of poison on everything you control.",
+  "Klaus' Mom": "Takes a Decay spell back out of the discard pile every turn."
+ },
+ "plan": "Cati delivers. Paraseeds are parcels: kill one with a spell and it moves into your caster's support zone, poisons him for good and shrinks his maximum health; once the Greenhouse is in play she simply re-addresses them onto your heroes herself. Bloom makes that poison savage, Pes'zet adds a stack whenever anything lands on her side, Poison Pollen stuns whatever is poisoned, and a Plant Golem or a Stowaway arrives on the hero carrying your Storm. A hero that dies of it joins her. She has almost no direct damage and her heroes are ordinary: everything depends on your sweepers and zaps opening her parcels, and on one Area.",
+ "looks": {
+  "early": "Two Paraseeds and a Town Guard on her side; a Plant Golem rooted in front of your caster.",
+  "mid": "Paraseeds sitting in YOUR support zones; the Greenhouse on the table; poison ticking.",
+  "late": "One of your heroes standing on her side of the table."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Her side holds two Paraseeds that she seems perfectly happy to lose.",
+   "why": "Whatever kills a Paraseed carries it home: a sweep puts every one of them into your caster's support zone. Aim at heroes, never at the parcels."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Paraseed Greenhouse is in play and she is moving Paraseeds onto your heroes herself.",
+   "why": "The Area is the engine now. The Yeeting takes a Paraseed out of your own zone and its poison with it, Snow Cannon on Bloom switches off the worst of the damage, and her heroes are ordinary."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Your Storm caster carries two Paraseeds and a Plant Golem; Poison Pollen is coming.",
+   "why": "He dies in two turns and then stands up on her side. Tea moves the curable statuses off him, The Yeeting clears a Paraseed, and keeping the carrier alive comes before everything else."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Her hand is empty and the Greenhouse is gone.",
+   "why": "Her heroes never hit back; all that is left on her side is parcels you should not open."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Cati sets down two Paraseeds and looks at them fondly.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning: she has to pick heroes first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Bloom"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the lot, and sign for them"
+     }
+    ]
+   },
+   {
+    "board": "A Plant Golem arrives in your caster's support zone: he cannot act.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Spend the Action and a discard to clear it, then burn heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Golem"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Level another hero and sweep later"
+     }
+    ]
+   },
+   {
+    "board": "Klaus casts The Warlord's Bite on Tarleinn and a Paraseed slides into his own zone for free.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Klaus"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea: pass the poison across to Bloom"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Paraseeds"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Paraseed Greenhouse comes down; she moves two Paraseeds across the table onto your Storm caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting takes one out of your zone, and its poison with it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything into Bloom"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche, and receive the rest"
+     }
+    ]
+   },
+   {
+    "board": "Your Storm zaps at the start of her turn: she chooses three Paraseeds, and all three walk over to your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Bloom before the poison ticks"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race: her heroes are ordinary"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Keep sweeping"
+     }
+    ]
+   },
+   {
+    "board": "A Stowaway boards Nicolas: his effect and Abilities are off.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea cures it and the Stowaway is deleted"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it and burn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep around it"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Poison Pollen: everything poisoned is stunned, and your caster is the most poisoned thing on the island.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea onto the caster, the statuses onto Pes'zet"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Paraseed that is feeding Bloom"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more Destruction Magic to a stunned hero"
+     }
+    ]
+   },
+   {
+    "board": "Your caster is two ticks from dying with a Paraseed aboard; she is keeping one card back.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn and clear the Paraseed"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the card she is holding"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Let him go and start again"
+     }
+    ]
+   },
+   {
+    "board": "Paraseed Control: Tarleinn dies of poison and stands up on her side of the table.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Protect the next carrier; Homerun! does not stop poison"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Burn your own former hero down"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Begin a new Storm from nothing"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No hand, no Greenhouse; three Paraseeds on her side.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning: heroes first"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Acid Vial on Bloom"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche, for old times' sake"
+     }
+    ]
+   },
+   {
+    "board": "Bloom alone, a Paraseed Zombie keeping her at one health.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "One more hit"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea ready, and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Pes'zet for one more stack of poison.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Klaus"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea in hand"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

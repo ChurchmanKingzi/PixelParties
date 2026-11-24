@@ -1,0 +1,474 @@
+# ═══════════════════════════════════════════════════════════════════
+#  TAG 1 · MORGEN · FÄHRE · HECK und BRÜCKE
+#  Kanon: bible/places/ferry_stern.json, ferry_bridge.json
+#  Heck = der ruhige Teil des Schiffs: hier trifft, wer Leute sucht statt Streit.
+# ═══════════════════════════════════════════════════════════════════
+
+@place ferry_stern
+  travel 0
+  travelFrom ferry_deck=3 ferry_lounge=2 ferry_bridge=3
+  onArrive stern_first
+  object jessica sprite=jessica x=20 y=96 h=66 label="Girl with the caskets" scene=ferry_jessica when day=1 and time<10:40 and not met:jessica
+  object jessica_m sprite=jessica x=20 y=96 h=66 label="Jessica" scene=ferry_jessica when day=1 and time<10:40 and met:jessica
+  object ashton sprite=ashton x=36 y=94 h=70 label="Boy with a rose" scene=ferry_ashton when day=1 and time<10:40 and not met:ashton
+  object ashton_m sprite=ashton x=36 y=94 h=70 label="Ashton" scene=ferry_ashton when day=1 and time<10:40 and met:ashton
+  object victoria sprite=victoria x=56 y=88 h=60 label="Girl with a parasol" scene=ferry_victoria when day=1 and time<10:40 and not met:victoria
+  object victoria_m sprite=victoria x=56 y=88 h=60 label="Victoria" scene=ferry_victoria when day=1 and time<10:40 and met:victoria
+  object ophelia sprite=ophelia x=68 y=100 h=64 label="Short-haired girl" scene=ferry_ophelia when day=1 and time<10:40 and not met:ophelia
+  object ophelia_m sprite=ophelia x=68 y=100 h=64 label="Ophelia" scene=ferry_ophelia when day=1 and time<10:40 and met:ophelia
+  object sunny sprite=sunny x=80 y=100 h=68 label="Girl on the rail" scene=ferry_sunny when day=1 and time<10:40 and not met:sunny
+  object sunny_m sprite=sunny x=80 y=100 h=68 label="Sunny" scene=ferry_sunny when day=1 and time<10:40 and met:sunny
+  object marit sprite=marit x=92 y=94 h=64 label="Girl on a bollard" scene=ferry_marit when day=1 and time<10:40 and not met:marit
+  object marit_m sprite=marit x=92 y=94 h=64 label="Marit" scene=ferry_marit when day=1 and time<10:40 and met:marit
+  action wake "Watch the wake and the gulls" scene=stern_wake when day=1 and time<10:40
+  action cage "Look through the luggage cage" scene=stern_cage when day=1 and time<10:40
+
+@place ferry_bridge
+  travel 0
+  travelFrom ferry_deck=2 ferry_lounge=2 ferry_stern=3
+  onArrive bridge_first
+  object abel sprite=abel x=62 y=96 h=74 label="The captain" scene=ferry_abel when day=1 and time<10:40 and not met:abel
+  object abel_m sprite=abel x=62 y=96 h=74 label="Captain Stroud" scene=ferry_abel when day=1 and time<10:40 and met:abel
+  object rana sprite=rana x=24 y=100 h=48 label="Scowling girl" scene=ferry_rana when day=1 and time<10:40 and not met:rana
+  object rana_m sprite=rana x=24 y=100 h=48 label="Rana" scene=ferry_rana when day=1 and time<10:40 and met:rana
+  object teobalt sprite=teobalt x=84 y=94 h=62 label="Boy with a clipboard" scene=ferry_teobalt when day=1 and time<10:40 and not met:teobalt
+  object teobalt_m sprite=teobalt x=84 y=94 h=62 label="Teobalt" scene=ferry_teobalt when day=1 and time<10:40 and met:teobalt
+  action list "Read the passenger list" scene=bridge_list when day=1 and time<10:40
+  action plate "Read the brass plate by the door" scene=bridge_plate when day=1 and time<10:40
+  action chart "Look at the chart" scene=bridge_chart when day=1 and time<10:40
+  action binoculars "Borrow the binoculars" scene=bridge_binoculars when day=1 and time<10:40
+  action overlook "Look down on the ship" scene=bridge_overlook when day=1 and time<10:40
+
+# ───────────────────────────── HECK ─────────────────────────────
+
+@scene stern_first once bg=ferry_stern
+  You follow the side deck aft past the funnel, which breathes warmth over your shoulder like a large, sleeping animal. And then the noise falls away.
+  The open after deck: a long white wake running back to an empty horizon, gulls riding the air above the flagstaff, a wire luggage cage stacked to the top with trunks. One bench stands dry under a canvas awning. The rest of the planking shines with spray.
+  It is quieter here than forward. The mainland is gone.
+  Half a dozen people are scattered across the deck, each in their own small piece of calm, and none of them is quarrelling with anybody. A girl is reciting to the gulls. A boy is standing very nobly at the rail holding a rose. Beside the cage, a very still girl in a ruffled dress sits under a parasol, and a short-haired girl with her arms crossed stands guard at her elbow.
+  ~ So this is where people go who want to meet each other.
+  @time 3
+
+@scene stern_wake
+  The wake is a long white seam, stitched behind the ship and closing as it goes. Gulls ride the air above it with their wings fixed, barely moving. They watch the water like accountants.
+  You stand at the rail with the wind behind you and say nothing to anyone. It is, you realise, the longest you have been quiet since you got on the boat.
+  ~ Nobody is looking at me. Nobody is waiting for me to do anything.
+  It feels, for a moment, like a gift.
+  @time 8
+
+@scene stern_cage
+  The luggage cage is a wire pen stacked to the top with trunks, duffels, and one inexplicable tuba. Every item has a paper label tied to it, handwritten.
+  You read some. HALVORSEN B. — FRAGILE (a very large hard case that you suspect holds nothing breakable at all). WHISPER N. — OPEN ME AND DIE (a battered duffel, with a smaller, tidier label beneath that says in another hand: *please don't*). CAPULET V. & O. — HANDLE WITH GRACE. LUND P. — CAMERA, DON'T. THANA O. — one small bag, tied twice.
+  At the bottom of the pile, sagging, you find your own duffel. The label says, in Aunt Dee's handwriting: ROWAN — CALL HER WHEN YOU LAND.
+  ~ I will. I will call her the minute I know what to say.
+  @flag found_duffel
+  @time 5
+
+@scene ferry_jessica
+  @if not met:jessica
+    Beside a crewman's trolley stacked with three leather caskets, a beautiful girl sits with one gloved hand on the smallest. Long dark chestnut curls, violet eyes, a small beauty mark under the left one. Jewellery chosen fresh this morning and worn as if it were nothing. A mild, patient look on her face, the look of someone who has been approached by a great many people with a great many lines.
+    She is not looking at you. She has, however, noticed you crossing the deck.
+    @choice
+      > A plain hello. "Hello. I'm Rowan." @hint Plain
+        [jessica?] "Hello." She looks up. A small, real smile, like a candle catching. "That's the first time this morning anyone has crossed the deck to say that and nothing else."
+        [jessica?] "Jessica Montclair. I would shake your hand, but I do not take my gloves off for these." A tilt of the head at the caskets.
+        @meet jessica
+        @aff jessica +4 | Said hello plainly
+        @flag jessica_plain
+      > Say something clever about the caskets. @hint Line
+        [jessica?] "How lovely." It is a very warm, very final phrase. "Those are my jewels. Not the corpses you were about to suggest."
+        [jessica?] "Jessica Montclair."
+        @meet jessica
+        @aff jessica +1 | Made a joke
+      > A line from the rose boy's playbook. @hint Cheesy
+        [jessica?] "Ah." A gracious, faintly sorrowful lift of the brow. "I have been addressed that way four times this morning. By the same boy. You are, I think, an imitation, and I am not sure how I feel about that."
+        [jessica?] "Jessica Montclair."
+        @meet jessica
+        @aff jessica -2 | Used a line
+    @add ferry_talked +1
+    @if jessica_plain
+      [jessica] "Where are you going to be living?"
+      [rowan] "The Commons. Bungalow seven."
+      [jessica] "Spectral Tower. I have a room on the second floor, apparently. With a view of the volcano." A small, wry shrug. "Nobody has told me yet whether I am meant to find that pleasant."
+    @time 8
+  @else
+    @if not jessica_game_after_docks
+      [jessica] "Do sit."
+      @choice
+        > Sit and keep her company.
+          For a few minutes the two of you watch the wake. She asks you real questions, and waits for the answers. It is an odd and pleasant feeling, like being held in warm light.
+          [jessica] "I don't chase, Rowan. It isn't pride. It's that I should like to know someone crossed the room on purpose."
+          @aff jessica +2 | Stayed to talk
+          @time 15
+        > Ask her for a game. @hint She declined earlier
+          [jessica] "On a boat? With my caskets in the way?" A gracious headshake. "After we dock. If you remember to ask me then."
+          @flag jessica_game_after_docks
+          @aff jessica +1 | Asked politely
+        > Excuse yourself.
+          [jessica] "Of course. Go and cross some other deck."
+    @else
+      [jessica] "Rowan."
+      @time 3
+
+@scene ferry_ashton
+  @if not met:ashton
+    A tall, slim boy with golden hair swept up into a crest stands very nobly at the rail, holding a single rose by the stem. A little silver knife is folded in his other hand. He is trying one line after another. Not one of them is working.
+    [ashton?] "A rose for the lady, and my condolences to every man she met before me."
+    The lady in question, thirty feet away, is looking at the sea.
+    [ashton?] "Ah. An audience." He swings round, seeing you for the first time. "Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does."
+    @meet ashton
+    @add ferry_talked +1
+    [ashton] "Vance, isn't it. The laundry boy with the storm deck. Don't look like that. I've watched your replays. Twice."
+    [rowan] "You — what?"
+    [ashton] "Everyone's watched them, old thing. You think the ladder's a secret?"
+  @else
+    [ashton] "Vance! Rescue me."
+  @choice
+    > "Is that working?" @hint Gestures at Jessica
+      [ashton] "No." Cheerfully. "But she hasn't asked me to stop, and I have a theory that persistence is a kind of conversation."
+      [ashton] "I lost at the lounge table half an hour ago, so I'm quite used to it."
+      @flag ashton_lost_table
+      @aff ashton +1 | Made him laugh
+    > "What happened at the table?" @if ashton_lost_table or table_resolved
+      [ashton] "Gideon." A shrug of the shoulders. "He did nothing. For nine turns he did nothing. I attacked, he sat there, I attacked more, and when I'd finished hanging myself, he took my head off."
+      [ashton] "Elegant, really. I have never been so thoroughly beaten by someone doing so little."
+      @flag saw_counter
+      @aff ashton +1 | Shared the story
+    > "How did Gideon take it?" @if table_resolved
+      @if ferry_table_won
+        [ashton] "Beaten! By YOU! Do you know what that is worth?" He is delighted. "He carried it very well. Said nothing. Looked ill. Bravo."
+      @elif ferry_inya_won
+        [ashton] "Beaten by a child with bunnies! I wish I could have seen his face."
+      @elif ferry_table_lost
+        [ashton] "Oh, my dear boy. Four cases. Up that hill. I'd say bring a hat."
+      @elif ferry_table_settled
+        [ashton] "You — made him play for nothing. I want to hear about that for an hour."
+      @else
+        [ashton] "The child lost. She attacked first. I could have told her."
+      @aff ashton +1 | Brought news
+    > "Play a game?" @if not flag_ashton_game
+      [ashton] "For no stake. Lazily. Is she watching?" He glances at Jessica, who is not. "She is. Very well."
+      @duel ferry_ashton deck=ashton name="Ashton Beaumont-Lyle"
+        @win
+          [ashton] "Poisoned the field and still lost. How instructive. Naturally." A beat. "…What was the question?"
+          @aff ashton +2 | Good sport
+        @lose
+          [ashton] "Do tell the lady, if she asks, that I won gracefully."
+          @aff ashton +2 | Won gracefully
+      @flag flag_ashton_game
+      @time 25
+    > Go and speak to the girl with the caskets.
+      [ashton] "Do. Do. And tell her I said hello. Or that I said nothing. Or don't."
+  @time 6
+
+@scene ferry_victoria
+  @if not met:victoria
+    Under the one dry canvas awning, on the one dry bench, a girl in a ruffled dress sits with a lace parasol open over her head, although she is already under an awning. Long pale-gold ringlets tied with ribbons. Wide sky-blue eyes that rest on things rather than people. She is watching the wake.
+    She does not look round. A very short girl, standing at her elbow, is looking at you.
+    @choice
+      > Speak to her plainly. "Excuse me. I'm Rowan. Is it all right if I sit?" @hint Plain
+        [victoria?] "Yes." She turns her head. "I should like that. I have been here since Tuesday." A pause. "That is a joke. I am told that I do not make them. I was practising."
+        [victoria?] "Victoria Capulet. This is my sister Ophelia."
+        @meet victoria
+        @aff victoria +3 | Asked her plainly
+        @flag victoria_plain
+      > Make a joke. @hint Joke
+        Silence. The sea goes on being the sea.
+        Then the short-haired girl at her elbow says, flatly, "Meaning what?"
+        [ophelia?] "She didn't hear you. She's looking at the sea. She'll finish in about a minute."
+        @meet ophelia
+        @aff victoria -1 | Joked at her
+        @aff ophelia -1 | Joked at her sister
+      > Say something with a few others. @hint Group
+        Three heads turn. The silence is very polite. And then very, very long.
+        [ophelia?] "That's a lot of people. She doesn't talk to crowds."
+        @meet ophelia
+        @aff ophelia -1 | Crowded her sister
+    @add ferry_talked +1
+    @time 8
+  @else
+    @if victoria_plain
+      [victoria] "Rowan." She looks up. It is a very still, very attentive look. "The sea has been exactly the same colour since we left. I find that restful."
+      @choice
+        > Ask what she is looking at.
+          [victoria] "The place where the wake becomes the sea. It is not a line. It is a decision." Quiet. "It is not a very large decision. I like it."
+          @aff victoria +2 | Asked about her view
+        > Ask if she'd play a game. @hint After docks
+          [victoria] "I do not play in a crowd. After we dock. At a table." A faint, almost-smile. "I should like it very much."
+          @flag victoria_game_after_docks
+          @aff victoria +1 | Asked politely
+        > Let her be.
+          [victoria] "Thank you."
+    @else
+      [ophelia] "She's thinking. Give her a minute."
+      @aff ophelia +0 | Waited
+    @time 5
+
+@scene ferry_ophelia
+  @if not met:ophelia
+    A short-haired, short-tempered looking girl in a red jacket stands at the luggage cage with her arms crossed and her eyes on the dry bench. The sleeves are shoved to the elbow and the collar unbuttoned. At first glance she could be a boy. She seems quite used to that.
+    [ophelia?] "You're staring."
+    [rowan] "I'm — sorry. I was looking at the cage."
+    [ophelia?] "It's a cage. It has luggage in it. What did you expect?"
+    @meet ophelia
+    [ophelia] "Ophelia Capulet. Second-year. That's my sister on the bench. Don't crowd her."
+    @add ferry_talked +1
+    @choice
+      > "Would you like to play?" @hint Cards
+        [ophelia] "After we dock." Flat. "Not on a boat. Boats are for waiting."
+        @flag ophelia_game_after_docks
+        @aff ophelia +1 | Asked a plain question
+      > "What does she do?"
+        [ophelia] "She looks at things." Bluntly. "She's very good at it. Don't make that into a joke."
+        @aff ophelia +2 | Respectful
+      > "Sorry. I'll go."
+        [ophelia] "Good."
+        @aff ophelia +0 | Backed off
+    @time 5
+  @else
+    [ophelia] "She's thinking. Give her a minute." A beat. "Meaning what?"
+    @time 3
+
+@scene ferry_sunny
+  @if not met:sunny
+    A tall girl is sitting on the lower bar of the rail with her bare feet dangling over the wake. A towel is slung round her neck like a scarf. Her ponytail is wet, although it has not rained. She is, at the exact moment you notice her, doing something with a deck of cards that involves flipping half of it into the air and catching it behind her back.
+    She sees you looking and grins with her whole face.
+    [sunny?] "You're the wildcard! Nice shoulders for a laundry bloke. That's a compliment, don't make it weird."
+    @meet sunny
+    @add ferry_talked +1
+    [sunny] "Sunny Aldane. Sports scholarship. I'm the lifeguard, as of — what — Monday. Everything on the island's going to fall in the water, and I'm the one who fishes it out. It's literally the job."
+    [sunny] "I like you. There, said it. Your turn — or we can race for it."
+    @choice
+      > "You like me? You've known me thirty seconds."
+        [sunny] "Takes me thirty. That's practically a marathon for me."
+        @aff sunny +3 | Liked directly
+      > "Race you where?"
+        [sunny] "Off the stern to the lifeboat and back! No — kidding, I'd get us both thrown off." She laughs, a big, easy sound. "Cards. Come on. Loser does ten push-ups."
+        @aff sunny +2 | Played along
+        @jump sunny_game
+      > Go red and say nothing.
+        [sunny] "Ha! There it is. That's a good colour on you."
+        @aff sunny +1 | Blushed
+    @time 8
+  @else
+    @label sunny_game
+    @if not flag_sunny_game
+      [sunny] "Right. Ten push-ups for the loser. On the planks."
+      @choice
+        > "You're on."
+          @duel ferry_sunny deck=sunny name="Sunny Aldane"
+            @win
+              [sunny] "No dramas!" She is already face-down on the planks, counting aloud, loudly, with great goodwill. "Seven! Eight! Nine — I'm lying, that was six. TEN!" She bounces up. "Good game, Wildcard!"
+              @aff sunny +3 | Took the loss well
+            @lose
+              [sunny] "Ha!" Triumphant. "Ten! Go on! Face down!"
+              You do ten. By the seventh your arms are shaking. By the tenth you are lying on the planks next to a seagull with the sun on your back, and Sunny is lying next to you, laughing, and you realise you are laughing too.
+              @aff sunny +4 | Did the push-ups
+          @flag flag_sunny_game
+          @time 25
+        > "Not on a wet deck."
+          [sunny] "Chicken." Affectionately. "Come find me on land."
+    @else
+      [sunny] "Hey, Wildcard! Still alive?"
+      @aff sunny +1 | Chatted
+      @time 5
+
+@scene ferry_marit
+  @if not met:marit
+    A girl in a flame-orange bow tie is standing on a mooring bollard, reciting to the gulls.
+    "…and in that hour, when the sea went grey as a forgotten promise —" She has long flame-orange ombré hair that stands up at the crown. She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter.
+    She sees you. The recital stops.
+    [marit?] "A human! An audience! Behold!"
+    [marit?] "Marit Solberg. Commentary track, theatre kid, flame-adjacent. You are the brooding stranger from the rainy west."
+    @meet marit
+    @add ferry_talked +1
+    [rowan] "I'm from — Ohio, mostly."
+    [marit] "Rowan Vance. Storm-bringer. I have decided we are having an arc."
+    @choice
+      > "What kind of an arc?"
+        [marit] "Oh, the good kind. The kind where you start out afraid of something and end up with a very good coat." She grins. "I'll let you know."
+        @aff marit +2 | Played along
+      > "A game, then?" @hint She narrates
+        [marit] "A GAME. Yes. Yes yes yes. And I shall narrate every move. Because I cannot help it."
+        @jump marit_game
+      > "Is that a hobby?"
+        [marit] "It's a calling." Quieter, an aside, almost ordinary. "Also a hobby. I'm not 'too much'. I'm the correct amount for a larger room."
+        @aff marit +3 | Saw behind the act
+    @time 8
+  @else
+    @label marit_game
+    @if not flag_marit_game
+      [marit] "A game! I shall narrate. You will hate it. You will love it. Behold!"
+      @choice
+        > "Let's go."
+          A small crowd gathers around the bollard in the time it takes to shuffle. Six people, then eight. The deckhand with the tea, two girls from the lounge, a boy with a clipboard. Your hands begin to shake the moment you pick up the deck.
+          ~ Everyone's watching. Not me, exactly. The game. But close enough.
+          [marit] "From the ashes of my frankly terrible opening hand — she RETURNS! (I had no idea that would work.)"
+          @duel ferry_marit deck=marit name="Marit Solberg"
+            @win
+              [marit] "Alas! Defeat! And what a defeat, ladies and gentlemen, what a — no, it's a good one. Rowan Vance, you have a very quiet kind of thunder."
+              @aff marit +3 | Good game
+            @lose
+              [marit] "The phoenix, ladies and gentlemen. Always the phoenix." She takes a very small, very private bow, then drops, mid-flourish, into her ordinary voice: "That was lovely. Thank you for letting me."
+              @aff marit +3 | Played with her
+          @flag flag_marit_game
+          @time 25
+        > "Maybe later."
+          [marit] "Later! The sequel! The sequel is always better."
+    @else
+      [marit] "Rowan! Protagonist! Have you seen the island? It has a MOUNTAIN. I've already written a monologue."
+      @aff marit +1 | Chatted
+      @time 5
+
+# ───────────────────────────── BRÜCKE ─────────────────────────────
+
+@scene bridge_first once bg=ferry_bridge
+  You take the iron stair two steps at a time. At the top is a narrow wing outside the wheelhouse door, a slab of weathered deck with a rail and a view.
+  From up here the whole ship lies below you: fore deck, funnel, stern, the white seam of the wake. People look like cards laid out for a game you do not yet know the rules of. The island stands dead ahead, larger now, its dark flanks furred with jungle.
+  Through the open door you see a brass wheel, a compass in a glass bowl, and a chart held flat by a mug. A man in a navy suit and a blue bowler hat stands at the wheel with his feet apart, talking without turning round.
+  @time 3
+
+@scene bridge_overlook
+  From the wing you can see who is where. A knot of people at the lounge stair. A girl on the stern rail with her feet over the wake. A small crowd round a bollard where somebody is waving an arm at the gulls. Nathan, a spiky dot, in motion on the fore deck, talking at a very tall dot.
+  @if table_resolved
+    The lounge door lets out a ripple of noise, and then another. Whatever was going to happen at the table has happened.
+  @else
+    A small dot with a deck box stands at the end of a table. The deck has gone quiet, in the way decks do before something happens.
+  @time 4
+
+@scene bridge_plate
+  A small brass plate is screwed to the wheelhouse door, bright where the sleeves of generations have rubbed it:
+  M/V SECOND CHANCE — EVERYBODY GETS ONE.
+  ~ That's either the most reassuring or the most alarming thing I've read all week.
+  @time 2
+
+@scene bridge_chart
+  The chart is pinned flat by a chipped mug that says WORLD'S OKAYEST CAPTAIN. It shows the island as a rough, blunt oval with a volcano at the centre, the pier on the south coast, a bay with the town on its western curve, and a dotted line round the north shore labelled, in a very old hand, DO NOT.
+  Somebody has drawn a small boat on the south side, dead on the pier, and written: *tie up 10.40*.
+  @time 3
+
+@scene bridge_binoculars
+  The binoculars hang from a hook inside the door. Nobody stops you from borrowing them.
+  Through the lenses the island becomes sharp and brilliant: the black rim of the crater, the green flanks, a white tower on the south cliff that must be the lighthouse. And, clear as a sketch, a long curve of pale beach with a row of tiny roofs along it. Seven of them. You count.
+  ~ Bungalow row. Seven roofs. Mine's the last one, probably. Late admission, last bungalow.
+  @flag saw_commons_roofs
+  @time 5
+
+@scene bridge_list
+  The passenger list hangs on a clipboard beside the wheelhouse door, typed. You read down it.
+  Thirty-five names in a tidy column, and then, at the bottom, a thirty-sixth, in ink, squeezed in at a slight angle as if added in a hurry:
+  *Vance, R. — Wildcard.*
+  ~ Everyone who reads this list knows who the Wildcard is.
+  @flag read_passenger_list
+  @time 3
+
+@scene ferry_abel
+  @if not met:abel
+    The man at the wheel is barrel-chested, with a full white beard and a blue bowler hat gone soft with age. His face is the colour and texture of a good saddle.
+    [abel?] "Thirty-five and — hold on. Thirty-six! There you are. I counted thirty-five." He does not turn round. "Captain Abel Stroud. Welcome to the Second Chance. If you are going to be sick, do it leeward — that's the side that isn't me."
+    @meet abel
+    @add ferry_talked +1
+  @else
+    [abel] "Thirty-six. Still thirty-six."
+  @choice
+    > "When do we dock?"
+      [abel] "Ten-forty! On the nose! Not a minute before, not a minute after, or I will eat my hat. Which is soft. I've considered it."
+      @aff abel +1 | Asked about docking
+    > "How long have you been on this run?"
+      [abel] "Twenty-two years. I've carried champions, and I've carried trunks home without their owners. I know which I'd rather."
+      [abel] "Hundred and forty-four out in September. I like a hundred and forty-four back in June. Don't spoil my sums."
+      @aff abel +2 | Asked about his work
+    > "What's the weather going to do?"
+      [abel] "Fair, then lumpy, then fair. Same as everyone's morning." He laughs at his own joke, a big, rolling laugh. "That's one of six. I'll do the next one in half an hour."
+      @aff abel +1 | Laughed at the joke
+    > "Do you play, Captain?"
+      [abel] "Not at sea. One game a year, on land, with Race Boats, which is a novelty deck and loses." A wink in his voice. "Ask me in May."
+      @flag abel_game_may
+      @aff abel +1 | Asked about cards
+    > "Is there anything I can carry ashore for you?" @if not has_snapper
+      [abel] "Hm." A very long pause, and a very small cough into his beard. "There is a crate of snapper under the tarp by the door. For Mrs Fuentes — runs the kitchen at the Commons. You'll know her. You can't miss her. She will be the one with the spoon."
+      [abel] "No message. Just — it's good snapper."
+      @flag has_snapper
+      @aff abel +3 | Offered to carry the snapper
+    > Thank him and go.
+      [abel] "Mind the step!"
+  @time 5
+
+@scene ferry_rana
+  @if not met:rana
+    On the top step of the iron stair a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship. Brown curly hair dragged into a high ponytail. Black nail polish, chipped from biting. A plain grey collar studded with tiny silver studs. She is watching the planks.
+    She knows you are there. She does not look up.
+    [rana?] "No."
+    [rowan] "I haven't — "
+    [rana?] "No. Whatever it is. No."
+    @choice
+      > Sit down on the stair near her. @hint Quiet
+        She makes a very small noise in her throat. It is not welcome, but it is not a wall, either.
+        You sit. You say nothing.
+        After a while she speaks, without looking at you.
+        [rana?] "…You can read, right? There's a list. I'm on it. I'm on a different list, too, with a different collar." A very quick, very bitter glance. "Don't."
+        [rowan] "Don't what?"
+        [rana?] "Whatever you were going to ask."
+        @meet rana
+        @aff rana +2 | Didn't push
+      > "What's your name?"
+        [rana?] "Rana. That's all you get." Under six words, nearly. "Why."
+        @meet rana
+        @aff rana +1 | Asked plainly
+      > Ask why she is sitting alone.
+        Her whole body goes rigid. The scowl, which looked permanent, finds another notch.
+        [rana?] "Why do you care."
+        @meet rana
+        @aff rana -2 | Pushed
+        @flag rana_pressed
+    @add ferry_talked +1
+    @time 6
+  @else
+    @if rana_pressed
+      [rana] "Whatever."
+      @time 2
+    @else
+      [rana] "…Yeah?"
+      @choice
+        > "Deck-building question." @hint Tentative
+          [rana] "What." A beat. Then, very fast: "Chain LOCUST off ANTS before their next turn and the whole swarm comes in a turn early. It's not that interesting." And then, to herself, softer: "Whatever."
+          [rowan] "That's actually quite clever."
+          [rana] "Don't."
+          @aff rana +3 | Asked about decks
+          @flag rana_deck_talk
+        > "Good to see you again."
+          [rana] "Mm."
+        > Leave her.
+          [rana] "Good."
+      @time 4
+
+@scene ferry_teobalt
+  @if not met:teobalt
+    A boy with a neat brown side parting and square glasses is standing very straight at the wheelhouse door with a clipboard. He is looking slightly over the heads of the crowd below, as if counting them. There is a spare pen behind his ear.
+    [teobalt?] "Excuse me. Do you know in what order the luggage comes off? It is a question of logistics."
+    [rowan] "I — no. I'm sorry."
+    [teobalt?] "No. Nobody does. I have asked the captain, and he says it comes off in the order it comes off. That is, I'm afraid, not an order."
+    [teobalt?] "Teobalt Ferrant. I have drawn up a list."
+    @meet teobalt
+    @add ferry_talked +1
+    @choice
+      > "Could I see the list?"
+        [teobalt] "Three things." A rustle, a page, a pen. "One: the unloading order, which I have taken the liberty of estimating. Two: who has my stapler, which is not relevant yet. Three is confidential until I've solved one and two."
+        He tears out a clean copy and hands it over. It is colour-coded.
+        @item "Teobalt's unloading list"
+        @flag has_unloading_list
+        @aff teobalt +3 | Wanted the list
+      > "Play a game?"
+        [teobalt] "Thursday. I am making a list." A faint, regretful smile. "It is an excellent offer. I accept it for Thursday."
+        @flag teobalt_thursday
+        @aff teobalt +1 | Asked politely
+      > "Sorry to bother you."
+        [teobalt] "It is no bother. It is, at worst, an interruption. And I like those, in moderation."
+    @time 6
+  @else
+    [teobalt] "Rowan. Is the list working?"
+    @if has_unloading_list
+      [rowan] "It's wonderful. It's teal."
+      [teobalt] "Teal. Yes." A very small, very pleased pause. "Nobody ever notices the teal."
+      @aff teobalt +2 | Noticed the teal
+    @time 3

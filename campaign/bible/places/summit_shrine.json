@@ -1,0 +1,20 @@
+{
+ "name": "The Summit Shrine",
+ "zone": "wild",
+ "bg": "summit_shrine",
+ "night": false,
+ "hike": 3,
+ "hours": "On the highest point of the rim, north side; a full day there and back. Few students ever see it.",
+ "sight": "On the north peak of the rim, above the last cinder and often above the cloud, stands a small roofless square of fitted black stones, open to the sky. In its middle is a waist-high block with a grid of shallow squares cut into the top and a single tile set in one corner. The floor is a spiral mosaic worn nearly blank by weather. The wind never stops, and you can see the curve of the world.",
+ "things": [
+  "Reach it — that is most of the thing",
+  "Stand in the square and look straight down the north slope to the shore",
+  "Study the block: nine by nine shallow squares, one tile in place",
+  "Follow the floor spiral with your feet",
+  "Leave an offering as others have: a card, a coin, a ribbon",
+  "Watch cloud pour over the rim below you",
+  "Stay very still and feel the mountain hum through the soles of your boots"
+ ],
+ "secret": "The Tessellate's lookout and CHALLENGE STONE (three sides of the block each show a falling star ending inside a square — three earlier Visitors, bound; the fourth side is blank): here they watched the sky, and from here a formal contest was announced to a Visitor (the single tile is the 'first move', left standing for centuries as an open invitation). A Charter Duel formally issued with a hand on this block is 'heard' by anything on the island bound by the old rules — this is how Rowan can summon the Guest to the Vault on his own terms rather than be found by it, and how he can name the place and the ante (the way-to-win clause: ante 'everything you have taken', played in the Vault). Madame Oru's people kept this shrine; her line 'where the squares are warm' points to the Vault, and 'say it where the sky can hear' points here. Offerings left by past climbers include a smoke-grey ribbon. From D27 the single tile has moved one square.",
+ "access": "Beyond the cordon from Day 29; reachable unseen by the eastern rim path from the lava-tube shoulder."
+}

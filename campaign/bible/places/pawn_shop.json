@@ -1,0 +1,18 @@
+{
+ "name": "Second Draw Pawn & Loan",
+ "zone": "town",
+ "bg": "pawn_shop",
+ "night": false,
+ "hours": "Afternoon and Evening; a brass bell, a grille and a proprietor who never gives his name.",
+ "sight": "Three steps down from an alley off Main Street, behind a window so cluttered it works as a wall: guitars, sextants, diving helmets, wedding rings on a card, and trays of single trading cards in yellowed sleeves. Inside, a grille and a counter, and a man with a jeweller's loupe who has all the time in the world. Everything here was once somebody's emergency. It smells of brass polish and damp.",
+ "things": [
+  "Pawn something for credits — and get a ticket with a date on it",
+  "Redeem something, yours or somebody else's",
+  "Go through the card trays: bent, played, occasionally astonishing",
+  "Ask what a card is really worth and get a number lower than the truth (he pays 35% of list value)",
+  "Recognise an item in the window",
+  "Sell without questions asked",
+  "Look at the locked cabinet behind him, the one with the cloth over it"
+ ],
+ "secret": "Emergency credits at a cruel rate, and the place where desperation shows: Livvie's mother's locket is in the window by Day 30 (redeeming it for her, 120 cr, anonymously or not, is a major route beat); Rana pawns her judge-quality playmat before the Island Open. Stolen cards surface here — some of what Brant extorted, sold by his hangers-on in September, can be bought back for their owners. The cloth-covered cabinet holds a loose first print: a Kaboom Alpha 'Treasure Chest', pawned nine years ago by a frightened student for a ferry ticket and never redeemed (ticket stub name: one of the Umbra four). The pawnbroker will sell it to the first serious buyer: one of Marrow's aides buys it on Day 75 unless Rowan gets there first (price 2,500 cr, or a wager duel — he is a townsman, not bound by the school's charter, but he is a gambling man)."
+}

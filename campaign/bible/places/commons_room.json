@@ -1,0 +1,20 @@
+{
+ "name": "Bungalow 7 — Your Room",
+ "zone": "dorms",
+ "bg": "commons_room",
+ "night": true,
+ "part": "commons_beach",
+ "hours": "Bungalow 7 — yours, with two roommates: Baylee Halvorsen and Nathan Whisper. (Any other bungalow visited on the row uses this same picture, dressed with its residents' things.)",
+ "sight": "One long plank room with three iron beds, three footlockers and a ceiling fan that ticks on every fourth turn. Baylee's bed, reinforced with a door laid under the mattress, is made with military corners; Nathan's is an explosion of socks, booster wrappers and a poster of the War Counselors. Your corner has the window on the sea, a wobbly desk and one bare bulb. The walls are thin enough that you know what the neighbours think. At night the surf comes in through the shutters and the room smells of salt and Baylee's liniment.",
+ "things": [
+  "Sleep (ends the day; restores energy)",
+  "Study or rebuild your deck at the wobbly desk",
+  "Talk to your roommates in the dark, when people say true things",
+  "Look through your footlocker: Aunt Dee's letter, the cracked phone, the one good shirt",
+  "Lay out 'Gather That Storm!' on the bed and goldfish opening hands",
+  "Write home",
+  "Check the ladder on the cracked phone under the blanket",
+  "Listen to the row at night through the plank walls"
+ ],
+ "secret": "The most important room in the campaign. Before D27: Nathan snores like a chainsaw, borrows Rowan's sleeves without asking, and — once, clumsily — defends Rowan to Brant's face. Make him loud, exhausting and impossible to hate{H=nathan?; the player must miss him|}.{H?| Make the room and its neighbours on the row dear to the player: one first-year of the row will not be here after the night of Day 26, and the game decides who on that night.} NIGHT OF D26: {H=@room?{H}'s bed empties after the bang; his deck box is gone, his boots are gone, his toothbrush stays.|{H}'s bed in {H:bungalow} empties after the bang.} FROM D27: '{H}' comes back at Midday with glass dust in {H:his} hair. {H=nathan?He stops snoring.|}{H=@row?From Day 28 its cot stands in this room, between the beds (see its notes).|}{H=@near?From Day 28 it sits on the steps of this bungalow every evening and stands below the window at ten past two (see its notes).|} Whenever Rowan wakes at night (1 in 2) the shape sits upright on the bed, eyes open, facing north; if spoken to: 'I am listening to the island. Go back to closing your eyes.' Other tells to ration over weeks: the shadow on the wall arrives late; he no longer blinks; the bed is always made, copied crease for crease from Baylee's; unknown cards with a deep-sea-and-stars frame appear between the War Counselors ('They were always mine'); a tin under his bed fills with small neatly labelled things that are antes. Baylee notices before Rowan does and says nothing because he has no words for it; he moves his bed a hand's width further away each week and about Day 45 asks Mama for the spare cot in Bungalow 8, the laundry, unless given a reason to stay. Bungalow 6 next door (Sammy, Tobias, Dmitri) hears everything through the plank wall — and, after D27, nothing at all. If the shape is exposed before Day 106, {H=@near?what is left on the top step of number 7 is|what is left on {H}'s bed is} a drift of black glass sand in the outline of a sleeper."
+}

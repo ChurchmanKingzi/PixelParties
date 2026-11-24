@@ -1,0 +1,273 @@
+{
+ "id": "thandi",
+ "name": "Thandiwe \"Thandi\" Mokoena",
+ "firstName": "Thandi",
+ "age": 22,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 4,
+ "dorm": "spectral",
+ "room": "Spectral Tower, third floor, the junior warden's room (3A)",
+ "romance": true,
+ "deck": "Five Signatures (Trials: wins by passing five tests, hurting nobody — Beato, the Butterfly Witch; Archibald, the Archmage; Tempeste, the Weather Fairy)",
+ "look": "Tall (about 5'10\") and slender with a long neck and a netball player's upright carriage, deep dark-brown skin, and black hair cropped very close to the skull with a razor-cut part line above the left temple. Wide-set dark-brown eyes, high cheekbones, a dimple in the chin and a calm closed-mouth smile. Large flat silver disc earrings. She wears the gold Game Design jacket fully buttoned with the white, gold-edged Spectral collar, a narrow green warden's ribbon pinned to the left lapel under a brass badge shaped like a small open book, and a brass pocket watch on a chain in the breast pocket. She carries the Sign-Out Book — a green cloth ledger with a red ribbon marker and a fountain pen clipped to the cover — against her chest with her left arm. She stands very straight with her weight on both feet and looks down at people kindly.",
+ "voice": "Low, even and exact, Eastern Cape English; she asks 'back by when?' first and waits for a real answer. Dry rather than stern: her jokes arrive late and deadpan. With Georgie she is slower and softer and never talks over the child's head. The crosser she is, the more polite she gets. Off duty: warmer, competitive, funny about her bad taste in novels; hums the alto line in empty corridors. RARE habit (once in a scene at most; most scenes go without it): 'Write it down.'",
+ "lines": [
+  "Back by nine means the pen is in your hand at nine. I can wait. Her bedtime can't.",
+  "I design games nobody loses. My professors call it a flaw. I call it a thesis.",
+  "The choir needs a baritone. You look like a man nobody has asked. I'm asking.",
+  "Netball. Goal defence. I am not a gracious loser and I've stopped apologising.",
+  "My mother works nights. I learned to cook at ten and to worry at eleven.",
+  "That detective novel is terrible. I've read it twice. Don't tell me who did it.",
+  "A suite the size of a house and one child in it. Somebody should count the lights.",
+  "Be charming on your own time. At this desk you are a signature.",
+  "I got a rule wrong once, on purpose. Ask me in a year."
+ ],
+ "intro": "Spectral Tower's junior warden: a tall, exact fourth-year Game Design student who keeps the sign-out book for the Tower's under-age residents — this year, one fourteen-year-old — and wants to know when you will have her back.",
+ "traits": [
+  {
+   "id": "thandi_1",
+   "text": "She is the junior warden of Spectral Tower: anyone taking Georgie Santa off campus, or keeping her out after eight, signs the green book at the atrium desk first.",
+   "how": "Try to take Georgie anywhere; the desk in the Spectral atrium."
+  },
+  {
+   "id": "thandi_2",
+   "text": "She times every return with a brass pocket watch and writes the minute down, early or late.",
+   "how": "Bring Georgie back."
+  },
+  {
+   "id": "thandi_3",
+   "text": "Her thesis is a card format in which nobody is eliminated, and her professors keep marking down its 'tension'.",
+   "how": "The Design Lab in the Afternoon; ask what she is cutting out."
+  },
+  {
+   "id": "thandi_4",
+   "text": "She plays goal defence for the staff-and-student netball side and is a furious loser.",
+   "how": "The gym on a weekend; or ask Coach Delgado."
+  },
+  {
+   "id": "thandi_5",
+   "text": "She sings alto and leads the small choir that rehearses in the Little Theatre on Saturday afternoons.",
+   "how": "The theatre, weekend Afternoon."
+  },
+  {
+   "id": "thandi_6",
+   "text": "She reads dreadful detective paperbacks from the second-hand shelf in town and always guesses the murderer wrong.",
+   "how": "Look at what is under the sign-out book."
+  },
+  {
+   "id": "thandi_7",
+   "text": "She half-raised her younger sister Lindiwe in Gqeberha while their mother nursed on nights.",
+   "how": "Friend stage; ask who taught her to keep a book."
+  },
+  {
+   "id": "thandi_8",
+   "text": "Her room in the Tower is paid for by the warden's bursary; without the book she would be in the bungalows.",
+   "how": "Friend stage; ask how a designer came by a white collar."
+  },
+  {
+   "id": "thandi_9",
+   "text": "Twice she has written 'consent received' in the book when no consent had come.",
+   "how": "Close stage; she shows the two lines herself."
+  }
+ ],
+ "secret": "FUNCTION (use her instead of a nameless warden): Junior Warden of Spectral Tower, welfare officer for residents under eighteen — this year only Georgie Santa (14, a child). She keeps the SIGN-OUT BOOK at the atrium desk: whoever takes Georgie off campus (town, market, beach, an away match) or keeps her out after eight signs her out with place, companion and hour, and signs her back in; Thandi countersigns, checks that she has eaten, holds her consent slips, and can refuse an outing. She answers to the Chancellor's office, not the council. Strictly correct, warm underneath; never patronises Georgie, who trusts her.\nWHO SHE IS. From Gqeberha, South Africa; a night nurse's daughter who ran the house from ten and half-raised her sister Lindiwe. When Thandi left for the Academy, Lindiwe, fifteen, walked out and was missing four days. Wound: she left, and someone small paid for it. Contradiction: she designs games nobody can lose and cannot bear to lose at netball. Her white collar is a warden's bursary, not rank or money.\nSECRET. The book is not clean. Georgie's father consents by ship's radio, and twice the message did not come; Thandi wrote 'consent received' herself so a lonely child could go to the night market with Pippa. If Sebastian's desk or Gideon ever reads the book closely it costs her the post and the room. After the first incident (Day 40) she turns the cast's unspoken agreement that Georgie is never alone into a pencilled rota, and she holds everyone to the by-law that nobody under sixteen may be party to an ante — should the polite first-year {H=@near?from the steps of|from} bungalow 7 offer to walk Georgie home, she refuses, and he accepts at once.\nDRAWN TO Baraka Otieno. ROUTE: slow; won by reliability with the book.",
+ "wants": "To hand Georgie back at the end of the year unharmed and a little less alone — and to finish a game nobody has to lose.",
+ "fears": "The empty line in the book: a child signed out and not signed in.",
+ "crush": "baraka",
+ "crushNote": "Her year-mate on the infirmary rota is the only person in the Tower who asks whether SHE has eaten. It shows as their duty evenings always falling together, a second cup set out at the atrium desk, and her being unable to remember the netball score when he was the one keeping it.",
+ "crushPace": 0.5,
+ "likes": [
+  "People who are back when they said",
+  "Being asked before, not forgiven after",
+  "Anyone who talks to Georgie as a person",
+  "Choir harmony, netball, rooibos with too much honey",
+  "Bad detective novels",
+  "A game explained without condescension",
+  "Someone noticing she is still on duty"
+ ],
+ "dislikes": [
+  "'Five more minutes'",
+  "Charm offered instead of a signature",
+  "Georgie being shown off like a trophy",
+  "Being called matron",
+  "Losing, at anything",
+  "People reading the book over her shoulder",
+  "Winner-takes-all designs"
+ ],
+ "gifts": [
+  "Card: The Final Trial",
+  "A second-hand detective paperback, the worse the better",
+  "Card: Trial of Loyalty",
+  "A tin of rooibos from the Saturday market",
+  "Black ink for a fountain pen",
+  "Georgie returned ten minutes early, and fed"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Dry, exact, off duty only.",
+  "text": "At the desk Rowan is a signature and she will not flirt across the book. Off duty she warms by degrees: a seat kept at choir, a paperback lent with one page folded, a late deadpan joke. She starts nothing; she is won by reliability with the book and by being made to stop working. Never charm her at the desk."
+ },
+ "intimacy": "Slow and deliberate, and only once the book is shut. First it is company on the late desk shift, his chair pulled round to her side; then her head tipped back against the wall, humming, and his hand taken without comment. She is tall and likes not having to stoop to be kissed; she is ticklish and furious about it. Unhurried, warm, a little solemn, laughing late. Her third-floor room, the pocket watch face down on the sill. Fade as she unpins the green ribbon and puts it in the drawer.",
+ "events": [
+  {
+   "id": "thandi_e1",
+   "stage": 1,
+   "title": "Back by when?",
+   "condition": "Take Georgie somewhere that needs the book (town with Pippa, the night market, the tide pools) and sign her out properly at spectral_lobby; bring her back on time and fed, and sign her in.",
+   "hint": [
+    "The Tower's youngest resident cannot leave campus without a signature. Somebody keeps the book.",
+    "Sign Georgie out at the Spectral atrium desk for an outing and bring her back on time."
+   ]
+  },
+  {
+   "id": "thandi_e2",
+   "stage": 2,
+   "title": "Nobody loses",
+   "condition": "Find her at design_lab in the Afternoon and playtest her no-elimination format honestly — say what is dull in it and what is not; or turn up to the Saturday choir at theatre when she asks.",
+   "hint": [
+    "She is something other than a warden for most of the day.",
+    "Playtest her thesis game in the Design Lab, or go to her choir."
+   ]
+  },
+  {
+   "id": "thandi_e3",
+   "stage": 3,
+   "title": "Off duty",
+   "condition": "After Day 30, keep her company through a late desk shift at spectral_lobby without wanting anything, and get her away from the desk for an hour (rooftop_garden, or a netball game she is allowed to lose). She asks, exactly, whether this is an outing and who is signing for it. Sign.",
+   "hint": [
+    "She signs everyone else out. Nobody has ever signed her out.",
+    "Keep her company on a late shift and take her away from the desk for an hour."
+   ]
+  },
+  {
+   "id": "thandi_e4",
+   "stage": 4,
+   "title": "Consent received",
+   "condition": "After Day 40, keep every duty she gives you without fail; when she shows you the two false lines in the book, neither tell her it was fine nor tell anyone else. Hear about Lindiwe. She does not go back to the desk that night.",
+   "hint": [
+    "Her book has two lines in it that she looks at more than the others.",
+    "Be someone she can rely on after the first incident, and keep what she shows you to yourself."
+   ]
+  },
+  {
+   "id": "thandi_e5",
+   "stage": 5,
+   "title": "The empty line",
+   "condition": "In Term 2, when the book is demanded (the vice-president's desk, Gideon, or the Chancellor's office), stand beside her while she answers for the two entries herself, and help her keep the post or lose it properly. She gives you the pocket watch to hold.",
+   "hint": [
+    "Sooner or later somebody with authority will want to read the sign-out book.",
+    "Stand with her when the book is audited."
+   ]
+  }
+ ],
+ "bonds": {
+  "georgie": {
+   "label": "mentor",
+   "text": "Her charge: fourteen, signed for by the hour, and never once talked down to.",
+   "public": true,
+   "from": 1
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Georgie's self-appointed big sister signs the book more often than anyone and has never been a minute late.",
+   "public": true,
+   "from": 7
+  },
+  "anni": {
+   "label": "mentor",
+   "text": "The first-year in S3 walks the corridor at ten and hands in a written report nobody asked for. Thandi reads every line.",
+   "public": true,
+   "from": 4
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "Next door to Georgie; brushes the child's hair flat every morning. Thandi has stopped pretending not to approve.",
+   "public": true,
+   "from": 3
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "Ms Kirishima was once the child in the big suite, and tells her quietly what this one will not say.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "rivals",
+   "text": "The other fourth-year designer in the Tower. Octavia thinks a warden's bursary is a waste of a good administrator and has said so kindly.",
+   "public": true,
+   "from": 0
+  },
+  "lilia": {
+   "label": "friends",
+   "text": "Year-mates. The captain asks after Georgie in three words, every week.",
+   "public": true,
+   "from": 0
+  },
+  "baraka": {
+   "label": "crush",
+   "text": "Her year-mate on the infirmary rota, and the only person who asks whether she has eaten.",
+   "public": true,
+   "from": 0
+  },
+  "camille": {
+   "label": "colleagues",
+   "text": "The nurse holds Georgie's medical card; Thandi holds the consent slips. They compare notes over the dispensary hatch.",
+   "public": true,
+   "from": 0
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "He has asked twice, pleasantly, to 'look over' the book. It answers to the Chancellor's office, and she has told him so.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "Polite, gloved, and far too interested in who signs for whom.",
+   "public": true,
+   "from": 6
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Playtests the no-elimination format in her pyjamas and tells her the truth about it.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "colleagues",
+   "text": "The radio telegrams from Georgie's father come up from the mail window in her hand, the same hour they arrive.",
+   "public": true,
+   "from": 0
+  },
+  "shirin": {
+   "label": "friends",
+   "text": "Books Georgie a carrel with a lamp and sits two tables off without being asked.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "spectral_lobby",
+   "Afternoon": "design_lab",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_lobby",
+   "Midday": "rooftop_garden",
+   "Afternoon": "theatre",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Plays five different Trials on five turns and then The Final Trial, which simply wins; Tempeste and a pile of shields keep three frail heroes standing. Never attacks.",
+  "tilt": "Having her hand stripped: unplayed Trials are her whole plan."
+ }
+}

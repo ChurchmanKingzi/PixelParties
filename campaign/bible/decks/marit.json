@@ -1,0 +1,401 @@
+{
+ "name": "Phoenix Encore",
+ "owner": "marit",
+ "heroes": [
+  "Visionary Genius Heinz",
+  "Cute Annoyance Mini",
+  "Cool Rescuer Monia"
+ ],
+ "main": [
+  [
+   2,
+   "Cute Bird"
+  ],
+  [
+   4,
+   "Cute Bunny"
+  ],
+  [
+   4,
+   "Cute Cat"
+  ],
+  [
+   4,
+   "Cute Dog"
+  ],
+  [
+   4,
+   "Cute Phoenix"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of Balance"
+  ],
+  [
+   2,
+   "Field Cannon"
+  ],
+  [
+   5,
+   "Fighting"
+  ],
+  [
+   2,
+   "Forceful Revival"
+  ],
+  [
+   4,
+   "Frolake"
+  ],
+  [
+   1,
+   "Gigantisaur Triceras"
+  ],
+  [
+   4,
+   "Glass of Marbles"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Grave Worm"
+  ],
+  [
+   3,
+   "Gravedigger Slap"
+  ],
+  [
+   4,
+   "Harpyformer Choir"
+  ],
+  [
+   1,
+   "Populated Island Turtle"
+  ],
+  [
+   4,
+   "Skull Necklace"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Visionary Genius Heinz": "Hero",
+  "Cute Annoyance Mini": "Hero",
+  "Cool Rescuer Monia": "Hero",
+  "Cute Bird": "Creature L1",
+  "Cute Bunny": "Creature L0",
+  "Cute Cat": "Creature L1",
+  "Cute Dog": "Creature L1",
+  "Cute Phoenix": "Creature L3",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of Balance": "Spell (Magic Arts)",
+  "Field Cannon": "Creature L3",
+  "Fighting": "Ability",
+  "Forceful Revival": "Attack",
+  "Frolake": "Creature L1",
+  "Gigantisaur Triceras": "Creature L3",
+  "Glass of Marbles": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Grave Worm": "Creature L0",
+  "Gravedigger Slap": "Attack",
+  "Harpyformer Choir": "Creature L0",
+  "Populated Island Turtle": "Creature L3",
+  "Skull Necklace": "Artifact",
+  "Summoning Magic": "Ability",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Cute Phoenix": "The win condition. Once per turn it hits one target, harder for every differently named creature in her discard pile. If you defeat it she discards two cards and it returns at full health. Only one at a time.",
+  "Cute Bird": "When it dies she may discard two cards to bring a Cute Phoenix straight from the deck into its place.",
+  "Cute Cat": "Goes to the discard pile the moment it is summoned and mills three more cards with it.",
+  "Cute Dog": "Summons itself when discarded; discards up to two cards to search that many big creatures or spells (the Phoenix).",
+  "Cute Bunny": "Hops in for free and draws a card whenever she discards two at once.",
+  "Cute Annoyance Mini": "Discards a card to fetch a Cute creature and a second to summon it at once.",
+  "Visionary Genius Heinz": "Discards up to four copies of one card to draw that many.",
+  "Cool Rescuer Monia": "Discards two cards to cancel anything that would affect creatures.",
+  "Gravedigger Slap": "An attack that hits like the Phoenix: harder for every different creature in her discard pile.",
+  "Grave Worm": "Crawls back from the discard pile into the slot of a creature that just died, and draws a card.",
+  "Frolake": "Draws two on arrival and refills her hand to four at the end of each turn.",
+  "Glass of Marbles": "Draws two when it is discarded.",
+  "Skull Necklace": "Stings a target whenever it is discarded.",
+  "Forceful Revival": "An attack that drags a creature out of the discard pile, hurting her own hero.",
+  "Field Cannon": "Fragile creature with one enormous shot per turn.",
+  "Populated Island Turtle": "Huge creature filling three zones; refills her hand to ten each turn."
+ },
+ "plan": "A discard pile deck dressed as a petting zoo. Marit throws cards away on purpose: Mini, Heinz and Cute Dog discard for value, Cute Cats mill, Skull Necklaces and Glasses of Marbles pay on the way down, Cute Bunnies and Frolake refund the cards. Every differently named creature in the discard pile is fuel for the Cute Phoenix and for Gravedigger Slap, which between them remove a hero every turn or two. Killing the Phoenix only costs her two discards, which she enjoys. The deck is weak before the Phoenix shows up, depends on her having cards to discard, and all three heroes are small.",
+ "looks": {
+  "early": "Mini and Heinz cycling cards, a Cute Bird perched in front, a discard pile growing faster than her board.",
+  "mid": "The Cute Phoenix blazing beside Mini with half a zoo in the discard pile; Cute Bunnies and a Frolake underfoot.",
+  "late": "A Phoenix that has already come back twice, a hand of one or two cards, Marit announcing its next entrance anyway."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "She is discarding and milling, and a Cute Bird sits alone in front of her heroes.",
+   "why": "Before the Phoenix she has no defence and three small heroes; killing the Cute Bird is precisely what summons the Phoenix early, and Cute Cats remove themselves."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "The Cute Phoenix is out, her discard pile is deep, and she holds a full hand.",
+   "why": "Defeating the Phoenix, by burn or by The Yeeting, just costs her two cards from a full hand; Dark Gear steals it outright so it cannot come back, a freeze silences it for a turn, and White Eye discards take away the two cards each return costs."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "A second Phoenix has replaced the first and her hand is down to a card or two.",
+   "why": "She keeps finding Phoenixes, but it hits once a turn; her three small heroes are the shorter road, and every return now costs cards she no longer has."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "She is out of cards, so the Phoenix cannot return if it falls; one peck or one Gravedigger Slap still kills.",
+   "why": "With an empty hand the Phoenix is just a fragile creature: freeze or kill it on the turn it threatens lethal and spend everything else on the last hero."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Marit summons a Cute Bird with a flourish, discards two cards through Mini and gets a Cute Bunny for it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Leave the Bird alone, burn Mini"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Mini"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Bird"
+     }
+    ]
+   },
+   {
+    "board": "Cute Cat arrives, leaves at once and takes three cards from her deck with it; a Frolake draws two.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning three undefended heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Frolake"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build while she plays with her discard pile"
+     }
+    ]
+   },
+   {
+    "board": "Heinz throws away three Skull Necklaces at once; each stings, and she draws three.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Heinz is low: press him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on your caster"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Save a sweeper for the bunnies"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Cute Phoenix lands beside Mini with half a zoo in the discard pile; her hand is full.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Phoenix"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it and finish Heinz"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Burn the Phoenix down"
+     }
+    ]
+   },
+   {
+    "board": "You destroy the Phoenix; she discards two with a bow and it returns at full health.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it instead: stolen, it cannot return"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Stop feeding it, hit heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill it again"
+     }
+    ]
+   },
+   {
+    "board": "A Populated Island Turtle fills Monia's side and her hand goes back to ten.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal or Yeet the Turtle"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Phoenix, spells at Mini"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Cute Dog fetches another Phoenix; she has one card left.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Her heroes are low: go past it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Phoenix this turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hunt for Dark Gear"
+     }
+    ]
+   },
+   {
+    "board": "Monia discards her last two cards to cancel your sweep.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "She is empty-handed now: strike"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Force another discard with The White Eye"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   },
+   {
+    "board": "Gravedigger Slap from Monia has just removed one of your heroes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Monia, the only attacker"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the next one"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild on another caster"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No cards in her hand; the Phoenix cannot return if it falls now.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Kill the Phoenix, then her last hero"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race, you are a turn ahead"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep everything else too"
+     }
+    ]
+   },
+   {
+    "board": "Mini alone with the Phoenix; your Storm is ticking.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Phoenix and let the tick finish"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mini"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh: Heinz returns to draw one last hand.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the peck, kill Mini"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear bunnies"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,406 @@
+{
+ "name": "Spell Industrialization",
+ "owner": "ashton",
+ "heroes": [
+  "Cooldin, King of Coolness",
+  "Victorica, the Eternal Empress",
+  "Ingo, Investor of Evil"
+ ],
+ "main": [
+  [
+   6,
+   "Alchemy"
+  ],
+  [
+   2,
+   "Dark Gear"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   2,
+   "Eraser Beam"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Golden Wings"
+  ],
+  [
+   1,
+   "Goldify"
+  ],
+  [
+   6,
+   "Leadership"
+  ],
+  [
+   2,
+   "Magic Mirror"
+  ],
+  [
+   2,
+   "Magnetic Glove"
+  ],
+  [
+   6,
+   "Mana Mining"
+  ],
+  [
+   4,
+   "Pollution Piranha"
+  ],
+  [
+   4,
+   "Pollution Spewer"
+  ],
+  [
+   4,
+   "Pyroblast"
+  ],
+  [
+   2,
+   "Rain of Arrows"
+  ],
+  [
+   1,
+   "Rain of Death"
+  ],
+  [
+   1,
+   "Reincarnation"
+  ],
+  [
+   2,
+   "Shard of Chaos"
+  ],
+  [
+   2,
+   "Tea"
+  ],
+  [
+   2,
+   "The Great Clock Tower \"Big Gwen\""
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cooldin, King of Coolness": "Hero",
+  "Victorica, the Eternal Empress": "Hero",
+  "Ingo, Investor of Evil": "Hero",
+  "Alchemy": "Ability",
+  "Dark Gear": "Artifact",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Eraser Beam": "Spell (Destruction Magic)",
+  "Golden Ankh": "Artifact",
+  "Golden Wings": "Spell (Summoning Magic, Reaction)",
+  "Goldify": "Spell (Decay Magic)",
+  "Leadership": "Ability",
+  "Magic Mirror": "Spell (Magic Arts, Surprise)",
+  "Magnetic Glove": "Artifact",
+  "Mana Mining": "Ability",
+  "Pollution Piranha": "Creature L0",
+  "Pollution Spewer": "Artifact (Creature)",
+  "Pyroblast": "Spell (Destruction Magic)",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Rain of Death": "Spell (Destruction Magic)",
+  "Reincarnation": "Spell (Support Magic)",
+  "Shard of Chaos": "Artifact",
+  "Tea": "Artifact",
+  "The Great Clock Tower \"Big Gwen\"": "Area (Magic Arts)",
+  "Wheels": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Pyroblast": "Hits any number of targets he likes and drops one Pollution Token on his own side per target.",
+  "Pollution Spewer": "An artifact that sits on the board as a creature; whenever a Pollution Token leaves his side it shoots a target.",
+  "Pollution Piranha": "Free creature summoned by removing a Pollution Token; nips a target each turn. When it leaves the board he loses a card from hand.",
+  "Victorica, the Eternal Empress": "Removes one older Pollution Token every turn.",
+  "Mana Mining": "Ability that makes polluting spells cheaper to cast, level by level.",
+  "Eraser Beam": "Once per game, for three tokens and as his only spell that turn: one of your targets is simply defeated.",
+  "Rain of Arrows": "Hits your whole side, harder for every creature he controls.",
+  "Goldify": "Destroys a creature and pays him gold.",
+  "Magic Mirror": "Face-down trap: cancels a spell aimed at its hero and casts a copy back.",
+  "Rain of Death": "Deletes every non-starting Ability on the board, both sides.",
+  "Reincarnation": "Fully revives a hero once, or returns a creature.",
+  "The Great Clock Tower \"Big Gwen\"": "Area (Cooldin fetches it): tokens no longer force him to throw cards away at once.",
+  "Ingo, Investor of Evil": "Gold every time a creature lands on his side.",
+  "Cooldin, King of Coolness": "Plays an Area from the deck regardless of level, ending the turn.",
+  "Wheels": "Draws three.",
+  "Magnetic Glove": "Searches any card."
+ },
+ "plan": "Ashton plays powerful spells on credit. Pyroblast hits as many targets as he likes and leaves a Pollution Token in his own support zones for each; every token shrinks his hand limit. Then he launders them: Victorica lifts one a turn, every Piranha is summoned by removing one, and each token that leaves fires a Pollution Spewer. With Piranhas and Spewers on the board Rain of Arrows hits your whole side, and once per game Eraser Beam just removes a hero. It is slow to start, his zones clog, the engine is small creatures, and his three heroes are fragile.",
+ "looks": {
+  "early": "Mana Mining on Victorica, Big Gwen overhead, one Pollution Spewer.",
+  "mid": "Grey tokens in his support zones, Piranhas and Spewers between them, a shot every time a token is cleaned away.",
+  "late": "Zones choked with tokens, three kept conspicuously free, Ashton smiling at one of your heroes."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He has spent two turns on Mana Mining and Big Gwen and has one Spewer on the board.",
+   "why": "His heroes are fragile and unprotected while he builds, and every turn you give him brings the Pyroblast turns closer."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "BALANCE",
+   "tell": "Piranhas and Spewers sit between the tokens in his support zones.",
+   "why": "Those small creatures are the whole engine: a sweep kills them, each dying Piranha costs him a card, and without them Rain of Arrows and the token shots do nothing."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "He is keeping exactly three support zones free and has cast no spell this turn.",
+   "why": "Eraser Beam needs three free zones and must be his only spell of the turn: Homerun! cancels a defeat by effect, so keep it for the hero carrying the Storm rather than spending the turn building."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Every one of his support zones holds a token and Reincarnation is used.",
+   "why": "With no room for tokens he cannot pay for his own spells; he is out of gas and simply needs to be finished."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Cooldin fetches Big Gwen and the turn ends; Victorica attaches Mana Mining.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Victorica, the smallest"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Mana Mining"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Match him and build"
+     }
+    ]
+   },
+   {
+    "board": "A Pollution Spewer clanks into place; his first Pyroblast clips two of your heroes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning his three heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Spewer"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep levelling"
+     }
+    ]
+   },
+   {
+    "board": "He sets a card face-down on Cooldin and keeps four cards.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Aim at Victorica and Ingo instead"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the face-down card"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Spewer"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Two Piranhas and two Spewers; Victorica lifts a token and a Spewer shoots.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: each Piranha costs him a card too"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Victorica"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "One shot at a Spewer, rest at heroes"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Arrows with four creatures out hits your whole side.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before the second one"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Death strips every added Ability from both sides.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Artifacts and potions still work: clear his board"
+     },
+     {
+      "stance": "RUSH",
+      "text": "He lost Mana Mining too: press"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild levels from nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Three zones kept free, no spell cast yet, his eyes on your Storm caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held for Eraser Beam"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill the caster who would fire it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more to the hero he is looking at"
+     }
+    ]
+   },
+   {
+    "board": "A Magic Mirror sits face-down in front of Victorica.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks are not aimed: let them work"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Trigger it with a throwaway spell"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire your biggest spell into it"
+     }
+    ]
+   },
+   {
+    "board": "He revives Victorica with Reincarnation.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shields up, then kill her again"
+     },
+     {
+      "stance": "RUSH",
+      "text": "It only works once: burn her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Every support zone of his holds a token.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall up and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for a prettier win"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; his has a Magic Mirror.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial, neither is a spell aimed at him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Spring the Mirror first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Victorica for one more token lifted.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Ingo"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

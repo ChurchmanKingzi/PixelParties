@@ -1,0 +1,390 @@
+{
+ "name": "Slimy Infestation",
+ "owner": "pippa",
+ "heroes": [
+  "Alice, the Puppeteer Girl",
+  "Stellan, the Calm Cat",
+  "Barker, the Monster Tamer"
+ ],
+ "main": [
+  [
+   4,
+   "Alchemy"
+  ],
+  [
+   4,
+   "Cloudy Slime"
+  ],
+  [
+   2,
+   "Cute Camera"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Cuteness Sensor"
+  ],
+  [
+   4,
+   "Fiery Slime"
+  ],
+  [
+   3,
+   "Icy Slime"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Martyry"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "Rain of Arrows"
+  ],
+  [
+   4,
+   "Shadowy Slime"
+  ],
+  [
+   4,
+   "Shiny Slime"
+  ],
+  [
+   2,
+   "Slime Rancher"
+  ],
+  [
+   3,
+   "Sparky Slime"
+  ],
+  [
+   4,
+   "Splashy Slime"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Alice, the Puppeteer Girl": "Hero",
+  "Stellan, the Calm Cat": "Hero",
+  "Barker, the Monster Tamer": "Hero",
+  "Alchemy": "Ability",
+  "Cloudy Slime": "Creature L0",
+  "Cute Camera": "Artifact (Reaction)",
+  "Cute Cheese": "Artifact",
+  "Cuteness Sensor": "Artifact",
+  "Fiery Slime": "Creature L0",
+  "Icy Slime": "Creature L0",
+  "Magnetic Glove": "Artifact",
+  "Martyry": "Spell (Support Magic, Reaction)",
+  "Performance": "Ability",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Shadowy Slime": "Creature L0",
+  "Shiny Slime": "Creature L0",
+  "Slime Rancher": "Creature L1",
+  "Sparky Slime": "Creature L0",
+  "Splashy Slime": "Creature L0",
+  "Wheels": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Alice, the Puppeteer Girl": "Once per turn hits one of your targets, harder for every creature of hers that has been on the board since last turn.",
+  "Stellan, the Calm Cat": "When he is hit or affected, up to three different small creatures jump from her hand onto the board.",
+  "Barker, the Monster Tamer": "Starts the game with a small creature already in play.",
+  "Rain of Arrows": "Hits your whole side, harder for every creature she controls.",
+  "Fiery Slime": "On arrival sets any target on fire for the rest of the game.",
+  "Icy Slime": "On arrival freezes any target until the end of her next turn.",
+  "Sparky Slime": "On arrival switches off the effects and Abilities of any target until her next turn.",
+  "Shadowy Slime": "On arrival pulls another small creature back from the discard pile.",
+  "Cloudy Slime": "On arrival puts another small creature from her hand onto the board.",
+  "Shiny Slime": "On arrival draws a card per different small creature she controls.",
+  "Splashy Slime": "On arrival pays gold per different small creature.",
+  "Slime Rancher": "Every Slime's arrival effect happens twice.",
+  "Martyry": "Reaction: a hit aimed at one of her targets is taken by the caster instead.",
+  "Cute Cheese": "Searches any creature.",
+  "Wheels": "Draws three."
+ },
+ "plan": "Slimes do their work the moment they arrive: burn something forever, freeze something, switch something off, draw, pay gold. Pippa floods the board with them, doubles the effects with Slime Rancher, brings them back with Shadowy Slime, and then turns the crowd itself into damage: Alice hits for every creature that has sat there a turn, and Rain of Arrows hits your whole side for every creature at once. The bodies are tiny and the heroes ordinary; a wide board that survives a turn is the entire win condition.",
+ "looks": {
+  "early": "A handful of slimes; one of your heroes on fire, another frozen.",
+  "mid": "A Slime Rancher in a carpet of slimes, all your heroes burning, Alice counting her creatures.",
+  "late": "Eight slimes, Rain of Arrows twice in two turns, Alice pointing at whoever is left."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her slimes have used their arrival effects and now simply sit there, five of them.",
+   "why": "Each slime that survives to her next turn adds to Alice's hit and to Rain of Arrows; they are tiny, and swept now they have done nothing but their one trick."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "A Slime Rancher stands in a wide board and she is holding Rain of Arrows.",
+   "why": "The width is the damage: a sweep before her turn turns Rain of Arrows and Alice into scratches, and the Rancher dies with the rest; waiting only adds permanent burns."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "An Icy Slime keeps coming back from the discard pile and your Storm caster is frozen every other turn.",
+   "why": "Tea throws the freeze (or your burns) onto one of her heroes, and a freeze on Alice stops the big hit; racing with a frozen caster does not work."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Her hand is empty and only a few slimes are left.",
+   "why": "Without a crowd Alice and Rain of Arrows do almost nothing, and her heroes have no protection."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Barker starts with a slime in play; a Fiery Slime sets your caster alight and an Icy Slime freezes Nicolas.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep them before they count for Alice"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Stellan's neighbours"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "You hit Stellan and three different slimes leap out of her hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the lot"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Alice or Barker instead"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Shiny Slime draws her four cards.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep now, before Rain of Arrows"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Slime Rancher is out: the next Fiery Slime burns two targets.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, Rancher included"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Rancher"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Finish your setup first"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Arrows with seven creatures out hits your whole side hard.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before the second one"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Alice lines up her once-per-turn hit behind six slimes.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the crowd: the hit shrinks with it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Shadowy Slime fishes the Icy Slime back and your caster is frozen again.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the freeze onto Alice"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cast from the other two"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race with a frozen caster"
+     }
+    ]
+   },
+   {
+    "board": "All three of your heroes are burning.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea a burn across to Stellan"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tarleinn heals, Howitzer answers"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it"
+     }
+    ]
+   },
+   {
+    "board": "Martyry pulls your removal onto Stellan, and more slimes jump out.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Untargeted sweeps cannot be pulled away"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Stellan again"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Three slimes and no hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish her heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the last slimes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take a breath"
+     }
+    ]
+   },
+   {
+    "board": "One hero each, both burning.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "You burn slower: race"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea your burn onto hers"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear two slimes"
+     }
+    ]
+   },
+   {
+    "board": "Resuscitation Potion brings Alice back on a sliver.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Any tick takes her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

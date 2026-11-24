@@ -1,0 +1,216 @@
+{
+ "id": "magnus",
+ "name": "Magnus Prospero",
+ "firstName": "Magnus",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S6",
+ "romance": false,
+ "deck": "This Week: … (rotates; whatever tops the ladder)",
+ "look": "Wiry, with sharp cheekbones, slicked ginger hair and restless pale eyes that go to the nearest scoreboard. His red jacket, white-and-gold Spectral collar, is worn with designer sneakers still creased from the box, and there is always a tablet of ladder statistics in the crook of his arm. He cannot stand still while someone else is talking.",
+ "voice": "Fast, clipped and competitive, every exchange turned into a comparison he is winning; numbers quoted to one decimal. He talks at people rather than with them and checks his tablet mid-sentence. Under it, when he loses, there is a tight, careful politeness that is much more telling. RARE habit (once in a scene at most; most scenes go without it): quoting his own and the other person's ladder positions, unprompted, as a greeting.",
+ "lines": [
+  "Two years, Vance. Two years at number six looking at your avatar in fifth. You don't even remember the series, do you?",
+  "This deck? Dropped it yesterday. Win rate fell under fifty-eight. I'm not married to cardboard.",
+  "Congratulations. No, really. Enjoy it. I'll have the replay broken down by breakfast.",
+  "My father says the audience only remembers who's holding the hat. I don't need the audience. I need the rank."
+ ],
+ "intro": "A wiry Spectral first-year with a tablet full of ladder statistics, another online pro, who seems to have a personal quarrel with the Wildcard that the Wildcard was never told about.",
+ "traits": [
+  {
+   "id": "magnus_1",
+   "text": "Online he is 'Prospero_GG', ranked directly below Best_Tarleinn_NA for two straight years.",
+   "how": "He tells you within a minute of meeting; the placement board on Day 1."
+  },
+  {
+   "id": "magnus_2",
+   "text": "He changes his deck every week or two to whatever the numbers favour.",
+   "how": "Play him twice."
+  },
+  {
+   "id": "magnus_3",
+   "text": "A ladder graph is taped across his suite window with one handle circled in red.",
+   "how": "Visit Spectral suite 6."
+  },
+  {
+   "id": "magnus_4",
+   "text": "He attends every party with his tablet and talks about nothing but rankings.",
+   "how": "Any evening on the Spectral terrace."
+  },
+  {
+   "id": "magnus_5",
+   "text": "He owns a great many pairs of sneakers, most of them unworn.",
+   "how": "His suite; the boxes are stacked like trophies."
+  },
+  {
+   "id": "magnus_6",
+   "text": "His father is a famous stage magician, and Magnus was his assistant until he was fourteen.",
+   "how": "Ask about the surname; or Bex digs it up."
+  },
+  {
+   "id": "magnus_7",
+   "text": "He has never had a favourite card, and looks blank when asked.",
+   "how": "Ask."
+  },
+  {
+   "id": "magnus_8",
+   "text": "He has replayed every game he ever lost to one particular player, and there are forty-one.",
+   "how": "Friend stage; he shows the folder."
+  }
+ ],
+ "secret": "Magnus is the only son of Aurelio 'The Great' Prospero, a touring illusionist, and spent his childhood in a spangled waistcoat being sawn in half. His father's creed, delivered nightly: the audience remembers one name, and the other person on the stage is furniture. Magnus left the act at fourteen, found a ladder where position is a number nobody can take away with a flourish, and has been climbing it ever since with his father's work ethic and none of his joy. For two years he has sat one rank below Best_Tarleinn_NA. He has built the whole thing into a rivalry — forty-one losses catalogued, a red circle on the window — and what he cannot forgive is not that Rowan beats him, but that Rowan does it from a cracked phone in a laundromat, on one deck he obviously loves, without knowing Magnus exists. It offends his entire theory of the world, which is that resources, preparation and the best list win. He has no deck of his own because he has never let himself love one: a favourite is a liability. Contradiction: the least sentimental player in the year is driven entirely by a feeling he will not name, and the name is 'look at me'.\nHis rivalry is one-sided and very aggressive: he challenges Rowan on the ladder whenever the rules allow, turns up at his matches to take notes, trash-talks on the stream, and will go on doing so. He is not malicious — he is honest about results, shakes hands, and is quietly fair to weaker players — and he is desperately easy to wound by indifference. The way to him is to remember one of the forty-one games. Ophelia Capulet, who beat him with a deck he had dismissed and did not even look pleased, has got under his skin in a different way.\nFrom Day 30 the ladder acquires a problem he cannot solve: a Commons nobody climbing faster than is arithmetically reasonable. He is the first to chart it and the first to be beaten by it in a ranked game (around Day 36), and it does not gloat, which he finds unbearable. Through Stage B and C he rotates decks at it like a man trying keys. Not in the default timeline, but he is a standing risk: he will play anyone for rank, and 'your place on the ladder' is an ante he would name himself.",
+ "wants": "To be ranked above Rowan Vance, once, with everyone watching.",
+ "fears": "Being the assistant — second, and unnoticed — for the rest of his life.",
+ "crush": "ophelia",
+ "crushNote": "She beat him with a deck he had dismissed and did not even look pleased, and it is the first loss he has ever replayed for a reason other than rank. It shows as him turning up at Rare Hall with 'a matchup question' and forgetting to quote her ladder position.",
+ "crushPace": 0.8,
+ "likes": [
+  "Being remembered as an opponent",
+  "Statistics, replays, exact numbers",
+  "A ranked rematch accepted on the spot",
+  "Being beaten by better preparation (he respects it)",
+  "New sneakers",
+  "Stream coverage that says his handle correctly",
+  "Anyone asking how the old magic act worked"
+ ],
+ "dislikes": [
+  "Indifference",
+  "'It's only a ladder'",
+  "Loyalty to one deck, which he calls superstition",
+  "Being nicknamed 'Maggie'",
+  "Card tricks",
+  "Losing to something he cannot chart"
+ ],
+ "gifts": [
+  "A printed replay of one of your online series, annotated",
+  "Card: Blueprints",
+  "White sneaker cleaner",
+  "Card: Future Tech Database",
+  "A deck of ordinary playing cards (he will, despite himself, do a flawless fan)"
+ ],
+ "events": [
+  {
+   "id": "magnus_e1",
+   "stage": 1,
+   "title": "Number six",
+   "condition": "When he confronts you about the ladder (Day 1 or soon after), accept a ranked game instead of shrugging him off, and afterwards recall one specific online game you played against him.",
+   "hint": [
+    "Somebody on the island has been keeping score against you for two years. It would cost little to acknowledge it.",
+    "Take his challenge seriously and show him you remember playing him online."
+   ]
+  },
+  {
+   "id": "magnus_e2",
+   "stage": 2,
+   "title": "Not married to cardboard",
+   "condition": "Play him at least three ranked games across different weeks (he brings a different deck each time); ask what he would play if rank did not exist, and wait for an answer.",
+   "hint": [
+    "He changes his deck constantly. There is a question about that nobody has put to him.",
+    "Keep giving him ranked games, and ask him which deck he actually likes."
+   ]
+  },
+  {
+   "id": "magnus_e3",
+   "stage": 3,
+   "title": "Holding the hat",
+   "condition": "After Day 36, compare his charts of a certain player's climb with what you know, and talk him out of staking his ladder place on a rematch; at some point tell him plainly that he is a real rival. He stops circling the handle.",
+   "hint": [
+    "He has found something on the ladder that no list can beat, and he is running out of lists.",
+    "Go through his ladder charts with him, keep him from a reckless wager, and give him the acknowledgement he wants."
+   ]
+  }
+ ],
+ "bonds": {
+  "ophelia": {
+   "label": "crush",
+   "text": "She beat him with a deck he had written off and did not even look pleased. He has replayed it more than any ladder game.",
+   "public": true,
+   "from": 20
+  },
+  "rowan": {
+   "label": "rivals",
+   "text": "Ranked one place above him online for two years. Magnus has forty-one losses to him on file and a red circle round the handle.",
+   "public": true,
+   "from": 0
+  },
+  "rex": {
+   "label": "rivals",
+   "text": "Another name from the top of the online ladder, with a worse attitude and a better win rate.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "rivals",
+   "text": "Fourteen hours a day on one deck. Magnus calls it a waste and checks his log every morning.",
+   "public": true,
+   "from": 5
+  },
+  "gideon": {
+   "label": "friends",
+   "text": "The suite next door: someone else who thinks the Commons qualifier was a mistake.",
+   "public": true,
+   "from": 2
+  },
+  "dom": {
+   "label": "protégé",
+   "text": "The vice-captain has a number for everyone. Magnus wants to see the spreadsheet more than he wants a team place.",
+   "public": true,
+   "from": 15
+  },
+  "bex": {
+   "label": "friends",
+   "text": "She says his handle wrong on air on purpose. He submits a correction every time.",
+   "public": true,
+   "from": 6
+  },
+  "ashton": {
+   "label": "friends",
+   "text": "Beaumont-Lyle's parties are where the rankings get talked about. He is there every time, with the tablet.",
+   "public": true,
+   "from": 2
+  },
+  "georgie": {
+   "label": "rivals",
+   "text": "A fourteen-year-old took him apart in week one and said sorry. It is not in the forty-one, and it should be.",
+   "public": true,
+   "from": 3
+  },
+  "mikoto": {
+   "label": "distrusts",
+   "text": "The one who calls him Maggie. In public. He has asked. It continues.",
+   "public": true,
+   "from": 3
+  },
+  "sebastian": {
+   "label": "friends",
+   "text": "The vice-president understands that a refusal of ranked play is a refusal. Useful man.",
+   "public": true,
+   "from": 10
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "trial_dome",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_suite",
+   "Midday": "duel_terraces",
+   "Afternoon": "trial_dome",
+   "Evening": "spectral_terrace",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Always the statistically best list of the week, piloted cleanly from a script; excellent in known matchups, brittle when the game leaves the data. His deck changes between meetings, so preparation against him ages fast.",
+  "tilt": "Rowan across the table — he plays to make a point instead of to win — and any opponent who seems not to care."
+ }
+}

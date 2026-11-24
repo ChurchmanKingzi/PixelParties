@@ -1,0 +1,47 @@
+@place ferry_deck
+@system fx augen
+Salt on your lips. An engine thrumming somewhere under your shoes. You must have dozed off against the railing.
+You open your eyes to a morning so bright it hurts. The ferry left the mainland in the dark, and since then there has been nothing but water.
+Now there is an island.
+It is still far off: a dark volcano with cloud round its top, jungle down its flanks, one white speck that must be a lighthouse. Caldera Key. Pixel Academy.
+Two weeks ago you were folding other people's sheets in Aunt Dee's laundromat, phone propped against the detergent shelf, climbing the online ladder one match at a time between dryer cycles.
+Best_Tarleinn_NA. Top ten in North America for your age bracket. Winner of the Wildcard Qualifier — the last open seat of the year.
+You have never once played this game on a real table. Never shuffled a real deck in front of a real person who was looking at your hands.
+Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Sixty-five cards, and you know every one of them by heart.
+@system window Pixel Academy\nYear One · Competitive Play\nWelcome, Rowan Vance.
+The acceptance letter is still in your bag, folded so often it has gone soft. At the bottom, in smaller print: "Housing: The Commons, Bungalow 7 (late admission)."
+You do not know yet what that means.
+The deck around you is full: duffel bags, deck boxes, thirty-odd people your age in stiff new uniform jackets, red and gold and black. Every one of them is a stranger. Your own jacket, the letter says, will be issued on arrival.
+A loudspeaker crackles above the wheelhouse.
+[?Loudspeaker] "Morning, all. Captain Stroud speaking. Thirty-six new heads aboard, I counted twice. We tie up at ten-forty. There is coffee in the lounge. Hold on to your hats."
+@enter nathan laughing
+@faces nathan=laughing
+[nathan] "DUDE. Is that it? That's IT, right? That's the island! Hey — HEY, big guy, look, that's the island!"
+@faces nathan=grin
+The shout comes from about a foot behind your ear. Its owner has a square face, spiky black hair under a grey headband, a chipped front tooth and the widest grin you have seen all week. He points at the volcano with his whole arm.
+@enter baylee embarrassed
+@faces nathan=grin baylee=embarrassed
+The "big guy" is not hard to find. He is the tallest person on the deck by a head and a half, blond, sunburnt, built like a barn door, and he stands with his shoulders pulled in so that people can get past him.
+@faces nathan=grin baylee=shy
+[baylee] "…I see it."
+@faces nathan=happy baylee=shy
+[nathan] "Nathan Whisper! War Counselors, best deck in the format, don't let anyone tell you different. You look wrecked. You a first-year too? What dorm? I got something called the Commons, sounds fancy."
+@faces nathan=happy baylee=smile
+He sticks out a hand. Behind him the giant gives you a small nod.
+@faces nathan=happy baylee=shy
+[baylee] "Baylee. Commons too. …He has been like this since the harbour."
+@faces nathan=laughing baylee=embarrassed
+[nathan] "I've been EVERYWHERE since the harbour. Okay, listen. Down those steps there's a lounge with an actual card table, green felt and everything. A guy in white gloves has sat at it all morning. Gideon something. Won three in a row."
+@faces nathan=grin baylee=worried
+[nathan] "And there's this tiny girl with green hair, Inya, she's been waiting twenty minutes to play him and he won't. He just sits there. And a kid called Tomi is taking bets on it. Bets! On a boat!"
+@faces nathan=happy baylee=neutral
+[nathan] "Also, at the back there's a girl with three treasure chests. Real ones. I counted. And the captain lets you look at the steering wheel if you ask nice."
+@faces nathan=grin baylee=thinking
+Under the wheelhouse a door stands open on a flight of steps. You can hear it from here: cards slapping on felt, a girl's voice, quick and sharp, and a second voice that stays low and does not hurry. A few people on the benches have turned their heads that way.
+@faces nathan=grin baylee=neutral
+A side deck runs aft past the funnel to the stern, where gulls hang over the wake. An iron stair climbs to the wheelhouse door. The island stands dead ahead, still small. The clock over the lounge door says seven.
+@faces nathan=happy baylee=smile
+Nathan's hand is still out.
+@system help
+@choice Shake his hand: "Rowan. Commons too." | "Show me this card table." | Stay at the rail and watch the island come closer
+

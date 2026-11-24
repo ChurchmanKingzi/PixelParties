@@ -1,0 +1,19 @@
+{
+ "name": "Port Mulligan Harbour",
+ "zone": "town",
+ "bg": "harbor",
+ "night": true,
+ "hours": "Working harbour: fishing boats out before dawn and back by Midday; ferry days Wednesday and Saturday.",
+ "sight": "A horseshoe of stone quay around green water, crowded with painted fishing boats, lobster pots and drying nets. Pastel houses climb the hill behind in tiers. Old men mend nets on upturned crates and play Pixel Parties with decks older than you, slapping cards down like dominoes. By night the boats knock together gently, lamps swing on the quay, and the lighthouse beam goes round over everything like a slow thought.",
+ "things": [
+  "Watch the catch come in and the gulls go mad",
+  "Play the net-menders for small coin — they cheat cheerfully and know every old trick",
+  "Read the tide tables and storm warnings at the harbourmaster's hut",
+  "Hire a rowing boat for a slot (8 cr)",
+  "Eat fried squid from a paper cone on the quay wall",
+  "Look at the wreck memorial: an anchor and a list of ships",
+  "Ask the fishermen about the north shore and watch them change the subject",
+  "At night: walk the quay to the end light with someone"
+ ],
+ "secret": "The town lived on fishing before the school and will after. The net-menders' decks are a museum of old printings (no Alphas — they sold those long ago to 'a nice gentleman from the company', i.e. Chuck buying them back). The wreck memorial lists the Agnieszka, with seven names and the words 'one spared'. Fishermen will not fish the north shore: 'nets come up heavy and empty'. After D27 the catch on the north side fails entirely and the south side teems — fish are fleeing round the island. Regatta Day 41, boat blessing Day 160. From Day 61 an unmarked grey launch is moored at the outer mole: Marrow's, for moving equipment round to the north shore without using the cordoned track."
+}

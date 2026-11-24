@@ -1,0 +1,209 @@
+{
+ "id": "eberhart",
+ "name": "Eberhart von Düsterwald",
+ "firstName": "Eberhart",
+ "age": 20,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R101",
+ "romance": false,
+ "deck": "Iron Parade (Fighting, Toras)",
+ "look": "Tall and bullish, with cropped ash-blond hair, a heavy brow and an old straight duelling scar across the left cheek. His red jacket is buttoned to the throat, blue collar squared, shoes polished. He stands at something like parade rest and looks at people as though assessing their guard, which he is.",
+ "voice": "Sparse, formal and level, in careful English with German word order showing under strain. He answers what was asked and nothing more, then waits. It reads as hostility and is only economy; when a subject is training, technique or a well-played game, he becomes exact and almost generous. RARE habit (once in a scene at most; most scenes go without it): a short, correct bow of the head in place of hello, thank you or goodbye.",
+ "lines": [
+  "No. Thank you. I train at five.",
+  "Your third turn was honest. The fourth was afraid. Do the third one again.",
+  "It is not a game to me. This is not an insult to those for whom it is.",
+  "Yamaguchi has a name for me. I have asked him not to. He continues."
+ ],
+ "intro": "A tall, silent German first-year from Rare Hall with a scar on his cheek and his jacket buttoned to the throat, who treats every duel as a bout and every invitation as an interruption.",
+ "traits": [
+  {
+   "id": "eberhart_1",
+   "text": "He trains to a written regimen pinned square to his wall: five in the morning, every day.",
+   "how": "Rare Hall room 101; or the gym before dawn."
+  },
+  {
+   "id": "eberhart_2",
+   "text": "He bows before and after every duel and regards a sloppy shuffle as bad footwork.",
+   "how": "Play him."
+  },
+  {
+   "id": "eberhart_3",
+   "text": "He says no to nearly every invitation, politely, and means nothing unfriendly by it.",
+   "how": "Invite him anywhere."
+  },
+  {
+   "id": "eberhart_4",
+   "text": "The scar on his cheek is from academic fencing, and he considers it a mark of having stood still.",
+   "how": "Ask directly; he answers directly."
+  },
+  {
+   "id": "eberhart_5",
+   "text": "He carries other people's heavy things without being asked and leaves before he can be thanked.",
+   "how": "Arrival day; any stairs."
+  },
+  {
+   "id": "eberhart_6",
+   "text": "His roommate calls him by a cutesy nickname, and he has asked him to stop every day since the first.",
+   "how": "Hear Mikoto in the corridor."
+  },
+  {
+   "id": "eberhart_7",
+   "text": "He feeds the Rare Hall cat from his own plate and denies that the cat is his.",
+   "how": "Rare common room, late."
+  },
+  {
+   "id": "eberhart_8",
+   "text": "He is the youngest son of a family with a title, a ruined house and nothing else, and he will not use the 'von' unless a form requires it.",
+   "how": "Friend stage; or the roster with legal names on Day 19."
+  },
+  {
+   "id": "eberhart_9",
+   "text": "He reads poetry at night, in a small worn book, and does not wish this known.",
+   "how": "Trusted; or Mikoto lets it slip."
+  }
+ ],
+ "secret": "Eberhart is the third son of a Brandenburg family whose name is older than its roof: Schloss Düsterwald is a conference hotel now, and his father manages its car park with great dignity. He grew up among portraits of men with swords and no money, and took from it one usable thing — that what you are is what you have trained yourself to be. An older brother, Konrad, the gifted one, drank himself out of university and came home; Eberhart, sixteen, concluded that talent is nothing and discipline is everything, and has kept a daily log ever since. He fenced Mensur with a student corps at eighteen (the scar: one cut, taken without flinching, which was the point), found Pixel Parties in the corps house, and understood it at once as a martial art: a contest of nerve, distance and timing in which the cards are only the weapon. Toras, master of all weapons, is not a mascot to him; it is the correct tool.\nHe is not unfriendly. He is unsocial: company costs him effort he would rather spend on training, small talk is a language he does not speak, and he has never learned to refuse warmly, so he refuses briefly. He wants to be left in peace and, to his steady bewilderment, is not: his roommate Mikoto has attached himself like a burr ('Ebi'); the Rare Hall cat sleeps on his regimen; a girl in ribbons has decided he is a knight because he once carried her parasol stand up two flights without a word; Freya Nordlicht treats his composure as a personal challenge. Contradiction: the man who wants only solitude cannot see a heavy box, a frightened first-year or a stray animal without doing something about it. He reads Eichendorff at night. He admires Priya Raman — the dawn range, the stillness before release — as the one person on the island who trains the way he does, and would no more say so than miss a session.\nAfter Day 40 he draws the soldier's conclusion: there is an opponent, it fights by rules, therefore it can be fought. He studies its games as one studies a fencer, and by Stage C he believes he sees an opening. He does not. Not in the default timeline, but he is exactly the kind to issue a formal challenge out of principle, correctly worded, with a bow. If North Crown's captain is on the island he will have found the one other person who thinks as he does, which helps or makes it worse.",
+ "wants": "To be better tomorrow than today, and to be let alone to do it.",
+ "fears": "Becoming his brother: gifted, admired and finished at twenty-five.",
+ "crush": "priya",
+ "crushNote": "She trains at dawn as he does and holds still before a release the way a fencer holds a guard; it is the only thing on the island he would call beautiful. It shows as his run happening to end at the archery range, and one correct bow each morning.",
+ "crushPace": 0.6,
+ "likes": [
+  "Training partners who arrive on time and do not chatter",
+  "Exact criticism of his play",
+  "Being left alone without being left out",
+  "Courtesy: a bow returned",
+  "Anyone who trains seriously at anything",
+  "The cat",
+  "A rematch requested properly"
+ ],
+ "dislikes": [
+  "Nicknames",
+  "Being pressed to 'come along, it'll be fun'",
+  "Sloppiness with cards",
+  "Mockery of anyone weaker",
+  "Questions about the 'von'",
+  "Drunkenness, his own family's above all"
+ ],
+ "gifts": [
+  "Card: Toras, Master of all Weapons",
+  "Shoe polish and a good brush",
+  "Card: Weapon Storm",
+  "A pocket edition of German poems from the pawn shop",
+  "Tinned fish, 'for the cat that is not mine'"
+ ],
+ "events": [
+  {
+   "id": "eberhart_e1",
+   "stage": 1,
+   "title": "I train at five",
+   "condition": "Turn up at gym at five in the Morning, train beside him without talking, and bow when he does; or play him and take his criticism as offered.",
+   "hint": [
+    "He refuses everything except the one thing he does every morning.",
+    "Join his dawn training without making conversation."
+   ]
+  },
+  {
+   "id": "eberhart_e2",
+   "stage": 2,
+   "title": "Honest and afraid",
+   "condition": "Train or spar with him at least three more times; when he carries something for someone and leaves, say nothing about it; find out about the cat and keep the fiction.",
+   "hint": [
+    "He would rather be judged by what he does than by anything he says, which is as well.",
+    "Keep training with him and let his small kindnesses go unremarked."
+   ]
+  },
+  {
+   "id": "eberhart_e3",
+   "stage": 3,
+   "title": "Not a game",
+   "condition": "After Day 40, when he begins studying a certain player's games 'as one studies an opponent', study with him — and show him honestly why the opening he thinks he sees is not one, before he words a formal challenge.",
+   "hint": [
+    "He believes anything that fights by rules can be beaten by training. He is preparing something.",
+    "Work through his analysis with him and tell him the truth about it before he acts on it."
+   ]
+  }
+ ],
+ "bonds": {
+  "mikoto": {
+   "label": "roommates",
+   "text": "Rare Hall 101. Yamaguchi talks, giggles and calls him 'Ebi'. He has asked him to stop daily. He would also break the arm of anyone who mocked him.",
+   "public": true,
+   "from": 1
+  },
+  "victoria": {
+   "label": "friends",
+   "text": "The young lady with the parasol requires that heavy things be carried and that nobody talk. He can do both.",
+   "public": true,
+   "from": 7
+  },
+  "priya": {
+   "label": "friends",
+   "text": "She trains at dawn and wastes nothing. They exchange one nod each morning at the range.",
+   "public": true,
+   "from": 6
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "The coach gave him a harder regimen without being asked. He is grateful and has shown it by completing it.",
+   "public": true,
+   "from": 3
+  },
+  "noor": {
+   "label": "friends",
+   "text": "Fräulein Al-Sayed rules correctly and greets correctly. They share a library table in silence.",
+   "public": true,
+   "from": 9
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "The big American also rises early and also does not talk. They have carried a great many boxes together.",
+   "public": true,
+   "from": 12
+  },
+  "willas": {
+   "label": "friends",
+   "text": "Tann insulted his shuffle on the dock and then carried half his trunk. He has decided this is how the man says welcome.",
+   "public": true,
+   "from": 1
+  },
+  "isolde": {
+   "label": "rivals",
+   "text": "The captain of North Crown fences sabre and plays as she fences. He requested a bout and a duel in the same sentence.",
+   "public": true,
+   "from": 68
+  },
+  "teobalt": {
+   "label": "friends",
+   "text": "Ferrant next door keeps a rota and does not make conversation while handing it over.",
+   "public": true,
+   "from": 4
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "gym",
+   "Midday": "lecture_hall",
+   "Afternoon": "duel_terraces",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "gym",
+   "Midday": "cliff_path",
+   "Afternoon": "trial_dome",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Toras with one weapon after another: measured aggression, attack on the correct beat, never a wasted swing. Plays the same disciplined game against everyone.",
+  "tilt": "Disorder and clowning. An opponent who will not take the bout seriously makes him rigid and predictable."
+ }
+}

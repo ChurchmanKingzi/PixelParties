@@ -1,0 +1,20 @@
+{
+ "name": "The Maintenance Tunnels",
+ "zone": "campus",
+ "bg": "maintenance_tunnels",
+ "night": false,
+ "hours": "Staff only; Silas Grieve walks them on Mondays. Students know three ways in and pretend to know six.",
+ "sight": "Brick-vaulted service tunnels run under the whole campus, warm and dim, lined with lagged steam pipes and bundled holo-cable. Bare bulbs in cages make a chain of yellow islands. Painted arrows point to ARENA, DOMES, LIBRARY, KITCHEN; older arrows underneath have been painted out. Water drips somewhere with great patience, and the walls sweat.",
+ "things": [
+  "Follow the arrows and learn which hatch comes up where",
+  "Find the graffiti of every graduating class, the old ones in four colours",
+  "Take the shortcut to the arena stage hatch",
+  "Listen at a grating to a room above",
+  "Follow a painted-out arrow to a bricked-up arch",
+  "Get lost for a slot and come up somewhere embarrassing",
+  "Find the disused meter room that somebody has fitted out as a photographic darkroom",
+  "Meet someone else who should not be down here"
+ ],
+ "secret": "The stealth layer of the campus: links main building, library (and the Archive's service door), arena stage, Trial Domes, cafeteria kitchen and the infirmary cellar. After D67 this is how to move at night. The painted-out arrows read UMBRA: a tunnel once ran north under the ridge to the fourth dorm; it is bricked up 200 metres in, but the brick is one course thick and recent mortar shows it was opened and re-closed within the last year (Viktor). Under the Trial Domes lies the hologram plant, Professor Helical's real workplace most nights; at its far end the bypassed original projector stands in a sealed grey housing with a second, private padlock and a small chalk helix on the plate (the second grey notebook; plot file, M9). The plantation built on older cuttings: in the deepest stretch the wall changes from brick to fitted black stone with small square recesses — Tessellate work, the southernmost trace of it. Silas knows every metre and will guide someone he trusts. The darkroom in the old meter room is Pippa's; it is turned over around Day 70 unless she has hidden her negatives. '{H}' is met down here exactly once, standing in the dark without a lamp, 'listening'.",
+ "access": "Forbidden to students. Entrances: boiler room behind the cafeteria, the arena stage hatch, a grating by the clock tower arcade (viktor, tomi and silas know them)."
+}

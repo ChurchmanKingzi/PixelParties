@@ -1,0 +1,436 @@
+{
+ "name": "Bone Rush",
+ "owner": "isolde",
+ "heroes": [
+  "Cute Nerd Magenta",
+  "Vacarn, the Dark Goblin Necromancer",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   1,
+   "Burning Skeleton"
+  ],
+  [
+   4,
+   "Cosmic Skeleton"
+  ],
+  [
+   2,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   4,
+   "Glass of Marbles"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   1,
+   "Hammer Skeleton"
+  ],
+  [
+   2,
+   "Harpyformer Choir"
+  ],
+  [
+   4,
+   "Inventing"
+  ],
+  [
+   1,
+   "Leadership"
+  ],
+  [
+   2,
+   "Loyal Bone Dog"
+  ],
+  [
+   2,
+   "Mystery Box"
+  ],
+  [
+   4,
+   "Necromancy"
+  ],
+  [
+   4,
+   "Rain of Arrows"
+  ],
+  [
+   1,
+   "Skeleton Archer"
+  ],
+  [
+   2,
+   "Skeleton Bard"
+  ],
+  [
+   1,
+   "Skeleton Death Knight"
+  ],
+  [
+   1,
+   "Skeleton Demon"
+  ],
+  [
+   1,
+   "Skeleton Healer"
+  ],
+  [
+   3,
+   "Skeleton Mage"
+  ],
+  [
+   4,
+   "Skeleton Necromancer"
+  ],
+  [
+   1,
+   "Skeleton Reaper"
+  ],
+  [
+   1,
+   "Skeleton Skull Bat"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   1,
+   "Treasure Skeleton"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Monster in a Bottle"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cute Nerd Magenta": "Hero",
+  "Vacarn, the Dark Goblin Necromancer": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Burning Skeleton": "Creature L1",
+  "Cosmic Skeleton": "Creature L1",
+  "Cute Cheese": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Glass of Marbles": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Hammer Skeleton": "Creature L1",
+  "Harpyformer Choir": "Creature L0",
+  "Inventing": "Ability",
+  "Leadership": "Ability",
+  "Loyal Bone Dog": "Creature L1",
+  "Mystery Box": "Artifact",
+  "Necromancy": "Ability",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Skeleton Archer": "Creature L1",
+  "Skeleton Bard": "Creature L1",
+  "Skeleton Death Knight": "Creature L1",
+  "Skeleton Demon": "Creature L1",
+  "Skeleton Healer": "Creature L1",
+  "Skeleton Mage": "Creature L1",
+  "Skeleton Necromancer": "Creature L1",
+  "Skeleton Reaper": "Creature L1",
+  "Skeleton Skull Bat": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Treasure Skeleton": "Creature L1",
+  "Elixir of Quickness": "Potion",
+  "Monster in a Bottle": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Vacarn, the Dark Goblin Necromancer": "Skeletons he raises from the discard pile with Necromancy keep their effects and may use them at once. Low health.",
+  "Cute Nerd Magenta": "Discards a card to send any card from the deck to the discard pile, where the Skeletons are wanted.",
+  "Alice, the Puppeteer Girl": "Once per turn hits one of your targets, harder for every creature that has stayed on her board.",
+  "Rain of Arrows": "Hits your whole side, harder for every creature she controls.",
+  "Necromancy": "Ability: each turn summons a creature from the discard pile as a free action.",
+  "Skeleton Necromancer": "Discards a card to raise another Skeleton.",
+  "Cosmic Skeleton": "A heavy shot every turn.",
+  "Skeleton Demon": "Whenever you draw or search cards with your own effects, it hits a target for each card.",
+  "Hammer Skeleton": "Each turn smashes a spell attached to a hero, or an Area.",
+  "Skeleton Skull Bat": "Makes you discard a card every turn.",
+  "Skeleton Death Knight": "Stops one of your heroes from acting until the end of your next turn.",
+  "Skeleton Bard": "Lets another Skeleton use its effect twice.",
+  "Skeleton Mage": "Draws two, discards one.",
+  "Loyal Bone Dog": "Discarded from hand to revive a Skeleton that just died.",
+  "Glass of Marbles": "Draws two when it is discarded.",
+  "Divine Gift of Fire": "Once per game: sets your whole side on fire for good."
+ },
+ "plan": "Skeletons are small, die easily and do not stay dead. Each has one useful trick per turn (a heavy shot, a discard, a smashed attachment, a locked hero), and Isolde keeps the right ones on the board by raising them with Necromancy every turn; raised by Vacarn they act immediately. Magenta stocks the discard pile, the Bard doubles the best effect, and the row itself is a weapon: Alice and Rain of Arrows both count her creatures. The army is as fragile as it looks and has to be rebuilt after every sweep; Vacarn, the hero who makes it fast, is the frailest thing on her side.",
+ "looks": {
+  "early": "A Town Guard, a Skeleton Mage, Skeletons going into the discard pile on purpose.",
+  "mid": "Five Skeletons each doing one thing a turn, another rising at the start of each of her turns, Alice counting.",
+  "late": "A board rebuilt for the third time, a Hammer Skeleton eyeing your Storm, Rain of Arrows in hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her Skeletons have just been summoned from hand and cannot use their effects until next turn.",
+   "why": "A Skeleton that dies before its first turn has done nothing, and a Hammer Skeleton left alive will smash Gathering Storm the moment it is attached."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Vacarn raises a Skeleton every turn and that Skeleton acts immediately; a Skeleton Demon watches your draws.",
+   "why": "Sweeps only buy a turn while Vacarn stands; he has the least health on her side, and without him raised Skeletons arrive blank. A setup turn full of draws is paid for through the Demon."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Her board is five Skeletons wide and she is holding Rain of Arrows.",
+   "why": "Alice and Rain of Arrows both scale with that row: a sweep before her turn makes both nearly harmless, and racing three heroes while five Skeletons act loses."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Her discard pile is thin and few Skeletons are left to raise.",
+   "why": "With the recursion running dry, her heroes cannot stop the Storm on their own."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Isolde summons a Skeleton Mage and a Hammer Skeleton; neither can act yet.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Hammer before your Storm exists"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Vacarn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm next to a Hammer Skeleton"
+     }
+    ]
+   },
+   {
+    "board": "Magenta discards a Glass of Marbles to drop a Cosmic Skeleton into the discard pile, and draws two.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the small ones"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Vacarn before he raises it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Vacarn raises the Cosmic Skeleton and it fires at once.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Burn Vacarn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on the caster"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Five Skeletons; a Skull Bat takes a card from you every turn and a Death Knight locks your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Vacarn so the next ones rise blank"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play through the lock"
+     }
+    ]
+   },
+   {
+    "board": "A Skeleton Demon hits you for every card your Leadership draws.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Demon before reshuffling"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep it with the rest"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep drawing into it"
+     }
+    ]
+   },
+   {
+    "board": "Your sweep clears the board. Next turn two are back and working.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Vacarn, now"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Alice"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Five Skeletons, the Bard making the Cosmic Skeleton fire twice, Rain of Arrows in her hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Draw out the Idol, then sweep"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the double shot"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race three heroes"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Fire: your whole side burns for the rest of the duel.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep; Tea a burn across afterwards"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race, burning"
+     }
+    ]
+   },
+   {
+    "board": "The Hammer Skeleton smashes your Storm.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill it and re-attach"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Hammer"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach at once into the same Hammer"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Alice alone with two Skeletons.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "The Storm and Acid Vial"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Skeletons first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Her discard pile is nearly empty of Skeletons.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "One last sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Relax"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Vacarn for one more raise.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Alice"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

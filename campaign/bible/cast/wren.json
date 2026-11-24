@@ -1,0 +1,275 @@
+{
+ "id": "wren",
+ "name": "Wren Ishikawa",
+ "firstName": "Wren",
+ "age": 21,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 3,
+ "dorm": null,
+ "room": "A camp bed in the Design Lab",
+ "romance": true,
+ "deck": "Prototype Puppets (Puppets)",
+ "look": "Ink-stained fingers, a messy black bun skewered with three pencils and a brush, huge round glasses forever sliding down her nose, and a paint-spattered gold Game Design jacket worn over a lilac top that may well be pyjamas. There are card sketches on her forearms in ballpoint. She looks at people as if checking their line weight.",
+ "voice": "Mumbled, digressive and suddenly intense; half her sentences are addressed to the card in front of her, and she forgets to finish small talk but never a mechanic. She asks strange, exact questions and waits properly for the answer. Japanese-Canadian; unfailingly gentle. RARE habit (once in a scene at most; most scenes go without it): thinking aloud in little hums before she answers.",
+ "lines": [
+  "Were you there long? Hold this. Not like that — by the edges.",
+  "Good design is a puppet. You want the player to feel the strings and choose to dance anyway.",
+  "Have you eaten? I haven't. What day is it? Don't tell me, I'll lose the thread.",
+  "This ink is wrong. Not bad — wrong. Tilt it. See? It's looking at you."
+ ],
+ "intro": "A third-year Game Design student who more or less lives in the Design Lab in her pyjamas, and is known to be the founder's favourite pupil.",
+ "traits": [
+  {
+   "id": "wren_1",
+   "text": "She sleeps on a camp bed in the Design Lab and has not seen her dorm room this term.",
+   "how": "Visit the design lab at any hour."
+  },
+  {
+   "id": "wren_2",
+   "text": "Chuck Kaboom calls her the best designer he has taught.",
+   "how": "Card Design class."
+  },
+  {
+   "id": "wren_3",
+   "text": "She draws card frames on her arms when she runs out of paper.",
+   "how": "Look at her sleeves."
+  },
+  {
+   "id": "wren_4",
+   "text": "She forgets to eat for whole days and lives on whatever people leave near her.",
+   "how": "Bring food; watch it vanish."
+  },
+  {
+   "id": "wren_5",
+   "text": "She designs by asking how a card should FEEL to lose to.",
+   "how": "Show her a design or ask about hers."
+  },
+  {
+   "id": "wren_6",
+   "text": "She has a twin brother, Kei, who is an actual puppeteer in Montréal; the deck is half a joke between them.",
+   "how": "Ask why Puppets."
+  },
+  {
+   "id": "wren_7",
+   "text": "She can identify a card's print run by smell and by the sound it makes when flicked.",
+   "how": "Hand her any old card."
+  },
+  {
+   "id": "wren_8",
+   "text": "She has not been off campus since last spring and is slightly afraid of the ferry.",
+   "how": "Friend stage; invite her to town."
+  },
+  {
+   "id": "wren_9",
+   "text": "She thinks there is something wrong with the oldest cards in the archive and has told only one person.",
+   "how": "Close stage, or bring her an unusual card."
+  }
+ ],
+ "secret": "Wren is a designer's designer: obsessive, generous with ideas, hopeless with her own maintenance. She and her twin Kei grew up in Vancouver above their grandmother's bunraku workshop; Kei got the hands for puppets and Wren got the head for systems, and each thinks the other got the better deal. She came to the Academy for Chuck, and Chuck — who sees in her the pure delight he had before the island cost him anything — has given her more of his real attention than anyone but Inya. She adores him and is beginning to be frightened for him. Wound: she is only ever at ease inside a problem; outside one she feels like a badly templated card — unclear what she does. Contradiction: she understands exactly how to make strangers feel things across a table and has no idea what to do with a person standing next to her. Octavia Sterling's rivalry baffles her; she thinks Octavia's Hell Circles is the best student design in a decade and has said so, which Octavia took as condescension. Private joke: every prototype she makes has a hidden tiny wren somewhere in the frame; finding it is how you know she likes you enough to show you.\nWhat she knows: Alpha ink is WRONG. Under the lab's lamp its pigment does not sit on the stock, it sits slightly above it; the art shifts between two looks; a magnet does nothing but a struck tuning fork makes the card hum back a half-tone lower. Working from a first-print common borrowed over the counter in town, she has found that the ink is ground mineral, not pigment, whose grains fit together like tiny tiles — dust of no stone in the campus collection — except one shard in Professor Ashdown's office labelled 'tessera, north slope'. She told Chuck; he laughed too loudly, took the sample, and asked her as a personal favour to stop. She did not stop. Professor Santángel has twice asked her to 'consult' on Alpha handling for his lab; she refused because she does not like how he looks at the cards. After Day 27 she gets hold of a crumb of crater glass (via Viktor or Rowan) and finds the Alpha ink grains physically crawl away from it. After the first Cosmic Depths card is seen she draws it from memory and cannot — the frame will not close on paper. Her arc: from the lab to the Vault; she is the one who understands that a tile is a record and a card is a COPY of a record, and what that implies about how Aleksander Hale could be 'played for'. Marrow wants her more than anyone on the island, as the person who could reproduce the Alpha process; she is an abduction or coercion risk in Stage C/D.\nRoute: she does not notice flirting, at all, for weeks. She notices help, curiosity and food. Then she notices him all at once and is extremely direct about it in the wrong order.",
+ "wants": "To understand how the oldest cards work — and to make one thing as alive as they are.",
+ "fears": "That the thing she loves most is hurting the man who taught her, and that outside the lab she is nobody in particular.",
+ "crush": "felix",
+ "crushNote": "He is the other half of her designs and the only person who can make her go to sleep; it has not occurred to her that this is what it is. It shows as her drawing a second hidden figure next to the wren, and looking up when the lab door opens.",
+ "crushPace": 0.5,
+ "likes": [
+  "Food left quietly near her elbow",
+  "Good questions about why a card feels the way it does",
+  "Being brought odd cards, misprints, mysteries",
+  "Playtesting her prototypes honestly",
+  "People who find the hidden wren",
+  "Being reminded what day it is, kindly",
+  "Quiet company while she works",
+  "Anyone gentle with Chuck"
+ ],
+ "dislikes": [
+  "Being dragged away mid-thought without warning",
+  "Careless handling of old cards",
+  "Design by committee",
+  "Santángel's requests",
+  "Being called a genius (she thinks it is an excuse not to explain)",
+  "Loud rooms",
+  "Anyone asking her to get them access to the Archive"
+ ],
+ "gifts": [
+  "A hot meal carried to the lab",
+  "Card: Tri Ad, the Puppet Mistress",
+  "A misprint or miscut card from Dex's junk box",
+  "Card: Weird Doll",
+  "A set of fine sable brushes from the boutique",
+  "Card: Blueprints"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Oblivious, then abruptly literal.",
+  "text": "Wren does not flirt and does not detect it; compliments are filed as data ('Oh. Thank you. Is that relevant?'). Her interest shows as inclusion: she hands him the prototype, asks his opinion first, draws him — he finds a small storm cloud hidden in a frame where the wren should be. Approach her by turning up, bringing food, asking real questions and playtesting honestly; make her laugh and she will look at him properly for the first time. When it finally occurs to her that this is A Thing she says so, out loud, as a design observation, probably in front of someone. After that she is curious, affectionate and unembarrassed, and treats being in love like a marvellous new system she intends to learn thoroughly."
+ },
+ "intimacy": "Late to start and then wholehearted and curious. Touch begins by accident — her guiding his hand to tilt a card under the lamp and forgetting to let go; falling asleep mid-sentence against his arm on the camp bed. She is unselfconscious to the point of comedy (pyjamas, ink on her cheek) and then suddenly very present, attentive in the way she is with a design: what does this feel like, and this? She likes being gently taken out of her head — glasses lifted off, pencils drawn from her hair one at a time, the lamp clicked off over the workbench. Soft, absorbed, a little wondering, with quiet laughter. Fade on the lab's blinds coming down and one ink-smudged handprint on his sleeve.",
+ "events": [
+  {
+   "id": "wren_e1",
+   "stage": 1,
+   "title": "By the edges",
+   "condition": "Bring food to design_lab and playtest one of her prototypes with honest criticism; handle the cards the way she shows you.",
+   "hint": [
+    "She lives in the Design Lab and forgets meals. Start there.",
+    "Take her something to eat and test one of her designs truthfully."
+   ]
+  },
+  {
+   "id": "wren_e2",
+   "stage": 2,
+   "title": "Find the wren",
+   "condition": "Come back regularly; bring her something odd (a misprint from card_shop, a found card from Viktor); spot the hidden bird in a prototype frame. She shows him the drawer of things Chuck asked her to stop working on.",
+   "hint": [
+    "Every one of her designs has something hidden in it. Finding it means something.",
+    "Keep visiting, bring her curiosities, and look closely at her card frames."
+   ]
+  },
+  {
+   "id": "wren_e3",
+   "stage": 3,
+   "title": "A design observation",
+   "condition": "Get her off campus for the first time in months — card_shop and cafe on a weekend, or the Night of Masks (Day 54) — and back again safely; she announces, with total candour, what she has noticed about how she feels.",
+   "hint": [
+    "She has not left campus since spring. Somebody could ask.",
+    "Invite her into town, look after her on the way, and listen when she tells you what she has worked out."
+   ]
+  },
+  {
+   "id": "wren_e4",
+   "stage": 4,
+   "title": "The ink is wrong",
+   "condition": "After Day 27, bring her a crumb of crater glass or let her examine a card nobody printed, and keep her findings between you; when Chuck asks her to stop, stand with her without turning her against him. She asks him to stay in the lab.",
+   "hint": [
+    "She has found something about the oldest cards that she was asked to leave alone.",
+    "Bring her an unusual sample from somewhere off the map and keep her research secret and safe."
+   ]
+  },
+  {
+   "id": "wren_e5",
+   "stage": 5,
+   "title": "Copy of a record",
+   "condition": "In Term 2, keep her out of Marrow's and Santángel's hands (do not let her go to old_print_works alone), and go with her and Chuck to card_archive or the Vault's threshold when she explains what she has understood; she makes Rowan a card — one copy, with both a wren and a storm cloud in the frame.",
+   "hint": [
+    "Someone wants what she knows. And she is one step from understanding something enormous.",
+    "Protect her from people who want her knowledge, and be beside her when she finally explains her discovery."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "friends",
+   "text": "Chuck's granddaughter, who sorted cards beside her bench as a child. Wren keeps the secret without thinking of it as one.",
+   "public": false,
+   "from": 0
+  },
+  "chuck": {
+   "label": "mentor",
+   "text": "The reason she came to the island. She adores him and has begun to be afraid for him.",
+   "public": true,
+   "from": 0
+  },
+  "livvie": {
+   "label": "mentor",
+   "text": "The most natural designer in the first year, and the hungriest.",
+   "public": true,
+   "from": 8
+  },
+  "felix": {
+   "label": "best friends",
+   "text": "The other half of her designs.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "rivals",
+   "text": "Thinks Octavia's deck is the best student design in a decade and cannot see why saying so went badly.",
+   "public": true,
+   "from": 0
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "He keeps asking her to 'consult' on old cards. She does not like how he looks at them.",
+   "public": false,
+   "from": 0
+  },
+  "leona": {
+   "label": "friends",
+   "text": "The quiet first-year asks better questions about first prints than most of the staff. Wren has not thought to wonder at it.",
+   "public": true,
+   "from": 20
+  },
+  "maisie": {
+   "label": "friends",
+   "text": "The first person on the tech side who asks what the hologram is FOR.",
+   "public": true,
+   "from": 10
+  },
+  "hedda": {
+   "label": "mentor",
+   "text": "An impossible brief and a real one. Wren has given her three constraints and told her to come back.",
+   "public": true,
+   "from": 15
+  },
+  "eloise": {
+   "label": "mentor",
+   "text": "No templating, no costs, and the best instincts for a frame she has ever seen. Wren is teaching her to finish.",
+   "public": true,
+   "from": 9
+  },
+  "helical": {
+   "label": "friends",
+   "text": "The one professor who talks to the equipment. She suspects he knows what the first ink is.",
+   "public": false,
+   "from": 0
+  },
+  "rafa": {
+   "label": "friends",
+   "text": "Food appears. She worked out who it was in the third week and drew him a wren on the lid.",
+   "public": true,
+   "from": 20
+  },
+  "junho": {
+   "label": "mentor",
+   "text": "The most rigorous first-year she has seen. She is trying to get him to hand something in.",
+   "public": true,
+   "from": 6
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "Tariq knows where everything is and never asks why she wants the oldest cards. She suspects he has guessed.",
+   "public": true,
+   "from": 0
+  },
+  "imara": {
+   "label": "friends",
+   "text": "Imara thinks in costs the way Wren thinks in feel. They are usually both right, which is why the card takes a month.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "design_lab",
+   "Afternoon": "card_archive",
+   "Evening": "design_lab",
+   "Night": "design_lab"
+  },
+  "weekend": {
+   "Morning": "design_lab",
+   "Midday": "chuck_workshop",
+   "Afternoon": "design_lab",
+   "Evening": "design_lab",
+   "Night": "design_lab"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Puppets: her heroes do very little and make your creatures do a great deal, usually to each other. Plays to see what happens; frequently stops to write something down.",
+  "tilt": "An interesting interaction — she will throw a winning game to see what a strange line does. Also plain hunger."
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "name": "The Rope Bridge",
+ "zone": "wild",
+ "bg": "rope_bridge",
+ "night": false,
+ "hike": 2,
+ "hours": "Open; the only dry crossing of the Split, the ravine that cuts the island's waist. Maintained by Silas twice a year.",
+ "sight": "The trail ends at a lip of rock and continues as sixty metres of plank and cable over a ravine so deep the river at the bottom is a white thread. The bridge sags in the middle and sings in the wind. On the far side the jungle is darker and older, and the volcano is suddenly very large. A tin sign says ONE AT A TIME and somebody has added a card-game joke about stack limits.",
+ "things": [
+  "Cross it. Do not look down. Look down.",
+  "Wait your turn and talk to whoever is waiting too",
+  "Count the planks that have been replaced and the ones that should be",
+  "Drop a pebble and count the seconds",
+  "Read the knots: prayer ribbons, hair ties and sleeves tied to the cables by people who made it across",
+  "Tie on something of your own",
+  "Find the old stone abutments of a much earlier bridge, just upstream"
+ ],
+ "secret": "The threshold between the 'school' half of the island and the old half; everything north of here costs real time. A Nerve test the first time (failing is funny, not fatal: Baylee or Viktor walks you over). The old abutments are Tessellate. D29: the school's cordon post is HERE, at the campus-side anchor (the 'north trailhead') — two unnamed proctors by day, a chain across the planks by night; the official line is rockfall on the north slope. Ways past: Viktor's ravine descent upstream, the cliff path and coast, a boat, or permission. From D61 Marrow's field assistants use the bridge freely and carry cases over. On the far side, from D27, there are no birds at all.",
+ "access": "From Day 29 guarded and chained: no students beyond without written permission (ashdown can issue a field-section pass for the ruins; nobody issues one for the north slope)."
+}

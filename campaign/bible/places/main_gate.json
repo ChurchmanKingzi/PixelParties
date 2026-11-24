@@ -1,0 +1,18 @@
+{
+ "name": "Main Gate",
+ "zone": "campus",
+ "bg": "main_gate",
+ "night": false,
+ "hours": "Open from dawn to the end of the Evening slot; a porter's lodge with a sign-out book for town trips.",
+ "sight": "Two squat towers of black volcanic stone hold up a wrought-iron arch in the shape of a fanned hand of cards, each card a different rarity gem in coloured glass. Beyond it a palm-lined avenue climbs to the quad; behind you the harbour road drops away to the town roofs. The Academy charter is cast in bronze on the left tower, polished gold at shoulder height where thousands of hands have touched it for luck.",
+ "things": [
+  "Read the bronze charter plate — including the clause on formally issued challenges",
+  "Touch the plate for luck like everybody does",
+  "Sign out for a town trip in the porter's book and see who else is out",
+  "Look up at the five glass cards in the arch when the sun comes through them",
+  "Wait on the low wall for someone coming back from town",
+  "Check the lost-and-found crate in the lodge (single sleeves, one sandal, a dragon plush that goes missing weekly)",
+  "Catch the town shuttle cart that leaves on the hour (free with student ID)"
+ ],
+ "secret": "The charter plate carries the nine short articles (exact wording: CHARTER in the plot file) and is the first place Rowan can read them: a challenge is made aloud, by name, before one who counts; it may not be refused; the result binds both. Noor can explain them; later they are the text the Guest quotes. The arch has five cards but only four rarity gems are lit — the fifth, a smoky black glass, belongs to Umbra House and was never removed. The sign-out book is a record: from D27 '{H:sig}' signs out at odd hours in handwriting that grows steadily neater. D67: the gate is locked at the end of the Evening slot and the book becomes mandatory; a proctor sits in the lodge. ACCESS NOTE: From Day 67 locked during the Night slot (the wall east of the lodge can be climbed; viktor knows where)."
+}

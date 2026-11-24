@@ -1,0 +1,211 @@
+{
+ "id": "ed",
+ "name": "Ed Venture",
+ "firstName": "Ed",
+ "age": 18,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B5",
+ "romance": false,
+ "deck": "Monkee Rodeo (Monkees)",
+ "look": "Sunburnt, sandy-haired, with a huge uncomplicated grin under a battered cowboy hat that has never been seen off his head, a bandana at the throat of his red jacket's grey collar, and knees that are permanently scraped. He walks as if the ground were a suggestion. Something on him is always freshly bandaged.",
+ "voice": "Bright, loud and wide open, a ranch-country drawl, every sentence leaning forward into the next adventure. He takes warnings as recommendations and bad news as a detail. No guile at all and very little fear; he thanks people sincerely for rescuing him and sets off again. RARE habit (once in a scene at most; most scenes go without it): asking, with real hope, whether something is dangerous.",
+ "lines": [
+  "Back home you can see weather coming for two hours. Here it just lands on you. I kind of love it.",
+  "Tomi says rope's eleven credits at the store and four in town. Four! I'd have paid eleven like an idiot.",
+  "I can't do the probability homework. I read the first question nine times. Can I look at yours? Not copy. Look.",
+  "Monkeys just go for it, you know? Grab the shiny thing, figure out the rest on the way down.",
+  "She called me an idiot again. By name this time. That's good, right?",
+  "Hold this end. No, tighter. That's a bowline — my dad ties it behind his back.",
+  "Sorry I'm late, I found a crab. Big one. I put him back.",
+  "Viktor says I'm not to follow him any more, so I've been going ahead of him instead.",
+  "Nah, it's a scratch. The nurse has seen worse. Off me, mostly.",
+  "Is it dangerous? Like, properly? Okay. Okay! Which way?"
+ ],
+ "intro": "A sunburnt, grinning first-year in a cowboy hat from bungalow 5 who has pinned a map of the island over his bunk and marked every place labelled dangerous as somewhere to go.",
+ "traits": [
+  {
+   "id": "ed_1",
+   "text": "He never takes off his cowboy hat, including to sleep and, reportedly, to shower.",
+   "how": "Share a row with him."
+  },
+  {
+   "id": "ed_2",
+   "text": "There is a hand-drawn map over his bunk with red crosses on everything marked DANGER, and ticks on some of them.",
+   "how": "Visit bungalow 5."
+  },
+  {
+   "id": "ed_3",
+   "text": "He has been to the infirmary more often than anyone else in the year, and knows the nurse's biscuit tin by heart.",
+   "how": "Infirmary, any week."
+  },
+  {
+   "id": "ed_4",
+   "text": "He cannot hear a warning without wanting to go and look.",
+   "how": "Tell him not to go somewhere."
+  },
+  {
+   "id": "ed_5",
+   "text": "He grew up on a ranch in Wyoming, and broke his first bone falling off a horse at four.",
+   "how": "Ask about the hat."
+  },
+  {
+   "id": "ed_6",
+   "text": "He slept straight through the bang on the night the sky lit up, and has never forgiven himself for missing it.",
+   "how": "Bring up that night."
+  },
+  {
+   "id": "ed_7",
+   "text": "He believes, sincerely, that nothing really bad will ever happen to him.",
+   "how": "Ask whether he is ever scared."
+  },
+  {
+   "id": "ed_8",
+   "text": "The hat was his older brother's.",
+   "how": "Trusted; he takes it off to show the name inside."
+  }
+ ],
+ "secret": "Ed Venture (the name is real; his parents are Dale and Marlene Venture of the Lazy V, outside Lander, Wyoming) grew up half-wild on a ranch at seven thousand feet with an older brother, Cody, who was the daring one: rodeo rider, cliff-jumper, the boy every story was about. Cody died at nineteen when a bull fell on him at a county fair; Ed was thirteen. He put on his brother's hat that week and has not taken it off, and somewhere in the same week he quietly stopped believing that anything could happen to HIM — because the alternative, that it can happen to anyone at any moment, was too big. So he is boundlessly, sincerely cheerful, wants to see every dangerous place there is, and has no sense of self-preservation whatever. It is not bravery; a brave person feels the fear. Contradiction: the sunniest boy on the island is running, at a dead sprint, away from the one afternoon of his life he has never talked about. He came to the Academy because it is on a volcano.\nHe rooms with Viktor Hale, who is the real thing, and trails him into the jungle like a happy dog; Viktor's attempts to shake him have only taught him to scout ahead. He is the first-year most likely to be found in the lava tubes, on the rope bridge in a gale, inside the crater cordon or halfway up the radio tower, and he finds things by falling into them. He is smitten with Inya Bell, who is the only person he has met who moves faster than he does and tells him he is an idiot to his face.\n{H=ed?|On the night of Day 26 he slept through the bang — the only person on the row who did — and woke to find that {H=nathan?Nathan had|{H?Nathan and {H} had both|half the row had}} gone to see a crashed spaceship without him. He has not got over it. From Day 27 he thinks '{H}' is the coolest person he knows ('{H:he} doesn't even blink, man') and is not afraid of {H:him} at all, which makes him the most endangered student in the year: asked 'would you play me for something?', Ed would say 'sure!' before hearing what. The default timeline spares {H:him} only because the thing {H=@near?on the steps of|in} bungalow 7, finding no conflict in {H:him}, has not thought to ask. Someone should get to {H:him} first. }His arc is the hat: admitting what happened to Cody, and being frightened, properly, for the first time in five years — for somebody else.",
+ "wants": "To see everything, especially the parts with a fence round them.",
+ "fears": "Nothing he will admit to. Underneath: a phone ringing with bad news, and being the one left behind.",
+ "crush": "inya",
+ "crushNote": "She is the only person he has ever met who moves faster than he does, and she calls him an idiot to his face and comes anyway. It shows as carrots brought back from expeditions, and him inventing dangers near the rabbit hutches.",
+ "crushPace": 1,
+ "likes": [
+  "Being invited along",
+  "A dare",
+  "Stories about the island's dangerous places",
+  "Rope, knots, a good pocket knife",
+  "Being patched up without a lecture",
+  "People who say plainly that he is an idiot and come anyway",
+  "Jerky, trail mix, anything portable"
+ ],
+ "dislikes": [
+  "Being left behind",
+  "Fences, cordons and locked gates",
+  "Long lectures indoors",
+  "Being told to be careful as a goodbye",
+  "Anyone touching the hat",
+  "Sitting still"
+ ],
+ "gifts": [
+  "Card: Nimble Monkee",
+  "A coil of climbing rope from the boathouse",
+  "Card: Adventurousness",
+  "A proper first-aid kit (give it to him; Camille will thank you)",
+  "Card: Cheeky Monkee"
+ ],
+ "events": [
+  {
+   "id": "ed_e1",
+   "stage": 1,
+   "title": "Which way",
+   "condition": "Go somewhere with him that is merely steep (cliff_path, waterfall, tide_pools) and bring him back in one piece; laugh with him, not at him.",
+   "hint": [
+    "One of the first-years is going exploring with or without company. With is safer for him.",
+    "Go on a small expedition with the boy in the cowboy hat and get him home intact."
+   ]
+  },
+  {
+   "id": "ed_e2",
+   "stage": 2,
+   "title": "Great bush",
+   "condition": "Pull him out of real trouble once (rope_bridge, lava_tubes, the radio_tower ladder) and patch him up or walk him to infirmary without a lecture; ask about the map.",
+   "hint": [
+    "He has a map of where he means to go. Somebody ought to know what is on it.",
+    "Rescue him from one of his adventures and ask to see his map."
+   ]
+  },
+  {
+   "id": "ed_e3",
+   "stage": 3,
+   "title": "The name in the hat",
+   "condition": "After Day 27, make him promise — properly, on the hat — never to agree to play a certain neighbour 'for something' without telling you first; when he asks why you look scared, tell him the truth. He takes the hat off.",
+   "hint": [
+    "He is not afraid of anything on this island. There is one thing he should be.",
+    "Get his solemn promise not to accept a certain kind of game, and be honest with him about why."
+   ]
+  }
+ ],
+ "bonds": {
+  "tomi": {
+   "label": "roommates",
+   "text": "Tomi knows what everything costs, including rope. Ed thinks he is the smartest person he has ever met.",
+   "public": true,
+   "from": 1
+  },
+  "viktor": {
+   "label": "roommates",
+   "text": "His roommate goes to all the best places and never says a word about them. Ed intends to see every one.",
+   "public": true,
+   "from": 1
+  },
+  "inya": {
+   "label": "crush",
+   "text": "The only person who moves faster than he does, and she calls him an idiot and comes anyway.",
+   "public": true,
+   "from": 5
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "Nathan from bungalow 7 has the best theories on the island. Ed slept through the night he went to check one.",
+   "public": true,
+   "from": 1
+  },
+  "camille": {
+   "label": "friends",
+   "text": "The nurse has a biscuit tin and never lectures. He is in there most weeks.",
+   "public": true,
+   "from": 4
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "She knows where the big waves are and has promised to show him when he can stay on a small one.",
+   "public": true,
+   "from": 21
+  },
+  "silas": {
+   "label": "friends",
+   "text": "The old keeper knows every dangerous place on the island and will not tell him where they are, which is practically a map.",
+   "public": true,
+   "from": 9
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "She takes great pictures and will climb stuff if he goes first. He thinks she is brilliant.",
+   "public": true,
+   "from": 7
+  },
+  "sunny": {
+   "label": "friends",
+   "text": "Sunny's the best. She lets him race her and only wins by a lot.",
+   "public": true,
+   "from": 3
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "jungle_trail",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "waterfall",
+   "Midday": "cliff_path",
+   "Afternoon": "tide_pools",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Monkees run as a cheerful bank: every bit of gold wakes another one, and the real money piles up on Logan. He plays it at a run — attack with everything, find out what the opponent had by walking into it — and wins more than he should on sheer tempo.",
+  "tilt": "Nothing upsets him, which is the problem: he never notices he is losing until it is over."
+ },
+ "range": "Danger is ONE of his subjects: he asks whether something is dangerous at most once in a scene, never twice about the same thing, and not at all in most indoor talk. He is also a ranch kid (horses, weather, fences, knots, early mornings, big sky he misses without saying so); hopeless at sitting still in lectures and honestly worried about his grades; in awe of clever people (Tomi, Viktor, Nathan's theories) and full of questions about what THEY are doing; smitten with Inya and bad at hiding it; generous — shares jerky, lends his knife, carries things, volunteers first; curious about other people's homes and decks; a cheerful, sloppy Monkee player who wants to get better. He listens, laughs at himself, and goes quiet when he is tired or when family comes up."
+}

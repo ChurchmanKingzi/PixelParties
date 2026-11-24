@@ -1,0 +1,375 @@
+{
+ "name": "Future Tech v9",
+ "owner": "kenji",
+ "heroes": [
+  "Future Tech Gunslinger Riffel",
+  "Toras, Master of all Weapons",
+  "Fern, the Ship Slave"
+ ],
+ "main": [
+  [
+   3,
+   "Blueprints"
+  ],
+  [
+   5,
+   "Fighting"
+  ],
+  [
+   3,
+   "Future Tech Battery"
+  ],
+  [
+   3,
+   "Future Tech Bazooka"
+  ],
+  [
+   3,
+   "Future Tech Copy Device"
+  ],
+  [
+   4,
+   "Future Tech Database"
+  ],
+  [
+   3,
+   "Future Tech Escape Device"
+  ],
+  [
+   3,
+   "Future Tech Fists"
+  ],
+  [
+   4,
+   "Future Tech Gun"
+  ],
+  [
+   3,
+   "Future Tech Jetpack"
+  ],
+  [
+   4,
+   "Future Tech Lamp"
+  ],
+  [
+   4,
+   "Future Tech Laser Cannon"
+  ],
+  [
+   2,
+   "Future Tech Prototypes"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   4,
+   "Mysterious Core"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Future Tech Gunslinger Riffel": "Hero",
+  "Toras, Master of all Weapons": "Hero",
+  "Fern, the Ship Slave": "Hero",
+  "Blueprints": "Artifact",
+  "Fighting": "Ability",
+  "Future Tech Battery": "Artifact",
+  "Future Tech Bazooka": "Artifact (Equipment)",
+  "Future Tech Copy Device": "Artifact",
+  "Future Tech Database": "Artifact",
+  "Future Tech Escape Device": "Artifact (Reaction)",
+  "Future Tech Fists": "Artifact (Equipment)",
+  "Future Tech Gun": "Artifact (Equipment)",
+  "Future Tech Jetpack": "Artifact (Equipment)",
+  "Future Tech Lamp": "Artifact",
+  "Future Tech Laser Cannon": "Artifact (Equipment)",
+  "Future Tech Prototypes": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Mysterious Core": "Artifact",
+  "Quick Attack": "Attack",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Mysterious Core": "Sends three different artifacts from the deck straight to the discard pile. Every Future Tech card is stronger for each copy of itself already there.",
+  "Future Tech Gun": "Equipment: more Attack for every Gun in his discard pile.",
+  "Future Tech Laser Cannon": "Huge Attack bonus; absurdly expensive until copies in the discard pile make it nearly free.",
+  "Future Tech Fists": "Equipment: once per turn hits as many targets as there are Fists in the discard pile.",
+  "Future Tech Bazooka": "When its hero kills with an attack, splashes creatures.",
+  "Future Tech Jetpack": "Its hero cannot be hit by low-level attacks.",
+  "Future Tech Escape Device": "Reaction: cancels an attack or spell on a hero if its level is no higher than the number of Escape Devices in his discard pile.",
+  "Future Tech Database": "Searches Future Tech cards, more with each Database discarded.",
+  "Future Tech Lamp": "Digs the top of the deck for artifacts.",
+  "Future Tech Battery": "Makes an artifact cheaper per copy in the discard pile.",
+  "Future Tech Copy Device": "Becomes a copy of a Future Tech artifact from the discard pile.",
+  "Blueprints": "Fetches another copy of an artifact that is in the discard pile.",
+  "Future Tech Gunslinger Riffel": "Each turn equips, for free from the deck, a copy of an equipment that lies in the discard pile.",
+  "Toras, Master of all Weapons": "High Attack that grows for every differently named artifact he wears; only ever hits one target.",
+  "Fern, the Ship Slave": "Halves the cost of equipment.",
+  "Heavy Hit": "Attack that stuns."
+ },
+ "plan": "A grinder's deck: every Future Tech card counts the copies of itself in the discard pile. Kenji spends the early turns throwing his own artifacts away with Mysterious Core and cycling Lamps and Databases; then Riffel pulls equipment out of the deck for free each turn, the Laser Cannon costs nothing, and Toras, hung with guns, removes a hero with every Heavy Hit and Quick Attack. Escape Devices start cancelling your cheaper spells. The early game is nearly all setup, and nothing protects his heroes before the Escape Devices are stocked; but destroying his equipment later only feeds the discard pile he is counting.",
+ "looks": {
+  "early": "Artifacts going straight from deck to discard pile, a Lamp, a bare-handed Toras.",
+  "mid": "Toras wearing two or three different weapons, Riffel fetching another each turn.",
+  "late": "A Laser Cannon and Guns on Toras, a discard pile like a scrapyard, an Escape Device held up whenever you cast."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He is discarding his own artifacts and has equipped nothing yet.",
+   "why": "His cards do almost nothing until copies are in the discard pile; these are free turns against three undefended heroes, and matching his setup turn for turn is a race he wins."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "Toras wears several different weapons and Riffel replaces whatever leaves the board from the deck.",
+   "why": "Destroying his equipment adds to the very discard pile that powers the next copy; blunt the one attacker instead (Snow Cannon on Toras, Homerun! for the hit) and send the rest into Riffel."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Toras, loaded with guns, has little health; there is not a single creature on his side.",
+   "why": "He is a glass cannon holding the entire win condition, and there is nothing to sweep; your level-three spells are still above what his Escape Devices can cancel."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Whatever hero he has left swings twice a turn with Quick Attack and Heavy Hit.",
+   "why": "One stun plus one hit per turn is what he does: keep a shield for the hit and Tea for the stun, and the Storm finishes a deck with no healing."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Kenji plays Mysterious Core and three different artifacts go from his deck to the discard pile.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Toras while he is unarmed"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye his Blueprints and Databases"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Set up alongside him"
+     }
+    ]
+   },
+   {
+    "board": "Riffel equips a Future Tech Gun from the deck for free.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Riffel is the engine: hit him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Riffel"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep an empty board"
+     }
+    ]
+   },
+   {
+    "board": "Lamp, Database, Battery: his hand is all artifacts and none of them hurt yet.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning the three heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on your caster for later"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level quietly"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Toras wears a Gun, a Jetpack and a Bazooka and has just stunned your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Toras, burn Riffel"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Toras"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the lot into his discard pile"
+     }
+    ]
+   },
+   {
+    "board": "You destroy a Gun; the next one out of the deck is stronger for it.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Stop breaking things; freeze Toras"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill the hero, not the gear"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Break another"
+     }
+    ]
+   },
+   {
+    "board": "The Laser Cannon comes down for almost nothing.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon Toras, Homerun! in hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "All burn into Toras now"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Finish the Storm first"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Toras, wounded, carries the whole arsenal.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Toras"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze him and tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for nothing"
+     }
+    ]
+   },
+   {
+    "board": "An Escape Device cancels a Cataclysm you cast at level zero; your level-three spells are still too high for it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Use the level-three spells and the Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Acid Vial instead"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for a better turn"
+     }
+    ]
+   },
+   {
+    "board": "Fists hit two of your heroes at once.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the weaker one"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Break the Fists"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Riffel alone, re-equipping every turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the hit, let the Storm work"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh returns Toras with everything still in the discard pile.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the swing"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Riffel"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; his is stunning yours every turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea, then finish"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race through the stun with the Storm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

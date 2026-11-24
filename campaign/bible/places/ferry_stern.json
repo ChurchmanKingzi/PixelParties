@@ -1,0 +1,20 @@
+{
+ "name": "Stern Deck",
+ "zone": "campus",
+ "bg": "ferry_stern",
+ "night": false,
+ "part": "ferry_deck",
+ "hours": "Open for the whole crossing. ARRIVAL DAY (Day 1, 08:00–10:40) on the stern: jessica — on the sheltered side beside three leather caskets stacked on a crewman's trolley, one gloved hand on the smallest; she does not leave them. She declines a game on a boat and before a proper introduction, and is glad of conversation with anyone who crossed the deck to offer it. ashton — at the rail near her with a rose, trying one line after another; he lost at the lounge table half an hour ago and says so cheerfully. He plays a casual game lazily, readily if a woman is watching, for no stake. victoria — on the one dry bench under the awning with a parasol open, looking at the wake; she does not play in a crowd. ophelia — a second-year, her sister, standing at the luggage cage with her arms crossed, watching the bench; she answers for Victoria when strangers crowd her and says 'after we dock' to any game. sunny — sitting on the lower bar of the rail with her bare feet over the wake and a towel round her neck; plays at once, on the planks, and proposes that the loser does ten push-ups. marit — standing on a mooring bollard reciting to the gulls, glad of a human audience; plays any game offered and narrates it for whoever gathers.",
+ "sight": "The open after deck: a white wake running back to an empty horizon, gulls riding the air above the flagstaff, a wire luggage cage stacked to the top with trunks. One bench stands dry under a canvas awning; the rest of the planking shines with spray. It is quieter here than forward, the funnel is warm at your back, and the mainland is gone.",
+ "things": [
+  "Watch the wake and the gulls",
+  "Stand at the rail with the wind behind you and say nothing to anybody",
+  "Cross the deck and introduce yourself to someone",
+  "Sit on the dry bench, if there is room and you ask",
+  "Play a casual game on the planks, cards under a shoe",
+  "Read the labels in the luggage cage and guess who owns what",
+  "Find your own duffel at the bottom of the cage"
+ ],
+ "secret": "No quarrel here by default: this is where the ship is calm, and where a player who wants to meet people rather than fight goes. Ashton's courtship of Jessica is going politely nowhere; she notices who crosses the deck to speak to her and how, and a plain greeting does more than a line. Victoria answers one person at a time, in complete sentences, if spoken to directly and plainly; a group or a joke gets silence, and then Ophelia. Sunny says what she likes about a person within a minute of meeting them. Marit's game draws a small crowd, which is hard on Rowan's hands. News travels aft: if Rowan has played at the lounge table, the stern knows the result before he arrives, and Ashton asks him how Gideon took it.",
+ "access": "Only during a crossing."
+}

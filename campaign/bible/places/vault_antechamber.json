@@ -1,0 +1,21 @@
+{
+ "name": "The Antechamber",
+ "zone": "wild",
+ "bg": "vault_antechamber",
+ "night": false,
+ "hike": 2,
+ "part": "ruin_gate",
+ "hours": "Behind the Ruin Gate; reachable only while the gate stands open.",
+ "sight": "A square hall cut into the living rock, lit by nothing you can find — the tiled walls give back a dim honey-coloured glow of their own. Every surface is mosaic: rows of small figures facing rows of other figures across grids, like a wall of frozen games. Two stone benches face each other across a stone table inlaid with a board. The air is dry, warm and perfectly still, and your footsteps make no echo at all.",
+ "things": [
+  "Read the walls: game after game, each with a winner marked by a raised tile",
+  "Sit at the stone table",
+  "Study the long panel over the inner door: figures, a falling spiral, a board between them",
+  "Find the modern things: a dropped pencil, a boot print in nine-year-old dust, a field lantern",
+  "Touch a raised tile and feel it give, very slightly, like a key",
+  "Examine the inner door of black stone and its small square keyhole",
+  "Notice there are no shadows in here"
+ ],
+ "secret": "The Tessellate's teaching hall and the place where a challenger was instructed before entering the Vault. THE LONG PANEL is the rule of the island in pictures, and the copy in Hale's torn pages comes from it: (1) a thing falls from the sky; (2) it cannot be struck — spears pass through; (3) one of the people sits down and lays a board between them; (4) the thing sits too; (5) the board decides, and both rise changed: the loser has a square-shaped piece missing, the winner holds a tile. A sixth image, chipped but readable: a person plays FOR another, a line connecting them — proxy play is lawful (this is why Willas can take Lilia's duel, and why someone can 'play for' Aleksander). The stone table is where a Charter Duel 'in the Vault' can be formally opened; the charter's own wording was lifted by Chuck from what he dreamed here. The inner door opens with Silas's black stone key or stands open if the Guest has gone before. Hale's lantern and the students' dropped things are here. One tile near the inner door shows a young, sleeping castaway — Chuck, recorded lightly fifty years ago: one who is part of the record may not play in the Vault, which is why he never could.",
+ "access": "Only through the open Ruin Gate."
+}

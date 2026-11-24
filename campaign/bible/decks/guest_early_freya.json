@@ -1,0 +1,442 @@
+{
+ "name": "Glacier",
+ "owner": "guest",
+ "heroes": [
+  "Fiedel, the Mercenary Mage",
+  "Klaus, the Cult Leader",
+  "Saya, the Plant Princess"
+ ],
+ "main": [
+  [
+   8,
+   "Decay Magic"
+  ],
+  [
+   1,
+   "Divine Gift of Biseria"
+  ],
+  [
+   3,
+   "Frost Breaker"
+  ],
+  [
+   3,
+   "Frost Rune"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Heart of Ice"
+  ],
+  [
+   3,
+   "Iceage"
+  ],
+  [
+   3,
+   "Icy Grave"
+  ],
+  [
+   3,
+   "Instant Cryo Stasis"
+  ],
+  [
+   3,
+   "Mischief Militia - Banner Bearer"
+  ],
+  [
+   3,
+   "Mischief Militia - Bear Rider"
+  ],
+  [
+   3,
+   "Mischief Militia - Chilly Wizard"
+  ],
+  [
+   3,
+   "Mischief Militia - Colored Snow"
+  ],
+  [
+   2,
+   "Mischief Militia - Thaw Blader"
+  ],
+  [
+   3,
+   "Sculpture Guards"
+  ],
+  [
+   2,
+   "Sculpture Theft"
+  ],
+  [
+   3,
+   "Snowstorm Mischief"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Support Magic"
+  ],
+  [
+   3,
+   "The Master's Plan"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   2,
+   "Elixir of Cold"
+  ],
+  [
+   2,
+   "Petrifying Potion"
+  ],
+  [
+   1,
+   "Healing Potion"
+  ],
+  [
+   1,
+   "Smoke Vial"
+  ]
+ ],
+ "types": {
+  "Fiedel, the Mercenary Mage": "Hero",
+  "Klaus, the Cult Leader": "Hero",
+  "Saya, the Plant Princess": "Hero",
+  "Decay Magic": "Ability",
+  "Divine Gift of Biseria": "Spell (Decay Magic)",
+  "Frost Breaker": "Spell (Decay Magic)",
+  "Frost Rune": "Spell (Decay Magic, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Heart of Ice": "Artifact (Equipment)",
+  "Iceage": "Spell (Decay Magic)",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Instant Cryo Stasis": "Spell (Decay Magic)",
+  "Mischief Militia - Banner Bearer": "Creature L2 (Surprise)",
+  "Mischief Militia - Bear Rider": "Creature L2",
+  "Mischief Militia - Chilly Wizard": "Creature L2",
+  "Mischief Militia - Colored Snow": "Creature L1",
+  "Mischief Militia - Thaw Blader": "Creature L1",
+  "Sculpture Guards": "Spell (Support Magic, Reaction)",
+  "Sculpture Theft": "Spell (Magic Arts, Reaction)",
+  "Snowstorm Mischief": "Spell (Decay Magic)",
+  "Summoning Magic": "Ability",
+  "Support Magic": "Ability",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Acid Vial": "Potion",
+  "Elixir of Cold": "Potion",
+  "Petrifying Potion": "Potion",
+  "Healing Potion": "Potion",
+  "Smoke Vial": "Potion",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Iceage": "Freezes your whole side for a turn, two at a higher level.",
+  "Snowstorm Mischief": "Freezes every creature for two turns.",
+  "Instant Cryo Stasis": "Freezes a creature for the rest of the game.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Divine Gift of Biseria": "Once: freezes a target for three turns.",
+  "Frost Breaker": "Thaws a frozen target with a heavy hit.",
+  "Mischief Militia - Colored Snow": "When one of your targets is frozen, plays the top card of her Potion Deck.",
+  "Mischief Militia - Bear Rider": "Free with frozen targets about; hits a frozen target hard.",
+  "Mischief Militia - Chilly Wizard": "Sits in your hero's support zone; its statuses are your hero's.",
+  "Mischief Militia - Banner Bearer": "Trap: blunts a hit and freezes her own target safely.",
+  "Frost Rune": "Trap: cancels what chose its hero and freezes the attacker.",
+  "Heart of Ice": "Equipment: attackers of its hero freeze.",
+  "Sculpture Guards": "A frozen target of hers takes no damage.",
+  "The Master's Plan": "Cancels one card.",
+  "Petrifying Potion": "Stuns a hero for three turns.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Where the other Mischief Militia deck floods the board, Freya's freezes it solid and waits. Iceage and Icy Grave keep your heroes out of the game, Colored Snow turns each freeze into a free potion, and Frost Breaker and a couple of Bear Riders break what is frozen. Frost Runes and The Master's Plan guard her. It is a control deck with very few hitters; a hero that thaws cannot be refrozen for a turn, and frozen heroes still tick with an attached Storm. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "Icy Grave on your caster, a Frost Rune set. And an unfamiliar Area with a starfield on it.",
+  "mid": "Your whole side frozen every other turn, potions arriving off Colored Snow.",
+  "late": "Frost Breaker on a hero that has not acted for four turns."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "She freezes one hero a turn and has no hitters out.",
+   "why": "An attached Storm ticks while its caster is frozen, so attach it before the Iceages start; there is nothing to sweep."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Iceage froze all three of your heroes last turn; they have just thawed.",
+   "why": "A thawed hero cannot be frozen again for a turn: this is the turn to act with everything, Tea ready for the caster."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "A Colored Snow turns every freeze into a potion and a Chilly Wizard sits beside your caster.",
+   "why": "Those two creatures are her value: steal or remove them; racing into Frost Runes freezes you yourself."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "She is out of freezes and has two hitters.",
+   "why": "Her heroes have no health to spare."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Freya sets a Frost Rune and puts an Icy Grave on Nicolas.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm while you can"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning, which picks no one"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Heart of Ice on Fiedel.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level; do not attack him"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Klaus"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Banner Bearer freezes her own Saya to save her.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn the others"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Your heroes thaw after an Iceage.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Everything now; they cannot be refrozen this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard her hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Slow turn"
+     }
+    ]
+   },
+   {
+    "board": "The Master's Plan cancels your first spell.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Second spell at Klaus"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Klaus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Frost Breaker shatters a frozen hero.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "That hero is free: use it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea first next time"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Colored Snow fires a Petrifying Potion at your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear Colored Snow"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into the Runes"
+     }
+    ]
+   },
+   {
+    "board": "A Chilly Wizard is planted on your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Wizard"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea each freeze"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Give up the caster"
+     }
+    ]
+   },
+   {
+    "board": "Snowstorm freezes every creature, the Wizard included.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the Wizard"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No cards in her hand; a Bear Rider she cannot afford.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Fiedel alone behind a Frost Rune.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks are not aimed"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Klaus.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Saya"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

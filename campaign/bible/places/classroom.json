@@ -1,0 +1,18 @@
+{
+ "name": "Seminar Room 2B",
+ "zone": "campus",
+ "bg": "classroom",
+ "night": false,
+ "hours": "Seminars Mon–Fri Morning and Midday; study groups in the Afternoon and (until the curfew) Evening; the Judge Circle meets here Monday evenings.",
+ "sight": "A bright corner room with twenty paired duel desks, a wall-length blackboard dense with someone's probability tree, and tall windows over the duel terraces. A battered projector shows a paused replay; a shelf holds thirty copies of the Comprehensive Rules, every spine cracked at the same chapter. Somebody has drawn a tiny bunny in chalk in the lowest corner of the board, and nobody has had the heart to wipe it.",
+ "things": [
+  "Sit a seminar: Rules & Judging with Ms. Kirishima or Probability with Dr. Blum",
+  "Work through the problem of the week chalked in the top-right corner (Blum pays 5 cr for a first correct proof)",
+  "Borrow a copy of the Comprehensive Rules and look up the ruling you argued about at lunch",
+  "Join a study group at the back desks",
+  "Play the 'judge call' drill: one plays, one cheats subtly, one must catch it",
+  "Stay behind to wipe the board and talk to whoever else stays behind",
+  "Look out over the terraces and scout tomorrow's opponents"
+ ],
+ "secret": "Rules & Judging and Probability are taught here; Hana's slow route begins with staying behind after class, Noor's with the Judge Circle (Mondays, Evening; from D67 moved to the Afternoon). Blum's problem of the week is a small steady income and a study bonus. The probability tree on the board after Day 45 is Blum privately trying to compute the odds of one student winning ninety consecutive ladder games; he gets a number he does not like and erases it when anyone enters. The chalk bunny is Inya's."
+}

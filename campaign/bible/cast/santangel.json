@@ -1,0 +1,222 @@
+{
+ "id": "santangel",
+ "name": "Prof. Aurelio Santángel",
+ "firstName": "Aurelio",
+ "age": 46,
+ "sex": "m",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": false,
+ "deck": "Tempo Lesson (stun-and-poison tempo control)",
+ "look": "Silver at the temples, a sharp black goatee, a black turtleneck in every season and the posture of a man still half expecting cameras. He wears a world-finalist's ring on his right hand and turns it when he is thinking. His eyes are tired and very quick.",
+ "voice": "Smooth, sardonic and exacting, Madrid-inflected; he lectures in aphorisms and praises in the past tense. Surnames only. He turns cold and brief if his lost final is mentioned, and oddly young and animated in front of a truly new idea. RARE habit (once in a scene at most; most scenes go without it): 'Adequate.' as the highest mark he gives.",
+ "lines": [
+  "Tempo, Vance, is the only resource you cannot draw. You have just spent three turns of it on being careful.",
+  "That was adequate. Do not smile. Adequate is where it starts.",
+  "I lost one game in front of forty million people. I have won every one since. Nobody televised those.",
+  "Some cards are older than the rules we teach about them. A serious player ought to want to know why."
+ ],
+ "intro": "Head of Competitive Play and teacher of Tempo & Resource: a former world finalist with a black turtleneck and very high standards.",
+ "traits": [
+  {
+   "id": "santangel_1",
+   "text": "He was a top professional for a decade and lost a famous world final.",
+   "how": "Common knowledge; do not bring it up in class."
+  },
+  {
+   "id": "santangel_2",
+   "text": "His highest praise is 'adequate'.",
+   "how": "Tempo & Resource, first lecture."
+  },
+  {
+   "id": "santangel_3",
+   "text": "He wears his finalist's ring and turns it when a student makes the mistake he made.",
+   "how": "Watch his hand during reviews."
+  },
+  {
+   "id": "santangel_4",
+   "text": "He signs off on every hold-back and promotion in Competitive Play personally.",
+   "how": "Ask Rana, at your own risk."
+  },
+  {
+   "id": "santangel_5",
+   "text": "He has a new, well-funded lab in the faculty wing that is closed to students.",
+   "how": "Notice the locked door, the donor's plaque and the delivery crates."
+  },
+  {
+   "id": "santangel_6",
+   "text": "He plays one blitz game a week against the student who asks the best question.",
+   "how": "Ask one."
+  },
+  {
+   "id": "santangel_7",
+   "text": "He was the son of a Madrid taxi driver and paid for his first deck by washing cabs.",
+   "how": "Friend stage, late office hours."
+  },
+  {
+   "id": "santangel_8",
+   "text": "He can recite the final turn of the game he lost, and has never watched the recording.",
+   "how": "Trusted only."
+  }
+ ],
+ "secret": "Fifteen years ago Aurelio Santángel reached the World Championship final and lost it on a tempo misjudgement — he held a play one turn for safety — to a seventeen-year-old. He retired within two years, came to the island to teach, and has built a department that turns out champions and a life organised round one unhealed turn. He is an excellent, unsparing teacher who cannot forgive in others the caution he cannot forgive in himself; holding Rana Marika back was, in his own mind, mercy ('better a year here than a career of second places') and was at least half self-portrait. He is also the colleague of Hana Kirishima, who at seventeen beat him in a televised 'legends' showmatch, his one comeback appearance, seven years ago; he treats her with scrupulous courtesy and cannot be in a room with her for long.\nWhat he has done: for two years he has taken money from Lucian Marrow — a 'Kaboom Entertainment Research Fellowship', laundered through the department — to study Alpha cards in a locked lab in the faculty wing. He obtains first prints through Marrow's purchases and the occasional 'conservation loan' initialled by a reluctant Okonkwo, and — the thing he hides even from himself — he has BURNT several of them to extract the ink's mineral residue for Marrow; the lab's waste holds scorched first-print stock and coloured mineral flecks, and his notebook says in plain words that Marrow wants the residue's 'quarry'. He knows: Alphas are warm; their holograms in Charter Duels resolve at a fidelity the projectors cannot produce; the ink is ground mineral of no known stone; under formal conditions ON THE ISLAND an Alpha's effect has once left a physical mark (a scorch on his bench). He wants, badly, to know what the cards 'reference' — not for Marrow's billions but because a man who lost by being careful wants one piece of knowledge nobody else has. He does not know about the Vault, where the dust comes from, Hale's fate or Visitors. He does not know Gideon Pryce reports on him, or that Gideon will use his credential to rob the Archive on Day 72. Marrow's plan is to install him as acting head when the board removes the Chancellor (default Day 170). He tells himself the money is for the students' equipment, and some of it is.\nAfter Day 40 his lab instruments go mad on nights that turn out to be Hollow Duel nights; he has the data and sits on it for Marrow. He is among the first staff to suspect '{H:last}' and — fatally curious — plays {H:him} a 'friendly' around Day 60 to observe. He becomes the Guest's most dangerous admirer through Stage C; the standing risk in Stage D is that he formally challenges it himself for the one thing he wants ('show me the turn I should have played') — not part of the default timeline, but exactly the kind of mistake he makes. His redemption path: he confesses if he is shown the ash from his own lab AND asked what he would tell his younger self; then he gives his data to the students instead of to Marrow, and tells Rana the truth about why he signed.",
+ "wants": "To know one thing nobody else knows, and to replay one turn.",
+ "fears": "That he is, permanently, the man who waited one turn too long.",
+ "crush": "hana",
+ "crushNote": "She beat him once on camera and then lost more than he did, and she is the only person on the island who knows what the top felt like. It shows as scrupulous courtesy, an inability to stay in a room with her, and her timetable somehow never clashing with her physiotherapy.",
+ "crushPace": 0.5,
+ "likes": [
+  "A genuinely new question",
+  "Decisive play, even when wrong",
+  "Students who review their losses unprompted",
+  "Being argued with on theory",
+  "Discretion about his past",
+  "Espresso, properly made",
+  "Courage at match point"
+ ],
+ "dislikes": [
+  "Any mention of the world final he lost",
+  "Caution dressed as wisdom",
+  "Questions about his lab",
+  "Pity",
+  "Being compared to Kirishima",
+  "Sloppy tempo"
+ ],
+ "gifts": [
+  "Card: Coffee",
+  "A bag of proper espresso beans from the cafe",
+  "A written analysis of one of your own losses",
+  "Card: Null Zone",
+  "Card: Anti Magic Enchantment"
+ ],
+ "events": [
+  {
+   "id": "santangel_e1",
+   "stage": 1,
+   "title": "Adequate",
+   "condition": "Attend Tempo & Resource regularly and bring an unprompted written review of a loss to his office in faculty_wing; earn the word.",
+   "hint": [
+    "He respects students who dissect their own defeats.",
+    "Hand him an honest analysis of a game you lost."
+   ]
+  },
+  {
+   "id": "santangel_e2",
+   "stage": 2,
+   "title": "The best question",
+   "condition": "Ask the question that wins the weekly blitz game (about tempo, or about why some old cards behave oddly) and play it; do not mention the final. He talks about washing cabs.",
+   "hint": [
+    "He plays one game a week against whoever asks the best question.",
+    "Ask him something genuinely sharp in class and take him up on the game."
+   ]
+  },
+  {
+   "id": "santangel_e3",
+   "stage": 3,
+   "title": "One turn",
+   "condition": "After Day 60, confront him — with Wren's findings, Gideon's notebook or what you saw through the lab door — as a student who wants the truth rather than a prosecutor; ask him what he would stake to replay his turn, and talk him out of it.",
+   "hint": [
+    "He keeps a locked door in the faculty wing, and an old regret that could lead him somewhere worse.",
+    "Bring him what you know about his research and talk him out of a mistake."
+   ]
+  }
+ ],
+ "bonds": {
+  "dom": {
+   "label": "mentor",
+   "text": "The department's finest analytical mind; he expects a captaincy of him.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "protégé",
+   "text": "Thinks Pryce is simply a keen student who asks good questions about old cards.",
+   "public": false,
+   "from": 8
+  },
+  "rana": {
+   "label": "protégé",
+   "text": "He believes holding her back was a mercy; he sees his own lost final in her.",
+   "public": true,
+   "from": 0
+  },
+  "wren": {
+   "label": "distrusts",
+   "text": "She knows something about the first prints and will not share it.",
+   "public": false,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "She signs what he needs and asks few questions.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "owes",
+   "text": "Takes the board's money for a locked lab and tells himself it is for the students.",
+   "public": false,
+   "from": 0
+  },
+  "hana": {
+   "label": "colleagues",
+   "text": "She beat him in a televised showmatch when she was seventeen. He is scrupulously courteous and never stays in the room.",
+   "public": true,
+   "from": 0
+  },
+  "rox": {
+   "label": "colleagues",
+   "text": "A polite, permanent disagreement about who runs the Battle Team.",
+   "public": true,
+   "from": 0
+  },
+  "leona": {
+   "label": "strangers",
+   "text": "One of the forgettable ones at the back of Tempo & Resource.",
+   "public": false,
+   "from": 25
+  },
+  "maisie": {
+   "label": "protégé",
+   "text": "A first-year who has built by hand what his lab cannot. He means to have her working for him.",
+   "public": false,
+   "from": 62
+  },
+  "helical": {
+   "label": "colleagues",
+   "text": "The hologram man could save him a year's work and will not discuss it.",
+   "public": false,
+   "from": 0
+  },
+  "tariq": {
+   "label": "distrusts",
+   "text": "The student at the archive desk reads what he is asked to stamp.",
+   "public": false,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "great_arena",
+   "Afternoon": "faculty_wing",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "faculty_wing",
+   "Midday": "cafe",
+   "Afternoon": "great_arena",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 9,
+  "style": "Tempo of textbook purity: one attack that stuns and poisons, then a second action while you are still answering the first; he is always half a turn ahead. Still world-class in blitz.",
+  "tilt": "The endgame of a close match with an audience. He takes the decisive line now — every time, even when waiting is correct."
+ }
+}

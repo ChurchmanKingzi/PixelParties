@@ -1,0 +1,410 @@
+{
+ "name": "Bamboo Warrior",
+ "owner": "lucas",
+ "heroes": [
+  "Cute Nerd Magenta",
+  "Xiong, the Bamboo Guardian",
+  "Nicolas, the Hidden Alchemist"
+ ],
+ "main": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   3,
+   "Bamboo Shield"
+  ],
+  [
+   4,
+   "Bamboo Staff"
+  ],
+  [
+   4,
+   "Critical Strike"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   6,
+   "Fighting"
+  ],
+  [
+   2,
+   "Fire Bomb"
+  ],
+  [
+   3,
+   "Glass of Marbles"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Hammer Throw"
+  ],
+  [
+   1,
+   "Healing Potion"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   1,
+   "Magic Lamp"
+  ],
+  [
+   4,
+   "Metal Harpyformer"
+  ],
+  [
+   3,
+   "Mystery Box"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ],
+  [
+   3,
+   "Ska Harpyformer"
+  ],
+  [
+   2,
+   "Tears of Creation"
+  ],
+  [
+   1,
+   "Thieving Strike"
+  ],
+  [
+   1,
+   "Whirlwind Strike"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   1,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ]
+ ],
+ "types": {
+  "Cute Nerd Magenta": "Hero",
+  "Xiong, the Bamboo Guardian": "Hero",
+  "Nicolas, the Hidden Alchemist": "Hero",
+  "Acid Vial": "Potion",
+  "Bamboo Shield": "Artifact (Reaction)",
+  "Bamboo Staff": "Artifact (Equipment)",
+  "Critical Strike": "Attack",
+  "Elixir of Immortality": "Potion",
+  "Fighting": "Ability",
+  "Fire Bomb": "Potion",
+  "Glass of Marbles": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Healing Potion": "Potion",
+  "Heavy Hit": "Attack",
+  "Magic Lamp": "Potion",
+  "Metal Harpyformer": "Creature L0",
+  "Mystery Box": "Artifact",
+  "Performance": "Ability",
+  "Quick Attack": "Attack",
+  "Resuscitation Potion": "Potion",
+  "Ska Harpyformer": "Creature L0",
+  "Tears of Creation": "Potion",
+  "Thieving Strike": "Attack",
+  "Whirlwind Strike": "Attack",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion"
+ },
+ "gist": {
+  "Xiong, the Bamboo Guardian": "High Attack; when he defeats a target with an attack he takes a card from either discard pile into his hand.",
+  "Bamboo Staff": "Equipment: once per turn, when a card returns from his discard pile to his hand, it hits a target for its hero's base Attack.",
+  "Bamboo Shield": "Expensive reaction that cancels damage to a hero; once it has come back from the discard pile it is cheap. One per turn.",
+  "Critical Strike": "An attack for twice the hero's Attack.",
+  "Heavy Hit": "Attack that stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Hammer Throw": "Makes your next artifacts cost you cards.",
+  "Thieving Strike": "Attack that steals a hand card.",
+  "Whirlwind Strike": "Hits two heroes; needs Fighting three.",
+  "Nicolas, the Hidden Alchemist": "Potion draws; potions in the main deck.",
+  "Cute Nerd Magenta": "Discards a card to put any card from the deck into the discard pile, for Xiong to fetch.",
+  "Metal Harpyformer": "Free summon that fetches Fighting.",
+  "Ska Harpyformer": "Free summon that fetches Performance.",
+  "Performance": "Raises an Ability a level.",
+  "Glass of Marbles": "Draws two when discarded.",
+  "Acid Vial": "A clean, unpreventable hit."
+ },
+ "plan": "One fighter and a recycling loop. Xiong attacks; every kill lets him take a card back from a discard pile, usually a Bamboo Shield, which is then cheap, and every card that comes back makes a Bamboo Staff hit again. Magenta stocks the discard pile, Nicolas adds potions. Shields answer one hit a turn. All the damage is Xiong, and the loop only starts once he has killed something.",
+ "looks": {
+  "early": "Xiong with a Bamboo Staff, Fighting climbing.",
+  "mid": "A Shield cancelling your best hit each turn, Staffs pinging as cards return.",
+  "late": "Critical Strike on a stunned hero."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "SETUP",
+   "trap": "CONTROL",
+   "tell": "Xiong does all the attacking and has not killed anything yet.",
+   "why": "His loop needs a first kill, and a creatureless deck offers only heroes: a frozen Xiong is the whole deck switched off."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "He holds a Bamboo Shield, which cancels one hit on a hero per turn.",
+   "why": "One cancel a turn does not stop three Storm ticks: keep ticking, shield Xiong's one big attack, Tea the stun back."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Two Bamboo Staffs are equipped and Shields keep returning from his discard pile.",
+   "why": "Fire Bomb takes the Staffs, and White Eye discards put the Shields back at full price."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Xiong is down or frozen and the others do not attack.",
+   "why": "Nicolas and Magenta have no damage of their own."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Lucas equips a Bamboo Staff to Xiong and levels Fighting.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Xiong"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Firewall and levels"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep two Harpyformers"
+     }
+    ]
+   },
+   {
+    "board": "Magenta drops a Bamboo Shield into the discard pile for later.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Burn Xiong before his first kill"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Heavy Hit stuns your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea it onto Xiong"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Bamboo Shield cancels your spell on Xiong.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Let the ticks land; one cancel a turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the next Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Critical Strike is coming at a stunned hero.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Xiong"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Hammer Throw taxes your artifacts.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Spells and potions this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb, a potion"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Xiong kills a hero, takes a Shield back, and both Staffs fire.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Staffs"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shields up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Every turn a Shield returns cheap.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Elixir of Immortality stands openly on his side.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill a Harpyformer first to use it up"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Xiong is down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Nicolas throws an Acid Vial.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish him"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Xiong.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Magenta"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

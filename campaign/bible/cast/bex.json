@@ -1,0 +1,281 @@
+{
+ "id": "bex",
+ "name": "Bex Calloway",
+ "firstName": "Bex",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, fourth floor (half studio)",
+ "romance": true,
+ "deck": "Snow Day (Mischief Militia)",
+ "look": "Purple hair streaked with pink, cut in a blunt fringe and falling past her shoulders, a cat-eared broadcast headset with the microphone always at her mouth, bubblegum always, and a black Auxiliary jacket, blue Rare collar, worn open over a pink top. She holds her phone like a microphone and her eyebrows do half her talking. She is never not slightly on air.",
+ "voice": "Fast, punchy and funny, a Bristol accent sanded down for broadcast; she is always slightly on air and turns whatever is said to her into a headline. Sharp but not cruel. Off-mic and tired she is slower, wryer and surprisingly gentle. RARE habit (once in a scene at most; most scenes go without it): 'BREAKING:' before a piece of gossip.",
+ "lines": [
+  "BREAKING: Wildcard boy speaks. Chat, he's taller than his avatar. Say something for the Top Deck, Storm.",
+  "Nothing's off the record, babe, but I'll sit on it for a week if you bring me something better.",
+  "My deck's a snowball fight with a body count. It's not deep. Neither's most of the meta.",
+  "Gossip is what other people do. I'm infrastructure."
+ ],
+ "intro": "The voice of the campus stream 'The Top Deck': a purple-haired second-year who knows everything first and broadcasts most of it.",
+ "traits": [
+  {
+   "id": "bex_1",
+   "text": "She runs the campus stream 'The Top Deck' and half the island watches it nightly.",
+   "how": "Day 2; it is on in every common room."
+  },
+  {
+   "id": "bex_2",
+   "text": "She gives everyone a nickname on air, and they stick.",
+   "how": "Rowan's is 'Storm' by the end of week one."
+  },
+  {
+   "id": "bex_3",
+   "text": "She knows who is dating whom about a day before they do.",
+   "how": "Ask her anything."
+  },
+  {
+   "id": "bex_4",
+   "text": "She dated Ashton Beaumont-Lyle for two weeks on the summer circuit and ended it live on air.",
+   "how": "She tells the story herself; so does everyone else."
+  },
+  {
+   "id": "bex_5",
+   "text": "She built the stream's whole rig herself from second-hand gear.",
+   "how": "Visit the broadcast studio."
+  },
+  {
+   "id": "bex_6",
+   "text": "She will hold a story back if you trade her a better one, and she keeps those bargains.",
+   "how": "Ask her to sit on something."
+  },
+  {
+   "id": "bex_7",
+   "text": "She was a foster kid, moved nine times, and learned to be the one who knows what is going on in any house within a day.",
+   "how": "Close stage; said like a headline, then not."
+  },
+  {
+   "id": "bex_8",
+   "text": "She has never broadcast a single thing about herself.",
+   "how": "Notice it; ask."
+  },
+  {
+   "id": "bex_9",
+   "text": "She has one story she has sat on for a year and it frightens her.",
+   "how": "Dating stage, off-mic."
+  }
+ ],
+ "secret": "Rebecca Calloway went through nine placements in Bristol and Bath between six and seventeen. Her survival skill was intelligence in the literal sense: within a day in any new house she knew who was angry with whom, where the money was kept and when to be out. The stream is that skill with an audience — and an audience, unlike a family, cannot send you back as long as you keep being interesting. She is quick, funny, relentless, and has a hard private code: she does not break a child (Georgie is off-limits on air), does not out anyone, and keeps a bargain. Wound: she has never been kept. Contradiction: the island's biggest mouth has told no one a single true thing about herself; even 'Bex' is a broadcast name. Her mentor Vivienne Laurent taught her camera craft and is now half rival — Bex wants to be a journalist, Vivienne is an entertainer, and Bex is starting to see the difference. Ashton was two weeks of fun and a great segment; she is fond of him the way you are fond of a ridiculous dog. Private joke: she keeps a folder called 'DEAD AIR' of the things she chose not to run, and it is her proudest work.\nThe story she has sat on for a year: a first-year tip that Umbra House was not structural damage — an ex-student's name (Josie Hart), a settlement figure, a groundskeeper with keys. She dropped it when the Chancellor's office made it clear the stream's licence was a privilege. She has not forgiven herself.\nPlot role: she is first with everything — on air within minutes of the bang at 02:10 on Day 27 ('Chat, did the volcano just burp?'), first with footage of the crater on Day 27, first to say 'Brant Kessler has been found unresponsive' on Day 40, first to use the word 'Hollowed' (Day 52, borrowed from a line Madame Oru said to her). The administration leans on her after each; Marrow's people offer her a network job to shape the story. Her arc is from infrastructure to journalist: with support she runs Teobalt's log, Pippa's photographs and her own Umbra file, and the stream becomes how the student body learns the truth — which is also what triggers the 'exposed before Day 106' branch if done in Term 1. She flirts first and fast, on air and off; what she has no script for is someone who wants the off-mic version.",
+ "wants": "A scoop that matters, and one person she does not have to keep entertained.",
+ "fears": "Being sent back — being dropped the moment she stops being interesting.",
+ "crush": "cas",
+ "crushNote": "She is used to being the best voice in the room, and then a first-year opened his mouth. It shows as him getting more airtime than is strictly fair, her losing her place in a link for the first time in two years, and a nickname she refuses to give him.",
+ "crushPace": 1.1,
+ "likes": [
+  "A good tip, properly sourced",
+  "Banter at speed",
+  "People who keep bargains",
+  "Being asked about herself and not letting her dodge",
+  "Technical help with the rig",
+  "Someone who says 'you look tired' and brings tea",
+  "Courage on camera",
+  "Loyalty to sources"
+ ],
+ "dislikes": [
+  "'No comment' said smugly",
+  "Being called a gossip",
+  "Anyone using the stream to hurt Georgie or out someone",
+  "Being lied to on air",
+  "Administrators 'having a word'",
+  "Being left on read",
+  "Dull people who think they are deep"
+ ],
+ "gifts": [
+  "Card: Mischief Militia - Colored Snow",
+  "Bubblegum, the sour purple kind from the arcade",
+  "Card: Communication Device",
+  "A proper pop filter for her microphone",
+  "An exclusive: one true thing about yourself",
+  "Card: Thunder Trumpet"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Banter as broadcast.",
+  "text": "Bex flirts on first contact and often on air: a nickname, a raised eyebrow, 'chat thinks you're cute, chat's occasionally right'. It is quick, public and deniable as content. She likes someone who can volley — fast, funny, unembarrassed — and who is not scared of being on the stream. The real invitation comes off-mic: she pulls the headset down round her neck and asks an actual question. She wants to be approached there, by someone who asks about HER and waits out three jokes for the answer. She is suspicious of being used for airtime, generous once sure, and jealous in a wry, well-informed way — she will know about any other route before he has decided to tell her."
+ },
+ "intimacy": "Fast with banter, slower with anything real. Physical affection starts as bits — she steals his jacket for a segment, falls asleep on his shoulder in the studio at 3 a.m. with the 'ON AIR' light off. She likes being wanted without an audience, and it takes her a while to believe it is possible; the turning point is the first time she switches every camera in the room off, one by one, herself. Then she is warm, quick, funny, talkative right up until she is not, and fierce about being held afterwards. Studio sofa, monitors dark, the glow of one standby light. Fade when she takes the headset off entirely and puts it face down.",
+ "events": [
+  {
+   "id": "bex_e1",
+   "stage": 1,
+   "title": "Say something for the Top Deck",
+   "condition": "Give her a first-week interview at broadcast_studio or on the quad and volley with her on air; then bring her a real tip.",
+   "hint": [
+    "She will stick a microphone in your face. How you handle it decides a lot.",
+    "Do an interview on her stream with good humour, and bring her a piece of news."
+   ]
+  },
+  {
+   "id": "bex_e2",
+   "stage": 2,
+   "title": "Dead air",
+   "condition": "Ask her to hold a story back (about you or someone you are protecting), trade fairly for it, and see that she keeps the bargain; help with the rig on a late Night and ask her one question about herself.",
+   "hint": [
+    "She keeps a folder of the things she did not broadcast. Ask her why.",
+    "Make a bargain with her over a story, and stay late at the studio to help and to ask about her."
+   ]
+  },
+  {
+   "id": "bex_e3",
+   "stage": 3,
+   "title": "Off-mic",
+   "condition": "On the night of the bang (Day 26–27) or the first Hollowing (Day 40), be at the studio when the administration leans on her and back her right to report; afterwards she switches the cameras off and asks if he wants to stay.",
+   "hint": [
+    "Something will happen that someone powerful does not want reported. See where she stands, and stand there.",
+    "Be with her when she is pressured to bury a story, and take her side."
+   ]
+  },
+  {
+   "id": "bex_e4",
+   "stage": 4,
+   "title": "The one she sat on",
+   "condition": "After Day 66, earn the file she dropped a year ago: go with her to bar to meet her old source, and promise the source protection. She tells him her real name.",
+   "hint": [
+    "There is a story that frightens her. It has been in a drawer for a year.",
+    "Help her reopen the story she abandoned and meet the person at the centre of it."
+   ]
+  },
+  {
+   "id": "bex_e5",
+   "stage": 5,
+   "title": "Infrastructure",
+   "condition": "In Term 2, stand with her when she broadcasts the truth knowing it costs her the licence and Marrow's job offer; be on the sofa when the screen goes dark and she has nothing to be interesting with.",
+   "hint": [
+    "One broadcast will cost her everything she built. She needs to know someone stays when the stream is off.",
+    "Support her in airing the truth, and stay with her when it costs her the stream."
+   ]
+  }
+ ],
+ "bonds": {
+  "ashton": {
+   "label": "exes",
+   "text": "Fun, a great segment, and no hard feelings — like a ridiculous dog.",
+   "public": true,
+   "from": 0
+  },
+  "nathan": {
+   "label": "strangers",
+   "text": "A loud first-year in chat. She does not know him.",
+   "public": false,
+   "from": 3
+  },
+  "tomi": {
+   "label": "teammates",
+   "text": "Her bookmaker and second-best source.",
+   "public": true,
+   "from": 12
+  },
+  "marit": {
+   "label": "teammates",
+   "text": "Best on-air chaos she has ever booked.",
+   "public": true,
+   "from": 14
+  },
+  "pippa": {
+   "label": "teammates",
+   "text": "Her photographer; Bex has learned to ask what Pippa noticed.",
+   "public": true,
+   "from": 5
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "Learned camera craft from her and is starting to want something different.",
+   "public": true,
+   "from": 0
+  },
+  "mika": {
+   "label": "friends",
+   "text": "Rumour exchange: campus for town, at par.",
+   "public": true,
+   "from": 0
+  },
+  "josie": {
+   "label": "owes",
+   "text": "A year ago she dropped a story that had Josie's name in it. She has not forgiven herself.",
+   "public": false,
+   "from": 0
+  },
+  "sammy": {
+   "label": "friends",
+   "text": "A nickname that stuck and a boy who blushes on camera. She is gentler with him than with most.",
+   "public": true,
+   "from": 12
+  },
+  "ophelia": {
+   "label": "distrusts",
+   "text": "Had her studio door opened very hard last year, took the clip down, and has been careful about that family ever since.",
+   "public": true,
+   "from": 0
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "A walking ladder segment: quotable, furious, always available.",
+   "public": true,
+   "from": 6
+  },
+  "freya": {
+   "label": "rivals",
+   "text": "The first-year from the north runs Militia like a bar fight. Bex wants her on the stream and has been warned to book her before nine.",
+   "public": true,
+   "from": 7
+  },
+  "cas": {
+   "label": "crush",
+   "text": "She is used to being the best voice in the room. Then a first-year opened his mouth, and she lost her place in a link for the first time in two years.",
+   "public": true,
+   "from": 14
+  },
+  "pilar": {
+   "label": "rivals",
+   "text": "Her old producer writes the official version now, three doors down the corridor. Bex misses her and would sooner swallow the microphone than say so.",
+   "public": true,
+   "from": 0
+  },
+  "gani": {
+   "label": "friends",
+   "text": "Her arena feeds come from his desk and never drop. She has a clip of him in a folder and has not decided what she is.",
+   "public": false,
+   "from": 0
+  },
+  "cati": {
+   "label": "friends",
+   "text": "The mail window knows everything and tells her arrivals and departures only. It drives her mad.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "classroom",
+   "Afternoon": "quad",
+   "Evening": "broadcast_studio",
+   "Night": "broadcast_studio"
+  },
+  "weekend": {
+   "Morning": "broadcast_studio",
+   "Midday": "main_street",
+   "Afternoon": "night_market",
+   "Evening": "broadcast_studio",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Mischief Militia: snowballs, sculptures and stolen tempo, played while commentating her own game. Wins by irritation and momentum.",
+  "tilt": "A story breaking mid-match — she cannot not check her phone — and opponents who refuse to banter."
+ }
+}

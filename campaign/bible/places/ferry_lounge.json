@@ -1,0 +1,21 @@
+{
+ "name": "Passenger Lounge",
+ "zone": "campus",
+ "bg": "ferry_lounge",
+ "night": false,
+ "part": "ferry_deck",
+ "hours": "Open for the whole crossing. ARRIVAL DAY (Day 1, 08:00–10:40) in the lounge: gideon — holds the one real card table; he has won three games there since the harbour, the last against Ashton, and sits squaring his deck with his white gloves folded beside it. He does not play for nothing and does not play first-comers; see the secret for his terms. inya — standing at the end of that table with her deck box in both hands, next in line for twenty minutes. Once the matter of the table is over, however it ends, she challenges Rowan herself if she has seen him play or seen his deck box: a game on a bench, loser buys the cinnamon rolls (6 cr). tomi — on the nearest bench with a binder open on his knees and a pencil behind his ear, keeping a book on the table games on the inside of the binder lid and trading out of the binder. He does not play today: he is working. He takes a bet of up to 20 cr at evens from anyone and pays to the credit. magnus — two benches back, a tablet on his knee, logging every game at the table. He looks at Rowan twice and says nothing. He plays nobody aboard, with one exception: if Rowan says his handle aloud or speaks to him, he asks for a game here and now and says it will not count and that he will remember it anyway. noor — on a window bench with the Academy rulebook and a pencil. She plays a game without a stake gladly and announces every step; she refuses any stake. Asked what 'winner stays' obliges the winner to do, she answers exactly: it says who keeps the seat and nothing else. livvie — at the galley end with a clipboard, adding a column; she has bought nothing to eat. She plays for 5 cr a side or not at all.",
+ "sight": "A low saloon under the wheelhouse, its windows fogged with salt. Rows of bolted benches in cracked red vinyl run fore and aft, and duffel bags fill the aisles. At the forward end a galley hatch sells coffee and cinnamon rolls. In the middle stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to its edge. People stand round it two deep. The engine is louder down here and the floor hums.",
+ "things": [
+  "Watch the game at the brass-rimmed table and see how the winner plays",
+  "Read the brass plate on the table: WINNER STAYS",
+  "Ask for the next game at the table",
+  "Put a few credits on a game with the boy who keeps a book on a binder lid",
+  "Play a casual game on a bench, the cards held down with a coffee cup",
+  "Buy a coffee (2 cr) or a cinnamon roll (3 cr) at the galley hatch",
+  "Look through a trade binder",
+  "Sit down by a window next to someone who is sitting alone"
+ ],
+ "secret": "THE TABLE (hook h_ferry_table; when it ends, set exactly one flag). Gideon will not give Inya her game: the plate says who keeps the seat, not whom he must play, and he does not play a grey collar for nothing. His terms: the loser carries the winner's luggage from the dock to the winner's door. He has four cases. Inya accepts. IF ROWAN STAYS OUT: they play; she attacks first into his counter-swing and loses (@result gideon inya gideon; no flag). IF ROWAN TELLS HER what a watcher can see — Gideon never attacks first and wins only on the counter — she waits him out and wins (@result gideon inya inya; @flag ferry_inya_won). IF ROWAN ASKS FOR THE GAME HIMSELF: Inya gives up her turn if he asks her, not if he steps past her; Gideon accepts, because the room is watching: @duel gideon casual | loser carries the winner's luggage from the dock. Afterwards @flag ferry_table_won or @flag ferry_table_lost. ANY PEACEFUL END Rowan brings about (a second table built from two benches and a bag, Gideon talked into a plain game): @flag ferry_table_settled. If Rowan takes Gideon's side, Inya plays and loses as above and remembers who said what. No crew, no staff and no upper-year steps in.",
+ "access": "Only during a crossing."
+}

@@ -1,0 +1,397 @@
+{
+ "name": "Free Port",
+ "owner": "tomi",
+ "heroes": [
+  "Gabby, the Boarding Broad",
+  "Key, the Cursed Thief",
+  "Monsieur Pete, the Booty Raider"
+ ],
+ "main": [
+  [
+   2,
+   "Decay Magic"
+  ],
+  [
+   3,
+   "Deepsea Pirate"
+  ],
+  [
+   4,
+   "Dirty Smuggler"
+  ],
+  [
+   1,
+   "Fighting"
+  ],
+  [
+   3,
+   "Gold Trap"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Golden Apple"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Market Crash"
+  ],
+  [
+   3,
+   "Mimic"
+  ],
+  [
+   3,
+   "Mine! Mine! Mine!"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Smuggler's Pier"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "The Golden Abomination"
+  ],
+  [
+   2,
+   "Thieving"
+  ],
+  [
+   4,
+   "Thieving Strike"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Treasure Theft"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Gabby, the Boarding Broad": "Hero",
+  "Key, the Cursed Thief": "Hero",
+  "Monsieur Pete, the Booty Raider": "Hero",
+  "Decay Magic": "Ability",
+  "Deepsea Pirate": "Creature L1",
+  "Dirty Smuggler": "Creature L1",
+  "Fighting": "Ability",
+  "Gold Trap": "Spell (Decay Magic, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Heavy Hit": "Attack",
+  "Magic Arts": "Ability",
+  "Market Crash": "Spell (Magic Arts)",
+  "Mimic": "Creature L0",
+  "Mine! Mine! Mine!": "Attack",
+  "Quick Attack": "Attack",
+  "Smuggler's Pier": "Artifact (Area)",
+  "Summoning Magic": "Ability",
+  "The Golden Abomination": "Creature L2",
+  "Thieving": "Ability",
+  "Thieving Strike": "Attack",
+  "Treasure Chest": "Artifact",
+  "Treasure Theft": "Spell (Decay Magic)"
+ },
+ "gist": {
+  "Dirty Smuggler": "Whenever you draw by an effect it steals gold from you; if you have none, he draws twice as many cards instead.",
+  "Smuggler's Pier": "Area: either player may buy cards for gold on their own turn.",
+  "Thieving": "Ability: steals gold from you every turn, more per level.",
+  "Key, the Cursed Thief": "When you play an artifact he may pay its cost to cancel it and take it into his own hand.",
+  "Monsieur Pete, the Booty Raider": "Whenever he takes damage he searches any card.",
+  "Gabby, the Boarding Broad": "Draws a card whenever she takes a real hit.",
+  "Mimic": "Steals gold every turn.",
+  "The Golden Abomination": "Your normal gold income goes to him while you still have gold.",
+  "Deepsea Pirate": "Steals gold on arrival.",
+  "Gold Trap": "Trap: gold you would gain by an effect goes to him.",
+  "Market Crash": "Sets both players' gold to zero.",
+  "Thieving Strike": "Attack that steals a hand card; free with Thieving.",
+  "Mine! Mine! Mine!": "Takes an equipped artifact.",
+  "Treasure Theft": "Moves your equipment onto his hero.",
+  "False-Bottom Crate": "Invented card: hides one of his cards for a turn.",
+  "Harbour Bribe": "Invented card: doubles the price of one of your artifacts."
+ },
+ "plan": "Tomi takes your gold. Thieving on all three heroes, Mimics, Pirates and the Dirty Smuggler empty your purse every turn, the Golden Abomination redirects your income, and Key buys your artifacts out from under you. With your gold he buys cards at the Pier. A deck whose answers are artifacts (The Yeeting, Dark Gear, Snow Cannon, Tea) finds it cannot pay for them. He hits weakly, with Thieving Strikes; spells and potions cost no gold, and his thieves are small creatures.",
+ "looks": {
+  "early": "Your gold on his side, a Mimic, the Pier.",
+  "mid": "You at zero gold every turn, him buying three cards, your Snow Cannon in his hand.",
+  "late": "A rich man with small attacks."
+ },
+ "custom": [
+  {
+   "name": "False-Bottom Crate",
+   "type": "Artifact",
+   "text": "Hides a card from his hand under the crate; it cannot be discarded or stolen and comes back next turn."
+  },
+  {
+   "name": "Harbour Bribe",
+   "type": "Artifact (Reaction)",
+   "text": "Pays gold to make one of your artifacts cost double this turn."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Mimic and a Dirty Smuggler sit on his side and your gold is already his.",
+   "why": "The thieves are small creatures and your sweepers are spells, which cost no gold; killed now, your artifacts stay affordable."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "DISRUPT",
+   "tell": "You have no gold, and Key takes any artifact you do manage to play.",
+   "why": "Disrupting needs artifacts you cannot pay for: spells, potions and Storm ticks are free, and his heroes' real damage is small."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Monsieur Pete searches a card every time you damage him.",
+   "why": "Leave Pete alone until he can be finished in one turn; spend the damage on Key and Gabby."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "He has gold and cards and almost no damage.",
+   "why": "He cannot buy a win."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Tomi steals your gold with Thieving and sets down a Mimic.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the thieves"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Key"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build without gold"
+     }
+    ]
+   },
+   {
+    "board": "A Dirty Smuggler takes more each time your Leadership draws.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep drawing"
+     }
+    ]
+   },
+   {
+    "board": "The Golden Abomination redirects your income.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill it while you can still pay for nothing"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Gabby"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Key buys your Snow Cannon out of the air.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Spells and potions only"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the thieves"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Try another artifact"
+     }
+    ]
+   },
+   {
+    "board": "He buys three cards at the Pier with your gold.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Key"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm, free under his Pier"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Reach for an artifact you cannot afford"
+     }
+    ]
+   },
+   {
+    "board": "Mine! Mine! Mine! takes The White Eye.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb, a potion, is free"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Pete, hit, searches a Golden Apple.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Stop poking Pete; shields ready"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill him in one turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Apple borrows your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Market Crash: nobody has gold.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Nothing changes for you: cast"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Gabby and Pete, rich, with Thieving Strikes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Pete alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "One big turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Key.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Gabby"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

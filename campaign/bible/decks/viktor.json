@@ -1,0 +1,390 @@
+{
+ "name": "Shifting Sandlands",
+ "owner": "viktor",
+ "heroes": [
+  "Nomu, Wanderer of Worlds",
+  "Bakhm, the Desert Digger",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   5,
+   "Adventurousness"
+  ],
+  [
+   1,
+   "Afflicted Pests"
+  ],
+  [
+   2,
+   "Afflicted Vermin"
+  ],
+  [
+   4,
+   "Booby Trap"
+  ],
+  [
+   2,
+   "Book of Doom"
+  ],
+  [
+   2,
+   "Cactus Creature"
+  ],
+  [
+   4,
+   "Cosmic Skeleton"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Defending the Gate"
+  ],
+  [
+   4,
+   "Destruction Magic"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Magnetic Glove"
+  ],
+  [
+   2,
+   "Mummy Maker Machine"
+  ],
+  [
+   2,
+   "Noble Mummy Guards"
+  ],
+  [
+   4,
+   "Pure Advantage Camel"
+  ],
+  [
+   4,
+   "Rain of Arrows"
+  ],
+  [
+   2,
+   "Spider Avalanche"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Telekinesis"
+  ],
+  [
+   1,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Ushabti of the Great Pharaoh"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Nomu, Wanderer of Worlds": "Hero",
+  "Bakhm, the Desert Digger": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Adventurousness": "Ability",
+  "Afflicted Pests": "Creature L0 (Surprise)",
+  "Afflicted Vermin": "Creature L0 (Surprise)",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Book of Doom": "Artifact",
+  "Cactus Creature": "Creature L0 (Surprise)",
+  "Cosmic Skeleton": "Creature L1",
+  "Cute Cheese": "Artifact",
+  "Defending the Gate": "Spell (Magic Arts, Surprise)",
+  "Destruction Magic": "Ability",
+  "Golden Ankh": "Artifact",
+  "Magnetic Glove": "Artifact",
+  "Mummy Maker Machine": "Creature L1 (Surprise)",
+  "Noble Mummy Guards": "Creature L0 (Surprise)",
+  "Pure Advantage Camel": "Creature L1 (Surprise)",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Spider Avalanche": "Spell (Destruction Magic, Surprise)",
+  "Summoning Magic": "Ability",
+  "Telekinesis": "Spell (Magic Arts)",
+  "Treasure Chest": "Artifact",
+  "Ushabti of the Great Pharaoh": "Artifact"
+ },
+ "gist": {
+  "Bakhm, the Desert Digger": "Hides trap creatures in his support zones too, and whenever any trap is sprung he hits a target hard.",
+  "Nomu, Wanderer of Worlds": "Draws extra cards on single draws and has no hand limit.",
+  "Silent Water Mizune": "Can discard one of his own traps for cards.",
+  "Pure Advantage Camel": "Trap creature: springs when you draw outside your normal draw, and draws for him. Can bury itself again each turn.",
+  "Mummy Maker Machine": "Trap creature: springs when you use a hero's effect and plants a Mummy Token on one of your heroes, replacing that hero's effect.",
+  "Noble Mummy Guards": "Trap creature: springs when you attach an Ability and returns a different Ability from that hero to your hand.",
+  "Afflicted Pests": "Trap creature: springs when you equip or attach something and destroys a card in a support zone.",
+  "Afflicted Vermin": "Trap creature: springs when a creature is summoned and destroys another creature.",
+  "Cactus Creature": "Trap creature: shoves a status effect onto another of his targets.",
+  "Cosmic Skeleton": "Plain creature with a heavy shot every turn, as long as its hero knows a spell school besides Summoning.",
+  "Booby Trap": "Trap spell that punishes whoever hits its hero.",
+  "Spider Avalanche": "Trap spell that hurts your whole side, more for each creature he has.",
+  "Defending the Gate": "Trap spell that cancels something aimed at his support zones.",
+  "Telekinesis": "Springs one of his own face-down traps on purpose.",
+  "Ushabti of the Great Pharaoh": "Buries any creature on the board face-down into a surprise zone.",
+  "Adventurousness": "Ability: spend the turn's action on a pile of gold."
+ },
+ "plan": "An explorer's pile of buried things. Viktor fills surprise zones (and Bakhm's support zones) with trap creatures that spring on ordinary plays: extra draws, Ability attachments, equipment, hero effects. Each one that springs becomes a body on the board, Bakhm punishes you for every trap, and the creatures can bury themselves again next turn to do it all over. Cosmic Skeletons supply the steady damage. The deck is loose and greedy with its turns, often spending the action on Adventurousness gold; its trap creatures are face-up and killable between springing and re-burying, and nearly all of its punishment runs through Bakhm.",
+ "looks": {
+  "early": "Face-down cards under every hero and in Bakhm's support zones; Viktor spending his action on gold.",
+  "mid": "Camels and mummy guards face-up after springing, a Cosmic Skeleton firing, Bakhm hitting on every trigger.",
+  "late": "A Mummy Token squatting on one of your heroes, traps re-buried, Nomu holding a hand the size of a map."
+ },
+ "profile": {
+  "opening": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Face-down cards sit in Bakhm's support zones as well as the surprise zones, and Viktor has not attacked at all.",
+   "why": "His traps answer your housekeeping (extra draws, Ability attachments, equipment), so make only the plays you need and send the rest at his heroes; a long setup turn triggers half his deck."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Several trap creatures lie face-up after springing; he can bury them again at his next turn.",
+   "why": "Between springing and re-burying they are ordinary small creatures: sweep them on your turn and the traps do not come back."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Bakhm is wounded, and every time a trap goes off it is Bakhm who hits you.",
+   "why": "The traps themselves do little; the damage is Bakhm's. Freezing or finishing him turns the whole board into slow, harmless bodies."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "His traps are sprung and face-up, Nomu holds many cards but few that deal damage.",
+   "why": "Without Bakhm and with the Skeletons gone he has almost no way to finish; clearing leftover camels costs time you do not need to give."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Viktor buries four cards, two of them in Bakhm's support zones, then spends his action on Adventurousness gold.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Play only what you must and poke Mizune"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning, which triggers nothing"
+     },
+     {
+      "stance": "SETUP",
+      "text": "A full setup turn: attach, draw, equip"
+     }
+    ]
+   },
+   {
+    "board": "Your Leadership draw wakes a Pure Advantage Camel; Bakhm hits your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Fewer extra draws from now on, spells at heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Bakhm"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep cycling regardless"
+     }
+    ]
+   },
+   {
+    "board": "A Noble Mummy Guards pops up and returns one of your Destruction Magic to your hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill it while it is face-up"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Re-attach once and move on"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach again on every hero"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Two camels and a Mummy Maker Machine sit face-up; a Cosmic Skeleton fires from Mizune's side.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche before they bury themselves"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Cosmic Skeleton"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait and rebuild levels"
+     }
+    ]
+   },
+   {
+    "board": "A Mummy Token has replaced Tarleinn's effect.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the token"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, token and creatures together"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Play on without the healing"
+     }
+    ]
+   },
+   {
+    "board": "He Telekinesis-springs his own Spider Avalanche across your side.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "The more creatures he has the worse it gets: sweep"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and return fire"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore the board"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Bakhm is low and three traps are freshly buried.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Finish Bakhm before touching anything"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks and spells at heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach and equip into the traps"
+     }
+    ]
+   },
+   {
+    "board": "An Ushabti buries his Cosmic Skeleton to dodge your removal.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Bakhm, the Skeleton returns next turn anyway"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Hit Nomu in the meantime"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Wait to sweep it later"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh brings Bakhm back for a turn of triggers.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Make no trap-springing plays this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Mizune"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Nomu and Mizune remain with a pair of camels; no Skeleton, no Bakhm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "End it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick and keep Homerun!"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Chase the camels"
+     }
+    ]
+   },
+   {
+    "board": "He holds a dozen cards and shrugs; most are Abilities.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "He has no finisher, press"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard his hand anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Match his hand size"
+     }
+    ]
+   },
+   {
+    "board": "One Booby Trap face-down on Nomu, his last hero.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm, which hits no one, finish"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire into the trap"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Remove the trap first"
+     }
+    ]
+   }
+  ]
+ }
+}

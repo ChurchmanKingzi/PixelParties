@@ -1,0 +1,20 @@
+{
+ "name": "The Night Market",
+ "zone": "town",
+ "bg": "night_market",
+ "night": false,
+ "hours": "First and third Saturday of the month on the old customs yard, Evening and Night slots; in rain it moves under the fish-market roof.",
+ "sight": "After sunset the customs yard fills with awnings, paper lanterns and smoke from a dozen grills. Stalls sell skewers, shaved ice, counterfeit sleeves, lucky dice, cards in languages you cannot read and things that might be antiques. A string band plays; children run between legs. At the far end, where the lanterns are fewer and redder, a small tent of patched indigo cloth has a hand-lettered sign: MADAME ORU — THE SPREAD SEES.",
+ "things": [
+  "Eat your way down the row: grilled corn, octopus balls, mango with chilli",
+  "Haggle for foreign-language printings and oddities",
+  "Play a carnival game — knock down the stack, win a booster",
+  "Have your cards read by Madame Oru (5 cr; she chooses the price again afterwards)",
+  "Buy a small gift for someone",
+  "Run into half the school out of uniform",
+  "Watch the fire-eater who uses a deck of cards as his fan",
+  "Find the stall that only opens after midnight and only sells one thing each time"
+ ],
+ "secret": "Market nights: Days 6, 20, 34, 48, 62, 76, 90, 104, 111, 125, 139, 153, 167, 181, 195, 209 (first/third-Saturday rule approximated to a fortnightly rhythm). ORU: her readings are TRUE but vague (canon). She lays a spread from the customer's own deck. Give one reading per visit, never explicit. Before D27 (nothing that points past Day 26): 'Someone who eats at your table is wearing half a name. Before the month is out it will be printed whole.' After D27: 'A polite guest. It will take only what is offered. Offer nothing you cannot name.' Late: 'What cannot be fought can be bound. Ask the one who knows the rules by heart' (Noor) / 'Where the squares are warm.' She will not read for '{H}': the one time {H:he} sat at her table (the market of Day 34) she said only 'I only keep the count'; since then, when {H:he} approaches, her lanterns go out and she packs up. Asked aloud and by name to count, she answers as what she is (plot file: q_witness). The midnight stall once sells an old Academy jacket with a smoke-grey collar. From D67 students may attend only the Evening slot; staying on is a curfew breach and where the best scenes are.",
+ "access": "Only on market nights. From Day 67 the Night slot is a curfew breach."
+}

@@ -1,0 +1,245 @@
+{
+ "id": "hana",
+ "name": "Ms. Hana Kirishima",
+ "firstName": "Hana",
+ "age": 24,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": true,
+ "deck": "Rules Check (reactions and face-down answers; her retired pro list)",
+ "look": "A sleek black bob cut to the jaw, red-framed glasses, a judge's lanyard and a pencil skirt with a pressed white blouse. She wears a slim black brace on her right wrist that she adjusts when she thinks nobody is looking. Her posture is tournament-perfect; her eyes are tired at the corners.",
+ "voice": "Crisp, exact and a little too formal for her age; in class she uses surnames and corrects loose terminology on the spot. Outside class the sentences shorten and soften and she does not quite know what to do with her hands. A dry, self-mocking humour surfaces only after hours. RARE habit (once in a scene at most; most scenes go without it): a judge's 'Hold.' to stop a sloppy play.",
+ "lines": [
+  "Hold. You said 'I guess I attack'. There is no 'I guess' step in the turn structure, Mr Vance.",
+  "A penalty is not a punishment. It is the game telling you the truth about what you did.",
+  "I was world number four at eighteen. I mark attendance sheets now. Sit down, you're late.",
+  "...You stayed to stack the chairs. Nobody stays to stack the chairs."
+ ],
+ "intro": "The Rules & Judging instructor: the youngest member of staff, a former prodigy pro, and very strict about terminology.",
+ "traits": [
+  {
+   "id": "hana_1",
+   "text": "She is the youngest instructor at the Academy and by far the strictest about procedure.",
+   "how": "First Rules & Judging class, Day 3."
+  },
+  {
+   "id": "hana_2",
+   "text": "She was a professional at fifteen and ranked fourth in the world at eighteen.",
+   "how": "Common knowledge; there are posters in the card shop."
+  },
+  {
+   "id": "hana_3",
+   "text": "She wears a brace on her right wrist and shuffles left-handed.",
+   "how": "Watch her demonstrate in class."
+  },
+  {
+   "id": "hana_4",
+   "text": "She eats lunch alone in her classroom with a rulebook propped open.",
+   "how": "Classroom, Midday."
+  },
+  {
+   "id": "hana_5",
+   "text": "She looks out for the fourteen-year-old prodigy with a fierceness that surprises people.",
+   "how": "See her with Georgie."
+  },
+  {
+   "id": "hana_6",
+   "text": "She grades until midnight and then plays solitaire formats nobody else knows.",
+   "how": "Faculty wing or classroom at Night."
+  },
+  {
+   "id": "hana_7",
+   "text": "Her career ended with a wrist injury at nineteen, and she has not played a sanctioned match since.",
+   "how": "Ask Mika, Dex or Vivienne; or ask her, carefully."
+  },
+  {
+   "id": "hana_8",
+   "text": "She is from Sendai and has not been home since she stopped winning.",
+   "how": "Close stage."
+  },
+  {
+   "id": "hana_9",
+   "text": "She does not know who she is when she is not either competing or enforcing.",
+   "how": "Dating stage, outside the classroom."
+  }
+ ],
+ "secret": "Hana Kirishima was a child of the circuit: pro at fifteen, world number four at eighteen, a face on posters. At nineteen a repetitive-strain injury turned into nerve damage in her right wrist; two surgeries; she can shuffle for perhaps twenty minutes before her hand goes numb, and a best-of-five is beyond her. The sponsors were gone within a season. She spent three years judging small events and finishing a degree by correspondence; then the Academy offered a teaching post and she took it the way one takes a lifeboat. She is three to five years older than her students and has to be twice as strict to be taken seriously, so she is; the pencil skirt and the surnames are a uniform. Wound: she was a prodigy and then, overnight, an anecdote, and her parents — who managed her career — have not known what to say to her since. Contradiction: she teaches that a penalty is 'the game telling the truth' and cannot bear to hear the truth about her own hand, which is that with therapy she could probably play short formats again and is too afraid of being mediocre to try. She protects Georgie because she knows exactly what happens to girls like that when the results stop. Friday wine with Vivienne and Camille is her entire social life. Private joke: she keeps a penalty log on herself ('Kirishima, H. — Failure to maintain game state: ate cereal for dinner').\nRoute: slow, and against regulations. Teacher–student relationships are forbidden under staff code 7.2: discovery means her dismissal and a disciplinary mark (possibly expulsion hearing) for him. She knows this better than anyone and it is the rulebook she lives by. The route begins as mentorship (extra judging practice; she notices his stage fright because she recognises the hands), becomes a friendship she tells herself is allowed, and she will not cross the line for a long time — he must be patient, discreet and must never pressure her. When she does cross it she is terrified and happier than she has been in five years. Secrecy is part of every scene: locked classroom, the long way round, no looks in class; Bex sniffing; Vivienne guessing first and covering for her; Santángel or Octavia as real threats; a possible formal hearing in Term 2 where what Rowan says matters. Consequences must be real.\nPlot: as the Academy's senior judge she is the one who signs the Dome 3 incident log on Day 40, and she sees what no report says: a legal Charter Duel between Kessler and {H:last} was booked and logged that night; the antes are blacked out on paper and '[inaudible]' in the transcript; the recorder worked perfectly and captured silence; the dome's clock stopped at 02:10. She shows the transcript only to a scorekeeper she trusts. She understands procedure better than anyone but Noor and realises the Hollowed all LOST LEGALLY. That horrifies her precisely: the rules she serves are the weapon. In Stage D she can be asked to do the thing she has avoided for five years — sit at a table again. (As a judge she can also formally require '{H}' to state {H:his} name for the record, which exposes {H:him}; and in an empty dome, left-handed, for one game, she is still frightening.)",
+ "wants": "To matter to the game again in some way that is hers — and to be seen as a person, not a cautionary tale.",
+ "fears": "Picking up a deck and finding out she is ordinary now.",
+ "crush": "santangel",
+ "crushNote": "He is the only one here who does not pity her, because he is too busy not forgiving himself. It shows as her preparing harder for his department meetings than for anything else, and a showmatch replay she has watched more than she would admit.",
+ "crushPace": 0.5,
+ "likes": [
+  "Correct terminology and clean play",
+  "Students who stay to help after class",
+  "Being asked about judging, not about her career",
+  "Discretion — absolute",
+  "Patience with her boundaries",
+  "Being made to laugh after hours",
+  "Small unshowy kindnesses (tea, chairs stacked)",
+  "Care taken of Georgie"
+ ],
+ "dislikes": [
+  "Familiarity in front of other students",
+  "Being called 'Hana' in class",
+  "Pity about her wrist",
+  "Rules-lawyering in bad faith",
+  "Pressure, haste, or any hint of bragging about her",
+  "Poster-era nostalgia",
+  "Lateness"
+ ],
+ "gifts": [
+  "Card: Tea",
+  "A thermal wrist wrap from the infirmary stores (ask Camille)",
+  "Card: Guardian Angel",
+  "Good green tea from the boutique",
+  "A hand-written, correctly formatted match report",
+  "Card: Stellan, the Calm Cat"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "A retired pro's list rebuilt as a rules exam: face-down answers on every hero that cancel and punish exactly one kind of play each, played left-handed with ruthless economy. In a single short game she is still one of the best in the world.",
+  "text": "Ms Kirishima does not flirt with students. What happens instead is that her formality develops tiny faults: she uses his first name once and corrects herself; she keeps him back to 'review a ruling' and the review runs an hour; she laughs and then looks at the door. She will never initiate and will retreat hard if pushed or if he is indiscreet. Approach her with respect for the line she is trying to hold: be an excellent, serious student first; help without making it a claim; let her set every step. Outside class and off campus she is younger, funnier and unsure — talk to that person about anything but cards. The moment she chooses is hers alone, and he should make it easy for her to un-choose it."
+ },
+ "intimacy": "Extremely slow, charged by restraint and by risk. For most of the route intimacy is a hand that almost touches when a rulebook is passed, tea shared in an empty classroom after dark with the blinds down, her taking off her glasses and rubbing her eyes in front of him — which she does in front of no one. When the line is finally crossed it is behind a locked door and she is shaking: he should be gentle and unhurried, mindful of the wrist (she will let him unfasten the brace, which matters more to her than any other undressing). She likes quiet, lamplight, being held as if she were not made of rules; she whispers. Afterwards she is at once radiant and already calculating how he gets back unseen. Fade as the lanyard is lifted over her head and laid on the desk.",
+ "events": [
+  {
+   "id": "hana_e1",
+   "stage": 1,
+   "title": "Nobody stacks the chairs",
+   "condition": "Attend Rules & Judging without lateness for the first two weeks and stay after one class to help; ask a real question about judging.",
+   "hint": [
+    "She is strict in class. Notice what the room is like after everyone leaves.",
+    "Be a punctual, serious student in her class and stay behind once to help."
+   ]
+  },
+  {
+   "id": "hana_e2",
+   "stage": 2,
+   "title": "Explain your line",
+   "condition": "Take her extra judging practice (floor-judging at the Freshman Cup, Days 19–20, under her supervision) and let her help with your stage fright; talk to her once off campus (card_shop or cafe) about something that is not cards.",
+   "hint": [
+    "She recognises something in your hands at the table. She has an idea about it.",
+    "Volunteer as a judge under her at the Freshman Cup and accept her coaching for your nerves."
+   ]
+  },
+  {
+   "id": "hana_e3",
+   "stage": 3,
+   "title": "Mr Vance — Rowan",
+   "condition": "After Day 40, be the person she tells about the match log from Trial Dome 3; keep it secret. Across the following weeks never once be familiar with her in public. On the Night of Masks or the Winter Gala (Day 103), masked or in a crowd, she asks him to dance and uses his first name.",
+   "hint": [
+    "As senior judge she sometimes sees things she cannot report. And she is holding a line that costs her more each week.",
+    "Keep her confidence, be perfectly discreet, and let her be the one to step closer."
+   ]
+  },
+  {
+   "id": "hana_e4",
+   "stage": 4,
+   "title": "Locked classroom",
+   "condition": "Maintain total secrecy through Term 1's end (no one told; no public slip; cover held when Bex or Santángel pries); help her begin wrist therapy with Camille. She crosses the line herself, in classroom at Night, door locked.",
+   "hint": [
+    "What she wants is against regulations. Whether it happens depends on whether she can trust you with her whole career.",
+    "Keep the secret flawlessly, support her recovery, and wait for her decision."
+   ]
+  },
+  {
+   "id": "hana_e5",
+   "stage": 5,
+   "title": "Judge of record",
+   "condition": "In Term 2, when the relationship is threatened with exposure (a hearing in council_room or chancellor_office), tell the truth in the way SHE asks you to; and in Stage D ask her to sit as judge of record for a duel that needs one. She picks up a deck again.",
+   "hint": [
+    "Sooner or later someone will ask her, formally, a question about you. And someone will ask her to sit at a table again.",
+    "Stand by her when the secret is tested, and ask her to judge the match that matters."
+   ]
+  }
+ ],
+ "bonds": {
+  "georgie": {
+   "label": "mentor",
+   "text": "She was this child once and intends this one to have a softer landing.",
+   "public": true,
+   "from": 5
+  },
+  "noor": {
+   "label": "mentor",
+   "text": "The best judging mind in the first year.",
+   "public": true,
+   "from": 4
+  },
+  "santangel": {
+   "label": "colleagues",
+   "text": "Her head of department, who looks at her wrist and then away.",
+   "public": true,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "friends",
+   "text": "Friday wine. Vivienne narrates staff meetings under her breath until Hana has to leave the room.",
+   "public": true,
+   "from": 0
+  },
+  "camille": {
+   "label": "friends",
+   "text": "Friday wine; Camille falls asleep first.",
+   "public": true,
+   "from": 0
+  },
+  "blum": {
+   "label": "colleagues",
+   "text": "The one senior colleague who treats her as a colleague.",
+   "public": true,
+   "from": 0
+  },
+  "anni": {
+   "label": "mentor",
+   "text": "She recognises the armour: it is her own, ten sizes too stiff. She is trying to loosen it gently.",
+   "public": true,
+   "from": 4
+  },
+  "lucas": {
+   "label": "mentor",
+   "text": "The fairest floor judge she has trained, and too gentle by a degree. She means to leave him the floor.",
+   "public": true,
+   "from": 0
+  },
+  "thandi": {
+   "label": "mentor",
+   "text": "The Tower's junior warden asks her what a fourteen-year-old prodigy will not say aloud. Hana tells her.",
+   "public": true,
+   "from": 0
+  },
+  "zeynep": {
+   "label": "mentor",
+   "text": "Her ladder registrar: the one student ruling she has never had to correct twice.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "classroom",
+   "Midday": "classroom",
+   "Afternoon": "faculty_wing",
+   "Evening": "classroom",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "card_shop",
+   "Midday": "cafe",
+   "Afternoon": "faculty_wing",
+   "Evening": "bar",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 9,
+  "style": "A retired pro's Divinity list, played left-handed with ruthless economy. In a single short game she is still one of the best in the world.",
+  "tilt": "Length. Past the second midgame her wrist goes numb and her play collapses; she will concede rather than show it."
+ }
+}

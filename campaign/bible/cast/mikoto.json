@@ -1,0 +1,209 @@
+{
+ "id": "mikoto",
+ "name": "Mikoto Yamaguchi",
+ "firstName": "Mikoto",
+ "age": 18,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R101",
+ "romance": false,
+ "deck": "Tiny Bone Friends (Skeletons: healers and mages)",
+ "look": "Thin, with a bowl of black hair, big round glasses that magnify an anxious blink, and a nervous grin that arrives a second before he knows what he is grinning at. The sleeves of his red jacket, blue collar, hang past his knuckles. He holds his deck box in both hands like something that might be taken away.",
+ "voice": "High, hurried and unsteady, sentences tumbling over one another and trailing into worry. He laughs at the wrong moments — a bright helpless giggle that can tip over into something near tears — and then apologises for it at length. Under the fluster he is observant and entirely without malice. RARE habit (once in a scene at most; most scenes go without it): a cutesy nickname for whoever he is talking to, coined on the spot and never abandoned.",
+ "lines": [
+  "Is that allowed? Are we allowed to sit here? I'll check. I'll just quickly check.",
+  "Maggie says I'm not to call him Maggie, so now I've got two things to remember and I can only do one.",
+  "They get up again, you see — the skeletons. Nothing's ever properly finished. I find that very calming.",
+  "I laughed because I was frightened. It isn't funny. I know it isn't funny. Please don't look at me like that."
+ ],
+ "intro": "A thin, bespectacled first-year from Rare Hall with a nervous grin, who laughs at exactly the wrong moments and has a pet name for everybody by the second day.",
+ "traits": [
+  {
+   "id": "mikoto_1",
+   "text": "He gives everyone a cutesy nickname and cannot be talked out of any of them.",
+   "how": "Meet him; Magnus is 'Maggie', Eberhart is 'Ebi'."
+  },
+  {
+   "id": "mikoto_2",
+   "text": "He laughs when he is nervous, which is nearly always, and it is never at the right time.",
+   "how": "Any tense moment."
+  },
+  {
+   "id": "mikoto_3",
+   "text": "He keeps lists of everything that might go wrong today, and ticks off the ones that did not.",
+   "how": "Rare Hall room 101; his half of it."
+  },
+  {
+   "id": "mikoto_4",
+   "text": "A row of little painted skeleton figures stands along his windowsill, each with a name.",
+   "how": "Visit the room."
+  },
+  {
+   "id": "mikoto_5",
+   "text": "He has learned not to cross the middle of the room before six in the morning.",
+   "how": "Ask about his roommate."
+  },
+  {
+   "id": "mikoto_6",
+   "text": "He recognises people by their voices and the way they walk far better than by their faces.",
+   "how": "Change your hair or coat; or ask why the nicknames."
+  },
+  {
+   "id": "mikoto_7",
+   "text": "He was brought up in Sapporo by a grandmother who expected a disaster every day and was occasionally right.",
+   "how": "Ask who he writes to."
+  },
+  {
+   "id": "mikoto_8",
+   "text": "He is cleverer at the game than anyone who has heard him giggle would guess.",
+   "how": "Play him seriously."
+  },
+  {
+   "id": "mikoto_9",
+   "text": "He would like, very much, to be someone other people are not embarrassed to sit with.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Mikoto was raised in Sapporo by his grandmother Yamaguchi Setsuko after his parents' divorce: a loving woman convinced that the gas would leak, the roof would fall and the boy would catch something, who taught him to rehearse every possible calamity before breakfast. He arrived at school already braced, and other children did the rest. The laugh is not amusement; it is what his body does with fear, and it has cost him every friendship he nearly had. The nicknames have a reason he has never told anyone: he is mildly face-blind. He knows people by voice, by walk, by the sound of their shoes, and a silly name is the peg he hangs all that on. He is not stupid and not weak — a sharp, patient Skeleton player whose minions keep getting up, which is the only philosophy that has ever comforted him — and he is entirely without malice, which is why being disliked bewilders him afresh each time. Contradiction: the most frightened boy in the year shares a room with the most forbidding one and is not in the least afraid of him; he worked out in two days that 'Ebi' is safe, and trails him like a small boat behind a ship. He adores Trixie Hollis, the one person who laughs WITH him and gives nicknames back.\nThe face-blindness makes him a witness. From Day 27 he says, in passing and to general irritation, {H=nathan?'Nate-kun walks wrong now. He used to stamp. Now every step is the same size.'|'{H} walks wrong now. Every step is the same size.'} He hears it before anyone sees it. After Day 40 his lists get very long and, for once, everyone else's are just as long; frightened people turn out to like having someone around who has always been frightened and gets up every morning anyway. He is a Hollowing risk only by accident — he might laugh at the wrong moment in front of the wrong person — and the thing in question, puzzled, would ask him what was funny and accept 'nothing, I'm scared' as a complete answer.",
+ "wants": "One table where people are glad he sat down.",
+ "fears": "Everything, in order of likelihood; and above all being the reason someone leaves.",
+ "crush": "trixie",
+ "crushNote": "She laughs with him, not at him, and gave him a nickname back. It shows as a new painted skeleton with yellow-striped socks on his windowsill, and him standing very still near beehives, terrified, because she asked.",
+ "crushPace": 0.9,
+ "likes": [
+  "Being told clearly what the rules of a situation are",
+  "Nicknames given back",
+  "People who keep sitting there after the laugh",
+  "Patience while he checks",
+  "Sweet things, hot milk tea",
+  "Being asked to help with something he is good at",
+  "Eberhart's unchanging timetable"
+ ],
+ "dislikes": [
+  "Being told to calm down",
+  "Sudden shouting",
+  "Being imitated",
+  "Having his lists read out",
+  "Changes of plan without warning",
+  "Being left behind in a corridor"
+ ],
+ "gifts": [
+  "Card: Skeleton Bard",
+  "A tiny pot of model paint for the figures",
+  "Card: Loyal Bone Dog",
+  "Milk tea powder from the night market",
+  "A list, in your handwriting, of things that went right today"
+ ],
+ "events": [
+  {
+   "id": "mikoto_e1",
+   "stage": 1,
+   "title": "I'll just quickly check",
+   "condition": "Sit with him (cafeteria or rare_common_room) through one of his laughs without leaving or mocking, and accept the nickname he gives you.",
+   "hint": [
+    "He laughs at the wrong time and people get up and go. Staying is unusual.",
+    "Sit with the nervous boy from Rare Hall, and do not mind the nickname."
+   ]
+  },
+  {
+   "id": "mikoto_e2",
+   "stage": 2,
+   "title": "Nothing is ever finished",
+   "condition": "Play him seriously and tell him honestly that he is good; ask why the nicknames, and keep the answer to yourself.",
+   "hint": [
+    "There is a reason he renames everybody. It is not the one people assume.",
+    "Duel him properly, tell him he plays well, and ask about the nicknames."
+   ]
+  },
+  {
+   "id": "mikoto_e3",
+   "stage": 3,
+   "title": "Walks wrong",
+   "condition": "After Day 27, listen when he says someone's footsteps have changed, believe him, and tell him he is not being silly; give him one job that uses what he hears.",
+   "hint": [
+    "He notices people by ear. Lately he has been hearing something that worries him.",
+    "Take him seriously when he says somebody sounds different, and put his sharp ears to use."
+   ]
+  }
+ ],
+ "bonds": {
+  "eberhart": {
+   "label": "roommates",
+   "text": "Ebi is safe. Mikoto worked that out in two days and has not crossed the middle of the room before six since.",
+   "public": true,
+   "from": 1
+  },
+  "magnus": {
+   "label": "friends",
+   "text": "'Maggie' has the best statistics in the year and shouts when he is nervous, which Mikoto understands completely.",
+   "public": true,
+   "from": 3
+  },
+  "trixie": {
+   "label": "crush",
+   "text": "'Bee-chan' laughs with him and gave him a nickname back. He stood next to a beehive for her and nearly died.",
+   "public": true,
+   "from": 5
+  },
+  "noor": {
+   "label": "friends",
+   "text": "She tells him exactly what the rule is, every time he asks, and has never sighed.",
+   "public": true,
+   "from": 7
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "'Nate-kun' says the wrong thing as often as Mikoto laughs at the wrong time. They sat together at the mixer for that reason.",
+   "public": true,
+   "from": 3
+  },
+  "camille": {
+   "label": "friends",
+   "text": "The nurse taught him to breathe into a count of four and lets him sit in the infirmary when the lists get too long.",
+   "public": false,
+   "from": 9
+  },
+  "isolde": {
+   "label": "protégé",
+   "text": "The captain of North Crown plays his deck the way it is meant to be played. He asked her forty questions and she answered every one.",
+   "public": true,
+   "from": 68
+  },
+  "kenji": {
+   "label": "friends",
+   "text": "'Ken-senpai' lets him sit and watch at the dome and has never told him to be quiet.",
+   "public": true,
+   "from": 10
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "The only person in the school he is not afraid of losing to, because everybody does.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "rare_common_room",
+   "Evening": "student_lounge",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rare_room",
+   "Midday": "card_shop",
+   "Afternoon": "arcade",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Skeletons that die and return, grinding out small advantages; careful, patient, double-checks every trigger aloud. Better than his rank.",
+  "tilt": "An impatient or loud opponent. He starts apologising, then giggling, then misses his own triggers."
+ }
+}

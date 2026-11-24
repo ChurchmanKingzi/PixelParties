@@ -1,0 +1,389 @@
+{
+ "name": "Tiny Bone Friends",
+ "owner": "mikoto",
+ "heroes": [
+  "Rha'Bi, the Living Skeleton",
+  "Vacarn, the Dark Goblin Necromancer",
+  "Styx, the Gate to the Spirit World"
+ ],
+ "main": [
+  [
+   3,
+   "Burning Finger"
+  ],
+  [
+   2,
+   "Cosmic Skeleton"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Loyal Bone Dog"
+  ],
+  [
+   3,
+   "Magic Arrows"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   4,
+   "Necromancy"
+  ],
+  [
+   3,
+   "Raise the Minions!"
+  ],
+  [
+   2,
+   "Skeleton Death Knight"
+  ],
+  [
+   3,
+   "Skeleton Healer"
+  ],
+  [
+   4,
+   "Skeleton Mage"
+  ],
+  [
+   3,
+   "Skeleton Necromancer"
+  ],
+  [
+   3,
+   "Skeleton Priest"
+  ],
+  [
+   2,
+   "Skeleton Reaper"
+  ],
+  [
+   3,
+   "Skeleton Wizard"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Bonegrinder"
+  ],
+  [
+   3,
+   "Treasure Skeleton"
+  ],
+  [
+   3,
+   "Winged Skeleton"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Rha'Bi, the Living Skeleton": "Hero",
+  "Vacarn, the Dark Goblin Necromancer": "Hero",
+  "Styx, the Gate to the Spirit World": "Hero",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Cosmic Skeleton": "Creature L1",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Destruction Magic": "Ability",
+  "Golden Ankh": "Artifact",
+  "Loyal Bone Dog": "Creature L1",
+  "Magic Arrows": "Spell (Destruction Magic)",
+  "Magic Arts": "Ability",
+  "Necromancy": "Ability",
+  "Raise the Minions!": "Spell (Summoning Magic)",
+  "Skeleton Death Knight": "Creature L1",
+  "Skeleton Healer": "Creature L1",
+  "Skeleton Mage": "Creature L1",
+  "Skeleton Necromancer": "Creature L1",
+  "Skeleton Priest": "Creature L1",
+  "Skeleton Reaper": "Creature L1",
+  "Skeleton Wizard": "Creature L1",
+  "Summoning Magic": "Ability",
+  "The Bonegrinder": "Area (Magic Arts)",
+  "Treasure Skeleton": "Creature L1",
+  "Winged Skeleton": "Creature L1"
+ },
+ "gist": {
+  "The Bonegrinder": "Area, cheap once Skeletons are in the discard pile: deletes dying Skeletons for a card each.",
+  "Raise the Minions!": "Returns three Skeletons from the discard pile at once.",
+  "Skeleton Priest": "Casts a cheap Destruction spell out of the discard pile each turn.",
+  "Skeleton Wizard": "Casts a cheap Magic Arts spell from hand as a free action.",
+  "Skeleton Healer": "Heals another target each turn.",
+  "Winged Skeleton": "Returns a targeted Skeleton to hand to cancel what targeted it.",
+  "Skeleton Mage": "Draws two, discards one.",
+  "Treasure Skeleton": "Makes gold each turn.",
+  "Skeleton Necromancer": "Discards a card to raise a Skeleton.",
+  "Loyal Bone Dog": "Discarded to revive a Skeleton that just died.",
+  "Vacarn, the Dark Goblin Necromancer": "Skeletons he raises act at once.",
+  "Rha'Bi, the Living Skeleton": "Gives up his own health to plant cards on your side.",
+  "Styx, the Gate to the Spirit World": "Sturdy; grows when heroes fall.",
+  "Magic Arrows": "Small hits on three targets, recast by the Priest.",
+  "Burning Finger": "Cheap burn, recast by the Priest."
+ },
+ "plan": "Mikoto's Skeletons are the quiet ones: healers, mages, priests and treasure-keepers that draw, heal and recast small burn spells while The Bonegrinder turns every Skeleton that dies into a card. It grinds rather than rushes, and Raise the Minions rebuilds after a sweep. The damage is thin, the bodies are small, and Vacarn is as frail as ever.",
+ "looks": {
+  "early": "A Mage and a Treasure Skeleton, cards being drawn.",
+  "mid": "The Bonegrinder up, a Priest recasting Magic Arrows, a Healer undoing your ticks.",
+  "late": "A hand of nine and a row raised for the third time."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "His Skeletons were summoned this turn; no Bonegrinder yet.",
+   "why": "Before the Bonegrinder a dead Skeleton is just dead, and they need a turn to act."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "The Bonegrinder is out: each Skeleton you kill draws him a card.",
+   "why": "Remove the Area first (Cataclysm is free under it); sweeping into it refills his hand."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Healer and Styx keep his heroes topped up; his damage is small burn spells.",
+   "why": "He cannot race: Vacarn and Rha'Bi are frail, and focused damage outruns one heal a turn."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His discard pile has been ground away.",
+   "why": "Nothing comes back any more."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Mikoto apologises and summons a Skeleton Mage and a Treasure Skeleton.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep them"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Vacarn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Priest and a Healer follow.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Rha'Bi"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "Vacarn raises the Mage and it draws at once.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Vacarn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Bonegrinder goes up.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free under it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep into it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Your sweep draws him four cards.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Bonegrinder"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Winged Skeleton lifts your target away.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Area first, untargeted"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Healer undoes your tick on Vacarn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "All spells into Vacarn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Healer"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Priest recasts Magic Arrows.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Race, it is small"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   },
+   {
+    "board": "Raise the Minions: three back.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Heroes, not bones"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Styx alone, big.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "No Skeletons left to raise.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Vacarn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Styx's neighbour"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

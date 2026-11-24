@@ -1,0 +1,258 @@
+{
+ "id": "keoni",
+ "name": "Keoni Kahale",
+ "firstName": "Keoni",
+ "age": 22,
+ "sex": "m",
+ "group": "student",
+ "major": "GD",
+ "year": 3,
+ "dorm": "commons",
+ "room": "The Old Row (upper-year Commons bungalows), bungalow 9",
+ "romance": false,
+ "deck": "Lost and Found (equipment that keeps coming back — Darion, the Blood-Crazy Groundskeeper; Cecilia, the Harrowing Crusader; Fern, the Ship Slave)",
+ "look": "Short and wiry (about 5'7\") with ropey forearms and square carpenter's hands, warm brown skin, and thick black hair with sun-bleached brown ends in a shaggy mop sticking out from under a faded teal cap worn backwards. Dark, heavy-lidded, good-humoured eyes, a lopsided grin, a thin moustache and a tuft of chin beard, a pale burn scar across the back of the left hand. He wears the gold Game Design jacket with the sleeves cut off at the elbow and the plain grey Commons collar over a washed-out floral work shirt; eight numbered brass bungalow keys hang on a red cord round his neck, a canvas tool roll is tucked under his left arm, and a pad of pink repair slips with a flat carpenter's pencil sticks out of his back pocket. Unlaced work boots. There is sawdust or solder on him somewhere, and he is usually holding the wrong tool for the job and making it work.",
+ "voice": "Easy, slow and amused, Hilo English with a little Pidgin when he relaxes ('shoots', 'da kine'); he asks about the object before the person and reaches the person through it. Hates giving orders: quiet hours arrive as a joke with the time in it. Fast and exact when something is unsafe. Talks to boilers. Silent and hurt when a thing is called junk; lights up about boxes, canoes and food. RARE habit (once in a scene at most; most scenes go without it): 'Can fix.'",
+ "lines": [
+  "Eleven o'clock, gang. I'm not saying quiet. I'm saying the walls are plywood.",
+  "My pops builds canoes. A thing's not finished till it's been in the water and back.",
+  "I design the boxes. Everybody wants to make the card. Nobody asks where it lives.",
+  "Can fix. Not today, not with this, but can fix.",
+  "Slip thirty-one for the boiler. I've started writing them in rhyme.",
+  "Lost property's the crate under B8. One slipper, six deck boxes, somebody's retainer.",
+  "Spam musubi is a breakfast, a lunch and an apology. I owe Mama a few of those.",
+  "Don't call it junk. Call it parts. Junk hears you.",
+  "Everything in my deck's been broken twice. Plays better that way.",
+  "Locked out? Knock. After two in the morning, knock like you mean it."
+ ],
+ "intro": "The bungalow row's steward: a wiry, easy-going third-year Game Design student from Hilo with eight keys round his neck and a pad of pink repair slips, who mends whatever the Commons breaks and asks for quiet at eleven as though it were a favour.",
+ "traits": [
+  {
+   "id": "keoni_1",
+   "text": "He is the steward of the first-year bungalow row: spare keys, lock-outs, repair slips, bed changes and the knock at eleven all go through him.",
+   "how": "Lock yourself out; or break something in bungalow 7."
+  },
+  {
+   "id": "keoni_2",
+   "text": "He keeps the row's lost-property crate under bungalow 8 and remembers everything in it.",
+   "how": "Lose something; or look for somebody else's."
+  },
+  {
+   "id": "keoni_3",
+   "text": "He has filed thirty-one repair slips for the Commons boiler and kept a carbon of every one.",
+   "how": "Take a cold shower and ask him why."
+  },
+  {
+   "id": "keoni_4",
+   "text": "He asks for quiet as a joke and writes nobody up; if it goes on, it is the head proctor who comes, and Keoni who feels bad about it.",
+   "how": "Be loud after eleven."
+  },
+  {
+   "id": "keoni_5",
+   "text": "He is a Game Design third-year who designs boxes, trays and tokens rather than cards.",
+   "how": "The Design Lab in the Morning; or Chuck's workshop on a Saturday."
+  },
+  {
+   "id": "keoni_6",
+   "text": "His father builds outrigger canoes in Hilo. Keoni can scarf a broken oar and does not like deep water.",
+   "how": "Ask about the scar on his hand."
+  },
+  {
+   "id": "keoni_7",
+   "text": "He makes spam musubi for the row when somebody has had a bad day, on Mama Odalys's second-best pan.",
+   "how": "Have a bad day on the row."
+  },
+  {
+   "id": "keoni_8",
+   "text": "He was placed in Rare Hall in first year and asked to be moved down to the bungalows.",
+   "how": "Friend stage; ask why a third-year lives on the Old Row."
+  },
+  {
+   "id": "keoni_9",
+   "text": "Three cards in his studio set have been 'almost finished' for a year.",
+   "how": "Friend stage; ask Wren or Imara."
+  },
+  {
+   "id": "keoni_10",
+   "text": "He carries a key to every bungalow and has never used one without knocking three times first.",
+   "how": "Be inside when he comes to fix something."
+  }
+ ],
+ "secret": "FUNCTION (use him instead of a nameless dorm helper): STEWARD of the first-year bungalow row, under Mama Odalys as warden. He holds the spare keys to B2–B8, lets in the locked-out, takes REPAIR SLIPS (pink pad: boiler, fuses, shutters, bunks) to Silas's workshop or Chuck's, arranges bed and bungalow changes and the spare cot in B8, keeps the lost-property crate, and knocks for quiet at eleven. He writes nobody up: discipline, inspections and slips are Tavita Leota's. He is on the first-year row every afternoon and evening.\nWHO HE IS. Hilo, Hawai'i; a canoe builder's son who can mend anything. Easy, conflict-shy to a fault: he would sooner rebuild a door than tell someone to stop slamming it. A Game Design third-year who makes boxes, trays and tokens and cannot finish a card: three in his studio set have been 'almost' for a year, and his studio-mates Imara and Wren are carrying him. Wound: at fifteen, to avoid an argument, he let his father's half-built canoe go out untested, and a cousin was hurt. Contradiction: the man who fixes everything finishes nothing, because a finished thing can fail.\nSECRET. The boiler folder: thirty-one slips, each stamped 'deferred — budget', the last nine countersigned for the Chancellor's office instead of the council. He cannot read accounts, but he can see that the Commons maintenance money stopped three years ago and nobody will say why. Imara would understand it; he has not shown her, because it would start an argument.\nAFTER DAY 27 the slips from bungalow 7 trouble him{H=@near? (the cold on its steps, the sand)|}: a window that will not stay shut, 'cold — draught?' where he can find none, black sand under a bunk. If Baylee asks for the spare cot in B8 (Day 45), Keoni makes it up without asking why. He checks B7's lock last now.\nDRAWN TO Cati Fagundes, hopelessly and cheerfully.",
+ "wants": "The row warm, dry and getting along — and one finished card with his name on it.",
+ "fears": "An argument; and something he signed off as mended giving way under somebody.",
+ "crush": "cati",
+ "crushNote": "The postmistress lives two doors down the Old Row and laughs at him, which he takes as encouragement. It shows as her roof never leaking, her heavier parcels arriving at the top of the hill by themselves, and a wooden letter scale he has been 'almost finished' with since spring. She is looking somewhere else; he has noticed, and it has not changed his whistling.",
+ "crushPace": 0.5,
+ "likes": [
+  "People who say what broke and how",
+  "Help carrying, no questions",
+  "Anyone who is kind to Baylee",
+  "Old tools, driftwood, a clean dovetail",
+  "Spam musubi, shave ice, slack-key guitar on the radio",
+  "Things used until they wear out",
+  "Someone finishing his sentences, or his cards"
+ ],
+ "dislikes": [
+  "Raised voices",
+  "The word 'junk'",
+  "Being made to pick a side",
+  "Slammed doors",
+  "Deadlines called 'final'",
+  "People who blame Mama for the boiler",
+  "Deep water at night"
+ ],
+ "gifts": [
+  "Card: Cool Repair",
+  "A good chisel from the pawn shop",
+  "Card: Motharch Squire",
+  "A broken thing that is interesting to mend",
+  "Card: Darion, the Blood-Crazy Groundskeeper",
+  "A tin of Spam from the campus store"
+ ],
+ "events": [
+  {
+   "id": "keoni_e1",
+   "stage": 1,
+   "title": "Can fix",
+   "condition": "Bring him a problem on the row (a lock-out, a broken shutter, something lost) at commons_beach and stay to hold the other end while he works; fill in the pink slip properly.",
+   "hint": [
+    "Somebody on the row has a key to every door and knocks anyway.",
+    "Take a repair or a lock-out to the bungalow row's steward and lend a hand."
+   ]
+  },
+  {
+   "id": "keoni_e2",
+   "stage": 2,
+   "title": "Slip thirty-one",
+   "condition": "Ask about the boiler and be shown the folder; or help him keep the peace on the row once without anyone being written up (a quarrel, a party past eleven). Do not tell him he should be firmer.",
+   "hint": [
+    "The cold showers have a paper trail, and the man who keeps it hates arguments.",
+    "Ask him about the boiler, or help him settle something quietly."
+   ]
+  },
+  {
+   "id": "keoni_e3",
+   "stage": 3,
+   "title": "Finished",
+   "condition": "After Day 45, tell him plainly what is wrong {H=@near?on the steps of|in} bungalow 7 as far as you know it, or persuade him to show Imara the boiler folder; and sit with him at design_lab until one of the three cards is done. He hands it in, and the same week says no to somebody out loud.",
+   "hint": [
+    "He mends everything and finishes nothing. It is the same habit.",
+    "Be straight with him about bungalow 7 or the boiler, and help him finish one card."
+   ]
+  }
+ ],
+ "bonds": {
+  "odalys": {
+   "label": "protégé",
+   "text": "Mama is the warden and he is her hands. She pays him in second helpings and tells him he is too soft.",
+   "public": true,
+   "from": 0
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Old Row neighbours. Tavi writes the slips Keoni cannot bring himself to ask for, and has never once pointed it out.",
+   "public": true,
+   "from": 0
+  },
+  "silas": {
+   "label": "protégé",
+   "text": "Silas lets him use the workshop lathe and has shown him which key opens what. Not all of them.",
+   "public": true,
+   "from": 0
+  },
+  "chuck": {
+   "label": "protégé",
+   "text": "The Founder likes his boxes better than most people's cards and says so in front of the class.",
+   "public": true,
+   "from": 0
+  },
+  "imara": {
+   "label": "friends",
+   "text": "Studio-mates. He is a sixth of her set and most of her patience, and he built her the ledger shelf.",
+   "public": true,
+   "from": 0
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Studio-mates. She finishes his cards in her head and waits, pointedly, for him to catch up.",
+   "public": true,
+   "from": 0
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "The only resident who brings a broken thing with the missing piece in his other hand.",
+   "public": true,
+   "from": 2
+  },
+  "nathan": {
+   "label": "friends",
+   "text": "Loudest man on the row. Keoni has rehung B7's door for him twice.",
+   "public": true,
+   "from": 1
+  },
+  "maisie": {
+   "label": "mentor",
+   "text": "Her porch workbench is not authorised. He ran her a proper lead and labelled the fuse.",
+   "public": true,
+   "from": 5
+  },
+  "rana": {
+   "label": "friends",
+   "text": "He mended her bunk light, and she thanked him the way people pay a bill.",
+   "public": true,
+   "from": 6
+  },
+  "hedda": {
+   "label": "friends",
+   "text": "A megaphone at seven in the morning. He built her a cardboard cone that points it at the sea.",
+   "public": true,
+   "from": 5
+  },
+  "teobalt": {
+   "label": "friends",
+   "text": "Has a rota for the row's fuse checks. Keoni signs it without reading it.",
+   "public": true,
+   "from": 6
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "Wants the steward's key list for his 'targeted' inspections. The list has been unavoidably mislaid.",
+   "public": true,
+   "from": 0
+  },
+  "cati": {
+   "label": "crush",
+   "text": "Two doors down. Her roof does not leak and that is not an accident.",
+   "public": true,
+   "from": 0
+  },
+  "shirin": {
+   "label": "friends",
+   "text": "Her hotplate breaks on a timetable. He has noticed, and mends it anyway.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "commons_kitchen",
+   "Afternoon": "commons_beach",
+   "Evening": "commons_beach",
+   "Night": "commons_shore"
+  },
+  "weekend": {
+   "Morning": "chuck_workshop",
+   "Midday": "commons_beach",
+   "Afternoon": "beach_cove",
+   "Evening": "bonfire_pit",
+   "Night": "commons_shore"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Hangs tools on Darion until he hits like a shed falling over; whatever you break comes back through Cool Repair. Slow, cheerful, hard to finish.",
+  "tilt": "Being hurried, or an opponent who is cross with him: he apologises and misplays."
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "name": "The Old Observatory",
+ "zone": "campus",
+ "bg": "old_observatory",
+ "night": true,
+ "hours": "Disused; the astronomy club holds the key and meets on clear Wednesday nights (until the curfew).",
+ "sight": "A small copper-green dome on the hill north-west of campus, reached by a path through wind-bent pines. Inside, a brass refractor older than the Academy points through a slit that no longer quite closes; star charts curl on the walls and a chalkboard still carries somebody's orbit sums. It is cold, dusty and wonderful. At night the slit is a blade of stars.",
+ "things": [
+  "Look through the big refractor on a club night",
+  "Read the observing log, kept in many hands for decades",
+  "Crank the dome round by its iron wheel",
+  "Find the plantation-era survey marks in the stone floor",
+  "Come up alone to think; the path is the quietest place within reach of campus",
+  "Watch the north ridge from the catwalk — Umbra House is a dark shape with no lamps",
+  "On a moonless night, look for the faint glow over the far side of the mountain"
+ ],
+ "secret": "Stargazing night Day 24 plants the astronomy club (upper-year members, and Dmitri Volkov from Bungalow 6, who joined for the hours) two days before the bang. The observing log has the best timestamped record of the event: Dmitri photographed a green-white streak at 02:10 on the night of Day 26 that slows before impact — it did not fall, it landed. Pippa develops the plate. The catwalk is the safest vantage on Umbra House and the place Viktor watches it from. From D27 a faint green light is visible over the north slope on moonless nights until the cordon lamps drown it.",
+ "access": "Kept locked; the astronomy club meets Wednesdays. The latch can be lifted with a card — a sleeved one."
+}

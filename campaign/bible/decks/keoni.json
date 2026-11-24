@@ -1,0 +1,419 @@
+{
+ "name": "Lost and Found",
+ "owner": "keoni",
+ "heroes": [
+  "Darion, the Blood-Crazy Groundskeeper",
+  "Cecilia, the Harrowing Crusader",
+  "Fern, the Ship Slave"
+ ],
+ "main": [
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   2,
+   "Club of Gobbo"
+  ],
+  [
+   2,
+   "Sacred Hammer of the Volcano"
+  ],
+  [
+   2,
+   "Shield of Life"
+  ],
+  [
+   2,
+   "Shield of Death"
+  ],
+  [
+   2,
+   "Wanted Poster"
+  ],
+  [
+   2,
+   "Warhorse"
+  ],
+  [
+   1,
+   "The Sun Sword"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   2,
+   "Gravedigger's Shovel"
+  ],
+  [
+   1,
+   "Crusader's Cutlass"
+  ],
+  [
+   1,
+   "Crusader's Flintlock"
+  ],
+  [
+   1,
+   "Crusader's Arm-Cannon"
+  ],
+  [
+   4,
+   "Cool Repair"
+  ],
+  [
+   3,
+   "Motharch Squire"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Treasure Hunter's Backpack"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Breaking Strike"
+  ],
+  [
+   2,
+   "Hammer Throw"
+  ],
+  [
+   2,
+   "Bluff"
+  ],
+  [
+   6,
+   "Fighting"
+  ],
+  [
+   2,
+   "Wealth"
+  ],
+  [
+   2,
+   "Trapping"
+  ],
+  [
+   1,
+   "Adventurousness"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Darion, the Blood-Crazy Groundskeeper": "Hero",
+  "Cecilia, the Harrowing Crusader": "Hero",
+  "Fern, the Ship Slave": "Hero",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Club of Gobbo": "Artifact (Equipment)",
+  "Sacred Hammer of the Volcano": "Artifact (Equipment)",
+  "Shield of Life": "Artifact (Equipment)",
+  "Shield of Death": "Artifact (Equipment)",
+  "Wanted Poster": "Artifact (Equipment)",
+  "Warhorse": "Artifact (Equipment)",
+  "The Sun Sword": "Artifact (Equipment)",
+  "Smug Coin": "Artifact (Equipment)",
+  "Gravedigger's Shovel": "Artifact (Equipment)",
+  "Crusader's Cutlass": "Artifact (Equipment)",
+  "Crusader's Flintlock": "Artifact (Equipment)",
+  "Crusader's Arm-Cannon": "Artifact (Equipment)",
+  "Cool Repair": "Artifact",
+  "Motharch Squire": "Creature L0",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Treasure Hunter's Backpack": "Artifact",
+  "Quick Attack": "Attack",
+  "Heavy Hit": "Attack",
+  "Breaking Strike": "Attack",
+  "Hammer Throw": "Attack",
+  "Bluff": "Attack (Surprise)",
+  "Fighting": "Ability",
+  "Wealth": "Ability",
+  "Trapping": "Ability",
+  "Adventurousness": "Ability"
+ },
+ "gist": {
+  "Darion, the Blood-Crazy Groundskeeper": "All equipment on him shares a single support zone, so there is no limit to what he carries. Whenever he defeats something he equips another piece from hand or deck at half price.",
+  "Cecilia, the Harrowing Crusader": "Once a turn spends all her gold to delete an artifact from the discard pile and fetch a fresh copy from the deck. Only she carries the Crusader's guns: each fires a small shot a turn and swaps itself for a different one at the end of the turn.",
+  "Fern, the Ship Slave": "Everything equipped to his heroes costs half.",
+  "Cool Repair": "Re-equips any equipment from the discard pile for a fraction of its price.",
+  "Motharch Squire": "Tiny creature: on arrival shuffles two artifacts from the discard pile back into the deck; when it dies, it fetches an artifact.",
+  "Club of Gobbo": "More Attack, and its hero's attack damage cannot be reduced or cancelled.",
+  "Breaking Strike": "Discards his own equipment for one hit multiplied by the number of pieces thrown.",
+  "Wanted Poster": "Draws two whenever its hero defeats a target.",
+  "The Sun Sword": "Whatever its hero hits burns for the rest of the game.",
+  "Gravedigger's Shovel": "When its hero defeats a target, the top five cards of your deck go to the discard pile.",
+  "Warhorse": "Bigger hits on a single target.",
+  "Pocket Catapult": "A small shot every turn.",
+  "Treasure Hunter's Backpack": "Puts any piece of equipment from his deck straight onto a hero for nothing; that hero skips his Action this turn.",
+  "Bluff": "Face-down: draws three when its hero is aimed at.",
+  "Heavy Hit": "An attack that also stuns."
+ },
+ "plan": "Keoni keeps hanging tools on Darion — clubs, hammers, a horse, catapults, all in one support zone and at half price through Fern — until a single Heavy Hit is a shed falling on you; Club of Gobbo makes those hits impossible to reduce or cancel. Whatever you remove comes back: Cool Repair, the Squire, Cecilia buying a fresh copy. Breaking Strike cashes the whole toolbox in for one enormous blow, and then he rebuilds it. But Darion only gets his free equips by defeating things, and a deck without creatures gives him nothing to defeat; the build is slow, everything costs gold, and there is one real attacker.",
+ "looks": {
+  "early": "A Pocket Catapult and a Club on Darion, Fern counting half prices; a Motharch Squire.",
+  "mid": "Six pieces of equipment in a single zone; Cecilia's gun changing every turn.",
+  "late": "Breaking Strike: the whole toolbox thrown at one hero, and Cool Repair picking it up again."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "He equips one cheap tool a turn and has not attacked.",
+   "why": "He needs gold and kills to get going, and you offer nothing to kill. Use the quiet turns; there is nothing to sweep but one Squire, and its death fetches him an artifact."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Darion carries five tools in a single zone and his Attack has doubled.",
+   "why": "One hero is the whole deck: freeze him, and every turn he does not swing the Storm ticks. Removing single tools is pointless — they come back."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "Club of Gobbo is on Darion — his hits cannot be reduced or cancelled — and he is holding Breaking Strike.",
+   "why": "Cloud in a Bottle and Homerun! do nothing against the Club. What works is a frozen Darion, a Firewall on the target, and healing out of range."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Darion is down; Cecilia fires one small gun a turn.",
+   "why": "Without him the toolbox has nobody to carry it."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Keoni equips a Pocket Catapult to Darion at half price and pings your caster, apologising.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level Destruction Magic"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Darion, early"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche for a single Squire"
+     }
+    ]
+   },
+   {
+    "board": "A Motharch Squire shuffles two tools back into his deck.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Leave it alive: its death fetches him an artifact"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear takes the Squire"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep it"
+     }
+    ]
+   },
+   {
+    "board": "Cecilia's Flintlock fires a small shot and swaps itself for the Cutlass.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Cecilia"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold your sweepers"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Club, Hammer, Warhorse and a Wanted Poster, all in one zone on Darion.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon: he does not swing this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and Acid Vial into Darion"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "The Yeeting on one tool, which Cool Repair returns"
+     }
+    ]
+   },
+   {
+    "board": "Your Yeeting removes the Warhorse. Cool Repair puts it back for almost nothing.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Stop removing tools; freeze the man"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Darion"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Remove another"
+     }
+    ]
+   },
+   {
+    "board": "The Sun Sword: whatever Darion hits burns for the rest of the game.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea moves the burn onto Fern"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Look for something to sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Breaking Strike: six tools go to the discard pile and one of your heroes takes all of it.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Firewall was face-down on that hero"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Darion before the Action"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade a hero for tempo"
+     }
+    ]
+   },
+   {
+    "board": "Club of Gobbo makes Heavy Hit uncancellable; your caster is stunned.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea, then heal through Tarleinn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon back at him"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn through it"
+     }
+    ]
+   },
+   {
+    "board": "Gravedigger's Shovel: every kill buries five cards of your deck.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep your heroes alive, whatever it costs"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Shovel, once"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the deck count"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Darion has fallen with eight tools around him.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Fern and Cecilia"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh: Darion stands for one more swing.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Cecilia instead"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal the target out of range"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Cecilia alone, her gun changing every turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

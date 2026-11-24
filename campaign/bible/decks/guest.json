@@ -1,0 +1,370 @@
+{
+ "name": "Depths of the Cosmos",
+ "owner": "guest",
+ "heroes": [
+  "Blackstache, Scourge of the Pixel Seas",
+  "Argos, the Eye of the Cosmos",
+  "Cooldin, King of Coolness"
+ ],
+ "main": [
+  [
+   8,
+   "Alchemy"
+  ],
+  [
+   4,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   4,
+   "Coffee"
+  ],
+  [
+   4,
+   "Cosmic Malfunction"
+  ],
+  [
+   4,
+   "Dark Gear"
+  ],
+  [
+   4,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of the Guardian"
+  ],
+  [
+   4,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   4,
+   "Gerrymander"
+  ],
+  [
+   4,
+   "Invader from the Cosmic Depths"
+  ],
+  [
+   4,
+   "Life-Searcher from the Cosmic Depths"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   8,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Cosmic Depths"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Blackstache, Scourge of the Pixel Seas": "Hero",
+  "Argos, the Eye of the Cosmos": "Hero",
+  "Cooldin, King of Coolness": "Hero",
+  "Alchemy": "Ability",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Coffee": "Artifact",
+  "Cosmic Malfunction": "Spell (Summoning Magic, Reaction)",
+  "Dark Gear": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of the Guardian": "Spell (Summoning Magic, Reaction)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Gerrymander": "Creature L1",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "Magnetic Glove": "Artifact",
+  "Summoning Magic": "Ability",
+  "The Cosmic Depths": "Area (Summoning Magic)",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Blackstache, Scourge of the Pixel Seas": "Carries Terror at level two: a player's turn ends after six differently named cards and effects. His own side ignores Terror, and nothing you play can end its turn early.",
+  "Argos, the Eye of the Cosmos": "Gathers Change Counters according to the number of cards in YOUR hand and spends them to place a Cosmic Depths creature of exactly that level from hand or deck. Carries another Terror.",
+  "Cooldin, King of Coolness": "Plays The Cosmic Depths from the deck on the first turn.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search and summon a creature of a level they do not control.",
+  "Analyzer from the Cosmic Depths": "Gains a Change Counter whenever you draw or search by an effect; spends counters to drop Invader Tokens into support zones, yours included. While a token is out, at the end of each of your turns you must discard a card or take a small hit on a target of the opponent's choice, unless you control a card with Change Counters.",
+  "Gatherer from the Cosmic Depths": "Gains a counter whenever you draw or search by an effect; turns counters into cards.",
+  "Life-Searcher from the Cosmic Depths": "Searches a Cosmic card on arrival and can swap itself for the next-bigger Cosmic creature from the deck.",
+  "Invader from the Cosmic Depths": "The top of the chain: places two more Invader Tokens (each a card or a small hit from you every turn) and discards spells for heavy hits.",
+  "Gerrymander": "Whenever one of your cards lets you choose, or says you \"may\", it decides for you.",
+  "Cosmic Malfunction": "Reaction: protects its Cosmic creatures from being moved or removed and locks the card you used for the turn.",
+  "Dark Gear": "Steals a creature; four copies.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures.",
+  "Divine Gift of the Guardian": "Once per game: its creatures take no damage for a turn.",
+  "Alchemy": "Ability: draws from its Potion Deck.",
+  "Coffee": "Clears statuses from a hero and gives it another action."
+ },
+ "plan": "This deck does not hurry; it feeds on what you do. Terror on Blackstache ends your turn after six differently named plays while his own side is exempt. Every card you draw or search by an effect puts a counter on the Analyzer and the Gatherer, the size of your hand puts counters on Argos, and the counters become cards, creatures placed for free (climbing level by level to the Invader) and Invader Tokens: a slow tax of one card or one small hit at the end of each of your turns, which only stops if you yourself control a card with Change Counters. Gerrymander makes your optional effects for you. A deck that reshuffles, tutors and draws potions every turn is its ideal opponent. All of it is three heroes' text and a set of small creatures: silence Blackstache or Argos, sweep the collectors before they are protected, and what remains is ordinary.",
+ "looks": {
+  "early": "The Cosmic Depths out on turn one, an Analyzer, your turn ending before you were finished.",
+  "mid": "Change Counters everywhere, a Gatherer and a Life-Searcher, Invader Tokens out, and you paying a card or a little health at the end of every turn.",
+  "late": "The Invader on the board, a full hand it never paid for, and your turns six plays long."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Your turn ended on its own after six differently named plays; the Terror sits on Blackstache.",
+   "why": "A frozen hero's Abilities are switched off: Snow Cannon on Blackstache gives you a full turn, and the Area that tutors its creatures can be removed; a normal setup turn of many small plays is exactly what Terror ends."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "An Analyzer and a Gatherer gain a counter every time you draw or search by an effect.",
+   "why": "The collectors are small creatures and the whole engine; sweep them, and until then every Leadership and Magnetic Glove you play is paid to the other side."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Invader Tokens are out and the Invader itself has arrived; at the end of each of your turns you lose a card or some health, and it does not, because its cards carry Change Counters.",
+   "why": "The tax stops the moment you control a card with Change Counters: Dark Gear on its Analyzer or Gatherer (cheap, they are low level) ends it and takes a collector away in one play; otherwise The Yeeting removes a token. Setup turns just bleed."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Blackstache is wounded; while he stands, Terror binds only you.",
+   "why": "If Blackstache falls the limit applies to both sides, and its own long turns end early too; he is the hero to finish first."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "You attach, reshuffle, draw a potion, equip and play a glove; before you can cast, your turn is over.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Blackstache for one free turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fewer, bigger plays: straight to Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Try the same long turn again"
+     }
+    ]
+   },
+   {
+    "board": "Cooldin plays The Cosmic Depths from the deck; next turn a creature is searched out with it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Area"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Argos"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold a full hand and build"
+     }
+    ]
+   },
+   {
+    "board": "An Analyzer gains two counters from your Leadership and drops an Invader Token: a card or a small hit from you at the end of every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Stop drawing by effect this turn; kill the Analyzer"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Spend your plays on damage"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep cycling"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Analyzer, Gatherer and Gerrymander stand together; no Deepsea Idol has been shown yet.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the collectors"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Plays go to heroes; the Storm ticks for free"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Leadership, Glove, potion: three more counters"
+     }
+    ]
+   },
+   {
+    "board": "Cosmic Malfunction cancels your Yeeting and locks The Yeeting for the turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Then damage: sweep them"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear, a different card"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Pass"
+     }
+    ]
+   },
+   {
+    "board": "Gerrymander decides that your White Eye discard does not happen.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill it with the rest"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Blackstache"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Invader arrives with two more Invader Tokens; you discard or bleed at the end of every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear its Gatherer: with Change Counters on your side the tax stops"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Invader, one spell at Blackstache"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach, reshuffle, draw, end of turn"
+     }
+    ]
+   },
+   {
+    "board": "Argos places a Life-Searcher for exactly the number of cards you hold; the tokens have already cost you two cards.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet a token, freeze Argos"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Pay the tax in health, shield and burn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Life-Searcher"
+     }
+    ]
+   },
+   {
+    "board": "Flashbang does nothing: its turn cannot be ended by your cards. The token tax takes another card.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Analyzer and keep its counters"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle instead, pay the tax in health"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Try it again"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Blackstache is nearly down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish him; then Terror binds both of you"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him instead"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the board first"
+     }
+    ]
+   },
+   {
+    "board": "Blackstache has fallen; its own turn now ends after a handful of plays.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Even race now: Storm and spells"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "One hero each. It has not spoken in several turns.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Everything"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held, Storm tick to finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

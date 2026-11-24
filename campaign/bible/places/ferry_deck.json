@@ -1,0 +1,20 @@
+{
+ "name": "Fore Deck of the Second Chance",
+ "zone": "campus",
+ "bg": "ferry_deck",
+ "night": false,
+ "hours": "Only during crossings: the ferry runs Wednesdays and Saturdays plus special runs on arrival and departure days. ARRIVAL DAY (Day 1, 08:00–10:40) on the fore deck: nathan — has been over the whole ship since the harbour and reports all of it at full volume; attaches himself to Rowan and comes along anywhere; plays anyone, at once, on a bench with the cards sliding. baylee — standing where he blocks least, one hand on the rail; follows Nathan and Rowan if asked, says little; plays if asked kindly, says first that he is not good. ed — hanging off the bow rail by one hand to see the island sooner; plays anywhere, preferably somewhere he could fall from. georgie — sitting on a coiled rope with her deck box in both hands, being photographed; says yes very quietly to a polite request for a game, never for a stake, and is the strongest player aboard. pippa — photographing Georgie against the volcano (they met ten minutes ago), then anyone who holds still; would sooner take pictures than play, can be coaxed. mikoto — apologising to a gull that has his sandwich; plays gladly and apologises throughout. The first-years not named on any part of the ship are below with the luggage or asleep on their bags and stay there.",
+ "sight": "A blunt white-and-rust ferry shoulders through green swell, her fore deck slick with spray and crowded with duffel bags, deck boxes and first-years in new jackets. Ahead, Caldera Key climbs out of the haze: a dark cone with a scarf of cloud, jungle running down its flanks to pale sand. An iron stair goes up to the wheelhouse door; under it a doorway leads down into the passenger lounge, and a side deck runs aft past the funnel to the stern. The engine thrums up through the soles of your shoes and the air tastes of salt and diesel.",
+ "things": [
+  "Lean on the bow rail and watch the island grow from a smudge into a mountain",
+  "Go down into the passenger lounge, where people are playing",
+  "Walk aft along the side deck to the stern",
+  "Climb the iron stair to the wheelhouse door",
+  "Play a wobbly first table game on a bolted-down bench while the cards try to slide away",
+  "Count the collars: white with a gold edge, blue, plain grey",
+  "Spot the lighthouse, the cliff tower and the thin white line of the Commons beach as the ferry rounds the south point",
+  "Be seasick with dignity, or without"
+ ],
+ "secret": "ARRIVAL DAY ABOARD (Day 1, Morning only). The ship is four places with no travel time between them: ferry_deck (fore deck), ferry_lounge, ferry_stern, ferry_bridge; who is where, and whether they will play, stands under Hours of each. Everyone is a stranger to Rowan and to everyone else. CLOCK: she docks at 10:40. Never use @time aboard, only @clock. From about 10:25 the horn sounds and people crowd the rail; at 10:40, or as soon as the player waits or skips ahead (@clock up to that minute), write @place ferry_dock. Nobody is still aboard at 11:00. Duels aboard are casual only, about 25 minutes each. On the fore deck: Rowan is the only first-year without a jacket (late admission; his is issued on the Quad), so nobody can read his dorm from a collar. Nathan repeats to everybody whatever Rowan tells him. A challenge to Rowan can come from two people, each once: Inya in the lounge (see there) and Magnus, if Rowan says his online handle within his hearing or speaks to him. Later crossings: see ferry_bridge for the captain. Day 105 and Day 210 are the last ferries: who stands at the rail with Rowan is decided by the routes.",
+ "access": "Not a place to visit freely; only as part of a crossing. Leaving the island mid-term without leave counts as absence in every course."
+}

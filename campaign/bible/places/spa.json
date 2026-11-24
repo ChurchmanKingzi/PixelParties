@@ -1,0 +1,18 @@
+{
+ "name": "The Campus Spa",
+ "zone": "campus",
+ "bg": "spa",
+ "night": false,
+ "hours": "Afternoon and Evening (Afternoon only from the curfew); attendant Selene Vasquez. Free for Spectral residents, 10 cr entry for everyone else.",
+ "sight": "A low cedar bathhouse on the western edge of campus, fed by a pipe from the volcanic springs. Sliding screens open on a steaming indoor pool, a cold plunge, a row of wooden tubs and a relaxation room of reed mats and paper lamps. Everything is hushed, warm and slightly sulphurous. Towels are stacked in exact pyramids, and the attendant seems to appear exactly when a thought needs finishing.",
+ "things": [
+  "Soak in the mineral pool (recovers energy; calms the nerves for the next slot)",
+  "Dare the cold plunge",
+  "Lie in the relaxation room and overhear what people say when they forget anyone is there",
+  "Talk to Selene over the towel counter — she knows more than Bex and tells less",
+  "Book a shoulder massage after a tournament day (15 cr)",
+  "Read the framed notice about the springs' mineral content and 'traditional island bathing customs'",
+  "Take a paid shift folding towels and scrubbing tubs (16 cr)"
+ ],
+ "secret": "Selene's route; job site. The spa is the island's confessional: with her trust Rowan can learn one overheard secret per week (who is failing, who is seeing whom, what Octavia was offered, what Gideon reports). After D40 the staff come here to fall apart quietly — Hana, Camille, even Okonkwo once. The spring water comes down a pipe from the wild hot springs; since D27 it runs two degrees hotter and leaves a faint dark grit in the filter that Selene keeps in a jar because it is 'pretty' — black glass sand. Separate bathing hours and robes are the rule; keep every scene here tasteful. ACCESS NOTE: 10 cr entry for non-Spectral students; from Day 67 Afternoon only."
+}

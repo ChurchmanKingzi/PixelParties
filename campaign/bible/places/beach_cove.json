@@ -1,0 +1,20 @@
+{
+ "name": "Driftwood Cove",
+ "zone": "wild",
+ "bg": "beach_cove",
+ "night": true,
+ "hike": 1,
+ "hours": "Always open; a ten-minute scramble west of the Commons over the headland. Lifeguarded only on organised beach days.",
+ "sight": "A crescent of pale sand between two black lava headlands, with water that goes from glass-green to deep blue in thirty strokes. Bleached driftwood trunks lie like benches; a rope swing hangs from a leaning palm. No building is in sight. By night the sand is cold and silver, and the surf lights up green wherever you step in it.",
+ "things": [
+  "Swim, properly, in the open sea",
+  "Go on the rope swing",
+  "Join a beach day: volleyball, a cool box, cards weighted down with shells",
+  "Snorkel over the reef shelf and see parrotfish and one grumpy moray",
+  "Build something ambitious out of driftwood",
+  "Walk the tideline for sea-glass and shells",
+  "Have a picnic for two",
+  "At night: wade in and watch the water glow round your ankles"
+ ],
+ "secret": "The island at its most innocent: beach days Days 7, 147, 203. Swimsuit scenes are light and tasteful; Georgie, if present, has armbands of dignity and a sun hat. Night swims here are key scenes for Sunny and Saoirse. The glow is ordinary plankton — until D27, after which on some nights it gathers into slow square patterns before breaking up. Among the sea-glass after D27: beads of black fused glass, carried round by the current from the north."
+}

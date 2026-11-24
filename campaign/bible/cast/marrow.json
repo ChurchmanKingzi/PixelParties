@@ -1,0 +1,215 @@
+{
+ "id": "marrow",
+ "name": "Lucian Marrow",
+ "firstName": "Lucian",
+ "age": 49,
+ "sex": "m",
+ "group": "visitor",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Spectral Tower guest suite, sixth floor (from Day 61)",
+ "romance": false,
+ "deck": "A boardroom gift set (barely plays; no deck profile)",
+ "look": "A grey suit that fits like a decision, perfect teeth, silver-brown hair cut every ten days and a soft voice that makes people lean in. No tie pin, no watch you would notice, one plain wedding band he turns when he is losing patience. He smiles with his mouth and counts with his eyes.",
+ "voice": "Soft, courteous and patient, mid-Atlantic; he uses first names at once, never threatens — he describes outcomes — and makes people lean in to hear him. The softer he gets, the worse it is. RARE habit (once in a scene at most; most scenes go without it): 'Help me understand.'",
+ "lines": [
+  "Rowan. May I call you Rowan? Help me understand what you think you saw.",
+  "I'm not the villain of anything. I'm a man with a fiduciary duty and a ferry ticket.",
+  "Your founder made a miracle and filed it under 'hobbies'. I'd simply like it properly looked after.",
+  "Nobody's being pressured. That was next year's budget. It's a description."
+ ],
+ "intro": "A soft-spoken board representative of Kaboom Entertainment who arrives on the island mid-term 'to review operations'.",
+ "traits": [
+  {
+   "id": "marrow_1",
+   "text": "He represents the board of Kaboom Entertainment and arrives on the ferry on Day 61.",
+   "how": "Day 61; Bex covers it."
+  },
+  {
+   "id": "marrow_2",
+   "text": "He learns everyone's first name at once and uses it.",
+   "how": "Meet him."
+  },
+  {
+   "id": "marrow_3",
+   "text": "He takes the best suite at the inn and holds meetings in the faculty wing.",
+   "how": "Inn; faculty wing."
+  },
+  {
+   "id": "marrow_4",
+   "text": "He funds a research fellowship in the Competitive Play department.",
+   "how": "Faculty wing plaque."
+  },
+  {
+   "id": "marrow_5",
+   "text": "He has never been seen to finish a game of Pixel Parties.",
+   "how": "Offer him one."
+  },
+  {
+   "id": "marrow_6",
+   "text": "He dines with the student council president and calls her the only adult on the island.",
+   "how": "Cafe or inn, Evening."
+  },
+  {
+   "id": "marrow_7",
+   "text": "He turns his wedding ring when he is not getting what he wants.",
+   "how": "Refuse him something."
+  }
+ ],
+ "secret": "Lucian Marrow rose through licensing, not design. He joined Kaboom Entertainment twenty years ago, turned a card game into a media property, and has spent a decade watching its founder treat a multi-billion-dollar asset as a personal toy on a rock in the Pacific. What he knows: three years ago a lab he pays assayed a first-print card and found that its ink is a ground mineral that makes holograms behave as real things — 'Living Holograms', worth billions. The dust is finite; there must be a quarry; the quarry is under that mountain. He holds the Academy's Umbra House payment records (four 'legacy obligations', paid quarterly for nine years) and with them the Chancellor's career and the school's licence. He does not know what the Vault is, what the Tessellate were, or that the rules are real — only that there is a process (the ink) and a source (something behind a door a dead archaeologist opened).\nHis scheme: (1) starve and pressure the Chancellor — he carries a folder and lets her see it; (2) fund Santángel's closed lab to reproduce the ink and test first prints to destruction; (3) acquire first prints — by purchase (the pawn shop's covered cabinet by about Day 75; Dex; students in need: he offers Livvie her whole tuition, 9,000 cr, for information about old cards, night hikers and Archive access) and by theft from the Archive through his informant (Day 72, on Santángel's credential); (4) take the crater: his 'geologist' and 'surveyors' are corporate security, his field camp fences it from Day 61, and its glass goes out crated as 'laboratory glass'; his people find the old print works around Day 80 and from about Day 120 dig at the rockfall in the lava tubes; (5) have the board remove the Chancellor (default Day 170), install Santángel as acting head and transfer the ruins and the north slope to a subsidiary; (6) open the Gate; (7) the lattice: he bought the outer geometry of Miriam Helical's solid-hologram projector from her husband three years ago ('two-fifths of a dead woman's idea'), wants the three grey notebooks Professor Helical has hidden on the island, and from about Day 50 holds the daughter's forged admission waiver over him (default: first notebook Day 95, second found by his engineers Day 130, third Day 160; with all three and the print works' pigment his prototype on Day 168 is solid). His own initials are in the Print Works Welfare Fund ledger in the Card Archive for the last ten years, against 'no claim' — the one document on the island that can sink him by itself. His informant is Gideon Pryce, whose family firm is in debt to Marrow's fund: 'the boy in the gloves', kept on a leash of debt.\nAbout Day 64 his field staff find {H:full}'s body under the cracked crater glass. From that day Marrow KNOWS that the boy ranked sixty-first on the ladder is not a boy. He has the body cut out in its block of glass and hidden in a door-sized crate marked LABORATORY GLASS in the stable of the inn — his private proof — and by default ships it out with a 'medical transfer' on Day 172. He tells no one, not even the parents who keep telephoning. That is the measure of him: he is not sadistic; he is worse — reasonable. In his own head he is the responsible adult rescuing an asset from a senile hobbyist, and a dead student is a liability to be managed and a thing at the crater that 'makes deals' is a counterparty. In Stage D/E he tries to negotiate with it. The Guest finds him interesting — 'You wager things that are not yours. Is that allowed?' On the bad-ending morning he is at the fence with his surveyors and gets exactly what he asked for. Contradiction: the wedding band is for a wife who left six years ago; he has not taken it off because it tests well in rooms.\nHe arrives Day 61 and judges the Design Contest (his prize money). He courts Octavia (a post at head office; dinner at the inn), Vivienne (a network show), Jessica (a presenter contract with strings), Ashdown (a research chair), Livvie (her tuition). Each offer is real. That is what makes him dangerous. In the steam of the spa's private pool he talks on the phone as though the attendant were furniture.",
+ "wants": "To own the process and the source, properly papered.",
+ "fears": "Being the man on whose watch the asset was lost — and, though he has not met it yet, something that cannot be described into compliance.",
+ "crush": "vivienne",
+ "crushNote": "She is the one acquisition on the island he would like for its own sake: a famous voice, perfectly finished, with a price he can meet. It shows as dinner invitations, close attention, and an offer improved without her having asked.",
+ "crushPace": 0.8,
+ "likes": [
+  "People who want something he can provide",
+  "Discretion, deliverables, signed paper",
+  "Ambition in the young",
+  "Being called reasonable",
+  "A clean exit",
+  "First names used back at him"
+ ],
+ "dislikes": [
+  "Sentiment",
+  "The founder's stories",
+  "Students with cameras",
+  "Being told no without a counter-offer",
+  "Things that are not for sale",
+  "Mud"
+ ],
+ "gifts": [
+  "Nothing. He does not accept gifts; he logs them.",
+  "A signed non-disclosure agreement (he is delighted; do not)",
+  "Information about another character (raises his 'affinity', lowers theirs if discovered)",
+  "Card: Debt-O-Tron Damage Fees"
+ ],
+ "events": [
+  {
+   "id": "marrow_e1",
+   "stage": 1,
+   "title": "May I call you Rowan",
+   "condition": "Meet him after Day 61 and remain polite without agreeing to anything; he gives Rowan a card with a number on it.",
+   "hint": [
+    "A visitor from the board will take an interest in you. Courtesy costs nothing. Agreement might.",
+    "Be civil to the man from the company without promising him anything."
+   ]
+  },
+  {
+   "id": "marrow_e2",
+   "stage": 2,
+   "title": "A description",
+   "condition": "Be offered something real by him (credits, tuition, a contact) and either refuse with a stated reason or accept as a deliberate ruse known to at least one ally; learn what he wants from the crater.",
+   "hint": [
+    "He will make you an offer. It will be a good one. Understand what it is for before you answer.",
+    "Hear his offer out, find out what he is really after, and decide with your eyes open."
+   ]
+  },
+  {
+   "id": "marrow_e3",
+   "stage": 3,
+   "title": "Not for sale",
+   "condition": "Late Term 1 or Term 2: confront him with evidence (Gideon's true notebook, the ferry manifest, Santángel's data) in front of someone whose opinion he needs; he drops the soft voice for one sentence. ('Trusted' here means he takes Rowan seriously as an opponent — the only respect he gives.)",
+   "hint": [
+    "He is reasonable with everyone until someone shows him a document.",
+    "Gather proof of what he has done on the island and put it in front of him with a witness."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "enemies",
+   "text": "A senile hobbyist sitting on the company's most valuable asset.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "protégé",
+   "text": "His eyes and ears on campus: a debtor's son who understands who holds the file.",
+   "public": false,
+   "from": 0
+  },
+  "octavia": {
+   "label": "protégé",
+   "text": "'The only adult on the island.' His intended ally inside the student body.",
+   "public": false,
+   "from": 0
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "A capable administrator with an old liability on her books.",
+   "public": true,
+   "from": 0
+  },
+  "santangel": {
+   "label": "colleagues",
+   "text": "A funded researcher who delivers reports — and is watched.",
+   "public": false,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "colleagues",
+   "text": "A famous voice with a price.",
+   "public": false,
+   "from": 61
+  },
+  "dex": {
+   "label": "distrusts",
+   "text": "A shopkeeper who is lying about what he has behind the counter.",
+   "public": false,
+   "from": 61
+  },
+  "leona": {
+   "label": "strangers",
+   "text": "A first-year he has looked straight through. He has no idea whose daughter she is.",
+   "public": false,
+   "from": 0
+  },
+  "maisie": {
+   "label": "protégé",
+   "text": "She has half the lattice on a porch. With the right carrier she is the process, and she is cheap.",
+   "public": false,
+   "from": 63
+  },
+  "helical": {
+   "label": "colleagues",
+   "text": "A broken man with the remainder of the design somewhere on this island. Patience has always worked on him.",
+   "public": false,
+   "from": 0
+  },
+  "sebastian": {
+   "label": "mentor",
+   "text": "If the president proves difficult, the vice-president will not. A reserve, and a cheap one.",
+   "public": false,
+   "from": 61
+  },
+  "imara": {
+   "label": "colleagues",
+   "text": "A bursary student holding the council's books. He has asked only for what he could get anyway — so far.",
+   "public": false,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "spectral_lobby",
+   "Midday": "chancellor_office",
+   "Afternoon": "faculty_wing",
+   "Evening": "inn",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_lobby",
+   "Midday": "harbor",
+   "Afternoon": "old_print_works",
+   "Evening": "inn",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Knows the rules the way he knows a contract, plays a pre-built executive gift deck, and concedes when the result stops being useful.",
+  "tilt": "Stakes that cannot be priced. He has never played for anything he could not afford to lose."
+ }
+}

@@ -1,0 +1,389 @@
+{
+ "name": "Endgame Study",
+ "owner": "dom",
+ "heroes": [
+  "Junshi, the Tactical Genius",
+  "Kasperov, the King of Kings [B]",
+  "Tharx, the Never-Losing General"
+ ],
+ "main": [
+  [
+   2,
+   "Bishop of Kings [B]"
+  ],
+  [
+   3,
+   "Bishop of Kings [W]"
+  ],
+  [
+   3,
+   "Board of Kings"
+  ],
+  [
+   1,
+   "Castling"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Knight of Kings [B]"
+  ],
+  [
+   3,
+   "Knight of Kings [W]"
+  ],
+  [
+   3,
+   "Leadership"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Pawn Chain"
+  ],
+  [
+   4,
+   "Pawn of Kings [B]"
+  ],
+  [
+   8,
+   "Pawn of Kings [W]"
+  ],
+  [
+   3,
+   "Pawn Sacrifice"
+  ],
+  [
+   1,
+   "Queen of Kings [B]"
+  ],
+  [
+   2,
+   "Queen of Kings [W]"
+  ],
+  [
+   2,
+   "Rook of Kings [B]"
+  ],
+  [
+   2,
+   "Rook of Kings [W]"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Junshi, the Tactical Genius": "Hero",
+  "Kasperov, the King of Kings [B]": "Hero",
+  "Tharx, the Never-Losing General": "Hero",
+  "Bishop of Kings [B]": "Creature L2",
+  "Bishop of Kings [W]": "Creature L2",
+  "Board of Kings": "Area (Magic Arts)",
+  "Castling": "Spell (Support Magic, Attachment)",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Knight of Kings [B]": "Creature L1",
+  "Knight of Kings [W]": "Creature L1",
+  "Leadership": "Ability",
+  "Magic Arts": "Ability",
+  "Pawn Chain": "Spell (Summoning Magic, Reaction)",
+  "Pawn of Kings [B]": "Creature L0",
+  "Pawn of Kings [W]": "Creature L0",
+  "Pawn Sacrifice": "Spell (Magic Arts)",
+  "Queen of Kings [B]": "Creature L3",
+  "Queen of Kings [W]": "Creature L3",
+  "Rook of Kings [B]": "Creature L3",
+  "Rook of Kings [W]": "Creature L3",
+  "Summoning Magic": "Ability",
+  "Thicket": "Artifact",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Board of Kings": "Area, cheaper for each chess piece he controls. While it is out, a piece cannot be chosen or affected by you as long as a lower-level piece stands in the zone next to it.",
+  "Pawn of Kings [W]": "One-health pawn, up to eight copies; free to summon with the Board out.",
+  "Pawn of Kings [B]": "While the Board is out, you cannot remove his Areas.",
+  "Kasperov, the King of Kings [B]": "Sacrifices a pawn that has survived a turn to put any chess piece from hand or deck in its place.",
+  "Knight of Kings [B]": "With a Rook and the Board: you cannot move cards out of your deck or discard pile except by drawing.",
+  "Bishop of Kings [B]": "With a Knight and the Board: the effects of all your heroes are switched off.",
+  "Rook of Kings [B]": "With a Bishop and the Board: his side ignores anything that would affect more than one of his targets.",
+  "Queen of Kings [B]": "Counts as Knight, Bishop and Rook at once and stops his other pieces from being switched off.",
+  "Queen of Kings [W]": "Cheap with pieces out, free to summon, counts as every piece while the Board is out.",
+  "Bishop of Kings [W]": "Fetches a pawn every turn and puts it straight onto the Board.",
+  "Rook of Kings [W]": "Turns a pawn sacrifice into another piece from the deck.",
+  "Pawn Chain": "Reaction: a dead creature is replaced by a pawn from hand or deck.",
+  "Pawn Sacrifice": "Trades a pawn for three cards.",
+  "Castling": "Once per game: cancels something aimed at a hero and summons a piece.",
+  "Junshi, the Tactical Genius": "His Magic Arts spells get cheaper per creature; may act out of turn when a creature dies."
+ },
+ "plan": "Dom assembles a position. Every chess piece has a single point of health, so the pieces themselves are nothing; the Board of Kings is what matters, because under it a piece cannot be touched while a lower-ranked piece stands beside it. Behind a front of pawns he promotes: the black Knight, Bishop and Rook in the right pairs switch off your hero effects, forbid searching your deck and make his side immune to anything that hits more than one target. Then pawns and Tharx grind you out. Before the Board arrives the whole army dies to a breeze, and afterwards it can still be taken apart from the lowest piece upward, one single-target hit at a time.",
+ "looks": {
+  "early": "A scatter of one-health pawns and a Knight; no Board yet.",
+  "mid": "The Board of Kings laid out, pawns flanking a Bishop and a Rook, your sweepers suddenly doing nothing.",
+  "late": "Queen, Rook, Bishop and Knight in a line behind pawns; your heroes' effects dark, your deck unsearchable, Dom taking notes."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "His pieces all have a single point of health and the Board of Kings is not in play yet.",
+   "why": "Before the Board every piece dies to any damage at all, and he needs several pieces out to afford the Board; a sweep now sets him back to nothing."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "RUSH",
+   "tell": "The Board of Kings is out with white pawns only beside it; no black pawn protects the Area.",
+   "why": "The Board is the whole defence: while no black Pawn of Kings is on it, The Yeeting or a free Cataclysm removes it and the one-health army is naked again."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "A black Rook and Bishop stand together, so nothing that hits several targets works; pawns sit at the ends of the row.",
+   "why": "Only single-target hits work now, and only on pieces with no lower piece beside them; start with the pawns on the ends and walk up the row, one small hit per piece."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "DISRUPT",
+   "tell": "The position has been broken or traded off and his heroes, never sturdy, are in the open.",
+   "why": "The Kasperov deck has no healing and small heroes; once the pieces are few, nothing it has left stops direct damage."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Dom lines up three pawns and a white Knight. Each has a single point of health.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche or Cataclysm, now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb Junshi's Magic Arts, the Board's caster"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build and let him develop"
+     }
+    ]
+   },
+   {
+    "board": "Kasperov sacrifices a pawn and a black Bishop steps out of the deck into its square.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill it before the Board arrives"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Kasperov"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Junshi"
+     }
+    ]
+   },
+   {
+    "board": "Pawn Sacrifice draws him three; he is one piece short of a cheap Board.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep so the Board stays expensive"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye into the fresh hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Board of Kings comes down. Only white pawns flank his Rook and Bishop.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Board before a black pawn guards it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Pick off the end pawns"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race his heroes"
+     }
+    ]
+   },
+   {
+    "board": "Your sweep does nothing: black Rook and Bishop are both out.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Single shots at the lowest pieces"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm is still free and removes the Board"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rethink next turn"
+     }
+    ]
+   },
+   {
+    "board": "A black pawn now protects the Board from removal.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "It is the lowest piece on the row: kill it first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the Rook to break the pair"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Give up on the board"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Knight and Bishop together: Tarleinn and Nicolas have lost their effects.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill a pawn, then the Knight it was covering"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Bishop"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Try to rebuild without hero effects"
+     }
+    ]
+   },
+   {
+    "board": "Knight and Rook together: Magnetic Glove finds nothing, your deck is closed.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Acid Vial and single burns up the row"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Rook"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig by drawing alone"
+     }
+    ]
+   },
+   {
+    "board": "The black Queen arrives and counts as all three pieces.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the Queen with The Yeeting"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the pawns beside her, then her"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into a full lock"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "The row is broken: two pawns and a Knight remain, and all three of his heroes are hurt.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Mop up the pieces"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Bother with the Board"
+     }
+    ]
+   },
+   {
+    "board": "Castling cancels your finisher on Kasperov and a pawn appears.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "It works once per game: cast again"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the pawn first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Regroup"
+     }
+    ]
+   },
+   {
+    "board": "Tharx draws off five surviving pieces and he begins to rebuild.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Tharx is low, end it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "One more sweep if the Rook is gone"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Out-draw him"
+     }
+    ]
+   }
+  ]
+ }
+}

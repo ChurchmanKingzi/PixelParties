@@ -1,0 +1,262 @@
+{
+ "id": "victoria",
+ "name": "Victoria Capulet",
+ "firstName": "Victoria",
+ "age": 18,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R203",
+ "romance": true,
+ "deck": "Pretty Things (a mishmash chosen for the art)",
+ "look": "Long pale-gold ringlets tied with ribbons that match the day of the week, wide sky-blue eyes that rest on things rather than people, and an elaborate ruffled dress worn over — or frankly instead of — the black Auxiliary jacket, whose blue-collared lapel is pinned to her bodice like a brooch. She carries a lace parasol indoors and out. She sits very straight, hands folded, and can stay that way for an hour.",
+ "voice": "Light, formal and unhurried, with the vocabulary of old novels and no small talk whatever. She says exactly what she observes, in complete sentences, and does not soften it or notice that it might need softening. Long silences are simply where she is thinking; she resumes where she stopped. RARE habit (once in a scene at most; most scenes go without it): referring to what 'a lady' does or does not do, as a rule she is consulting rather than a boast.",
+ "lines": [
+  "Your storm card has a very good sky. The lightning is the wrong blue, but the clouds were painted by someone who had looked at clouds.",
+  "I did not hear you, because I was looking at the fountain. I have finished now.",
+  "A lady does not run. Pippa has written the time on the card, so I shall arrive when it says.",
+  "Is this a joke? Ophelia says I am to ask. If it is a joke I will consider it afterwards."
+ ],
+ "intro": "A first-year in ribbons and a ruffled dress who sits on the same quad bench every afternoon gazing at nothing, and who commentates duels by describing how lovely the cards are.",
+ "traits": [
+  {
+   "id": "victoria_1",
+   "text": "She wears a ruffled dress instead of the uniform and has a signed dispensation for it.",
+   "how": "Visible at once; Anni has checked the paperwork."
+  },
+  {
+   "id": "victoria_2",
+   "text": "She sits on the same bench on the quad at the same hour each day, looking at nothing in particular.",
+   "how": "Quad, Afternoon."
+  },
+  {
+   "id": "victoria_3",
+   "text": "As a commentator she describes the pictures on the cards and has never once said who is winning.",
+   "how": "Any stream or class exercise she casts."
+  },
+  {
+   "id": "victoria_4",
+   "text": "She is, by a distance, the lowest-ranked player on the ladder and is perfectly content there.",
+   "how": "The ladder board; she will tell you the number."
+  },
+  {
+   "id": "victoria_5",
+   "text": "Her roommate writes the day's times on a card by the door, and Victoria follows it to the minute.",
+   "how": "Visit Rare Hall room 203 in the Morning."
+  },
+  {
+   "id": "victoria_6",
+   "text": "Her ribbons are a different colour for each day of the week, and a wrong one upsets her whole day.",
+   "how": "Ask about the ribbons; or see a bad Thursday."
+  },
+  {
+   "id": "victoria_7",
+   "text": "She can describe from memory the artwork of every card she has ever seen, down to the brushwork.",
+   "how": "Show her any card, then take it away."
+  },
+  {
+   "id": "victoria_8",
+   "text": "Her older sister is a second-year here and is never far away, though the two are rarely seen speaking.",
+   "how": "Notice Ophelia on the landing; ask either of them."
+  },
+  {
+   "id": "victoria_9",
+   "text": "Loud rooms, flickering holograms and sudden touch are painful to her, and she will simply leave.",
+   "how": "A crowded event; watch her walk out without a word."
+  },
+  {
+   "id": "victoria_10",
+   "text": "She has never been asked what she wants, only what she needs.",
+   "how": "Close stage, on the bench."
+  }
+ ],
+ "secret": "Victoria Capulet is autistic — diagnosed at six, profoundly so in the ways that show: she depends on routine, on written times, on other people to manage food, laundry, money and directions; she does not read faces, does not lie and cannot follow a conversation with more than two people in it. She is also exactly what she says she is, a lady: she has built herself, out of her late mother's novels and a trunk of inherited dresses, a complete code of conduct that tells her what to do in situations nobody ever explained, and she follows it with total seriousness. The staring is not emptiness. She has an exact, involuntary visual memory, and when she sits on the bench she is looking at pictures — card art, mostly, turning it over in detail. She loves the game for its paintings and regards the rules as an eccentric frame around them. The Capulets are a threadbare old family from Bath (father Edmund, an antiquarian bookseller who loves his daughters and cannot manage a household; mother Rosalind died when Victoria was ten). When Ophelia won a place here, Victoria stopped eating until she was allowed to follow; she auditioned for commentary by describing the art of a whole match from memory, and Chuck, who was on the panel, admitted her on the spot. He has never said why. She is the weakest player on the island, rank 144 of 144, and it does not trouble her.\nThe cast protects her and the GM must too. Pippa (roommate, timetable, quiet advocate), Ophelia (from the background, fiercely), Jessica (who treats her as a fellow lady and is the only one who never talks down to her), Vivienne (who has realised her aesthetic commentary is oddly popular and guards her from being made a joke), Cas (who 'translates' on the desk), Georgie (they eat in the same quiet places). Nobody is to mock, trick or use her; a scene in which someone tries is a scene in which three people step in. She is not a child and resents being handled as one: the hard part of knowing her is telling help from management.\nWhat she notices (clues): Alpha cards 'are painted twice — the picture moves when I am not looking, which is impolite of it'. The island's ordinary holograms 'have no brushwork'. And from Day 27, about a certain boy from the bungalows: 'He is printed too clean. There is no line round him. His shadow is late.' She says this aloud, in public, as an observation about lighting, and nobody listens. It finds her restful; she tells it its shadow is unpunctual and it apologises. It can find no conflict with her — she offers none and wagers nothing — and she is never Hollowed.\nRomance (slow, gentle, wholly on her terms; she must never be taken advantage of): she is eighteen, an adult, and has feelings she names precisely. It can only begin from her, in her own time, and proceeds by rules she states aloud; any pressure, haste or trading on her dependence ends the route at once and brings her sister down like weather. Being asked what she WANTS — and having the answer treated as decisive — is the whole of it.",
+ "wants": "To be allowed to choose something for herself and have it stand.",
+ "fears": "A day with no card by the door — being left somewhere without knowing what comes next.",
+ "crush": "eberhart",
+ "crushNote": "He carried her parasol stand up two flights without a word and bowed; by her code that makes him a knight, and he is restfully quiet. It shows as her saying 'good afternoon, Herr von Düsterwald' at the same hour each day, and allowing him — alone of the boys — onto the bench.",
+ "crushPace": 0.5,
+ "likes": [
+  "Being told plans in advance, with times",
+  "Being asked what she wants and then getting exactly that",
+  "Beautiful card art, discussed seriously",
+  "Quiet, benches, fountains, soft cloth",
+  "Good manners: an arm offered, a door held, a hat lifted",
+  "Being spoken to directly rather than through her sister",
+  "Honest answers, including unwelcome ones",
+  "Ribbons in the correct colour"
+ ],
+ "dislikes": [
+  "Being touched without being asked",
+  "Jokes at her expense, explained or not",
+  "Noise, crowds, flickering light",
+  "Changed plans",
+  "Being spoken about as if absent",
+  "Being hurried",
+  "Anyone lying to her 'to be kind'"
+ ],
+ "gifts": [
+  "Card: Sleeping Beauty",
+  "A ribbon in the right colour for the day you give it",
+  "Card: Moonlight Butterfly",
+  "A card chosen purely because its art is beautiful, with a reason",
+  "A written invitation with a time on it",
+  "Card: Pink Sky"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Literal, formal and entirely unguarded.",
+  "text": "Victoria does not flirt; she has no indirect register at all. If she comes to like someone she will say so, as an observation, probably at an unsuitable moment: 'I find that I look for you.' Until then she shows it by allowing him onto the bench, by telling him about a picture, by putting his name on the card by the door. She must never be pursued in the ordinary sense: no teasing she cannot parse, no surprise touch, no pressure of any kind. Approach her with exact courtesy and exact honesty — say what you mean, ask before everything, arrive when you said, and take a silence as a silence. The pace is hers and it is very slow. The GM keeps her protectors in view: if Rowan is patient and straight with her they come to trust him; if he is not, the route is simply closed."
+ },
+ "intimacy": "Almost entirely non-physical for most of the route, and exact about consent throughout. Closeness is sitting on the bench without speaking; being allowed to carry the parasol; her gloved hand placed deliberately on his sleeve, announced beforehand ('I am going to take your arm now'). She dislikes light or sudden touch and likes firm, steady, expected touch: a hand held properly, her hair brushed in long strokes, a shawl put round her shoulders. She states rules aloud and he keeps them. A first kiss is requested by her, in words, and discussed afterwards. If the route reaches the Lovers stage it is because she has decided and said so, soberly, in her own room with the card by the door turned over; it is tender, careful and very quiet, he asks at each step, and the scene ends as she unties the day's ribbon and puts it in his hand.",
+ "events": [
+  {
+   "id": "victoria_e1",
+   "stage": 1,
+   "title": "The bench",
+   "condition": "Sit on her bench on the quad in the Afternoon — after asking, and accepting 'not today' — and stay without filling the silence; when she speaks about a card's art, answer about the art.",
+   "hint": [
+    "She sits in the same place each afternoon. One may ask to sit there. One may be refused.",
+    "Ask to share her bench on the quad, and talk about what she wants to talk about."
+   ]
+  },
+  {
+   "id": "victoria_e2",
+   "stage": 2,
+   "title": "Written on the card",
+   "condition": "Earn Pippa's or Ophelia's trust first; then make a plan with Victoria herself, with a time, keep it to the minute, and on a bad day (wrong ribbon, a changed room) help by fixing the thing rather than soothing her. Your name appears on the card by the door of R203.",
+   "hint": [
+    "Her day runs to a card by the door. People she trusts are written on it.",
+    "Make a plan with her, keep it exactly, and be practical when something goes wrong for her."
+   ]
+  },
+  {
+   "id": "victoria_e3",
+   "stage": 3,
+   "title": "I find that I look for you",
+   "condition": "Stand up for her without speaking for her: when her commentary is mocked (the Freshman Cup stream, or the Day 68 friendly) or someone tries to trick her, stop it and then ask HER what she wants done. Some weeks later she tells you, plainly, that she looks for you; answer just as plainly.",
+   "hint": [
+    "Someone will make a joke of her in public. What she needs afterwards is not what most people offer.",
+    "Defend her when she is mocked, ask what she wants, and be honest when she tells you how she feels."
+   ]
+  },
+  {
+   "id": "victoria_e4",
+   "stage": 4,
+   "title": "Rules, stated",
+   "condition": "Court her on the rules she states (ask before any touch; no surprises; times kept) through the Winter Gala (Day 103), which she attends only if the evening is planned with her hour by hour and she may leave when she chooses. She decides, and says so; her sister is told by Victoria herself.",
+   "hint": [
+    "She has rules for being close to someone. She will tell you every one of them.",
+    "Follow the rules she sets, plan the Gala evening with her in detail, and let every decision be hers."
+   ]
+  },
+  {
+   "id": "victoria_e5",
+   "stage": 5,
+   "title": "What she wants",
+   "condition": "In Term 2, when others decide for her (to send her home after the curfew weeks, or to keep her off the commentary desk), help her say what SHE wants to her sister and her father, and make it possible; she chooses where she will be on the last ferry day and writes it on the card.",
+   "hint": [
+    "Everyone who loves her makes decisions on her behalf. She would like to make one.",
+    "Help her tell her family what she has decided about her own future, and back it."
+   ]
+  }
+ ],
+ "bonds": {
+  "pippa": {
+   "label": "roommates",
+   "text": "Pippa writes the card. Pippa asks before she takes a photograph. Pippa is on the card herself, every day, at the top.",
+   "public": true,
+   "from": 1
+  },
+  "ophelia": {
+   "label": "family",
+   "text": "Her elder sister, who is always somewhere near and never fusses. Victoria followed her here by refusing to eat until she was allowed.",
+   "public": true,
+   "from": 0
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "Ms Laurent says her commentary is 'a different programme' and has forbidden anyone to laugh at it.",
+   "public": true,
+   "from": 4
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "Miss Montclair is a lady and speaks to her as one. They take tea on Sundays at four.",
+   "public": true,
+   "from": 6
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "Georgie also eats where it is quiet, and does not mind silence.",
+   "public": true,
+   "from": 8
+  },
+  "camille": {
+   "label": "friends",
+   "text": "The nurse has a quiet room with a couch, and one may sit in it without being asked questions.",
+   "public": true,
+   "from": 10
+  },
+  "marit": {
+   "label": "friends",
+   "text": "Marit is extremely loud, but she announces it beforehand, which is considerate.",
+   "public": true,
+   "from": 5
+  },
+  "chuck": {
+   "label": "protégé",
+   "text": "The old gentleman on the panel asked her what colour a hero's cloak really was, and she told him, and he let her in.",
+   "public": false,
+   "from": 0
+  },
+  "cas": {
+   "label": "teammates",
+   "text": "Her partner on the student desk. He says what is happening so that she may say what it looks like.",
+   "public": true,
+   "from": 4
+  },
+  "eberhart": {
+   "label": "crush",
+   "text": "He carried her parasol stand up two flights and bowed. A knight. She says good afternoon to him at the same hour each day.",
+   "public": true,
+   "from": 7
+  },
+  "eloise": {
+   "label": "friends",
+   "text": "Miss Lafayette paints pictures that are finished. They sit together and do not speak, which is ideal.",
+   "public": true,
+   "from": 10
+  },
+  "lucas": {
+   "label": "friends",
+   "text": "Mr Brennan is very tall and bends down to speak, which is considerate. He writes the start times on a card. She has allowed him the far end of the bench twice.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "classroom",
+   "Afternoon": "quad",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rare_room",
+   "Midday": "greenhouse",
+   "Afternoon": "quad",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 1,
+  "style": "Plays whichever card in her hand has the loveliest picture, in order of loveliness, and attacks only with creatures she feels look ready. She has won twice, both times to her own mild surprise.",
+  "tilt": "Flickering holograms and noise. She puts her cards down, folds her hands and waits for it to stop; she does not experience this as losing."
+ }
+}

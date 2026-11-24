@@ -1,0 +1,174 @@
+{
+ "id": "oru",
+ "name": "Madame Oru",
+ "firstName": "Oru",
+ "age": null,
+ "sex": "f",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": null,
+ "romance": false,
+ "deck": "None — she reads other people's",
+ "look": "Ageless: seventy in one light, forty in another. Small, very upright, wrapped in a hooded robe of deep violet stitched with small stars and edged in gold, with long silver-grey hair falling straight from under the hood and eyes of so bright a gold that they seem to hold the lantern. Her hands are long, ringless, and never quite still: the fingers move over her cards as if telling knots on a cord.",
+ "voice": "Quiet, dry and unhurried, with an accent nobody can place and grammar a little too careful. She says true things sideways and answers the question underneath the one asked; of the future she says 'is laid', never 'will'. A sudden, entirely ordinary humour about prices and weather. RARE habit (once in a scene at most; most scenes go without it): declining to explain.",
+ "lines": [
+  "Three cards. Yours — I do not keep any. Lay them on the squares. No, with the other hand. That one lies less.",
+  "It is two credits. The future is cheap. It is the past that costs.",
+  "A guest who is not shown the rules of the house will make his own from what he finds lying about. You should tidy.",
+  "I do not tell fortunes. I read what is already laid. Whether you lift it is your affair."
+ ],
+ "intro": "The fortune teller at the Port Mulligan night market, who reads spreads from your own deck for two credits and is unsettlingly specific about being vague.",
+ "traits": [
+  {
+   "id": "oru_1",
+   "text": "She reads three-card spreads from the customer's own deck at the night market for two credits.",
+   "how": "Night market."
+  },
+  {
+   "id": "oru_2",
+   "text": "Her readings are vague, and people keep coming back to say they were right.",
+   "how": "Have one; wait."
+  },
+  {
+   "id": "oru_3",
+   "text": "Nobody in town knows her age or remembers the stall not being there.",
+   "how": "Ask Mika, Dex or Silas."
+  },
+  {
+   "id": "oru_4",
+   "text": "She lays her readings on square pieces of glazed clay and calls them 'the receipt'.",
+   "how": "Watch."
+  },
+  {
+   "id": "oru_5",
+   "text": "She buys dream drawings from the illustrator at the next table.",
+   "how": "Night market, Saturday."
+  },
+  {
+   "id": "oru_6",
+   "text": "Nobody has ever seen her play a single game; she watches, and her fingers keep count.",
+   "how": "Sit with her more than once; ask anyone's grandmother."
+  },
+  {
+   "id": "oru_7",
+   "text": "She will not read for the founder, and he has stopped asking.",
+   "how": "Mention Chuck to her."
+  },
+  {
+   "id": "oru_8",
+   "text": "She leaves the market before midnight and no one has seen which way she walks.",
+   "how": "Friend stage; follow, and lose her."
+  }
+ ],
+ "secret": "What she knows, exactly — which is nearly everything, and she is bound in how she may say it. Oru is the last of the COUNTERS: the servant line the Tessellate kept for the one office their law cannot do without. A contest must be made 'before one who counts' (Article 1), and 'where no one counts, nothing was played' (Article 9). The Counters swore never to play. They stayed outside when the Tessellate recorded themselves at the end, and remained on the island for generations, dwindling, marrying into whoever came. She is far older than she looks — those who count are not counted. Her 'deck' is no deck: she lays the customer's own cards onto square glazed clay pieces she calls 'the receipt', and she carries in her sleeve an ancient cord knotted along its whole length. Her mothers' mothers counted three Visitors before this one; three sides of the challenge stone at the summit shrine show them, and the fourth is blank.\nShe knows: Visitors fall every few centuries; they cannot be fought and can be BOUND BY RULES, because a rule it has accepted is the only solid ground such a thing has; the tiles are records of real beings ('keepings'); one who takes a tile is kept in its place — she knows Aleksander Hale is a tile, aware, and that he can be played for; she knows the law stays in force only while it is played and counted. She knows Chuck slept in the keeping-house and carried its dreams away — she calls him 'the thief who dreams' without much heat; he at least built something that keeps the game played — and that he mixed tile dust into ink, which she thinks obscene and also, strangely, the reason the island still has cards a Visitor cannot see through. She chalked '02:10' on the market wall a week before the meteor. She knew by the next market night that it 'wears a boy and is learning the house from the founder's translation'. She knows a Hollowing is simply an ante paid and kept, and that what is kept can be won back only by the same law. And she knows what she herself is for: a contest in the Vault that SHE counts binds a Visitor completely.\nWhy she does not just tell everyone: telling someone the move is playing, and she may not play. So she reads, truly and obliquely: for Rowan, early — 'Someone who eats at your table is wearing half a name. It will be printed whole.'; later — 'two in one room; keep your word'; for Lilia — 'the opponent you asked for is laid'; for Willas — she refuses his two credits; for Bex — the word 'hollowed'. She will not read for the Guest. It came to her table at the market of Day 34, sat, and said 'You are polite. You know the house.' She said 'I only keep the count.' It left two credits. She has not spent them.\nShe must be ASKED: aloud, by name — 'Madame Oru, will you count?' Then she stops being a market act. 'Three before this one. I had hoped to die uncalled. I do not play. I do not advise. I will not tell you the move. But where I count, it holds — for that one more than for you. My price is not credits.'",
+ "wants": "For the keeping-house to be played in rightly once more before her line ends.",
+ "fears": "That the last Counter will keep the count for a contest nobody living knows how to win.",
+ "crush": "chuck",
+ "crushNote": "'The thief who dreams' is the one living person who has been where her mothers kept the count, and she has been irritated by him, with care, for fifty years. It shows as her refusing to read for him, and reading about him constantly.",
+ "crushPace": 0.5,
+ "likes": [
+  "A question asked plainly, aloud, by name",
+  "Payment, however small, made without haggling",
+  "People who bring her something true",
+  "Rice left at the mosaics",
+  "Felix's drawings",
+  "Patience",
+  "Those who keep their word"
+ ],
+ "dislikes": [
+  "Being asked to 'just tell me the move'",
+  "Hands on her clay squares",
+  "The founder's jokes",
+  "Tile-takers and souvenir-hunters",
+  "Anyone asking her to play",
+  "Marrow's soft voice asking what her stall 'turns over'"
+ ],
+ "gifts": [
+  "A handful of uncooked rice in a paper twist",
+  "A card you are willing to give up, face down",
+  "One true thing you have told nobody",
+  "Card: Carris, the Time Keeper",
+  "A length of plain undyed cord"
+ ],
+ "events": [
+  {
+   "id": "oru_e1",
+   "stage": 1,
+   "title": "Two credits",
+   "condition": "Pay for a reading at night_market, cut as she says, and do not ask her to explain it.",
+   "hint": [
+    "The fortune teller reads from your own deck. It is cheap. Listen rather than argue.",
+    "Have your cards read at the night market and accept what she says."
+   ]
+  },
+  {
+   "id": "oru_e2",
+   "stage": 2,
+   "title": "Asked twice",
+   "condition": "After something she read has come true (after Day 27), return, pay again, and ask the same question a second time; bring her rice or one of Felix's drawings.",
+   "hint": [
+    "She answers differently the second time a thing is asked — if it is asked properly.",
+    "Go back to her after a reading proves true and ask again, with a small offering."
+   ]
+  },
+  {
+   "id": "oru_e3",
+   "stage": 3,
+   "title": "Will you count",
+   "condition": "After Day 62, having had at least two readings and kept your word in every bargain the GM has tracked, ask her aloud and by name the one question her office answers to; she produces the cord and names her price, which is not credits.",
+   "hint": [
+    "She will not tell anyone what to do. There is one thing she can be asked to do instead.",
+    "Learn from the Charter and the old mosaics what her family's task was, and ask her — aloud, by name — to perform it."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "distrusts",
+   "text": "'The thief who dreams.' He took what was kept and made a living from it — and, she admits, kept the game alive.",
+   "public": false,
+   "from": 0
+  },
+  "felix": {
+   "label": "friends",
+   "text": "She buys his drawings. He draws very well for someone who has never been there.",
+   "public": true,
+   "from": 0
+  },
+  "silas": {
+   "label": "friends",
+   "text": "The Grieves have always known when to leave a door shut.",
+   "public": false,
+   "from": 0
+  },
+  "fiona": {
+   "label": "friends",
+   "text": "A girl who has sat with the dead and is not afraid of them. Oru gave her a reading for nothing, which she does not do.",
+   "public": true,
+   "from": 13
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "summit_shrine",
+   "Midday": "ruins_field",
+   "Afternoon": "fish_market",
+   "Evening": "night_market",
+   "Night": "night_market"
+  },
+  "weekend": {
+   "Morning": "ruins_field",
+   "Midday": "fish_market",
+   "Afternoon": "night_market",
+   "Evening": "night_market",
+   "Night": "night_market"
+  }
+ },
+ "duel": {
+  "skill": 7,
+  "style": "She does not play: it is her oath, and the story must never make her. The number stands only for how completely she can read a game she is watching.",
+  "tilt": "Being asked to play at all."
+ }
+}

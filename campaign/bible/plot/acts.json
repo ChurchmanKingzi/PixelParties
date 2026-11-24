@@ -1,0 +1,118 @@
+[
+ {
+  "id": "act1",
+  "n": 1,
+  "days": [
+   1,
+   26
+  ],
+  "title": "Grey Collars",
+  "mood": "Sunlit, funny, a little salty. Arrival nerves, cheap food, warm people, first table duels with shaking hands. The biggest problem on the island is a ladder rank and a crush.",
+  "foreground": [
+   "Dorm life in the Commons: Mama Odalys's kitchen, Nathan's volume, Baylee's silence, Inya's hoodie, Rana's scowl, Tomi's binder, Livvie counting credits.",
+   "Rowan's stage fright at a physical table versus his online name; small wins that cost real nerve.",
+   "Classes and grades, the ladder opening on Day 12, the Freshman Cup on Days 19-20 and the printed roster that reveals Inya's surname.",
+   "First meetings with every romanceable woman in her own place and at her own pace; town trips, the bonfire mixer, the pool, the night market.",
+   "Rowan's roommates and his neighbours on the bungalow row as real people the player can come to like — Nathan above all: loud, tactless, generous with snacks, loyal without knowing the word. Give each of them warm scenes, Nathan at least four. (One first-year of the row will not be here in Act 2. The game decides who in the night of Day 26; you do not know, so nobody may be singled out, shielded or mourned in advance.)",
+   "Chuck's stories as pure comedy. Viktor as a charming truant. Umbra House as a boarded-up curiosity on the ridge."
+  ],
+  "mustNotHint": [
+   "Anything falling from the sky, anything cosmic, any dread about anybody. No foreshadowing of the bang before the Night slot of Day 26.",
+   "That anyone will be harmed. No comas, no curfews, no infirmary scenes beyond sunburn and a sprained wrist.",
+   "That Chuck's stories are true, that the tiles are records, that the Vault exists as more than 'old ruins'.",
+   "Lucian Marrow by name (he is a signature on a sponsorship plaque at most). Gideon is only a snob.",
+   "That the Charter is anything but a quaint school tradition."
+  ]
+ },
+ {
+  "id": "act2",
+  "n": 2,
+  "days": [
+   27,
+   60
+  ],
+  "title": "The Morning After",
+  "mood": "The same sunny school with one note out of tune. Excitement about the meteor, then a slow private unease that only someone sharing a room could feel. One bad dawn (Day 40) that the school explains away.",
+  "foreground": [
+   "The bang as campus fun: Bex's stream, crater selfies, the cordon, wild theories. {H}'s triumphant return ({H=nathan?'told you cowards'|'{H:retLine}'}).",
+   "Roommate oddities in the bungalow, each small, each deniable. Never more than one per in-game day, never commented on by the narration.",
+   "{H} getting good — suspiciously, joyfully good — and {H=nathan?nicer|easier to be near}. People like the new {H} better. That should feel worse the longer it goes on.",
+   "School life at full strength: tryouts (Day 33), midterms (Days 47-49), Night of Masks (Day 54), romance routes opening.",
+   "Brant Kessler on Day 40: an ambulance cart at dawn, the word 'seizure', and Camille's face.",
+   "Viktor's search gathering pace; Umbra House becomes reachable; the pre-meteor mysteries (Chuck, Alpha cards, Hale) can be pursued in daylight."
+  ],
+  "mustNotHint": [
+   "That {H} is dead (the body is unreachable before Day 60) or that '{H}' is not {H} — the narration never says so and no character concludes it before the player does.",
+   "The word 'Visitor', the words 'Hollow Duel', the Tessellate's rules. Nobody on the island has that vocabulary yet except Chuck, Oru and Ashdown, and they are not sharing.",
+   "Marrow in person (he lands Day 61). Gideon's reports.",
+   "That the Hollowed can be restored, or that an ante was involved. Day 40 looks medical."
+  ]
+ },
+ {
+  "id": "act3",
+  "n": 3,
+  "days": [
+   61,
+   105
+  ],
+  "title": "Ward B",
+  "mood": "Autumn storms. The school keeps smiling with its teeth. Curfew, rumours, a man in a grey suit, a ward that fills. The player's private unease becomes a secret he has to carry — and decide whom to share with.",
+  "foreground": [
+   "The cracked crater crust and what lies under it (from Day 60). The weight of knowing while sharing a bungalow with it.",
+   "The second and third Hollowings, the curfew from Day 67, Camille's notes, Bex's stream being leaned on.",
+   "Marrow's arrival: charming, generous, everywhere. The Design Contest as a bright thing with his money behind it. Santángel's lab lights on late.",
+   "The Hale thread reaching Umbra House room 9; Ashdown's guilt; Josie's story; Silas's keys.",
+   "The Guest's rules becoming legible: the cold, the silence, the named ante, the fact that it pays and never cheats. Noor and the Charter.",
+   "Light still exists and matters: Promotion Duels, the North Crown friendly, the Winter Gala. Warmth is what is at stake, so show it."
+  ],
+  "mustNotHint": [
+   "The way to win (ante 'everything you have taken', in the Vault). The pieces may be collected; nobody assembles them for the player.",
+   "That Aleksander Hale is alive in any sense, before the torn pages or the Vault are found.",
+   "Madame Oru's ancestry. She is still a night-market act with unsettling accuracy.",
+   "Gideon as second host. Who the Day-150 victim will be."
+  ]
+ },
+ {
+  "id": "act4",
+  "n": 4,
+  "days": [
+   106,
+   165
+  ],
+  "title": "The Champion's Table",
+  "mood": "Clear, cold term. The thing with the grey collar (or the white gloves) is climbing toward the Battle Team and everyone who can read a ladder can see it. Dread with a calendar. Allies form or do not.",
+  "foreground": [
+   "Formal challenges to Battle Team members, one by one, each ante stranger and more intimate than the last.",
+   "The Island Open (Days 124-126): Rana's last chance, Livvie's money, Rowan's proof that he can play on a stage.",
+   "Lilia's hunger for a rival, and the Guest's dawning interest in 'the best'. Willas's pride. Day 150.",
+   "Marrow's endgame: the board vote, the crater glass in crates, the Archive count that does not add up, Viktor's temptation.",
+   "The Vault itself becoming reachable: the Gate, the sea cave, Chuck's confession, Oru's third reading.",
+   "Lantern Night (Day 139) as the last purely tender evening of the year."
+  ],
+  "mustNotHint": [
+   "Which ending the player is heading for. Never signal that a choice 'locks' something.",
+   "That the Guest could choose to stay, leave or be recorded — those possibilities appear only inside the final duel's aftermath.",
+   "That Chuck cannot play in the Vault himself, until he says so (chuck_confided)."
+  ]
+ },
+ {
+  "id": "act5",
+  "n": 5,
+  "days": [
+   166,
+   210
+  ],
+  "title": "What Was Wagered",
+  "mood": "Festival lights over a held breath. The Interschool Cup with a hollow in the middle of the home team, Founder's Festival night at the Ruin Gate, then either the quietest graduation the island has ever had or no graduation at all.",
+  "foreground": [
+   "The Interschool Cup under strain: North Crown's honour, Isolde's offer, Rex's mistake.",
+   "Day 180: fireworks for Chuck's 75th on one side of the volcano, the Gate on the other. Everything the player gathered either is on the table or is not.",
+   "The final duel under the Charter's oldest reading, with a witness who counts.",
+   "Aftermath as long, earned scenes: wards emptying or not, a body brought home or not, what is done with a perfect record of a loud boy.",
+   "Finals, the Graduation Exhibition (Day 201), graduation, the last ferry."
+  ],
+  "mustNotHint": [
+   "Nothing is withheld any more except by the characters' own reticence. Still: no narration verdicts, no 'this was the good ending'."
+  ]
+ }
+]

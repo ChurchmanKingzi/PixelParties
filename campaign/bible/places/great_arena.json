@@ -1,0 +1,19 @@
+{
+ "name": "The Great Arena",
+ "zone": "campus",
+ "bg": "great_arena",
+ "night": true,
+ "hours": "Open for events, Battle Team practice (Afternoons) and sanctioned finals; the stands are free to sit in whenever the doors are open. The projector rig and scoreboard are run by stage manager Gani Villaluz; ladder registrar Zeynep Arslan has the scorer's table in the Afternoon.",
+ "sight": "A bowl of four thousand seats under a ribbed glass roof, with a single raised duel stage at the centre like an altar. When a match is on, heroes and creatures stand up out of the table in light, three storeys tall, and the crowd noise comes down on the players like weather. Banners of three unbeaten years hang over the tunnel. Empty at night, it holds its breath, and your footsteps come back to you from every side.",
+ "things": [
+  "Watch a feature match from the stands: big flat holograms flickering over the stage, creatures sliding rather than walking",
+  "Walk out of the players' tunnel onto the stage when nobody is there",
+  "Watch Battle Team practice and Coach Rox's whistle drills",
+  "Read the champions' wall in the concourse — Lilia Mann's name three years running",
+  "Buy grilled corn and iced tea from the concourse stand on match days",
+  "Find your seat number for the next assembly",
+  "Stand at the table under full lights and practise breathing",
+  "At night: sit in row one and listen to the roof tick as it cools"
+ ],
+ "secret": "Stage for the Freshman Cup finals (Day 20), assemblies (Day 29, Day 106), the North Crown friendly (Day 68), Island Open top 8 (Day 126), Interschool Cup (Days 166–168) and the Graduation Exhibition (Day 201). Standing on the stage alone raises Nerve; being seen there by Lilia starts her interest. Hologram technology is still rudimentary — flat, flickering, creatures without matched animations; here they are merely bigger — which is why anyone who has seen a duel with an Alpha card notices the difference at once. D106+: the Guest issues its Battle Team challenges here in plain view, formally, politely, after practice. The stage has a maintenance hatch into the tunnels."
+}

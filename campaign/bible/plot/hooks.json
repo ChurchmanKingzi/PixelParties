@@ -1,0 +1,1153 @@
+[
+ {
+  "id": "h_ferry_table",
+  "offer": {
+   "dayFrom": 1,
+   "dayTo": 1,
+   "where": [
+    "ferry_lounge"
+   ],
+   "who": [],
+   "how": "At the brass-rimmed table a pale boy in white gloves [gideon] squares his deck and does not look up. A very small girl with mint-green hair [inya] stands at the end of the table with her deck box in both hands; she has stood there for twenty minutes. \"The plate says winner stays,\" she says. \"It does,\" he says. \"It does not say whom the winner has to play.\" He looks at the grey collar above her hoodie. \"I do not play for nothing. The loser carries the winner's luggage from the dock to the winner's door. I have four cases.\" On the nearest bench a boy in a yellow bandana [tomi] turns the lid of a binder towards the room and takes the pencil from behind his ear. Let Rowan see and hear this; nobody asks him to do anything."
+  },
+  "deadline": 1,
+  "ifIgnored": "Inya takes the wager, attacks first and loses. On the pier (Day 1, Midday) she carries Gideon's four cases up to the Spectral Tower in two trips and lets nobody help; Tomi pays out his book. From Day 3 she will not be paired with a white collar in class (timeline: t_ferry_debt_default, t_ferry_echo_default). If Rowan steps in instead, one of the flags ferry_table_won, ferry_table_lost, ferry_inya_won or ferry_table_settled is set and the matching timeline entries of Day 1 and Day 3 follow.",
+  "returns": []
+ },
+ {
+  "id": "h_livvie_rolls",
+  "offer": {
+   "dayFrom": 4,
+   "dayTo": 10,
+   "where": [
+    "cafeteria",
+    "commons_kitchen"
+   ],
+   "who": [
+    "livvie",
+    "odalys"
+   ],
+   "how": "Livvie takes one tray, eats the soup, and slides both bread rolls into her cardigan pocket with a practised hand. Mama Odalys sees it too and ladles her bowl a little fuller without a word."
+  },
+  "deadline": 22,
+  "ifIgnored": "Day 23, Midday: Livvie faints at her bench in the design_lab and is carried to the infirmary; Camille logs 'undernourished, refuses meal vouchers'. She loses three days of paid shifts and becomes guarded about being watched while she eats. (Getting her to accept regular seconds from Mama's kitchen before then sets livvie_eating and prevents it.)",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 23,
+     "dayTo": 30
+    },
+    "how": "A get-well card for Livvie goes round the Commons kitchen; Tomi has pinned 5 cr to it."
+   }
+  ]
+ },
+ {
+  "id": "h_pawn_alpha",
+  "offer": {
+   "dayFrom": 6,
+   "dayTo": 74,
+   "where": [
+    "pawn_shop",
+    "main_street"
+   ],
+   "who": [],
+   "how": "Second Draw Pawn & Loan: behind the grille, a locked cabinet with a cloth over it, and a proprietor who answers a glance at it with 'Not in the trays. Twenty-five hundred, or we play for it.' That is five months of stipend."
+  },
+  "deadline": 74,
+  "ifIgnored": "Day 75, Afternoon: a polite young man from the board's staff pays the 2,500 without haggling. The pawnbroker mentions it to anyone who asks; the card goes to Santángel's safe and is ash by Day 85.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 75,
+     "dayTo": 95
+    },
+    "how": "The pawnbroker, pleased, the cabinet standing open and empty: 'Nine years I dusted that. Suit. Didn't even ask what it was.'"
+   }
+  ]
+ },
+ {
+  "id": "h_rana_flyer",
+  "offer": {
+   "dayFrom": 6,
+   "dayTo": 12,
+   "where": [
+    "card_shop",
+    "main_street"
+   ],
+   "who": [
+    "rana",
+    "mika"
+   ],
+   "how": "A flyer in the shop door: SATURDAY SANCTIONED — 8 PLAYERS — JUDGE ON SITE. Rana is across the street pretending to read a menu, looking at the flyer every few seconds."
+  },
+  "deadline": 12,
+  "ifIgnored": "Day 13, Afternoon: Rana enters alone, reaches the final and loses from a winning position at match point in front of eleven people. She does not speak at dinner. Her affinity gains are halved until Day 30 and she refuses practice partners until then.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 13,
+     "dayTo": 20
+    },
+    "how": "Mika has kept the Day-13 final's score sheet. Rana's last turn is circled; next to it, in the judge's column, a small sad face."
+   }
+  ]
+ },
+ {
+  "id": "h_viktor_rope",
+  "offer": {
+   "dayFrom": 7,
+   "dayTo": 8,
+   "where": [
+    "commons_beach",
+    "commons_room",
+    "bonfire_pit"
+   ],
+   "who": [
+    "viktor"
+   ],
+   "how": "Viktor, coiling rope on the porch at dusk, to nobody in particular: 'Anyone here not afraid of heights and bad at asking questions?'"
+  },
+  "deadline": 8,
+  "ifIgnored": "Day 8, Night: he crosses the rope_bridge gorge alone, a plank goes, he sprains his left wrist. He appears on Day 9 with a strapped arm and says he fell out of bed. His Day-15 expedition slips to Day 17 and he trusts no one with the journal before Day 20.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 9,
+     "dayTo": 14
+    },
+    "how": "Viktor shuffles one-handed at breakfast and loses a casual game to Tomi because of it. He pays up without complaint."
+   }
+  ]
+ },
+ {
+  "id": "h_georgie_plush",
+  "offer": {
+   "dayFrom": 8,
+   "dayTo": 14,
+   "where": [
+    "quad",
+    "cafeteria",
+    "spectral_lobby"
+   ],
+   "who": [
+    "georgie",
+    "pippa"
+   ],
+   "how": "Georgie's backpack has a bare carabiner where the dragon plush hangs. She keeps reaching back to touch it and finding nothing. She says she's fine. Her eyes are red-rimmed."
+  },
+  "deadline": 14,
+  "ifIgnored": "Day 15, Midday: Pippa finds the plush zip-tied to the top of the quad flagpole (Brant's crew). She gets it down, photographs who laughs, and starts a feud with Brant that the Battle Team has to break up on Day 16. Georgie stops eating in the cafeteria until the Cup.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 15,
+     "dayTo": 22
+    },
+    "how": "The plush is back on the backpack with a scorched ear. Georgie has sewn a tiny bandage on it."
+   }
+  ]
+ },
+ {
+  "id": "h_silas_blanket",
+  "offer": {
+   "dayFrom": 10,
+   "dayTo": 25,
+   "where": [
+    "quad",
+    "main_gate",
+    "jungle_trail"
+   ],
+   "who": [
+    "silas"
+   ],
+   "how": "Dawn. Silas limps in through the main gate with a lantern gone out and a folded blanket, mud to the knee, looking like a man coming off a night shift nobody pays him for."
+  },
+  "deadline": null,
+  "ifIgnored": "Nothing changes; Silas goes on following Chuck on the nights it happens (about one in four).",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 30,
+     "dayTo": 100
+    },
+    "how": "Past midnight from the Commons porch: a lantern moving slowly along the jungle trail, ten paces behind something you cannot see."
+   }
+  ]
+ },
+ {
+  "id": "h_bex_boom",
+  "offer": {
+   "dayFrom": 10,
+   "dayTo": 18,
+   "where": [
+    "broadcast_studio",
+    "student_lounge",
+    "quad"
+   ],
+   "who": [
+    "bex"
+   ],
+   "how": "Bex, mid-gum-bubble, to the whole lounge: 'Top Deck needs a second voice for Freshman Cup who actually knows what a storm count is. Pays forty and a sandwich.' She does not look at anyone in particular."
+  },
+  "deadline": 18,
+  "ifIgnored": "Day 19: Livvie takes the gig (+40 cr to her fund). She is good and nervous; the regular colour slot is hers afterwards and no longer open to Rowan before Term 2.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 106,
+     "dayTo": 120
+    },
+    "how": "Bex: 'Season two, new desk, I need a third chair for the Open.'"
+   }
+  ]
+ },
+ {
+  "id": "h_noor_group",
+  "offer": {
+   "dayFrom": 12,
+   "dayTo": 30,
+   "where": [
+    "library",
+    "job_board"
+   ],
+   "who": [
+    "noor"
+   ],
+   "how": "A hand-ruled notice on the job board: CHARTER READING GROUP — LIBRARY, THURSDAY EVENINGS — 'It is nine articles. You have signed it. Have you read it?' Two tear-off tabs are gone. One of them was torn off and pinned back."
+  },
+  "deadline": 30,
+  "ifIgnored": "Day 31: the group dissolves for want of a third member. Noor goes on alone. Studying the Charter then requires either her personal quest or five separate Evening slots alone in the card_archive.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 41,
+     "dayTo": 60
+    },
+    "how": "Noor in the library with the Charter and a ruler, the dome's incident printout beside it, lips moving."
+   }
+  ]
+ },
+ {
+  "id": "h_wren_lamp",
+  "offer": {
+   "dayFrom": 14,
+   "dayTo": 25,
+   "where": [
+    "design_lab",
+    "card_shop"
+   ],
+   "who": [
+    "wren"
+   ],
+   "how": "Wren, to her own reflection in the lab window: 'I need thirty minutes with a first print that isn't cracked and isn't under glass. Just thirty, next to mine. Dex has one in the back. Dex does not lend to people who haven't slept.'"
+  },
+  "deadline": 25,
+  "ifIgnored": "Day 26, Evening: she takes an Alpha common out of the Archive case 'for a moment', is caught by the curator, and is banned from the card_archive until Day 75. Her ink findings (c_m5_wren_ink) are still available, but she cannot verify anything in the Archive for the player until the ban ends.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 27,
+     "dayTo": 40
+    },
+    "how": "A printed notice on the Archive door: 'W. Ishikawa — access suspended.' Somebody has drawn a tiny sad pencil on it."
+   }
+  ]
+ },
+ {
+  "id": "h_inya_small_lie",
+  "offer": {
+   "dayFrom": 15,
+   "dayTo": 18,
+   "where": [
+    "commons_beach",
+    "bonfire_pit",
+    "commons_kitchen"
+   ],
+   "who": [
+    "inya"
+   ],
+   "how": "Inya, tying and untying her hoodie cord: 'Hypothetically. If somebody had told you a small lie on day one. For a good reason. And it was about to stop being small.' Then: 'Never mind. Your turn.'"
+  },
+  "deadline": 18,
+  "ifIgnored": "Day 19, Morning: the roster is printed; Rowan learns with everyone else. Inya assumes he will treat her like the rest do and keeps a careful distance until he proves otherwise (first private scene after Day 19 starts cold).",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 19,
+     "dayTo": 19
+    },
+    "how": "The roster on the arena doors. A ring of students around one line of it. Inya at the back of the crowd with her hood up."
+   }
+  ]
+ },
+ {
+  "id": "h_nathan_hike",
+  "offer": {
+   "dayFrom": 26,
+   "dayTo": 27,
+   "where": [
+    "commons_room",
+    "commons_beach"
+   ],
+   "who": [
+    "nathan"
+   ],
+   "how": "{H?{H=nathan?Night of Day 26, minutes after the bang: Nathan, torch belted to his head, pan in hand, in the bungalow doorway. 'LAUNDRY. Spaceship. You coming or are you a coward like the rest?' He is already walking backwards down the steps.|{H=baylee?Night of Day 26, ten minutes after Nathan and his pan have gone up the trail: Baylee on the bungalow step, lacing his boots, a water bottle under his arm. 'He's got no water. Somebody ought to walk behind him.' A long pause. 'You could come. You don't have to.'|{H=ed?Night of Day 26, minutes after the bang: Ed Venture, already running, hat jammed on, skids to a stop at the steps of bungalow 7 for exactly one second. 'Rowan! There's a HOLE in the mountain! You coming? It might be dangerous!' He is hopping backwards up the boardwalk as he says it.|{H=tobias?Night of Day 26, minutes after the bang, behind the bungalows where nobody is looking: Tobias Crowe with a rucksack on one shoulder, quite still, as if Rowan had caught him at something. Then, level: 'That's a rock off the sky. Belongs to nobody. A lump of that's worth a street of houses.' He looks Rowan over. 'You could carry. Halves.'|{H=sammy?Night of Day 26, minutes after the bang, at the dark end of the boardwalk: Sammy Counts, coat buttoned to the chin, notebook in his hand, plainly terrified and plainly going. He has a line ready and it comes out at the wrong speed: 'I am going to see it. Some of us are — drawn to such things.' Then, in his ordinary voice, fast: 'Would you come? Only it's very dark.'|{H=fiona?Night of Day 26, a few minutes after Nathan and his pan have gone up the trail: Fiona on the boardwalk with the kitchen storm lantern, hair tied back for once, no act at all. 'I'm going up to look. Things that fall out of the sky don't frighten me, people do.' A real smile, quick. 'You can carry the lantern if you like.'|{H=freya?Night of Day 26, minutes after the bang: Freya on the boardwalk, bottle in hand, the wide wicked grin fully arrived, hooking her arm through Rowan's. 'A STAR fell on us and they want to go back to bed! Come on. One drink at the top and we are the only two people on this island who saw it.'|{H=hedda?Night of Day 26, minutes after the bang: Hedda, megaphone under one arm, stuffing a tin of bandages into her apron, glaring at the whole boardwalk and then at Rowan. 'There are NESTS on that slope. Forty pairs. You have hands — are you coming or are you one of the people who watch?'|{H=sunny?Dawn after the bang, about five, on the boardwalk below bungalow 7: Sunny, in running shoes, already moving, turning to run backwards for three steps. 'Somebody went up there ON HIS OWN? In the dark? Oh, you're kidding. Come on if you're coming — I'm not waiting!'|Night of Day 26, minutes after the bang: Nathan, torch belted to his head, pan in hand, in the bungalow doorway. 'LAUNDRY. Spaceship. You coming or are you a coward like the rest?' He is already walking backwards down the steps.}}}}}}}}}|Night of Day 26, minutes after the bang: one of the row, already leaving, asks whether Rowan is coming.}",
+   "hostWho": "swap"
+  },
+  "deadline": 27,
+  "ifIgnored": "He goes alone (canon). He is back at Midday of Day 27 with glass dust in his hair, {H=nathan?pleased, quieter|pleased, and not quite himself}.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 27,
+     "dayTo": 27
+    },
+    "how": "{H=nathan?IF THE PLAYER GOES WITH HIM: Nathan cannot be saved and Rowan cannot be harmed. Nathan outpaces him in the dark ('keep UP'), Rowan loses him at the rope bridge and reaches the rim after sunrise — to meet 'Nathan' already walking back along his own tracks, setting each foot down flat. 'Roommate. You came. That is—' a pause, a careful smile '—that is a thing he would have liked.' He corrects it at once: 'I like it.' Set saw_crater; the player has lived c_m1_viktor_dawn first-hand (record that clue as found).|{H=baylee?IF THE PLAYER GOES WITH HIM: Baylee cannot be saved and Rowan cannot be harmed. One of Baylee's strides is two of Rowan's; at the fork below the rope bridge he says 'You wait for him here, in case he comes down this way,' and takes the cattle track. Nathan does come down that way, torch dead, furious. Rowan reaches the rim after sunrise — to meet 'Baylee' already walking back along his own tracks, setting each foot down flat. 'Roommate. You came. That is—' a pause, a careful smile '—that is a thing he would have been glad of.' He corrects it at once: 'I am glad of it.'|{H=ed?IF THE PLAYER GOES WITH HIM: Ed cannot be saved and Rowan cannot be harmed. Ed runs where Rowan climbs ('keep UP!'); Rowan loses him at the rope bridge, which Ed takes at a sprint in the dark, and reaches the rim after sunrise — to meet 'Ed' already walking back along his own tracks, setting each foot down flat, hat in his hand. 'Roommate— no. Neighbour. You came. That is—' a pause, a careful smile '—that is a thing he wanted. He wanted to show you.' He corrects it at once: 'I want to show you. There is nothing in it.'|{H=tobias?IF THE PLAYER GOES WITH HIM: Tobias cannot be saved and Rowan cannot be harmed. Tobias climbs without a light and without a sound; at the rope bridge he says 'You're too loud. Wait here,' and is gone. Nathan comes down past Rowan with a dead torch, swearing. Rowan reaches the rim after sunrise — to meet 'Tobias' already walking back along his own tracks, setting each foot down flat, the rucksack empty. 'You waited. That is—' a pause, a careful smile '—that is a thing he would have paid you for.' He corrects it at once: 'I owe you. Halves of nothing. I will keep the account.'|{H=sammy?IF THE PLAYER GOES WITH HIM: Sammy cannot be saved and Rowan cannot be harmed. They follow Nathan's torch at a distance until it dies at the rope bridge; Nathan comes back down past them, swearing, and takes Rowan for the only one there. When Rowan looks round, Sammy has gone on across the bridge alone — the one brave thing he has ever done, and he did it where nobody could see. Rowan reaches the rim after sunrise — to meet 'Sammy' already walking back along his own tracks, setting each foot down flat. 'You came. That is—' a pause, a careful smile '—that is a thing he wanted very much.' He corrects it at once: 'I am glad to be seen.'|{H=fiona?IF THE PLAYER GOES WITH HER: Fiona cannot be saved and Rowan cannot be harmed. She talks the whole way, in her real voice, about Whitby and her mother. At the rope bridge they meet Nathan coming down with a dead torch; while Rowan is hearing about it she takes the lantern and goes on — 'Catch me up.' He reaches the rim after sunrise — to meet 'Fiona' already walking back along her own tracks, setting each foot down flat. 'Partner— no. That is later. You came. That is—' a pause, exactly as long as her pauses '—that is a thing she would have liked.' It corrects itself at once: 'I like it.'|{H=freya?IF THE PLAYER GOES WITH HER: Freya cannot be saved and Rowan cannot be harmed. She sings the first hour and is very quiet the second. At the rope bridge they meet Nathan coming down with a dead torch; she sits down on the planks to finish the bottle and tells Rowan to go and see him home, she will follow. She does not follow. He reaches the rim after sunrise — to meet 'Freya' already walking back along her own tracks, setting each foot down flat, entirely sober. 'You came. That is—' a pause, a careful smile '—that is a thing she wanted. Company.' It corrects itself at once: 'I am glad of the company.'|{H=hedda?IF THE PLAYER GOES WITH HER: Hedda cannot be saved and Rowan cannot be harmed. She lectures for an hour and then stops, because there is no birdsong at all. Below the rope bridge she finds the first empty nest, tells Rowan to search the east side, and goes west and up. He searches till sunrise, finds nothing alive, and reaches the rim — to meet 'Hedda' already walking back along her own tracks, setting each foot down flat. 'You came. You looked. That is—' a pause, a careful smile '—that is a thing she wanted to be wrong about people for.' It corrects itself at once: 'Thank you for looking.'|{H=sunny?IF THE PLAYER GOES WITH HER: Sunny cannot be saved and Rowan cannot be harmed. He cannot run a mountain; she is out of sight in ten minutes, calling back that she will leave markers. She does: a towel, a hair tie, a shoe-lace on a branch. He reaches the rim an hour after her — to meet 'Sunny' already walking back along her own tracks, not running, setting each foot down flat. 'You came. You followed the markers. That is—' a pause, a careful smile '—that is a thing she would have been proud of you for.' It corrects itself at once: 'I am proud of you.'|IF THE PLAYER GOES WITH HIM: {H} cannot be saved and Rowan cannot be harmed. {H} outpaces him in the dark ('keep UP'), Rowan loses him at the rope bridge and reaches the rim after sunrise — to meet '{H}' already walking back along his own tracks, setting each foot down flat. 'Roommate. You came. That is—' a pause, a careful smile '—that is a thing he would have liked.' He corrects it at once: 'I like it.' Set saw_crater; the player has lived c_m1_viktor_dawn first-hand (record that clue as found).}}}}}}}}}"
+   }
+  ]
+ },
+ {
+  "id": "h_tomi_torch",
+  "offer": {
+   "dayFrom": 27,
+   "dayTo": 30,
+   "where": [
+    "commons_beach",
+    "commons_kitchen"
+   ],
+   "who": [
+    "tomi"
+   ],
+   "how": "Tomi, sorting a binder: 'Good torch, that was. Forty cr. Nathan says he never had it. Nathan can't remember a torch but he can remember my whole price list from Tuesday, word for word. Funny.'",
+   "host": [
+    "nathan"
+   ]
+  },
+  "deadline": 30,
+  "ifIgnored": "Day 31: Tomi hikes to the crater to look for it, is caught at the cordon and loses town privileges for two weeks; the Commons trade binder's prices are 20% worse until Day 45.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 27,
+     "dayTo": 28,
+     "flags": [
+      "saw_crater"
+     ]
+    },
+    "how": "A torch with a belt through its strap lies at the crater rim. It is still switched on. Bringing it back to Tomi sets tomi_torch_dropped; he turns it over and over and says the batteries were nearly dead when he lent it."
+   }
+  ]
+ },
+ {
+  "id": "h_pippa_board",
+  "offer": {
+   "dayFrom": 28,
+   "dayTo": 35,
+   "where": [
+    "student_lounge",
+    "rare_common_room"
+   ],
+   "who": [
+    "pippa"
+   ],
+   "how": "Pippa is pinning meteor-morning prints to the lounge cork board. She pins one, unpins it, holds it at arm's length, tilts it, and puts it in her back pocket instead."
+  },
+  "deadline": 35,
+  "ifIgnored": "Day 36: she hands the set to The Top Deck. Vivienne's edit bins the odd frame as 'a sensor glitch'. The negative survives only in Pippa's room; she shows it afterwards only to someone with pippa affinity or to whoever helps Georgie.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 52,
+     "dayTo": 70
+    },
+    "how": "Pippa has started photographing shadows: benches, lamp posts, classmates' feet. She says it's a series."
+   }
+  ]
+ },
+ {
+  "id": "h_livvie_locket",
+  "offer": {
+   "dayFrom": 30,
+   "dayTo": 94,
+   "where": [
+    "pawn_shop",
+    "main_street"
+   ],
+   "who": [],
+   "how": "In the pawn shop window, between a sextant and a card of wedding rings: a thin silver locket, open, with a photograph of a tired woman holding a small boy. The same photograph is taped inside the lid of Livvie's deck box. The ticket says 120 cr."
+  },
+  "deadline": 94,
+  "ifIgnored": "Day 95: the ticket's date passes and the locket is sold to a tourist off the ferry. Livvie checks the window that Saturday, stands there a full minute, and adds nothing to her spreadsheet that week.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 95,
+     "dayTo": 105
+    },
+    "how": "A clean rectangle in the dust of the pawn shop window where something small used to lie."
+   }
+  ]
+ },
+ {
+  "id": "h_ashdown_door",
+  "offer": {
+   "dayFrom": 30,
+   "dayTo": 60,
+   "where": [
+    "faculty_wing"
+   ],
+   "who": [
+    "ashdown"
+   ],
+   "how": "Ashdown's office door is ajar. On the desk a framed photograph lies face down, and she is sitting with one hand flat on its back, looking at the volcano through the window, not marking the essays in front of her."
+  },
+  "deadline": 60,
+  "ifIgnored": "Day 61, Afternoon: Marrow calls on her with a folder. From then on her door is shut and she confides only if shown the torn pages or the Gate.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 62,
+     "dayTo": 105
+    },
+    "how": "Ashdown cancels a field trip to the ruins 'for weather'. The sky is spotless."
+   }
+  ]
+ },
+ {
+  "id": "h_marit_understudy",
+  "offer": {
+   "dayFrom": 30,
+   "dayTo": 40,
+   "where": [
+    "theatre",
+    "quad",
+    "cafeteria"
+   ],
+   "who": [
+    "marit"
+   ],
+   "how": "Marit sweeps through the cafeteria scattering flyers like a sower: 'THE PHOENIX REVUE — Night of Masks — one role UNCAST — must be able to stand still and suffer beautifully!' One flyer lands in your soup."
+  },
+  "deadline": 40,
+  "ifIgnored": "Day 41: Ashton takes the part and rewrites it to include a rose. The revue goes on; Marit is gracious and privately furious, and Ashton gains standing with the theatre crowd.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 54,
+     "dayTo": 54
+    },
+    "how": "From the festival crowd you can hear the revue's finale and a wave of applause."
+   }
+  ]
+ },
+ {
+  "id": "h_gideon_tower",
+  "offer": {
+   "dayFrom": 30,
+   "dayTo": 70,
+   "where": [
+    "quad",
+    "clock_tower"
+   ],
+   "who": [
+    "gideon"
+   ],
+   "how": "Tuesday, early evening: Gideon Pryce crosses the quad against the dinner crowd and lets himself into the clock tower stair with a key students are not issued."
+  },
+  "deadline": 71,
+  "ifIgnored": "His reports continue weekly. On the night of Day 72 the Archive swap goes ahead.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 73,
+     "dayTo": 100
+    },
+    "how": "Gideon has stopped wearing his gloves for a week. Then a new pair, whiter."
+   }
+  ]
+ },
+ {
+  "id": "h_brant_shakedown",
+  "offer": {
+   "dayFrom": 34,
+   "dayTo": 39,
+   "where": [
+    "cafeteria",
+    "commons_beach",
+    "quad"
+   ],
+   "who": [
+    "brant",
+    "tomi",
+    "trixie",
+    "tobias"
+   ],
+   "how": "Brant Kessler has Trixie Hollis's deck box in one hand and is leafing through it like a menu. Trixie, for once in her life perfectly still, is studying the floor. Nobody nearby is looking either — except Tobias Crowe, on the steps of Bungalow 6, who has put his hands in his hoodie pocket and is deciding something.",
+   "self": [
+    "tobias"
+   ]
+  },
+  "deadline": 39,
+  "ifIgnored": "Day 39, Evening: {H} asks Brant {H:his} question in the cafeteria. Day 40, dawn: Brant is found in Trial Dome 3.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 40,
+     "dayTo": 46
+    },
+    "how": "Trixie's foil comes back to her in a staff envelope with her name on a slip in very tidy handwriting. She hasn't touched the deck since."
+   }
+  ]
+ },
+ {
+  "id": "h_baylee_porch",
+  "offer": {
+   "dayFrom": 36,
+   "dayTo": 44,
+   "where": [
+    "commons_room",
+    "commons_beach"
+   ],
+   "who": [
+    "baylee"
+   ],
+   "how": "Baylee's bed has been creeping across the room for weeks, a hand's width at a time; nobody mentioned it. Tonight it has reached the door, and he is carrying the mattress out to the porch, folded under one arm like a newspaper. 'Heat,' he says. It rained all day. He does not look at {H}'s bed as he passes it.",
+   "self": [
+    "baylee"
+   ],
+   "host": [
+    "@room",
+    "@row"
+   ]
+  },
+  "deadline": 44,
+  "ifIgnored": "Day 45: Baylee asks Mama Odalys for the spare cot in Bungalow 8, the laundry, 'on account of snoring'. From then on Rowan shares the room with the Guest alone at night, and Baylee will only talk about why if sought out away from the Commons.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 46,
+     "dayTo": 90
+    },
+    "how": "Baylee at the far end of the beach at dusk, feeding the stray cat out of his enormous hand. It comes to him at a run."
+   }
+  ]
+ },
+ {
+  "id": "h_camille_bench",
+  "offer": {
+   "dayFrom": 40,
+   "dayTo": 46,
+   "where": [
+    "infirmary",
+    "quad"
+   ],
+   "who": [
+    "camille"
+   ],
+   "how": "Camille is asleep sitting up on the bench outside the infirmary, a chart open on her knees and a biro still in her fingers. There is writing on her wrist."
+  },
+  "deadline": 49,
+  "ifIgnored": "Day 50: the Chancellor's office orders Ward B's charts sealed 'for privacy'. Camille complies. She will share them afterwards only with someone who has worked a volunteer shift on the ward.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 52,
+     "dayTo": 66
+    },
+    "how": "A second bed, then a third, is wheeled past the infirmary windows. Camille is the one pushing."
+   }
+  ]
+ },
+ {
+  "id": "h_viktor_umbra",
+  "offer": {
+   "dayFrom": 40,
+   "dayTo": 44,
+   "where": [
+    "commons_beach",
+    "cliff_path",
+    "umbra_house"
+   ],
+   "who": [
+    "viktor"
+   ],
+   "how": "Viktor is sketching Umbra House's upper floor from memory on the back of a quiz paper: a corridor, eight doors crossed off, the ninth ringed twice. He turns it over when he sees you, not quite fast enough."
+  },
+  "deadline": 44,
+  "ifIgnored": "Day 45, Night: he goes in by the scullery shutter to search room 9 a third time. Silas is waiting in the housemaster's chair. Viktor has a hearing before the Chancellor, gets a formal warning and is watched by staff until Day 60; the pages stay in the lamp.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 46,
+     "dayTo": 60
+    },
+    "how": "Viktor attends every class for a week, radiating the patience of a man doing time."
+   }
+  ]
+ },
+ {
+  "id": "h_shark_boast",
+  "offer": {
+   "dayFrom": 48,
+   "dayTo": 51,
+   "where": [
+    "rare_lobby",
+    "rare_common_room",
+    "trial_dome"
+   ],
+   "who": [
+    "kenji",
+    "priya"
+   ],
+   "how": "A Rare Hall second-year with a shark-tooth necklace is telling the lobby he has finally got 'the Commons freak' to agree to a real stake. 'Wouldn't take credits. Wanted something that MATTERS. So I said, my edge. He said, that is acceptable.' Laughter."
+  },
+  "deadline": 51,
+  "ifIgnored": "Day 52, dawn: he is found on the duel_terraces, eyes open, cards laid out.",
+  "returns": []
+ },
+ {
+  "id": "h_marrow_coffee",
+  "offer": {
+   "dayFrom": 61,
+   "dayTo": 64,
+   "where": [
+    "cafe",
+    "quad",
+    "main_street"
+   ],
+   "who": [
+    "marrow"
+   ],
+   "how": "A man in a grey suit holds the café door for you and says, softly, 'Best_Tarleinn_NA. I've watched your replays. Let me buy the ladder's most patient player a coffee.' He already knows how you take it."
+  },
+  "deadline": 64,
+  "ifIgnored": "He takes it as an answer. Day 70: Rowan's stipend is 'delayed by an audit' for one week (−120 cr). Marrow's attention moves to Livvie (Day 63) and Octavia.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 103,
+     "dayTo": 103
+    },
+    "how": "At the Winter Gala Marrow raises a glass to you across the ballroom, perfectly friendly."
+   }
+  ]
+ },
+ {
+  "id": "h_livvie_playtest",
+  "offer": {
+   "dayFrom": 61,
+   "dayTo": 66,
+   "where": [
+    "design_lab",
+    "commons_kitchen"
+   ],
+   "who": [
+    "livvie"
+   ],
+   "how": "Livvie has index cards spread across the kitchen table in a pattern, and is playing both sides, badly, yawning. 'I can't see it any more. I just need one person to break it who isn't me.'"
+  },
+  "deadline": 66,
+  "ifIgnored": "She submits untested on Day 75. Day 82: second place (500 cr). Wren wins the 5,000.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 82,
+     "dayTo": 82
+    },
+    "how": "The results are pinned outside the design lab. Livvie reads them, nods twice, and goes to her shift."
+   }
+  ]
+ },
+ {
+  "id": "h_tomi_fakes",
+  "offer": {
+   "dayFrom": 62,
+   "dayTo": 65,
+   "where": [
+    "commons_beach",
+    "commons_kitchen",
+    "commons_room"
+   ],
+   "who": [
+    "tomi"
+   ],
+   "how": "Tomi has a jeweller's loupe and a list. 'No set code. No number. I've got a buyer in town says they're fakes and fakes get you expelled. I'm going to put it to him straight: cut me in or I go to a judge.' He grins. It doesn't reach."
+  },
+  "deadline": 65,
+  "ifIgnored": "Day 65, Night: he puts it to {H} straight. Day 66, dawn: Tomi is found in the student_lounge at a table, binder open, eyes open.",
+  "returns": []
+ },
+ {
+  "id": "h_oru_second",
+  "offer": {
+   "dayFrom": 61,
+   "dayTo": 100,
+   "where": [
+    "night_market"
+   ],
+   "who": [
+    "oru"
+   ],
+   "how": "A market night; passing her tent. Without looking up from her clay squares: 'First one you paid for. Second one's free. Third one costs.' She says it to the lamp."
+  },
+  "deadline": 100,
+  "ifIgnored": "After Day 100 the indigo tent is missing from the market for the winter; she is not there again until the market of Day 139.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 139,
+     "dayTo": 175
+    },
+    "how": "At the far end of the customs yard, under the old chalk numerals, the indigo tent is back. The lamp is lit."
+   }
+  ]
+ },
+ {
+  "id": "h_archive_lanyard",
+  "offer": {
+   "dayFrom": 70,
+   "dayTo": 72,
+   "where": [
+    "design_lab",
+    "card_archive",
+    "lecture_hall"
+   ],
+   "who": [
+    "wren",
+    "santangel"
+   ],
+   "how": "Professor Santángel pats his pockets at the end of Tempo & Resource, frowning, then shrugs and borrows a colleague's swipe for the faculty door."
+  },
+  "deadline": 72,
+  "ifIgnored": "Day 72, 23:41: the Archive is entered with his credential; one Alpha card is swapped for a reprint.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 73,
+     "dayTo": 80
+    },
+    "how": "Santángel's lanyard is back around his neck. He touches it often."
+   }
+  ]
+ },
+ {
+  "id": "h_lilia_empty_arena",
+  "offer": {
+   "dayFrom": 76,
+   "dayTo": 100,
+   "where": [
+    "great_arena"
+   ],
+   "who": [
+    "lilia"
+   ],
+   "how": "The great arena at night, house lights off, one table lit. Lilia Mann is playing both sides of a match, fast, and losing interest in real time. She glances up. 'You're the online one. Storm. Sit, if you like. Nobody here plays me like they mean it.'"
+  },
+  "deadline": 100,
+  "ifIgnored": "She does not notice Rowan again before Term 2; becoming her rival then requires a top-8 ladder rank instead of an invitation.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 110,
+     "dayTo": 149
+    },
+    "how": "Lilia's eye runs down the Season 2 ladder sheet and stops, briefly, at a name."
+   }
+  ]
+ },
+ {
+  "id": "h_dee_letter",
+  "offer": {
+   "dayFrom": 85,
+   "dayTo": 95,
+   "where": [
+    "commons_room",
+    "campus_store"
+   ],
+   "who": [
+    "odalys"
+   ],
+   "how": "A letter in Aunt Dee's block capitals: weather, the neighbour's dog, a customer who left a wedding dress for six weeks. One line near the end: 'Boiler's acting up but don't you think about it.' She has underlined 'don't'."
+  },
+  "deadline": 104,
+  "ifIgnored": "Day 105 interlude: Dee's voice on the phone is cheerful and tired; she has taken night shifts at the cannery to cover the boiler. She asks only whether he is eating.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 130,
+     "dayTo": 140
+    },
+    "how": "A parcel from home: a jar of pickles, and a laundromat receipt roll on which Dee has written the scores of every stream match of his she could find."
+   }
+  ]
+ },
+ {
+  "id": "h_rana_signup",
+  "offer": {
+   "dayFrom": 106,
+   "dayTo": 118,
+   "where": [
+    "job_board",
+    "great_arena"
+   ],
+   "who": [
+    "rana"
+   ],
+   "how": "The Island Open sign-up sheet. Line 14: 'R. Marika', written firmly and then crossed out, hard enough to tear the paper."
+  },
+  "deadline": 118,
+  "ifIgnored": "Day 119: she signs again on the last line, alone and untrained for match point.",
+  "returns": []
+ },
+ {
+  "id": "h_chuck_pier",
+  "offer": {
+   "dayFrom": 110,
+   "dayTo": 140,
+   "where": [
+    "harbor",
+    "fish_market"
+   ],
+   "who": [
+    "chuck"
+   ],
+   "how": "Dawn on the harbour pier. Chuck is fishing without bait and without telling a story. 'Ever owe somebody a thing you can't pay, kid? Not money. Money's easy.' Then he reels in the empty hook and looks at it as if it had disappointed him personally."
+  },
+  "deadline": 164,
+  "ifIgnored": "Day 165, Night: Chuck goes to the Ruin Gate with an Alpha card and tries to go in alone. He is found on the threshold at dawn by Silas, alive, speechless, and is in the infirmary until Day 185 — absent from his own 75th.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 150,
+     "dayTo": 164
+    },
+    "how": "The sea-chest under the hammock stands open, the padlock key still on its string round his neck. Chuck is sorting his first prints into two piles and will not say what the piles are."
+   }
+  ]
+ },
+ {
+  "id": "h_kenji_hours",
+  "offer": {
+   "dayFrom": 114,
+   "dayTo": 117,
+   "where": [
+    "rare_common_room",
+    "trial_dome",
+    "gym"
+   ],
+   "who": [
+    "kenji"
+   ],
+   "how": "Kenji, three energy drinks deep, headphones round his neck: '{H:last} called me out. Formal. Ante's some poetry — my hours. Whatever. I've got fourteen of them a day, he can have a few.'"
+  },
+  "deadline": 117,
+  "ifIgnored": "Day 118, dawn: Kenji is found in Trial Dome 1, headphones still playing.",
+  "returns": []
+ },
+ {
+  "id": "h_willas_bag",
+  "offer": {
+   "dayFrom": 140,
+   "dayTo": 147,
+   "where": [
+    "gym"
+   ],
+   "who": [
+    "willas"
+   ],
+   "how": "Late. Willas is hitting the heavy bag bare-knuckled, sleeves rolled. Between combinations: 'Say somebody was about to call out the person you love — everybody can see who's next. Somebody who doesn't lose. And you're the worst player on your own team. What's the move.' He isn't really asking you."
+  },
+  "deadline": 149,
+  "ifIgnored": "Day 150: he takes the duel in Lilia's place.",
+  "returns": []
+ },
+ {
+  "id": "h_saoirse_boat",
+  "offer": {
+   "dayFrom": 150,
+   "dayTo": 170,
+   "where": [
+    "boathouse",
+    "beach_cove"
+   ],
+   "who": [
+    "saoirse"
+   ],
+   "how": "Saoirse is caulking an old six-metre launch, barefoot in the shavings. 'Rules I can't stand. Tides I trust. She'll be ready by the festival. Room for five and I've counted you.' She says it lightly and does not smile.",
+   "self": [
+    "sammy"
+   ]
+  },
+  "deadline": 178,
+  "ifIgnored": "Day 179, Night: she takes Trixie, Mikoto and Sammy, who asked, to the mainland on the tide. She is not on the island on Day 180.",
+  "returns": []
+ },
+ {
+  "id": "h_isolde_offer",
+  "offer": {
+   "dayFrom": 166,
+   "dayTo": 167,
+   "where": [
+    "great_arena",
+    "inn",
+    "festival_grounds"
+   ],
+   "who": [
+    "isolde"
+   ],
+   "how": "Isolde Varga, white braid, black lipstick, looking at the home team's bench with its gaps. 'North Crown did not sail four days to beat a hospital. Tell me who did this to your team and I will ask him to the table myself.'"
+  },
+  "deadline": 167,
+  "ifIgnored": "Day 167: Rex Tanaka, unasked, calls '{H}' a ghoul to {H:his} face on stream and is challenged. Day 168 dawn: Rex is found hollowed. North Crown withdraws and sails on Day 169, Isolde standing at the stern.",
+  "returns": []
+ },
+ {
+  "id": "h_helical_list",
+  "offer": {
+   "dayFrom": 3,
+   "dayTo": 10,
+   "where": [
+    "quad",
+    "job_board",
+    "faculty_wing"
+   ],
+   "who": [
+    "helical"
+   ],
+   "how": "A gaunt professor in a burn-holed lab coat is reading the first-year housing list on the board. He has been reading it for some time. His finger rests under one line of Bungalow 4; when he notices he is being watched he takes off his glasses, cleans them, and reads the lunch menu instead."
+  },
+  "deadline": 10,
+  "ifIgnored": "Nothing visible. He lets the waiver stand, as he has since arrival day, and starts leaving his office door open in the Afternoons in case she ever comes by. She does not.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 40,
+     "dayTo": 90
+    },
+    "how": "The office door at the end of the faculty wing stands open every Afternoon. The man inside looks up at each set of footsteps and then back down."
+   }
+  ]
+ },
+ {
+  "id": "h_leona_torch",
+  "offer": {
+   "dayFrom": 9,
+   "dayTo": 25,
+   "where": [
+    "commons_beach"
+   ],
+   "who": [
+    "leona",
+    "dmitri"
+   ],
+   "how": "Past one in the morning. The door of Bungalow 4 opens a hand's width and Leona slips out in her cardigan, shoes in one hand, a torch in the other that she does not switch on. From the porch of 6 Dmitri raises his thermos an inch in greeting. She freezes; sees you too; puts a finger to her lips, not pleading — instructing — and is gone up the boardwalk."
+  },
+  "deadline": 25,
+  "ifIgnored": "She goes on alone, twice a week. By Day 60 she has found the manager's office at the print works; she cannot force the safe's inner drawer alone, cannot open locker 14, cannot get into the Archive's records room, and trusts nobody.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 112,
+     "dayTo": 120,
+     "flags": [
+      "leona_caught"
+     ]
+    },
+    "how": "A notice on the council board, pinned by Pilar under the council seal: 'L. Helical — formal warning — found in the Card Archive after hours.' Leona eats breakfast under it as if it were about someone else."
+   }
+  ]
+ },
+ {
+  "id": "h_maisie_coil",
+  "offer": {
+   "dayFrom": 20,
+   "dayTo": 45,
+   "where": [
+    "commons_beach",
+    "design_lab"
+   ],
+   "who": [
+    "maisie"
+   ],
+   "how": "Maisie, goggles down, a projector coil in one hand and a soldering iron in the other and a third thing held in her teeth, says round it: \"Hold this. No — the hot bit's the other end. I'm going to make one you can shake hands with. Everyone says you can't. Everyone hasn't tried.\""
+  },
+  "deadline": 45,
+  "ifIgnored": "She builds it alone. It flickers like everything else; she blows the row's fuse twice (Day 46 and Day 58: no lights on the Commons that evening) and concludes the fault is the pigment in the test cards, which is closer to the truth than is safe.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 134,
+     "dayTo": 134
+    },
+    "how": "Maisie's stand at the Open Playtest Afternoon: a small crowd, a flat flickering Debt-O-Tron, and a polite young man from the board's staff taking notes at the back."
+   }
+  ]
+ },
+ {
+  "id": "h_victoria_bench",
+  "offer": {
+   "dayFrom": 4,
+   "dayTo": 15,
+   "where": [
+    "quad",
+    "rooftop_garden",
+    "duel_terraces"
+   ],
+   "who": [
+    "victoria"
+   ],
+   "how": "Dusk. A girl in a ruffled dress sits on a bench with a closed parasol across her knees, looking at nothing, entirely composed. She was sitting exactly so at Midday. The bell for supper has gone and she has not moved."
+  },
+  "deadline": 15,
+  "ifIgnored": "Ophelia or Pippa collects her, as one of them does every evening; from Day 16 Pippa's schedule card is pinned by the door of R203 and Victoria follows it to the minute. She does not learn Rowan's name before the Freshman Cup.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 19,
+     "dayTo": 20
+    },
+    "how": "On the Cup stream a clear, serious voice from the second chair: \"The border on that one is a very good blue. I should like it to win.\""
+   }
+  ]
+ },
+ {
+  "id": "h_ed_most_dangerous",
+  "offer": {
+   "dayFrom": 6,
+   "dayTo": 20,
+   "where": [
+    "commons_beach",
+    "commons_kitchen",
+    "jungle_trail"
+   ],
+   "who": [
+    "ed"
+   ],
+   "how": "Ed Venture, cowboy hat, scraped knees, a hand-drawn map of the island with a great many red crosses: \"Quick question. If you wanted to see the single most dangerous place on this whole rock — like, properly lethal — where'd you start? Viktor won't tell me. That means he knows.\"",
+   "self": [
+    "ed"
+   ]
+  },
+  "deadline": 20,
+  "ifIgnored": "Day 21: he climbs out along the underside of the rope bridge 'to see how it's tied', is fetched back by Viktor with a face like weather, and has his arm in a sling for a week. It teaches him nothing.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 27,
+     "dayTo": 28
+    },
+    "how": "Ed is back from the north slope before anyone, sunburnt to the collar, with a disposable camera and the widest grin on the island: \"It's a HOLE. It's the best hole I've ever seen. Your roommate beat me to it — he walked right past me. Didn't say hi. Weird, he always says hi.\""
+   }
+  ]
+ },
+ {
+  "id": "h_tobias_crowbar",
+  "offer": {
+   "dayFrom": 12,
+   "dayTo": 30,
+   "where": [
+    "commons_beach",
+    "spectral_lobby",
+    "quad"
+   ],
+   "who": [
+    "tobias"
+   ],
+   "how": "Tobias Crowe is standing across the quad from Spectral Tower with his hands in his hoodie, counting. Not windows — the time between the concierge's rounds. \"Fat cats,\" he says, friendly enough, when he sees you looking. \"One of them hands out roses. You know what a rose costs here? I do. Don't worry, Laundry-boy. I never take from anybody who'd miss it.\"",
+   "self": [
+    "tobias"
+   ]
+  },
+  "deadline": 30,
+  "ifIgnored": "He has cased suite S2 and then crossed it off by himself: he followed Jessica into town, saw her come out of the pawn shop with a ticket, and understood. Day 31, Night: he goes up the service stair with the crowbar to S4 instead and comes down with Ashton's cufflinks and cravat pins. Ashton knows by breakfast and, to everyone's surprise including his own, reports nothing; the pins turn up, piece by piece, as anonymous envelopes of credits under the doors of Bungalows 3 and 6. The campus store's cash box is next on the list, and the Card Archive after that.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 32,
+     "dayTo": 60,
+     "flags": [
+      "casket_taken"
+     ]
+    },
+    "how": "An unmarked envelope with 40 cr in it has been pushed under the door of Bungalow 3. Livvie is holding it at arm's length like something that might go off."
+   }
+  ]
+ },
+ {
+  "id": "h_magnus_two_places",
+  "offer": {
+   "dayFrom": 2,
+   "dayTo": 16,
+   "where": [
+    "quad",
+    "trial_dome",
+    "duel_terraces"
+   ],
+   "who": [
+    "magnus"
+   ],
+   "how": "A wiry boy with slicked ginger hair holds a tablet up beside your face, comparing. \"Best_Tarleinn_NA. Two years. Two years you've been exactly one line above me.\" He turns the screen: the placement list, his name two places over yours. \"Not any more. I'm Prospero. You've never heard of me, have you. That's the worst part.\""
+  },
+  "deadline": null,
+  "ifIgnored": "Nothing stops it. He measures the year in the gap between two names and will challenge whenever it changes (see q_magnus_number_two).",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 31,
+     "dayTo": 31
+    },
+    "how": "Ladder Snapshot I on the quad board. Magnus is photographing it. He has brought a ruler."
+   }
+  ]
+ },
+ {
+  "id": "h_dmitri_thermos",
+  "offer": {
+   "dayFrom": 6,
+   "dayTo": 26,
+   "where": [
+    "commons_beach"
+   ],
+   "who": [
+    "dmitri"
+   ],
+   "how": "Whenever you cannot sleep there is one lit porch on the row: Bungalow 6, a man in a beanie under a blanket, a thermos, a notebook. He lifts the second cup an inch off the boards — an offer, no more — and goes back to looking at the dark."
+  },
+  "deadline": null,
+  "ifIgnored": "He goes on keeping the night alone, and keeps what he sees to himself until someone sits down.",
+  "returns": [
+   {
+    "when": {
+     "dayFrom": 28,
+     "dayTo": 45
+    },
+    "how": "Dmitri's porch light is on. He has moved his chair a metre to the left — to where he can see your door."
+   }
+  ]
+ },
+ {
+  "id": "h_hedda_megaphone",
+  "offer": {
+   "dayFrom": 8,
+   "dayTo": 20,
+   "where": [
+    "cafeteria",
+    "fish_market",
+    "commons_kitchen"
+   ],
+   "who": [
+    "hedda",
+    "baylee"
+   ],
+   "how": "A megaphone squeals. A very small person with moss-green hair is standing on a cafeteria chair, pointing at Baylee's tray. Baylee, who raised the animal's cousins by hand, has gone crimson to the scalp and is trying to hide a sausage behind a bread roll.",
+   "self": [
+    "baylee",
+    "hedda"
+   ]
+  },
+  "deadline": 20,
+  "ifIgnored": "The feud sets: Hedda pickets the Commons kitchen on Day 22 (see the calendar); Baylee starts eating on the bungalow steps; Mama Odalys bans megaphones within thirty paces of her range.",
+  "returns": []
+ }
+]

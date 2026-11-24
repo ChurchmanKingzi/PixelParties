@@ -1,0 +1,239 @@
+{
+ "id": "rana",
+ "name": "Rana Marika",
+ "firstName": "Rana",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B3",
+ "romance": true,
+ "deck": "Debug Mode (Cybugs)",
+ "look": "Wiry, with brown curly hair dragged into a high ponytail, olive skin, sharp dark eyes and a scowl that seems to have been installed at the factory. Her black nail polish is chipped from biting. She wears a black choker and has studded the plain grey collar of her red jacket herself, and dares anyone to mention it.",
+ "voice": "Clipped, sarcastic and defensive; under six words when cornered, and she answers questions with questions. The hostility is a wall, not a temperament: when the subject is deck construction it drops away and she becomes fast, exact and almost happy, until she notices. RARE habit (once in a scene at most; most scenes go without it): a muttered 'whatever' to close a subject she cares about.",
+ "lines": [
+  "No. Why are you sitting here.",
+  "Yes, I'm the one who got held back. Good, you can read a noticeboard. Anything else?",
+  "Chain LOCUST off ANTS before their next turn and the whole swarm comes in a turn early. It's not that interesting.",
+  "I had it on board and my hand just stopped. Every time. Don't look at me like that."
+ ],
+ "intro": "The one student repeating first year, demoted to the Commons and furious about everything; she lives in bungalow 3 behind a sheet she has hung round her bed.",
+ "traits": [
+  {
+   "id": "rana_1",
+   "text": "She is the only student of last year's intake who was held back.",
+   "how": "Common knowledge; Nathan announces it on Day 1."
+  },
+  {
+   "id": "rana_2",
+   "text": "She has not won a single sanctioned event, and has a drawer of second-place tokens she will not throw away.",
+   "how": "Mama Odalys mentions the drawer; so does anyone who has helped Rana move in."
+  },
+  {
+   "id": "rana_3",
+   "text": "She bites her nails during other people's matches, not her own.",
+   "how": "Watch a duel beside her."
+  },
+  {
+   "id": "rana_4",
+   "text": "Her Cybug list is entirely her own build and nobody on the ladder runs it the same way.",
+   "how": "Play her, or ask about a card choice and stand back."
+  },
+  {
+   "id": "rana_5",
+   "text": "She tutors Commons first-years in sequencing at night and tells them to keep quiet about it.",
+   "how": "Find her at the Commons kitchen table at Night with Tomi's customers."
+  },
+  {
+   "id": "rana_6",
+   "text": "Her parents run a pharmacy in Dearborn and wanted a pharmacist; her little sister Nour is on her side.",
+   "how": "A phone call overheard on the Commons beach."
+  },
+  {
+   "id": "rana_7",
+   "text": "She wears her old Rare scarf because, she says, she has not finished with it.",
+   "how": "Ask about the scarf once she has stopped snapping at you."
+  },
+  {
+   "id": "rana_8",
+   "text": "She has lost four finals from winning positions, and can recite the exact turn each time.",
+   "how": "A long Night at the trial dome once she is Close."
+  },
+  {
+   "id": "rana_9",
+   "text": "She would rather be hated than pitied, and has arranged things accordingly.",
+   "how": "She says it herself, Dating stage, not looking at you."
+  }
+ ],
+ "secret": "Rana is the eldest daughter of Samir and Hala Marika, Lebanese-American pharmacists in Dearborn who gave her one year 'to get this out of her system' and have now, grimly, given a second. She is a genuinely excellent deck-builder — careful, inventive, the kind of player who finds the line nobody else saw — and she chokes at match point. Not nerves in general: specifically the last decision of a game she is winning. Her hand physically stalls; she takes the safe line, the wrong line, any line that is not the one that ends it. It began in a regional final at seventeen when she made a winning play, her opponent (a friend) burst into tears, and Rana felt like a thief. Some part of her has refused to finish people off ever since. She does not know this is the cause; she thinks she is simply a coward. Four finals lost from ahead. Held back by Santángel's signature 'for her own good'; demoted from Rare, where her best friend and ex-roommate Priya Raman went on to a Battle Team reserve pin. The bad temper is shame wearing armour: if she bites first, nobody gets close enough to be kind, and kindness is what she cannot stand. Contradiction: she tutors frightened first-years at midnight, patiently, and would deny it under oath. Private joke: she names her Cybugs after people who annoyed her that week; if there is ever one called Rowan it is a promotion.\nRoute: slow. She has to be argued with, not soothed; respected as a player before anything else; and eventually helped — not told — to see what actually happens at match point. The Island Open (Days 124–126) is her last chance under the school's rules: no sanctioned win by the end of Term 2 means she is out. With the choke understood she can win it; if she does it with Rowan in the top row it is the best scene in her route.\nDark turn: she despised Brant and still goes pale when he is Hollowed. She understands, earlier than most, that the Hollow Duels are 'a final you cannot afford to choke in', and it terrifies and fascinates her. In a bad timeline she challenges the Guest herself on Day 126 after losing the Open, having nothing left to lose. In a good one she is the person in the finale who makes the last, ugly, necessary play without flinching.",
+ "wants": "One trophy with her name on it, won by finishing the job.",
+ "fears": "That she is exactly what the noticeboard says: the one who could not.",
+ "crush": "kenji",
+ "crushNote": "He is the one person from her old year who never changed how he spoke to her, and he still plays her at midnight as an equal. It shows as her being on time for exactly one thing, and as criticism of his list so detailed it must have taken hours.",
+ "crushPace": 0.6,
+ "likes": [
+  "Being argued with as an equal",
+  "Specific, technical praise of a build or a line",
+  "Being asked to test a deck",
+  "People who do not flinch when she snaps",
+  "Black coffee, salt snacks, late hours",
+  "Loyalty to the Commons",
+  "Rematches",
+  "Silence that is not pity"
+ ],
+ "dislikes": [
+  "Pity, pep talks, 'you'll get it next time'",
+  "Being let win",
+  "Anyone mentioning Priya's team pin",
+  "Santángel's name said with respect",
+  "Being called 'cute when angry'",
+  "Unasked advice at match point",
+  "Bullies"
+ ],
+ "gifts": [
+  "Card: Cybug RHINOCEROS",
+  "Black nail polish",
+  "Strong cardamom coffee from the night market",
+  "Card: Golden Ladybug",
+  "A printed bracket with her name pencilled in the winner's line (only once Close)",
+  "Card: Troop Annihilation"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Hostile until proven otherwise; affection as insult.",
+  "text": "Rana does not flirt; she slowly stops telling him to go away. Interest shows as criticism that gets oddly specific ('your turn-three sequencing is embarrassing, sit down, I'll show you'), as sitting one seat nearer, as a Cybug named after him. She will not start anything and treats obvious charm as mockery. Approach her through the game: ask her to test, disagree with her and be right once, keep turning up after she has been rude. Do not comfort her; stay. The first time she laughs she looks furious about it. If he ever lets her win she will know, and it will cost weeks."
+ },
+ "intimacy": "Guarded for a long time, then fierce. She does not do casual touch — the first contact is likely a shoved shoulder or her hand correcting his grip on a card and not moving away. She kisses the way she plays: after long calculation, decisively, and then pretends it was nothing. In private, once trust exists, the armour comes off all at once: she is intense, direct about what she wants, holds on hard, and is undone by gentleness in a way that makes her briefly angry. She likes being close in the dark after a win or a loss, talking in a low voice with her head on his chest. Fade when she pulls the blanket over both their heads and tells him to shut up.",
+ "events": [
+  {
+   "id": "rana_e1",
+   "stage": 1,
+   "title": "Why are you sitting here",
+   "condition": "Keep showing up: sit at her table at commons_kitchen or duel_terraces at least three times in the first three weeks despite being told to go away, and ask her one real question about her Cybug build.",
+   "hint": [
+    "She tells everyone to leave. A few times is not the same as meaning it.",
+    "Keep sitting with her even when she is rude, and ask about how she built her deck."
+   ]
+  },
+  {
+   "id": "rana_e2",
+   "stage": 2,
+   "title": "Sit down, I'll show you",
+   "condition": "Ask her to test against you before the Freshman Cup or Ladder Season, take her criticism without sulking, and beat her fairly at least once; discover the midnight tutoring and say nothing to anyone.",
+   "hint": [
+    "She is a better teacher than she wants known.",
+    "Practise with her seriously, win one honestly, and keep quiet about what she does at night in the kitchen."
+   ]
+  },
+  {
+   "id": "rana_e3",
+   "stage": 3,
+   "title": "The exact turn",
+   "condition": "After a loss from a winning position (Promotion Duels, Days 89–91, or any sanctioned match), stay with her at trial_dome at Night and replay the final turn together until she says out loud what happened to her hand; do not offer a solution. She kisses him, once, and says it means nothing.",
+   "hint": [
+    "She loses the same way every time. She has never looked at it with someone else in the room.",
+    "After she throws away a won game, stay and go through the last turn with her without trying to fix her."
+   ]
+  },
+  {
+   "id": "rana_e4",
+   "stage": 4,
+   "title": "Not finished with it",
+   "condition": "Over the winter interlude and early Term 2, be her training partner specifically for closing games (she chooses the drills); be there when she phones home and tells her parents she is entering the Island Open. She stays the night.",
+   "hint": [
+    "She has one event left. She has to decide to enter it as someone who expects to win.",
+    "Train with her on finishing games, and be beside her when she tells her family she is going for it."
+   ]
+  },
+  {
+   "id": "rana_e5",
+   "stage": 5,
+   "title": "Match point",
+   "condition": "At the Island Open (Days 124–126), be visibly in the top row for her final; she must make the winning play herself (win or lose, she makes it without stalling). Afterwards she takes off the Rare scarf and gives it to Rowan.",
+   "hint": [
+    "Her last chance has a date. What she needs from you that day is very simple.",
+    "Be in the stands, where she can see you, for her final at the Island Open."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "roommates",
+   "text": "The green-haired one will not stop talking through the sheet. By about the third week Rana has, grudgingly, started answering.",
+   "public": true,
+   "from": 1
+  },
+  "livvie": {
+   "label": "roommates",
+   "text": "The only person in the bungalow who works later than Rana sulks. She respects that, and says nothing about the spreadsheet in the wardrobe.",
+   "public": true,
+   "from": 1
+  },
+  "kenji": {
+   "label": "friends",
+   "text": "The one teammate from her old year who never changed how he spoke to her.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "rivals",
+   "text": "Priya got the team pin while Rana got the grey collar. Rana cannot sit in that chair.",
+   "public": true,
+   "from": 0
+  },
+  "nathan": {
+   "label": "distrusts",
+   "text": "He read her shame off a noticeboard at full volume. She has not forgiven it, though she knows he meant nothing.",
+   "public": true,
+   "from": 1
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "He signed the form that held her back.",
+   "public": true,
+   "from": 0
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "He calls her 'Oh-for-a-year'. She has a Cybug named after him.",
+   "public": true,
+   "from": 0
+  },
+  "ophelia": {
+   "label": "friends",
+   "text": "One of the few from her old year who neither pities nor avoids her. No jokes. Rana finds that restful.",
+   "public": true,
+   "from": 0
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "The one person awake when she is. He does not ask about last year.",
+   "public": true,
+   "from": 8
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "commons_kitchen"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "card_shop",
+   "Afternoon": "trial_dome",
+   "Evening": "bonfire_pit",
+   "Night": "commons_kitchen"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "A home-brewed Cybug swarm that chains small bodies into one enormous turn; inventive, well-prepared, usually ahead by the crisis phase. Plays like a 7 until the last decision.",
+  "tilt": "Match point. In the endgame phase of any sanctioned match she is winning, she takes the safe line. An opponent who looks upset about losing makes it worse."
+ }
+}

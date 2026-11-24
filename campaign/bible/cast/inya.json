@@ -1,0 +1,233 @@
+{
+ "id": "inya",
+ "name": "Inya Kaboom (enrolled as Inya Bell)",
+ "firstName": "Inya",
+ "age": 18,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B3",
+ "romance": true,
+ "deck": "Hop & Pop (bunnies)",
+ "look": "Petite, with long mint-green hair in two low tails held by a bunny hairclip and big amber eyes that narrow when she is calculating. She wears an oversized hoodie over the uniform, sleeves past her knuckles, and a bunny keychain swings from her deck box. She sits cross-legged on every chair.",
+ "voice": "Quick, bright and competitive, in short sentences that stack up into an argument. She states bunny facts in the flat tone other people keep for tax law, sulks for about four seconds when she loses a point, and laughs before the sulk is finished. Suspicious of compliments, generous with rematches. RARE habit (once in a scene at most; most scenes go without it): a one-word verdict ('Rude.') on a point she has just conceded.",
+ "lines": [
+  "You kept the removal for the wrong bunny. That one was the decoy. They're all the decoy — that's the deck.",
+  "Rude. Accurate, but rude.",
+  "A rabbit can turn ninety degrees at full speed. Name one of your storm clouds that can do that.",
+  "Don't let me win. If you let me win I'll know, and I'll never speak to you again, and I'll still take the win."
+ ],
+ "intro": "A first-year from bungalow 3, enrolled as Inya Bell: tiny, fiercely competitive, and completely serious about rabbits.",
+ "traits": [
+  {
+   "id": "inya_1",
+   "text": "She asked to be housed in the Commons even though her entrance rank would have put her higher.",
+   "how": "Dorm assignment on Day 1, or Mama Odalys mentions it."
+  },
+  {
+   "id": "inya_2",
+   "text": "She has kept rabbits since she was five and can list every breed by ear length.",
+   "how": "Any casual chat; unavoidable."
+  },
+  {
+   "id": "inya_3",
+   "text": "She keeps a tally of every loss in the back of a notebook, with one line on what she should have done.",
+   "how": "Play her and lose or win; she writes it down in front of you."
+  },
+  {
+   "id": "inya_4",
+   "text": "She cannot sleep without noise and leaves a tiny radio on low all night.",
+   "how": "Livvie complains about it, or visit bungalow 3 at Night."
+  },
+  {
+   "id": "inya_5",
+   "text": "She is afraid of deep water and has never told the pool crowd why she stays in the shallow end.",
+   "how": "A pool, beach or boat scene."
+  },
+  {
+   "id": "inya_6",
+   "text": "Her first rabbit was called Admiral Buttons; the bunny hairclip was bought the week he died.",
+   "how": "A quiet evening on the commons beach once she is a Friend."
+  },
+  {
+   "id": "inya_7",
+   "text": "She grew up mostly in hotel rooms near tournaments and conventions, with a tutor and a suitcase.",
+   "how": "Ask where she is from; she dodges twice and answers the third time."
+  },
+  {
+   "id": "inya_8",
+   "text": "There is a hero card called 'Card Game Player Inya', printed when she was six, and she has never put it in a deck.",
+   "how": "After her surname is public; she brings it up herself if she trusts you."
+  },
+  {
+   "id": "inya_9",
+   "text": "She wants a pro title won under a name nobody handed her, and would rather lose than be waved through.",
+   "how": "After Day 19, alone."
+  }
+ ],
+ "secret": "Inya is Chuck's only grandchild. Her mother, Margit Bell-Kowalczyk, is Chuck's estranged daughter, a tournament organiser who raised Inya on the convention circuit and taught her that 'Kaboom' is a brand, not a family. Inya adores her grandfather and has seen him perhaps forty days in her life, most of them childhood summers on the island (Silas taught her to fish off the lighthouse rocks; Wren's predecessor let her sort cards in the workshop). Her wound: every adult who was ever kind to her turned out to be kind to the name. At eleven she overheard a judge say 'give the kid the ruling, it's his granddaughter' and has never trusted a win since. The mint hair, the hoodie and the mother's surname are armour; so are the bunnies, which are also simply true. The lie she lives: that she can keep the two halves of her life apart and be only 'Inya Bell, Commons, rank 140-something'. She knows nothing of the Vault, the tiles or what her grandfather found — only that he has 'stories he won't finish' and a locked drawer.\nArc: Day 19 (Freshman Cup roster with legal names) blows the cover. People who mocked her start bowing; a couple of Commons kids feel lied to. She hides at beach_cove and plays worse for a week. Whoever treats her exactly as before becomes permanently important to her. After the bang she is curious, not scared. After Day 40 she notices her grandfather is frightened, which she has never seen, and starts pushing at the locked drawer; she will pick the lock by midwinter if nobody helps her ask. She does not react to the Hollowings with fear but with fury — it is HER game being used. If she learns Chuck hid the truth she stops calling him Grandpa for a long, exact number of days. She went out of the Freshman Cup in the semi-final to Georgie, fairly, and people still said the bracket was rigged for her. She knows her grandfather sleepwalks and that his 'made-up' lullaby language is not made up. She is brave to the point of stupidity: when the third Hollowing takes one of the Commons' own (Day 66) she will formally challenge '{H}' herself unless someone she loves makes a better plan — it will defer the full three days, hoping to be talked out of it.",
+ "wants": "To earn a pro seat under a name that opens no doors for her.",
+ "fears": "That she has never actually won anything, and that everyone but her has always known it.",
+ "crush": "tomi",
+ "crushNote": "He priced her as 'Bell' and kept the price exactly the same after the roster was printed. It shows as her haunting the trade binder, haggling far longer than the card is worth, and going pink when he says 'friend price'.",
+ "crushPace": 0.9,
+ "likes": [
+  "Being beaten honestly, and rematched immediately",
+  "People who ask about the rabbits and then remember the answers",
+  "Carrots, radishes, anything crunchy shared from a paper bag",
+  "Being treated the same on Day 20 as on Day 18",
+  "Late-night deck tuning on the bungalow steps",
+  "Teasing that she can return with interest",
+  "Standing up for Commons kids"
+ ],
+ "dislikes": [
+  "Being let win, or 'going easy'",
+  "Any mention of her surname as a favour, a threat or a compliment",
+  "Asking her to get something from her grandfather",
+  "Reverent voices",
+  "Jokes about rabbits as food",
+  "Being called cute in the middle of a match",
+  "Being left out of a plan 'for her safety'"
+ ],
+ "gifts": [
+  "Card: Cheering Rabbit",
+  "Card: Cute Bunny",
+  "A paper bag of fresh carrots from the orchard stall",
+  "A tiny hand-sewn bunny charm for the keychain",
+  "Batteries for her night radio",
+  "Card: Lovely Teddy"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Competitive and deniable.",
+  "text": "Inya flirts by challenging: a bet, a rematch, a dare with a forfeit ('loser buys the winner cocoa and has to say something nice'). She does not start it — she escalates what is already there, and backs off with a pout the moment she suspects flattery aimed at her name. She wants to be approached as a rival first: beat her, lose to her, remember her bunny facts, never mention her grandfather. Compliments about her play land; compliments about her looks make her go red and suspicious. Once sure, she is suddenly direct and a little bossy about it."
+ },
+ "intimacy": "Slow to start, then wholehearted. She is inexperienced and hides it behind jokes; laughing with her, never at her, is what makes her brave. She likes closeness that begins as play — a stolen hoodie string, a wrestling match over the last carrot, falling asleep against a shoulder with the radio on — and she likes being held firmly, as though she will not be put down again. First kisses happen mid-argument. She wants the hoodie off on her own terms and the lights low, and she talks, breathless and teasing, right up to the moment the scene should fade.",
+ "events": [
+  {
+   "id": "inya_e1",
+   "stage": 1,
+   "title": "Loser buys cocoa",
+   "condition": "At the Day 5 Commons bonfire mixer (or any later evening at bonfire_pit), play her a casual game without holding back, and afterwards ask her something about rabbits rather than about her deck list.",
+   "hint": [
+    "She respects people who don't go easy on her.",
+    "Play her seriously at the bonfire and show interest in what she loves."
+   ]
+  },
+  {
+   "id": "inya_e2",
+   "stage": 2,
+   "title": "Legal names",
+   "condition": "After the Freshman Cup roster is printed on Day 19, find her where she hides (beach_cove, Evening or Night) within three days and treat her exactly as before — no reverence, no questions about her family unless she opens the door.",
+   "hint": [
+    "Something changes how people look at her. Don't change with them.",
+    "After the Freshman Cup roster comes out, find her at the cove and be the same person you were the day before."
+   ]
+  },
+  {
+   "id": "inya_e3",
+   "stage": 3,
+   "title": "The rabbit under the mask",
+   "condition": "Have never used her name for any advantage (no asking Chuck for favours through her), then accept the dance or duel she offers at the Night of Masks (Day 54) at festival_grounds and tell her afterwards you knew which mask was hers.",
+   "hint": [
+    "On a night when everyone wears another face, she will want to know if you can still find her.",
+    "Go to the Night of Masks, recognise her, and say yes to what she asks."
+   ]
+  },
+  {
+   "id": "inya_e4",
+   "stage": 4,
+   "title": "Her own name",
+   "condition": "Be in the stands for her Promotion Duel (Days 89–91); whether she wins or loses, walk her back along commons_beach and hear the real reason she chose the Commons. The step completes that night or after the Winter Gala (Day 103).",
+   "hint": [
+    "There is a match she needs to play as herself, with one person watching for the right reasons.",
+    "Watch her Promotion Duel, walk her home along the beach, and let her tell you why she lives where she lives."
+   ]
+  },
+  {
+   "id": "inya_e5",
+   "stage": 5,
+   "title": "The locked drawer",
+   "condition": "In Term 2, go with her to chuck_workshop when she confronts her grandfather about what he is hiding; stay when it goes badly, take neither side falsely, and afterwards help her decide what SHE does with what she learned.",
+   "hint": [
+    "She is going to ask a question she has been afraid of all her life. She should not be alone for the answer.",
+    "Go with her to her grandfather's workshop when she demands the truth, and stay through all of it."
+   ]
+  }
+ ],
+ "bonds": {
+  "livvie": {
+   "label": "roommates",
+   "text": "Bungalow 3. Inya shares her carrots and has not yet noticed that Livvie never brings food of her own.",
+   "public": true,
+   "from": 1
+  },
+  "rana": {
+   "label": "roommates",
+   "text": "Bungalow 3. Rana has hung a sheet round her bed like a wall; Inya talks to her through it and asks for deck advice on purpose. Friends, more or less, by midterms.",
+   "public": true,
+   "from": 1
+  },
+  "chuck": {
+   "label": "family",
+   "text": "Her grandfather. She adores him, has seen too little of him, and enrolled under her mother's name to get out from under his.",
+   "public": false,
+   "from": 0
+  },
+  "georgie": {
+   "label": "rivals",
+   "text": "Lost to her at a national junior event two years ago and has wanted the rematch ever since; likes her anyway.",
+   "public": true,
+   "from": 0
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "He is polite to her in a way that feels like being measured.",
+   "public": false,
+   "from": 14
+  },
+  "silas": {
+   "label": "friends",
+   "text": "He taught her to fish off the lighthouse rocks on childhood summers and has never once called her by her surname.",
+   "public": false,
+   "from": 0
+  },
+  "wren": {
+   "label": "friends",
+   "text": "Knows her from summers in the workshop; one of the few students who has always known her real name and never cared.",
+   "public": false,
+   "from": 0
+  },
+  "ed": {
+   "label": "friends",
+   "text": "He would walk into the volcano if somebody said it was interesting. She has decided someone has to keep count of him.",
+   "public": true,
+   "from": 5
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "card_shop",
+   "Afternoon": "greenhouse",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Goes wide and fast with cheap bunnies and makes every removal spell feel wasted; Bunny Bombs ticking in the back punish anyone who races. Far better than a first-year should be at sequencing, weaker at long grinding games.",
+  "tilt": "Suspecting her opponent is holding back, or hearing her surname from the crowd — she overextends to 'prove it' and walks into board wipes."
+ },
+ "range": "Rabbits and winning are two notes among many: matchup talk, stories from the convention circuit, fierce loyalty to the row, crunchy snacks, teasing, impatience with anyone who goes easy on her. 'Rude.' once a scene at most."
+}

@@ -1,0 +1,385 @@
+{
+ "name": "Overdraft Mk. III",
+ "owner": "maisie",
+ "heroes": [
+  "Kent, the Indebted Apprentice",
+  "Visionary Genius Heinz",
+  "Legendary Explorer Dajan"
+ ],
+ "main": [
+  [
+   3,
+   "Adventurousness"
+  ],
+  [
+   3,
+   "Bamboo Shield"
+  ],
+  [
+   3,
+   "Cool Repair"
+  ],
+  [
+   4,
+   "Debt-O-Tron Damage Fees"
+  ],
+  [
+   3,
+   "Debt-O-Tron Model Backup Duplicator"
+  ],
+  [
+   3,
+   "Debt-O-Tron Model Loan Shredder"
+  ],
+  [
+   4,
+   "Debt-O-Tron Model Missing Parts"
+  ],
+  [
+   4,
+   "Debt-O-Tron Model Money Printer"
+  ],
+  [
+   3,
+   "Debt-O-Tron Model Scrap Plow"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Future Tech Laser Cannon"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   5,
+   "Inventing"
+  ],
+  [
+   2,
+   "MOE Bomb"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   3,
+   "Secret Lab Entrance"
+  ],
+  [
+   3,
+   "Trade"
+  ],
+  [
+   2,
+   "Vampiric Sword"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Kent, the Indebted Apprentice": "Hero",
+  "Visionary Genius Heinz": "Hero",
+  "Legendary Explorer Dajan": "Hero",
+  "Adventurousness": "Ability",
+  "Bamboo Shield": "Artifact (Reaction)",
+  "Cool Repair": "Artifact",
+  "Debt-O-Tron Damage Fees": "Artifact",
+  "Debt-O-Tron Model Backup Duplicator": "Artifact (Creature)",
+  "Debt-O-Tron Model Loan Shredder": "Artifact (Creature)",
+  "Debt-O-Tron Model Missing Parts": "Artifact (Creature)",
+  "Debt-O-Tron Model Money Printer": "Artifact (Creature)",
+  "Debt-O-Tron Model Scrap Plow": "Artifact (Creature)",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Future Tech Laser Cannon": "Artifact (Equipment)",
+  "Golden Ankh": "Artifact",
+  "Inventing": "Ability",
+  "MOE Bomb": "Artifact",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Secret Lab Entrance": "Artifact (Equipment)",
+  "Trade": "Ability",
+  "Vampiric Sword": "Artifact (Equipment)"
+ },
+ "gist": {
+  "Kent, the Indebted Apprentice": "May overspend by a fixed amount, going into negative gold, at the price of her action that turn.",
+  "Debt-O-Tron Model Missing Parts": "Machine playable only in debt: each turn hits a target for ten times her negative gold.",
+  "Debt-O-Tron Model Money Printer": "Draws cards whenever she overspends.",
+  "Debt-O-Tron Model Scrap Plow": "When she overspends, sends any non-hero card on the board to the discard pile.",
+  "Debt-O-Tron Model Backup Duplicator": "When she overspends, searches more Debt-O-Trons.",
+  "Debt-O-Tron Model Loan Shredder": "Once per turn resets her gold to zero.",
+  "Debt-O-Tron Damage Fees": "An artifact she can always play, whatever her gold: a debt on demand.",
+  "Future Tech Laser Cannon": "Hugely expensive weapon; here mostly a way to plunge into debt.",
+  "Vampiric Sword": "Another price tag to overspend on.",
+  "MOE Bomb": "Destroys every creature.",
+  "Bamboo Shield": "Cancels a hit on a hero.",
+  "Legendary Explorer Dajan": "Plays an artifact straight from the deck at a discount.",
+  "Prototype Battle Table": "Invented card: a ruinously expensive Area.",
+  "Debt-O-Tron Model Spare Arm": "Invented card: a repair machine."
+ },
+ "plan": "Maisie builds machines that run on debt. Kent lets her spend gold she does not have; while her gold is negative the Debt-O-Trons can be played, and every further overspend makes them draw, search and remove your cards, while Missing Parts shoots for ten times the size of the debt. The Loan Shredder wipes the slate so she can do it again. The machines are small artifact creatures, the whole thing stops if Kent is silenced, and a turn in which she goes into debt is a turn without an action.",
+ "looks": {
+  "early": "A negative number where her gold should be, one small machine.",
+  "mid": "Four machines whirring each time she overspends; your attachments vanishing.",
+  "late": "A debt the size of a house and Missing Parts aimed at your caster."
+ },
+ "custom": [
+  {
+   "name": "Prototype Battle Table",
+   "type": "Artifact (Area)",
+   "text": "Absurdly expensive; both players' artifacts cost a little less."
+  },
+  {
+   "name": "Debt-O-Tron Model Spare Arm",
+   "type": "Artifact (Creature)",
+   "text": "Only playable in debt; repairs another Debt-O-Tron each turn."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She went into debt and took no action this turn.",
+   "why": "Each debt turn costs her the action, and Kent is small: early damage is unanswered."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Four small machines stand on her side.",
+   "why": "They are creatures with little health and they are the engine: one sweep ends the factory, where waiting lets the Scrap Plow eat your Storm."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Her debt is enormous and Missing Parts is on the board.",
+   "why": "Its shot is ten times the debt: steal or freeze that one machine, or freeze Kent so no further debt is possible."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "The Loan Shredder is gone and she is stuck in debt.",
+   "why": "She cannot play ordinary artifacts any more."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Maisie buys a Laser Cannon she cannot afford and loses her action.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Kent"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Cannon"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Money Printer clatters down and draws her two.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "Dajan fetches a Damage Fees.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kent first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Kent"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Printer, Plow, Duplicator, Missing Parts.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal Missing Parts"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach under a Scrap Plow"
+     }
+    ]
+   },
+   {
+    "board": "The Scrap Plow sends your Storm to the discard pile.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before re-attaching"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Plow"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach at once"
+     }
+    ]
+   },
+   {
+    "board": "She shows a Deepsea Idol.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Two sweeps in one turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Kent"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Missing Parts aims a shot the size of her debt.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "The Loan Shredder resets her gold for another round.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Shredder"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "MOE Bomb is in her hand; you have no creatures.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Let her; freeze Kent"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Stuck in debt, no machines.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Heinz alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Kent.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Dajan"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

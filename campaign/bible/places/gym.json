@@ -1,0 +1,19 @@
+{
+ "name": "The Gymnasium",
+ "zone": "campus",
+ "bg": "gym",
+ "night": false,
+ "hours": "Physical Conditioning classes Tuesday Morning; open training Morning to Evening; Battle Team strength sessions before dawn.",
+ "sight": "A high timber hall striped with court lines, climbing ropes and a bouldering wall whose holds are shaped like Gold coins and card symbols. One corner is free weights and battered punch bags; another, incongruously, a ring of duel tables on rubber matting, where people play with their pulse still at 150. Coach Rox's whistle cuts through everything. It smells of rubber, chalk and effort.",
+ "things": [
+  "Attend Physical Conditioning (and discover why a card school has one)",
+  "Run intervals, then play a timed hand with shaking fingers — the 'heartbeat drill'",
+  "Climb the gem wall",
+  "Lift with Baylee, who spots for anyone and says nothing about the weights",
+  "Hit the bag after a bad loss",
+  "Watch the Battle Team's dawn session through the door glass",
+  "Read the tryout notice and the standards sheet pinned beside it",
+  "Ask Coach Rox what she looks for in a reserve"
+ ],
+ "secret": "Conditioning is the mechanical remedy for Rowan's low Nerve: the heartbeat drill converts fitness into steadier hands (technique 'Box Breath'). Battle Team open tryouts Day 33 are announced here; the result is posted on Day 34. Rox judges people by what they do when exhausted; she is the staff member least impressed by Lilia's legend and most protective of Willas. Stage D: after each team member's incident her standards sheet loses a name; she never takes the sheet down. Priya trains here at dawn; Sunny between pool shifts."
+}

@@ -1,0 +1,19 @@
+{
+ "name": "Coin-Op Cove",
+ "zone": "town",
+ "bg": "arcade",
+ "night": false,
+ "hours": "Midday to Evening (to Night on Fridays and Saturdays before the curfew).",
+ "sight": "A dim cave of a building near the quay, loud with chiptune and flashing in six colours: rows of old cabinets, a claw machine full of card-themed plushies, air hockey, a dance pad, and a line of first-generation Pixel Parties holo-pods where the heroes are made of a few hundred glowing blocks each. The carpet is a galaxy pattern worn to grey paths. It smells of dust burning on hot tubes and spilled soda.",
+ "things": [
+  "Play the old holo-pods: the game as it looked twenty years ago (1 cr a game)",
+  "Try the claw machine for a bunny plush someone would love",
+  "Lose at air hockey to someone much more competitive than they look",
+  "Do the dance pad and be watched",
+  "Go for the high score on a cabinet and get your initials up",
+  "Win tickets and trade them for erasers, dice or one dusty mystery booster",
+  "Bring a date who needs to laugh"
+ ],
+ "secret": "Light-hearted date and friendship location (Inya and the bunny plush; Georgie, supervised, is unbeatable at everything and delighted about it; Kenji holds four high scores). The old holo-pods run first-generation projection, built by Chuck's original engineers to imitate what he saw in the Vault: block-figures that look like tiles standing up. After D27, if '{H}' plays a pod, the blocks rearrange into things that are not in the game's roster and the cabinet has to be unplugged. The dusty mystery booster at the ticket counter is an unopened pack from a 25-year-old set: valuable to Tomi, Livvie or Mika, not Alpha.",
+ "access": "From Day 67 closes to students at the end of the Evening slot."
+}

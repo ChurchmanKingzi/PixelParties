@@ -1,0 +1,251 @@
+{
+ "id": "ophelia",
+ "name": "Ophelia Capulet",
+ "firstName": "Ophelia",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor",
+ "romance": true,
+ "deck": "Last Day (Damus, Armageddon, Ifrit: one explosive turn)",
+ "look": "Often taken for a boy at first glance: short choppy dark-blond hair she cuts with kitchen scissors, a sharp jaw, a red jacket with the sleeves shoved to the elbow and its blue collar unbuttoned, hands on her hips. She stands square, looks straight at people and frowns while she listens. There is nothing of her sister's ribbons about her except the same sky-blue eyes.",
+ "voice": "Blunt, practical and flat: she says the necessary thing in the fewest words and expects it to be acted on. No irony at all — she takes every remark at face value, answers jokes as if they were statements, and gets visibly irritated when people laugh at what she thinks was a plain fact. Her temper is quick and short-lived. RARE habit (once in a scene at most; most scenes go without it): 'Meaning what?' when she suspects a joke has gone past her.",
+ "lines": [
+  "You're on her bench. She'll want it at two. Be gone by five to.",
+  "Nothing happens for six turns and then you're dead. I don't see what's funny about that.",
+  "Who told you that? Give me a name and a room number.",
+  "I don't hover. I happen to be on that landing a lot."
+ ],
+ "intro": "A short-haired, short-tempered second-year from Rare Hall, often mistaken for a boy, who plays a deck that does nothing and then ends the game at a stroke.",
+ "traits": [
+  {
+   "id": "ophelia_1",
+   "text": "She is regularly taken for a boy and corrects people once, flatly, without interest.",
+   "how": "Meet her; Nathan gets it wrong at volume."
+  },
+  {
+   "id": "ophelia_2",
+   "text": "She has no sense of humour whatever and knows it.",
+   "how": "Tell her a joke."
+  },
+  {
+   "id": "ophelia_3",
+   "text": "Her deck sets up quietly for half the game and then wins in a single turn.",
+   "how": "Play her without knowing; lose."
+  },
+  {
+   "id": "ophelia_4",
+   "text": "She is on the first-year landing of Rare Hall far more often than a second-year has reason to be.",
+   "how": "Rare lobby or common room, most evenings."
+  },
+  {
+   "id": "ophelia_5",
+   "text": "Her younger sister is the first-year in the ruffled dress, and Ophelia never fusses over her where anyone can see.",
+   "how": "See them pass each other without speaking; ask Pippa."
+  },
+  {
+   "id": "ophelia_6",
+   "text": "She mends, cooks, budgets and fixes plumbing, having run her father's household since she was twelve.",
+   "how": "A broken tap in Rare Hall."
+  },
+  {
+   "id": "ophelia_7",
+   "text": "She did not go to team tryouts last year, though the coach asked her twice.",
+   "how": "From Rox or Priya."
+  },
+  {
+   "id": "ophelia_8",
+   "text": "She loses her temper fast, says one unforgivable thing, and then stands there not knowing how to take it back.",
+   "how": "Be there when it happens; stay."
+  },
+  {
+   "id": "ophelia_9",
+   "text": "Nobody has asked her what she would do with a free afternoon in about eight years, and she has no answer ready.",
+   "how": "Close stage."
+  }
+ ],
+ "secret": "Ophelia has been the adult in the Capulet house since their mother Rosalind died, when she was twelve and Victoria ten: father Edmund, an antiquarian bookseller in Bath, is gentle, learned and incapable of paying a gas bill. She learned to run a household, to stand between her sister and a world that laughs, and to do both without ever seeming to — because the one thing Victoria cannot bear is being managed. So she watches from the background: she is on the landing, she has spoken to the roommate, she knows the timetable by heart, and she says none of it. The boyishness is not a statement; she simply never had time for the other thing and distrusts ornament, which in her experience gets people laughed at. The humourlessness is real and has a cause: every joke of her childhood was at her sister's expense, and she stopped being able to hear the kind ones. Wound: nobody has asked what she wants in eight years, and she has stopped having an answer. Contradiction: she plays the most patient, far-sighted deck in the second year — Damus setting the table, Ifrit and Armageddon ending the world in one turn — and has the shortest fuse on campus. She is a better player than her rank: she turned down Rox's invitation to tryouts twice because the team travels. Private habit: she keeps a list of people who have been unkind to Victoria, with dates. Brant Kessler is on it three times.\nShe came to the Academy first; Victoria followed by refusing to eat. Ophelia has never decided whether that was the best or worst day of her life. Her route is about someone seeing the guardian as a person: she is practical about attraction, blunt once she has decided, and has no idea how to be looked after. Do not joke at her; say it straight.\nAfter Day 40 her only question is how to get Victoria off the island, and her sister's flat refusal to leave is the first real quarrel of their lives. She does not believe in monsters and does not need to: she would formally challenge anything that looked sideways at Victoria, at once, by name, and her deck — whose whole plan is to survive until one turn — is exactly the kind of game the thing {H=@near?on the steps of|in} bungalow 7 has already read to the end. Keeping her from that is the task. In a good ending she is the one who holds a door.",
+ "wants": "Her sister safe without her sister knowing how much work it is — and, though she could not phrase it, one thing that is hers.",
+ "fears": "The day Victoria does not need her, and the day she does and Ophelia is not there.",
+ "crush": "kenji",
+ "crushNote": "He works harder than anyone she knows, never jokes at her and treats a game as a job to be done properly. It shows as her turning up at the trial dome 'for practice' at his hours, and bringing him a meal with an order to eat it.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being told things straight",
+  "Practical help done properly and not mentioned",
+  "Anyone decent to her sister who does not make a show of it",
+  "Competence with tools",
+  "Being asked what she wants, and the question being waited out",
+  "A plain rematch",
+  "Quiet respect for her deck's timing",
+  "Punctuality"
+ ],
+ "dislikes": [
+  "Jokes, especially explained ones",
+  "Being called 'he', then fussed over about it",
+  "Ornament and flattery",
+  "People who talk to Victoria through her",
+  "Being told to calm down",
+  "Brant Kessler",
+  "Anyone asking why she 'bothers' with the game"
+ ],
+ "gifts": [
+  "Card: Damus, the Prophet of Apocalypse",
+  "A good multi-tool from the campus store",
+  "Card: Ifrit",
+  "A free afternoon, arranged: someone trusted with her sister, and nothing she must do",
+  "Strong plain tea",
+  "Card: Armageddon"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "None; then a blunt statement of fact.",
+  "text": "Ophelia does not flirt and does not recognise it — a compliment gets 'Meaning what?' She warms through usefulness and respect: he is decent to Victoria without performing it, he turns up, he says things straight. She will not start a courtship, but once she has worked out that she likes him she says so as she would report a leak, and expects a straight answer. Never tease her; never joke about her looks or her sister. She wants an equal who can stand her temper, tell her when she is wrong, and now and then take a job off her hands without making her ask."
+ },
+ "intimacy": "Unpractised, direct and unexpectedly shy once the practical part is over. She has never been the one looked after, and the first intimacy is simply that: someone else making the tea, taking the list out of her hand, telling her to sit. She is physically frank — strong hands, a firm grip, no coyness — and then startled by gentleness, which she does not know how to receive and goes very quiet under. She likes plainness: his shirt, a window open, no talk. Her room on the third floor with the door actually locked for once. Fade as she drops the jacket over the chair and, for the first time anyone has seen, does not check the time.",
+ "events": [
+  {
+   "id": "ophelia_e1",
+   "stage": 1,
+   "title": "Be gone by five to",
+   "condition": "Meet her because of her sister (the bench on the quad, or the first-year landing in rare_lobby) and take her bluntness without offence; be straightforwardly decent to Victoria in front of her, without making a point of it.",
+   "hint": [
+    "Somebody is always nearby when the girl in ribbons is about. She is not friendly. She is paying attention.",
+    "Be kind to Victoria where her sister can see, and do not mind the sister's manner."
+   ]
+  },
+  {
+   "id": "ophelia_e2",
+   "stage": 2,
+   "title": "Six turns",
+   "condition": "Play her deck without being warned, lose, and ask her to explain it; then be the one who tells her straight when she has lost her temper at the wrong person, and stay while she works out how to apologise.",
+   "hint": [
+    "Her deck and her temper work the same way. Both are worth understanding.",
+    "Duel her, ask about her deck, and be honest with her after she loses her temper."
+   ]
+  },
+  {
+   "id": "ophelia_e3",
+   "stage": 3,
+   "title": "Meaning what",
+   "condition": "Arrange a free afternoon for her (Pippa or Jessica with Victoria; a plan she did not have to make) after midterms; when she tells you, as a plain fact, that she likes you, give a plain answer.",
+   "hint": [
+    "She has not had an afternoon to herself in years. She would not know how to ask.",
+    "Give her time off from looking after everyone, and answer her honestly when she speaks her mind."
+   ]
+  },
+  {
+   "id": "ophelia_e4",
+   "stage": 4,
+   "title": "The list",
+   "condition": "After Day 40, when she wants Victoria off the island and Victoria refuses, do not take a side falsely; help the two of them have the quarrel properly, and keep Ophelia from doing something rash about it. She shows you the list. You stay.",
+   "hint": [
+    "The sisters have never once quarrelled. They are about to.",
+    "Help the two sisters through their first real argument, and keep the elder from acting in anger."
+   ]
+  },
+  {
+   "id": "ophelia_e5",
+   "stage": 5,
+   "title": "Something of hers",
+   "condition": "In Term 2, stop her formally challenging a certain unbeaten player on her sister's account (by a better plan, not by forbidding it), and back her when she finally goes to Coach Rox about the team. She tells Victoria herself.",
+   "hint": [
+    "She would walk into anything for her sister. Somebody must give her a reason to walk into something for herself.",
+    "Talk her out of a duel she cannot win, and support her in claiming a place she has earned."
+   ]
+  }
+ ],
+ "bonds": {
+  "victoria": {
+   "label": "family",
+   "text": "Her younger sister, whom she has stood guard over since she was twelve — from the background, because Victoria cannot bear to be managed.",
+   "public": true,
+   "from": 0
+  },
+  "kenji": {
+   "label": "friends",
+   "text": "Same intake, same floor. He works properly and never jokes at her.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "friends",
+   "text": "Trains like someone who means it. Ophelia turned down tryouts the year Priya made the team, and neither has mentioned it.",
+   "public": true,
+   "from": 0
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "Three entries on her list, with dates. He mimicked her sister once.",
+   "public": true,
+   "from": 0
+  },
+  "rana": {
+   "label": "friends",
+   "text": "They came in together. Ophelia thinks what was done to Rana was stupid and has said so to the department head's face.",
+   "public": true,
+   "from": 0
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Her sister's roommate. Ophelia interviewed her on the first day and has trusted her since the second.",
+   "public": true,
+   "from": 1
+  },
+  "rox": {
+   "label": "protégé",
+   "text": "The coach asked her to tryouts twice. Saying no cost more than she lets on.",
+   "public": true,
+   "from": 0
+  },
+  "bex": {
+   "label": "distrusts",
+   "text": "The stream once clipped thirty seconds of Victoria's commentary as a joke. Ophelia went to the studio.",
+   "public": true,
+   "from": 0
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "Speaks to Victoria as an equal and expects nothing for it. That is rare enough to be noted.",
+   "public": true,
+   "from": 8
+  },
+  "magnus": {
+   "label": "strangers",
+   "text": "A first-year who keeps turning up with 'matchup questions'. She answers them. She has not wondered why.",
+   "public": true,
+   "from": 20
+  },
+  "lucas": {
+   "label": "distrusts",
+   "text": "Tall, polite, always near the bench. She has found nothing against him yet and is still looking.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "great_arena",
+   "Afternoon": "duel_terraces",
+   "Evening": "rare_lobby",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rare_common_room",
+   "Midday": "campus_store",
+   "Afternoon": "trial_dome",
+   "Evening": "rare_lobby",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Damus builds for six quiet turns, then Ifrit and Armageddon end the game at once. Against anyone who does not know the deck she looks harmless until the turn they lose; against anyone who does, she is ordinary.",
+  "tilt": "Being laughed at mid-game, or her sister in distress within earshot: she goes off a turn early and it fizzles."
+ }
+}

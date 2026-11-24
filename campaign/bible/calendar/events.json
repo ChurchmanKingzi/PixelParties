@@ -1,0 +1,3763 @@
+[
+ {
+  "id": "arrival",
+  "day": 1,
+  "slot": "Morning",
+  "place": "ferry_deck",
+  "title": "Arrival Day",
+  "public": "The ferry Second Chance brings the new students to Caldera Key. She docks at 10:40.",
+  "visibleFrom": 1,
+  "who": [
+   "abel",
+   "nathan",
+   "baylee",
+   "ed",
+   "georgie",
+   "pippa",
+   "mikoto",
+   "gideon",
+   "inya",
+   "tomi",
+   "magnus",
+   "noor",
+   "livvie",
+   "jessica",
+   "ashton",
+   "victoria",
+   "ophelia",
+   "sunny",
+   "marit",
+   "rana",
+   "teobalt"
+  ],
+  "gm": "DAY 1, MORNING, ABOARD THE FERRY: the ship is four places with no travel time (ferry_deck, ferry_lounge, ferry_stern, ferry_bridge); the Hours line of each says who is there, what they are doing and whether they will play. Use only @clock aboard, never @time. She docks at 10:40: then @place ferry_dock, and the walk up to the Quad. All 36 first-years are strangers to each other and to Rowan. In the lounge a quarrel over the one card table is coming to a head (hook h_ferry_table). The opening scene is the player's to use: he may stay at the rail, walk the ship, talk to anyone, challenge people to casual games or be challenged (Inya; Magnus if he hears the handle), put credits on a game with Tomi, or step into the quarrel. Let him meet people by what they are doing, not by introduction; names come when people give them. NOBODY KNOWS ANYBODY: the only exceptions are family (the Capulet sisters) and whatever people have learned of each other since the harbour. Keep it light and wide-eyed. Rowan is a late Wildcard qualifier: his name is handwritten at the bottom of the passenger list by the wheelhouse door, and he is the only first-year without a jacket.",
+  "kind": "school"
+ },
+ {
+  "id": "ferry_docks",
+  "day": 1,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "The Ferry Docks",
+  "public": "The Second Chance ties up at the Academy pier at 10:40. The walk up to the Quad takes ten minutes.",
+  "visibleFrom": 1,
+  "who": [
+   "abel",
+   "nathan",
+   "baylee"
+  ],
+  "gm": "ONLY IF ROWAN IS STILL ON THE SHIP (his place is ferry_deck, ferry_lounge, ferry_stern or ferry_bridge): she docked at 10:40 while he was busy, and it is eleven. Begin this answer with the gangway down and the decks emptying; a talk or a game in progress was cut short by the horn, and a wager that was not played out stands and is settled ashore. Write @place ferry_dock at once and take him up the avenue towards the Quad, where the welcome address is beginning (next entry). If he is already ashore, ignore this entry.",
+  "kind": "school"
+ },
+ {
+  "id": "dorm_assignment",
+  "day": 1,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Welcome Address & Dorm Assignment",
+  "public": "The Chancellor welcomes the new intake on the Quad; dorm lists are read out.",
+  "visibleFrom": 1,
+  "who": [
+   "okonkwo",
+   "teobalt",
+   "octavia",
+   "odalys",
+   "nathan",
+   "baylee"
+  ],
+  "gm": "Okonkwo's short, formidable speech from the main steps; Octavia reads the lists in rank order — Spectral, Rare, then the Commons. Rowan, having qualified two weeks after admissions closed, is read out last of all: the Commons, bungalow 7, with N. Whisper and B. Halvorsen. Red Competitive Play jacket issued from a crate, with the plain grey collar of the Commons. Mama Odalys collects 'her' eighteen first-years and marches them down to the cove. First sight of the bungalow row and of the room. If the player sulks about the Commons, let Odalys feed him.",
+  "kind": "school"
+ },
+ {
+  "id": "placement_duel",
+  "day": 1,
+  "slot": "Afternoon",
+  "place": "trial_dome",
+  "title": "Placement Duel",
+  "public": "Every new student plays one Placement Duel in the Trial Domes to set a starting ladder rank.",
+  "visibleFrom": 1,
+  "who": [
+   "hana",
+   "santangel",
+   "rox",
+   "rana"
+  ],
+  "gm": "Rowan's first game ever on a physical table in front of people (exam-kind duel; witnesses on the benches, Hana judging, Santángel watching for four minutes and leaving). Opponent: an upper-year volunteer from the distant crowd, or Rana Marika (they have not met; she is simply the name drawn) — she is repeating the year and takes it badly either way. His reads are brilliant and his hands shake; let the player feel both. Result sets the first ladder rank (of 144: roughly 120–135). Losing is fine and expected. Rox notes the tremor and says nothing yet.",
+  "kind": "duel"
+ },
+ {
+  "id": "welcome_supper",
+  "day": 1,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Welcome Supper at the Commons",
+  "public": "Mama Odalys cooks for the whole bungalow row.",
+  "visibleFrom": 1,
+  "who": [
+   "odalys",
+   "nathan",
+   "baylee",
+   "inya",
+   "livvie",
+   "tomi",
+   "rana",
+   "viktor",
+   "freya",
+   "hedda",
+   "trixie",
+   "maisie",
+   "fiona",
+   "leona",
+   "ed",
+   "sammy",
+   "tobias",
+   "dmitri"
+  ],
+  "gm": "The Commons at one table. Eighteen first-years who met this morning, bungalow by bungalow, each in one beat (use names only as people give them): Freya very upright and very cool, Hedda asking what is in the stew, Trixie with something alive in a matchbox (B2); Maisie taking the pepper mill apart, Fiona in black lace saying grace in a deep voice, Leona — ordinary, pleasant, forgettable — choosing the seat nearest the door (B4); Ed asking which part of the island is forbidden (B5); Sammy in a long coat at the table's end being silent at people, Tobias eating like someone who counts meals, Dmitri wide awake when everyone else is fading (B6). And the ones Rowan will know best: Tomi already trading, Livvie eating very fast and very neatly, Rana at the far end not talking, Viktor arriving late with mud to the knee, Inya defending bunnies, Nathan telling Rowan he snores 'so you know'. Odalys's house rules: nobody eats alone, nobody skips breakfast, lights out means quiet. Ends with the first night in bungalow 7 — Nathan does snore.",
+  "kind": "social"
+ },
+ {
+  "id": "orientation",
+  "day": 2,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Orientation Day",
+  "public": "09:00 Lecture Hall: welcome, staff, the three majors, the Ladder, the Charter. 11:00 guided campus tours by dorm from the fountain, lunch at 12:30, second half until about 15:00.",
+  "visibleFrom": 1,
+  "who": [
+   "okonkwo",
+   "santangel",
+   "hana",
+   "blum",
+   "ashdown",
+   "rox",
+   "vivienne",
+   "chuck",
+   "noor",
+   "helical",
+   "camille",
+   "silas",
+   "odalys",
+   "wren",
+   "lilia",
+   "bex",
+   "octavia",
+   "tavita",
+   "pilar",
+   "sebastian",
+   "imara"
+  ],
+  "gm": "ORIENTATION DAY follows the timed plan under FIXED TIMES TODAY, step by step and complete: 09:00 the Chancellor's welcome and the Charter → every member of staff → the three majors, Ladder, credits, grades → Charter Duels, house rules, student council → the Founder, timetables, tour groups → 11:00 guided tour (first half) → 12:30 lunch → 13:15 guided tour (second half) → about 15:00 free. Each step is played out in full when its time comes; nothing is skipped or summarised. Before nine the first-years have breakfast and walk up together. Whoever stays away misses it.",
+  "kind": "school"
+ },
+ {
+  "id": "classes_begin",
+  "day": 3,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Classes Begin",
+  "public": "First day of lectures. Check your timetable: first bell 08:40, Morning class 09:00–10:30, Midday class 11:30–13:00.",
+  "visibleFrom": 1,
+  "who": [
+   "ashdown"
+  ],
+  "gm": "First class of the year (Wednesday: Lore & History in the Morning, Table Practicum at Midday). Establish the rhythm: classes fill Morning and Midday, everything after is Rowan's own time. Skipping is possible and is counted.",
+  "kind": "school"
+ },
+ {
+  "id": "club_fair",
+  "day": 3,
+  "slot": "Afternoon",
+  "place": "quad",
+  "title": "Club Fair",
+  "public": "Clubs and societies recruit on the Quad: theatre, Judge Circle, swim squad, astronomy, outdoor, gardening, The Top Deck and more. 14:30 stalls open, 15:30 demonstrations on the fountain steps, sign-up sheets close at 17:00.",
+  "visibleFrom": 2,
+  "who": [
+   "teobalt",
+   "marit",
+   "bex",
+   "pippa",
+   "sunny",
+   "noor",
+   "wren",
+   "saoirse",
+   "pilar",
+   "sebastian",
+   "hedda"
+  ],
+  "gm": "Stalls round the fountain, run by Pilar, the council's events secretary; Teobalt, three days on the island like everyone else, already holds her clipboard, and Sebastian, the vice-president, stamps club charters. Hedda has a stall of her own that nobody authorised (three causes, one megaphone) until Pilar moves it; Ed signs up for the outdoor club before its leader has finished the safety talk; Trixie asks the gardening club about bees; Eloise is painting the theatre club's banner instead of joining anything. Each club is a door to a character: theatre (Marit, in full flight), Judge Circle (Noor, exact and shy), swim squad (Sunny, flirting immediately), The Top Deck (Bex, wants 'a Commons voice'), photo club (Pippa), gardening (Wren, half asleep), outdoor club (unnamed leader; Viktor signs up only to see their maps). Rowan can join up to two without his grades suffering. Missing the fair only delays this.",
+  "kind": "social"
+ },
+ {
+  "id": "bonfire_mixer",
+  "day": 5,
+  "slot": "Evening",
+  "place": "bonfire_pit",
+  "title": "Commons Bonfire Mixer",
+  "public": "The first Friday bonfire of the year at the Commons cove. All dorms welcome. 18:00 wood and grill, fire lit at 18:45, firelight duels from 20:15, the talking shell at 21:00, embers about 22:00.",
+  "visibleFrom": 2,
+  "who": [
+   "odalys",
+   "nathan",
+   "baylee",
+   "inya",
+   "livvie",
+   "tomi",
+   "rana",
+   "viktor",
+   "marit",
+   "sunny",
+   "pippa",
+   "saoirse",
+   "willas",
+   "jessica",
+   "ashton",
+   "freya",
+   "hedda",
+   "sammy",
+   "cas",
+   "rafa",
+   "trixie",
+   "fiona",
+   "victoria",
+   "ophelia"
+  ],
+  "gm": "The first big social scene (Evening into Night). Everyone here has known everyone else for five days at most; no old friendships, no in-jokes older than Monday. By name: Freya discovers the drinks and by the second verse is conducting the singing with a bottle; Hedda inspects the grill; Sammy stands at the edge of the light being mysterious at nobody; Cas narrates the marshmallows; Rafa feeds people; Trixie introduces a moth; Fiona tells a ghost story in her deep voice and three boys forget to breathe (Sammy, Tobias, and Gideon Pryce at the very edge of the light, pretending to be leaving); Victoria sits on a log with her parasol open against the sparks, Ophelia two logs behind her. Other dorms come down: Marit makes an entrance, Sunny arrives wet from the sea, Jessica comes 'to see how the other half lives' and stays longer than she meant to, Ashton hands out roses, Willas carries the wood for everybody and shouts at someone for dropping a log. Firelight duels with no holograms: Rowan's gentlest first games in front of people. The talking shell goes round — whoever holds it tells a true story; Nathan's is long and embarrassing. Most routes can be opened here. If Rowan stays away, he hears the row singing through the plank wall.",
+  "kind": "social"
+ },
+ {
+  "id": "first_town_trip",
+  "day": 6,
+  "slot": "Morning",
+  "place": "main_street",
+  "title": "First Town Saturday",
+  "public": "The first free Saturday: shuttle carts to Port Mulligan leave the main gate on the hour from 09:00 to 12:00 (sign out at the lodge). Last cart back from Main Street at 21:30; the gate shuts at 22:00.",
+  "visibleFrom": 2,
+  "who": [
+   "dex",
+   "mika",
+   "josie",
+   "abel",
+   "tomi",
+   "inya",
+   "livvie"
+  ],
+  "gm": "Port Mulligan opens up: Main Street, the harbour, the Sleeve & Binder (Dex and Mika; Rowan needs sleeves and a mat, and discovers what singles cost), the café, the arcade. Unlock town places as he walks them. Tomi explains prices; Livvie sells a rare with a face like stone. In the Evening the first Night Market (separate entry). Rowan's money is tight: let the laundromat arithmetic show without comment.",
+  "kind": "town"
+ },
+ {
+  "id": "night_market_first",
+  "day": 6,
+  "slot": "Evening",
+  "place": "night_market",
+  "title": "Night Market",
+  "public": "Port Mulligan's Night Market on the old customs yard, every second Saturday from dusk: lanterns up at 18:00, stalls until late. Last cart back to the Academy at 21:30.",
+  "visibleFrom": 2,
+  "who": [
+   "oru",
+   "mika",
+   "marit",
+   "pippa",
+   "tomi"
+  ],
+  "gm": "Lanterns, skewers, foreign-language printings. At the far end Madame Oru reads spreads from the customer's own deck for 5 cr. Her readings are true and vague: if Rowan sits down now she turns three of his cards and says he sleeps in a room of three, and that one of them 'will keep the bed and lose the sleeper'. No explanation, no repeat. It should read as carnival patter today.",
+  "kind": "town"
+ },
+ {
+  "id": "beach_day_1",
+  "day": 7,
+  "slot": "Afternoon",
+  "place": "beach_cove",
+  "title": "Beach Day at Driftwood Cove",
+  "public": "Swim squad and Commons invite everyone to the cove west of the bungalows. Lifeguard on duty 14:00–17:00. 14:30 volleyball, 15:15 first surfing lesson, towel tables all afternoon.",
+  "visibleFrom": 4,
+  "who": [
+   "sunny",
+   "saoirse",
+   "inya",
+   "baylee",
+   "nathan",
+   "marit",
+   "pippa",
+   "georgie"
+  ],
+  "gm": "Sun, volleyball, a rope swing, cards weighted with shells. Sunny lifeguards and flirts; Saoirse offers a first surfing lesson; Baylee gets sunburnt in real time; Nathan cannonballs onto somebody's playmat; Georgie is there with Pippa, in a sun hat, annihilating upper-years at a towel table. Pure warmth. This is the island the story later takes away.",
+  "kind": "social"
+ },
+ {
+  "id": "judge_circle_first",
+  "day": 8,
+  "slot": "Evening",
+  "place": "classroom",
+  "title": "Judge Circle: First Meeting",
+  "public": "Weekly rules circle in Seminar Room 2B, Mondays 19:00–20:45. Newcomers welcome; bring a ruling you got wrong.",
+  "visibleFrom": 3,
+  "who": [
+   "noor",
+   "hana",
+   "mika"
+  ],
+  "gm": "Noor chairs, Hana supervises from the back, Mika comes up from town. A dozen students argue corner cases. Good for Rules & Judging study, for Noor's slow route and Hana's. Noor can quote the charter's duel clause from memory when asked; plant that she is the person who knows it by heart.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_teobalt",
+  "day": 9,
+  "slot": "Afternoon",
+  "place": "council_room",
+  "title": "Teobalt's birthday",
+  "public": "Teobalt's birthday. Cake in the council chamber at 16:00; leftovers go round the dorms afterwards.",
+  "visibleFrom": 2,
+  "who": [
+   "teobalt"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Teobalt; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The council delegates surprise him with a cake shaped like a clipboard; he has scheduled eleven minutes for it. Helping him carry leftover cake round the dorms is an easy way to meet half the school.",
+  "kind": "social"
+ },
+ {
+  "id": "top_deck_premiere",
+  "day": 9,
+  "slot": "Evening",
+  "place": "broadcast_studio",
+  "title": "The Top Deck: Season Premiere",
+  "public": "The campus stream returns, live from the broadcast studio. Studio audience welcome: doors 18:30, on air 19:00–19:40 (ladder predictions, ones to watch, rules quiz).",
+  "visibleFrom": 4,
+  "who": [
+   "bex",
+   "vivienne",
+   "pippa",
+   "marit"
+  ],
+  "gm": "Bex's show: ladder predictions, freshman 'ones to watch' (Georgie, Gideon, Ashton — and a throwaway joke about 'the Wildcard kid with the online handle'), a rules quiz. If Rowan is in the audience she may pull him on air for thirty seconds: a first, small public-nerve test. Crew shifts are available from tonight.",
+  "kind": "social"
+ },
+ {
+  "id": "ladder_registration",
+  "day": 10,
+  "slot": "Afternoon",
+  "place": "council_room",
+  "title": "Ladder Deck Registration Deadline",
+  "public": "Register your decklist with the council clerk to play ranked in Season 1: the desk is open 14:00–18:00 and closes at the Evening bell. Late forms: ten ranks' penalty.",
+  "visibleFrom": 3,
+  "who": [
+   "noor",
+   "octavia",
+   "teobalt",
+   "sebastian"
+  ],
+  "gm": "A form in triplicate at the council chamber; Noor checks every list against the legality sheet. If Rowan forgets, he can still register late with a 10-rank penalty. Octavia looks at his grey collar, his handle and his list, in that order, and files him. Sebastian Thorne has the next desk, Permits & Sanctions: late forms and the ten-rank penalty are his to rule on, warmly and to the letter.",
+  "kind": "school"
+ },
+ {
+  "id": "ed_expedition_1",
+  "day": 10,
+  "slot": "Afternoon",
+  "place": "tide_pools",
+  "title": "Ed's Expedition No. 1: The Blowhole",
+  "public": "'Meet at the tide pools at low water — 15:00. Bring nothing you mind losing. Back before the tide, about 16:45.' — E. Venture",
+  "visibleFrom": 8,
+  "who": [
+   "ed",
+   "viktor",
+   "tomi",
+   "trixie"
+  ],
+  "gm": "A hand-drawn poster on the Commons boardwalk. The blowhole at the north end of the pools throws spray four metres on a rising tide and Ed wants to stand on it. Merely stupid rather than lethal; Viktor has come, he says, to see the pools. (Plot file: q_ed_places_to_die.)",
+  "kind": "social"
+ },
+ {
+  "id": "bday_trixie",
+  "day": 10,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Trixie's birthday",
+  "public": "Trixie's birthday. Cake at Mama's Kitchen after supper, about 19:00.",
+  "visibleFrom": 3,
+  "who": [
+   "trixie"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Trixie; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The first birthday on the row and nobody has known her ten days: Mama bakes anyway. Trixie cries with happiness, names the cake, and gives the first slice to the bee hotel 'for the girls'.",
+  "kind": "social"
+ },
+ {
+  "id": "movie_night_1",
+  "day": 11,
+  "slot": "Evening",
+  "place": "student_lounge",
+  "title": "Movie Night",
+  "public": "Student lounge, pull-down screen, bring a cushion. Seats from 19:30, film at 20:00, out by 22:00. Tonight: an old pirate picture.",
+  "visibleFrom": 6,
+  "who": [
+   "marit",
+   "bex",
+   "tomi",
+   "inya",
+   "pippa"
+  ],
+  "gm": "Low-stakes evening; whoever Rowan sits next to gets a quiet scene in the dark. Marit narrates until silenced. Runs every other Thursday.",
+  "kind": "social"
+ },
+ {
+  "id": "ladder_s1_opens",
+  "day": 12,
+  "slot": "Morning",
+  "place": "quad",
+  "title": "Ladder Season 1 Opens",
+  "public": "Ranked play begins: the board goes live on the Quad at 07:45, Prof. Santángel opens the season at 08:05. Challenge anyone within 20 ranks of you; book a Trial Dome or meet on the Terraces.",
+  "visibleFrom": 1,
+  "who": [
+   "santangel",
+   "lilia",
+   "dom",
+   "kenji",
+   "priya",
+   "gideon",
+   "brant"
+  ],
+  "gm": "The split-flap board clatters to life and the terraces fill. Explain the ladder loop: ranked duels move rank; top 8 at snapshot dates qualify for events. Brant and his two hangers-on start 'trading' first-years (Sammy, Trixie, Mikoto) out of their rares on the middle terrace — Nathan tells him loudly what he thinks of that. Lilia's name sits at #1 with a gap under it.",
+  "kind": "duel"
+ },
+ {
+  "id": "freya_first_friday",
+  "day": 12,
+  "slot": "Evening",
+  "place": "beach_cove",
+  "title": "Freya's First Friday",
+  "public": "A beach party at Driftwood Cove after the bonfire, from 20:30; night swim about 21:15. 'Bring a cup.' — F. Nordlicht, Bungalow 2.",
+  "visibleFrom": 9,
+  "who": [
+   "freya",
+   "trixie",
+   "hedda",
+   "sunny",
+   "saoirse",
+   "cas"
+  ],
+  "gm": "Twelve days into term and Freya Nordlicht already runs the island's social calendar. Swimming in the dark, a driftwood fire, far too much to drink. She is magnificent until about one and then needs walking home (plot file: q_freya_northern_lights). A good night to meet the first year out of uniform; people are still learning each other's names.",
+  "kind": "social"
+ },
+ {
+  "id": "market_day_1",
+  "day": 13,
+  "slot": "Morning",
+  "place": "main_street",
+  "title": "Harbour Market Day",
+  "public": "The big monthly market fills Main Street and the quay from 08:30 to 14:00: produce, second-hand cards, carved dice. Carts from the main gate on the hour.",
+  "visibleFrom": 8,
+  "who": [
+   "dex",
+   "mika",
+   "odalys",
+   "josie"
+  ],
+  "gm": "Bigger than the weekly stalls. Odalys shops for the week with Baylee and Rafa as porters (job-like favour). Second-hand playmats and binders cheap; one stall of old printings worth digging through.",
+  "kind": "town"
+ },
+ {
+  "id": "field_section_1",
+  "day": 13,
+  "slot": "Midday",
+  "place": "ruins_field",
+  "title": "Lore & History Field Section",
+  "public": "Optional Saturday walk with Professor Ashdown to the old ruins beyond the rope bridge. Sign up at the faculty wing; bring water and boots. Roll call at the main gate 11:00, on site about 13:00, back by 16:30.",
+  "visibleFrom": 6,
+  "who": [
+   "ashdown",
+   "viktor",
+   "pippa",
+   "noor",
+   "felix"
+  ],
+  "gm": "A long day out (jungle trail, rope bridge — a small Nerve test — ruins field). Ashdown lectures on site, crisp and guarded; students take rubbings for credit. The first sight of the mosaics; some figures look like card heroes. Viktor comes for the first and only time and asks where the avenue leads; she says 'to a rock face' and changes the subject. One trench stays under a tarpaulin. Counts as study for Lore. A second section is announced for Day 41 and never takes place.",
+  "kind": "school"
+ },
+ {
+  "id": "dorm_inspection_1",
+  "day": 14,
+  "slot": "Midday",
+  "place": "commons_beach",
+  "title": "Dorm Inspection",
+  "public": "Termly room inspection by wardens and council delegates. Tidy up. The Commons row: at your doors at 11:00, bungalows in order from 11:15, results read out on the kitchen porch at 12:40.",
+  "visibleFrom": 10,
+  "who": [
+   "odalys",
+   "teobalt",
+   "tavita"
+  ],
+  "gm": "Teobalt with a clipboard, Odalys with the spoon. Bungalow 7: Baylee's corner is perfect, Nathan's is a crime scene. A failed inspection costs the room a weekend chore; helping Nathan shovel his side clean the night before is a roommate scene worth having. Teobalt notes the leaking roof and, within the week, gets it fixed. Tavita Leota, the head proctor, leads the delegates round with the warden: he explains the rule, gives each room its one free warning and writes a slip only the second time.",
+  "kind": "school"
+ },
+ {
+  "id": "story_hour_first",
+  "day": 15,
+  "slot": "Afternoon",
+  "place": "chuck_workshop",
+  "title": "The Founder's Story Hour",
+  "public": "Open door at Chuck Kaboom's workshop behind the Design Lab, Mondays 15:00–16:45: tea, a story at 15:15, then games against the Founder. Facts not guaranteed.",
+  "visibleFrom": 10,
+  "who": [
+   "chuck",
+   "wren",
+   "inya"
+  ],
+  "gm": "First chance to meet Chuck up close. He tells a story 'from when I knew them' with total conviction; plays anyone against his impossible mixed pile. Inya sits at the back pretending to be an ordinary fan and he pretends not to know her — badly, both of them. The oldest sketches on the wall are worth a look. Recurs most Mondays.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_eberhart",
+  "day": 15,
+  "slot": "Evening",
+  "place": "gym",
+  "title": "Eberhart's birthday",
+  "public": "Eberhart's birthday. He is in the gym from 18:30, as on any other evening.",
+  "visibleFrom": 8,
+  "who": [
+   "eberhart"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Eberhart; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He trains. Mikoto has made a banner (HAPPY BIRTHDAY EBI) and hung it in R101; it stays up exactly one day and then appears, folded square, in Eberhart's footlocker, where it stays all year.",
+  "kind": "social"
+ },
+ {
+  "id": "cup_practice_night",
+  "day": 16,
+  "slot": "Evening",
+  "place": "duel_terraces",
+  "title": "Freshman Cup Practice Night",
+  "public": "Open practice on the Terraces, 18:30–21:15. Freshman Cup registration (first-years only, free entry) at the registrar's table tonight; it closes on Thursday.",
+  "visibleFrom": 8,
+  "who": [
+   "inya",
+   "nathan",
+   "baylee",
+   "rana",
+   "georgie",
+   "gideon",
+   "ashton",
+   "noor",
+   "sunny",
+   "tomi"
+  ],
+  "gm": "Every first-year is testing. Good moment to learn decks (deck knowledge on several classmates), to be taught something by a friend, and for Rana — who must play the Freshman Cup a second time — to snap at anyone who mentions it. Tomi opens a betting pool; Georgie is the favourite at odds nobody will take. Registration closes on Day 18; not registering costs standing with Coach Rox.",
+  "kind": "duel"
+ },
+ {
+  "id": "swim_meet",
+  "day": 17,
+  "slot": "Afternoon",
+  "place": "pool",
+  "title": "Inter-Dorm Swim Meet",
+  "public": "Dorm relays at the pool. Swimmers and timekeepers wanted. Warm-up 14:30, individual heats 15:00, dorm relays 15:40, results 16:10.",
+  "visibleFrom": 10,
+  "who": [
+   "sunny",
+   "rox",
+   "priya",
+   "saoirse",
+   "jessica"
+  ],
+  "gm": "Rare Hall wins because of Sunny; the Commons relay needs a fourth and looks at Rowan. Taking part is worth fitness and affection; timekeeping from the lifeguard chair is a Sunny scene. Jessica presides from a lounger.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_inya",
+  "day": 18,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Inya's birthday",
+  "public": "Inya's birthday. Cake at Mama's Kitchen after supper, 19:00.",
+  "visibleFrom": 11,
+  "who": [
+   "inya"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Inya; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Mama bakes a tres leches with a bunny piped on it. An unsigned parcel arrives by the kitchen door: a hand-carved wooden rabbit, old, the paint worn — from Chuck, though she tells the table it is 'from home'. Tomorrow morning her legal name goes up on the Freshman Cup roster; tonight is the last evening she is only Inya Bell. If she trusts Rowan, she may tell him herself tonight.",
+  "kind": "social"
+ },
+ {
+  "id": "freshman_cup",
+  "day": 19,
+  "slot": "Morning",
+  "days": 2,
+  "place": "trial_dome",
+  "title": "Freshman Cup",
+  "public": "Two-day tournament for all first-years. Friday: roster on the arena doors 08:00, check-in at the Trial Domes 09:00, players' meeting 10:30, Swiss rounds at 11:00, 11:50, 13:20 and 14:10, standings 15:00. Saturday: bracket draw 10:00, top 8 in the Great Arena from 14:00. First-years are excused from Friday’s classes.",
+  "visibleFrom": 1,
+  "who": [
+   "inya",
+   "georgie",
+   "gideon",
+   "ashton",
+   "nathan",
+   "baylee",
+   "rana",
+   "noor",
+   "sunny",
+   "tomi",
+   "hana",
+   "santangel",
+   "bex",
+   "vivienne",
+   "pilar",
+   "imara"
+  ],
+  "gm": "Rowan's first tournament (tournament-kind duels; Nerve matters). The roster goes up in the Morning on the arena doors and at the job board with LEGAL NAMES: 'KABOOM, Inya' — a crowd forms, the reverent whispering she hates begins, and how Rowan treats her in the next hour matters a great deal. Day 1: four Swiss rounds from Midday (two or three played out, the rest summarised). Georgie goes undefeated without looking up; Gideon is smooth and contemptuous of grey collars; Rana, repeating, chokes at match point in round three unless someone steadies her. Scouts from the inn watch. Scorekeepers and runners for the Cup are on Pilar's crew list (20 cr a day) and are paid the same evening at Imara's table in the council room.",
+  "kind": "duel"
+ },
+ {
+  "id": "victoria_first_cast",
+  "day": 19,
+  "slot": "Midday",
+  "place": "broadcast_studio",
+  "title": "Second Desk: Freshman Cup",
+  "public": "The Top Deck's second desk covers the outer tables of the Freshman Cup: first-year Auxiliary students on the microphone, live from 11:15 with round 1.",
+  "visibleFrom": 15,
+  "who": [
+   "victoria",
+   "cas",
+   "bex",
+   "vivienne",
+   "ophelia"
+  ],
+  "gm": "Cas Abernathy calls the play; Victoria Capulet, beside him, says nothing about the game at all and describes the cards — borders, palettes, the expression of a creature — in complete serious sentences. Bex wants her off after ninety seconds; chat wants more. Ophelia watches from the studio door with her arms crossed. (Plot file: q_victoria_aesthetics.)",
+  "kind": "school"
+ },
+ {
+  "id": "freshman_cup_finals",
+  "day": 20,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Freshman Cup: Top 8 & Final",
+  "public": "Top 8 on the Great Arena stage, cast live by The Top Deck. Doors 14:00, quarter-finals 14:30, semi-finals 15:30, final 16:40. Prize-giving at dusk (17:30): 400 cr and a line on the arena wall.",
+  "visibleFrom": 1,
+  "who": [
+   "georgie",
+   "gideon",
+   "inya",
+   "ashton",
+   "lilia",
+   "willas",
+   "bex",
+   "vivienne",
+   "okonkwo"
+  ],
+  "gm": "The arena stage, lights, a crowd: if Rowan made top 8 this is the first great Nerve test; if not, he watches from the stands with whoever he chooses. Default result (plot timeline): Georgie beats Inya in the semi-final and Gideon in the final, 2–0; Gideon is gracious on camera and breaks a pen in the corridor. If Rowan is still in, the bracket is his to change. Lilia watches the final from the tunnel mouth and leaves before the handshake; if Rowan played with spine she remembers his handle. Night Market in town this evening.",
+  "kind": "duel"
+ },
+ {
+  "id": "bday_saoirse",
+  "day": 21,
+  "slot": "Afternoon",
+  "place": "boathouse",
+  "title": "Saoirse's birthday",
+  "public": "Saoirse's birthday. No party: she is at the boathouse from 14:00, surfing; turn up and you get a board.",
+  "visibleFrom": 14,
+  "who": [
+   "saoirse"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Saoirse; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). No party: she takes the day off everything and surfs. Anyone who turns up at the boathouse gets handed a board. Dom leaves a wrapped rulebook on her hammock as a joke; she uses it to level the camp stove.",
+  "kind": "social"
+ },
+ {
+  "id": "hedda_picket",
+  "day": 22,
+  "slot": "Midday",
+  "place": "commons_kitchen",
+  "title": "Picket at the Commons Kitchen",
+  "public": "'MEAT IS MURDER (ALSO ON TUESDAYS).' Hedda Njord pickets Mama's lunch, from 13:05 at the kitchen steps. Megaphone expected.",
+  "visibleFrom": 20,
+  "who": [
+   "hedda",
+   "odalys",
+   "rafa",
+   "baylee",
+   "trixie"
+  ],
+  "gm": "Hedda, one placard, one megaphone, against a woman with a wooden spoon who has fed this row for twelve years. Baylee eats on the steps. It ends when Mama lifts the lid of the pot that has stood on the back ring since Day 3 with an H chalked on it — nothing in it that ever had a face; Rafa has been improving it daily — and says, 'Thirty paces from my stove with that horn, mija, or you peel.' Hedda peels. (Plot file: q_hedda_cause.)",
+  "kind": "social"
+ },
+ {
+  "id": "study_group_forms",
+  "day": 22,
+  "slot": "Evening",
+  "place": "library",
+  "title": "Study Group Sign-Up",
+  "public": "First-year study groups form in the Library after dinner: sign-up at 19:00, first session 19:20–20:20, tables by course. Groups then meet Mondays and Thursdays at 19:00.",
+  "visibleFrom": 15,
+  "who": [
+   "noor",
+   "teobalt",
+   "livvie",
+   "georgie",
+   "baylee"
+  ],
+  "gm": "Standing groups for the term: Probability with Noor and Teobalt (Georgie corrects the answer key), Rules, Lore. Joining one gives steady study progress on that course every week it meets (Monday and Thursday Evenings) and is the low-effort way to keep grades up. Baylee struggles with the reading and will not ask; noticing is a friendship beat.",
+  "kind": "school"
+ },
+ {
+  "id": "storm_1",
+  "day": 23,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "Squall Warning",
+  "public": "Harbourmaster's notice: strong squall expected from the south-west this evening, from about 18:45 until 21:00. Boats in, shutters closed by 18:30.",
+  "visibleFrom": 22,
+  "who": [
+   "odalys",
+   "baylee",
+   "nathan",
+   "inya",
+   "livvie",
+   "silas"
+  ],
+  "gm": "The first real weather: horizontal rain, the bungalow roofs leak, the boardwalk floods. The Commons spends the evening bailing and laughing; Baylee holds a shutter on with his bare hands, Nathan narrates. A good night for a quiet scene in the kitchen or the greenhouse with whoever ran in from the rain. By morning it is washed clean and bright.",
+  "kind": "town"
+ },
+ {
+  "id": "stargazing",
+  "day": 24,
+  "slot": "Night",
+  "place": "old_observatory",
+  "title": "Stargazing Night",
+  "public": "The astronomy club opens the old observatory on the hill: clear skies forecast. Doors 22:00, turns at the telescope until about 23:20, closed at midnight. Bring a jacket.",
+  "visibleFrom": 17,
+  "who": [
+   "pippa",
+   "noor",
+   "georgie",
+   "viktor"
+  ],
+  "gm": "The brass refractor, the slit of stars, cocoa in a flask. A quiet, lovely night two days before everything changes; whoever Rowan stands next to at the eyepiece will remember it with him. Pippa photographs star trails over the dark north ridge. Viktor is on the catwalk watching a house with no lamps, not the sky.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_cas",
+  "day": 25,
+  "slot": "Evening",
+  "place": "broadcast_studio",
+  "title": "Cas's birthday",
+  "public": "Cas's birthday. A surprise for him in the broadcast studio at 19:15 — be there by 19:00 and keep quiet.",
+  "visibleFrom": 18,
+  "who": [
+   "cas"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Cas; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He commentates his own surprise party from the moment the lights come on ('and they have gone with the classic hide-behind-the-desk formation') and cannot stop until Rafa puts food in his mouth.",
+  "kind": "social"
+ },
+ {
+  "id": "friday_draft_1",
+  "day": 26,
+  "slot": "Evening",
+  "place": "card_shop",
+  "title": "Friday Night Draft",
+  "public": "Booster draft at the Sleeve & Binder. Entry 60 cr, keep what you pick. Sign-up 18:30, draft 19:00, three rounds from 20:05, done by 21:15.",
+  "visibleFrom": 20,
+  "who": [
+   "dex",
+   "mika",
+   "tomi",
+   "kenji",
+   "inya",
+   "nathan"
+  ],
+  "gm": "Eight-player pods at the back tables; Mika judges with a sleepy smile. Nathan drafts badly and loudly and has the time of his life; on the walk home along the harbour road he tells Rowan, unprompted, that this is the best month he has ever had. Let it be the last ordinary evening. He goes to bed still talking.",
+  "kind": "duel"
+ },
+ {
+  "id": "the_bang",
+  "day": 26,
+  "slot": "Night",
+  "place": "commons_room",
+  "title": "THE BANG",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "nathan",
+   "baylee",
+   "odalys",
+   "inya",
+   "rana",
+   "viktor",
+   "tomi"
+  ],
+  "gm": "02:10 (see the plot timeline and its hooks; this entry only sets the stage). A concussion that lifts dust from the rafters and a green-white flash through the shutters; every window on the island rattles. The whole bungalow row is out on the boardwalk in blankets; a glow over the north slope fades in a minute. {H?{H=nathan?About half past two {H}, banging a pan, Tomi's good torch belted to his head, deck box in his jacket 'in case it wants a game', announces that it is a crashed spaceship, that he will be the first human to shake hands with it, and that everyone else is a coward — and goes up the jungle trail alone with two of Mama's empanadas. Rowan may go after him: {H} outpaces him in the dark and he loses him at the rope bridge. Nobody stops {H}. This is the last time Rowan sees him alive.|{H=baylee?Nathan and the pan, as always: spaceship, cowards, up the jungle trail alone at half past two with Tomi's torch. Baylee had offered to go along and been told he would scare the aliens. He stands on the step for ten minutes. Then he fills a water bottle at the kitchen tap, says to whoever is nearest — Rowan, if he is awake — 'Somebody ought to walk behind him,' and follows, without a light, at the pace of a man walking a fence line. Nobody stops him; nobody thinks of it. Nathan's torch dies at the rope bridge and he is back by four, scratched and loud, having met no one: Baylee had taken the old cattle track to come out above him. Play it as comedy with one quiet figure in it. Do NOT telegraph anything.|{H=ed?Nathan and the pan, as always: spaceship, cowards, up the jungle trail at half past two with Tomi's torch. And this time the pan has woken Ed Venture. He comes out of bungalow 5 at a dead run, hat on, bootlaces flying, no torch — 'IS IT DANGEROUS?' — and is past Nathan before the trailhead. Nobody stops him; people cheer. Nathan cannot keep up, his torch dies at the rope bridge, and he is back by four swearing the cowboy cheated. Ed crossed the bridge without slowing down. Play it as comedy. Do NOT telegraph anything: this is Ed being Ed.|{H=tobias?Nathan and the pan, as always: spaceship, cowards, up the jungle trail at half past two with Tomi's torch. The whole row watches him go — which is exactly when Tobias Crowe goes out of the back window of bungalow 6 with a rucksack and no light. Only Dmitri [dmitri] sees it, and Dmitri says nothing; he never has. Nathan's torch dies at the rope bridge and he is back by four, loud and scratched, having met nobody. Tobias was already above him. Play the pan as comedy; the window is one line in a notebook. Do NOT telegraph anything.|{H=sammy?Nathan and the pan, as always: spaceship, cowards, up the jungle trail at half past two with Tomi's torch. Sammy Counts stands at the edge of the crowd in his long coat and writes one line in the numbered notebook. Then, fifty paces behind Nathan and without a light — because being seen to be afraid of the dark would be worse than the dark — he follows. Nobody notices; nobody ever does. When Nathan turns back at the rope bridge with a dead torch, Sammy steps off the path and lets him pass, and then cannot make himself be the second one who turned back. Nathan is home by four. Play the pan as comedy; the coat is a shape at the back of it. Do NOT telegraph anything.|{H=fiona?Nathan and the pan, as always: spaceship, cowards, up the jungle trail alone at half past two with Tomi's torch. Fiona Blackwood has been knitting on the porch of bungalow 4 through all of it. She puts the needles down, says in her real voice — light, northern, the one nobody is meant to hear — 'Well. Somebody ought to see it properly,' takes the storm lantern off the kitchen hook and walks up after his torch at her own slow pace. Nobody stops her; half of them think it is part of the act. Nathan's torch dies at the rope bridge; he passes her coming down, tells her the bridge is closed, and is home by four. She says 'Mm,' and goes on. Play the pan as comedy and the lantern as one small light going up the hill. Do NOT telegraph anything.|{H=freya?Nathan and the pan, as always: spaceship, cowards, up the jungle trail alone at half past two with Tomi's torch. Freya Nordlicht, three drinks in and delighted, announces to the boardwalk that the night has at last become worth staying up for, and goes up after his torch with the bottle in her hand, singing. People cheer her off. Nathan's torch dies at the rope bridge; he finds her sitting on it finishing the bottle, tells her the whole thing is closed, and is home by four. When the bottle was empty she went on, because the other way led to a quiet room. Play it as comedy. Do NOT telegraph anything: this is Freya being Freya.|{H=hedda?Nathan and the pan, as always: spaceship, cowards, up the jungle trail alone at half past two with Tomi's torch. Then Hedda Njord on the kitchen steps with the megaphone: the north slope is where the frigatebirds nest, there will be burnt chicks up there, and has ANYONE on this row thought of that? Nobody has. She goes up after his torch with the megaphone and her tin of bandages, still shouting statistics over her shoulder. People laugh. Nathan's torch dies at the rope bridge and he is home by four; she had left the trail below it to look for nests. Play it as comedy. Do NOT telegraph anything: this is Hedda being Hedda.|{H=sunny?Nathan and the pan, as always: spaceship, cowards, up the jungle trail alone at half past two with Tomi's torch. His torch dies at the rope bridge and he is home by four, loud and scratched. Nobody else from the row goes up, and the row goes back to bed. (The one who goes is not on the row tonight. At five Sunny Aldane comes down from Rare Hall for her run, hears from Dmitri [dmitri] on his porch that somebody went up the mountain alone in the dark, does not wait for the rest of the sentence, and runs: three hours' hike is seventy minutes at her pace. If Rowan is awake at five he sees her go by.) Play the pan as comedy. Do NOT telegraph anything.|About half past two {H}, banging a pan, Tomi's good torch belted to his head, deck box in his jacket 'in case it wants a game', announces that it is a crashed spaceship, that he will be the first human to shake hands with it, and that everyone else is a coward — and goes up the jungle trail alone with two of Mama's empanadas. Rowan may go after {H:him}: {H} outpaces him in the dark and he loses {H:him} at the rope bridge. Nobody stops {H}. This is the last time Rowan sees him alive.}}}}}}}}}|About half past two one first-year of the row goes up the jungle trail towards the glow, alone, and is not stopped (the game decides who when the evening of Day 26 begins).} {H=nathan?|This is the last time Rowan sees {H} alive. }Do not telegraph it.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "crater_morning",
+  "day": 27,
+  "slot": "Morning",
+  "place": "crater",
+  "title": "THE MORNING AFTER",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "nathan",
+   "viktor",
+   "bex",
+   "baylee",
+   "odalys",
+   "silas"
+  ],
+  "gm": "The clock tower stands at 02:10 until Silas restarts it. {H}'s bed is empty. On the far north slope there is a 40-metre crater of fused black glass, three hours' hike away, and for two days nothing stops a student going (hike 3: most of the day). At dawn {H} reached it first and died there; what walks back into the Commons at Midday with glass dust in its hair is THE GUEST. {H=nathan?It grins {H}'s grin, says it found 'a big hole, nothing in it', eats six plates, and does not insult anyone.|It wears {H}'s face exactly, {H:ret}.} From now on play the replacement exactly as CORE 4.3 describes: nearly perfect, slightly literal, kind. The gulls leave the cove within the week.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "top_deck_special",
+  "day": 27,
+  "slot": "Midday",
+  "place": "broadcast_studio",
+  "title": "The Top Deck: Special Broadcast",
+  "public": "Unscheduled live special from the studio about last night's noise and light: on air 12:30–13:20, eyewitness calls welcome.",
+  "visibleFrom": 27,
+  "who": [
+   "bex",
+   "pippa",
+   "vivienne"
+  ],
+  "gm": "Bex is first with it: eyewitness calls, Pippa's star-trail plate with a green streak across it, a rumour of 'a crater'. The staff line by evening is 'a meteorological event; nothing to worry about'. Bex wants someone to go up and look. If Rowan was on the boardwalk he is a witness she wants on air.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_pippa",
+  "day": 28,
+  "slot": "Afternoon",
+  "place": "rare_common_room",
+  "title": "Pippa's birthday",
+  "public": "Pippa's birthday. Party in the Rare Hall common room from 15:00 (paper crowns provided); cake at 16:00.",
+  "visibleFrom": 21,
+  "who": [
+   "pippa"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Pippa; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Marit throws her a party with a paper-crown photo booth; Georgie has made a card by hand and is rigid with worry that it is babyish. Pippa is distracted: she spent the morning in the darkroom with the plate from the observatory, and the streak in it slows down before it lands.",
+  "kind": "social"
+ },
+ {
+  "id": "north_slope_closed",
+  "day": 29,
+  "slot": "Morning",
+  "place": "rope_bridge",
+  "title": "North Slope Closed",
+  "public": "Chancellor's notice (posted 07:30): all trails beyond the rope bridge are closed until further notice because of unstable ground. Field sections suspended. The bridge is watched by day and chained from dusk.",
+  "visibleFrom": 29,
+  "who": [
+   "okonkwo",
+   "ashdown",
+   "silas",
+   "rox"
+  ],
+  "gm": "The cordon (canon, Day 29): staff tape and a rota at the north trailhead — the campus-side anchor of the rope bridge — by day, a chain at night, tape at the crater. Officially unstable ground. Ashdown argued against the closure and lost; Silas hung the chain. Anyone who went up on Days 27–28 saw the crater open; from now on it takes a Night slot, the coast, the tubes, or Viktor, and being caught inside the cordon is a formal warning.",
+  "kind": "school"
+ },
+ {
+  "id": "assembly_event",
+  "day": 29,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "All-School Assembly",
+  "public": "The Chancellor addresses the school in the Great Arena about Friday night's event. Attendance expected: seated by 14:15, over by about 15:00.",
+  "visibleFrom": 28,
+  "who": [
+   "okonkwo",
+   "santangel",
+   "blum",
+   "bex",
+   "nathan"
+  ],
+  "gm": "Okonkwo, calm and exact: a meteorite, no danger, the site is closed for everyone's safety, lessons continue. Blum is asked to say something reassuring about meteorites and cheerfully gives the odds, which are terrible. In the stands '{H}' asks Rowan, interested, why everyone is sitting in rows facing one person. Students laugh. It is a good question.",
+  "kind": "school",
+  "hostWho": "add"
+ },
+ {
+  "id": "movie_night_2",
+  "day": 30,
+  "slot": "Evening",
+  "place": "student_lounge",
+  "title": "Movie Night",
+  "public": "Student lounge. Tonight, by popular demand: a flying-saucer double bill. Seats 19:00, first film 19:20, second film 20:40, out by 22:00.",
+  "visibleFrom": 25,
+  "who": [
+   "marit",
+   "bex",
+   "inya",
+   "nathan",
+   "baylee"
+  ],
+  "gm": "The school is still treating the bang as a joke. '{H}' comes along, watches the invasion film with complete attention, laughs half a second after everyone else every time, and afterwards says quietly that the visitors in it were 'very rude: they did not ask what the rules were'.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "ladder_snapshot_1",
+  "day": 31,
+  "slot": "Evening",
+  "place": "quad",
+  "title": "Ladder Snapshot I",
+  "public": "First ranking snapshot of the season at the Evening bell (18:00); results stamped before the bell count. At 18:15 the top 8 non-team players are seeded into Friday's Battle Team tryouts.",
+  "visibleFrom": 12,
+  "who": [
+   "santangel",
+   "rox",
+   "lilia",
+   "dom",
+   "kenji",
+   "priya"
+  ],
+  "gm": "The board freezes at the bell and a crowd watches it. Top 8 non-team players get seeds for the tryout; everyone else may still enter the open bracket. Somebody notices that {H:sig} has climbed forty places in four days.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_georgie",
+  "day": 32,
+  "slot": "Evening",
+  "place": "rare_common_room",
+  "title": "Georgie's birthday",
+  "public": "Georgie's birthday. Party in the Rare Hall common room at 18:30; helpers for Pippa welcome from 17:30.",
+  "visibleFrom": 25,
+  "who": [
+   "georgie"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Georgie; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Pippa has planned it for weeks: the first birthday party Georgie has ever had with people near her own age. Paper dragons, a cake with a plastic egg on it, Willas in a party hat daring anyone to comment. Keep it bright and childlike. Helping Pippa set it up, or simply turning up and playing Georgie a serious game as her present, counts for a great deal with both of them. Tryouts are tomorrow; someone should tell her she is allowed to enter.",
+  "kind": "social"
+ },
+ {
+  "id": "battle_team_tryouts",
+  "day": 33,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Battle Team Open Tryouts",
+  "public": "Open tryouts for one reserve slot on the Battle Team. Any student may enter. Coach Delgado presiding. Sign-in 14:00, circuits 14:20, tables from 15:00, final table 16:40. Result tomorrow at 09:15.",
+  "visibleFrom": 12,
+  "who": [
+   "rox",
+   "lilia",
+   "willas",
+   "dom",
+   "saoirse",
+   "kenji",
+   "priya",
+   "nathan",
+   "gideon",
+   "georgie",
+   "rana"
+  ],
+  "gm": "Rox runs it like a fitness test: circuits, then duels against team members while exhausted; Priya drills the first-years and is the fairest assessor there. One slot: second reserve. Rowan can enter (tournament-kind; hard) — surviving to the final table is enough to be noticed by Lilia. Default (plot timeline): Gideon Pryce gets the slot, unless Georgie has been encouraged to try out or Rowan earns it. '{H}' enters, beats two starters' practice decks flawlessly, and is turned down by Rox for 'not looking tired — I don't trust it'. Lilia watches every game {H:he} plays with the first interest she has shown all year. Willas loses his temper at Mikoto, who cannot stop laughing through the circuits, and then lends him his water. Result posted tomorrow morning.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "tryout_results",
+  "day": 34,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "Battle Team Reserve Named",
+  "public": "Coach Delgado announces the new Battle Team reserve in the Great Arena: 09:00, name at 09:15.",
+  "visibleFrom": 33,
+  "who": [
+   "rox",
+   "priya",
+   "willas",
+   "dom",
+   "gideon",
+   "georgie",
+   "pippa"
+  ],
+  "gm": "One name. By default Gideon Pryce, who thanks the coach in a speech; if Georgie tried out and won it, she hides behind Pippa; if Rowan won it, Rox pins the Battle Team pin on him, crooked, and gives him one sentence of real feedback about his hands. Priya, first reserve for a second year, applauds correctly and goes to hit the bag. Dom says in the tunnel, not quietly, that the wrong starter is being protected; Willas hears.",
+  "kind": "school"
+ },
+ {
+  "id": "prerelease_tidebreak",
+  "day": 34,
+  "slot": "Midday",
+  "days": 2,
+  "place": "card_shop",
+  "title": "Pre-Release Weekend: 'Tidebreak'",
+  "public": "The new set arrives early at the Sleeve & Binder: sealed-deck events Saturday and Sunday. Entry 90 cr. Both days: registration 11:30, deckbuilding 12:00, three rounds from 12:45, prizes 15:00.",
+  "visibleFrom": 20,
+  "who": [
+   "dex",
+   "mika",
+   "tomi",
+   "livvie",
+   "kenji",
+   "inya"
+  ],
+  "gm": "New cards in everyone's hands; prices move (Tomi and Mika are both worth listening to this weekend). Sealed deck is a format where Rowan's online grind does not help and his reads do. Livvie plays both days for the prize boosters and sells every card she opens before she leaves the shop.",
+  "kind": "town"
+ },
+ {
+  "id": "bday_ashton",
+  "day": 35,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Ashton's birthday",
+  "public": "Ashton's birthday. By engraved invitation: Tower lobby 19:00, terrace from 19:30. Residents' guests are signed in.",
+  "visibleFrom": 28,
+  "who": [
+   "ashton"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Ashton; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He throws his own party on the tower terrace, by engraved invitation, and grey collars are not on the list — unless Jessica or Georgie brings one as a guest. Three of his ex-girlfriends are present and comparing notes. He is, annoyingly, a generous host.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_freya",
+  "day": 36,
+  "slot": "Evening",
+  "place": "bonfire_pit",
+  "title": "Freya's birthday",
+  "public": "Freya's birthday. Fire at the Commons pit from 19:00, toasts at 19:45, singing until midnight. Everybody comes.",
+  "visibleFrom": 29,
+  "who": [
+   "freya"
+  ],
+  "gm": "{H=freya?BIRTHDAY (mention it in advance only if Rowan has met {H=freya?'Freya'|Freya}). Her party at the fire, the one the row has been promised for a week, and it is exactly as loud as her last one. Somebody hands her a whole bottle of aquavit as a dare, as somebody always does. She drinks it the way you drink water after a run — all of it, in one, without her eyes watering — and hands it back empty. Then she sits and waits, politely, hands on her knees. After a minute she asks: 'When does it begin?' People laugh. Hedda leans in to smell her breath, laughing, and stops. Do not explain; let the player's skin crawl on its own.|BIRTHDAY (mention it in advance only if Rowan has met Freya; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Her birthday is an event the whole island attends whether invited or not. Aquavit, a song in a language nobody knows with a chorus everybody does by midnight. She remembers all of it tomorrow, which nobody else can say. '{H}' is handed a bottle as a dare (plot file: c_m1_aquavit).}",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "pageant_auditions",
+  "day": 37,
+  "slot": "Evening",
+  "place": "theatre",
+  "title": "Auditions: Night of Masks Pageant",
+  "public": "The theatre club casts this year's pageant, 'The Founder's Shipwreck'. No experience needed. Really. Sign up 18:30, readings from 18:50, cast list read out at 20:30.",
+  "visibleFrom": 30,
+  "who": [
+   "marit",
+   "pippa",
+   "felix",
+   "vivienne",
+   "chuck"
+  ],
+  "gm": "Marit directs with a megaphone she does not need. Parts: the Deckhand, the Storm, the Parrot, a chorus of Heroes. Taking any part is a Nerve track with an audience at the end (Day 54). Chuck drifts in to watch, enjoys the Parrot, and leaves when they block the cave scene.",
+  "kind": "social"
+ },
+ {
+  "id": "lava_tube_trip",
+  "day": 38,
+  "slot": "Morning",
+  "place": "lava_tubes",
+  "title": "Outdoor Club: Lava Tube Descent",
+  "public": "Guided trip to the first chamber of the lava tubes on the volcano's east shoulder (outside the closed area; permission granted). Helmets provided. Roll call at the main gate 07:30, back about 16:30. Full day — clashes with the orchard harvest.",
+  "visibleFrom": 24,
+  "who": [
+   "viktor"
+  ],
+  "gm": "The long-planned trip goes ahead by the old tramway, with grudging permission because the east shoulder lies outside the closed area. Unnamed club leader, a dozen students, knotted rope down the skylight, the glittering first chamber, torches off for real dark. Viktor (who was already down here alone two nights ago) slips into a side passage and is gone forty minutes; he comes back with chalk dust on his hands and a lie. From one passage: a faint warm draught and a clicking, which the leader calls 'the mountain settling'. Costs the whole day: Rowan cannot also work the harvest.",
+  "kind": "social"
+ },
+ {
+  "id": "orchard_harvest",
+  "day": 38,
+  "slot": "Afternoon",
+  "place": "orchard",
+  "title": "Orchard Harvest Day",
+  "public": "All hands to the old orchard: mango and guava harvest for the kitchens. Paid by the crate; cider afterwards. Rows given out at 14:00, water break 16:00, crates counted from 16:25, cider at 17:30.",
+  "visibleFrom": 31,
+  "who": [
+   "odalys",
+   "baylee",
+   "livvie",
+   "silas",
+   "inya",
+   "tomi"
+  ],
+  "gm": "Paid work (about 20 cr for the afternoon, more for the strong) and the gentlest day of the term. {H=baylee?'Baylee'|Baylee} is in his element and, for once, talks — about soil. Livvie works until she nearly faints; Odalys sends her to sit down. The goats will not go into the northern rows. Good for the technique {H=baylee?'Baylee'|Baylee} teaches.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_bex",
+  "day": 39,
+  "slot": "Evening",
+  "place": "broadcast_studio",
+  "title": "Bex's birthday",
+  "public": "Bex's birthday. A special edition of The Top Deck, live from the studio 19:00–20:00; audience welcome from 18:45.",
+  "visibleFrom": 32,
+  "who": [
+   "bex"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Bex; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She celebrates live on air with a cake that says BREAKING. It is a loud, happy show. It is also the last Top Deck before the first incident: tomorrow morning she will be the first student at Trial Dome 3 with a camera, and by lunch she will have been told what she may not broadcast.",
+  "kind": "social"
+ },
+ {
+  "id": "incident_1",
+  "day": 40,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "FIRST HOLLOWING — BRANT KESSLER",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "brant",
+   "camille",
+   "okonkwo",
+   "hana",
+   "bex",
+   "nathan",
+   "silas"
+  ],
+  "gm": "Dawn (canon; see the plot timeline — this entry only stages the place; skip it entirely if Brant was saved). Silas finds Brant in Trial Dome 3, upright in the chair, eyes open, chain on, breathing, nobody home. The emergency toll rings from the clock tower for the first time; an ambulance cart crosses the Quad during first period. By Midday the word is 'seizure'. For a player who gets close before or after the dome is taped: the score clock stopped at 02:10; a ring of melting frost on the dais; the cards he extorted stacked neatly on the far side, sorted by owner; one after-hours entry in tidy handwriting on the booking sheet, ante column blacked out by lunch. Camille opens Ward B. The public quarrel between Brant and {H} was yesterday evening in the cafeteria. If Rowan is not near, he hears the bell and the rumour at lunch.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "harbor_regatta",
+  "day": 41,
+  "slot": "Midday",
+  "place": "harbor",
+  "title": "Harbour Regatta",
+  "public": "Port Mulligan's autumn regatta: dinghy races, rowing heats, fried squid. Students may crew. Boats out 11:00, rowing heats 11:30, dinghy class 12:30, prizes on the quay 13:30.",
+  "visibleFrom": 27,
+  "who": [
+   "saoirse",
+   "abel",
+   "silas",
+   "josie",
+   "sunny",
+   "dex"
+  ],
+  "gm": "The town carries on, pointedly. Saoirse wins the dinghy class in a boat held together with varnish; she needs a crew of one and Rowan will do if he can take orders. Dex throws Brant's two hangers-on out of his shop this morning for trying to sell 'his collection'. Fishermen are saying the north side has gone dead. The field section planned for today does not happen.",
+  "kind": "town"
+ },
+ {
+  "id": "bday_fiona",
+  "day": 42,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "Fiona's birthday",
+  "public": "Fiona's birthday. Candles on the steps of Bungalow 4 from 19:30; presents at 20:00.",
+  "visibleFrom": 35,
+  "who": [
+   "fiona"
+  ],
+  "gm": "{H=fiona?BIRTHDAY (mention it in advance only if Rowan has met {H=fiona?'Fiona'|Fiona}). The row has made her a cake with black icing and a small marzipan coffin, as a joke she would have loved, and she does everything right: the tilt of the head, the low 'How very thoughtful. I shall be buried with it,' the pause. The table waits for the laugh — the real one, an octave up, that always gets out on her birthday. It does not come. She thanks everyone, by name, correctly. Asked for a speech, she says what her mother says over the dead, word for word, kindly. Somebody laughs, late. Do not explain; let the player's skin crawl on its own.|BIRTHDAY (mention it in advance only if Rowan has met Fiona; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Candles on the steps of Bungalow 4, black icing, and an embarrassment of presents from boys: {H=sammy?'Sammy's'|Sammy's} is a book of ghost stories he has clearly read first; {H=tobias?'Tobias's'|Tobias's} is a bunch of flowers that were growing on the Spectral terrace this morning; and there is an unsigned box, expensive, in tissue paper, that can only have come from the Tower. Maisie's present is a black light she wired herself, and it is the one Fiona keeps on. After midnight she takes her knitting out to the porch, two doors up from Dmitri's.}",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "midterm_study_week",
+  "day": 43,
+  "slot": "Evening",
+  "days": 4,
+  "place": "library",
+  "title": "Midterm Study Week",
+  "public": "The Library stays open until midnight Monday to Thursday. Review tables by course from 18:30 (evening session 19:00–21:30); quiet floors upstairs; doors close at 24:00.",
+  "visibleFrom": 36,
+  "who": [
+   "noor",
+   "teobalt",
+   "georgie",
+   "livvie",
+   "blum",
+   "hana"
+  ],
+  "gm": "Four evenings of extended hours. Each study session this week counts normally — steady work beats cramming — but company matters: who Rowan studies beside. The school is subdued; people study in groups and walk home in groups without saying why.",
+  "kind": "exam"
+ },
+ {
+  "id": "bday_nathan",
+  "day": 44,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Nathan's birthday",
+  "public": "Nathan's birthday. Cake at Mama's Kitchen after supper, 19:00.",
+  "visibleFrom": 37,
+  "who": [
+   "nathan"
+  ],
+  "gm": "{H=nathan?BIRTHDAY (mention it in advance only if Rowan has met {H=nathan?'Nathan'|Nathan}; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Mama bakes the cake because she bakes one for everybody, and sets it down without the hug. 'Nathan' studies the candles with real interest and asks what he is supposed to do; told to make a wish and blow, he asks who receives the wish and what it costs. He eats the whole cake, or none. He thanks everyone correctly. He remembers, in perfect detail, his seventh birthday. Baylee leaves early. Do not explain; let the player's skin crawl on its own. Brant's mother arrived today on a special run of the ferry.|BIRTHDAY (mention it in advance only if Rowan has met Nathan; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Nathan has announced it for a week and wants it loud, because the row has gone quiet and he cannot stand it. Mama bakes; he gets the hug. For half an hour it is September again. Then '{H}', who has watched the candles with real interest, asks Nathan who receives the wish, and what it costs. 'ME. It costs NOTHING. It's a WISH.' — 'Then it is not an ante,' it says, satisfied, and thanks him. Nathan laughs first and stops first. Do not explain; let the player's skin crawl on its own. Brant's mother arrived today on a special run of the ferry.}",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "blum_review",
+  "day": 45,
+  "slot": "Afternoon",
+  "place": "classroom",
+  "title": "Probability Review Session",
+  "public": "Dr. Blum works through past midterm problems, Seminar Room, 14:30–16:15. Bring questions and, ideally, chalk.",
+  "visibleFrom": 40,
+  "who": [
+   "blum",
+   "noor",
+   "georgie"
+  ],
+  "gm": "Useful (counts as strong study for Probability). The side board carries a half-erased tree with far too many zeros at the bottom; if asked, Blum says it is 'a hobby problem about streaks' and changes the subject.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_mikoto",
+  "day": 46,
+  "slot": "Afternoon",
+  "place": "rare_common_room",
+  "title": "Mikoto's birthday",
+  "public": "Mikoto's birthday. Rare Hall common room from 16:00; cake before study hall.",
+  "visibleFrom": 39,
+  "who": [
+   "mikoto"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Mikoto; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He has worried about this for a week (what if nobody comes; what if everybody comes). The first-year table gives him a deck box with every nickname he has ever handed out written on it. He laughs for a very long time and it is, for once, the right moment.",
+  "kind": "social"
+ },
+ {
+  "id": "midterms_1",
+  "day": 47,
+  "slot": "Morning",
+  "days": 3,
+  "place": "lecture_hall",
+  "title": "Midterm Examinations",
+  "public": "Midterms for all courses, Friday to Sunday; seat lists at the job board from 07:45. Fri: Card Design 09:00, Table Practicum from 11:30. Sat: Tempo & Resource 09:00, Rules & Judging 11:30, heartbeat drill 14:30. Sun: Probability 09:00, Lore essay 11:30. Results are posted Monday morning. No regular classes on Friday.",
+  "visibleFrom": 1,
+  "who": [
+   "santangel",
+   "hana",
+   "blum",
+   "ashdown",
+   "rox",
+   "chuck"
+  ],
+  "gm": "Three days. Rowan's papers (see GRADING.exams): Friday Morning Card Design submission, Friday Midday Table Practicum practical (a recorded duel against a second-year, exam-kind); Saturday Morning Tempo & Resource written, Midday Rules & Judging written; Sunday Morning Probability, Midday Lore essay; the Conditioning heartbeat drill is on Saturday Afternoon. Play one or two as scenes, summarise the rest. Missing an exam counts as a missed class and hurts. Midterm letters are advisory.",
+  "kind": "exam"
+ },
+ {
+  "id": "midterm_grades",
+  "day": 50,
+  "slot": "Morning",
+  "place": "job_board",
+  "title": "Midterm Results Posted",
+  "public": "Midterm letters for every course go up in the glass cases by the job board. 07:30 sheets posted, 07:50 pink slips for office hours; over by the first bell.",
+  "visibleFrom": 47,
+  "who": [
+   "teobalt",
+   "livvie",
+   "rana",
+   "baylee"
+  ],
+  "gm": "A crowd at the glass. Reactions to stage: Livvie needs a C average for her scholarship and reads the sheet three times; {H=baylee?'Baylee'|Baylee} has an F in Lore and stands very still; Rana's are all B and she is angry anyway. Anyone with an F gets a pink slip for office hours. Rowan's own letters appear by themselves.",
+  "kind": "school",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_hedda",
+  "day": 51,
+  "slot": "Midday",
+  "place": "cafeteria",
+  "title": "Hedda's birthday",
+  "public": "Hedda's birthday. 13:15 lunch table at the Mess after class, 13:30 cake.",
+  "visibleFrom": 44,
+  "who": [
+   "hedda"
+  ],
+  "gm": "{H=hedda?BIRTHDAY (mention it in advance only if Rowan has met {H=hedda?'Hedda'|Hedda}). Midday in the cafeteria: the row has made her a cake with no egg, no milk and no joy in it, exactly as she would have demanded, and a card from the gulls. A month ago she would have made a speech about the dairy industry and cried at the card. 'Hedda' thanks everyone, by name, correctly, reads the card through once, and asks whether the gulls signed it themselves. Then she eats a slice of somebody else's cake, the ordinary one, with the cream. Nobody says anything. Rafa takes her plate away untouched an hour later, the vegan one. Do not explain; let the player's skin crawl on its own.|BIRTHDAY (mention it in advance only if Rowan has met Hedda; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She announces that birthdays are a consumer ritual and then is visibly crushed when it looks as though people believed her. Rafa's cake has no egg, no butter and no flaw; {H=baylee?'Baylee'|Baylee}, of all people, carries it in.}",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "incident_2",
+  "day": 52,
+  "slot": "Morning",
+  "place": "duel_terraces",
+  "title": "SECOND HOLLOWING",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "camille",
+   "okonkwo",
+   "bex",
+   "noor",
+   "nathan",
+   "sunny"
+  ],
+  "gm": "Dawn (canon, Day 52; see the plot timeline — skip if the Shark was saved): the Rare Hall ladder shark, a second-year who farmed newcomers for rank and side money, is found at a top-terrace table by {H=sunny?'Sunny'|Sunny} on her dawn run, awning frozen stiff, eyes open. The school says 'second isolated incident'; Bex says 'two' on stream and is called to the Chancellor. Rare Hall stops updating its league board. Noor, clerking the charter register, finds a correctly made entry for a challenge the night before and does not know what to do with it.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "mask_workshop",
+  "day": 53,
+  "slot": "Afternoon",
+  "place": "theatre",
+  "title": "Mask-Making Workshop",
+  "public": "Make your mask for tomorrow's Night of Masks: papier-mâché, paint, feathers. Materials free. 14:30 doors and briefing, 14:50 making, 16:30 masks on the drying line; done by 17:00.",
+  "visibleFrom": 46,
+  "who": [
+   "marit",
+   "felix",
+   "pippa",
+   "inya",
+   "georgie"
+  ],
+  "gm": "Glue and gossip. Felix paints other people's masks from their descriptions of their dreams — several of them, lately, are of a tiled floor. What mask Rowan makes is his own choice and will be remarked on tomorrow. The alternative is the mask wall at the boutique in town.",
+  "kind": "social"
+ },
+ {
+  "id": "night_of_masks",
+  "day": 54,
+  "slot": "Evening",
+  "place": "festival_grounds",
+  "title": "Night of Masks",
+  "public": "The autumn festival: everyone masked from dusk. Stalls, the theatre pageant, an open-air mini-tournament, dancing on the Quad, fireworks at midnight. 18:00 first lantern, masks on · 18:30 stalls and mask prize · 19:00 pageant · 20:00 mask tables (8 players) · 21:30 dancing · 23:45 unmasking, fireworks at midnight.",
+  "visibleFrom": 1,
+  "who": [
+   "marit",
+   "jessica",
+   "ashton",
+   "inya",
+   "sunny",
+   "bex",
+   "vivienne",
+   "selene",
+   "octavia",
+   "nathan",
+   "chuck",
+   "pippa",
+   "noor",
+   "livvie",
+   "rana",
+   "pilar",
+   "tavita"
+  ],
+  "gm": "The campus transformed (Evening and Night). Everyone masked: flirtation, mistaken identities, routes advancing fast for those who flirt first. The pageant plays 'The Founder's Shipwreck' as comedy; Chuck leaves before the cave scene. The school needs this night badly and throws itself at it. The Guest is DELIGHTED that everybody wears another face (canon): in a mask that is a printed photograph of its own face it asks masked people who they are 'now', and once asks Rowan whether he would like to trade for the evening. By default nothing terrible happens tonight — the dread is that it could. If Rowan is absent he misses the term's best romance window. It is Pilar's event from the first lantern to the last stall; Tavita has the door and the floor, unmasked, so that people can find him; Imara closes the books at the council table tomorrow morning.",
+  "kind": "festival",
+  "hostWho": "add"
+ },
+ {
+  "id": "morning_after_brunch",
+  "day": 55,
+  "slot": "Midday",
+  "place": "commons_kitchen",
+  "title": "Morning-After Brunch",
+  "public": "Mama's post-festival brunch at the Commons. Other dorms welcome; bring your mask for the wall. 11:30 brunch served, 12:15 masks nailed up over the range, done by half past one.",
+  "visibleFrom": 54,
+  "who": [
+   "odalys",
+   "inya",
+   "livvie",
+   "tomi",
+   "baylee",
+   "marit",
+   "sunny"
+  ],
+  "gm": "Hungover glitter, fried plantain, last night retold. The masks get nailed up over the range. Whoever Rowan spent the festival with either comes or pointedly does not. Gossip from the night settles into fact here — the island is small.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_marit",
+  "day": 56,
+  "slot": "Evening",
+  "place": "theatre",
+  "title": "Marit's birthday",
+  "public": "Marit's birthday. 19:00 house opens at the theatre, 19:15 her one-woman show, cake on the stage afterwards.",
+  "visibleFrom": 49,
+  "who": [
+   "marit"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Marit; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She stages her own birthday as a one-woman show with a curtain call and expects flowers thrown. Underneath, she is rattled: she keeps coming back to the masked boy who asked whether a person in a mask is 'allowed to be the other one', and cannot decide whether it was the best line of the festival or the worst.",
+  "kind": "social"
+ },
+ {
+  "id": "judge_mock_exam",
+  "day": 57,
+  "slot": "Evening",
+  "place": "classroom",
+  "title": "Judge Circle: Level-1 Mock Exam",
+  "public": "Sit the mock judge exam: 40 questions and a floor scenario. Passing qualifies you to staff events in town. 18:15 seating and rules, 18:30 written paper (40 min), 19:15 floor scenarios, 20:00 results.",
+  "visibleFrom": 43,
+  "who": [
+   "noor",
+   "hana",
+   "mika"
+  ],
+  "gm": "Passing teaches the technique tied to Rules & Judging and opens the better-paid card shop job. Afterwards Noor asks Hana, formally, whether the register must accept ANY ante that is stated and witnessed. Hana says yes; then asks why. Noor does not answer in front of others.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_baylee",
+  "day": 58,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Baylee's birthday",
+  "public": "Baylee's birthday. 18:30 supper in Mama's kitchen, cake about ten past seven.",
+  "visibleFrom": 51,
+  "who": [
+   "baylee"
+  ],
+  "gm": "{H=baylee?BIRTHDAY (mention it in advance only if Rowan has met {H=baylee?'Baylee'|Baylee}). {H=baylee?'Baylee'|Baylee} had told nobody; Mama knew anyway, and bakes the cake because she bakes one for everybody, and sets it down without the hug. A parcel from the farm came on the last ferry: socks, a jar of something pickled, a photograph of a cow. 'Baylee' looks at the photograph and says her name, her dam's name and the date she was sold, and asks whether a photograph is a record or a present. He eats the whole jar, brine included, steadily. He thanks everyone, by name, correctly. Nathan — Nathan — leaves food on his plate and goes out early. Do not explain; let the player's skin crawl on its own.|BIRTHDAY (mention it in advance only if Rowan has met Baylee; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He did not tell anyone; Mama knew anyway. A parcel from the farm: socks, a jar of something pickled, a photograph of a cow. He is moved and has no idea where to look. {H=@near?He no longer sits on the steps of number 7 in the evening; he eats and goes in. If Rowan asks him directly tonight, he gets as far as 'Sat next to her an hour. She don't breathe right.'|He has shifted his bed another hand's width from {H}'s. If Rowan asks him directly tonight, he gets as far as 'He don't breathe right when he sleeps. He don't sleep.'}}",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_magnus",
+  "day": 59,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Magnus's birthday",
+  "public": "Magnus's birthday. From 19:00 on the Spectral Tower terrace (residents and their guests).",
+  "visibleFrom": 52,
+  "who": [
+   "magnus"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Magnus; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He holds it on the tower terrace and spends it refreshing the ladder. His present to himself is a new deck. If Rowan comes, Magnus is so thrown that he forgets to be hostile for nearly an hour.",
+  "kind": "social"
+ },
+ {
+  "id": "storm_2",
+  "day": 60,
+  "slot": "Night",
+  "place": "greenhouse",
+  "title": "Gale Warning",
+  "public": "Harbourmaster's notice: thunderstorm and full gale from the north overnight. Stay indoors. Shutters barred and head counts at 21:30; the gale is expected about 22:15 and should blow itself out by dawn.",
+  "visibleFrom": 59,
+  "who": [
+   "silas",
+   "odalys",
+   "baylee",
+   "camille"
+  ],
+  "gm": "The first great storm of the autumn: slates off the main building, a palm down across the avenue. Wherever Rowan shelters, someone shelters with him. Up on the north slope lightning strikes the crater three times; by morning the glass crust is cracked from the centre outward and what lies under it can be seen by anyone who reaches the middle (canon: findable from now on; Marrow's people, arriving tomorrow, will find and crate it within days). '{H}' stands on the Commons beach in the storm for an hour, face turned north, and comes in dry.",
+  "kind": "town",
+  "hostWho": "add"
+ },
+ {
+  "id": "board_visit",
+  "day": 61,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Board Delegation Arrives",
+  "public": "A delegation of the Kaboom Entertainment board visits the Academy. Dress code: full uniform on campus today. 11:20 arrival at the Academy pier, 13:20 address to the whole school on the Quad (after the Midday class).",
+  "visibleFrom": 57,
+  "who": [
+   "marrow",
+   "okonkwo",
+   "santangel",
+   "octavia",
+   "gideon",
+   "abel",
+   "sebastian",
+   "pilar",
+   "imara"
+  ],
+  "gm": "Lucian Marrow lands (canon): grey suit, perfect teeth, soft voice, a smile for everyone, two aides and crates marked as laboratory glass. Okonkwo meets him herself. On the Quad he personally announces this year's Design Contest and its prize. He takes the tower's best suite, visits Ashdown in the afternoon, funds 'safety research' on the north slope under Santángel's name, and by evening his people have relieved the staff rota at the crater. He looks through grey collars. Chuck's workshop door is bolted all day. Within days he has found the council: a word about 'modern governance' for Sebastian, ready-made press lines for Pilar's bulletin, and a pleasant request to Imara for the council's copy of the accounts 'for audit'.",
+  "kind": "school"
+ },
+ {
+  "id": "design_contest_opens",
+  "day": 61,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Design Contest Opens",
+  "public": "The annual Card Design Contest: design one original card. Open to all students. First prize 5,000 cr. Entries due Day 75 (Friday, November 14). Briefing in the Design Lab at 14:30; entry forms and blank stock from 15:15.",
+  "visibleFrom": 50,
+  "who": [
+   "chuck",
+   "wren",
+   "livvie",
+   "felix",
+   "teobalt",
+   "marrow"
+  ],
+  "gm": "Announced at Midday on the Quad by the visiting board member; the briefing in the lab is Chuck's and Wren's. First prize 5,000 cr (canon), more than half of Livvie's tuition: she goes white and starts sketching before the rules have been read. Any student may enter, Rowan included (a real project: several Afternoons in the lab, playtests, a submission). Helping Livvie test — under an agreement she writes herself — is a major route beat; so is entering against her. Wren thinks the sponsor's interest in 'printing techniques' is odd.",
+  "kind": "school"
+ },
+ {
+  "id": "night_market_harvest",
+  "day": 62,
+  "slot": "Evening",
+  "place": "night_market",
+  "title": "Harvest Moon Night Market",
+  "public": "The biggest Night Market of the autumn, under the full moon. 18:30 lanterns up and stalls open, Madame Oru's tent from 21:00, last stalls about 23:30.",
+  "visibleFrom": 55,
+  "who": [
+   "oru",
+   "mika",
+   "josie",
+   "selene",
+   "tomi"
+  ],
+  "gm": "Strangers in good shoes are buying old cards at every stall and asking who has older ones. Oru's reading now, if Rowan sits: a polite caller who 'takes only what is offered — offer nothing you cannot name'. If '{H}' comes within sight of her tent, her lanterns go out and she packs up without a word.",
+  "kind": "town",
+  "hostWho": "add"
+ },
+ {
+  "id": "interdorm_scrimmage",
+  "day": 63,
+  "slot": "Midday",
+  "place": "duel_terraces",
+  "title": "Inter-Dorm Scrimmage: Commons vs Rare Hall",
+  "public": "Friendly team match on the Terraces, eight boards a side. Tea afterwards in the Rare Hall common room. 11:15 team sheets and pairings, 11:30 play, about 12:35 the score, 13:00 tea.",
+  "visibleFrom": 56,
+  "who": [
+   "teobalt",
+   "tomi",
+   "inya",
+   "noor",
+   "sunny",
+   "kenji",
+   "rana",
+   "baylee"
+  ],
+  "gm": "Teobalt's idea, to get people out in daylight together. Casual-kind duels, good practice for team play; the Commons fields eight and needs Rowan. Afterwards, tea in Rare Hall, where the league whiteboard still has a missing student's name at the top.",
+  "kind": "duel"
+ },
+ {
+  "id": "terrace_reception",
+  "day": 63,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Spectral Tower Terrace Reception",
+  "public": "Reception for the visiting board on the tower terrace. By invitation. 19:00 arrivals, 19:20 welcome; carriages at 21:15.",
+  "visibleFrom": 61,
+  "who": [
+   "marrow",
+   "octavia",
+   "jessica",
+   "ashton",
+   "gideon",
+   "lilia",
+   "dom",
+   "santangel",
+   "sebastian"
+  ],
+  "gm": "Marrow meets 'the Academy's future'. Invitations go to Spectral residents and the ladder top 12; Rowan gets in only as someone's guest (Jessica, if he has courted properly; Georgie, who does not want to go alone). Marrow courts Octavia in plain sight, asks Lilia what she plans after graduation and gets a shrug, and asks several students, lightly, whether their families own any first-print cards. When Octavia proves hard to steer he spends ten unhurried minutes with Sebastian instead, and promises him a reference.",
+  "kind": "social"
+ },
+ {
+  "id": "industry_talk",
+  "day": 64,
+  "slot": "Evening",
+  "place": "lecture_hall",
+  "title": "Industry Talk: The Future of Holographic Play",
+  "public": "Public lecture by a member of the Kaboom Entertainment board. Lecture hall; all majors welcome. 18:45 doors, 19:00 introduction and lecture, 19:55 questions; ends about 20:15.",
+  "visibleFrom": 60,
+  "who": [
+   "marrow",
+   "santangel",
+   "wren",
+   "octavia",
+   "chuck"
+  ],
+  "gm": "Marrow, soft-voiced and excellent, on 'holograms you can touch' — the next generation of the game, worth more than the cards themselves. Santángel introduces him without meeting anyone's eye. Maisie Voltage, in the front row with her goggles on her forehead, is the only person in the hall taking notes with both hands; Professor Helical stands at the back by the door with his arms folded and leaves before the applause; Leona, three rows from him, watches the speaker the way one watches a pickpocket. Wren asks a precise question about pigment carriers and is complimented and not answered. Chuck is absent. A listener who has seen the Archive's first prints may feel a connection forming.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_tomi",
+  "day": 65,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "Tomi's birthday",
+  "public": "Tomi's birthday. 18:30 raffle tickets on the Commons boardwalk (2 cr each), 19:00 the draw.",
+  "visibleFrom": 58,
+  "who": [
+   "tomi"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Tomi; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He runs his own birthday as a raffle and comes out thirty credits ahead. Under the patter he is uneasy: his betting pool has stopped taking action on any game {H} plays — 'no market, {H:he} doesn't lose' — and two of his regulars are in Ward B. Tonight (plot timeline) {H:he} means to put it to {H} straight, {H=nathan?about the torch and everything else|about the cards and everything else}; unless someone talks {H:him} out of it or goes with {H:him}, tomorrow morning is the third.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "incident_3",
+  "day": 66,
+  "slot": "Morning",
+  "place": "student_lounge",
+  "title": "THIRD HOLLOWING",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "tomi",
+   "livvie",
+   "odalys",
+   "camille",
+   "okonkwo",
+   "nathan",
+   "bex"
+  ],
+  "gm": "Canon, Day 66 (see the plot timeline — skip entirely if Tomi was saved or a truce holds): Livvie finds Tomi when she opens the student lounge for her cleaning shift — binder open, loupe in hand, eyes open. He confronted {H} last night. This one belongs to the Commons: the kitchen is silent at breakfast and Mama sets his place anyway. Ward B has three beds filled and Camille has stopped pretending it is medical. Staff meet behind closed doors all day; raised voices in the faculty wing. The Top Deck is told not to broadcast. By nightfall the curfew is decided.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "curfew_begins",
+  "day": 67,
+  "slot": "Morning",
+  "place": "quad",
+  "title": "Curfew in Force",
+  "public": "By order of the Chancellor: from today all students are in their own dorms from nightfall to dawn. No hiking after the Afternoon bell. Town visits by sign-out only, back by the end of the evening. 07:30 the order is read on the Quad; 16:30 council session (night rota); 21:30 head count in the dorms; gate locked at 22:00.",
+  "visibleFrom": 67,
+  "who": [
+   "okonkwo",
+   "rox",
+   "hana",
+   "octavia",
+   "teobalt",
+   "odalys",
+   "tavita",
+   "sebastian",
+   "anni"
+  ],
+  "gm": "Canon, Day 67. Posted on every door and read out on the Quad. Proctors — staff and council in pairs with lanterns — walk the campus at night; the gate is locked; evening clubs move to the Afternoon; dinner is earlier. Mama starts real head counts. Being caught out in the Night slot is a formal warning; twice is probation (see CURFEW in places). It protects nobody from a challenge made aloud, and everybody half knows it. Teobalt starts a 'walking buddies' list; Rare Hall drafts a petition. Tavita writes the night rota (staff and council in pairs), issues the lanterns and walks the longest round himself; a curfew pass needs his signature and then Sebastian's stamp; Anni Brandt starts as a first-year proctor under him.",
+  "kind": "school"
+ },
+ {
+  "id": "north_crown_friendly",
+  "day": 68,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Friendly Match vs North Crown Institute",
+  "public": "The Battle Team hosts rival school North Crown in the Great Arena. Five boards, cast live. Doors open after Midday classes. 14:00 doors and walk-out · 14:30 boards 5–3 · 15:50 board 2 · 16:35 board 1 (the captains) · 17:15 handshakes.",
+  "visibleFrom": 50,
+  "who": [
+   "isolde",
+   "rex",
+   "lilia",
+   "willas",
+   "dom",
+   "saoirse",
+   "kenji",
+   "priya",
+   "rox",
+   "bex",
+   "vivienne",
+   "marrow"
+  ],
+  "gm": "The North Crown delegation landed this morning (canon: Isolde Varga arrives Day 68) — captain Isolde, ace Rex, three more. The school pours into the arena, hungry for something normal. Default: Academy wins 4–1; Lilia beats Isolde in a game Isolde is proud to have lost; Willas drops his board to Rex and hears about it. Isolde is honourable and sharp: she notices the empty seats, the proctors, the frightened faces, and asks straight questions. First of her limited windows (tonight at the inn, tomorrow morning at the dock).",
+  "kind": "duel"
+ },
+ {
+  "id": "north_crown_departs",
+  "day": 69,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "North Crown Departs",
+  "public": "The visiting team leaves on the Saturday ferry. Ferry in about 10:30, farewells at the gangway from 10:50, casts off at 12:00.",
+  "visibleFrom": 68,
+  "who": [
+   "isolde",
+   "rex",
+   "abel",
+   "lilia",
+   "rox"
+  ],
+  "gm": "Short farewell at the dock. Isolde, to Lilia: 'Whatever is wrong here, fix it before the spring. I want to beat you properly.' If Rowan spoke honestly with her yesterday she gives him an address on the mainland — a way to get a letter out that does not pass through the Chancellor's office.",
+  "kind": "town"
+ },
+ {
+  "id": "dorm_inspection_2",
+  "day": 70,
+  "slot": "Afternoon",
+  "place": "commons_beach",
+  "title": "Dorm Inspection & Curfew Roll",
+  "public": "Room inspection for all dorms, combined with the first curfew roll check. Commons row: 14:00 inspection party, 14:15 bungalows 2–7 in order, 15:30 curfew roll on the boardwalk, 16:00 slips read out.",
+  "visibleFrom": 67,
+  "who": [
+   "odalys",
+   "teobalt",
+   "hana",
+   "octavia",
+   "tavita",
+   "anni"
+  ],
+  "gm": "Stricter than September: staff come too. In bungalow 7 one bed is made with inhuman neatness and has plainly never been slept in; the tin under it is 'private property' and by the letter of the rules may not be opened. Hana, counting heads on the row, notices how the Commons has arranged itself to sleep as far from number 7 as possible. Tavita leads it and has Anni Brandt with him, a first-year proctor in training; he has asked her, mildly, to let the first one be free.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_brant",
+  "day": 71,
+  "slot": "Afternoon",
+  "place": "infirmary_ward",
+  "title": "Brant's birthday",
+  "public": "Brant's birthday. Ward B visiting hour 14:30–15:45, two at a time, by the nurse's leave.",
+  "visibleFrom": 64,
+  "who": [
+   "brant"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Brant; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). His birthday passes in Ward B. His mother sits by the bed with a shop cake nobody cuts; the two hangers-on do not come. Some of the people he robbed do — {H=sammy?'Sammy'|Sammy} and Mikoto; and Trixie, who leaves a card on the bedside table. A visit here (it needs Camille's leave) is a chance to notice what he no longer reacts to: his own name.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "radio_play_night",
+  "day": 72,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Radio Play Night",
+  "public": "Movie night is suspended under the curfew, so the Commons kitchen hosts a live radio play instead. Parts handed out at the door. 18:30 parts and sound table, 18:50 curtain, about 20:15 cocoa; guests are escorted home at 21:00.",
+  "visibleFrom": 68,
+  "who": [
+   "odalys",
+   "inya",
+   "livvie",
+   "baylee",
+   "rana",
+   "marit"
+  ],
+  "gm": "Marit smuggles a script and half of Rare Hall down before dark; the kitchen is packed, loud and defiantly cheerful. Everyone reads a part badly. It is the Commons at its best — and '{H}', given the villain, reads it with flawless menace because {H:he} does exactly what the stage directions say.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_rafa",
+  "day": 73,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Rafa's birthday",
+  "public": "Rafa's birthday. He cooks: from 17:45 helpers welcome in the Commons kitchen, 18:30 dinner for forty, toast about 19:35.",
+  "visibleFrom": 66,
+  "who": [
+   "rafa"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Rafa; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He cooks his own birthday dinner for forty because he cannot imagine a better present, and Mama, who lets nobody else near her range, hands him her wooden spoon for the evening. Under curfew the whole Commons is in the kitchen anyway.",
+  "kind": "social"
+ },
+ {
+  "id": "contest_crunch",
+  "day": 74,
+  "slot": "Evening",
+  "place": "design_lab",
+  "title": "Design Contest: Open Lab Night",
+  "public": "The Design Lab is open late (with curfew passes) for final playtests before tomorrow's deadline. 18:30 passes and table list, 18:45 playtest slots (3 × 30 min), 20:30 last changes; lab closes 22:15, escort home.",
+  "visibleFrom": 68,
+  "who": [
+   "wren",
+   "livvie",
+   "felix",
+   "teobalt",
+   "chuck"
+  ],
+  "gm": "Curfew passes signed by Chuck in crayon. Livvie has not eaten today; her card is very good and she cannot see it. Testers needed. If Rowan entered, this is his last iteration. Wren runs the tables in pyjamas and lab coat. Santángel's assistants return the lab microscope tonight, wiped too clean.",
+  "kind": "school"
+ },
+ {
+  "id": "design_contest_deadline",
+  "day": 75,
+  "slot": "Evening",
+  "place": "design_lab",
+  "title": "Design Contest: Entries Due",
+  "public": "Submission box in the Design Lab closes at the Evening bell. One card per entrant, with design notes. The box is open all afternoon; it closes at 18:00 sharp; entries are counted and sealed at 18:15.",
+  "visibleFrom": 61,
+  "who": [
+   "wren",
+   "chuck",
+   "livvie",
+   "felix"
+  ],
+  "gm": "The box closes at the bell (canon, due Day 75). Livvie's hand shakes putting hers in. Results on Day 82. If Rowan promised to help someone and did not, this is where it lands.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_willas",
+  "day": 77,
+  "slot": "Afternoon",
+  "place": "gym",
+  "title": "Willas's birthday",
+  "public": "Willas's birthday. 15:00 the Battle Team's cake in the gym after Sunday practice.",
+  "visibleFrom": 70,
+  "who": [
+   "willas"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Willas; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The team gives him a cake iced with a scowling face; he roars at them for wasting money and eats three slices. Lilia's present is small and private. Dom shakes his hand, correctly. Later Willas is the one who carries Victoria's bags up to her sister's room on the third floor, because she no longer dares sleep on the first-year landing.",
+  "kind": "social"
+ },
+ {
+  "id": "ladder_snapshot_2",
+  "day": 78,
+  "slot": "Evening",
+  "place": "quad",
+  "title": "Ladder Snapshot II",
+  "public": "Second ranking snapshot at the bell. It fixes the seeding for the Promotion Duels. Results count until 18:00 sharp (registrar's table on the Terraces from 17:30); the board is frozen on the Quad at 18:00.",
+  "visibleFrom": 61,
+  "who": [
+   "santangel",
+   "octavia",
+   "noor",
+   "nathan",
+   "lilia"
+  ],
+  "gm": "The board freezes. It decides who may challenge upward at the Promotion Duels (Days 89–91) and who must defend. {H:sig} stands inside the top 15, with a record nobody wants to read aloud. Lilia looks at the board for a long moment and smiles for the first time in weeks — which Willas sees.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_maisie",
+  "day": 79,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Maisie's birthday",
+  "public": "Maisie's birthday. 14:30 at her workbench in the Design Lab; cake afterwards.",
+  "visibleFrom": 72,
+  "who": [
+   "maisie"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Maisie; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Someone asked what she wanted and she said 'a lathe', so the row has clubbed together for a set of jeweller's screwdrivers. Leona's present, unsigned, left on the bench: a coil of very fine old copper wire of a gauge nobody makes any more. Maisie does not ask where it came from. (It came from the print works.)",
+  "kind": "social"
+ },
+ {
+  "id": "spa_open_day",
+  "day": 80,
+  "slot": "Afternoon",
+  "place": "spa",
+  "title": "Open Afternoon at the Campus Spa",
+  "public": "Free entry for all dorms this afternoon, by order of the Chancellor's office: 'rest is part of safety'. 14:00 doors · pools 14:15–15:45 (women) and 16:00–17:30 (men) · relaxation room and tea counter open throughout · closes at the Afternoon bell.",
+  "visibleFrom": 76,
+  "who": [
+   "selene",
+   "camille",
+   "hana",
+   "sunny",
+   "jessica"
+  ],
+  "gm": "The whole frightened school in hot water (robes and separate hours; keep it tasteful). Selene hears everything today and will share one thing with someone she trusts. Camille falls asleep in the relaxation room. The filter jar on the counter is half full of pretty black grit.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_gideon",
+  "day": 81,
+  "slot": "Evening",
+  "place": "spectral_lobby",
+  "title": "Gideon's birthday",
+  "public": "Gideon's birthday. 19:00 private dinner in the Spectral Tower lobby (by invitation).",
+  "visibleFrom": 74,
+  "who": [
+   "gideon"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Gideon; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). A stiff little dinner in the tower with white gloves and place cards; Marrow sends a fountain pen. Gideon is pleased with himself and a little afraid of his patron. Nobody from the Commons is invited, naturally. (If things go badly at the Gala, this is his last birthday as only himself.)",
+  "kind": "social"
+ },
+ {
+  "id": "design_contest_results",
+  "day": 82,
+  "slot": "Midday",
+  "place": "design_lab",
+  "title": "Design Contest: Results",
+  "public": "Prize-giving in the Design Lab. The winning card will be printed. 13:00 all entries on show (after the Midday class), 13:15 results read out, 13:35 prize presented.",
+  "visibleFrom": 61,
+  "who": [
+   "chuck",
+   "wren",
+   "livvie",
+   "felix",
+   "marrow",
+   "okonkwo",
+   "teobalt"
+  ],
+  "gm": "Canon, Day 82. Chuck reads the results; Marrow presents. Default (plot timeline): Wren first — she gives half to the lab's paper budget — and Livvie second, 500 cr: heartbreak in public, arithmetic in private. With real playtesting help Livvie's card wins the 5,000 cr; if Rowan entered, judge his card on the work he put in. Marrow asks the winner, pleasantly, to sign over 'all process rights'; Chuck tears the form in half as a joke that is not one.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_eloise",
+  "day": 84,
+  "slot": "Afternoon",
+  "place": "theatre",
+  "title": "Eloise's birthday",
+  "public": "Eloise's birthday. 15:00 at the theatre's scene dock.",
+  "visibleFrom": 77,
+  "who": [
+   "eloise"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Eloise; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She has forgotten it is her birthday. Marit has not: the scene dock wall is hung with every canvas Eloise has painted this term, lit like a gallery, and the theatre club applauds her in. See also her exhibition on Day 87.",
+  "kind": "social"
+ },
+ {
+  "id": "promotion_filing",
+  "day": 85,
+  "slot": "Afternoon",
+  "place": "council_room",
+  "title": "Promotion Duels: Filing Deadline",
+  "public": "File your promotion challenge with the council clerk by the Afternoon bell: name the resident whose place you are playing for. Clerk's desk at the council chamber open from 14:15; last call 17:50; the register closes at 18:00 sharp.",
+  "visibleFrom": 71,
+  "who": [
+   "noor",
+   "octavia",
+   "teobalt",
+   "rana",
+   "gideon",
+   "sebastian"
+  ],
+  "gm": "Promotion Duels re-sort the dorms (canon). A lower-dorm student in the top half of his dorm's ladder may challenge a named resident of the next dorm up; the loser moves down. Rowan may file (against a Rare Hall resident) if his rank allows. Rana's form has been filled in and torn up twice. Gideon files to DEFEND against 'any Commons challenger', which is not a thing; Noor rejects the form with pleasure. Late or defective forms go to Sebastian's desk beside hers: a white collar's is 'an oversight', a grey collar's is 'out of time', unless someone holds him to the clause.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_livvie",
+  "day": 86,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Livvie's birthday",
+  "public": "Livvie's birthday. 18:30 supper in Mama's kitchen, cake at ten past seven.",
+  "visibleFrom": 79,
+  "who": [
+   "livvie"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Livvie; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She had hoped nobody knew. Mama's cake is the biggest of the term, on purpose. Livvie's own arithmetic for the year is in her cardigan pocket, on the back of a job slip. A present that is useful (a meal ticket, her mother's locket redeemed from the pawn shop) is worth far more than a pretty one — but charity offered clumsily will be refused.",
+  "kind": "social"
+ },
+ {
+  "id": "eloise_exhibition",
+  "day": 87,
+  "slot": "Afternoon",
+  "place": "theatre",
+  "title": "Large Format: Canvases by Eloise Lafayette",
+  "public": "An exhibition in the theatre's scene dock: card ideas painted two metres wide. Open all afternoon. 14:00 opening words, viewing until 17:30.",
+  "visibleFrom": 80,
+  "who": [
+   "eloise",
+   "marit",
+   "felix",
+   "wren",
+   "chuck",
+   "junho"
+  ],
+  "gm": "The school needs something to look at that is not the ward, and comes. Big, bright, strange canvases; one, from the stack she keeps face to the wall and never meant to show, of a floor of small lit squares with a figure at a table, back turned, in front of which Felix stands for an hour and Chuck for ten seconds before he leaves the building. A polite young man from the board's staff asks what it costs. (Plot file: q_eloise_large_format.)",
+  "kind": "social"
+ },
+ {
+  "id": "harvest_table",
+  "day": 88,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "The Harvest Table",
+  "public": "Mama Odalys's all-dorm harvest dinner at the Commons, the night before the Promotion Duels. Bring a dish or bring an appetite. 18:00 the long table is carried onto the boardwalk, 18:30 dinner, 19:30 the round of thanks; guests are escorted home at 21:00.",
+  "visibleFrom": 74,
+  "who": [
+   "odalys",
+   "inya",
+   "livvie",
+   "baylee",
+   "rana",
+   "viktor",
+   "willas",
+   "pippa",
+   "georgie",
+   "camille"
+  ],
+  "gm": "Late November, the long table carried out onto the boardwalk under lamps, curfew passes for guests. People from every dorm; Camille off shift for one hour. Mama makes each person say one thing they are thankful for. When it reaches '{H}' {H:he} says, after thought, 'I am thankful that the rules here are written down.' Tomorrow some of these people play each other for their beds.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "promotion_duels",
+  "day": 89,
+  "slot": "Morning",
+  "days": 3,
+  "place": "trial_dome",
+  "title": "Promotion Duels",
+  "public": "Three days of Promotion Duels in the Trial Domes and the Great Arena (Dome 3 remains closed). Dorm places are won and lost. Cast live by first-year Auxiliary students on the commentary track. Days 89–90 at the Domes: 08:30/09:00 check-in and deck check, sessions 09:30–12:30 and 13:30–16:30, results signed 16:30. Day 91 in the Great Arena: doors 10:00, duels from 10:30 and 14:00, register closed 16:30. Players, witnesses and crew are excused from Friday’s classes.",
+  "visibleFrom": 1,
+  "who": [
+   "hana",
+   "santangel",
+   "noor",
+   "octavia",
+   "rana",
+   "inya",
+   "gideon",
+   "nathan",
+   "teobalt",
+   "bex",
+   "vivienne"
+  ],
+  "gm": "Canon, Days 89–91: single binding duels for dorm places, with witnesses. If Rowan qualified and filed, his duel is formal, binding and watched — winning means Rare Hall from Day 106. Defaults (plot timeline): Rowan does not qualify or does not win; Inya wins hers and declines the Rare Hall bed; '{H}' wins in six turns and declines too — 'I have a {H:mate}'; Rana does not enter. Results are posted on Day 92; moves take effect at the start of Term 2.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_anni",
+  "day": 90,
+  "slot": "Evening",
+  "place": "spectral_lobby",
+  "title": "Anni's birthday",
+  "public": "Anni's birthday. 18:30–19:15 in the Spectral Tower lobby (seating plan; by invitation).",
+  "visibleFrom": 83,
+  "who": [
+   "anni"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Anni; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She has scheduled it: forty-five minutes, the lobby, a seating plan. Noor's present is a red pen with her initials; Georgie's is a hand-drawn certificate, 'BEST FLOOR MONITOR', which Anni frames. Somebody (the game master may let Rowan work out who) has left a wrapped romance novel at her door with no card.",
+  "kind": "social"
+ },
+ {
+  "id": "promotion_results",
+  "day": 92,
+  "slot": "Morning",
+  "place": "job_board",
+  "title": "Promotion Results & Finals Study Week",
+  "public": "New dorm lists for next term are posted at the job board. The Library runs extended hours all week under proctor escort. 07:30 lists posted. Library open to 21:00 this week; proctor escorts leave its doors at 20:00 and 21:00.",
+  "visibleFrom": 85,
+  "who": [
+   "octavia",
+   "teobalt",
+   "noor",
+   "odalys"
+  ],
+  "gm": "The lists go up: who rises, who falls. Collars will change after the break. Mama reads the Commons list with her lips moving and says only 'Well. More for supper.' Finals are in four days: study sessions this week matter, and proctors walk students home from the Library in groups.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_viktor",
+  "day": 93,
+  "slot": "Afternoon",
+  "place": "campsite",
+  "title": "Viktor's birthday",
+  "public": "Viktor's birthday. He is out at the Windbreak Campsite from 14:30 and back at the gate before the Afternoon bell.",
+  "visibleFrom": 86,
+  "who": [
+   "viktor"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Viktor; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He does not celebrate. He spends the afternoon at the campsite with a map and his father's journal — today he is one year closer to the age his father was in the last photograph. If Rowan has his trust and turns up, this is when he says the name Aleksander Hale aloud, or shows the place where twelve pages were torn out.",
+  "kind": "social"
+ },
+ {
+  "id": "finals_review",
+  "day": 94,
+  "slot": "Afternoon",
+  "place": "classroom",
+  "title": "Finals Review Clinics",
+  "public": "Back-to-back review clinics in Seminar Room 2B: Rules & Judging, then Probability. 14:00 Rules & Judging (Ms Kirishima), 15:45 Probability (Dr Blum); ends 17:15.",
+  "visibleFrom": 87,
+  "who": [
+   "hana",
+   "blum",
+   "noor",
+   "georgie",
+   "teobalt"
+  ],
+  "gm": "Counts as strong study for both courses. Hana keeps the room ten minutes over time to repeat, without being asked, exactly what makes a challenge formal — aloud, by name, before one who counts — and that nobody is ever obliged to MAKE one. She looks tired and very young.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_dmitri",
+  "day": 95,
+  "slot": "Night",
+  "place": "commons_beach",
+  "title": "Dmitri's birthday",
+  "public": "Dmitri's birthday. 00:00, midnight, on the porch of Bungalow 6 (Commons row only).",
+  "visibleFrom": 88,
+  "who": [
+   "dmitri"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Dmitri; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). A birthday that begins at midnight because that is when he is awake. Whoever has ever drunk his tea turns up on the porch of Bungalow 6 in blankets, one by one, with a candle in a mug. He says it is the first one he has not spent alone on purpose.",
+  "kind": "social"
+ },
+ {
+  "id": "finals_1",
+  "day": 96,
+  "slot": "Morning",
+  "days": 3,
+  "place": "lecture_hall",
+  "title": "Final Examinations",
+  "public": "Finals for all courses, Friday to Sunday. See the exam timetable at the job board. Term grades are posted Monday morning. Fri: 08:30 exam rules (lecture hall), 08:45 Card Design (Design Lab), 11:30 Table Practicum (Trial Domes). Sat: 08:30 Tempo & Resource (Trial Domes), 11:30 Rules & Judging written, 12:40 orals (Room 2B), 15:00 Conditioning (gym). Sun: 09:00 Probability, 11:30 Lore essay (lecture hall). No regular classes on Friday.",
+  "visibleFrom": 1,
+  "who": [
+   "santangel",
+   "hana",
+   "blum",
+   "ashdown",
+   "rox",
+   "chuck"
+  ],
+  "gm": "Three days (see GRADING.exams): Friday Morning Card Design submission, Midday Table Practicum practical before a staff panel; Saturday Morning Tempo & Resource practical duel with ledger, Midday Rules written and oral; Sunday Morning Probability, Midday Lore essay; Conditioning circuit Saturday Afternoon. Final grades decide probation: two F = probation, three F or a second probation = expulsion. Play the practical duels as scenes.",
+  "kind": "exam"
+ },
+ {
+  "id": "final_grades_1",
+  "day": 99,
+  "slot": "Morning",
+  "place": "job_board",
+  "title": "Term Grades Posted",
+  "public": "Final grades for the Autumn Term are posted. Students on probation report to the Chancellor's office. 07:30 grades posted; probation hearings at 14:30.",
+  "visibleFrom": 96,
+  "who": [
+   "teobalt",
+   "livvie",
+   "baylee",
+   "rana",
+   "okonkwo"
+  ],
+  "gm": "The glass cases again. Rowan's letters appear by themselves; on two F he is summoned for a probation hearing (a real scene with Okonkwo). {H=baylee?'Baylee'|Baylee} has scraped his C in Lore if anyone helped him read. The last week of term is light: classes are reviews, and everybody is talking about Friday.",
+  "kind": "school",
+  "hostWho": "add"
+ },
+ {
+  "id": "gala_fittings",
+  "day": 100,
+  "slot": "Afternoon",
+  "place": "boutique",
+  "title": "Gala Fittings in Town",
+  "public": "Maison Topdeck stays open all afternoon for Winter Gala fittings and hire. Shuttle from the main gate. Carts leave the gate from 14:15 on the half hours; fittings 14:45–17:20; last cart back 17:30 (through the gate by 18:00).",
+  "visibleFrom": 92,
+  "who": [
+   "jessica",
+   "marit",
+   "inya",
+   "pippa",
+   "ashton"
+  ],
+  "gm": "Formal dress is required on Friday. Hire from 30 cr; the cheap routes are Marit's costume rail or {H=baylee?'Baylee's'|Baylee's} cousin's suit. Jessica holds court in the shop as its unpaid consultant and will dress someone she has decided to take an interest in — if his pride allows. Who has asked whom to the Gala is the only topic on the island — louder than usual, to drown out this morning's news (plot timeline: a fifth, found by Mama beside the cold bonfire pit; Ward A is opened).",
+  "kind": "town",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_octavia",
+  "day": 100,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Octavia's birthday",
+  "public": "Octavia's birthday. She is working on the Spectral Tower terrace from 19:00.",
+  "visibleFrom": 93,
+  "who": [
+   "octavia"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Octavia; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She works through it. The council leaves a card; Marrow sends orchids and an offer of a position after graduation, in writing. A person who brings her nothing but a coffee and one honest question finds her, for ten minutes, almost unguarded.",
+  "kind": "social"
+ },
+ {
+  "id": "dance_lesson",
+  "day": 101,
+  "slot": "Afternoon",
+  "place": "theatre",
+  "title": "Crash Course: How to Waltz",
+  "public": "Emergency dance lesson on the theatre stage before the Gala. Partners assigned by lot. 15:00 lots, 15:15 the box step, 16:00 partners by choice; done by 17:00.",
+  "visibleFrom": 94,
+  "who": [
+   "marit",
+   "vivienne",
+   "sunny",
+   "noor",
+   "baylee",
+   "inya"
+  ],
+  "gm": "Vivienne and Marit teach; partners by lot, then by choice. {H=baylee?'Baylee'|Baylee} is terrified of treading on someone and turns out to be light on his feet. A dance learned here is a dance Rowan can ask for on Friday.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "wildcard_swap",
+  "day": 102,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "The Wildcard Swap",
+  "public": "Commons tradition: anonymous end-of-term gift exchange, limit 15 cr, drawn from Mama's stockpot. 07:30 names drawn at breakfast, 18:30 supper, 19:10 gifts opened one at a time.",
+  "visibleFrom": 95,
+  "who": [
+   "odalys",
+   "inya",
+   "livvie",
+   "baylee",
+   "rana",
+   "viktor",
+   "nathan"
+  ],
+  "gm": "Everyone draws a name. Gifts are small, silly or painfully well judged. '{H}' gives {H:his} draw the single most useful object they could have wanted, wrapped with geometric precision — and is puzzled by thanks: 'You needed it. I had observed that.' What Rowan gives, and to whom, counts.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "winter_gala",
+  "day": 103,
+  "slot": "Evening",
+  "place": "gala_ballroom",
+  "title": "The Winter Gala",
+  "public": "Formal ball in the Great Arena's upper hall to close the Autumn Term. Dinner, dancing, last dance at midnight. Formal dress. 18:30 doors · 19:00 the Chancellor's toast · 19:15 dinner · 20:15 first dance · 22:00 terrace open · 23:45 last dance · escorted home from 00:10.",
+  "visibleFrom": 1,
+  "who": [
+   "jessica",
+   "marit",
+   "inya",
+   "livvie",
+   "noor",
+   "sunny",
+   "rana",
+   "pippa",
+   "bex",
+   "octavia",
+   "hana",
+   "vivienne",
+   "camille",
+   "lilia",
+   "willas",
+   "ashton",
+   "gideon",
+   "marrow",
+   "okonkwo",
+   "chuck",
+   "nathan",
+   "georgie",
+   "pilar",
+   "tavita",
+   "imara",
+   "sebastian"
+  ],
+  "gm": "Term 1's emotional finale (Evening and Night; the curfew is lifted inside the hall, staff at every door). Who Rowan arrives with, dances with and is seen with is the second romance checkpoint. Octavia's seating plan is politics; the evening is Pilar's production, Tavita is on the door, and Imara closes the books tomorrow. Chairs with name cards stand empty for those in the wards, and the Chancellor's toast 'to those who cannot be with us' is brittle. Lilia and Willas dance like people who have done it for years; Georgie is taken home at ten. The Guest dances every dance perfectly after watching for four minutes; its partners' hands are cold afterwards. The terrace is the last good chance to expose the false {H} before the break: if that happens publicly, the shape collapses into black glass sand and it takes Gideon over the winter (canon).",
+  "kind": "festival",
+  "hostWho": "add"
+ },
+ {
+  "id": "farewell_bonfire",
+  "day": 104,
+  "slot": "Evening",
+  "place": "bonfire_pit",
+  "title": "End-of-Term Bonfire",
+  "public": "Last bonfire of the term at the Commons cove, with the wardens' permission. Burn your worst decklist. 18:30 the pit is lit, 19:00 decklists burned, then promises for next term; embers out 21:15.",
+  "visibleFrom": 96,
+  "who": [
+   "odalys",
+   "inya",
+   "livvie",
+   "baylee",
+   "rana",
+   "viktor",
+   "saoirse",
+   "marit",
+   "sunny"
+  ],
+  "gm": "The row's last night before the break; those who were promoted will come back with other collars. The decklist-burning ceremony — Mama insists on lighting the pit, whatever was found beside it on Monday morning. Promises for next term are made here, and the GM should remember them. The fire has a green edge on the side where {H} sits, if {H:he} still sits there.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "last_ferry_1",
+  "day": 105,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Last Ferry of the Term",
+  "public": "The Second Chance takes students home for the winter break. Boarding from mid-morning. 10:30 boarding begins, 11:15 goodbyes at the gangway, 12:00 the ferry casts off.",
+  "visibleFrom": 1,
+  "who": [
+   "abel",
+   "odalys",
+   "silas",
+   "inya",
+   "baylee",
+   "livvie",
+   "viktor"
+  ],
+  "gm": "Canon, Day 105: the dock, bags, goodbyes; whoever stands at the rail with Rowan is decided by his routes. Then ONE interlude scene for the whole break (Aunt Dee's laundromat in the rain; a letter or two; one thing that does not fit) and straight on to Day 106. Some stay on the island: Livvie cannot afford the fare, Viktor will not leave, Wren did not notice it was a holiday. If the false {H} was exposed, the taking of Gideon happens during the break, off stage.",
+  "kind": "school",
+  "hostWho": "add"
+ },
+ {
+  "id": "term2_begins",
+  "day": 106,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "Spring Term Begins",
+  "public": "Opening assembly in the Great Arena, then classes as normal. The curfew remains in force. 07:30 the ferry brings the school back, 08:30 assembly, classes from about 09:20.",
+  "visibleFrom": 1,
+  "who": [
+   "okonkwo",
+   "santangel",
+   "rox",
+   "lilia",
+   "octavia",
+   "nathan",
+   "gideon"
+  ],
+  "gm": "Canon, Day 106. Okonkwo's assembly is shorter and harder than in September: the curfew stays, Ward B is 'stable', the Interschool Cup WILL be hosted in March. Stage D begins: the Guest has learned the word 'champion' and wants to 'play the best to learn the most'. If unexposed, {H} {H=@near?is back on the steps of bungalow 7|is back in bungalow 7}, ladder top 10, gentle as ever. If exposed, {H}'s bed is stripped and nobody says {H:his} name, and Gideon Pryce has come back from the break very polite, very still, taking the stairs. Marrow has wintered on the island.",
+  "kind": "school",
+  "hostWho": "add"
+ },
+ {
+  "id": "moving_day",
+  "day": 106,
+  "slot": "Afternoon",
+  "place": "quad",
+  "title": "Dorm Moving Day",
+  "public": "Promotion results take effect: new room keys at the council table on the Quad, new collars at the campus store. Key table open from 14:00; carts all afternoon; rooms to be taken by 16:45.",
+  "visibleFrom": 92,
+  "who": [
+   "teobalt",
+   "odalys",
+   "willas",
+   "baylee",
+   "inya",
+   "rana"
+  ],
+  "gm": "Trunks on carts, collars changing colour. If Rowan won his Promotion Duel he moves to Rare Hall (he may petition to stay in the Commons — Mama pretends not to care which). Willas carries half the Commons' boxes personally and swears at every stair. The row has new faces and one or two fewer old ones.",
+  "kind": "school"
+ },
+ {
+  "id": "spring_signups",
+  "day": 107,
+  "slot": "Afternoon",
+  "place": "quad",
+  "title": "Spring Club & Elective Sign-Ups",
+  "public": "Second-term sign-ups on the Quad: clubs, electives, volunteer rotas for the Island Open and the Interschool Cup. 14:00 stalls open, 14:15 pitches (3 min each), 15:15 sign-up sheets, lists close at 17:00.",
+  "visibleFrom": 100,
+  "who": [
+   "teobalt",
+   "marit",
+   "noor",
+   "sunny",
+   "wren",
+   "bex",
+   "pilar",
+   "imara"
+  ],
+  "gm": "A smaller, tighter fair than September's: fewer stalls, more purpose. New: the volunteer rotas (Teobalt), the infirmary helpers' list (Camille's handwriting), and Bex recruiting 'anyone who can climb a hill and hold a cable'. A second chance to join whatever Rowan missed. Pilar runs the pitches; the crew lists for the Open and the Cup hang at her table, and Imara sits beside her with the pay sheet.",
+  "kind": "social"
+ },
+ {
+  "id": "top_deck_returns",
+  "day": 108,
+  "slot": "Afternoon",
+  "place": "broadcast_studio",
+  "title": "The Top Deck Returns",
+  "public": "First broadcast of the new term, now live in the late afternoon. Studio audience from 16:40, on air 17:00–17:40.",
+  "visibleFrom": 106,
+  "who": [
+   "bex",
+   "pippa",
+   "vivienne",
+   "marit"
+  ],
+  "gm": "A vetted show: results, Open previews, no mention of Ward B. Bex signs off with a line that was not in the approved script. Off air she and Pippa have a box of tapes and photographs that do not add up, and they are choosing whom to show it to.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_junho",
+  "day": 108,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Junho's birthday",
+  "public": "Jun-ho's birthday. 15:00–15:45 in the Design Lab.",
+  "visibleFrom": 101,
+  "who": [
+   "junho"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Junho; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He has issued a specification for his own party (duration, noise ceiling, cake density). His roommate Teobalt follows it to the letter except in one particular, which is that it is a surprise. Junho files a bug report and then, quietly, closes it as 'works as intended'.",
+  "kind": "social"
+ },
+ {
+  "id": "ladder_registration_2",
+  "day": 109,
+  "slot": "Afternoon",
+  "place": "council_room",
+  "title": "Season 2 Deck Registration",
+  "public": "Register or update your decklist with the council clerk before Friday's season opening. Clerk's desk at the council chamber 14:30–17:30.",
+  "visibleFrom": 106,
+  "who": [
+   "noor",
+   "octavia",
+   "teobalt",
+   "sebastian"
+  ],
+  "gm": "Routine, except that Noor now reads every registered list for cards she cannot find in any set file. There is one such list. She has not decided what the rules require her to do about it; asking Rowan is not beneath her. Sebastian, at the next desk, stamps late forms and penalties and has not been told what Noor is looking for.",
+  "kind": "school"
+ },
+ {
+  "id": "ladder_s2_opens",
+  "day": 110,
+  "slot": "Morning",
+  "place": "quad",
+  "title": "Ladder Season 2 Opens",
+  "public": "Ranked play resumes with fresh season points. Top 8 at the March snapshot qualify for the Interschool Cup side event. 07:45 the board is reset on the Quad, 08:00 first challenge slips; ranked tables at the Trial Domes from 14:30.",
+  "visibleFrom": 1,
+  "who": [
+   "santangel",
+   "lilia",
+   "dom",
+   "saoirse",
+   "kenji",
+   "priya",
+   "nathan",
+   "gideon"
+  ],
+  "gm": "Canon, Day 110. The board resets season points, not ranks. The top of the ladder is now Battle Team names and one other. The first of the Guest's formal approaches to team members happens soon after: correctly worded, witnessed, with an ante it finds reasonable. Kenji, who grinds fourteen hours a day and cannot refuse a game, is the likeliest first.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "winter_market",
+  "day": 111,
+  "slot": "Evening",
+  "place": "night_market",
+  "title": "Winter Night Market",
+  "public": "First Night Market of the new year: hot chestnuts, mulled apple, a lantern stall. Sign-out at the main gate from 18:00, stalls from 18:30; students leave at 21:15 and must be through the gate by 22:00.",
+  "visibleFrom": 106,
+  "who": [
+   "oru",
+   "mika",
+   "josie",
+   "dex",
+   "selene"
+  ],
+  "gm": "Students must be back by the end of the Evening slot; staying on is a curfew breach and where the good scenes are. Oru, late: 'What cannot be fought can be bound. Ask the one who knows the rules by heart.' The pawnbroker's covered cabinet stands open and empty, whoever bought what was in it.",
+  "kind": "town"
+ },
+ {
+  "id": "open_registration",
+  "day": 113,
+  "slot": "Afternoon",
+  "days": 11,
+  "place": "card_shop",
+  "title": "Island Open: Registration Opens",
+  "public": "Sign up at the Sleeve & Binder or the campus store for the Island Open (Days 124–126) by Day 123. Sanctioned event. The ladder top 8 enter directly; everyone else through the qualifier on the evening of Day 123. Prizes 6,000 / 3,000 / 1,500 cr. The list opens Day 113 at 14:30; the desk is open every afternoon 14:30–17:30; registration closes Day 123 at 17:00.",
+  "visibleFrom": 106,
+  "who": [
+   "dex",
+   "mika",
+   "rana",
+   "livvie",
+   "inya"
+  ],
+  "gm": "Open until Day 123. The Open is sanctioned (canon): it is Rana's last chance to win an event and not be sent down for good, and Livvie's best chance at real money. Mainland players will come over on the ferry. Outside the ladder top 8 the way in is Thursday's qualifier at the shop.",
+  "kind": "duel"
+ },
+ {
+  "id": "freya_midwinter",
+  "day": 113,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Midwinter in the Commons Kitchen",
+  "public": "Curfew-legal: a midwinter supper in Bungalow 1, by permission of Mama Odalys. Candles. Singing. 18:30 candles lit, 18:50 supper, 19:30 the northern song; over by 21:00.",
+  "visibleFrom": 108,
+  "who": [
+   "freya",
+   "odalys",
+   "rafa",
+   "trixie",
+   "dmitri",
+   "tobias"
+  ],
+  "gm": "{H=freya?'Freya's'|Freya's} answer to the curfew, if someone helped her find a legal one: candles down the long table, the northern song again, one bottle that Mama measures out herself. If nobody helped, there is no notice on the board and the party is at the cove after dark, with everything that means under curfew.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_noor",
+  "day": 114,
+  "slot": "Afternoon",
+  "place": "classroom",
+  "title": "Noor's birthday",
+  "public": "Noor's birthday. 16:00 in Seminar Room 2B, after the Judge Circle.",
+  "visibleFrom": 107,
+  "who": [
+   "noor"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Noor; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The Judge Circle gives her an annotated first-edition rulebook. She is quietly pleased and more quietly troubled: she is the charter clerk, she knows which register entries match which beds in Ward B, and she has told nobody. Someone who asks her today what the charter says about winning back what was lost gets a long, exact, hopeful answer.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_victoria",
+  "day": 116,
+  "slot": "Afternoon",
+  "place": "rooftop_garden",
+  "title": "Victoria's birthday",
+  "public": "Victoria's birthday. Tea in the rooftop garden: guests from 15:45, tea at 16:00 sharp, over by 17:00.",
+  "visibleFrom": 109,
+  "who": [
+   "victoria"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Victoria; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). A tea party in the rooftop garden at exactly four, announced on her schedule card a week ahead so that it will not be a surprise, because she does not like surprises. Ophelia stands at the stair door like a sentry and thanks each guest, stiffly, for coming. Victoria tells everyone which of their presents is the prettiest.",
+  "kind": "social"
+ },
+ {
+  "id": "storm_3",
+  "day": 117,
+  "slot": "Night",
+  "days": 2,
+  "place": "inn",
+  "title": "Winter Gale",
+  "public": "Harbourmaster's notice: severe gale Friday night into Saturday, expected from about 21:30 on Friday. The Saturday ferry (12:00) is cancelled. Anyone caught in town shelters at the Drowned Anchor and walks up in a group in the morning.",
+  "visibleFrom": 115,
+  "who": [
+   "josie",
+   "abel",
+   "silas",
+   "dex",
+   "mika"
+  ],
+  "gm": "The worst storm of the year blows up during Friday Night Draft: anyone in town is stranded there, sheltering at the inn or the bar with the townspeople — curfew is nobody's fault tonight. By the fire, with the lamps out, adults talk about the school in a way students never hear: about a fourth house, about a professor, about children who were 'played'. Josie pours and listens. On the ridge a guy cable of the radio mast comes down; Silas will need a hand with it on Sunday. (Plot timeline: on campus this same night a Battle Team member sits down in a Trial Dome, and is found in the morning.)",
+  "kind": "town"
+ },
+ {
+  "id": "bday_ed",
+  "day": 119,
+  "slot": "Afternoon",
+  "place": "commons_beach",
+  "title": "Ed's birthday",
+  "public": "Ed's birthday. If he is on his feet: meet on the bungalow steps at 14:00, bring a rope, back before the Afternoon bell.",
+  "visibleFrom": 112,
+  "who": [
+   "ed"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met {H=ed?'Ed'|Ed}; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). If he is in one piece: he wants to spend it somewhere with a red cross on the map, and the best present anyone can give him is to come along with a rope. If he is in the infirmary or has been lately: the row signs his cast or his sling instead. Viktor's present is a proper climbing harness, handed over without a word.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_felix",
+  "day": 121,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Felix's birthday",
+  "public": "Felix's birthday. In the design lab from 15:00: a wall of portraits, cake at about 15:30.",
+  "visibleFrom": 114,
+  "who": [
+   "felix"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Felix; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The lab pins up a wall of portraits of him drawn by everyone, all terrible. His present to himself is to finish the sequence of dream sketches: laid in order they show a hall of tiled walls and a round bright thing sitting down at a table. He asks whoever is nearest whether they have had that one too.",
+  "kind": "social"
+ },
+ {
+  "id": "open_judge_briefing",
+  "day": 122,
+  "slot": "Afternoon",
+  "place": "classroom",
+  "title": "Island Open: Judge & Volunteer Briefing",
+  "public": "Briefing for floor judges, scorekeepers and runners in Seminar Room 2B: sign-on 14:30, briefing 14:45, postings 15:25, venue walk-through 15:50. Volunteers are paid 20 cr a day and fed.",
+  "visibleFrom": 113,
+  "who": [
+   "hana",
+   "noor",
+   "mika",
+   "pilar",
+   "imara"
+  ],
+  "gm": "Paid volunteering as an alternative to playing. Hana is head judge; she instructs the floor that any challenge 'outside tournament play' made on the venue floor is to be reported to her at once — the only official acknowledgement so far of what everyone fears. Runners and scorekeepers sign on with Pilar; Imara pays each day's 20 cr at the council table.",
+  "kind": "school"
+ },
+ {
+  "id": "open_trial",
+  "day": 123,
+  "slot": "Evening",
+  "place": "card_shop",
+  "title": "Island Open Qualifier",
+  "public": "Last-chance qualifier at the Sleeve & Binder for everyone outside the ladder top 8. Registration and deck check 18:00, first round 18:20, final about 20:05; the four semi-finalists enter tomorrow's Island Open. Proctors walk everyone home at 20:45, back before the night bell.",
+  "visibleFrom": 113,
+  "who": [
+   "dex",
+   "mika",
+   "rana",
+   "inya",
+   "livvie",
+   "ashton"
+  ],
+  "gm": "A tight evening of single-elimination tables; Hana has lent the shop two proctors so that students can play and still be walked home. If Rowan is not in the ladder top 8 this is his way into the Open. Rana plays, and it is the first real test of whether she has learned to close.",
+  "kind": "duel"
+ },
+ {
+  "id": "island_open",
+  "day": 124,
+  "slot": "Morning",
+  "days": 3,
+  "place": "great_arena",
+  "title": "The Island Open",
+  "public": "Three-day sanctioned tournament, open to students, townspeople and mainland players. Fri: check-in 07:30, player meeting 08:30, Swiss rounds 1–4 from 09:00 (lunch 12:05). Sat: rounds 5–7 from 09:00, top 8 read out 13:15. Sun on the arena stage: quarter-finals 12:00, semi-finals 13:20, final 14:35, prize-giving 15:40. Prizes 6,000 / 3,000 / 1,500 cr. Players and crew are excused from Friday’s classes.",
+  "visibleFrom": 1,
+  "who": [
+   "rana",
+   "livvie",
+   "inya",
+   "georgie",
+   "gideon",
+   "ashton",
+   "dom",
+   "saoirse",
+   "hana",
+   "noor",
+   "mika",
+   "dex",
+   "bex",
+   "vivienne",
+   "nathan"
+  ],
+  "gm": "Canon, Days 124–126; the biggest event Rowan can enter this year (tournament-kind, long days, Nerve). Around 110 players (students, staff, town, visitors). RANA'S LAST CHANCE: she must win a sanctioned event to keep her place; whether she closes at match point depends on what Rowan has done for her (by default she falls short and leaves on Day 128; in a bad timeline she challenges the Guest herself on Sunday night, having nothing left to lose). LIVVIE needs a money finish. The Guest enters, because a tournament is a conflict offered to everyone: it plays every round flawlessly, with no antes, and by default wins the event and carries the trophy home in both hands like a bowl of water. Seven Swiss rounds (four on Friday, three on Saturday); the top 8 play on the arena stage on Sunday from noon (quarter-finals, semi-finals, final). Play Rowan's key rounds as scenes and summarise the rest.",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_rana",
+  "day": 127,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Rana's birthday",
+  "public": "Rana's birthday. Supper at Mama's table 18:30, cake at about 19:10.",
+  "visibleFrom": 120,
+  "who": [
+   "rana"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Rana; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). The day after the Open. Either the best birthday of her life — she is staying, and lets Mama hug her for a full three seconds — or the worst, with one duffel by the door and a boat in the morning. If the worst: a formal hearing before the Chancellor on her behalf (Noor knows the regulation) can still be attempted by her friends tonight.",
+  "kind": "social"
+ },
+ {
+  "id": "team_exhibition",
+  "day": 128,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Battle Team Exhibition Scrim",
+  "public": "The Battle Team plays an open training match against the top finishers of the Island Open. Free entry: doors 15:00, five boards from 15:20, the captain's board about 16:15, over by 17:10.",
+  "visibleFrom": 121,
+  "who": [
+   "lilia",
+   "willas",
+   "dom",
+   "saoirse",
+   "priya",
+   "rox",
+   "bex"
+  ],
+  "gm": "Rox wants the school to see the team confident — the more so if (plot timeline) one of its starters has been in Ward B since Day 118. If Rowan finished high at the Open he is invited to take a board: a first game against a starter with the school watching. Lilia plays one game at half speed and still wins; afterwards she asks Rox who on the ladder could make her play at full speed, and Rox does not want to say.",
+  "kind": "duel"
+ },
+ {
+  "id": "bday_jessica",
+  "day": 129,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Jessica's birthday",
+  "public": "Jessica's birthday. By invitation: guests received in the Spectral Tower lobby from 18:45, dinner on the terrace at 19:00 sharp, goodnights by 21:15.",
+  "visibleFrom": 122,
+  "who": [
+   "jessica"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Jessica; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). A candlelit dinner on the terrace, twelve covers, everything exactly right — her own planning, and she would never admit how much she hoped for one particular acceptance. Courted properly, this is the high point of her route so far; a careless gift, or lateness, is remembered for weeks. She wears her grandmother's sapphires.",
+  "kind": "social"
+ },
+ {
+  "id": "prerelease_ashfall",
+  "day": 132,
+  "slot": "Midday",
+  "days": 2,
+  "place": "card_shop",
+  "title": "Pre-Release Weekend: 'Ashfall Crown'",
+  "public": "The spring set arrives at the Sleeve & Binder: sealed-deck events Saturday and Sunday. Entry 90 cr. Each day: registration 11:00, deck building 11:20, three rounds from 12:00, prizes about 13:45.",
+  "visibleFrom": 118,
+  "who": [
+   "dex",
+   "mika",
+   "livvie",
+   "wren"
+  ],
+  "gm": "New cards, moving prices. Mika is unsettled: among the trade-ins this month were cards with a deep-sea-and-stars frame that are in no set list and are not fakes. She gave them back. Wren comes down from the lab for the first time in weeks to look at the new set's print quality and ends up at the pawn shop window, staring.",
+  "kind": "town"
+ },
+ {
+  "id": "ed_expedition_9",
+  "day": 133,
+  "slot": "Afternoon",
+  "place": "cliff_path",
+  "title": "Ed's Expedition No. 9: The Iron Rungs",
+  "public": "'Down the rungs to the Singing Cave. Roped this time, I PROMISE.' — E. Venture. Meet at the main gate 14:15 (sign out), at the rungs by 15:00, back at the gate before the Afternoon bell.",
+  "visibleFrom": 130,
+  "who": [
+   "ed",
+   "viktor",
+   "saoirse"
+  ],
+  "gm": "If he learned to go on a line (ed_on_a_line) this is the first expedition anyone enjoys: Viktor leading, {H=ed?'Ed'|Ed} second, the cave singing below. If he did not, the poster has no rope in it and a staff notice is pinned over it by evening.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "open_playtest",
+  "day": 134,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Open Playtest Afternoon",
+  "public": "Game Design students need testers for their spring projects. Sign-in 14:30, session one 14:45, a demonstration at 15:30, session two 15:55; pay-out at the door about 16:40. Snacks, prototypes, 12 cr per session.",
+  "visibleFrom": 127,
+  "who": [
+   "wren",
+   "felix",
+   "livvie",
+   "teobalt",
+   "chuck"
+  ],
+  "gm": "Paid, pleasant, and a good way into the lab. Maisie Voltage demonstrates her touchable-hologram rig at the bench by the fuse box (plot file: t_maisie_demo, q_maisie_push_back) with a young man from the board's staff in the back row; Junho is collecting bug reports on everyone else's prototypes; Eloise's is two metres wide. Wren has a private project on the side bench: a first-print frame under the lamp and a page of mineral names crossed out one by one. If Rowan has earned it she says what she thinks the ink is — and that the only place to prove it would be wherever the first set was actually printed.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_kenji",
+  "day": 135,
+  "slot": "Evening",
+  "place": "rare_common_room",
+  "title": "Kenji's birthday",
+  "public": "Kenji's birthday. His floor gathers in the Rare Hall common room at 18:30; visitors sign out by 21:30.",
+  "visibleFrom": 128,
+  "who": [
+   "kenji"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Kenji; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). If he is himself: his floor gives him a crate of energy drinks and a card saying GO OUTSIDE, and he plays until two as usual. By default (plot timeline) he has been in Ward B since Day 118 — the first Battle Team member, who could never say no to a game — and his floor leaves the crate by his bed with the headphones on top, still playing.",
+  "kind": "social"
+ },
+ {
+  "id": "lantern_workshop",
+  "day": 136,
+  "slot": "Afternoon",
+  "place": "rooftop_garden",
+  "title": "Lantern Workshop",
+  "public": "Fold and paint your paper lantern for Saturday's Lantern Night on the rooftop garden. Paper and candles provided. Start 14:30, painting from 15:45, lanterns racked to dry by 16:50.",
+  "visibleFrom": 129,
+  "who": [
+   "livvie",
+   "felix",
+   "wren",
+   "inya",
+   "pippa",
+   "noor",
+   "marit"
+  ],
+  "gm": "Paper, glue, the whole campus spread below. Each lantern carries a written wish; what Rowan writes is his own business unless he shows someone. Livvie's is very small and very neat. People are careful to write ordinary wishes and several fail.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_tobias",
+  "day": 137,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Tobias's birthday",
+  "public": "Tobias's birthday. After supper in Mama's kitchen, about 19:05. (He did not tell anyone.)",
+  "visibleFrom": 130,
+  "who": [
+   "tobias"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met {H=tobias?'Tobias'|Tobias}; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). He did not tell anyone. {H=sammy?'Sammy'|Sammy} found out from the register and told Mama. {H=tobias?'Tobias'|Tobias} sits through the cake and the singing with his jaw set like a man being arrested and afterwards washes every dish in the kitchen without being asked. Nobody has ever made him a cake before.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "rose_day",
+  "day": 138,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Rose Day",
+  "public": "Student council fundraiser for the infirmary: order a rose to be delivered tomorrow to anyone on campus. 3 cr a stem. Stall by the fountain from 11:00, last orders 13:30–14:00. Deliveries Saturday 12:00 on the Quad.",
+  "visibleFrom": 131,
+  "who": [
+   "ashton",
+   "octavia",
+   "teobalt",
+   "jessica",
+   "sunny",
+   "marit",
+   "silas",
+   "pilar",
+   "imara"
+  ],
+  "gm": "Ashton runs the stall as if born to it, with roses he has paid Silas honestly for; every credit goes to Camille's ward, and he does not advertise that part. A rose sent — and its colour, and whether it is signed — is a public act: deliveries are made on the Quad tomorrow in front of everyone. The fundraiser is on Pilar's calendar and she gave Ashton the pitch by the fountain; Imara counts the takings stem by stem and hands Camille the whole sum with a receipt.",
+  "kind": "social"
+ },
+ {
+  "id": "lantern_night",
+  "day": 139,
+  "slot": "Evening",
+  "place": "festival_grounds",
+  "title": "Lantern Night",
+  "public": "Saturday, February 14. Rose deliveries on the Quad at 12:00. Stalls and music from 18:00; lanterns handed out 18:40; procession to the Commons beach 19:00; the release, one per wish, at 19:20. Music on the Quad until 23:40; the curfew is lifted on campus until midnight.",
+  "visibleFrom": 1,
+  "who": [
+   "jessica",
+   "marit",
+   "inya",
+   "livvie",
+   "noor",
+   "sunny",
+   "rana",
+   "pippa",
+   "bex",
+   "octavia",
+   "hana",
+   "vivienne",
+   "camille",
+   "selene",
+   "saoirse",
+   "lilia",
+   "willas",
+   "chuck",
+   "nathan",
+   "gideon",
+   "pilar",
+   "tavita"
+  ],
+  "gm": "Canon, Day 139: the main romance checkpoint and the last purely tender evening. Whoever Rowan releases his lantern with is his declared choice, and others see it (several routes at once now have consequences: people talk, and tonight they are all on one beach). Staff routes stay secret and ache for it. Lilia and Willas release one lantern between them — make the player love them. The Guest releases one because everyone does. The whole flight drifts north and, far off over the crater, goes out all at once. Night Market in town the same evening for those who dare stay out. Pilar runs it; Tavita and his proctors hold the line between the beach and the dark and count everyone back up at midnight.",
+  "kind": "festival",
+  "hostWho": "add"
+ },
+ {
+  "id": "ladder_snapshot_3",
+  "day": 141,
+  "slot": "Evening",
+  "place": "quad",
+  "title": "Ladder Snapshot III",
+  "public": "Ranking snapshot: results count if handed in at the registrar's table by 18:25; the board freezes at 18:30 and the top 8 non-team players, who qualify for the Interschool Cup open bracket, are read out at 18:50.",
+  "visibleFrom": 110,
+  "who": [
+   "santangel",
+   "rox",
+   "lilia",
+   "nathan",
+   "gideon"
+  ],
+  "gm": "The board freezes. The top 8 outside the Battle Team will play the Cup's open bracket in March — a real goal for Rowan. The name directly under Lilia Mann's is no longer a team member's (by default the vice-captain was found at the captain's table this very morning; see the plot timeline).",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_leona",
+  "day": 142,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Leona's birthday",
+  "public": "Leona's birthday. Supper at Mama's table 18:30, cake about 19:00.",
+  "visibleFrom": 135,
+  "who": [
+   "leona"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Leona; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). Mama's cake, the row's singing, Leona's pleasant ordinary thanks. On the bench outside afterwards there is a small parcel with no card: a woman's wristwatch, old, the strap worn to the shape of a narrower wrist. She knows whose it was and who left it. By default she puts it in her locked suitcase and says nothing; if father and daughter are speaking, she is wearing it tomorrow.",
+  "kind": "social"
+ },
+ {
+  "id": "movie_night_3",
+  "day": 143,
+  "slot": "Evening",
+  "place": "student_lounge",
+  "title": "Movie Night Returns",
+  "public": "Movie night is back, early showing: doors 18:30, film 18:45, lights up 20:30, home before the night bell. Tonight: a romance, by vote.",
+  "visibleFrom": 139,
+  "who": [
+   "marit",
+   "bex",
+   "inya",
+   "pippa",
+   "sunny"
+  ],
+  "gm": "A small victory over the curfew, negotiated by Teobalt. The film is sentimental and the whole room cries, including people who claim otherwise. Walking someone home before the bell is the scene.",
+  "kind": "social"
+ },
+ {
+  "id": "bday_lilia",
+  "day": 144,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "Lilia's birthday",
+  "public": "Lilia's birthday. A party on the Spectral terrace (residents and their guests) from 19:00, cake at 20:00, guests out by 21:30.",
+  "visibleFrom": 137,
+  "who": [
+   "lilia"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Lilia; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She does not want a party; Willas organises one anyway, loudly and badly, and she lets him. Chuck sends a card in crayon. Late, at the infinity edge, she says to whoever is beside her that she has been promised a real game at last, 'all-out, for everything', and that she has not felt this awake in four years. She has not told Willas the terms. He has guessed.",
+  "kind": "social"
+ },
+ {
+  "id": "karaoke_night",
+  "day": 145,
+  "slot": "Evening",
+  "place": "rare_common_room",
+  "title": "Karaoke Night at Rare Hall",
+  "public": "The cover comes off the karaoke machine at Rare Hall. Visitors sign in at the lobby from 18:30, first song 18:50, open microphone 19:30, last song 20:30; out by the night bell.",
+  "visibleFrom": 138,
+  "who": [
+   "bex",
+   "marit",
+   "noor",
+   "sunny",
+   "teobalt",
+   "pippa"
+  ],
+  "gm": "Bex and Marit duet catastrophically; {H=sunny?'Sunny'|Sunny} is good; Noor can be coaxed into one song and has a lovely voice, which silences the room. A Nerve track of its own if Rowan takes the microphone. The league whiteboard has been wiped at last and someone has written three names in a corner with a small drawn candle.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "beach_cleanup",
+  "day": 147,
+  "slot": "Midday",
+  "place": "tide_pools",
+  "title": "Low-Tide Photo Walk & Beach Clean",
+  "public": "First warm Sunday of the year: photo club and swim squad clean the cove and walk the tide pools at low water. Meet at the Commons steps 11:00, the cove 11:15, the tide pools 12:15 (low water 12:30), picnic 13:30.",
+  "visibleFrom": 140,
+  "who": [
+   "pippa",
+   "georgie",
+   "sunny",
+   "baylee",
+   "saoirse",
+   "livvie"
+  ],
+  "gm": "Sacks, sun, bare feet. Pippa photographs everything; the northern pools are empty and very clear, and among the sea-glass there are beads of black fused glass. Georgie finds the nine-basin pool the locals call the Board and asks, reasonably, who plays on it.",
+  "kind": "social"
+ },
+ {
+  "id": "midterm_study_week_2",
+  "day": 148,
+  "slot": "Evening",
+  "days": 4,
+  "place": "library",
+  "title": "Midterm Study Week",
+  "public": "Extended Library hours Monday to Thursday, with proctor escorts back to the dorms. Sign-in 18:30; clinics at 19:00 (Monday Dr Blum, Tuesday Ms Kirishima); closing bell 21:15, escorts leave at once.",
+  "visibleFrom": 141,
+  "who": [
+   "noor",
+   "teobalt",
+   "georgie",
+   "livvie",
+   "blum",
+   "hana",
+   "tavita"
+  ],
+  "gm": "Four evenings. The school studies as if grades could keep it safe. On Wednesday night (Day 150) the escorts count one short on the Spectral run, and the one who slipped away is Willas, who told the proctor on that run — Tavita, his year-mate and old neighbour on the Row — that he had 'an errand'.",
+  "kind": "exam"
+ },
+ {
+  "id": "bday_ophelia",
+  "day": 149,
+  "slot": "Afternoon",
+  "place": "rare_common_room",
+  "title": "Ophelia's birthday",
+  "public": "Ophelia's birthday. Rare Hall common room at 16:00: a card will be read. Tea afterwards.",
+  "visibleFrom": 142,
+  "who": [
+   "ophelia"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Ophelia; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She does not see the point of birthdays. Victoria has made her a card, with ribbons, and reads it aloud to her in front of the common room in complete seriousness. It is the only time anyone on the island sees Ophelia not know what to do with her hands.",
+  "kind": "social"
+ },
+ {
+  "id": "willas_takes_the_duel",
+  "day": 150,
+  "slot": "Night",
+  "place": "great_arena",
+  "title": "WILLAS TAKES LILIA'S DUEL",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "willas",
+   "lilia",
+   "nathan",
+   "gideon",
+   "rox",
+   "camille",
+   "noor"
+  ],
+  "gm": "Canon, Day 150 (see the plot timeline; skip if Willas was saved). In the Evening, on the tower terrace, in front of Willas and the pool lights, the Guest says: 'Lilia Mann, I challenge you under the Charter.' She defers three days, as Article 3 allows; she is almost smiling — it is the game she has wanted for four years. Willas is not smiling. The same night he goes alone and takes her place as one bound to her (Article 5); the Guest, scrupulous, accepts. He plays the best game of his life and it is not close. Lilia finds him at dawn at her own table in the arena, sleeves rolled up, eyes open; she sits down across from him and stays there until Rox comes. Then she goes cold. PREVENTABLE if Rowan knows in time: warn Lilia, keep Willas talking past the hour, take the seat himself (it would rather not: 'You are roommate'), or have Noor contest whether Willas may stand without Lilia's word.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "midterms_2",
+  "day": 152,
+  "slot": "Morning",
+  "days": 3,
+  "place": "lecture_hall",
+  "title": "Midterm Examinations",
+  "public": "Spring midterms, Friday to Sunday. Fri: assembly 08:00, design hand-in until 09:00, Practicum 11:15. Sat: Tempo 08:45, Rules practical 10:45, heartbeat drill 14:30. Sun: Probability 08:45, Lore 10:15. See the exam timetable at the job board. Results are posted Monday at 07:30. No regular classes on Friday.",
+  "visibleFrom": 106,
+  "who": [
+   "santangel",
+   "hana",
+   "blum",
+   "ashdown",
+   "rox",
+   "chuck"
+  ],
+  "gm": "Same pattern as autumn (see GRADING.exams): Friday design submission and Practicum practical (a two-game set with a deck handed over ten minutes before); Saturday Tempo and Rules (the staged-match judging practical); Sunday Probability and Lore; the Conditioning heartbeat drill is on Saturday Afternoon. The school sits its papers two days after Willas — let it show: an empty chair at the Battle Team table, Hana's voice not quite steady reading the rules of the examination.",
+  "kind": "exam"
+ },
+ {
+  "id": "midterm_grades_2",
+  "day": 155,
+  "slot": "Morning",
+  "place": "job_board",
+  "title": "Midterm Results Posted",
+  "public": "Spring midterm letters are posted in the glass cases at the job board at 07:30, before the first class.",
+  "visibleFrom": 152,
+  "who": [
+   "teobalt",
+   "livvie",
+   "baylee",
+   "rana"
+  ],
+  "gm": "Letters go up; fewer people care than in October, and those who do care fiercely, because ordinary things have become precious. Scholarship students still need their C average: Livvie's count is on the back of a slip.",
+  "kind": "school"
+ },
+ {
+  "id": "cup_squad_announced",
+  "day": 157,
+  "slot": "Evening",
+  "place": "gym",
+  "title": "Interschool Cup Squad Announced",
+  "public": "Coach Delgado names the five starters and two reserves for the Interschool Cup. In the gym: seats from 18:30, the names at 18:45, squad meeting 19:05.",
+  "visibleFrom": 150,
+  "who": [
+   "rox",
+   "lilia",
+   "saoirse",
+   "santangel",
+   "gideon",
+   "georgie"
+  ],
+  "gm": "Rox reads seven names off her standards sheet. By default (plot timeline) four of the names that should be on it lie in Ward B, and she reads them first, aloud, before naming who will sit in their chairs: the home team is Lilia, Saoirse and whoever is left. Any team member Rowan helped to save is here and knows it. If the bench is empty enough a top-ladder first-year is named — it can be Rowan.",
+  "kind": "duel"
+ },
+ {
+  "id": "bday_dom",
+  "day": 158,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Dom's birthday",
+  "public": "Dom's birthday. Great Arena stands from 15:00, if he is there.",
+  "visibleFrom": 151,
+  "who": [
+   "dom"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Dom; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). If he is himself: he spends it reviewing tape of the unbeaten first-year, frame by frame, alone in the stands; he was never fair to Willas and knows it now, and to a Rowan who has taken a game off a team member or reached the top 30 he offers his one analysis session — and an apology he owes someone else. By default (plot timeline) he has been in Ward B since Day 141, three weeks of squared charts on the locker beside him; Lilia sits with him and Willas in turn.",
+  "kind": "social"
+ },
+ {
+  "id": "charity_draft",
+  "day": 159,
+  "slot": "Evening",
+  "place": "card_shop",
+  "title": "Friday Night Draft: Benefit for the Infirmary",
+  "public": "Tonight's entry fees and a raffle go to the Academy infirmary. Entry 60 cr; town and gown both welcome. Sign-up 18:00, a word from Dex 18:30, draft 18:45, raffle 20:30; students walk home with the proctors at 20:45.",
+  "visibleFrom": 152,
+  "who": [
+   "dex",
+   "mika",
+   "inya",
+   "camille",
+   "josie"
+  ],
+  "gm": "The town's way of saying what the school will not. Dex matches the takings from the till. Fishermen draft next to first-years. Mika has quietly marked which regulars have stopped coming, and why. Raffle prize: a framed old-set rare — valuable, not a first print.",
+  "kind": "duel"
+ },
+ {
+  "id": "boat_blessing",
+  "day": 160,
+  "slot": "Midday",
+  "place": "harbor",
+  "title": "Spring Market & Blessing of the Boats",
+  "public": "Port Mulligan opens the fishing season: the big spring market on Main Street from 11:00, the band's march to the harbour at 11:55, the blessing of the fleet at 12:00, market until evening.",
+  "visibleFrom": 150,
+  "who": [
+   "abel",
+   "silas",
+   "josie",
+   "saoirse",
+   "odalys",
+   "dex"
+  ],
+  "gm": "Bunting, a brass band, a priest with a bucket. The fleet has not fished the north side since October and the blessing lingers pointedly on 'safe return'. Silas, in a clean coat, stands by the wreck memorial. Students in town are treated with a new, awkward tenderness.",
+  "kind": "town"
+ },
+ {
+  "id": "hedda_boats",
+  "day": 160,
+  "slot": "Midday",
+  "place": "fish_market",
+  "title": "Protest at the Blessing of the Boats",
+  "public": "Hedda Njord has announced 'a word for the fish' at the Spring Market: under the fish-market roof at 12:40, straight after the blessing.",
+  "visibleFrom": 157,
+  "who": [
+   "hedda",
+   "josie",
+   "abel",
+   "baylee"
+  ],
+  "gm": "She arrives with the megaphone to shame the fishing fleet and finds the gutting women already saying aloud what the school will not: that the children in the ward 'have been played'. She listens. For the first time all year she hands the megaphone to someone else.",
+  "kind": "social"
+ },
+ {
+  "id": "cup_volunteers",
+  "day": 162,
+  "slot": "Afternoon",
+  "place": "council_room",
+  "title": "Interschool Cup: Volunteer Briefing",
+  "public": "Hosts, runners, scorekeepers and stage crew for the Cup report to the council chamber: sign-on 15:00, briefing 15:15, postings 15:40, arena walk-through for door and floor crews 16:05. Paid 20 cr a day.",
+  "visibleFrom": 155,
+  "who": [
+   "teobalt",
+   "octavia",
+   "noor",
+   "bex",
+   "pippa",
+   "pilar",
+   "imara",
+   "tavita"
+  ],
+  "gm": "Teobalt runs it; Octavia signs off the budget and is visibly thinking about something else — Marrow's offer has a deadline. A host assigned to the North Crown delegation spends three days in Isolde's company: volunteer for that if her route matters. The crew lists are Pilar's (she casts hosts and runners like a show; ask her for the North Crown posting), the 20 cr a day is counted out by Imara, and Tavita briefs the door and floor crews.",
+  "kind": "school"
+ },
+ {
+  "id": "bday_priya",
+  "day": 163,
+  "slot": "Afternoon",
+  "place": "gym",
+  "title": "Priya's birthday",
+  "public": "Priya's birthday. At the gym from 15:30, if she is training.",
+  "visibleFrom": 156,
+  "who": [
+   "priya"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Priya; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). If she is herself: she trains through it, the archery wrist guard gets a new strap from Rox, wordlessly, and whoever spars with her hears what she wants — one Cup match nobody can say was given to her. By default (plot timeline) she has been in Ward B since Day 131, having played, properly and with a judge's form filled in, to win a teammate back; Rox hangs the wrist guard on the gym door.",
+  "kind": "social"
+ },
+ {
+  "id": "north_crown_arrives",
+  "day": 164,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "North Crown Arrives",
+  "public": "The North Crown Institute delegation lands on the Wednesday ferry for the Interschool Cup. Welcome at the Academy dock: welcome party 12:15, ferry in 12:30, words of welcome 12:50, then the walk to their lodgings in town.",
+  "visibleFrom": 150,
+  "who": [
+   "isolde",
+   "rex",
+   "abel",
+   "okonkwo",
+   "rox",
+   "lilia",
+   "teobalt"
+  ],
+  "gm": "Canon: Isolde Varga returns for the Cup, with Rex Tanaka and a full squad of seven plus coach. She counts the Academy's team at the dock, sees who is missing, and does not gloat; she is angry on Lilia's behalf. They lodge at the inn. Her windows: the dock today, the opening ceremony, the Cup itself, the inn in the evenings, the departure on Day 169.",
+  "kind": "town"
+ },
+ {
+  "id": "interschool_cup",
+  "day": 166,
+  "slot": "Morning",
+  "days": 3,
+  "place": "great_arena",
+  "title": "The Interschool Cup",
+  "public": "Three days in the Great Arena: team matches Academy vs North Crown, the open bracket for the ladder top 8, finals on Sunday. Fri: doors 08:00, team rounds 08:30, 12:30 and 14:15, open bracket 10:05. Sat: team rounds 09:00, 12:45 and 14:30, open bracket 10:45. Sun: team round 09:00, open final 10:45, deciding round 13:30, trophy 15:15. Players, squad and crew are excused from Friday’s classes.",
+  "visibleFrom": 1,
+  "who": [
+   "isolde",
+   "rex",
+   "lilia",
+   "saoirse",
+   "rox",
+   "hana",
+   "santangel",
+   "marrow",
+   "bex",
+   "vivienne",
+   "nathan",
+   "gideon"
+  ],
+  "gm": "Canon, Days 166–168, Stage E begins. Team matches are five boards; the home team fields whoever is left — by default Lilia, Saoirse and reserves — and still wins, Lilia playing three matches a day like something being sharpened. If Rowan qualified at Snapshot III he plays the open bracket against both schools' best (tournament-kind); if he was named to the squad, a team board. The Guest watches every game. By default (plot timeline) North Crown's ace is found by his captain on the Sunday morning: it has learned that visitors can be asked too. Sunday: Marrow's 'living hologram' demonstration (it works, frighteningly, only if his lab got the pigment from the old print works).",
+  "kind": "duel",
+  "hostWho": "add"
+ },
+ {
+  "id": "cup_opening",
+  "day": 166,
+  "slot": "Evening",
+  "place": "great_arena",
+  "title": "Interschool Cup: Opening Ceremony",
+  "public": "At the end of the first day's play: flags, anthems and an exhibition game by the two captains. Great Arena, full house: doors 18:00, flags and anthems 18:30, the captains' exhibition 19:00, over by 19:40.",
+  "visibleFrom": 150,
+  "who": [
+   "okonkwo",
+   "isolde",
+   "rex",
+   "lilia",
+   "rox",
+   "marrow",
+   "chuck",
+   "vivienne",
+   "bex",
+   "marit"
+  ],
+  "gm": "Pageantry on a brave face. Marit sings the anthem; the two captains play a five-minute exhibition and Lilia plays it like a metronome — Isolde looks at her across the table with real concern. Marrow announces a 'special technical demonstration' for the final day; Chuck, in the front row, does not clap for that (if he is in the infirmary (flag chuck_down, Days 166–185), his front-row chair is empty, and it is Inya, standing at the tunnel mouth, who does not clap). Afterwards, in the tunnel (plot timeline, unless she has stood down): Lilia challenges the thing that took Willas — Day 180, at the Gate, for everything. It accepts.",
+  "kind": "festival"
+ },
+ {
+  "id": "north_crown_leaves",
+  "day": 169,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "North Crown Departs",
+  "public": "A special Monday ferry takes the visiting delegation home: at the Academy dock from 11:30, boarding 12:15, casting off at 12:30.",
+  "visibleFrom": 166,
+  "who": [
+   "isolde",
+   "rex",
+   "abel",
+   "lilia"
+  ],
+  "gm": "Isolde's last window (she stays on only if given a real reason). If Rex fell, his team carries him aboard and she is the last up the gangway. She offers Lilia a place on the mainland 'away from whatever this is'; Lilia declines with her half-smile. To Rowan, if he has earned it: her honest reading of the unbeaten first-year from three days at the rail — 'That is not a player. That is the game itself, wearing a boy.' After today no outsider is on the island except Marrow's people.",
+  "kind": "town"
+ },
+ {
+  "id": "bday_sammy",
+  "day": 170,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "Sammy's birthday",
+  "public": "Sammy's birthday. On the steps of Bungalow 6 from 18:45; cake at about 19:05.",
+  "visibleFrom": 163,
+  "who": [
+   "sammy"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met {H=sammy?'Sammy'|Sammy}; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). By now the coat is mostly for warmth. The row gives him a party on the steps of Bungalow 6 — or what is left of the row does: set as many places as there are people to sit in them, and let him be the one who says something for the empty ones.",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "council_hustings",
+  "day": 172,
+  "slot": "Afternoon",
+  "place": "theatre",
+  "title": "Student Council Hustings",
+  "public": "Candidates for next year's council president speak in the Little Theatre. Doors 15:00, speeches 15:15, questions from the floor 15:45, closing words 16:25.",
+  "visibleFrom": 162,
+  "who": [
+   "octavia",
+   "teobalt",
+   "noor",
+   "bex",
+   "marit",
+   "sebastian",
+   "pilar",
+   "imara",
+   "tavita"
+  ],
+  "gm": "Octavia graduates; the chair is open. Teobalt stands on a plain platform — tell the students the truth, share the proctor duty fairly. Sebastian Thorne, the vice-president, a Spectral third-year who has waited two years for the chair, stands for 'calm and confidence'. Octavia's endorsement is the question, and it depends on whether she has taken Marrow's offer. A good question from Rowan can swing the room. Pilar chairs with a stopwatch. Imara's and Tavita's endorsements are in play: Tavita gives his to whoever answers the question about one rule for the Tower and one for the Row; Imara gives hers to whoever can read a budget aloud.",
+  "kind": "school"
+ },
+ {
+  "id": "council_election",
+  "day": 173,
+  "slot": "Midday",
+  "place": "council_room",
+  "title": "Student Council Election",
+  "public": "Vote at the council chamber from 11:00 until the Afternoon bell (last call 13:45). The count follows; the result is announced at dinner, 18:30 at the Mess.",
+  "visibleFrom": 162,
+  "who": [
+   "octavia",
+   "teobalt",
+   "noor",
+   "sebastian",
+   "imara",
+   "tavita",
+   "pilar"
+  ],
+  "gm": "One student, one ballot; Noor counts. Default: Teobalt wins narrowly. As president-elect he gains access to the charter register and the council's keys, and will use them for Rowan if Rowan has been straight with him. Sebastian concedes in one smooth sentence and shakes hands for Pilar's bulletin; if he wins instead, nothing is ever refused again, only 'not this term'.",
+  "kind": "school"
+ },
+ {
+  "id": "festival_build",
+  "day": 175,
+  "slot": "Afternoon",
+  "place": "quad",
+  "title": "Founder's Festival: Build Day",
+  "public": "All hands on the Quad: stalls, the stage, three thousand lanterns to hang. Crews at the fountain 14:00, lemonade 15:30, a test lighting at 17:30. Chuck's 75th birthday is on Friday.",
+  "visibleFrom": 165,
+  "who": [
+   "teobalt",
+   "marit",
+   "felix",
+   "baylee",
+   "silas",
+   "inya",
+   "wren"
+  ],
+  "gm": "The school builds a fair with something like desperation. {H=baylee?'Baylee'|Baylee} carries beams; Felix paints the birthday banner; Inya is in charge of the cake design and is fierce about it. She has not seen her grandfather for four days and says he is 'being mysterious about his present to himself'. (If he is in the infirmary (flag chuck_down, Days 166–185), she says instead that they will not let her stay past visiting hour, and that a slice of this cake is going up the hill whatever happens.)",
+  "kind": "social",
+  "hostWho": "add"
+ },
+ {
+  "id": "bday_wren",
+  "day": 176,
+  "slot": "Evening",
+  "place": "design_lab",
+  "title": "Wren's birthday",
+  "public": "Wren's birthday. In the design lab at 18:30. (She has forgotten.)",
+  "visibleFrom": 169,
+  "who": [
+   "wren"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Wren; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). She forgot. The lab did not: a cake shaped like a booster pack, candles stuck in with drafting pins. IF CHUCK IS ON HIS FEET he comes by, gives her one of his own old brushes, and says, apropos of nothing, 'If anything happens to me on Friday, the chest under the hammock is Inya's and the notebooks are yours. Don't let the suits read the margins.' He laughs. She does not. IF HE IS IN THE INFIRMARY (flag chuck_down, Days 166–185), the brush arrives wrapped in a rag by Inya's hand, with the same sentence on a card in crayon, and Wren reads it twice.",
+  "kind": "social"
+ },
+ {
+  "id": "festival_rehearsal",
+  "day": 178,
+  "slot": "Evening",
+  "place": "theatre",
+  "title": "Founder's Festival: Dress Rehearsal",
+  "public": "Final run of the birthday pageant in the Little Theatre. Stagehands wanted: call 18:00, the run from 18:30, interval 19:15, house lights about 20:15.",
+  "visibleFrom": 171,
+  "who": [
+   "marit",
+   "vivienne",
+   "pippa",
+   "felix",
+   "chuck",
+   "inya"
+  ],
+  "gm": "Marit has rewritten the shipwreck pageant with a new last scene in which the deckhand comes home. If Chuck is on his feet, he watches the whole of it for the first time in twelve years, cave scene and all, from the back row, and afterwards holds Inya's hand for a moment without a joke. If he is in the infirmary (flag chuck_down, Days 166–185), the seat in the back row stays empty; afterwards Inya asks whether her grandfather would have liked the ending, and Marit sends the script up to the ward.",
+  "kind": "social"
+ },
+ {
+  "id": "founders_festival",
+  "day": 180,
+  "slot": "Morning",
+  "place": "festival_grounds",
+  "title": "Founder's Festival",
+  "public": "Friday, March 27: the Academy's birthday party for its founder, Chuck Kaboom, who turns 75. No classes. Opening on the Quad 09:00, stalls all day, long tables 12:30, lanterns lit and the pageant at dusk (18:15), the cake 19:30, music until the fireworks at midnight.",
+  "visibleFrom": 1,
+  "who": [
+   "chuck",
+   "inya",
+   "odalys",
+   "silas",
+   "okonkwo",
+   "marit",
+   "jessica",
+   "livvie",
+   "noor",
+   "sunny",
+   "rana",
+   "pippa",
+   "bex",
+   "octavia",
+   "hana",
+   "vivienne",
+   "camille",
+   "selene",
+   "teobalt",
+   "baylee",
+   "wren",
+   "felix",
+   "marrow",
+   "pilar",
+   "tavita",
+   "imara",
+   "sebastian"
+  ],
+  "gm": "Canon, Day 180: the biggest festival of the year, all day and all night, the school brittle and determined to be happy. Every route gets a scene. At dusk Chuck is missing from his own party (he has gone to the north shore with Silas, as every year) and Inya is looking for him. IF HE IS IN THE INFIRMARY (flag chuck_down, Days 166–185), he is absent from his own 75th from the first bell: whoever opens the day names him in two sentences, the Founder's chair stands empty with the paper crown on it, Inya takes the well-wishers' cards at Nurse Camille's desk and cuts the cake herself, a slice is carried up to the ward — and nobody is looking for him at dusk. At the fireworks Lilia is not in the crowd. If Rowan stays here until midnight, the lanterns go out in a wave from the north. See the Night entry. The student side of the day is Pilar's last and largest event of the year; Tavita has the doors and the midnight count; Imara pays the crews at the council table from the strongbox.",
+  "kind": "festival"
+ },
+ {
+  "id": "bday_chuck",
+  "day": 180,
+  "slot": "Midday",
+  "place": "chuck_workshop",
+  "title": "Chuck's birthday",
+  "public": "Chuck's birthday. He receives well-wishers at the workshop half-door from 11:00 to about 12:30.",
+  "visibleFrom": 173,
+  "who": [
+   "chuck"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met Chuck; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). IF HE IS IN THE INFIRMARY (flag chuck_down, Days 166–185): the half-door stays shut; cards and presents go to Nurse Camille's desk, visits are short, and a present from Rowan is put on the bedside locker by Inya — it counts all the same; skip the rest of this entry. OTHERWISE — His 75th. The half-door is open in the morning: he receives well-wishers in a paper crown, gives away more presents than he gets, and tells the story of his 'first birthday on the island' — a tin of peaches, a fire, and company 'you wouldn't believe'. By mid-afternoon the door is bolted and a note says BACK FOR CAKE. He will not be, unless someone fetches him.",
+  "kind": "social"
+ },
+ {
+  "id": "gate_duel",
+  "day": 180,
+  "slot": "Night",
+  "place": "ruin_gate",
+  "title": "LILIA VS THE GUEST AT THE RUIN GATE",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "lilia",
+   "nathan",
+   "gideon",
+   "chuck",
+   "silas",
+   "ashdown",
+   "inya",
+   "oru"
+  ],
+  "gm": "Canon, Founder's Festival night (see the plot timeline and the finale rules; skip if she stood down or the Vault duel is already won). Lilia has slipped the curfew and the festival and climbed to the Ruin Gate, where the Guest waits: ante 'everything', on the threshold pavement. She has her captain's card with her. WITHOUT ROWAN she loses on the last turn; 'everything' included her captain's card and with it the way in: it lays her first print in the recess and goes down to 'play the island'. WITH ROWAN (he must know to be here: Noor's register, Viktor's routes, Chuck's confession, Oru, Lilia herself) the outcomes branch per the plot file: witness, champion under Article 5, or caller of the debt under Article 7 — ante 'everything you have taken', the Vault named as the place. Getting here from the festival takes two slots; leaving at dusk is the last moment. Dread, not spectacle.",
+  "kind": "story",
+  "hostWho": "add"
+ },
+ {
+  "id": "morning_after_festival",
+  "day": 181,
+  "slot": "Morning",
+  "place": "quad",
+  "title": "THE MORNING AFTER THE FESTIVAL",
+  "public": null,
+  "visibleFrom": null,
+  "who": [
+   "okonkwo",
+   "inya",
+   "camille",
+   "teobalt",
+   "odalys",
+   "bex"
+  ],
+  "gm": "What the school wakes to depends entirely on the night (see the plot file). If the Guest won at the Gate and has not been stopped: the lanterns hang dead, the hot springs whistle, tiles of the surface mosaics have gone dark, people wake with small pieces of themselves missing, and there is a short window to follow it down. If it was beaten in the Vault: Ward B is full of people sitting up and asking for breakfast, and the term's last four weeks are an aftermath. Stage either as the first thing Rowan learns today.",
+  "kind": "story"
+ },
+ {
+  "id": "fools_draft",
+  "day": 185,
+  "slot": "Afternoon",
+  "place": "student_lounge",
+  "title": "The Fool's Draft",
+  "public": "April 1 tradition: a joke-format draft in the student lounge. Decks must contain at least ten cards the table votes 'worst ever printed'. The vote 15:00, the draft 15:25, three rounds from 15:55, the Fool crowned at 17:00.",
+  "visibleFrom": 178,
+  "who": [
+   "inya",
+   "marit",
+   "bex",
+   "georgie",
+   "baylee"
+  ],
+  "gm": "The Commons trade binder's tradition — run by Tomi if he is himself, otherwise by Inya with his binder on the table. Held only if the island is in a state to laugh: after a good outcome it is riotous relief (Georgie wins with a pile of unplayables and is carried round the room); otherwise stage it as six people in an empty lounge, trying.",
+  "kind": "social",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "last_draft",
+  "day": 187,
+  "slot": "Evening",
+  "place": "card_shop",
+  "title": "Last Friday Night Draft of the Year",
+  "public": "Final draft night of the school year at the Sleeve & Binder. Entry 60 cr; free pizza from 18:00, a few words from Dex 18:25, draft 18:35, prizes about 20:30.",
+  "visibleFrom": 180,
+  "who": [
+   "dex",
+   "mika",
+   "inya",
+   "rana"
+  ],
+  "gm": "Dex makes a short, gruff speech about the year. Mika has saved a card for someone she likes. A last chance to settle up with the shop: debts, trades, the thing in the not-for-sale case if it was lent.",
+  "kind": "duel",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "bday_sunny",
+  "day": 189,
+  "slot": "Afternoon",
+  "place": "beach_cove",
+  "title": "Sunny's birthday",
+  "public": "Sunny's birthday. A beach birthday at Driftwood Cove from 14:00: the race to the diving raft at 15:00, driftwood fire and cake from 15:30.",
+  "visibleFrom": 182,
+  "who": [
+   "sunny"
+  ],
+  "gm": "BIRTHDAY (mention it in advance only if Rowan has met {H=sunny?'Sunny'|Sunny}; a small present or simply remembering is worth real affection, forgetting costs a little with close friends). A beach birthday at the cove, as the first real swimming weather comes back: volleyball, a driftwood fire, half the school in the water. If the birds have come home, they are wheeling over the headland. She wants everyone to race her to the diving raft and wants one person in particular to lose gracefully.",
+  "kind": "social",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  },
+  "hostWho": "add"
+ },
+ {
+  "id": "finals_study_week_2",
+  "day": 190,
+  "slot": "Evening",
+  "days": 4,
+  "place": "library",
+  "title": "Finals Study Week",
+  "public": "Extended Library hours Monday to Thursday before spring finals. Sign-in 18:30; clinics at 19:00 (Monday Probability, Tuesday judge certification, Wednesday Tempo ledgers); closing bell 21:15.",
+  "visibleFrom": 183,
+  "who": [
+   "noor",
+   "teobalt",
+   "georgie",
+   "livvie",
+   "blum",
+   "hana"
+  ],
+  "gm": "The last four study evenings of the year. Final grades of this term decide probation and next year's standing; scholarship students need their average. Whoever shares Rowan's carrel now is someone he will miss in May.",
+  "kind": "exam",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "finals_2",
+  "day": 194,
+  "slot": "Morning",
+  "days": 3,
+  "place": "lecture_hall",
+  "title": "Final Examinations",
+  "public": "Spring finals, Friday to Sunday. Fri: assembly 08:00, design pitch 08:45, Practicum final on the arena stage 11:15. Sat: Tempo 08:30, judge certification 10:45 and 12:15, Conditioning circuit 15:00. Sun: Probability 08:45, Lore 10:30. See the exam timetable at the job board. Grades are posted Monday at 07:30. No regular classes on Friday.",
+  "visibleFrom": 106,
+  "who": [
+   "santangel",
+   "hana",
+   "blum",
+   "ashdown",
+   "rox",
+   "chuck"
+  ],
+  "gm": "Canon, Days 194–196 (see GRADING.exams): Friday design pitch to a staff panel and the Practicum final on the arena stage with crowd audio; Saturday the Tempo best-of-three and the Level-1 judge certification; Sunday Probability and the Lore oral-history file; Conditioning circuit Saturday Afternoon. Two F = probation, three = expulsion. Play the stage duel as a scene: it measures how far his hands have come since Day 1.",
+  "kind": "exam",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "final_grades_2",
+  "day": 197,
+  "slot": "Morning",
+  "place": "job_board",
+  "title": "Year-End Grades Posted",
+  "public": "Final grades for the Spring Term and the year are posted at the job board at 07:30. Scholarship and tuition notices follow at the mail window from 09:00.",
+  "visibleFrom": 194,
+  "who": [
+   "teobalt",
+   "livvie",
+   "baylee",
+   "rana",
+   "okonkwo"
+  ],
+  "gm": "The last crowd at the glass. Tuition notices: 9,000 cr for year two for anyone without a scholarship (canon) — Livvie's deadline is real and falls now; what she has, what her friends can lawfully add, and what the Academy can be shamed into, decides whether she is on the ferry for good on Day 210.",
+  "kind": "school",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "yearbook_photo",
+  "day": 198,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Yearbook Photograph",
+  "public": "Whole-school photograph on the main steps at 12:30 (line up from 12:15), then dorm groups from 12:50. Jackets on.",
+  "visibleFrom": 191,
+  "who": [
+   "pippa",
+   "teobalt",
+   "odalys",
+   "okonkwo",
+   "georgie"
+  ],
+  "gm": "Pippa on a stepladder, shouting. Dorm photographs afterwards: the Commons one will hang on Mama's wall with all the others. Who stands where, who is missing, and whether a place is left open for someone, is the scene.",
+  "kind": "social",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "senior_sendoff",
+  "day": 199,
+  "slot": "Evening",
+  "place": "bonfire_pit",
+  "title": "Senior Send-Off Bonfire",
+  "public": "The Commons hosts the traditional last bonfire for the graduating class. All dorms: fire and supper 18:30, the decklists burned 19:15, the talking shell 19:45, songs until about 21:30.",
+  "visibleFrom": 192,
+  "who": [
+   "odalys",
+   "lilia",
+   "willas",
+   "octavia",
+   "dom",
+   "saoirse",
+   "wren",
+   "inya",
+   "baylee",
+   "rana",
+   "livvie"
+  ],
+  "gm": "Fourth-years burn their first-year decklists. The talking shell goes round one more time. If Lilia and Willas are both here and whole it is the happiest scene of the campaign; if one of them is not, the seniors keep a place on the log.",
+  "kind": "social",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "graduation_exhibition",
+  "day": 201,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "The Graduation Exhibition",
+  "public": "The graduating class presents: thesis sets from 14:00, the seniors' broadcast 14:45, and at 15:15 the Captain's Exhibition Match — the outgoing Battle Team captain names her challenger. Over by about 17:00.",
+  "visibleFrom": 1,
+  "who": [
+   "lilia",
+   "willas",
+   "dom",
+   "octavia",
+   "wren",
+   "rox",
+   "santangel",
+   "okonkwo",
+   "chuck",
+   "bex",
+   "vivienne",
+   "isolde"
+  ],
+  "gm": "Canon, Day 201. Game Design shows its sets, Commentary runs the broadcast, and the captain plays one last match against an opponent of her own choosing, named from the stage. If Lilia stands and Rowan has become what she was looking for, she names HIM: an all-out exhibition on the arena stage, the truest duel of the year, with nothing wagered but the game. Otherwise she says 'nobody yet' and plays an exhibition against Isolde by video link. If she is in the ward: an empty captain's chair with her jacket over it.",
+  "kind": "duel",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "beach_volleyball",
+  "day": 203,
+  "slot": "Afternoon",
+  "place": "beach_cove",
+  "title": "Commons vs Spectral: Beach Volleyball",
+  "public": "Last beach day of the year at Driftwood Cove: Commons vs Spectral, net up 14:30, three sets from 14:50, last swim 16:20. Losing dorm cooks for the winners at 18:30.",
+  "visibleFrom": 196,
+  "who": [
+   "sunny",
+   "saoirse",
+   "baylee",
+   "inya",
+   "marit",
+   "pippa",
+   "ashton",
+   "jessica",
+   "georgie"
+  ],
+  "gm": "Nothing at stake but dinner. {H=baylee?'Baylee'|Baylee} at the net is unfair; Ashton takes his shirt off for the audience and gets sunburnt; Jessica referees from under a parasol with total authority. A closing-credits kind of afternoon — let every thread that ended well show its face.",
+  "kind": "social",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  },
+  "hostWho": "add"
+ },
+ {
+  "id": "awards_night",
+  "day": 205,
+  "slot": "Evening",
+  "place": "great_arena",
+  "title": "Awards Night & Final Ladder Standings",
+  "public": "The season's last ranking is fixed at the bell (19:00); year awards are presented in the Great Arena from 19:15. Doors 18:30; last results signed until 18:55.",
+  "visibleFrom": 190,
+  "who": [
+   "okonkwo",
+   "santangel",
+   "rox",
+   "hana",
+   "vivienne",
+   "chuck",
+   "teobalt",
+   "bex"
+  ],
+  "gm": "The split-flap board is rolled into the arena and stopped for the year. Awards: Freshman of the Year, Most Improved, the Judge's Whistle, the Commons Spoon (Mama's own, for whoever she says). Rowan's final rank and what the staff say about him sum up his year. Next year's dorm lists follow from the final standings.",
+  "kind": "school",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "room_checkout",
+  "day": 207,
+  "slot": "Afternoon",
+  "place": "commons_beach",
+  "title": "Room Check-Out & Graduation Rehearsal",
+  "public": "Rooms are inspected from 14:00 (the Commons row in order, Bungalow 7 about 15:00) and keys signed in by the Afternoon bell; graduating students rehearse in the arena at 16:00.",
+  "visibleFrom": 200,
+  "who": [
+   "odalys",
+   "teobalt",
+   "baylee",
+   "tavita"
+  ],
+  "gm": "Packing up the room. What is left on the third bed in bungalow 7 — an empty mattress, a tin, or a small square tile with {H=nathan?a loud grin|a face} on it — depends on the ending. {H=baylee?'Baylee'|Baylee} folds his blanket with military corners and says more than nine words. Tavita does the Commons round himself, his last as head proctor, and signs every key back in.",
+  "kind": "school",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  },
+  "hostWho": "add"
+ },
+ {
+  "id": "graduation",
+  "day": 208,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Graduation",
+  "public": "Commencement on the Quad. Families arrive on a special ferry at 10:45. Seats from 11:30, procession at 12:00, addresses 12:15, the scrolls 12:40. No classes.",
+  "visibleFrom": 1,
+  "who": [
+   "okonkwo",
+   "chuck",
+   "lilia",
+   "willas",
+   "octavia",
+   "wren",
+   "dom",
+   "saoirse",
+   "rox",
+   "odalys",
+   "inya"
+  ],
+  "gm": "Canon, Day 208. Gowns over red, gold and black jackets, parents on folding chairs, the fourth-years crossing the stage in front of the fountain; Chuck (if he can) hands over every scroll with a different wrong name as a joke. The names of those who cannot cross are read out too. Octavia's valedictory is either the speech of someone who sold something or of someone who refused to.",
+  "kind": "school",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "last_night_market",
+  "day": 209,
+  "slot": "Evening",
+  "place": "night_market",
+  "title": "Last Night Market of the Year",
+  "public": "Port Mulligan's farewell market for the school year, from 18:30 on the old customs yard; Madame Oru reads at 20:30. The curfew, if any remains, is lifted.",
+  "visibleFrom": 202,
+  "who": [
+   "oru",
+   "mika",
+   "josie",
+   "dex",
+   "selene",
+   "abel"
+  ],
+  "gm": "The town says goodbye to its students. Goodbyes to Mika, Josie, Selene. Oru's tent is there one last time; she will read for free, and for once says something plain about the summer ahead. Then she folds the indigo cloth and it is as if there was never a tent.",
+  "kind": "town",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "last_ferry_2",
+  "day": 210,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Last Ferry of the Year",
+  "public": "The Second Chance takes the school home for the summer. Boarding from 10:30, goodbyes on the pier, gangway in at 12:00.",
+  "visibleFrom": 1,
+  "who": [
+   "abel",
+   "silas",
+   "odalys",
+   "inya",
+   "baylee",
+   "livvie",
+   "rana"
+  ],
+  "gm": "Canon, Day 210: epilogue. Who stands at the rail with Rowan, with which collar, with what in his deck box; who waves from the dock; whether the gulls follow the ferry all the way out. Close with the ending the campaign has earned (see the plot file).",
+  "kind": "school",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  }
+ }
+]

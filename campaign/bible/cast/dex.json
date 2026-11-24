@@ -1,0 +1,186 @@
+{
+ "id": "dex",
+ "name": "Dexter \"Dex\" Quill",
+ "firstName": "Dex",
+ "age": 44,
+ "sex": "m",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Flat over the Sleeve & Binder",
+ "romance": false,
+ "deck": "Steam Dwarf Mines (discard engine; an old shop favourite)",
+ "look": "Bald, broad, with a full dark beard and full tattoo sleeves — every one a card he has owned and sold — and heavy black-framed glasses that he pushes up to look at a card and peers over to look at a customer. He wears a blue shop apron over a band T-shirt and a couple of thin gold chains. He handles cardboard like a jeweller.",
+ "voice": "Gravelly and unhurried, London worn down by the island; gruff with strangers, fatherly with regulars, and blank as a wall when asked about certain cards. He names a price once. Dry trade humour. RARE habit (once in a scene at most; most scenes go without it): 'Depends who's asking.'",
+ "lines": [
+  "Near mint, he says. Son, I've seen near mint. This has been through a wash. I'll give you four.",
+  "Condition's everything. Cards, people. Don't sleeve a thing you haven't looked at properly.",
+  "First print? Depends who's asking. And you're not asking — you're being asked to ask. I can smell it.",
+  "Ten years behind this counter. Kids come in wanting the card that wins. I sell 'em the forty that go round it."
+ ],
+ "intro": "Owner of the Sleeve & Binder, Port Mulligan's card shop: gruff, fair, and tattooed with every card he ever regretted selling.",
+ "traits": [
+  {
+   "id": "dex_1",
+   "text": "He owns the only card shop on the island and names a price exactly once.",
+   "how": "First town trip, Day 6."
+  },
+  {
+   "id": "dex_2",
+   "text": "Each of his tattoos is a card he once owned and sold.",
+   "how": "Ask about any one of them."
+  },
+  {
+   "id": "dex_3",
+   "text": "He runs a Saturday tournament with store credit as prizes.",
+   "how": "Card shop, weekend."
+  },
+  {
+   "id": "dex_4",
+   "text": "He was a travelling pro for ten years and then, at thirty-three, the oldest student the Commons ever had.",
+   "how": "Mika brags about him; Mama Odalys remembers."
+  },
+  {
+   "id": "dex_5",
+   "text": "He keeps a junk box of misprints and lets regulars dig.",
+   "how": "Become a regular."
+  },
+  {
+   "id": "dex_6",
+   "text": "He taught half the Commons how to value a card, starting with a kid in a bandana.",
+   "how": "Ask Tomi."
+  },
+  {
+   "id": "dex_7",
+   "text": "He keeps a ledger of every first-print sale he has heard of, and one card behind the counter that is not for sale at any price.",
+   "how": "Work Saturday shifts for him; or be seen to refuse a certain buyer."
+  }
+ ],
+ "secret": "Dex Quill had ten years as a journeyman pro — good enough to travel, never good enough to matter — and a bad divorce behind him when he enrolled, at thirty-three, in the Academy's second intake: the oldest student the Commons has ever had. He washed out as a player inside a year, discovered he was the only person on the island who could tell near-mint from played, and Chuck gave him the lease on Main Street for a pound a year 'because a game needs a shop the way a village needs a pub'. He is an honest dealer in a trade that does not require it: he will not buy stolen cards (which is why Brant's hangers-on are thrown out on Day 41 trying to sell 'his collection'). He keeps a ledger of every first-print sale he has heard of in twenty years — a common, forty thousand dollars; the last hero that surfaced, a number with two commas — and one piece of trade knowledge nobody can explain: every Alpha that leaves the island goes cold over the water, and the buyer rings within the year to ask if it was a fake. He has one first-print common in the shop that is not for sale; he will put it in the hand of a trusted Saturday worker, once, and will LEND it for half an hour against a real deposit. He knows about the old Treasure Chest under the cloth in the pawn shop's cabinet. He does not know why the cards are what they are and has decided not to. Wound: the cards on his arms are a ledger of things he let go for money, the first being his marriage. Contradiction: a salesman whose deepest loyalty is to things that are not for sale.\nFrom Day 61 Marrow's people come in with a blank cheque for first prints; Dex says he has nothing for them, and they know he is lying. He is the player's most reliable source for an Alpha by honest means. He closed his book on the {H:last} {H:boy} after watching one game on the shop table: 'That's not reading the table. That's reading the box the table came in.'",
+ "wants": "To keep a decent shop in a decent town and sell nobody anything they will regret.",
+ "fears": "Selling the one thing he should have kept, again.",
+ "crush": "josie",
+ "crushNote": "He has known her since she was a sixteen-year-old in a grey jacket and has never once asked her the question everybody else asks, which is its own kind of devotion. It shows as him being the last customer at the bar most nights and fixing things there she did not mention were broken.",
+ "crushPace": 0.5,
+ "likes": [
+  "Regulars",
+  "Cards looked after properly",
+  "A trade where both sides walk away pleased",
+  "Kids who ask about the forty cards, not the one",
+  "Loyalty to Mika and to the shop",
+  "Old tournament stories"
+ ],
+ "dislikes": [
+  "Haggling upward after a fair price",
+  "Speculators",
+  "Men in grey suits",
+  "Bent corners",
+  "Anyone leaning on Tomi or Mika",
+  "Being asked what the not-for-sale card would cost"
+ ],
+ "gifts": [
+  "Card: Beer",
+  "A vintage tournament programme from the pawn shop",
+  "Card: The Stormblade",
+  "A box of proper inner sleeves",
+  "A bacon roll from the cafe, before opening"
+ ],
+ "events": [
+  {
+   "id": "dex_e1",
+   "stage": 1,
+   "title": "Named once",
+   "condition": "Sell or buy at card_shop without trying to haggle upward, and enter one Saturday tournament.",
+   "hint": [
+    "He names a price once. Regulars are made, not born.",
+    "Trade fairly at his shop and play in his Saturday event."
+   ]
+  },
+  {
+   "id": "dex_e2",
+   "stage": 2,
+   "title": "The junk box",
+   "condition": "Become a regular (three or more visits), dig in the junk box, and bring something from it to Wren or back to him with a good question; ask about one tattoo.",
+   "hint": [
+    "He lets regulars dig through the box under the counter.",
+    "Keep coming back, and ask him about the cards on his arms."
+   ]
+  },
+  {
+   "id": "dex_e3",
+   "stage": 3,
+   "title": "Not for sale",
+   "condition": "Having worked at least four Saturday shifts and put a mis-sorted rare back on the counter instead of in a pocket, refuse (after Day 61) to act as a go-between for anyone trying to buy first prints; ask to borrow — not buy — the card that is not for sale, and say what for.",
+   "hint": [
+    "Somebody will ask you to ask him something. Don't. Then ask him something else.",
+    "Protect his shop from the people after rare cards, and ask honestly for his help."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "owes",
+   "text": "Owes the old man the shop and ten good years.",
+   "public": true,
+   "from": 0
+  },
+  "tomi": {
+   "label": "mentor",
+   "text": "The kid in the bandana: the best natural dealer he has seen, and honest with it.",
+   "public": true,
+   "from": 6
+  },
+  "mika": {
+   "label": "protégé",
+   "text": "Does his books, runs his counter and has better instincts than he does. He would leave her the shop.",
+   "public": true,
+   "from": 0
+  },
+  "josie": {
+   "label": "friends",
+   "text": "She was one of his first customers, a sixteen-year-old with a smoke-grey collar. He has never asked about that year.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "distrusts",
+   "text": "A man with a blank cheque asking about first prints.",
+   "public": false,
+   "from": 61
+  },
+  "leona": {
+   "label": "friends",
+   "text": "Quiet lass who knows a copyright line when she sees one. He lets her read the old price ledgers.",
+   "public": true,
+   "from": 12
+  },
+  "maisie": {
+   "label": "friends",
+   "text": "Takes his rubbish away and brings it back working. He has stopped charging her for sleeves.",
+   "public": true,
+   "from": 6
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "card_shop",
+   "Midday": "card_shop",
+   "Afternoon": "card_shop",
+   "Evening": "bar",
+   "Night": "main_street"
+  },
+  "weekend": {
+   "Morning": "card_shop",
+   "Midday": "card_shop",
+   "Afternoon": "card_shop",
+   "Evening": "night_market",
+   "Night": "bar"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "An old shop favourite from an era with fewer rules and harder players: Steam Dwarfs that grow every time he discards, and he discards constantly and profitably. Fundamentals you cannot rattle.",
+  "tilt": "Customers. He will leave mid-turn to ring up a sale."
+ }
+}

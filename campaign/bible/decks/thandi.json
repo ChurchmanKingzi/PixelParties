@@ -1,0 +1,405 @@
+{
+ "name": "Five Signatures",
+ "owner": "thandi",
+ "heroes": [
+  "Beato, the Butterfly Witch",
+  "Archibald, the Archmage",
+  "Tempeste, the Weather Fairy"
+ ],
+ "main": [
+  [
+   2,
+   "The Final Trial"
+  ],
+  [
+   2,
+   "Trial of Annoyance"
+  ],
+  [
+   2,
+   "Trial of Coolness"
+  ],
+  [
+   2,
+   "Trial of Dominance"
+  ],
+  [
+   2,
+   "Trial of Knowledge"
+  ],
+  [
+   3,
+   "Trial of Loyalty"
+  ],
+  [
+   2,
+   "Holy Cheese"
+  ],
+  [
+   2,
+   "Idol of Crestina"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Cloud Pillow"
+  ],
+  [
+   3,
+   "Homerun!"
+  ],
+  [
+   2,
+   "Strong Shield"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   2,
+   "Stoneskin"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   4,
+   "Toughness"
+  ],
+  [
+   4,
+   "Support Magic"
+  ],
+  [
+   3,
+   "Wisdom"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Friendship"
+  ],
+  [
+   3,
+   "Leadership"
+  ],
+  [
+   2,
+   "Resistance"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Beato, the Butterfly Witch": "Hero",
+  "Archibald, the Archmage": "Hero",
+  "Tempeste, the Weather Fairy": "Hero",
+  "The Final Trial": "Attack",
+  "Trial of Annoyance": "Spell (Decay Magic)",
+  "Trial of Coolness": "Spell (Summoning Magic)",
+  "Trial of Dominance": "Spell (Destruction Magic)",
+  "Trial of Knowledge": "Spell (Magic Arts)",
+  "Trial of Loyalty": "Spell (Support Magic)",
+  "Holy Cheese": "Artifact",
+  "Idol of Crestina": "Artifact (Reaction)",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Cloud Pillow": "Artifact",
+  "Homerun!": "Artifact (Reaction)",
+  "Strong Shield": "Artifact (Reaction)",
+  "Smug Coin": "Artifact (Equipment)",
+  "Heal": "Spell (Support Magic)",
+  "Stoneskin": "Spell (Support Magic, Attachment)",
+  "Juice": "Artifact (Reaction)",
+  "Toughness": "Ability",
+  "Support Magic": "Ability",
+  "Wisdom": "Ability",
+  "Magic Arts": "Ability",
+  "Friendship": "Ability",
+  "Leadership": "Ability",
+  "Resistance": "Ability"
+ },
+ "gist": {
+  "The Final Trial": "The win condition: an Attack that does nothing until she has played all five different Trials this game. Then, as the first Action of a turn, it wins the game outright.",
+  "Trial of Loyalty": "Fetches up to five different Trials from her deck into her hand. Usually the first one she plays.",
+  "Trial of Knowledge": "From then on every Trial counts as level zero, so any of her heroes can play the rest.",
+  "Trial of Dominance": "Defeats and deletes every creature you control. Against a deck with no creatures it is only a tick on her list.",
+  "Trial of Annoyance": "You discard down to two cards.",
+  "Trial of Coolness": "Marks one of her other targets: the next time it is defeated it comes straight back at full health.",
+  "Beato, the Butterfly Witch": "Can play any level-one spell of any school: every Trial, from the first turn. Little health.",
+  "Archibald, the Archmage": "Double Wisdom: plays Trials without the school by discarding a card for each. Little health.",
+  "Tempeste, the Weather Fairy": "Every hit on her OTHER heroes is reduced by a fixed amount, so the Storm's zaps and Chain Lightning's lighter bolts do nothing to them while she stands. Hits on Tempeste herself can never be reduced or cancelled.",
+  "Homerun!": "Cancels a hit that would take out a hero.",
+  "Strong Shield": "Cancels one very large hit.",
+  "Cloud Pillow": "Halves what one target takes for a turn.",
+  "Smug Coin": "Once a game leaves its hero on one health instead of none.",
+  "Stoneskin": "Attached: its hero takes much less from attacks and cannot be poisoned, burned or stunned.",
+  "Holy Cheese": "Fetches a Support spell — Trial of Loyalty, usually; you may heal one of your own targets a little in return.",
+  "Idol of Crestina": "Replaces her draw for the turn with a search for any card: the last missing Trial."
+ },
+ "plan": "Thandi does not fight. Each Trial may be played once a game and is the only Attack or Spell she plays that turn; five different ones, and then The Final Trial wins on the spot — six turns at the fastest. Loyalty fetches the set, Beato can play all of them, Tempeste takes a fixed bite out of every hit on the other two heroes, and the rest of the deck is shields, pillows and healing. Nothing in it deals damage. Her heroes are frail, the count is public — you always know how many Trials are left — and the Trials are only safe once played: until then they sit in her hand.",
+ "looks": {
+  "early": "Trial of Loyalty, and five Trials fanned in her hand; Toughness going onto Beato.",
+  "mid": "Three Trials played and laid out in a row; Tempeste shrugging off zaps for the others; a Cloud Pillow.",
+  "late": "Four Trials down, the fifth in hand, The Final Trial next turn."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "She plays Trial of Loyalty and shows five different Trials; her heroes have done nothing else.",
+   "why": "It is a clock, not a board: six turns at the fastest, and nothing she owns can hurt you. Every turn spent holding a sweeper for an empty table is a Trial closer."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Three Trials lie played in a row; Tempeste soaks up the Storm's zaps for the other two heroes.",
+   "why": "The Trials still in her hand are the whole plan: White Eye hits rip them out. Tempeste cannot be shielded by anything, and once she is down every zap counts."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "BALANCE",
+   "tell": "Four Trials played; she holds the fifth and The Final Trial.",
+   "why": "There is nothing to survive: the last card deals no damage, it simply ends the game. Only an empty hand or three fallen heroes stop it."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "The Final Trial is in her discard pile, or she is down to one hero.",
+   "why": "Without the last card she has only shields; finish before an Idol of Crestina finds the second copy."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Thandi plays Trial of Loyalty with Beato and lays five different Trials face up in her hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning across all three heroes at once"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Beato so the next Trial has to wait"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold Flame Avalanche for creatures that never come"
+     }
+    ]
+   },
+   {
+    "board": "Toughness goes onto Beato; Tempeste stands in the middle doing nothing you can see.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Tempeste first: nothing can shield her"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Magnetic Glove for The White Eye"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Level up and wait for a board to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Trial of Knowledge: from now on any of her heroes can play the rest.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and Chain Lightning into Tempeste"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze whoever holds the Abilities"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche over an empty table"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Three Trials lie played in a row; your Storm zaps Beato and Archibald for nothing while Tempeste stands.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "The White Eye on your caster: each hit takes a card from her hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything into Tempeste"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Add Destruction Magic and wait"
+     }
+    ]
+   },
+   {
+    "board": "Trial of Annoyance: you discard down to two cards.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Keep The White Eye and one spell to aim with it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Keep Chain Lightning and Acid Vial"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep the Leadership pieces and rebuild"
+     }
+    ]
+   },
+   {
+    "board": "A Cloud Pillow on Tempeste, a Smug Coin on Beato.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting sends the Smug Coin away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial through the Pillow: it cannot be reduced"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Let the Storm do it eventually"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Four Trials played. She holds two cards and is looking at neither.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "A White Eye hit: one of those two cards goes"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill the hero who would play it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! in hand against a card that deals no damage"
+     }
+    ]
+   },
+   {
+    "board": "Trial of Coolness marks Tempeste: if she falls she stands straight up again.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Leave Tempeste alone and strip the hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill her twice"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal up and hold"
+     }
+    ]
+   },
+   {
+    "board": "Idol of Crestina: instead of drawing she searches, and smiles for the first time.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye whatever she fetched"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and Acid Vial: two heroes have to fall"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle at the ready"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "The Final Trial is in her discard pile; one copy is left somewhere in her deck.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Keep ripping cards out of her hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild the Storm at leisure"
+     }
+    ]
+   },
+   {
+    "board": "Beato alone behind a Stoneskin.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Spells go straight through Stoneskin: burn her"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Stoneskin"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh stands Archibald up for one turn — long enough to play a Trial.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other two"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on the revived Archibald"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait it out"
+     }
+    ]
+   }
+  ]
+ }
+}

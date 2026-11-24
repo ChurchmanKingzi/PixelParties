@@ -1,0 +1,18 @@
+{
+ "name": "The Greenhouse",
+ "zone": "campus",
+ "bg": "greenhouse",
+ "night": false,
+ "hours": "Open in daylight; tended by Silas Grieve and the gardening club.",
+ "sight": "A Victorian iron-and-glass house brought out in pieces by the plantation owners, now steamy with orchids, tree ferns and seedling trays. Condensation runs down the panes in slow rivers. A potting bench is littered with labels in a square, careful hand, and a wicker chair sits by the stove with a blanket and a dog-eared almanac. Rain on the roof sounds like applause.",
+ "things": [
+  "Pot seedlings for the gardening club",
+  "Find the shelf of island natives nobody can identify in the textbooks",
+  "Shelter here from a squall and wait it out with whoever else ran in",
+  "Cut flowers for someone (ask first)",
+  "Read Silas's almanac margins: tides, rainfall, bird counts",
+  "Warm your hands at the stove in the wet season",
+  "Look for the rose bench — somebody's standing order"
+ ],
+ "secret": "Silas's almanac is a decades-long nature record: bird counts over the Commons cove fall to zero within a week of D27 and he has underlined it three times. He also notes, each year on the same March date, 'C. to the shore' — Chuck walks to the north shore every birthday. The rose bench is Ashton's supply; he pays Silas honestly for it, a small sign there is more to him. The unidentifiable natives grow only on ground over the mosaics; one, a white night-flower, closes when '{H}' enters. Storm shelter scenes (Days 23, 60, 117) can be staged here."
+}

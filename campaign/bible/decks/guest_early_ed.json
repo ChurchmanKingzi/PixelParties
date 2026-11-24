@@ -1,0 +1,416 @@
+{
+ "name": "Monkee Rodeo",
+ "owner": "guest",
+ "heroes": [
+  "Logan, the Investment Monkee",
+  "Güldefaber, the King of Dwarfs",
+  "Rool, the Troll Guard"
+ ],
+ "main": [
+  [
+   2,
+   "Bamboo Shield"
+  ],
+  [
+   4,
+   "Cheeky Monkee"
+  ],
+  [
+   4,
+   "Criminal Monkee"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Golden Apple"
+  ],
+  [
+   4,
+   "Golden Bananas"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   2,
+   "Magic Ruby"
+  ],
+  [
+   3,
+   "Mimic"
+  ],
+  [
+   4,
+   "Nimble Monkee"
+  ],
+  [
+   4,
+   "Non-Fungible Monkee"
+  ],
+  [
+   2,
+   "Play Money"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   4,
+   "Resilient Monkee"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Trade"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   4,
+   "Wealth"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Logan, the Investment Monkee": "Hero",
+  "Güldefaber, the King of Dwarfs": "Hero",
+  "Rool, the Troll Guard": "Hero",
+  "Bamboo Shield": "Artifact (Reaction)",
+  "Cheeky Monkee": "Creature L1",
+  "Criminal Monkee": "Creature L1",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Golden Bananas": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Magic Ruby": "Artifact",
+  "Mimic": "Creature L0",
+  "Nimble Monkee": "Creature L1",
+  "Non-Fungible Monkee": "Artifact (Equipment)",
+  "Play Money": "Artifact",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Resilient Monkee": "Creature L1",
+  "Smug Coin": "Artifact (Equipment)",
+  "Summoning Magic": "Ability",
+  "Trade": "Ability",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Logan, the Investment Monkee": "Turns gold into Invest Counters. At the end of each turn he either collects gold equal to the counters or hits any target for five times their number. If Ed ever has no gold, all counters vanish.",
+  "Cheeky Monkee": "Whenever Ed gains a little gold by an effect he may spend it at once on a solid hit; can also cash in Invest Counters for a hit.",
+  "Nimble Monkee": "Jumps from hand for free on a gold gain; turns Invest Counters into cards.",
+  "Resilient Monkee": "Comes back from the discard pile on a gold gain; can make a Monkee immune to damage for a turn.",
+  "Criminal Monkee": "Sneaks in when he spends a small sum; fetches and equips a Non-Fungible Monkee.",
+  "Non-Fungible Monkee": "Equipment: gold every time a Monkee enters or leaves the board.",
+  "Golden Bananas": "Three small gold gains in a row: three Monkee triggers.",
+  "Güldefaber, the King of Dwarfs": "Can spend the action on a large gold gain; very tough.",
+  "Rool, the Troll Guard": "Anything of yours that damages his side takes double damage for a while.",
+  "Mimic": "Steals gold from you every turn.",
+  "Pocket Catapult": "A small free shot each turn.",
+  "Golden Apple": "Borrows one of your heroes for a turn.",
+  "Magic Ruby": "Stuns a hero; reusable for a discard.",
+  "Bamboo Shield": "Expensive reaction that cancels one hit on a hero.",
+  "Treasure Chest": "Free gold and a Monkee trigger.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Ed runs a bank. Every gold gain wakes a Monkee: Cheeky ones spend it on hits, Nimble and Resilient ones appear for free, Non-Fungible Monkees pay again when they come and go. The real money goes onto Logan as Invest Counters, which he rolls over turn after turn until the pile is big enough to delete a hero at the end of a turn. Shields and Golden Apples protect the portfolio. The scheme has a single point of failure: Logan is the smallest hero on the table, his payout is a hero effect that a freeze or stun switches off, and the Monkees themselves are tiny. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "Wealth on two heroes, a Mimic, a few counters on Logan; Ed whooping at every coin. And an unfamiliar Area with a starfield on it.",
+  "mid": "A stack of Invest Counters on Logan, Monkees popping in and out with every Golden Banana, Cheeky Monkees sniping.",
+  "late": "Logan carrying a fortune and pointing it at one hero per turn; a Bamboo Shield's worth of gold kept in reserve."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Logan already carries a few Invest Counters and has the least health of his three heroes.",
+   "why": "Interest compounds: every turn the counters are left alone they come back doubled as gold, so the small, exposed banker has to be attacked before the pile exists."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "A tall stack of Invest Counters sits on Logan and Ed decides at the end of each turn whether to grow it or fire it.",
+   "why": "The payout is Logan's own end-of-turn effect, and a frozen hero has no effects: Snow Cannon on his turn cancels the shot, while killing twenty-health Monkees just pays him through Non-Fungible Monkee and they return on the next gold gain."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He has started firing the counters: one of your heroes is removed at the end of each of his turns.",
+   "why": "It is one huge hit per turn, which is exactly what Homerun! and Cloud in a Bottle answer; survive the shot and put the rest into Logan."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Logan is gone or empty and the remaining Monkees can only nibble.",
+   "why": "Without the Invest Counters the deck is Pocket Catapults and small change; his sturdy heroes are slow to kill but cannot win a race."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Ed puts his spare gold on Logan as Invest Counters and collects on them at end of turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Logan now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Mimic that is taxing you"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build while he saves"
+     }
+    ]
+   },
+   {
+    "board": "Golden Bananas: three little gains, a Nimble Monkee hops in, a Cheeky Monkee stings your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Keep everything on Logan"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on the caster"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Monkees"
+     }
+    ]
+   },
+   {
+    "board": "A Criminal Monkee equips a Non-Fungible Monkee to Güldefaber.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb it later with the rest; for now hit Logan"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning the heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A tall pile of counters on Logan. It is the start of his turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Logan, no payout this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Logan outright if you can"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Monkees"
+     }
+    ]
+   },
+   {
+    "board": "You sweep four Monkees; he collects gold for each one leaving and a Resilient Monkee climbs straight back.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Forget them, go for the banker"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Non-Fungible Monkees"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   },
+   {
+    "board": "Rool takes a hit and your caster is marked to take double damage.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Aim at Logan only, keep the caster shielded"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Rool"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit everything"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Logan fires the whole pile at your Storm caster at the end of his turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! the shot"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Logan before the turn ends"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Let the caster go and rebuild"
+     }
+    ]
+   },
+   {
+    "board": "A Golden Apple: he borrows your hero for a turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle for what it does to you"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang his next turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race on"
+     }
+    ]
+   },
+   {
+    "board": "His gold is low after paying for a Bamboo Shield.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Logan, now, with nothing to save him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "A Mimic stolen with Dark Gear takes his gold: at zero the counters vanish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun! for his shot, put the rest into Logan"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Logan is dead; Güldefaber and Rool remain with two Pocket Catapults.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Grind them down, they cannot race"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick and protect"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hunt Monkees"
+     }
+    ]
+   },
+   {
+    "board": "He Golden Ankhs Logan to fire one last time.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! in hand"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the revived Logan"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Rool"
+     }
+    ]
+   },
+   {
+    "board": "Güldefaber alone, enormous, taking gold every turn with nothing to buy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial and the Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Just keep ticking"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Set up The White Eye for the finish"
+     }
+    ]
+   }
+  ]
+ }
+}

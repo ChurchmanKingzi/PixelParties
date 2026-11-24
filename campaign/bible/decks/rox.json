@@ -1,0 +1,369 @@
+{
+ "name": "Leg Day",
+ "owner": "rox",
+ "heroes": [
+  "Alex, Trainer of Heroes",
+  "Arnold, the Maximum Lotl",
+  "Ghuanjun, the Undead Martial Artist"
+ ],
+ "main": [
+  [
+   4,
+   "Attack"
+  ],
+  [
+   2,
+   "Blow of the Venom Snake"
+  ],
+  [
+   3,
+   "Cloud Pillow"
+  ],
+  [
+   3,
+   "Club of Gobbo"
+  ],
+  [
+   2,
+   "Escape"
+  ],
+  [
+   4,
+   "Ferocious Tiger Kick"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   4,
+   "Muscle Training"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Strong Ox Headbutt"
+  ],
+  [
+   4,
+   "Toughness"
+  ],
+  [
+   3,
+   "Training"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Warhorse"
+  ],
+  [
+   3,
+   "Whirlwind Strike"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Alex, Trainer of Heroes": "Hero",
+  "Arnold, the Maximum Lotl": "Hero",
+  "Ghuanjun, the Undead Martial Artist": "Hero",
+  "Attack": "Attack",
+  "Blow of the Venom Snake": "Attack",
+  "Cloud Pillow": "Artifact",
+  "Club of Gobbo": "Artifact (Equipment)",
+  "Escape": "Attack (Reaction)",
+  "Ferocious Tiger Kick": "Attack",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Muscle Training": "Attack",
+  "Quick Attack": "Attack",
+  "Strong Ox Headbutt": "Attack",
+  "Toughness": "Ability",
+  "Training": "Ability",
+  "Treasure Chest": "Artifact",
+  "Warhorse": "Artifact (Equipment)",
+  "Whirlwind Strike": "Attack"
+ },
+ "gist": {
+  "Arnold, the Maximum Lotl": "Gains health and Attack permanently with every Ability attached to him.",
+  "Alex, Trainer of Heroes": "When he gains an Ability, he fetches another from the deck for a team-mate, twice a turn.",
+  "Ghuanjun, the Undead Martial Artist": "May make up to three different attacks in a turn if nobody else acts; his targets cannot drop below one health that turn.",
+  "Training": "Ability: extra Ability attachments each turn.",
+  "Toughness": "Ability: a large block of extra health per level.",
+  "Muscle Training": "A free \"attack\" that fetches a Fighting and attaches it.",
+  "Heavy Hit": "Attack that stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Ferocious Tiger Kick": "Attack that stuns; better as the second attack of the turn.",
+  "Strong Ox Headbutt": "Attack that makes you discard; better as the second attack.",
+  "Whirlwind Strike": "Hits two of your heroes at once; needs Fighting at level three.",
+  "Warhorse": "Equipment: single-target attacks hit harder.",
+  "Club of Gobbo": "Equipment: more Attack, and the damage cannot be reduced or cancelled.",
+  "Cloud Pillow": "Halves the damage one of her heroes takes for a turn.",
+  "Escape": "Reaction: discards a card to cancel an attack or spell that would defeat a hero."
+ },
+ "plan": "Coach Rox trains. For the first turns she does nothing but attach Abilities: Alex hands spares to his team-mates, Training allows several a turn, and Arnold grows bigger with each one. Then three enormous heroes with Fighting at level three take turns: Heavy Hit to stun, Quick Attack on top, Whirlwind Strike across two heroes, Ghuanjun softening everyone up with three attacks in a turn. There is nothing clever in it and almost nothing to interact with, which is its strength; its weakness is that every bit of damage is an attack by a hero, announced, one target at a time, and that the build-up takes turns.",
+ "looks": {
+  "early": "Ability stacks rising on all three heroes; no attack yet.",
+  "mid": "Arnold twice his printed size on a Warhorse, a stun on your caster every turn.",
+  "late": "Three walls of health with Fighting three, taking turns to hit two of your heroes at once."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "She is attaching Abilities three at a time and has not attacked once.",
+   "why": "Racing heroes that gain a block of health every turn is hopeless, but her slow start is free time: build the Storm and set Firewall, which burns whoever finally attacks for the rest of the duel."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Arnold swings once a turn with Heavy Hit and your caster is stunned every time.",
+   "why": "Her damage is one announced attack at a time: Tea the stun back, freeze the attacker of the turn, shield the big hit, and keep the Storm and burns ticking on all three. There is nothing to sweep."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Fighting has reached level three and Ghuanjun is winding up for a turn of three attacks.",
+   "why": "Flashbang ends her turn after the first action, which wrecks a multi-attack turn; Snow Cannon does the same to a single hero. Another turn of pure building will not survive Whirlwind Strike."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Her last hero is huge but has been burning from Firewall and ticking under the Storm for many turns.",
+   "why": "Health is all she has; unreducible damage (Acid Vial) and the doubled Storm outpace one attack a turn, and Escape only works if she still has a card to discard."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Coach Rox attaches Fighting to Alex, who fetches Toughness for Arnold; Arnold visibly swells.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build, with Firewall down"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb a Training"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn into growing health"
+     }
+    ]
+   },
+   {
+    "board": "Muscle Training, another Fighting; still no real attack.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Ghuanjun, the smallest"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spend your burn early"
+     }
+    ]
+   },
+   {
+    "board": "Arnold has three Abilities and a Warhorse.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Finish your levels this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Arnold before his first swing"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for no one"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Heavy Hit from Arnold: your caster is stunned and badly hurt.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Arnold"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him next turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep an empty board"
+     }
+    ]
+   },
+   {
+    "board": "Your Firewall catches Alex mid-swing and he burns for the rest of the game.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Set the second one, keep ticking"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Press Alex"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit back"
+     }
+    ]
+   },
+   {
+    "board": "Strong Ox Headbutt as a second attack: you discard.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shields on the hero she is working on"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Club of Gobbo and Warhorse"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild your hand"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Ghuanjun cracks his knuckles: three attacks this turn, each a different one.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang: her turn ends after the first"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle; none of them can kill this turn anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Whirlwind Strike hits two of your heroes at once.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn, shield the weaker"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze the level-three hero"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Arnold is enormous and unhurt; the other two are burning.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Finish the burning ones, freeze Arnold"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything at Arnold"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang her next turn and Fire Bomb his Fighting"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Arnold alone, mountainous, burning.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Acid Vial, the Storm, every spell"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Escape cancels your finisher for a discarded card; she has one card left.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Again: she cannot pay twice"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; hers stuns yours every turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea, then one spell"
+     },
+     {
+      "stance": "RUSH",
+      "text": "The Storm ticks through the stun"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hope"
+     }
+    ]
+   }
+  ]
+ }
+}

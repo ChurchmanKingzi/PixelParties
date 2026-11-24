@@ -1,0 +1,251 @@
+{
+ "id": "freya",
+ "name": "Freya Nordlicht",
+ "firstName": "Freya",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B2",
+ "romance": true,
+ "deck": "Glacier (Mischief Militia: freeze)",
+ "look": "Tall, with an ice-blonde braid over one shoulder, pale blue eyes and a cool, poised face that gives nothing away — until the first drink, when the whole arrangement melts into a wide, wicked grin. She wears the red jacket, grey collar, buttoned over a shirt and a narrow black tie, and carries herself like a ski instructor on a day off. There is usually a bottle somewhere within reach.",
+ "voice": "Sober: sparing, level, faintly amused, a northern lilt, long silences she is comfortable in. Drinking: loud, generous, funny and gloriously indiscreet, with an arm round whoever is nearest. In either state she is frank about what she likes and wants, without coyness and without pressure. RARE habit (once in a scene at most; most scenes go without it): proposing a toast to something absurd.",
+ "lines": [
+  "Where I come from the sun goes away for three months. You learn to make your own entertainment, and I got very good at it.",
+  "I like your hands. I'm telling you now, sober, so you know it isn't the aquavit talking later.",
+  "Snowballs, basically. My whole deck is a snowball fight. I've never lost one of those in my life.",
+  "To the ferry captain's hat! Everybody up — no, Hedda, it is NOT made of an animal, drink."
+ ],
+ "intro": "A tall, cool-eyed first-year from the far north, in bungalow 2, who looks like an ice sculpture at breakfast and is the loudest person at any party by ten at night.",
+ "traits": [
+  {
+   "id": "freya_1",
+   "text": "She seems aloof and mysterious on first meeting, for about as long as it takes to hand her a drink.",
+   "how": "The Day 5 bonfire mixer."
+  },
+  {
+   "id": "freya_2",
+   "text": "Her empty bottles are lined up along the bungalow step like trophies.",
+   "how": "Walk past bungalow 2."
+  },
+  {
+   "id": "freya_3",
+   "text": "She can out-drink anyone on the island and still frequently ends the night unable to find her own door.",
+   "how": "Any party; Dmitri sees her home."
+  },
+  {
+   "id": "freya_4",
+   "text": "She says what she likes about a person to their face, and what she would like to do about it.",
+   "how": "Catch her eye."
+  },
+  {
+   "id": "freya_5",
+   "text": "She grew up in Longyearbyen, on Svalbard, where there is a rifle by every door because of the bears.",
+   "how": "Ask about the north."
+  },
+  {
+   "id": "freya_6",
+   "text": "She skis, shoots and can gut a fish in four cuts, and thinks this island is far too warm.",
+   "how": "The fish market; a bet."
+  },
+  {
+   "id": "freya_7",
+   "text": "She has one rule she has never broken, and will tell you what it is if asked sober.",
+   "how": "Ask sober, before a party."
+  },
+  {
+   "id": "freya_8",
+   "text": "In the mornings, hung over and quiet, she is the sharpest tactical mind in the bungalow.",
+   "how": "Commons kitchen, Morning; play her then."
+  },
+  {
+   "id": "freya_9",
+   "text": "She does not like to be alone in a quiet room, and has arranged her life so that she never is.",
+   "how": "Close stage, early in the morning."
+  }
+ ],
+ "secret": "Freya grew up in Longyearbyen, seventy-eight degrees north: two thousand people, four months of night, a rifle by the door. Her father, Arne, a mine foreman, drank silently and steadily every dark season and was a gentle, absent man; her mother went south when Freya was eleven. She learned early that in the dark you can either sit in a quiet room with a bottle like her father, or fill the room with people and noise, and she chose the second with her whole heart. She is an absolute party animal: she loves drink, holds a great deal, and still ends up blind drunk with fair regularity simply because of the volume. She has almost no inhibitions and no shame about desire — she likes sex, says so, flirts and invites openly, and treats a refusal as cheerfully as an acceptance. None of that is a wound in itself; where she comes from, bodies are practical things and winter is long. The wound is the quiet room. Sober and alone at three in the afternoon she is her father's daughter, and she knows it. Contradiction: the least inhibited girl in the year is the most guarded about the one thing that matters — she will take anyone to bed and let nobody see her on an ordinary Tuesday morning.\nHer one rule, never broken: never the first time when she is drunk, and never with anyone who is. She will say exactly that. (GM: any intimate scene with her happens when she is sober enough to mean it; drunk Freya flirts outrageously and is then walked home — by Dmitri, usually, who is awake anyway and has never once taken advantage, which is why she trusts him and has not noticed how he looks at her.) She is drawn to Tobias Crowe, who has the same carelessness with rules and a better reason for it. She amuses herself trying to crack Eberhart's composure and has failed for weeks.\nUnder the noise she is clever, a Mischief Militia player with a real sense of tempo, who plays best with a headache. Josie at the Mulligan has cut her off more than once and is the only person who has told her plainly where this goes. After Day 67 the curfew takes away the parties and leaves her with the quiet room; that is the dangerous stretch for her. The thing in bungalow 7 once sat beside her on the step while she was very drunk and asked why she pours things into herself until she stops; she said 'so the night's shorter', and it replied, 'I do not sleep either. It is the same length.' She was sober for three days afterwards.",
+ "wants": "A full room, a full glass, and — unadmitted — somebody still there in the grey morning.",
+ "fears": "A silent room in the dark season, and turning into the man who sat in it.",
+ "crush": "tobias",
+ "crushNote": "He has the same carelessness about rules that she has, with a far better reason, and he once turned down a drink she offered because he was 'working'. It shows as open, cheerful pursuit — and, more tellingly, as her staying sober to hear him talk.",
+ "crushPace": 1.3,
+ "likes": [
+  "Plain speaking about wanting",
+  "People who can keep up, and people who say when they cannot",
+  "Cold water, hot saunas, the hot springs at night",
+  "Being walked home and not pawed",
+  "A good toast",
+  "Company in the morning with no talk about last night",
+  "Being told the truth about her drinking by someone who then stays",
+  "Dancing"
+ ],
+ "dislikes": [
+  "Prudishness and moralising",
+  "Jealous scenes",
+  "Being handled as fragile",
+  "Men who try it when she is drunk",
+  "Quiet evenings indoors",
+  "Heat without water nearby",
+  "Being called 'ice queen'"
+ ],
+ "gifts": [
+  "Card: Beer",
+  "A bottle of aquavit, to be shared",
+  "Card: Mischief Militia - Bear Rider",
+  "Salt liquorice from the boutique",
+  "A flask of strong coffee, delivered the morning after",
+  "Card: Snowstorm Mischief"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Mischief Militia played cold: she freezes the board solid and waits, turns each freeze into a free potion, then breaks what is frozen. At her best with a slight hangover, when the showmanship drops away and only the timing is left.",
+  "text": "Freya flirts from the first conversation and leaves no doubt what she means: she looks him over, says what she likes, proposes exactly what she has in mind, and laughs if he blushes. There is no game in it and no pressure; 'no' gets a shrug and another drink, 'yes' gets taken at its word. She initiates, and she is fast. What she wants is someone unshocked, good-humoured and honest about his own wanting. The difficult part is not getting close to her but getting past that: she offers her body easily and her mornings almost never. The route deepens when he turns up sober the next day, makes coffee and stays to talk about nothing."
+ },
+ "intimacy": "The most forward of anyone, and frankly sensual: she likes skin, heat, cold water, being looked at, and says so aloud. She takes the lead, laughs a great deal, is generous and curious and has no shame to work around — the hot springs after dark, the sauna hut by the pool, a blanket on the beach under an enormous sky. Her rule holds in every scene: sober enough to mean it, both of them; if she is drunk the evening ends with her being tucked in and a glass of water on the step. What is new for her, and what the GM should let build slowly, is tenderness afterwards — being held while the room is quiet, and finding she can bear it. Keep scenes warm, playful and bold in their lead-up; fade as she pulls the blanket over them both.",
+ "events": [
+  {
+   "id": "freya_e1",
+   "stage": 1,
+   "title": "Until the first drink",
+   "condition": "Meet her at the Day 5 bonfire mixer (or any party) and hold your own in conversation; answer her frank compliment with an honest one. Accepting or declining her invitation both count — what matters is doing it straight.",
+   "hint": [
+    "She is not as cool as she looks, and she says what she means. An honest answer is all she asks.",
+    "Talk to her at the bonfire and answer her directness directly."
+   ]
+  },
+  {
+   "id": "freya_e2",
+   "stage": 2,
+   "title": "The morning after",
+   "condition": "After a night when she has overdone it, bring coffee to bungalow 2 or the commons_kitchen in the Morning and keep her company without a word about last night; play her a game while she has the headache.",
+   "hint": [
+    "Everyone knows her at midnight. Very few have met her at breakfast.",
+    "Turn up the morning after a party with coffee, and no comments."
+   ]
+  },
+  {
+   "id": "freya_e3",
+   "stage": 3,
+   "title": "Sober, so you know",
+   "condition": "Ask her her rule, sober; keep it. Then accept an invitation that is made in daylight (hot_springs or beach_cove at Evening), and be honest with her about any other attachments.",
+   "hint": [
+    "She has one rule. It tells you more about her than the parties do.",
+    "Learn her rule, respect it, and say yes to her when she asks in daylight."
+   ]
+  },
+  {
+   "id": "freya_e4",
+   "stage": 4,
+   "title": "The quiet room",
+   "condition": "After the curfew begins (Day 67) and the parties stop, sit with her through a silent evening with no drink in it; when she talks about her father, do not lecture. Take her to Josie if she asks to hear it from someone who knows.",
+   "hint": [
+    "Take the noise away and she is left with the thing the noise was for.",
+    "Keep her company through a quiet, sober evening once the parties end, and listen."
+   ]
+  },
+  {
+   "id": "freya_e5",
+   "stage": 5,
+   "title": "Grey morning",
+   "condition": "In Term 2, be there on ordinary mornings as a habit; back her when she decides for herself what to do about the drinking (she may cut down, or not — it is hers to decide), and get through Lantern Night (Day 139) with her without a bottle between you. She asks you to stay for breakfast, and means every breakfast.",
+   "hint": [
+    "What she gives easily is not what she values. What she values she has never offered anyone.",
+    "Be a steady presence in her everyday life and support whatever she decides about her own habits."
+   ]
+  }
+ ],
+ "bonds": {
+  "hedda": {
+   "label": "roommates",
+   "text": "Bungalow 2. Hedda has read her the ingredients of every bottle. Freya drinks them anyway and lets her win the argument.",
+   "public": true,
+   "from": 1
+  },
+  "trixie": {
+   "label": "roommates",
+   "text": "Bungalow 2. Trixie puts a glass of water by her bunk and tells the bees to hum quietly in the mornings.",
+   "public": true,
+   "from": 1
+  },
+  "tobias": {
+   "label": "crush",
+   "text": "He turned down a drink because he was 'working', which no man has ever said to her. She has been interested ever since.",
+   "public": true,
+   "from": 5
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "The one on the porch who always knows which bungalow is hers. She trusts him completely and has never asked why he bothers.",
+   "public": true,
+   "from": 5
+  },
+  "bex": {
+   "label": "rivals",
+   "text": "They play the same deck and both think theirs is the proper build. It has been settled over drinks four times, differently each time.",
+   "public": true,
+   "from": 7
+  },
+  "josie": {
+   "label": "friends",
+   "text": "The only bartender who has ever cut her off, and the only person who has told her plainly where this road goes.",
+   "public": true,
+   "from": 6
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Cold water and bonfires: she swims out with her at dawn and they share a flask after.",
+   "public": true,
+   "from": 5
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "He tried it on at a party. She drank him under the table for his gold chain, wore it for a night and handed it back in front of everyone.",
+   "public": true,
+   "from": 8
+  },
+  "camille": {
+   "label": "owes",
+   "text": "The nurse has seen her at her worst twice, said nothing clever, and sat with her.",
+   "public": false,
+   "from": 10
+  },
+  "ashton": {
+   "label": "friends",
+   "text": "He offered a rose; she offered him an evening, in plain words; he went scarlet and fled. They get on famously now.",
+   "public": true,
+   "from": 4
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "Mama's kitchen is the one warm, loud, sober room she likes being in.",
+   "public": true,
+   "from": 2
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "pool",
+   "Evening": "bonfire_pit",
+   "Night": "commons_beach"
+  },
+  "weekend": {
+   "Morning": "commons_room",
+   "Midday": "beach_cove",
+   "Afternoon": "bar",
+   "Evening": "bonfire_pit",
+   "Night": "commons_beach"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Mischief Militia played as a brawl: snowballs, stolen tempo and a grin. At her best with a slight hangover, when the showmanship drops away and only the timing is left.",
+  "tilt": "Being properly drunk (she plays anyway, splendidly badly), and slow, joyless opponents who will not banter."
+ }
+}

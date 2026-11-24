@@ -1,0 +1,19 @@
+{
+ "name": "The Commons — The Beach Behind the Row",
+ "zone": "dorms",
+ "bg": "commons_shore",
+ "night": true,
+ "part": "commons_beach",
+ "hours": "Always open; thirty steps from any back porch on the row. Empty at dawn except for the early risers, busiest between the last class and supper, and after lights-out the place people go when the plank walls are too thin for what they have to say.",
+ "sight": "Behind the bungalows the stilts stand in soft sand, and past the last palm the south cove opens: a wide, shallow curve of pale sand, a tide line of shells and sea-glass, and then nothing but water to the horizon. The back porches of the row look down on it, each with its own steps, towels on the rails and somebody's surfboard propped against a post. An upturned rowing boat with flaking mint paint serves as a bench. To the east the black rocks begin, and beyond them the upper years' Old Row; to the west the headland hides the cove. By day the sea is glass-green over the sandbar and dark blue beyond it. At night the porch lamps throw long yellow stripes across the sand, the surf is a white line in the dark, and the stars come down to the water.",
+ "things": [
+  "Sit on the upturned boat and watch the sea",
+  "Walk the tide line and pick up shells and sea-glass",
+  "Wade out to the sandbar, or swim in the calm water inside it",
+  "Lay a duel mat on a towel and play with sand in the sleeves",
+  "Talk to someone on their back steps",
+  "Come down at night, when the row is asleep",
+  "Watch the sun come up, or go down"
+ ],
+ "secret": "No mystery of its own; it is the Commons' back garden and the best place on the island for a conversation nobody else should hear, which is exactly why it matters. People are different here than on the boardwalk: quieter, slower, more honest. Use it for first real talks, apologies, and the romance scenes that need the sea and no audience. Who is found here follows the row: early swimmers at dawn, half the Commons after class, one or two people at night. Dmitri's porch in B6 overlooks this beach as well as the boardwalk, so what happens here after midnight has, as a rule, one witness."
+}

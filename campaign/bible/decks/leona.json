@@ -1,0 +1,378 @@
+{
+ "name": "Borrowed Brilliance",
+ "owner": "leona",
+ "heroes": [
+  "Enigma, the Seller of Secrets",
+  "Lilly, the Charming Infiltrator",
+  "Gabby, the Boarding Broad"
+ ],
+ "main": [
+  [
+   3,
+   "Cell Escape"
+  ],
+  [
+   5,
+   "Charme"
+  ],
+  [
+   3,
+   "Decay Magic"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   3,
+   "Gather Intel"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Golden Apple"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   5,
+   "Infiltration"
+  ],
+  [
+   3,
+   "Informant"
+  ],
+  [
+   3,
+   "Live Show"
+  ],
+  [
+   4,
+   "Love Shot"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Mine! Mine! Mine!"
+  ],
+  [
+   3,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Secret Entrance"
+  ],
+  [
+   3,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Thieving Strike"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Enigma, the Seller of Secrets": "Hero",
+  "Lilly, the Charming Infiltrator": "Hero",
+  "Gabby, the Boarding Broad": "Hero",
+  "Cell Escape": "Spell (Decay Magic)",
+  "Charme": "Ability",
+  "Decay Magic": "Ability",
+  "Fighting": "Ability",
+  "Gather Intel": "Spell (Decay Magic)",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Haressassin": "Creature L2",
+  "Infiltration": "Ability",
+  "Informant": "Creature L0",
+  "Live Show": "Spell (Magic Arts)",
+  "Love Shot": "Spell (Magic Arts)",
+  "Magic Arts": "Ability",
+  "Mine! Mine! Mine!": "Attack",
+  "Quick Attack": "Attack",
+  "Secret Entrance": "Spell (Magic Arts)",
+  "Summoning Magic": "Ability",
+  "Thieving Strike": "Attack",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Enigma, the Seller of Secrets": "Each turn reveals the top five cards of your deck and takes one; you reorder the rest.",
+  "Lilly, the Charming Infiltrator": "Draws a card whenever Leona takes a card from your deck or hand.",
+  "Infiltration": "Ability: takes cards off the top of your deck, choosing among three at higher levels.",
+  "Love Shot": "Draws from your deck, then makes one of your heroes perform an attack or spell from her hand.",
+  "Cell Escape": "Draws two cards from your deck, four if one of her heroes is frozen or stunned.",
+  "Gather Intel": "Looks at your hand; you give her the card she picks or she draws two.",
+  "Secret Entrance": "Takes random cards from your hand.",
+  "Live Show": "Swaps cards between the hands as she likes.",
+  "Informant": "Rearranges the top of your deck for her next theft.",
+  "Charme": "Ability: borrows your Abilities; at two takes a hand card each turn.",
+  "Mine! Mine! Mine!": "Takes an equipped artifact.",
+  "Golden Apple": "Borrows one of your heroes for a turn.",
+  "Thieving Strike": "Attack that steals a hand card.",
+  "Haressassin": "Her own damage: one hard shot a turn."
+ },
+ "plan": "Leona plays your deck. Enigma and Infiltration take the best of your top cards every turn, Lilly draws for each theft, and Love Shot or Golden Apple make your own heroes cast what she took. Against this deck that means your Chain Lightning and Flame Avalanche coming back at you. Her own cards do almost nothing, her heroes are ordinary, and she can only use stolen spells through your heroes or her borrowed turns.",
+ "looks": {
+  "early": "Your top cards face-up in front of Enigma; one already in her hand.",
+  "mid": "A hand that is half yours, Lilly drawing, your Tarleinn casting at you under Love Shot.",
+  "late": "Your White Eye on her hero and your sweepers in her hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Enigma has taken one card a turn and has done no damage.",
+   "why": "Her deck only works once it holds your cards; Enigma is small, and every turn of quiet building is another of your key cards in her hand."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "She holds your sweeper and a Love Shot.",
+   "why": "Stolen spells are cast through your heroes: White Eye discards take them back out of her hand, and a frozen Enigma stops the daily theft."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Golden Apple borrows your caster; your own Chain Lightning is in her hand.",
+   "why": "Keep Cloud in a Bottle and Homerun! for your own spell and decide which hero takes its heavy hit; attaching more only gives the borrowed hero more to use."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "DISRUPT",
+   "tell": "Both hands are thin and her heroes are hurt.",
+   "why": "With nothing left to steal she has one Haressassin."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Enigma turns over your top five and keeps your Gathering Storm.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Enigma"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for the next copy"
+     }
+    ]
+   },
+   {
+    "board": "Infiltration and an Informant line up tomorrow's theft.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning now, while it is yours"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the Informant"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Lilly draws two off two thefts.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Enigma first, she is small"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Play your hand out"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold cards"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Love Shot: your Tarleinn casts your own Flame Avalanche at you.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye her hand empty"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Lilly"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Mine! Mine! Mine! takes The White Eye.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb it off her hero: it returns to you"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn the thief"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play on"
+     }
+    ]
+   },
+   {
+    "board": "Gather Intel: she looks at your hand and points.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Give her the dead card, freeze Enigma"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let her draw two"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep everything"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Golden Apple on your caster, your Chain Lightning in her hand.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the heavy hit"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Gabby"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more"
+     }
+    ]
+   },
+   {
+    "board": "Charme two: you must hand her a card each turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep one dead card to give"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold a full hand"
+     }
+    ]
+   },
+   {
+    "board": "A stunned Gabby lets Cell Escape draw four from your deck.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shields; do not stun her heroes"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Lilly"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "She has a Haressassin and two tired heroes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the Haressassin"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Nothing to take back"
+     }
+    ]
+   },
+   {
+    "board": "Lilly alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Enigma for one more look.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Lilly"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     }
+    ]
+   }
+  ]
+ }
+}

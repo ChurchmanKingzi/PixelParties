@@ -1,0 +1,363 @@
+{
+ "name": "War Room",
+ "owner": "nathan",
+ "heroes": [
+  "Tharx, the Never-Losing General",
+  "Layn, Defender of Deri",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   4,
+   "Censpartan War Counselor"
+  ],
+  [
+   3,
+   "Cute Cheese"
+  ],
+  [
+   4,
+   "Cykyran War Counselor"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Gorinthian War Counselor"
+  ],
+  [
+   4,
+   "Harpthenean War Counselor"
+  ],
+  [
+   4,
+   "Harpyformer Choir"
+  ],
+  [
+   3,
+   "Leadership"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Minocrete War Counselor"
+  ],
+  [
+   10,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Thebinxan War Counselor"
+  ],
+  [
+   4,
+   "War Chest"
+  ],
+  [
+   3,
+   "War Council Gathering Place"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tharx, the Never-Losing General": "Hero",
+  "Layn, Defender of Deri": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Censpartan War Counselor": "Creature L2",
+  "Cute Cheese": "Artifact",
+  "Cykyran War Counselor": "Creature L2",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Gorinthian War Counselor": "Creature L2",
+  "Harpthenean War Counselor": "Creature L2",
+  "Harpyformer Choir": "Creature L0",
+  "Leadership": "Ability",
+  "Magic Arts": "Ability",
+  "Magnetic Glove": "Artifact",
+  "Minocrete War Counselor": "Creature L2",
+  "Summoning Magic": "Ability",
+  "Thebinxan War Counselor": "Creature L2",
+  "War Chest": "Artifact",
+  "War Council Gathering Place": "Area (Magic Arts)"
+ },
+ "gist": {
+  "Censpartan War Counselor": "Makes his other Counselors untargetable; if you have more creatures than he does, it destroys the surplus.",
+  "Cykyran War Counselor": "With three different Counselors out, doubles his heroes' base Attack; each turn hits a target for one of his heroes' Attack.",
+  "Gorinthian War Counselor": "With two Counselors out, stuns a target for two turns (it takes no damage while stunned).",
+  "Harpthenean War Counselor": "Each turn either makes gold per Counselor or fires a shot that grows with his gold.",
+  "Minocrete War Counselor": "Doubles the damage of his other Counselors and can repeat the damage a target already took this turn.",
+  "Thebinxan War Counselor": "Reveals his top card after you guess its type; a wrong guess hurts everything you control.",
+  "War Chest": "Free gold for every Counselor on the board.",
+  "War Council Gathering Place": "Area: a freshly summoned Counselor may pay gold to use its effect at once.",
+  "Tharx, the Never-Losing General": "Draws a card for every creature he has had since last turn.",
+  "Layn, Defender of Deri": "Creatures Layn summons are much sturdier.",
+  "Silent Water Mizune": "The Summoning and Magic Arts caster.",
+  "Harpyformer Choir": "Free summon that fetches Summoning Magic and can protect a creature once.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures.",
+  "Cute Cheese": "Searches the Counselor he is missing."
+ },
+ "plan": "Six different War Counselors, one of each at a time, each stronger for every other one on the table. Nathan plays one per turn, loudly, and once three or four are out the board does everything: stuns for two turns, doubled shots, a gold cannon, cards from Tharx. War Chest pays for the Gathering Place so new arrivals act immediately. It is a straightforward board deck piloted without subtlety: he always over-commits, the Counselors are mid-sized bodies that a single sweep removes together, and without at least two or three of them each one is mediocre.",
+ "looks": {
+  "early": "One Counselor and a Harpyformer Choir, Summoning Magic climbing on Mizune.",
+  "mid": "Three or four different Counselors spread across his heroes, a fat gold pile, the Gathering Place overhead, Tharx drawing a handful each turn.",
+  "late": "Either the full council and a stunned, shrinking opponent, or an empty board and Nathan loudly drawing for another Counselor."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "He has one lonely Counselor; its text needs a second and third to matter.",
+   "why": "A single Counselor does almost nothing, so spending removal on it is waste; build your levels and keep the sweeper for the turn he has committed three."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Three different Counselors are out and he has put every creature in his hand on the table.",
+   "why": "They share mid-sized health and he never holds one back: one Flame Avalanche resets his whole game, while racing walks into a two-turn Gorinthian stun on your caster."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "His gold pile is enormous and the Harpthenean is pointing at your weakest hero.",
+   "why": "The Harpthenean's shot scales with his gold and Tharx refills the council every turn; remove that one Counselor or shut Tharx down rather than waiting for him to rebuild."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "DISRUPT",
+   "tell": "His board is thin and his heroes have taken every Storm tick he could not put on a creature.",
+   "why": "Without three Counselors the council does nothing and his heroes never had any defence of their own."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Nathan slaps down a Thebinxan War Counselor and demands you guess the top card of his deck.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Guess, shrug, keep building"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mizune, his summoner"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Spend removal on the lone Counselor"
+     }
+    ]
+   },
+   {
+    "board": "A Harpyformer Choir fetches him Summoning Magic; one Counselor, a lot of talk.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Find Flame Avalanche and hold it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning into three open heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one creature"
+     }
+    ]
+   },
+   {
+    "board": "Harpthenean makes him a little gold; he announces that the council is assembling.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Let it assemble, attach the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb Mizune's Summoning Magic"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Tharx"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Censpartan, Cykyran and Gorinthian stand together; his hand is empty of creatures and he is grinning.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche, all of them"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea ready for the stun, hit heroes"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into a two-turn stun"
+     }
+    ]
+   },
+   {
+    "board": "The Gorinthian stuns your Storm caster for two turns.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep; the stun dies with the Counselor's board"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Tharx"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit out the stun"
+     }
+    ]
+   },
+   {
+    "board": "He shows a Deepsea Idol by accident while bragging.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Draw the Idol out with one sweep, follow with the second"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discard and hope"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Forget the board"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "War Chest fills his purse and the Harpthenean's cannon swivels to your wounded caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Harpthenean"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm the lot"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal and hope"
+     }
+    ]
+   },
+   {
+    "board": "Tharx draws four cards off a surviving board and replays everything you killed.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Tharx, then sweep"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Leave the board, burn Tharx"
+     }
+    ]
+   },
+   {
+    "board": "The Gathering Place lets each new Counselor act the moment it lands.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the Area"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the new arrivals each turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Out-build him"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two heroes, one Counselor, no hand; your Storm has two ticks to go.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Speed it up with every spell"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the last Counselor first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove his Area for no reason"
+     }
+    ]
+   },
+   {
+    "board": "He Golden Ankhs Tharx to draw a new council.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the other heroes this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang the turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Refill your own hand"
+     }
+    ]
+   },
+   {
+    "board": "Minocrete repeats the damage on a hero you can barely keep alive.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, then kill his last hero"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Minocrete"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it and finish his last hero now"
+     }
+    ]
+   }
+  ]
+ }
+}

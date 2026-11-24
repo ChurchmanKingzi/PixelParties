@@ -1,0 +1,180 @@
+{
+ "scale": "A (85+), B (70–84), C (55–69), D (45–54), F (below 45), out of 100 points per course and term.",
+ "weights": {
+  "attendance": 40,
+  "study": 40,
+  "exam": 20
+ },
+ "rules": [
+  "Every course is graded A–F each term from attendance, study and exams.",
+  "Attendance (40 points): the share of that course's class slots Rowan actually sat in. A skipped class is counted the moment the slot passes; being on the island but elsewhere is a skip. Sanctioned absences (representing the Academy at an event, the infirmary with a nurse's note) do not count against him.",
+  "Study (40 points): time spent studying that course outside class — in the Library (best), a dorm room, a study group, office hours. Roughly three study sessions per course every two weeks keep full marks; cramming in exam week helps less than steady work.",
+  "Exams (20 points): the midterm (advisory: its letter is posted and warns of trouble, but does not by itself fail anyone) and the final. Knowledge, preparation and a little luck on the day.",
+  "Midterms: Days 47–49 (Term 1) and 152–154 (Term 2); letters posted the following morning. Finals: Days 96–98 and 194–196; final grades posted the following morning. Exams are sat ONLY on these days, at the times and places of the exam timetable (FIXED TIMES TODAY). There are no regular classes on the exam Friday; the classes from Monday to Thursday of an exam week are revision, mock papers and office hours on that course.",
+  "Failing (F) two courses in one term means academic probation. Probation a second time, or three F in one term, means expulsion: the Chancellor's office, and the next ferry home.",
+  "Grades also matter socially: teachers treat A-students and F-students differently, some clubs and jobs ask for a minimum grade, and scholarship students need a C average.",
+  "Cheating in an exam is an automatic F and a hearing. Nobody at this school is impressed by it."
+ ],
+ "exams": {
+  "cp101": {
+   "midterm": {
+    "format": "written",
+    "text": "Ninety minutes in the Lecture Hall: annotate a recorded World Final game turn by turn with a tempo ledger for both players."
+   },
+   "final": {
+    "format": "practical duel",
+    "text": "One duel in a Trial Dome against a drawn classmate; the ledger kept during play is graded, not only the result (Term 2: best of three, also in the Trial Domes)."
+   }
+  },
+  "cp150": {
+   "midterm": {
+    "format": "practical duel",
+    "text": "A recorded duel in the Trial Domes against a second-year, graded on procedure and composure (Term 2: a two-game set with a deck handed over ten minutes before). Low Nerve shows here before it shows anywhere else."
+   },
+   "final": {
+    "format": "practical duel",
+    "text": "A Trial Dome duel before a three-person staff panel (Term 2: on the arena stage with crowd audio)."
+   }
+  },
+  "rj101": {
+   "midterm": {
+    "format": "written",
+    "text": "Fifty rulings in fifty minutes, closed book (Term 2: a practical in the Trial Domes — judge a staged match containing three planted infractions)."
+   },
+   "final": {
+    "format": "written + oral",
+    "text": "A written paper, then ten minutes defending three rulings against Ms. Kirishima (Term 2: the Level-1 judge certification with floor practical)."
+   }
+  },
+  "ma101": {
+   "midterm": {
+    "format": "written",
+    "text": "Six problems; one cannot be solved as stated, and saying so earns full marks for it."
+   },
+   "final": {
+    "format": "written",
+    "text": "Eight problems, open formula sheet."
+   }
+  },
+  "lh101": {
+   "midterm": {
+    "format": "written",
+    "text": "An essay under exam conditions: 'Is the lore one story or many?' (Term 2: a comparative essay)."
+   },
+   "final": {
+    "format": "written",
+    "text": "An essay plus a source critique of one of the Founder's tales (Term 2: essay and oral-history file)."
+   }
+  },
+  "pc101": {
+   "midterm": {
+    "format": "practical",
+    "text": "The heartbeat drill in the gym: a judged sequencing puzzle solved straight off the track, pulse above 150 (both terms, on the exam Saturday)."
+   },
+   "final": {
+    "format": "practical",
+    "text": "Full circuit, then a composed-play test at the mat tables."
+   }
+  },
+  "gd110": {
+   "midterm": {
+    "format": "design submission",
+    "text": "One common Creature and one Spell with design notes, handed in on Day 47 (Term 2: a banned card redesigned so that it could be legal, handed in on Day 152)."
+   },
+   "final": {
+    "format": "design submission",
+    "text": "A five-card mini-archetype with a playtest log (Term 2: a ten-card set fragment and a pitch to a staff panel)."
+   }
+  },
+  "gd120": {
+   "midterm": {
+    "format": "written",
+    "text": "Cost twenty unseen cards; error measured against printed costs."
+   },
+   "final": {
+    "format": "design submission + oral",
+    "text": "A balance report (Term 2: a patch proposal with data, defended orally)."
+   }
+  },
+  "gd130": {
+   "midterm": {
+    "format": "written",
+    "text": "Rewrite ten broken card texts."
+   },
+   "final": {
+    "format": "design submission",
+    "text": "Template a classmate's archetype and sign off its rulings (Term 2: FAQ and release notes for the class set)."
+   }
+  },
+  "gd140": {
+   "midterm": {
+    "format": "design submission",
+    "text": "Three thumbnails and one finished common."
+   },
+   "final": {
+    "format": "design submission",
+    "text": "A Hero and signature card as a matched pair (Term 2: portfolio review)."
+   }
+  },
+  "gd150": {
+   "midterm": {
+    "format": "design submission",
+    "text": "A ten-game playtest log with one change per game."
+   },
+   "final": {
+    "format": "design submission",
+    "text": "A gold-box prototype with lab notebook (Term 2: the class set, playtested by staff)."
+   }
+  },
+  "cm101": {
+   "midterm": {
+    "format": "oral",
+    "text": "Five recorded minutes of solo play-by-play."
+   },
+   "final": {
+    "format": "oral",
+    "text": "Cast a live match with a partner (Term 2: on the main stage)."
+   }
+  },
+  "cm102": {
+   "midterm": {
+    "format": "oral",
+    "text": "A two-minute stage piece in front of the class."
+   },
+   "final": {
+    "format": "oral",
+    "text": "Introduce, live, a match you know nothing about (Term 2: a ten-minute hosting set)."
+   }
+  },
+  "cm110": {
+   "midterm": {
+    "format": "practical",
+    "text": "Crew a ten-minute live segment in a role drawn from a hat."
+   },
+   "final": {
+    "format": "practical",
+    "text": "Produce a complete Top Deck episode (Term 2: direct a main-stage match)."
+   }
+  },
+  "cm120": {
+   "midterm": {
+    "format": "oral",
+    "text": "A five-minute recorded breakdown of an assigned game."
+   },
+   "final": {
+    "format": "written + oral",
+    "text": "A scouting report plus an on-air segment (Term 2: a full player dossier presented live)."
+   }
+  },
+  "cm140": {
+   "midterm": {
+    "format": "practical",
+    "text": "Diagnose three sabotaged tables in forty minutes."
+   },
+   "final": {
+    "format": "practical",
+    "text": "Full service of one table, signed off by Professor Helical (Term 2: team table support for the Graduation Exhibition)."
+   }
+  }
+ }
+}

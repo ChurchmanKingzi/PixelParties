@@ -1,0 +1,2972 @@
+[
+ {
+  "id": "q_nathan_sorry",
+  "title": "How to Say It",
+  "giver": "nathan",
+  "where": [
+   "commons_room",
+   "commons_beach"
+  ],
+  "available": {
+   "dayFrom": 8,
+   "dayTo": 25
+  },
+  "public": "Nathan wants to apologise to Rana for something he said. He has no idea how apologies work.",
+  "steps": [
+   "Nathan called Rana 'the rerun' at breakfast (Day 7) and has realised, a day late, that her face did something. He asks Rowan, at full volume, what he did.",
+   "Coach him through one rehearsal on the beach (he keeps adding 'but').",
+   "Be present when he tries it on Rana by the bonfire pit: it is terrible, sincere, and ends with him giving her his last empanada. She takes it.",
+   "Play him one casual game afterwards; win or lose he shakes hands properly for the first time."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Censpartan War Counselor"
+   ],
+   "technique": null,
+   "affinity": {
+    "nathan": 3,
+    "rana": 1
+   },
+   "flags": [
+    "nathan_friend"
+   ]
+  },
+  "fail": "Expires silently on Day 26. Nathan never apologises; Rana never knows he wanted to. (After Day 27 the Guest remembers the wish and may, clumsily, carry it out — which is worse.)"
+ },
+ {
+  "id": "q_inya_just_bell",
+  "title": "Just Bell",
+  "giver": "inya",
+  "where": [
+   "commons_beach",
+   "duel_terraces",
+   "great_arena"
+  ],
+  "available": {
+   "dayFrom": 12,
+   "dayTo": 40
+  },
+  "public": "Inya wants one opponent who plays her properly. Especially now.",
+  "steps": [
+   "Before Day 19: accept her 'no going easy' pact after a casual game. If she confided via the small-lie hook, set inya_told_rowan.",
+   "Day 19: when the roster reveals 'Kaboom, Inya', do not treat her differently in the first scene afterwards (no reverence, no jokes about grandpa). Set knows_inya_name.",
+   "Play her for real in a ranked or Cup game and choose a strong line at Crisis even though the crowd is on her side; OR, if she beats you, concede cleanly.",
+   "Find her afterwards at the bonfire pit: she admits she asked for the Commons so nobody could say the name bought her bed."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Cute Bunny",
+    "Bunny Bombs"
+   ],
+   "technique": "go_wide",
+   "affinity": {
+    "inya": 4
+   },
+   "flags": [
+    "inya_equal"
+   ]
+  },
+  "fail": "If Rowan visibly goes easy on her or uses her name for an advantage (e.g. asks for an introduction to Chuck in that first scene), the quest fails; her affinity drops by 3 and she will not practise with him until Term 2."
+ },
+ {
+  "id": "q_inya_grandpa",
+  "title": "Where Grandpa Goes",
+  "giver": "inya",
+  "where": [
+   "quad",
+   "jungle_trail",
+   "ruin_gate",
+   "chuck_workshop"
+  ],
+  "available": {
+   "dayFrom": 22,
+   "flags": [
+    "knows_inya_name"
+   ]
+  },
+  "public": "Inya thinks her grandfather is leaving his rooms at night. She wants to know where — without him knowing she knows.",
+  "steps": [
+   "Keep watch with her from the rooftop garden for up to three Night slots (she has noticed he also turns up wherever '{H}' and she might be alone, and thinks the two things are one thing) (he walks about one night in four; guarantee it on the third).",
+   "Follow at a distance along the jungle trail; meet Silas and his blanket (c_m4_sleepwalk). Set gate_found when Chuck stops at the Ruin Gate.",
+   "Choose with Inya: wake him (he is frightened and denies everything; chuck affinity −1) or walk him home asleep (Silas approves).",
+   "Next day in the workshop, let Inya ask him one question. He tells one true thing: 'I owe that door a visit I can't make.'"
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Haressassin"
+   ],
+   "technique": null,
+   "affinity": {
+    "inya": 3,
+    "silas": 2,
+    "chuck": 1
+   },
+   "flags": [
+    "gate_found",
+    "chuck_watched"
+   ]
+  },
+  "fail": "If curfew (from Day 67) catches them on a third night out, both get a formal warning and Inya is confined to the Commons at night for two weeks."
+ },
+ {
+  "id": "q_rana_first_win",
+  "title": "Match Point",
+  "giver": "rana",
+  "where": [
+   "card_shop",
+   "commons_beach",
+   "great_arena",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 13
+  },
+  "public": "Rana needs one sanctioned event win this year. She would rather swallow a deck than ask for help. She is asking.",
+  "steps": [
+   "Earn the right: beat her or lose well to her in a casual game, then sit through her dissecting every one of your mistakes.",
+   "Three practice sessions (separate days) drilling winning positions only — she plays the Endgame from ahead until her hands stop doing what they do. Each needs an Afternoon or Evening slot.",
+   "Enter a Saturday Sanctioned at the Sleeve & Binder with her (any Saturday; Mika judges). If the bracket puts you against her, play to win: throwing the match fails the quest on the spot if she notices (she notices).",
+   "She must win an event: a Saturday Sanctioned, or the Island Open (Days 124–126). At her match point, the player may say one thing from the rail; anything that names her fear makes it worse, anything about the board helps.",
+   "The evening after: she buys the drinks, badly, and removes the chipped polish."
+  ],
+  "rewards": {
+   "credits": 60,
+   "cards": [
+    "Cybug RHINOCEROS",
+    "Troop Annihilation"
+   ],
+   "technique": "bug_report",
+   "affinity": {
+    "rana": 6
+   },
+   "flags": [
+    "rana_won"
+   ]
+  },
+  "fail": "If she has not won a sanctioned event by the end of Day 126, the Academy withdraws her place: she leaves on the ferry on Day 128 (flag rana_left) unless her friends obtain a formal hearing before the Chancellor on the evening of Day 127 (Noor knows the regulation; it needs three students to speak for her and is likelier to succeed if Rowan holds the Battle Team reserve slot or Coach Rox speaks too): set rana_hearing_won. Off-schedule risk: see GUEST.offSchedule.rana."
+ },
+ {
+  "id": "q_livvie_9000",
+  "title": "Nine Thousand",
+  "giver": "livvie",
+  "where": [
+   "commons_kitchen",
+   "design_lab",
+   "job_board",
+   "broadcast_studio"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "Livvie keeps a number on the inside of her wrist in biro. It goes down slowly. Help it go down faster — without her catching you being kind.",
+  "steps": [
+   "Learn the number: she starts the year with 1,150 cr saved. Target 9,000 by Day 200.",
+   "Open up paying work with or for her: scorekeeping (40 cr/event), The Top Deck colour slot (40 cr/show), Sleeve & Binder sorting (25 cr/shift), the Commons trade binder (Tomi gives her fair rates if Rowan vouches).",
+   "Design Contest (due Day 75, results Day 82): playtest her entry on two separate days and break it honestly; with both sessions she wins the 5,000 cr.",
+   "Island Open: she needs top 3 (1,500+) or a commentary contract (300). Help her prepare OR split winnings — she accepts a split only as a pre-agreed 'team stake', never as a gift.",
+   "Refuse Marrow for her or with her (c_m7_offer_livvie). If she takes his money she reaches 9,000 at once and hates herself; see fail.",
+   "Day 200: the wrist is clean."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Crystal Well",
+    "Mana Absorbing Crystal"
+   ],
+   "technique": null,
+   "affinity": {
+    "livvie": 7
+   },
+   "flags": [
+    "livvie_funded"
+   ]
+  },
+  "fail": "Direct gifts of credits are refused and cost 2 affinity each time. If she accepts Marrow's offer (default Day 90 if her fund is under 4,000 and nobody has intervened) set livvie_took_marrow: she is funded, becomes his source on the Commons, and avoids Rowan. If under 9,000 on Day 200 she leaves on the last ferry for good (livvie_left)."
+ },
+ {
+  "id": "q_baylee_harvest",
+  "title": "Big Hands",
+  "giver": "baylee",
+  "where": [
+   "commons_room",
+   "commons_beach",
+   "great_arena",
+   "orchard"
+  ],
+  "available": {
+   "dayFrom": 9,
+   "self": [
+    "baylee"
+   ]
+  },
+  "public": "Baylee bends cards when he shuffles and goes red when people watch. He would like to play one game in front of a crowd without wanting to die.",
+  "steps": [
+   "Notice his sleeves are split: get him oversized sleeves (campus_store 15 cr or a trade with Tomi).",
+   "Teach him a table shuffle that suits his hands (one Evening). He teaches Rowan how to stand so his own hands stop shaking — he has calmed a lot of cattle.",
+   "Help at the orchard on a Saturday: he is sending his job money home for the harvest; carry crates, hear about the farm.",
+   "Be on the rail for his Freshman Cup round (Day 19) or any later ranked game with spectators. He wins with Gigantisaur King Trex and says nine words in a row about it."
+  ],
+  "rewards": {
+   "credits": 40,
+   "cards": [
+    "Gigantisaur King Trex",
+    "Gigantisaur Stomp"
+   ],
+   "technique": "stand_your_ground",
+   "affinity": {
+    "baylee": 5
+   },
+   "flags": [
+    "baylee_friend"
+   ]
+  },
+  "fail": "If Rowan laughs at the bent cards in front of others, Baylee withdraws politely and the quest closes for Term 1."
+ },
+ {
+  "id": "q_viktor_search",
+  "title": "The Left Pannier",
+  "giver": "viktor",
+  "where": [
+   "commons_beach",
+   "rope_bridge",
+   "ruins_field",
+   "umbra_house",
+   "ruin_gate"
+  ],
+  "available": {
+   "dayFrom": 7
+  },
+  "public": "Viktor is not here for the degree. He needs someone who can hold a rope and keep quiet.",
+  "steps": [
+   "Hold the rope at the gorge (Day 8) or any later night expedition; ask no questions. Set viktor_trust after two outings or one outing plus covering for his absence to a teacher.",
+   "He shows the journal (c_m6_viktor_journal; set viktor_journal_seen). He says the name Hale for the first time.",
+   "Go into Umbra House with him: Silas's keys given freely (q_lighthouse_lamp) or Viktor's loose scullery shutter with a lookout. Set umbra_entered.",
+   "Room 9: key 9 (silas_keys), or lift the door off its old hinges together. Viktor has searched the room twice and missed them; from Day 45 the lamp gives up the pages (c_m6_pages; set pages_found) — sooner only on Ashdown's hint ('he never trusted drawers; he trusted things he could carry out of a fire'). Let Viktor read the last leaf himself.",
+   "Stop him going to the Gate alone that night: either promise to go with him when there is a card and a plan, or take the pages to Ashdown together."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Treasure Hunter's Backpack",
+    "Legendary Explorer Dajan"
+   ],
+   "technique": null,
+   "affinity": {
+    "viktor": 6
+   },
+   "flags": [
+    "viktor_trust",
+    "pages_found",
+    "viktor_waits"
+   ]
+  },
+  "fail": "If Rowan reports Viktor to staff, or shows the journal to anyone without asking, Viktor cuts him off for good and goes on alone (default timeline: caught Day 45, lost Day 158)."
+ },
+ {
+  "id": "q_tomi_binder",
+  "title": "The Commons Binder",
+  "giver": "tomi",
+  "where": [
+   "commons_beach",
+   "card_shop",
+   "night_market"
+  ],
+  "available": {
+   "dayFrom": 5,
+   "notFlags": [
+    "tomi_hollowed"
+   ]
+  },
+  "public": "Tomi runs the unofficial Commons trade binder and needs a second pair of eyes that can count.",
+  "steps": [
+   "Work three trade evenings on the steps of Bungalow 5; spot the Rare Hall upper-year passing a resleeved proxy.",
+   "Carry a sealed trade to Mika in town and bring back exactly what was agreed (Tomi tests whether anything is skimmed).",
+   "Talk him out of taking bets on Charter Duels, or keep the book straight for him for one event."
+  ],
+  "rewards": {
+   "credits": 90,
+   "cards": [
+    "Dirty Smuggler",
+    "Smuggler's Pier"
+   ],
+   "technique": null,
+   "affinity": {
+    "tomi": 4
+   },
+   "flags": [
+    "tomi_partner"
+   ]
+  },
+  "fail": "Skim once and Tomi knows; the binder is closed to Rowan and prices everywhere on the Commons get worse."
+ },
+ {
+  "id": "q_odalys_kitchen",
+  "title": "Kitchen Shift",
+  "giver": "odalys",
+  "where": [
+   "commons_kitchen"
+  ],
+  "available": {
+   "dayFrom": 3
+  },
+  "public": "Mama Odalys pays 20 cr and a plate for the breakfast shift. She also talks.",
+  "steps": [
+   "Work five Morning shifts (weekends, or weekdays at the cost of the Morning class).",
+   "Learn who eats and who doesn't; she asks Rowan, once, to make sure 'the pale one' takes seconds.",
+   "After Day 32: she asks him to find out why the birds have gone, because the bins are too tidy and it frightens her."
+  ],
+  "rewards": {
+   "credits": 100,
+   "cards": [
+    "Friendship"
+   ],
+   "technique": null,
+   "affinity": {
+    "odalys": 4,
+    "livvie": 1
+   },
+   "flags": [
+    "kitchen_job"
+   ]
+  },
+  "fail": "Missing two booked shifts ends the job; she forgives, but hires Baylee."
+ },
+ {
+  "id": "q_jessica_invitation",
+  "title": "A Proper Invitation",
+  "giver": "jessica",
+  "where": [
+   "spectral_terrace",
+   "boutique",
+   "rooftop_garden",
+   "gala_ballroom"
+  ],
+  "available": {
+   "dayFrom": 14,
+   "dayTo": 103
+  },
+  "public": "Miss Montclair does not chase. She has, however, let it be known that she is not yet engaged for the Winter Gala.",
+  "steps": [
+   "Be introduced properly: someone must present Rowan (Marit, Pippa or Teobalt will), or he must return the glove she drops on the terrace steps without comment.",
+   "Three calls, each on a different day and each planned: she notices effort, not expense (a walk through the greenhouse counts; a borrowed jacket counts; turning up late does not).",
+   "Ask her opinion on a real match and listen: she reads a board better than half the CP year and hides it. Do not act surprised.",
+   "Ask for the Gala — in person, in words, at least seven days ahead. Arrive on time. Dance the first dance however badly."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Golden Ankh",
+    "Tree of Golden Apples"
+   ],
+   "technique": null,
+   "affinity": {
+    "jessica": 7
+   },
+   "flags": [
+    "jessica_gala"
+   ]
+  },
+  "fail": "Ask by message, ask late, or let her hear he also asked someone else: she accepts Ashton's standing invitation and is courteous to Rowan for the rest of the term, which is terrible."
+ },
+ {
+  "id": "q_jessica_mic",
+  "title": "Montclair on the Mic",
+  "giver": "jessica",
+  "where": [
+   "broadcast_studio",
+   "great_arena",
+   "spectral_suite"
+  ],
+  "available": {
+   "dayFrom": 40
+  },
+  "public": "Jessica is an Auxiliary major on the commentary track who has never once volunteered for the desk. There is a third casket she has not opened in front of anyone.",
+  "steps": [
+   "Find out why: the third casket holds no jewellery but her late grandmother's tournament deck and scorebooks — her grandmother cast the very first Kaboom Alpha exhibition and was laughed off the desk for being decorative.",
+   "Get her one segment on The Top Deck (Bex agrees for a favour; Vivienne must sign off).",
+   "Be her analyst in the second chair, and at the key moment let her make the call — she makes it a turn before the players see it.",
+   "She wears her grandmother's plainest ring afterwards and nothing else from the caskets for a week."
+  ],
+  "rewards": {
+   "credits": 80,
+   "cards": [
+    "Golden Apple",
+    "The Sacred Mirror"
+   ],
+   "technique": null,
+   "affinity": {
+    "jessica": 5,
+    "bex": 1,
+    "vivienne": 1
+   },
+   "flags": [
+    "jessica_caster"
+   ]
+  },
+  "fail": "If Rowan talks over her call on air, she finishes the segment flawlessly and never sits at the desk again."
+ },
+ {
+  "id": "q_georgie_plush",
+  "title": "Ember Is Missing",
+  "giver": "georgie",
+  "where": [
+   "quad",
+   "cafeteria",
+   "rare_lobby"
+  ],
+  "available": {
+   "dayFrom": 8,
+   "dayTo": 14
+  },
+  "public": "Georgie's dragon plush, Ember, is gone from her backpack. She says it doesn't matter. It matters.",
+  "steps": [
+   "Ask around: Pippa has a photo of Brant's friends near the Spectral coat racks.",
+   "Find Ember zip-tied on the quad flagpole before Pippa does; get it down (Baylee can simply reach, or ask Silas for the ladder).",
+   "Return it without a speech. If Brant objects, a casual duel for 'leave the first-years' things alone' is enough; no Charter needed."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Shimmering Dragonegg"
+   ],
+   "technique": null,
+   "affinity": {
+    "georgie": 4,
+    "pippa": 3
+   },
+   "flags": [
+    "georgie_plush"
+   ]
+  },
+  "fail": "After Day 14 Pippa resolves it loudly (see hook). Georgie is grateful to her instead."
+ },
+ {
+  "id": "q_georgie_reserve",
+  "title": "The Smallest Chair",
+  "giver": "pippa",
+  "where": [
+   "great_arena",
+   "spectral_lobby",
+   "gym"
+  ],
+  "available": {
+   "dayFrom": 28,
+   "dayTo": 33
+  },
+  "public": "Pippa says the best player in the first year is not going to try out for the Battle Team because she thinks she is 'not a team person'. Pippa would like that fixed.",
+  "steps": [
+   "Play Georgie once and lose honestly — she relaxes only at a table.",
+   "Ask her what she would change about the Battle Team's lists; write it down; show it to Coach Rox or Dom.",
+   "Walk her to the arena on Day 33 with Pippa. She must choose to sign herself."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Rubin, the Dragoneer Champion"
+   ],
+   "technique": "egg_timer",
+   "affinity": {
+    "georgie": 3,
+    "pippa": 3,
+    "rox": 1
+   },
+   "flags": [
+    "georgie_on_team"
+   ]
+  },
+  "fail": "If nobody does this, Gideon takes the reserve slot by default. NOTE for Stage D: if georgie_on_team is set, the Guest never issues her an ante duel (see GUEST.teamApproach); the cast closes ranks around her."
+ },
+ {
+  "id": "q_lilia_rival",
+  "title": "All-Out",
+  "giver": "lilia",
+  "where": [
+   "great_arena",
+   "spectral_terrace",
+   "gym"
+  ],
+  "available": {
+   "dayFrom": 76
+  },
+  "public": "Lilia Mann has four months left on the island and has never been made to sweat. She is interviewing.",
+  "steps": [
+   "Get to her table: the empty-arena invitation (hook), or ladder top 8 in Season 2.",
+   "Survive a five-phase practice game where she holds nothing back. Losing is expected; the test is whether Rowan picks his own line at Crisis instead of the 'safe' one. Repeatable weekly.",
+   "Beat any Battle Team starter in a ranked game (Dom, Kenji, Saoirse or Willas).",
+   "Take one phase off her: in any game, hold momentum against her through a Crisis. She laughs out loud — the first time anyone has heard it during a match — and sets lilia_rival. Doing it by a line that is not his habit also sets off_book.",
+   "Day 201, if both are standing: she names him her challenger at the Graduation Exhibition."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Hipdall, Protector of Coolness",
+    "Coolness Overcharge"
+   ],
+   "technique": "all_out",
+   "affinity": {
+    "lilia": 6,
+    "willas": 2
+   },
+   "flags": [
+    "lilia_rival",
+    "off_book"
+   ]
+  },
+  "fail": "Cannot fail outright; lapses if Lilia is Hollowed on Day 180. If Rowan asks her to go easy even once, step 2 resets."
+ },
+ {
+  "id": "q_willas_earned",
+  "title": "Earned",
+  "giver": "willas",
+  "where": [
+   "gym",
+   "great_arena",
+   "spectral_terrace"
+  ],
+  "available": {
+   "dayFrom": 110,
+   "dayTo": 149
+  },
+  "public": "Willas Tann knows exactly what the island says about why he is on the team. He wants one result nobody can say she got for him.",
+  "steps": [
+   "Take his temper once without leaving (he insults Rowan's deck, his dorm and his haircut, then carries his boxes).",
+   "Spar with him three times; his recoil deck wins when he stops trying to win fast. Tell him so in words he can hear.",
+   "Dom's internal challenge for the starter slot (Day 140): be in his corner. With all three spars he wins it narrowly; without, he loses it and keeps the slot only because Lilia vetoes.",
+   "After the gym-bag hook (Days 140–147): get him to tell Lilia what he means to do when the challenge comes, or tell her yourself (he will be furious for a day). Either sets willas_saved and lilia_warned."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Furious Anger",
+    "Tazune, the Angry Hot-Blood"
+   ],
+   "technique": "burn_the_boats",
+   "affinity": {
+    "willas": 6,
+    "lilia": 2,
+    "dom": 1
+   },
+   "flags": [
+    "willas_saved",
+    "lilia_warned",
+    "willas_earned"
+   ]
+  },
+  "fail": "If nothing is done he takes Lilia's duel on Day 150 and is Hollowed. If Rowan tells Lilia before step 2, Willas feels handled and, on Day 149, goes to the Guest and issues his own challenge a day before it can issue hers, unless Lilia physically stops him."
+ },
+ {
+  "id": "q_ashton_thorns",
+  "title": "Thorns",
+  "giver": "ashton",
+  "where": [
+   "spectral_terrace",
+   "rooftop_garden",
+   "duel_terraces"
+  ],
+  "available": {
+   "dayFrom": 16
+  },
+  "public": "Ashton Beaumont-Lyle has decided you are his rival in love. You were not aware of competing.",
+  "steps": [
+   "Receive a rose and a challenge card: a duel 'for the right to escort' whichever woman Rowan last spoke to in his sight. Decline the stake (nobody is a prize) and play him for something that is his to give: one honest answer.",
+   "Beat his Pollution deck, or lose and owe him an honest answer instead.",
+   "His answer if he loses: he keeps a list of every girl who left him and has written an apology to none. Help him deliver one — Sunny or Bex are on the island and will hear it out with crossed arms."
+  ],
+  "rewards": {
+   "credits": 50,
+   "cards": [
+    "Magic Mirror",
+    "Golden Wings"
+   ],
+   "technique": null,
+   "affinity": {
+    "ashton": 4,
+    "sunny": 1,
+    "bex": 1
+   },
+   "flags": [
+    "ashton_ally"
+   ]
+  },
+  "fail": "Accept a woman as the stake and whoever it was hears about it within the day (−3 affinity with her and with her friends)."
+ },
+ {
+  "id": "q_teobalt_petition",
+  "title": "Hot Water",
+  "giver": "teobalt",
+  "where": [
+   "council_room",
+   "commons_beach",
+   "student_lounge"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "The Commons has had cold showers since Day 3. Teobalt has a clipboard and a plan and needs signatures from people who are tired of being asked to sign things.",
+  "steps": [
+   "Collect 40 signatures across all three dorms (ten scenes or one good speech at the bonfire).",
+   "Present it in the council room: Octavia will cut it to pieces on procedure and Sebastian will find, warmly, that it is 'not this term'; answer them on the numbers Teobalt prepared — Imara checks every figure aloud and says so when they hold, and Tavita, who has showered cold on the Row for four years, speaks for it.",
+   "After Day 67: Teobalt reuses the network as a walking-home rota under curfew; join one night."
+  ],
+  "rewards": {
+   "credits": 30,
+   "cards": [
+    "Tuscan Mystic",
+    "Blueprints"
+   ],
+   "technique": null,
+   "affinity": {
+    "teobalt": 5,
+    "octavia": 1,
+    "odalys": 2
+   },
+   "flags": [
+    "commons_petition"
+   ]
+  },
+  "fail": "Miss the council date and the boiler waits until Term 2."
+ },
+ {
+  "id": "q_priya_fair_slot",
+  "title": "Fair Draw",
+  "giver": "priya",
+  "where": [
+   "gym",
+   "great_arena",
+   "rare_common_room"
+  ],
+  "available": {
+   "dayFrom": 34
+  },
+  "public": "Priya Raman wants a starter slot and wants it clean. She needs a sparring partner who will not flatter her.",
+  "steps": [
+   "Morning runs with Coach Rox's group, three times (costs the Morning slot; improves Nerve).",
+   "Spar against her arrows deck and name her habit to her face: she always holds the Golden Arrow one turn too long.",
+   "When she is tempted to file a formal complaint about Willas's slot (Day 120), talk it through: complaint (splits the team before Stage D) or challenge him at the table."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Golden Arrow",
+    "Flame Arrow"
+   ],
+   "technique": "box_breath",
+   "affinity": {
+    "priya": 5,
+    "rox": 2
+   },
+   "flags": [
+    "priya_ally"
+   ]
+  },
+  "fail": "If the complaint is filed the team is divided: nobody is watching Willas on Day 150."
+ },
+ {
+  "id": "q_octavia_audit",
+  "title": "Line Item",
+  "giver": "octavia",
+  "where": [
+   "council_room",
+   "library",
+   "chancellor_office"
+  ],
+  "available": {
+   "dayFrom": 70
+  },
+  "public": "The council president has found a number that does not explain itself and requires a runner who is not on anybody's payroll.",
+  "steps": [
+   "Fetch three years of summary accounts from the library stacks; find the quarterly 'legacy obligations (4)' in each (c_m6_payments). The treasurer, Imara, is the officer who first found the line and was told by Octavia to leave it; she will confirm the figures to a runner who asks her plainly, and nothing more.",
+   "Learn that Marrow has a copy; Octavia has been invited to dinner at the inn. Advise her to go or not — she goes either way, but only tells Rowan what was said if he did not lecture her.",
+   "From Day 110: she shows the board draft (c_m7_board_letter). She must choose a side; she chooses the school if she has been treated as a person at least twice (any two non-business scenes)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Dante, the Wanderer of Hell"
+   ],
+   "technique": null,
+   "affinity": {
+    "octavia": 5
+   },
+   "flags": [
+    "octavia_ally"
+   ]
+  },
+  "fail": "If she sides with Marrow she delivers the council's endorsement to the board vote: the Chancellor falls on Day 170 with no student protest."
+ },
+ {
+  "id": "q_noor_charter",
+  "title": "Nine Articles",
+  "giver": "noor",
+  "where": [
+   "library",
+   "card_archive",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 12
+  },
+  "public": "Noor intends to be a head judge. She would like to argue the Charter with someone who argues back.",
+  "steps": [
+   "Attend three Thursday readings (Evening). Each covers three articles; she quizzes.",
+   "Shadow her as a floor-judge trainee at one sanctioned event; make one correct call under pressure.",
+   "Go to the Archive together and read Chuck's annotated draft (c_m4_charter_draft). Set charter_studied.",
+   "After Day 41: bring her the dome's log; hear her ruling on paid antes (c_m3_noor_ruling). If the player then raises 'taken without a game', she reads Article 7 aloud twice and sets debt_clause_known."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Doom Clock",
+    "Trial of Knowledge"
+   ],
+   "technique": "clock_discipline",
+   "affinity": {
+    "noor": 6,
+    "hana": 1
+   },
+   "flags": [
+    "charter_studied"
+   ]
+  },
+  "fail": "Being flippant about procedure during the judging shift gets Rowan sent off the floor; step 2 can be retried a week later."
+ },
+ {
+  "id": "q_pippa_series",
+  "title": "Contact Sheet",
+  "giver": "pippa",
+  "where": [
+   "rare_room",
+   "rooftop_garden",
+   "quad",
+   "broadcast_studio"
+  ],
+  "available": {
+   "dayFrom": 28
+  },
+  "public": "Pippa is shooting a series and needs someone to carry the tripod and tell her she's not seeing things.",
+  "steps": [
+   "Look at the Day-27 frames (set pippa_photos; c_m1_pippa_dawn).",
+   "Three shoots at golden hour on different days: she is collecting shadows. On the third, '{H}' walks through frame of {H:his} own accord and asks, kindly, whether the camera keeps what it takes.",
+   "Decide with her where the negatives live. Options: her room (searched by Gideon on Day 80 if gideon is not exposed — frames stolen), the lighthouse (safe), Bex (public at once; see GUEST.exposure)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Cute Camera",
+    "Slime Rancher"
+   ],
+   "technique": null,
+   "affinity": {
+    "pippa": 6,
+    "georgie": 1
+   },
+   "flags": [
+    "pippa_photos",
+    "photos_safe"
+   ]
+  },
+  "fail": "If the negatives are stolen, exposure by photograph is no longer possible; Pippa blames herself."
+ },
+ {
+  "id": "q_sunny_lifeguard",
+  "title": "Deep End",
+  "giver": "sunny",
+  "where": [
+   "pool",
+   "beach_cove",
+   "tide_pools"
+  ],
+  "available": {
+   "dayFrom": 4,
+   "self": [
+    "sunny"
+   ]
+  },
+  "public": "Sunny needs a second body for lifeguard cover and thinks you would look good in the chair. She has said so.",
+  "steps": [
+   "Pass the swim test (two Afternoon sessions; she coaches, with comments).",
+   "Cover three pool shifts (18 cr each).",
+   "Open-water swim to the marker buoy with her at dawn; from the buoy the islet and the dark mouth of the sea cave are both visible (she names them)."
+  ],
+  "rewards": {
+   "credits": 54,
+   "cards": [
+    "Slippery Skates"
+   ],
+   "technique": null,
+   "affinity": {
+    "sunny": 5
+   },
+   "flags": [
+    "lifeguard_job",
+    "knows_sea_cave_mouth"
+   ]
+  },
+  "fail": "Miss a shift and Mikoto gets a fright in the deep end; Sunny covers for him once."
+ },
+ {
+  "id": "q_saoirse_dawn",
+  "title": "Dawn Patrol",
+  "giver": "saoirse",
+  "where": [
+   "boathouse",
+   "beach_cove",
+   "sea_cave"
+  ],
+  "available": {
+   "dayFrom": 20
+  },
+  "public": "Saoirse will teach anyone to read water who is willing to get up before it.",
+  "steps": [
+   "Two dawn sessions at the cove. She talks about games exactly never.",
+   "Beat or simply survive her Deepsea deck in a boathouse game played on an upturned hull; she plays for who cooks.",
+   "She takes the dinghy (its half-repainted name reads UMBRA II; she bought it from Silas for a crate of beer and has no idea) round to the west cliffs and shows the Singing Cave, her secret place: on foot only at low tide. Set sea_cave_found."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Deepsea Treasure",
+    "Deepsea Idol"
+   ],
+   "technique": "undertow",
+   "affinity": {
+    "saoirse": 5
+   },
+   "flags": [
+    "sea_cave_found"
+   ]
+  },
+  "fail": "Quote a rule at her during the hull game and she laughs and beaches the lesson for a week."
+ },
+ {
+  "id": "q_bex_top_deck",
+  "title": "The Top Deck",
+  "giver": "bex",
+  "where": [
+   "broadcast_studio",
+   "great_arena",
+   "student_lounge"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "Campus stream. Second chair. Forty credits and a sandwich. Don't say 'um'.",
+  "steps": [
+   "One colour slot (Freshman Cup or any weekly show).",
+   "Bring her one true story before anyone else has it (any found clue that is not about a named student's health).",
+   "After Day 50: the Chancellor's office 'requests' she stop covering the infirmary. Help her decide: comply on air and keep digging off air, or defy and lose studio access for two weeks."
+  ],
+  "rewards": {
+   "credits": 120,
+   "cards": [
+    "Mischief Invasion"
+   ],
+   "technique": "tape_study",
+   "affinity": {
+    "bex": 5
+   },
+   "flags": [
+    "stream_regular"
+   ]
+  },
+  "fail": "Feed her something false and she runs it; the retraction costs both of them the Chancellor's patience."
+ },
+ {
+  "id": "q_wren_ink",
+  "title": "Wrong Ink",
+  "giver": "wren",
+  "where": [
+   "design_lab",
+   "card_shop",
+   "old_print_works"
+  ],
+  "available": {
+   "dayFrom": 14
+  },
+  "public": "Wren has found something in the first prints that should not be there and needs a courier, a witness and possibly a sandwich.",
+  "steps": [
+   "Persuade Dex to lend his intact Alpha common for thirty minutes, to set beside Wren's own cracked one (he agrees if Rowan leaves his own deck as deposit or has worked a shop shift).",
+   "Hold the lamp; see the grain (c_m5_wren_ink).",
+   "Find where it was printed: the old print works. Bring back one twist of tile chips (set printworks_seen).",
+   "She grinds a pinch and prints one test square. For four seconds the lab's hologram of it casts a shadow. She will not do it again and will not let Santángel have the sample unless told to."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Tri Ad, the Puppet Mistress",
+    "Brainstorming"
+   ],
+   "technique": null,
+   "affinity": {
+    "wren": 6,
+    "chuck": 1
+   },
+   "flags": [
+    "printworks_seen",
+    "ink_understood"
+   ]
+  },
+  "fail": "If the sample reaches Santángel, Marrow's schedule moves up: the crater crates ship on Day 70 instead of 75 and the Archive theft takes two cards."
+ },
+ {
+  "id": "q_hana_floor",
+  "title": "Floor Rules",
+  "giver": "hana",
+  "where": [
+   "classroom",
+   "trial_dome",
+   "faculty_wing"
+  ],
+  "available": {
+   "dayFrom": 20
+  },
+  "public": "Ms. Kirishima needs a volunteer scorekeeper for the Trial Dome's evening block. She has also stopped wearing her wrist brace in class, and flexes the hand when she thinks nobody sees.",
+  "steps": [
+   "Keep score for three evening blocks. She is exacting; do it right.",
+   "On the third, the dome is empty afterwards: she plays one game against Rowan left-handed, and is frightening. She was nineteen when the wrist went.",
+   "After Day 40: she is the judge who signs the Dome 3 incident log. She shows the transcript (c_m3_decklist) only to a scorekeeper she trusts."
+  ],
+  "rewards": {
+   "credits": 60,
+   "cards": [
+    "Trial of Loyalty"
+   ],
+   "technique": "priority_window",
+   "affinity": {
+    "hana": 5
+   },
+   "flags": [
+    "hana_trust"
+   ]
+  },
+  "fail": "Any hint of familiarity in front of students: she is formal for a month, for both their sakes."
+ },
+ {
+  "id": "q_vivienne_audition",
+  "title": "Cold Read",
+  "giver": "vivienne",
+  "where": [
+   "broadcast_studio",
+   "theatre"
+  ],
+  "available": {
+   "dayFrom": 25
+  },
+  "public": "Ms. Laurent is putting together the desk for the North Crown friendly and has room for one student analyst who can speak in sentences.",
+  "steps": [
+   "Audition: sixty seconds on a replay, cold. She interrupts twice.",
+   "Voice lessons, two Afternoons; she flirts as punctuation and means none of it yet.",
+   "Cast the friendly on Day 68 next to her. She is under orders from the Chancellor to keep the wards out of the broadcast; whether Rowan helps her keep that line or crosses it on air decides how she regards him."
+  ],
+  "rewards": {
+   "credits": 150,
+   "cards": [
+    "Thunder Trumpet"
+   ],
+   "technique": null,
+   "affinity": {
+    "vivienne": 5
+   },
+   "flags": [
+    "friendly_caster"
+   ]
+  },
+  "fail": "Freeze on air and she covers seamlessly; no second booking this term."
+ },
+ {
+  "id": "q_camille_ward",
+  "title": "Ward B",
+  "giver": "camille",
+  "where": [
+   "infirmary",
+   "infirmary_ward"
+  ],
+  "available": {
+   "dayFrom": 41
+  },
+  "public": "The infirmary needs volunteers to sit with patients. Nurse Moreau needs to sleep.",
+  "steps": [
+   "Two volunteer shifts (Evening). Sit with Brant; notice what he does with his hands (c_m3_gives_away). (His mother arrives on the Day-44 ferry and sits in Ward B for a week.)",
+   "Bring her food from Mama's kitchen and make her eat it. She shows the chart (set camille_ally).",
+   "Bring an Alpha card onto the ward (c_m3_alpha_warm). She starts a second, private chart: one stimulus per patient.",
+   "From Day 67: help her resist the order to ship the Hollowed to the mainland (if they leave the island they cannot be restored there — the antes are paid on the island). She needs one ally among the staff: Hana, Ashdown or Coach Rox."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Liquid Luck"
+   ],
+   "technique": "box_breath",
+   "affinity": {
+    "camille": 7
+   },
+   "flags": [
+    "camille_ally",
+    "ward_stays"
+   ]
+  },
+  "fail": "Without ward_stays the Hollowed are shipped out on Day 172 with the board's 'medical transfer'; anyone restored later wakes on the mainland days after, confused, and the scene of the wards emptying is lost."
+ },
+ {
+  "id": "q_mika_cardinals",
+  "title": "Four Corners",
+  "giver": "mika",
+  "where": [
+   "card_shop",
+   "night_market",
+   "pawn_shop",
+   "arcade"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Mika is completing a display set of the four Cardinal Beasts for the shop window and keeps putting three of them aside 'for someone'.",
+  "steps": [
+   "Cardinal Beast Baihu: prize of the arcade's ticket counter (800 tickets or beat the high score).",
+   "Cardinal Beast Qinglong: in Tomi's binder; he wants a fair trade and knows what fair is.",
+   "Cardinal Beast Xuanwu: a fisherman at the fish market uses it as a bookmark in his tide tables.",
+   "Cardinal Beast Zhuque: Mika has had it all along. She hands it over when the other three are on the counter."
+  ],
+  "rewards": {
+   "credits": 100,
+   "cards": [
+    "Cardinal Beast Zhuque",
+    "Luck"
+   ],
+   "technique": null,
+   "affinity": {
+    "mika": 6,
+    "dex": 2
+   },
+   "flags": [
+    "cardinals_done"
+   ]
+  },
+  "fail": "None; but the Xuanwu is sold to a tourist on Day 100 if not collected (then only three corners; half reward, Mika still smiles)."
+ },
+ {
+  "id": "q_dex_shop",
+  "title": "Sleeve & Binder",
+  "giver": "dex",
+  "where": [
+   "card_shop"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Dex pays 25 cr a shift to sort bulk and does not pay for opinions.",
+  "steps": [
+   "Four Saturday shifts.",
+   "Catch a mis-sorted rare in the bulk bin and put it on the counter instead of in a pocket.",
+   "He shows the Alpha ledger (c_m5_dex_price) and, once, puts one in Rowan's hand (c_m5_warm)."
+  ],
+  "rewards": {
+   "credits": 100,
+   "cards": [
+    "Treasure Skeleton"
+   ],
+   "technique": null,
+   "affinity": {
+    "dex": 4,
+    "mika": 2
+   },
+   "flags": [
+    "shop_job"
+   ]
+  },
+  "fail": "Pocket the rare and Mika sees; she says nothing, and never saves a card for him again."
+ },
+ {
+  "id": "q_josie_jacket",
+  "title": "Last Orders",
+  "giver": "josie",
+  "where": [
+   "bar",
+   "harbor"
+  ],
+  "available": {
+   "dayFrom": 20
+  },
+  "public": "The Mulligan needs glasses collected on market nights. The owner used to be a student and does not talk about it.",
+  "steps": [
+   "Three Evening shifts washing glasses (22 cr each).",
+   "Notice the jacket with the smoke-grey collar behind the bottles; do not ask on the same night.",
+   "Walk her to the end of the harbour wall after closing; she tells it (set josie_confided; c_m6_josie_night) — not before Day 50 by default, unless Rowan arrives with something from room 9.",
+   "Later, bring her a truth in return — the pages, or the Trespasser tile. She closes the bar for a night for the first time in six years."
+  ],
+  "rewards": {
+   "credits": 66,
+   "cards": [
+    "Dark Ocean"
+   ],
+   "technique": null,
+   "affinity": {
+    "josie": 6
+   },
+   "flags": [
+    "josie_confided"
+   ]
+  },
+  "fail": "Push on the first night and she bars the subject for a month."
+ },
+ {
+  "id": "q_selene_springs",
+  "title": "What the Steam Hears",
+  "giver": "selene",
+  "where": [
+   "spa",
+   "hot_springs"
+  ],
+  "available": {
+   "dayFrom": 15
+  },
+  "public": "The spa needs towels carried up to the springs at closing. The attendant is very good company and knows it.",
+  "steps": [
+   "Two closing shifts (16 cr each).",
+   "An hour in the upper spring after hours; she teases, asks one precise question about Rowan and waits for the true answer.",
+   "From Day 64: she repeats what the grey suit says in the steam (c_m7_selene), in exchange for Rowan warning her if it is dangerous to know."
+  ],
+  "rewards": {
+   "credits": 32,
+   "cards": [
+    "Heart of the Mountain"
+   ],
+   "technique": null,
+   "affinity": {
+    "selene": 5
+   },
+   "flags": [
+    "selene_ears"
+   ]
+  },
+  "fail": "Repeat her gossip with her name on it and the steam goes quiet."
+ },
+ {
+  "id": "q_isolde_honour",
+  "title": "Guest Right",
+  "giver": "isolde",
+  "where": [
+   "great_arena",
+   "inn",
+   "harbor"
+  ],
+  "available": {
+   "dayFrom": 68,
+   "dayTo": 168
+  },
+  "public": "North Crown's captain is on the island twice this year. She keeps a list of opponents worth remembering. It is short.",
+  "steps": [
+   "Day 68: play her or Rex in the friendly's open side-event. Win or lose with manners.",
+   "Walk the harbour with her that evening: she asks what is wrong with this island's birds.",
+   "Days 166–167: answer her offer honestly (hook). Tell her the rules. If told, she does not let Rex mouth off (rex_saved) and offers to stand as second at the Gate."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Skeleton Death Knight",
+    "Skeleton Bard"
+   ],
+   "technique": null,
+   "affinity": {
+    "isolde": 6
+   },
+   "flags": [
+    "isolde_ally",
+    "rex_saved"
+   ]
+  },
+  "fail": "Lie to her about the wards and she finds out from Rex's empty eyes."
+ },
+ {
+  "id": "q_marit_revue",
+  "title": "The Phoenix Revue",
+  "giver": "marit",
+  "where": [
+   "theatre",
+   "festival_grounds",
+   "rare_common_room"
+  ],
+  "available": {
+   "dayFrom": 30,
+   "dayTo": 54
+  },
+  "public": "Marit Solberg's Night of Masks revue has one role uncast: 'a young man who stands still and suffers beautifully'.",
+  "steps": [
+   "Audition (stand still; suffer). She casts on the spot.",
+   "Three rehearsals. She directs like weather. The role has four lines and a death.",
+   "Day 54: perform. Stage fright is real: this is a Nerve test, and passing it permanently helps at the table.",
+   "Afterwards on the theatre roof she is, for ninety seconds, completely quiet, and says thank you without gestures."
+  ],
+  "rewards": {
+   "credits": 30,
+   "cards": [
+    "Cute Phoenix",
+    "Cute Crown"
+   ],
+   "technique": "table_hands",
+   "affinity": {
+    "marit": 7
+   },
+   "flags": [
+    "revue_done"
+   ]
+  },
+  "fail": "Miss two rehearsals: Ashton gets the part and the rose."
+ },
+ {
+  "id": "q_marit_lantern",
+  "title": "A Play for Empty Beds",
+  "giver": "marit",
+  "where": [
+   "theatre",
+   "infirmary_ward",
+   "festival_grounds"
+  ],
+  "available": {
+   "dayFrom": 120,
+   "dayTo": 139,
+   "notFlags": [
+    "marit_hollowed"
+   ]
+  },
+  "public": "Marit wants to put on something for Lantern Night that is not a comedy, and the Chancellor's office has said no.",
+  "steps": [
+   "Read her script: twelve chairs, a name on each. It is about the ward and it is good.",
+   "Get it permitted (Teobalt's network, Octavia's signature or Vivienne's cover as a 'media project').",
+   "Day 139: light the lanterns. '{H}' attends, sits in the front row, and afterwards asks Marit — sincerely — which chair was {H:his}. She does not understand the question. The player might."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Heart-Shaped Bow, the Final Proof of Cuteness"
+   ],
+   "technique": null,
+   "affinity": {
+    "marit": 5,
+    "camille": 2,
+    "teobalt": 1
+   },
+   "flags": [
+    "lantern_play"
+   ]
+  },
+  "fail": "Unpermitted, she stages it anyway and takes a formal warning."
+ },
+ {
+  "id": "q_chuck_assignment",
+  "title": "Draw What You Remember",
+  "giver": "chuck",
+  "where": [
+   "lecture_hall",
+   "chuck_workshop",
+   "design_lab"
+  ],
+  "available": {
+   "dayFrom": 3
+  },
+  "public": "Card Design 101, first assignment: 'Design me a hero you have never seen. Extra credit if I have.'",
+  "steps": [
+   "Hand in any design. Chuck reads it like a letter from home.",
+   "Office hours in the workshop: he tells the story of the hero 'behind' the design (c_m4_story_detail), and catches himself.",
+   "From Day 20: tidy the top shelf for him (c_m4_notebook). He watches Rowan find the notebooks and does not stop him.",
+   "He tells the whole truth only late: not before Day 150 by default, and then only to Inya and Rowan together (needs inya_equal) — or at any time after Rowan describes to him the young sailor on the antechamber wall (c_m4_castaway), the one thing no one living could know. Hearing him out sets chuck_confided: all of M4."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Tarleinn's Floating Island",
+    "Champion, the Stormbringer"
+   ],
+   "technique": "designers_eye",
+   "affinity": {
+    "chuck": 6,
+    "inya": 1
+   },
+   "flags": [
+    "chuck_confided"
+   ]
+  },
+  "fail": "Tell anyone else what he confided before he does: he closes the workshop to Rowan until the Festival."
+ },
+ {
+  "id": "q_ashdown_survey",
+  "title": "Surface Survey",
+  "giver": "ashdown",
+  "where": [
+   "ruins_field",
+   "jungle_trail",
+   "classroom"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "Lore & History field credit: record three surface mosaics. Bring water. Stay on the marked path.",
+  "steps": [
+   "Record the traveller (c_m4_mosaic_match), the game scene (c_m8_mosaic_third) and one of the player's choice.",
+   "Hand in honest notes, including what looks impossible. She grades it A and asks him to stay behind.",
+   "Do not stay on the marked path: beyond the last flag the trail runs on to the Gate. If Rowan reports having seen it, she goes very still and asks who showed him. Set gate_found.",
+   "With pages_found or gate_found plus her trust: she tells her part (set ashdown_confided; c_m6_ashdown_card)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Ancient Guardian Statue"
+   ],
+   "technique": null,
+   "affinity": {
+    "ashdown": 5
+   },
+   "flags": [
+    "ashdown_confided",
+    "gate_found"
+   ]
+  },
+  "fail": "Falsify the notes and she fails the assignment (counts toward the Lore grade)."
+ },
+ {
+  "id": "q_lighthouse_lamp",
+  "title": "The Lamp",
+  "giver": "silas",
+  "where": [
+   "lighthouse",
+   "cliff_path",
+   "umbra_house"
+  ],
+  "available": {
+   "dayFrom": 8
+  },
+  "public": "The lighthouse lens wants cleaning and the keeper's knee does not like the stairs any more.",
+  "steps": [
+   "Carry paraffin and rags up the iron stair; polish the lens (one Afternoon). Or offer to carry the oil can when he winds the clock tower on a Sunday.",
+   "Read the keeper's log while he makes tea so strong the spoon stands up (c_m4_silas_log). He lets him.",
+   "Help him oil the locks at Umbra House — from the outside (c_m6_no_damage, c_m6_silas_keys).",
+   "He gives key 9 only to someone who has never lied to him, says truthfully why they want it AND has Viktor's trust or Ashdown's. Set silas_keys. 'He was a decent man. He tipped his hat to the building.'",
+   "The black stone key he gives only in extremity — when he is told, and believes, that someone means to play at the board under the mountain. Set stone_key. 'Found it in my boat the day after I took him off. Fifty years I've wondered what I was minding it for.'"
+  ],
+  "rewards": {
+   "credits": 30,
+   "cards": [
+    "Friendship"
+   ],
+   "technique": null,
+   "affinity": {
+    "silas": 6
+   },
+   "flags": [
+    "silas_keys",
+    "stone_key"
+   ]
+  },
+  "fail": "Take a key from the ring without asking: it works, once. He changes the lock the next day and never makes Rowan tea again."
+ },
+ {
+  "id": "q_crater_first",
+  "title": "Before the Tape",
+  "giver": null,
+  "where": [
+   "jungle_trail",
+   "rope_bridge",
+   "crater"
+  ],
+  "available": {
+   "dayFrom": 27,
+   "dayTo": 28
+  },
+  "public": "Something came down on the north slope. Everyone is going to look. The school will close it soon.",
+  "steps": [
+   "Three hours' hike each way: costs two slots out and two back (a full day).",
+   "Reach the rim. Set saw_crater. The glass is warm; the air above it is cold.",
+   "Read the tracks in the ash and walk out onto the glass (c_m2_bootprint). There is no rock, no metal, nothing that made this.",
+   "On the way back, the forest on the north slope has no insect noise for the last kilometre."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Meteor Crash"
+   ],
+   "technique": null,
+   "affinity": {
+    "bex": 1
+   },
+   "flags": [
+    "saw_crater"
+   ]
+  },
+  "fail": "From Day 29 the cordon is up (tape, proctors at the rope bridge): reaching the crater then means going at night, round by the north shore, or with Viktor, and breaks school rules (curfew_broken if caught: one in three, lower with Viktor). From Day 61 Marrow's field staff camp on the site."
+ },
+ {
+  "id": "q_print_works",
+  "title": "K.A.",
+  "giver": null,
+  "where": [
+   "old_print_works",
+   "cliff_path"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "There is a ruined building on the east shore that is on no campus map.",
+  "steps": [
+   "Find it: Viktor, Silas, Chuck or Wren can mention it; an hour and a half east along the overgrown plantation tramway.",
+   "Search the ink room and the yard (c_m5_printworks). Set printworks_seen. The drifts of uncut sheets on the press floor are from a later, ordinary set — pretty, worthless.",
+   "Under the collapsed drying rack: one half-sheet of true first-print rejects, nine cards, all miscut. One of the nine is Tarleinn the Traveler, warm. Cutting it free sets has_alpha_card and alpha_tarleinn (damaged first prints still open the Gate).",
+   "Optional: take the dockets off the spike and move the sealed jar (to Wren, Chuck or the lighthouse) so that Marrow's people find nothing: set printworks_hidden."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Tarleinn the Traveler"
+   ],
+   "technique": null,
+   "affinity": {},
+   "flags": [
+    "printworks_seen",
+    "has_alpha_card",
+    "alpha_tarleinn"
+   ]
+  },
+  "fail": "About Day 80 Marrow's people find the works by following old supply invoices and take the jar and the dockets (unless printworks_hidden); the reject sheet, overlooked under the rack, is still there until Day 150, when the building is fenced and guarded."
+ },
+ {
+  "id": "q_radio_tower",
+  "title": "Dead Air",
+  "giver": null,
+  "where": [
+   "radio_tower"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "The relay mast on the north-west ridge beyond Umbra House is the island's only link out besides the ferry.",
+  "steps": [
+   "Climb to it. The hut is padlocked; the hasp is loose (Bex knows), or Silas has the key.",
+   "Before Day 27 the monitor speaker gives The Top Deck, ship traffic and static. From Day 31, tune slowly toward the top of the dial at dusk (set radio_heard; c_m1_radio).",
+   "If Rowan TRANSMITS on that frequency with the hand-cranked set, something on the Commons beach turns its head; that night it asks him, interested and unoffended, 'Was that you, calling? You may simply speak. I am four metres away.'",
+   "From Day 41 the student uplink is 'under maintenance' on the Chancellor's order; Bex and Teobalt can restore it at the patch panel (needed for an uncensored broadcast)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Future Tech Copy Device"
+   ],
+   "technique": null,
+   "affinity": {
+    "bex": 1
+   },
+   "flags": [
+    "radio_heard"
+   ]
+  },
+  "fail": "None."
+ },
+ {
+  "id": "q_islet",
+  "title": "Gull Rock",
+  "giver": null,
+  "where": [
+   "islet",
+   "boathouse"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "There is a hump of rock and salt grass a quarter-mile off the south-west point, with a ruined hut on it.",
+  "steps": [
+   "Get there: Saoirse's dinghy, a boathouse kayak in calm weather (needs the swim test), or Silas rowing for a favour. Set islet_seen.",
+   "The ruined hut and what is scratched by the bunk (c_m6_islet_hut).",
+   "From about Day 34: the birds (c_m1_islet_birds). The seals do not mind visitors. It is the one place on the map that feels safe."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Deepsea Skeleton"
+   ],
+   "technique": null,
+   "affinity": {},
+   "flags": [
+    "islet_seen"
+   ]
+  },
+  "fail": "Kayaking without the swim test: capsized, rescued by Sunny or Stroud, a day lost in the infirmary."
+ },
+ {
+  "id": "q_sea_cave",
+  "title": "Low Water",
+  "giver": null,
+  "where": [
+   "sea_cave",
+   "cliff_path",
+   "lava_tubes"
+  ],
+  "available": {
+   "dayFrom": 6,
+   "flags": [
+    "sea_cave_found"
+   ]
+  },
+  "public": "The Singing Cave under the west cliffs can be entered on foot for a little while at low tide.",
+  "steps": [
+   "Enter at low water (by the iron rungs off the cliff path, or by kayak at mid-tide). Listen to it sing its two notes. (After Day 27 both are a semitone lower.)",
+   "The dry chamber's back wall (c_m8_sea_spiral). From Day 36 the player may notice that the blue-black, star-flecked stone of the spiral is the frame of the strange cards in '{H}'s' deck.",
+   "Above the back wall a natural shaft climbs, with ropes, into the lowest lava tubes: a way onto the mountain that passes no cordon. Set tube_route.",
+   "Mind the tide: getting it wrong means a wet, cold, dangerous hour on the shelf."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Gathering Storm"
+   ],
+   "technique": null,
+   "affinity": {
+    "saoirse": 1
+   },
+   "flags": [
+    "tube_route"
+   ]
+  },
+  "fail": "Caught by the tide alone: an hour on the shelf, a chill, the next slot lost. From Day 67 the cave is off limits after the Afternoon slot (curfew applies)."
+ },
+ {
+  "id": "q_north_shore",
+  "title": "Seventy-Seven",
+  "giver": null,
+  "where": [
+   "north_shore",
+   "boathouse"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "They say the Founder was wrecked on the north shore. The ribs of a boat are still there.",
+  "steps": [
+   "Get there: the long way on foot before Day 29, afterwards by boat with Saoirse or Silas (it counts as the closed north slope).",
+   "The wreck, the cave, the tally and the drawings (c_m4_shore_camp).",
+   "The cairn and the tobacco tin: fifty years of cards, one a year, for the crew who drowned. The bottom few are first prints. LEAVE THEM: taking one sets has_alpha_card and is grave-robbing — Chuck knows within the week and never speaks of it, which is worse than if he did.",
+   "From Day 27 an hour's climb from here reaches the crater from behind the cordon."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Deepsea Pirate"
+   ],
+   "technique": null,
+   "affinity": {
+    "chuck": 1
+   },
+   "flags": [
+    "north_shore_seen"
+   ]
+  },
+  "fail": "From Day 62 Marrow's grey launch lands equipment here; being seen by his field staff is reported to the school as a cordon breach."
+ },
+ {
+  "id": "q_summit_shrine",
+  "title": "The Top of the Mountain",
+  "giver": null,
+  "where": [
+   "volcano_rim",
+   "summit_shrine"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "There is something built on the very top of the mountain. It is a long way up.",
+  "steps": [
+   "A full-day climb by the rim trail (leave at Morning, back at Night).",
+   "The shrine and its block (c_m8_shrine_stars). Set shrine_seen. Others have left offerings: a coin, a card, a smoke-grey ribbon.",
+   "From Day 27: the tile has moved (c_m8_shrine_tile); looking straight down the north slope, the crater, like a pupil.",
+   "GM: a Charter challenge spoken aloud with a hand on this block is heard by the Guest wherever it is (see GUEST.finale.summons)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Shooting Star"
+   ],
+   "technique": null,
+   "affinity": {},
+   "flags": [
+    "shrine_seen"
+   ]
+  },
+  "fail": "From Day 29 the rim is beyond the cordon (the eastern rim path from the lava-tube shoulder is unwatched); after Day 67 it also means returning after curfew."
+ },
+ {
+  "id": "q_lava_tubes",
+  "title": "Under the Ridge",
+  "giver": null,
+  "where": [
+   "maintenance_tunnels",
+   "lava_tubes",
+   "ruin_gate"
+  ],
+  "available": {
+   "dayFrom": 30
+  },
+  "public": "The maintenance tunnels under campus go further than the plans say.",
+  "steps": [
+   "Enter by the boiler room (Teobalt's petition work or Silas's errands give a reason to be there).",
+   "Past the lab's waste chute (c_m7_lab_ash) the brick gives way to fitted black stone with small square recesses, and then to natural rock: the lava tubes. (Or come up the shaft from the sea cave; or tag along on the Outdoor Club trip of Day 38, as Viktor does.)",
+   "Chalk-arrow the route; one branch surfaces behind the ruins field, inside the cordon line, a short climb from the Ruin Gate (set gate_found, tube_route). This is the way to the Gate under curfew.",
+   "Another branch: the old arrows and the rockfall (c_m4_crack). Sleeping a night beside the warm draught gives a tile-dream — one true scene from the life of a hero in Rowan's own deck — set tile_dreamed and off_book.",
+   "A week of digging with tools (seven Night slots; Viktor halves it) reopens Chuck's crack: a way into the antechamber that needs no card (set vault_entered). The Guest may not use it: nobody has opened it FOR it."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Heart of the Mountain"
+   ],
+   "technique": null,
+   "affinity": {
+    "viktor": 1
+   },
+   "flags": [
+    "gate_found",
+    "tube_route"
+   ]
+  },
+  "fail": "Without chalk or a guide: bad air and a real chance of getting lost — a day gone, reported absent, formal warning. From about Day 120 Marrow's engineers are digging at the same rockfall by day."
+ },
+ {
+  "id": "q_umbra_room9",
+  "title": "Room Nine",
+  "giver": null,
+  "where": [
+   "umbra_house",
+   "umbra_room9"
+  ],
+  "available": {
+   "dayFrom": 8,
+   "flags": [
+    "umbra_entered"
+   ]
+  },
+  "public": "One door in the closed dorm has its own lock.",
+  "steps": [
+   "See the door (c_m6_room9_lock).",
+   "Open it with key 9 (silas_keys) or lift it off its hinges.",
+   "The study: the pinned map (thread from campus to the ruins field to a point inside the mountain — the first reliable route to the Gate; set gate_found), the child's drawing, the camp bed, the wardrobe with a housemaster's black jacket, smoke-grey collar.",
+   "From Day 45, or earlier on Ashdown's hint: the lamp (c_m6_pages; set pages_found).",
+   "On the window sill, in the dust, the prints of two elbows: someone has been coming here to look out. (Silas. He says the professor liked the view to be used.)"
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "The Master's Key"
+   ],
+   "technique": null,
+   "affinity": {
+    "viktor": 2
+   },
+   "flags": [
+    "pages_found",
+    "gate_found"
+   ]
+  },
+  "fail": "Being caught inside Umbra House is a hearing before the Chancellor (formal warning)."
+ },
+ {
+  "id": "q_col_storm",
+  "title": "Gather That Storm",
+  "giver": "dex",
+  "where": [
+   "card_shop",
+   "night_market",
+   "campus_store",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Dex: 'A storm deck without the Ring, the Blade and the Piano is a drizzle.' Three cards, three owners.",
+  "steps": [
+   "Storm Ring: campus_store prize wall, 150 cr or ten ladder wins in a week.",
+   "The Stormblade: a Rare Hall third-year stakes it in casual games on the terraces; win it.",
+   "Storm Piano: a night-market stall, 90 cr, or the octopus-ball seller will trade it for a full evening minding his grill."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Storm Ring",
+    "The Stormblade",
+    "Storm Piano"
+   ],
+   "technique": null,
+   "affinity": {
+    "dex": 1
+   },
+   "flags": [
+    "storm_complete"
+   ]
+  },
+  "fail": "None; the Stormblade's owner graduates out of reach on Day 208."
+ },
+ {
+  "id": "q_col_moons",
+  "title": "Five Moons",
+  "giver": "oru",
+  "where": [
+   "night_market",
+   "old_observatory",
+   "hot_springs",
+   "lighthouse",
+   "beach_cove"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Madame Oru will read a second spread for anyone who brings her the five moons. She does not say which moons.",
+  "steps": [
+   "Lunatic Cycle - New Moon: left in the old observatory's logbook by a former student.",
+   "Lunatic Cycle - Crescent Moon: Selene wears it in a locket; she lends it for a truth.",
+   "Lunatic Cycle - Half Moon: lighthouse, tucked in the lens housing (Silas: 'that's been there since the Umbra lot').",
+   "Lunatic Cycle - Gibbous Moon: beach cove, in a bottle, on the night of a spring tide.",
+   "Lunatic Cycle - Full Moon: the octopus-ball seller next to her tent has it for 60 cr; he has no idea.",
+   "Lay them on her cloth on a market night. The second reading (set oru_reading_2): 'A polite guest. It will take only what is offered. Offer nothing you cannot name.' Before Day 27 she gives instead: 'Come back when your room has changed.'"
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Lunar Eclipse"
+   ],
+   "technique": null,
+   "affinity": {
+    "oru": 4,
+    "selene": 1
+   },
+   "flags": [
+    "oru_reading_2"
+   ]
+  },
+  "fail": "None. (The free second reading from the hook also sets oru_reading_2; the moons then earn the Eclipse and her respect.)"
+ },
+ {
+  "id": "q_col_cosmic",
+  "title": "No Set Symbol",
+  "giver": "tomi",
+  "where": [
+   "commons_room",
+   "duel_terraces",
+   "trial_dome",
+   "card_shop"
+  ],
+  "available": {
+   "dayFrom": 36
+  },
+  "public": "Somebody on the Commons row is playing cards that are not in any catalogue. Tomi (or Mika) wants a list. Just the names.",
+  "steps": [
+   "Watch or play '{H}' until seven names are written down: The Cosmic Depths, Arrival from the Cosmic Depths, Gatherer from the Cosmic Depths, Life-Searcher from the Cosmic Depths, Cosmic Manipulation, Cosmic Malfunction, and the hero Argos, the Eye of the Cosmos. One or two appear per week from Day 36; Argos not before Day 76.",
+   "Each name recorded lets the game master describe that card's tell honestly in later duels against the Guest.",
+   "Show the list to Mika or Dex: no print run, no artist credit, and the card backs are warm in a different way from Alpha — cold-warm, like metal after sun."
+  ],
+  "rewards": {
+   "credits": 60,
+   "cards": [],
+   "technique": null,
+   "affinity": {
+    "tomi": 2,
+    "mika": 2
+   },
+   "flags": [
+    "cosmic_catalogued"
+   ]
+  },
+  "fail": "If Tomi is Hollowed (Day 66) the list passes to Mika. Asking '{H}' for the cards as a gift: {H:he} gives one, gladly — it is blank by morning."
+ },
+ {
+  "id": "q_col_alpha",
+  "title": "First Prints at Large",
+  "giver": "wren",
+  "where": [
+   "card_archive",
+   "pawn_shop",
+   "lighthouse",
+   "old_print_works",
+   "faculty_wing"
+  ],
+  "available": {
+   "dayFrom": 30,
+   "flags": [
+    "ink_understood"
+   ]
+  },
+  "public": "Wren wants to know where every first print on the island is. Not to own them. To know they are all right.",
+  "steps": [
+   "Archive: 22 (from Day 73: 21 and a reprint).",
+   "Chuck's pile and sea-chest: 'about sixty'; he lets Wren count if Rowan is there: 58.",
+   "Loose: the pawn shop's Treasure Chest (2,500 cr, or beat the pawnbroker in a wager duel — he is a townsman and not bound by the Charter, but he is a gambling man and pays; set alpha_pawn_bought and has_alpha_card), Silas's Friendship, Lilia's Thorad, Ashdown's Master's Key, the print-works rejects, the cairn tin.",
+   "Tell Wren which are in danger. She moves the Archive's to Chuck's sea-chest if warned before the night of Day 72 (set archive_theft_prevented)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Treasure Chest"
+   ],
+   "technique": null,
+   "affinity": {
+    "wren": 4,
+    "chuck": 2
+   },
+   "flags": [
+    "archive_theft_prevented"
+   ]
+  },
+  "fail": "Each card Marrow obtains (pawn, Archive) feeds Santángel's 'reconstitution'; with the print-works jar as well, his 'living hologram' prototype works in front of the Interschool Cup crowd on Day 168."
+ },
+ {
+  "id": "q_freshman_cup",
+  "title": "Freshman Cup",
+  "giver": "rox",
+  "where": [
+   "great_arena"
+  ],
+  "available": {
+   "dayFrom": 12,
+   "dayTo": 20
+  },
+  "public": "All 36 first-years: four Swiss rounds on Day 19, top 8 on the big stage on Day 20, on stream. Prize 400 cr and a line on the arena wall.",
+  "steps": [
+   "Register by Day 18.",
+   "Day 19: four Swiss rounds against named classmates (the game master picks from the roster by standing: early rounds Leona, Sammy, Trixie or Mikoto; later Eberhart, Fiona, Magnus, Noor). The first round is a Nerve test before it is a duel.",
+   "Day 20: quarter-final, semi-final, final on the arena stage. Default top 8 and bracket: see t_cup_named and t_cup_final; Rowan, if he qualifies, takes Ashton's place."
+  ],
+  "rewards": {
+   "credits": 400,
+   "cards": [
+    "Unwarranted Burst of Courage"
+   ],
+   "technique": "table_hands",
+   "affinity": {
+    "rox": 1,
+    "lilia": 1
+   },
+   "flags": [
+    "freshman_cup_won"
+   ]
+  },
+  "fail": "Losing is not failure: any win on stage still counts toward table_hands (ten physical duels in front of witnesses). Not registering costs standing with Coach Rox."
+ },
+ {
+  "id": "q_tryouts",
+  "title": "One Reserve Slot",
+  "giver": "rox",
+  "where": [
+   "great_arena",
+   "gym"
+  ],
+  "available": {
+   "dayFrom": 28,
+   "dayTo": 33
+  },
+  "public": "Battle Team open tryouts, Day 33. One reserve slot. Conditioning in the morning, three rounds in the afternoon.",
+  "steps": [
+   "Morning: Coach Rox's circuit (pass with any prior gym or swim work, otherwise scrape).",
+   "Three rounds against other candidates; then one game against a starter chosen by Lilia (Dom).",
+   "Selection is announced on Day 34: Rowan needs two round wins and a respectable loss to Dom, and must outrank Gideon on the day."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Cool Rescue"
+   ],
+   "technique": null,
+   "affinity": {
+    "rox": 3,
+    "lilia": 1,
+    "dom": 1,
+    "priya": 1
+   },
+   "flags": [
+    "team_reserve"
+   ]
+  },
+  "fail": "Default: Gideon gets the slot (or Georgie, if q_georgie_reserve was done — then neither Rowan nor Gideon)."
+ },
+ {
+  "id": "q_design_contest",
+  "title": "The Marrow Prize",
+  "giver": "wren",
+  "where": [
+   "design_lab",
+   "job_board"
+  ],
+  "available": {
+   "dayFrom": 61,
+   "dayTo": 75
+  },
+  "public": "Open Design Contest: one original card with a full rules text. 5,000 cr. Sponsored by the Kaboom Entertainment Board.",
+  "steps": [
+   "Enter alone (needs three design sessions and a playtester) or support Livvie's entry (see her quest); not both — entries are single-author and Livvie will withdraw if she learns Rowan is competing against her for the money.",
+   "Submit by Day 75 at the design lab.",
+   "Day 82 results. Marrow presents the cheque himself and asks the winner, lightly, what they would do with 'an ink that remembers'."
+  ],
+  "rewards": {
+   "credits": 5000,
+   "cards": [
+    "Blueprints"
+   ],
+   "technique": null,
+   "affinity": {
+    "wren": 1,
+    "chuck": 1
+   },
+   "flags": [
+    "design_contest_won"
+   ]
+  },
+  "fail": "Entering against Livvie without telling her: −4 livvie. Default result: Wren first, Livvie second."
+ },
+ {
+  "id": "q_ladder",
+  "title": "The Ladder",
+  "giver": null,
+  "where": [
+   "trial_dome",
+   "duel_terraces",
+   "job_board"
+  ],
+  "available": {
+   "dayFrom": 12
+  },
+  "public": "Rank ~128 of 144. The sheet is printed fresh every Monday.",
+  "steps": [
+   "Top 90: any five ranked wins.",
+   "Top 30 by the end of Season 1 (Day 105).",
+   "Top 8 at any Season 2 cut date (Days 123, 165, 193): set ladder_top8; qualifies for the Island Open main draw and the Interschool side bracket."
+  ],
+  "rewards": {
+   "credits": 200,
+   "cards": [
+    "The Final Trial"
+   ],
+   "technique": "zugzwang",
+   "affinity": {
+    "lilia": 1,
+    "kenji": 1
+   },
+   "flags": [
+    "ladder_top8"
+   ]
+  },
+  "fail": "None; rank decays if no ranked game is played for seven days."
+ },
+ {
+  "id": "q_island_open",
+  "title": "The Island Open",
+  "giver": "hana",
+  "where": [
+   "great_arena",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 110,
+   "dayTo": 126
+  },
+  "public": "Sanctioned. Open to students, staff, town and visitors. Days 124–126. Prizes 6,000 / 3,000 / 1,500 cr.",
+  "steps": [
+   "Register by Day 123 (free in the top 8, otherwise a qualifier on Day 123 Evening).",
+   "Day 124 (Friday): Swiss rounds 1–4. Day 125 (Saturday): Swiss rounds 5–7, the top 8 read out at 13:15. Day 126 (Sunday), on the arena stage: quarter-finals 12:00, semi-finals 13:20, final 14:35, prize-giving 15:40.",
+   "Default without the player: '{H}' (or the gloved host) wins the Open, beating Dom in the final without an ante — it names none in sanctioned play. Second Dom, third Saoirse. Rana makes the top 8 on Saturday and goes out in her quarter-final on Sunday at match point; Livvie out in Swiss.",
+   "If Rowan meets the Guest here it is an ordinary game: flawless opponent, no cold. Beating it in a sanctioned game sets worthy_rival."
+  ],
+  "rewards": {
+   "credits": 6000,
+   "cards": [
+    "Glorious Rebirth"
+   ],
+   "technique": null,
+   "affinity": {
+    "hana": 1,
+    "lilia": 2
+   },
+   "flags": [
+    "open_won"
+   ]
+  },
+  "fail": "Placings pay as listed; a top-3 finish also counts for q_livvie_9000 if staked as a team."
+ },
+ {
+  "id": "q_promotion",
+  "title": "Promotion Duels",
+  "giver": "rox",
+  "where": [
+   "great_arena",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 82,
+   "dayTo": 91
+  },
+  "public": "Days 89–91: beat a designated Rare Hall student and trade collars. Or don't.",
+  "steps": [
+   "Qualify: ladder top 72.",
+   "Win the designated duel (opponent: a Rare Hall second-year on a Future Tech list; if Kenji likes Rowan he coaches the matchup).",
+   "Choose: move to Rare Hall (more stipend: 180 cr/week; leaves the bungalow — the Guest asks, very carefully, whether '{H:mate}' can live in a different building) or decline and stay in the Commons, which takes a petition Mama Odalys countersigns (she cries into the rice)."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Future Tech Copy Device"
+   ],
+   "technique": null,
+   "affinity": {
+    "odalys": 1
+   },
+   "flags": [
+    "promotion_won"
+   ]
+  },
+  "fail": "Losing has no penalty. NOTE: '{H}' wins {H:his} promotion duel in six turns and declines the bed: 'I have a {H:mate}.'"
+ },
+ {
+  "id": "q_one_ante",
+  "title": "Play Me For It",
+  "giver": null,
+  "where": [
+   "hollow_field",
+   "trial_dome",
+   "infirmary_ward"
+  ],
+  "available": {
+   "dayFrom": 41,
+   "flags": [
+    "guest_suspected"
+   ]
+  },
+  "public": "Somebody on Ward B lost something in a game. Games can be replayed.",
+  "steps": [
+   "Learn one ante's exact wording (a witness, a note, or the Guest's own list).",
+   "Challenge aloud, by name, before a witness: '…for what Brant Kessler called his.' The Guest brightens: somebody asked. It requires an ante of equal weight, 'judged by the one who must give it'. It will accept a true part of Rowan (a memory he names, his handle, his stage fright — it will warn him, honestly, that it would have to keep it).",
+   "The Hollow Duel (see GUEST.rules; the engine records hollow_duel_won or hollow_duel_lost). At Stage B–C its deck is beatable with preparation, an Alpha card in the list, and one off-book line.",
+   "If won: the Guest pays at once. The patient wakes within the hour, hoarse, and remembers everything."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [],
+   "technique": null,
+   "affinity": {
+    "camille": 3
+   },
+   "flags": [
+    "hollowed_one_restored",
+    "rowan_challenged_guest",
+    "worthy_rival"
+   ]
+  },
+  "fail": "Losing (hollow_duel_lost) Hollows Rowan (ending e_hollowed) unless a champion bound to him stands ready under Article 5 and wins his ante back within three days: possible only for a romance partner or friend at high affinity who has charter_studied explained to them. Otherwise the game ends."
+ },
+ {
+  "id": "q_marrow_expose",
+  "title": "Grey Suit",
+  "giver": null,
+  "where": [
+   "chancellor_office",
+   "council_room",
+   "broadcast_studio",
+   "faculty_wing"
+  ],
+  "available": {
+   "dayFrom": 72
+  },
+  "public": "A great deal of money is moving around the school in one direction.",
+  "steps": [
+   "Evidence, any three of: lab ash, Santángel's ledger, the Archive log and thread (or the reprint), Selene's account, Livvie's card, the crates, the long crate in the stable, the board letter.",
+   "A voice: Santángel confessing (he does if shown the ash AND asked what he would tell his younger self), or Gideon turning (he does if shown that Marrow's fund has already called in his father's note — Octavia can find that — set gideon_turned), or the Chancellor choosing to tell the Umbra truth herself (okonkwo_ally).",
+   "A stage before Day 170: The Top Deck, the council, or the Founder himself. Set marrow_exposed."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "War Chest"
+   ],
+   "technique": null,
+   "affinity": {
+    "okonkwo": 4,
+    "octavia": 2,
+    "bex": 2
+   },
+   "flags": [
+    "marrow_exposed"
+   ]
+  },
+  "fail": "Go public with fewer than three pieces and no voice: Marrow's lawyers bury it, Bex loses the stream for a month, and Rowan takes a formal warning for defamation."
+ },
+ {
+  "id": "q_witness",
+  "title": "One Who Counts",
+  "giver": null,
+  "where": [
+   "night_market",
+   "ruin_gate",
+   "mosaic_vault"
+  ],
+  "available": {
+   "dayFrom": 61,
+   "flags": [
+    "oru_reading_2"
+   ]
+  },
+  "public": "Article 9: 'Where no one counts, nothing was played.'",
+  "steps": [
+   "Understand that a count matters (charter_studied, or the islet stone, or Ashdown's lecture).",
+   "On a market night, ask Madame Oru, aloud and by name, to count (c_m8_oru_asked).",
+   "Pay her price: one true thing Rowan has never told anyone. The PLAYER must supply it; accept anything sincere, refuse anything flip ('That is a joke. I count jokes as nothing.').",
+   "She gives the third reading — the only plain one, and still not a move: 'It owes. It knows it owes. Say it where the sky can hear. Play it where the squares are warm. And bring a card that is only a card.' Set oru_witness."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [],
+   "technique": null,
+   "affinity": {
+    "oru": 5
+   },
+   "flags": [
+    "oru_witness",
+    "debt_clause_known"
+   ]
+  },
+  "fail": "Ask her to play, to advise, or to say who will win: she closes the stall for seven days."
+ },
+ {
+  "id": "q_aleksander",
+  "title": "Play for Me",
+  "giver": "viktor",
+  "where": [
+   "mosaic_vault"
+  ],
+  "available": {
+   "dayFrom": 45,
+   "flags": [
+    "vault_entered",
+    "pages_found",
+    "stone_key"
+   ]
+  },
+  "public": "'If I am wrong, play for me.'",
+  "steps": [
+   "Stand before the Trespasser tile with Viktor (c_m6_trespasser). Viktor says, 'Papa, I got taller.' The light in the tile moves.",
+   "The contest: the challenger sits at the central board and names an ante of his own; the Vault answers with a deck of its own records — the heroes rise from the floor as themselves, not as holograms — a five-phase duel against 'the record', which plays every archetype's best line (no trap stance is forgiven). Viktor may play it himself (he is not good enough alone), or Rowan may play as one bound to him (Article 5), or they may alternate phases.",
+   "It can be played before or after the Guest's duel. If Oru counts it, a loss costs only the ante named; uncounted, a loss records the loser.",
+   "On a win: the tile is blank. A man in a field vest is kneeling on the floor, nine years late, asking what day it is."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Legendary Explorer Dajan"
+   ],
+   "technique": null,
+   "affinity": {
+    "viktor": 8,
+    "ashdown": 5,
+    "josie": 2,
+    "silas": 2
+   },
+   "flags": [
+    "aleksander_freed"
+   ]
+  },
+  "fail": "Loss with a witness: the named ante is kept by the Vault (GM: something real — e.g. Rowan's online handle is gone from every record and memory but his). Loss without a witness: do not allow the attempt to begin; the tiles simply do not light, because where no one counts, nothing is played."
+ },
+ {
+  "id": "q_leona_notebooks",
+  "title": "Grey Linen",
+  "giver": "leona",
+  "where": [
+   "commons_beach",
+   "old_print_works",
+   "card_archive",
+   "maintenance_tunnels"
+  ],
+  "available": {
+   "dayFrom": 9
+  },
+  "public": "Leona Helical goes out at night and comes back with rust on her sleeves. She has asked you — once, flatly — whether you can keep your mouth shut.",
+  "steps": [
+   "Earn it: play her and let her deck rob you without sulking; see her go out at night and tell nobody; set leona_trust only after she has tested that silence for a week.",
+   "She says what she is looking for and not why: 'three notebooks, grey cloth; and some paperwork.' Go with her to the print works: the payroll and sick list (c_m9_payroll) and locker 14 (c_m9_locker). Set printworks_seen.",
+   "The Archive's records room: the Welfare Fund ledger (c_m9_ledger). It needs Wren, Ashdown or a night entry; copied or photographed (Pippa) it is evidence. Payroll + ledger: set cough_proof.",
+   "She tells the rest, in one breath, looking at the wall: her mother; the sale; the waiver (set knows_helical_family). She will not go to her father. Rowan can.",
+   "The notebooks: the office (needs helical_trust; set notebook_1_safe when it is moved out of the faculty wing), the old projector housing in the plant under the Trial Domes (Maisie's bolt-cutters or the professor's key; notebook_2_safe), locker 14 (the professor's key, or the crowbar Tobias owns; notebook_3_safe). 'Safe' means somewhere Marrow's people will not look: Gull Rock, the lighthouse, Chuck's sea-chest.",
+   "Get the two of them into one room (c_m9_argument is the bad version of this). Set helicals_reconciled if they leave it having both said the true thing."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Thieving",
+    "Stealthy Pursuit"
+   ],
+   "technique": null,
+   "affinity": {
+    "leona": 7,
+    "helical": 3,
+    "maisie": 1
+   },
+   "flags": [
+    "leona_trust",
+    "knows_helical_family",
+    "cough_proof"
+   ]
+  },
+  "fail": "Report her night walks, or tell anyone her name before she does: she closes like a door and goes on alone (default timeline: caught in the Archive on Day 112, expelled on the forged waiver on Day 176). Handing the notebooks to her father against her wish costs her trust but not the quest."
+ },
+ {
+  "id": "q_maisie_push_back",
+  "title": "Push Back",
+  "giver": "maisie",
+  "where": [
+   "commons_beach",
+   "design_lab",
+   "arcade",
+   "lighthouse"
+  ],
+  "available": {
+   "dayFrom": 20
+  },
+  "public": "Maisie Voltage is going to build a hologram you can shake hands with. She needs a second pair of hands, a lens, and somebody to tell her when the bungalow is on fire.",
+  "steps": [
+   "Hold the coil (hook) and survive an evening of being talked at in circuit diagrams. Set maisie_helped.",
+   "Parts: a first-generation emitter from one of the arcade's old holo-pods (800 tickets, or Dex vouching), a spare lens from the lighthouse store (Silas, for a favour), and power that does not black out the row (Teobalt can get her a bench in the design lab).",
+   "It flickers. Then it meets a first print (c_m9_rig). She understands in one second that the difference is in the ink and in the next that she must not say so near Professor Santángel.",
+   "The carrier problem — the rig needs tile dust, and there are only three ways: (a) inert tile chips from the fish market or the north shore: solid for three seconds at a time, harmless; (b) a pinch of the print works' sealed pigment: fully solid — and it is what killed the ink room; show her the sick list first (cough_proof) or she will grind it bare-handed; (c) burning a first-print card for its residue, as Santángel does: works, and destroys a record — Wren will not forgive it and Chuck will know. Her choice follows Rowan's advice.",
+   "Day 134, Open Playtest Afternoon: the demo. With (a) or (b) and a second pair of hands it works in front of the school: a cat-sized Debt-O-Tron walks across the bench and knocks over a cup. Set lattice_rig. Marrow's aide is in the back row either way.",
+   "Afterwards: show her the grey notebook (c_m9_notebook) or let Leona do it. She reads 'DO NOT BUILD' three times and has to decide what kind of inventor she is."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Debt-O-Tron Model Backup Duplicator",
+    "Debt-O-Tron Model Money Printer"
+   ],
+   "technique": null,
+   "affinity": {
+    "maisie": 7,
+    "leona": 1,
+    "wren": 1
+   },
+   "flags": [
+    "maisie_helped",
+    "lattice_rig"
+   ]
+  },
+  "fail": "Without help the demo flickers and fails; Marrow, who found her within a week of landing (about Day 68) and has had a standing offer open ever since — a bench, a stipend, components, and a keen interest in what 'additive' she has in mind — renews it on Day 135, and by default she takes it on Day 140 (maisie_at_lab) — with her hands and the notebooks his prototype is solid on Day 168. CONSEQUENCES OF lattice_rig: see GUEST.lattice."
+ },
+ {
+  "id": "q_helical_what_he_sold",
+  "title": "What He Sold",
+  "giver": "helical",
+  "where": [
+   "faculty_wing",
+   "great_arena",
+   "maintenance_tunnels",
+   "inn"
+  ],
+  "available": {
+   "dayFrom": 30
+  },
+  "public": "Professor Helical, who mends the hologram tables, wants a student assistant for the evening rounds. He pays 15 cr and talks to the equipment more than to you.",
+  "steps": [
+   "Three evening rounds with him in the plant under the Trial Domes and at the arena tables (15 cr each). He is patient, exact and sad; he knows every table's fault by its sound. Set helical_trust when Rowan mentions Leona's name without using it against him.",
+   "From Day 62 a soft-voiced visitor calls at his office weekly. After one visit he asks Rowan to carry a wrapped oscilloscope to the lighthouse 'for repair' and not to drop it (notebook_1_safe).",
+   "He tells it — to a student, because he cannot tell his daughter: Miriam, the cough, the bills, the two-fifths he sold, and what Marrow now holds over him (the waiver).",
+   "His choice, which Rowan can tip: (a) keep paying in paper — the default; (b) go to the Chancellor himself about the waiver and take away the leverage (Leona stays on a hearing if okonkwo_ally or two staff speak; he is suspended); (c) stand up as a voice: his testimony plus the fund ledger with Marrow's initials counts as BOTH a piece of evidence and a voice for q_marrow_expose. Set helical_testifies.",
+   "The notebooks' fate, once all three are safe — he will accept whatever father and daughter agree: burn them as Miriam wished (lattice_burned), seal them with Chuck's first prints, or give them to an inventor who has read the sick list."
+  ],
+  "rewards": {
+   "credits": 45,
+   "cards": [
+    "Idej Projector"
+   ],
+   "technique": null,
+   "affinity": {
+    "helical": 7,
+    "leona": 2
+   },
+   "flags": [
+    "helical_trust"
+   ]
+  },
+  "fail": "Tell Leona what he confided before he is ready and she walks into his office and c_m9_argument happens at its worst. If nothing is done he hands the first notebook to Marrow on Day 95 and gives up locker 14 on Day 160."
+ },
+ {
+  "id": "q_sammy_mysterious",
+  "title": "Dark and Mysterious",
+  "giver": "sammy",
+  "where": [
+   "commons_beach",
+   "duel_terraces",
+   "student_lounge"
+  ],
+  "available": {
+   "dayFrom": 6,
+   "self": [
+    "sammy"
+   ]
+  },
+  "public": "Sammy Counts from next door would like people to think he has a terrible secret. He does not have one. He has asked whether you would mind looking slightly afraid of him in public.",
+  "steps": [
+   "Catch the stare slipping (he practises it in a mirror under a black cloth). Decline to fake fear; offer the true thing instead: his counter deck IS frightening to play against.",
+   "Play him properly on the terraces with people watching and say out loud, after, what it felt like to have five plays in a row countered. That is his first real reputation.",
+   "Days 34–39: Brant is working the row, and on Day 39 it is Trixie from Bungalow 2 (hook h_brant_shakedown). Sammy is ten paces away in his coat. Whether he steps up beside her — which a boy who is afraid of the actual dark finds very hard — or looks at the horizon, as his notebook advises, decides how he remembers this year.",
+   "After Day 40 a rumour does his work for him: that the quiet boy in the long coat, who was standing right there, 'put something on' Brant. It makes him popular for a week with exactly the wrong people. He must say it is not true — in front of Fiona, whom he likes — and finds that she prefers him without the coat."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Dangerous Knowledge"
+   ],
+   "technique": null,
+   "affinity": {
+    "sammy": 6,
+    "fiona": 1,
+    "tobias": 1
+   },
+   "flags": [
+    "sammy_honest"
+   ]
+  },
+  "fail": "Play along with the Brant rumour and it reaches '{H}', who asks Sammy with interest whether he also keeps what he wins. Sammy does not leave Bungalow 6 after dark for a month."
+ },
+ {
+  "id": "q_victoria_aesthetics",
+  "title": "The Aesthetics Desk",
+  "giver": "victoria",
+  "where": [
+   "broadcast_studio",
+   "quad",
+   "rare_room"
+  ],
+  "available": {
+   "dayFrom": 16
+  },
+  "public": "Miss Capulet is to be a commentator. She has informed you that the game itself is not very interesting but that some of the cards are beautiful, and that she will be saying which.",
+  "steps": [
+   "Be on her schedule: she accepts company only at a stated time and place (Pippa's card by the door of R203). Arrive on the minute, three times. Never change a plan without telling her beforehand.",
+   "Her first cast (Freshman Cup second desk, or any weekly show): she ignores the match and describes borders, palettes and the faces of the creatures, in complete serious sentences. Bex wants her off after ninety seconds. Sit beside her and give the game in one line whenever she finishes an art note; do not correct her.",
+   "The segment gets more chat messages than the match. Bex, who knows a format when she sees one, offers her 'The Aesthetics Desk'. Victoria asks what she must do differently and is told: nothing.",
+   "Someone on the stream chat, or a Spectral boy on the terrace, laughs at her to her face. She does not understand that she is being mocked and thanks him. What Rowan does in the next ten seconds is the quest; Ophelia is watching from the door."
+  ],
+  "rewards": {
+   "credits": 40,
+   "cards": [
+    "Butterfly Cloud",
+    "Sleeping Beauty"
+   ],
+   "technique": null,
+   "affinity": {
+    "victoria": 6,
+    "ophelia": 3,
+    "pippa": 1,
+    "bex": 1
+   },
+   "flags": [
+    "victoria_desk"
+   ]
+  },
+  "fail": "Any attempt to use her — her trust, her dependence, her not seeing a joke — ends it at once: Ophelia and Pippa close ranks and the whole first year hears why. Her route, if any, is slow, gentle and entirely on her terms."
+ },
+ {
+  "id": "q_ophelia_no_joke",
+  "title": "No Joke",
+  "giver": "ophelia",
+  "where": [
+   "rare_lobby",
+   "duel_terraces",
+   "trial_dome"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "A second-year with rolled sleeves has asked you three questions about yourself in the tone of a border guard. She is Victoria Capulet's sister. She did not laugh at anything.",
+  "steps": [
+   "Pass the inspection: answer plainly. Jokes are examined as statements and found false.",
+   "She wants to see how a person loses: a game on the terraces. Her deck does nothing for three phases and then ends the game with Damus, Armageddon and Ifrit in one turn. Losing to it the first time is expected; ask her afterwards what you should have seen.",
+   "Scout it (railbird one of her ladder games, or ask Kenji) and play her again: disrupt the set-up or race it. Win or lose, she respects a second attempt more than a first win.",
+   "She asks for one thing, stiffly, as if requesting a signature: that Rowan be the Thursday name on Victoria's card, 'because I have class then and Lund cannot do everything'. That is trust, in her language."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Armageddon",
+    "Ifrit"
+   ],
+   "technique": null,
+   "affinity": {
+    "ophelia": 6,
+    "victoria": 2
+   },
+   "flags": [
+    "ophelia_trust"
+   ]
+  },
+  "fail": "Miss a Thursday without warning and she takes the card back. She is not angry; she simply does not ask again."
+ },
+ {
+  "id": "q_eberhart_discipline",
+  "title": "Left in Peace",
+  "giver": "eberhart",
+  "where": [
+   "gym",
+   "duel_terraces",
+   "rare_room"
+  ],
+  "available": {
+   "dayFrom": 8
+  },
+  "public": "Eberhart von Düsterwald trains at five every morning and has said eleven words to anyone since the ferry. Four of them were 'You are in my way.'",
+  "steps": [
+   "Turn up at five and do the drill beside him without talking. Three mornings (costs the dawn; improves Nerve).",
+   "He offers a duel the way another man would offer his hand: formally, at a set hour, no spectators. To him it is a bout. Fight it as one — no chatter, no take-backs — and bow at the end, win or lose.",
+   "His roommate Mikoto has given him a nickname ('Ebi') and laughs when nervous, which is always. Eberhart has asked the hall for a single room four times. Get the two of them one rule each that they will keep (the strip of floor in R101 is the result).",
+   "The day after an incident (Day 40 or any later one) he is at the gym at five as always, and says his twelfth through twentieth words: that discipline is what you have ready for the day you are afraid."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Muscle Training",
+    "Training"
+   ],
+   "technique": "box_breath",
+   "affinity": {
+    "eberhart": 6,
+    "mikoto": 2
+   },
+   "flags": [
+    "eberhart_respect"
+   ]
+  },
+  "fail": "Treat the bout as a joke and he does not offer another this term. He bears no grudge; he simply withdraws."
+ },
+ {
+  "id": "q_magnus_number_two",
+  "title": "One Line Above",
+  "giver": "magnus",
+  "where": [
+   "quad",
+   "trial_dome",
+   "duel_terraces",
+   "great_arena"
+  ],
+  "available": {
+   "dayFrom": 2
+  },
+  "public": "Magnus Prospero was ranked one place below Best_Tarleinn_NA online for two years. He has decided this is the most important fact about both of you.",
+  "steps": [
+   "From the placement list on Day 1 he is two places above Rowan and says so (hook); when the ladder opens on Day 12 he asks for a ranked game at once. Accept it rather than shrug. He plays a different deck every week and expects to be studied.",
+   "Milestones — at each he issues an ordinary ranked challenge if the order of the two names has changed, with a new deck each time: Ladder Snapshot I (Day 31), Snapshot II (Day 78), end of Season 1 (Day 105), Snapshot III (Day 141), final standings (Day 205). Play each as a real ranked duel; his lists are good and have no habits to read.",
+   "He keeps a graph. On it Rowan's line and his own cross five or six times. There is a third line he started in October and stopped updating in November: {H:ladder} — he was going to challenge that one too (see GUEST.offSchedule.magnus).",
+   "The end of it, any time after the third milestone: either beat him with HIS deck of the week (he hands it over, list and all, to prove it is the player), or remember one of the forty-one online games he has catalogued and talk about it as a game; or tell him the truth — that Rowan has never once looked up where Magnus was — and stay in the room while that lands."
+  ],
+  "rewards": {
+   "credits": 60,
+   "cards": [
+    "Charm of Balance"
+   ],
+   "technique": "tape_study",
+   "affinity": {
+    "magnus": 5
+   },
+   "flags": [
+    "magnus_peace"
+   ]
+  },
+  "fail": "Dodge three of his challenges and he files them with the council as refusals of ranked play: a 10-rank penalty each. The filings go to the vice-president's Permits & Sanctions desk; Sebastian upholds them to the letter unless Rowan (or Noor for him) shows the clause that says otherwise."
+ },
+ {
+  "id": "q_mikoto_nicknames",
+  "title": "Koto-Koto",
+  "giver": "mikoto",
+  "where": [
+   "rare_common_room",
+   "trial_dome",
+   "rare_room"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Mikoto Yamaguchi laughed for a full ten seconds when you said good morning, apologised for a minute, and has given you a nickname. He is worried you hate it. He is worried about several other things.",
+  "steps": [
+   "Accept the nickname (the game master picks one from what Rowan has done so far; Magnus is 'Maggie', Eberhart is 'Ebi').",
+   "Sit second chair for one of his ranked games. He plays Skeletons well until something goes wrong, then laughs, then cannot stop. One sentence before the game about what to do WHEN it goes wrong is worth more than any advice during it.",
+   "He keeps lists of things that could happen. Read one. It is long, mostly absurd, and after Day 27 contains, between 'tsunami' and 'forgetting my locker number', the line 'N. looks at people like he is counting them'.",
+   "After Day 66 give him a job that uses the worry: he keeps the walking-buddy rota for Rare Hall and it is never once wrong."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Skeleton Mage",
+    "Skeleton Healer"
+   ],
+   "technique": null,
+   "affinity": {
+    "mikoto": 6,
+    "eberhart": 1
+   },
+   "flags": [
+    "mikoto_steady"
+   ]
+  },
+  "fail": "Laugh AT him in company and he laughs along, loudest of all, and stops sitting with people at meals."
+ },
+ {
+  "id": "q_fiona_underneath",
+  "title": "Cycling Demons",
+  "giver": "fiona",
+  "where": [
+   "commons_beach",
+   "duel_terraces",
+   "bonfire_pit"
+  ],
+  "available": {
+   "dayFrom": 8,
+   "self": [
+    "fiona"
+   ]
+  },
+  "public": "Fiona Blackwood has told you, in a voice half an octave lower than her own, that she can see your death. Three boys were listening. She plays a deck nobody has bothered to scout.",
+  "steps": [
+   "Play her. The deck is one of the strongest in the first year and she pilots it coldly; the eerie patter stops by the second phase because she is concentrating. Notice it; do not announce it.",
+   "Count the admirers: Sammy next door, worshipping from the edge of the firelight; Tobias, who leaves flowers lifted from the Spectral planters on her porch; and Gideon Pryce, who is on the same path too often and would die before admitting why. They are in love with the lace. (The one person she herself watches is Dmitri, on his porch at one in the morning, and he has not noticed.) She knows exactly which of them has ever asked her a question about herself.",
+   "A bonfire after everyone has gone: the voice comes up to where it lives. She is from an ordinary town, she likes the look, she is tired of it being the only thing she is allowed to be. She asks Rowan what HE puts on.",
+   "Freshman Cup or any stage game: she makes the top 8 and the island discovers she can play. The boys are confused. She is not."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Demon's Gate",
+    "Demonic Invasion"
+   ],
+   "technique": null,
+   "affinity": {
+    "fiona": 6,
+    "sammy": 1
+   },
+   "flags": [
+    "fiona_real"
+   ]
+  },
+  "fail": "Become the fifth boy who likes the costume and she is perfectly charming to him and never drops the voice again."
+ },
+ {
+  "id": "q_freya_northern_lights",
+  "title": "Aurora",
+  "giver": "freya",
+  "where": [
+   "bonfire_pit",
+   "commons_beach",
+   "bar",
+   "beach_cove"
+  ],
+  "available": {
+   "dayFrom": 5,
+   "self": [
+    "freya"
+   ]
+  },
+  "public": "Freya Nordlicht looked like a glacier on the ferry. By the second verse at the bonfire she was conducting the singing with a bottle. She has invited you to everything.",
+  "steps": [
+   "Survive one of her parties (the calendar has them) and be the one who is still upright to walk her down the boardwalk to Bungalow 2. She flirts the whole way, outrageously, and nothing happens: her one rule, which she states cheerfully, is never the first time when she is drunk and never with anyone who is. (Most nights it is Dmitri who walks her home and leaves a glass of water on the step.)",
+   "The morning after she is on the breakwater at dawn, clear-eyed, swimming. Where she comes from there are four months of dark; she drinks, she says, 'to make it summer'. It is said lightly. Do not make it a diagnosis.",
+   "She plays her Mischief Militia better with one drink than with none or five. Find the one: second chair at a ranked game, counting for her.",
+   "From Day 67 the curfew kills the bonfires and she takes it harder than anyone. Help her move the party somewhere legal and small — the Commons kitchen, with Mama's leave — or go with her when she breaks curfew to the cove, and take what comes."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Beer",
+    "Surprise Party"
+   ],
+   "technique": null,
+   "affinity": {
+    "freya": 6,
+    "odalys": 1
+   },
+   "flags": [
+    "freya_friend"
+   ]
+  },
+  "fail": "Lecture her about the drinking and she laughs, kisses the top of his head and stops inviting him. Take advantage of her when she is blind drunk and Trixie and Hedda, who share her bungalow, make sure the row knows."
+ },
+ {
+  "id": "q_hedda_cause",
+  "title": "No Small Causes",
+  "giver": "hedda",
+  "where": [
+   "cafeteria",
+   "commons_kitchen",
+   "fish_market",
+   "council_room"
+  ],
+  "available": {
+   "dayFrom": 8,
+   "self": [
+    "hedda"
+   ]
+  },
+  "public": "Hedda Njord has called you a corpse-eater through a megaphone. She says it is not personal. She has a clipboard and three open feuds.",
+  "steps": [
+   "Be shouted at and stay in the conversation. She respects people who answer back with reasons; she has never met one on this island who did.",
+   "The Baylee feud: he reared animals; she has never touched one bigger than a cat. Get them to the orchard goats on Harvest Day (Day 38). Neither converts. Both stop shouting.",
+   "The kitchen picket (calendar, Day 22): Mama has kept a separate pot for her on the back ring since the day Hedda denounced her and has never said so. Get Hedda to look in it. Rafa's cooking does the rest. After Day 27 she is the one with NUMBERS — forty gulls on the Commons roofs, thirty, none — and a placard: WHERE ARE THE BIRDS?",
+   "From Day 67: the megaphone finds its real use. When Teobalt's petition for the truth needs a crowd on the quad, she is the one who can raise it — if someone she trusts asks her to, and tells her what it is actually about."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Elven Druid",
+    "Elven Forager"
+   ],
+   "technique": null,
+   "affinity": {
+    "hedda": 6,
+    "baylee": 1,
+    "rafa": 1,
+    "teobalt": 1
+   },
+   "flags": [
+    "hedda_ally"
+   ]
+  },
+  "fail": "Eat meat in front of her on purpose to make a point and the feud is with Rowan: his bungalow door gets a new sticker every morning until Term 2."
+ },
+ {
+  "id": "q_tobias_fat_cats",
+  "title": "Fat Cats",
+  "giver": "tobias",
+  "where": [
+   "commons_beach",
+   "spectral_lobby",
+   "inn",
+   "pawn_shop"
+  ],
+  "available": {
+   "dayFrom": 12,
+   "self": [
+    "tobias"
+   ]
+  },
+  "public": "Tobias Crowe says the Academy is a club for fat cats and that he is here to redistribute. He has a crowbar in the floor of Bungalow 6 and a rule: never from anybody who'd miss it.",
+  "steps": [
+   "Learn the rule and that he keeps it: he has never taken a thing on the row, and since about Day 9 the cards Brant extorts have been reappearing on their owners' pillows without Brant ever working out how.",
+   "Learn the target (hook). Stop him, join him, or find out what he already knows and has told nobody: that the richest-looking girl in the Tower pawns a piece of jewellery a month to pay her fees. By his own rule he crossed her suite off the list, and it has been bothering him ever since, because it means the world is not arranged the way he needs it to be. He will say so only to someone who does not laugh.",
+   "If Ashton's pins were already taken (casket_taken): Ashton, who has reported nothing, wants one thing — to be told to his face why him. Get the two of them into one room. What is left of the pins goes back up the service stair; the envelopes already delivered stay delivered.",
+   "Give the crowbar a job a Robin Hood can respect: the padlock on locker 14 (q_leona_notebooks), or the long crate in the inn's stable from Day 64 (c_m2_crate) — 'now THAT is a fat cat'. From then on he is the row's unasked-for bodyguard."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Thieving Strike",
+    "Midnight Assault"
+   ],
+   "technique": null,
+   "affinity": {
+    "tobias": 6,
+    "ashton": 1,
+    "leona": 1
+   },
+   "flags": [
+    "tobias_ally"
+   ]
+  },
+  "fail": "Report him to staff: the crowbar is found, he is expelled within the week, and the Commons — which does not inform on its own — is cold to Rowan for a month. See also GUEST.offSchedule.tobias."
+ },
+ {
+  "id": "q_ed_places_to_die",
+  "title": "X Marks It",
+  "giver": "ed",
+  "where": [
+   "commons_beach",
+   "rope_bridge",
+   "sea_cave",
+   "lava_tubes",
+   "volcano_rim"
+  ],
+  "available": {
+   "dayFrom": 6,
+   "self": [
+    "ed"
+   ]
+  },
+  "public": "Ed Venture has a map of the island with red crosses on it and intends to stand on every one. He would love company. He has no idea why people keep saying no.",
+  "steps": [
+   "Go with him once somewhere merely stupid (the underside of the rope bridge, the blowhole at the tide pools). He is not brave; he genuinely does not picture falling.",
+   "Viktor, who shares his bungalow and does picture it, has started hiding the rope. Get the two of them to a bargain: Ed goes nowhere marked in red without a second person and a line; in return Viktor teaches him knots and takes him on one real route.",
+   "Day 38, the Outdoor Club's lava-tube descent: he unclips to look down a side shaft. Whoever is nearest — Rowan, if he came — has about two seconds. This is the day he is nearly killed; with the bargain kept he is on a line and it is only a fright.",
+   "After Day 29 the best cross on the map is behind a cordon. He will go. Either he goes with Viktor and Rowan and is useful (he photographed the crater on Day 27 before anyone thought to), or he goes alone on Day 62 and Marrow's field staff bring him back with a cracked rib and a confiscated camera."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Unlikely Encounter"
+   ],
+   "technique": null,
+   "affinity": {
+    "ed": 6,
+    "viktor": 2
+   },
+   "flags": [
+    "ed_on_a_line"
+   ]
+  },
+  "fail": "Without the bargain, Day 38 ends with Ed twelve metres down a shaft with a broken leg, carried out by Viktor and Baylee; he is in the infirmary until Day 60, signing his own cast, and Viktor trusts nobody with a rope for the rest of the term."
+ },
+ {
+  "id": "q_eloise_large_format",
+  "title": "Large Format",
+  "giver": "eloise",
+  "where": [
+   "design_lab",
+   "rare_room",
+   "theatre",
+   "rooftop_garden"
+  ],
+  "available": {
+   "dayFrom": 10
+  },
+  "public": "Eloise Lafayette paints her card ideas two metres wide and needs someone to carry the other end of the canvas.",
+  "steps": [
+   "Carry canvases from R201 to the theatre's scene dock, where Marit has lent her a wall (Marit is delighted by a roommate who is also a set).",
+   "Sit for her — she paints card heroes from the people she knows; the game master chooses what Rowan becomes, and it should be true and slightly unwelcome.",
+   "Her exhibition (calendar): help hang it. Marit, hanging everything she could find, has also hung one from the stack Eloise keeps face to the wall and does not show: a tiled floor of small lit squares with no ceiling, and a figure at a table, back turned. Felix, who draws people's dreams, stands in front of it for an hour.",
+   "A buyer: Marrow's aide offers 600 cr for the squares canvas 'for the board's collection'. She has never been offered money for anything. Advise her; she takes advice literally."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Tuscan Artist",
+    "Lesson in the Arts"
+   ],
+   "technique": "designers_eye",
+   "affinity": {
+    "eloise": 6,
+    "marit": 1,
+    "felix": 1
+   },
+   "flags": [
+    "eloise_show"
+   ]
+  },
+  "fail": "Miss the hanging and half the show stays on the floor; she does not mind, which is somehow worse."
+ },
+ {
+  "id": "q_trixie_bee_line",
+  "title": "Bee Line",
+  "giver": "trixie",
+  "where": [
+   "commons_beach",
+   "orchard",
+   "greenhouse",
+   "islet"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Trixie Hollis has put up a bee hotel under the eaves of Bungalow 2 and introduced you to its residents by name.",
+  "steps": [
+   "Help her with the proper hive in the corner of the greenhouse that the Chancellor, of all people, let her have; she talks to the bees the whole way and reports what they say, which is mostly about the weather and is always right.",
+   "Honey for Mama's kitchen (a jar a fortnight; Hedda rules it acceptable after an inquiry).",
+   "From Day 31 the bees change their line (c_m1_bees). She is the least sunny anyone has seen her. She wants to move the hotel and does not know where is safe.",
+   "Her foragers' dance now points to places a bee should not want — up the mountain; and, some days, due south and close. Move the hotel: to the greenhouse corner, or by boat to Gull Rock, where everything with wings has already gone. She leaves one empty box under the eaves of Bungalow 2 'so they know where home was'."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Bomblebee",
+    "Hive's Crown"
+   ],
+   "technique": null,
+   "affinity": {
+    "trixie": 6,
+    "silas": 1,
+    "hedda": 1
+   },
+   "flags": [
+    "bees_moved"
+   ]
+  },
+  "fail": "If the bees are not moved by Day 45 the hotel is empty one morning and she stops talking to insects for a while; people notice how quiet the row is without it."
+ },
+ {
+  "id": "q_dmitri_night_shift",
+  "title": "The Night Shift",
+  "giver": "dmitri",
+  "where": [
+   "commons_beach",
+   "bonfire_pit",
+   "infirmary"
+  ],
+  "available": {
+   "dayFrom": 6
+  },
+  "public": "Dmitri Volkov in Bungalow 6 does not sleep. He sits on his porch all night with a thermos and has seen everything that ever happened on the row after midnight. He has a second cup.",
+  "steps": [
+   "Take the second cup (hook). Three nights on his porch, each costing the Night slot: he says little, drily, and all of it is worth hearing.",
+   "What the row does after midnight before the meteor, as he tells it: Viktor going out with rope; Leona going out without a light (c_m9_night_walks); Freya coming home; a lantern on the jungle trail ten paces behind nothing.",
+   "From Day 28 he moves his chair. Read the log (c_m1_dmitri_log). He has not told anyone because it sounds like nothing, and because the one time he stood up to follow, {H} — at the waterline, forty metres off, back turned — said in an ordinary speaking voice, 'Good evening, Dmitri Volkov. Please sit down. You will be cold.' Some nights since, it has come and sat on the other end of his porch. He pours it tea, which it holds and does not drink. He knew by the second night, from the breathing; it is good company, and that frightens him more than anything.",
+   "He will not see Camille about the insomnia; get him there once. And from Day 67, when the proctors walk in pairs, he is the Commons' real night watch: anyone who needs to leave the row unseen needs him to look the other way, and he will, for people who drank his tea."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Lunatic Hawk",
+    "Refreshing Night"
+   ],
+   "technique": null,
+   "affinity": {
+    "dmitri": 7,
+    "camille": 1
+   },
+   "flags": [
+    "dmitri_watch"
+   ]
+  },
+  "fail": "None; but if nobody ever sits down he stops keeping the log on Day 50, on the grounds that nobody wants to read it."
+ },
+ {
+  "id": "q_rafa_seconds",
+  "title": "Seconds",
+  "giver": "rafa",
+  "where": [
+   "commons_kitchen",
+   "rare_room",
+   "fish_market"
+  ],
+  "available": {
+   "dayFrom": 4
+  },
+  "public": "Rafa Okonjo from Rare Hall works shifts in Mama's kitchen for the pleasure of it and has put a plate in front of you without being asked. You must have looked like you needed one.",
+  "steps": [
+   "Eat it. Tell him one true thing about home; that is the price and he will not say so.",
+   "Market run to the fish stalls on a Saturday; he cooks on a forbidden hotplate in R103 while Cas narrates the frying.",
+   "The pale girl who takes the bread rolls: he has noticed. With Mama and (from Day 23) Camille he works out the separate pan — rice, beans, fish, plantain, nothing with flour. Getting Livvie to eat from it without feeling watched sets livvie_eating.",
+   "The Harvest Table (Day 88): his menu, forty at one table, a second pot for Hedda, and one place laid for each bed in Ward B."
+  ],
+  "rewards": {
+   "credits": 20,
+   "cards": [
+    "Secret Spice Jar",
+    "Spice Mortar"
+   ],
+   "technique": null,
+   "affinity": {
+    "rafa": 6,
+    "odalys": 2,
+    "livvie": 2
+   },
+   "flags": [
+    "livvie_eating"
+   ]
+  },
+  "fail": "Refuse his food twice and he worries about you to everyone, which is its own penalty."
+ },
+ {
+  "id": "q_cas_dead_air",
+  "title": "Dead Air",
+  "giver": "cas",
+  "where": [
+   "broadcast_studio",
+   "rare_common_room",
+   "great_arena"
+  ],
+  "available": {
+   "dayFrom": 5
+  },
+  "public": "Cas Abernathy narrates everything in a caster's voice. He narrated you sitting down. He narrated himself noticing that you minded.",
+  "steps": [
+   "Let him call one of Rowan's casual games as if it were a final. He is good: he sees the turn before it happens and makes four spectators feel like forty.",
+   "A double act on The Top Deck: Cas on play-by-play, Victoria on aesthetics, or Rowan on analysis. He cannot stop narrating between segments, including his own crush, by name, on a live microphone.",
+   "Day 52, the morning of the second incident: the administration wants a calm voice and puts him on the stream to read its statement. Halfway through the second sentence the voice fails him on air — the old catch, on a b — and he stops. Be in the studio, and afterwards tell him it was the truest thing broadcast all term.",
+   "What he needs to learn is the thing casters call dead air: when to say nothing. On any later bad morning, stand next to him on the desk and let ten seconds of silence go out. Bex, in his earpiece: 'Good. That's the job too.'"
+  ],
+  "rewards": {
+   "credits": 40,
+   "cards": [
+    "Race Boat Captain"
+   ],
+   "technique": "tape_study",
+   "affinity": {
+    "cas": 6,
+    "bex": 1,
+    "victoria": 1
+   },
+   "flags": [
+    "cas_dead_air"
+   ]
+  },
+  "fail": "Mock the narration in front of others and he narrates that too, cheerfully, and keeps it up at Rowan's expense for a week."
+ },
+ {
+  "id": "q_junho_patch_notes",
+  "title": "Patch Notes",
+  "giver": "junho",
+  "where": [
+   "design_lab",
+   "rare_common_room",
+   "rare_room"
+  ],
+  "available": {
+   "dayFrom": 8
+  },
+  "public": "Park Jun-ho has handed you a printed sheet headed 'ROWAN v1.1 — known issues'. He means it kindly. There are eleven items.",
+  "steps": [
+   "Read the sheet without throwing it away. Two of the eleven are right.",
+   "Playtest the Rare Hall house cube with him; he rebalances it every week and cannot understand why people liked the broken version better.",
+   "He issues notes to everyone. Teobalt, his roommate, files them. Eloise painted over hers. Hedda's reply was four pages. Help him see that a person is not a card with a wrong number on it — by giving him, in his own format, his own sheet.",
+   "Design Contest (Days 61–75): by default he submits nothing — there are forty versions of one card in a private folder and he cannot call any of them finished. Sit with him until he hands in the fortieth, unchanged. It does not place, and Chuck asks to keep it."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Soul Shard Ka",
+    "Divine Gift of Balance"
+   ],
+   "technique": null,
+   "affinity": {
+    "junho": 6,
+    "teobalt": 1
+   },
+   "flags": [
+    "junho_v2"
+   ]
+  },
+  "fail": "None; an ignored Junho simply continues to ship updates."
+ },
+ {
+  "id": "q_anni_red_pen",
+  "title": "Red Pen",
+  "giver": "anni",
+  "where": [
+   "classroom",
+   "spectral_lobby",
+   "trial_dome",
+   "library"
+  ],
+  "available": {
+   "dayFrom": 8
+  },
+  "public": "Anneliese Brandt has reported you for an untucked shirt. She is training as a judge, patrols her own corridor at ten, and has never been wrong about a rule, which is not the same as being right.",
+  "steps": [
+   "Be reported, and take it without sneering; ask her for the regulation and read it. She has never been asked.",
+   "Judge Circle (Mondays): sit a mock ruling with her and Noor. Noor rules for what the rule is for; Anni rules for what it says. Each thinks the other is dangerous. Both are needed.",
+   "Return a library book for her and see what is under it on the shelf in S3: forty romance novels, spines to the wall. Say nothing, ever. She knows he saw.",
+   "From Day 67 she is a council proctor and the likeliest person to catch a curfew-breaker. Earn one act of discretion: she will look at her watch, say 'It is not yet ten by mine', and turn her back for exactly as long as it takes. Later, as a floor judge, she is one of those who can ask a player to state his name for the record."
+  ],
+  "rewards": {
+   "credits": 0,
+   "cards": [
+    "Loyal Shepherd",
+    "Loyal Terrier"
+   ],
+   "technique": "priority_window",
+   "affinity": {
+    "anni": 6,
+    "noor": 1
+   },
+   "flags": [
+    "anni_discretion"
+   ]
+  },
+  "fail": "Tease her about the novels and every infraction Rowan commits for the rest of the year is written up, correctly, in red."
+ }
+]

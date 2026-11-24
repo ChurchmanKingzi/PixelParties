@@ -1,0 +1,373 @@
+{
+ "name": "Realpolitik",
+ "owner": "sebastian",
+ "heroes": [
+  "Von Pixmarck, the Iron Chancellor",
+  "George, the Mad Tyrant King",
+  "Nero Zira, the Mastermind"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Capture"
+  ],
+  [
+   2,
+   "Decay Magic"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   6,
+   "Diplomacy"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Golden Apple"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   3,
+   "Mimic"
+  ],
+  [
+   3,
+   "Plant Golem"
+  ],
+  [
+   3,
+   "Powder Keg"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Stowaway"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   4,
+   "Wealth"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Von Pixmarck, the Iron Chancellor": "Hero",
+  "George, the Mad Tyrant King": "Hero",
+  "Nero Zira, the Mastermind": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Capture": "Attack",
+  "Decay Magic": "Ability",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Diplomacy": "Ability",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Haressassin": "Creature L2",
+  "Heavy Hit": "Attack",
+  "Mimic": "Creature L0",
+  "Plant Golem": "Creature L1",
+  "Powder Keg": "Artifact (Creature)",
+  "Quick Attack": "Attack",
+  "Stowaway": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability"
+ },
+ "gist": {
+  "Diplomacy": "Ability: pays gold to take permanent control of one of your creatures, bigger ones at higher levels.",
+  "Von Pixmarck, the Iron Chancellor": "Starts with Diplomacy at level two, so he can buy mid-sized creatures from the first turn. His printed end-of-turn creature swap has no effect script in the game and does nothing.",
+  "George, the Mad Tyrant King": "Uses Diplomacy twice a turn at half price, and the creatures he takes keep their effects; earns gold whenever you end a turn with no creatures.",
+  "Nero Zira, the Mastermind": "Gains Attack permanently every time a creature lands in his side's support zones, several times a turn.",
+  "Plant Golem": "Summoned into YOUR hero's support zone: that hero cannot act. You control it from then on and may spend your action and a discard to destroy it.",
+  "Stowaway": "Summoned into any hero's support zone: that hero's effect and Abilities are off, as a curable status. Nothing else touches the Stowaway, but when the status is cured (Tea, for one) or the hero falls, it is deleted.",
+  "Powder Keg": "A one-health barrel placed on your side that blasts the creatures beside it when it dies.",
+  "Mimic": "Steals gold from you every turn, which pays for Diplomacy.",
+  "Capture": "An attack that takes one of your creatures for good.",
+  "Golden Apple": "Borrows one of your heroes for a turn.",
+  "Haressassin": "A hard shot each turn.",
+  "Aggressive Town Guard": "Free summon with a ping.",
+  "Heavy Hit": "Nero Zira's attack; stuns.",
+  "Quick Attack": "A free first attack each turn."
+ },
+ "plan": "Sebastian governs by exchange. Against creature decks he simply buys the opposing board with Diplomacy, twice a turn through George, and Nero Zira grows with every creature that changes sides. Against a deck with no creatures he supplies them himself: a Plant Golem that stops your hero from acting, a Stowaway that blanks one, a Powder Keg, while Mimics drain your gold. Then Nero Zira, grown from every creature that landed on his own side, does the hitting. Most of his cards need something of yours to take, so a creatureless opponent leaves half his hand idle.",
+ "looks": {
+  "early": "Gold piling up, a Town Guard, a Plant Golem rooted in front of your caster.",
+  "mid": "A Golem on one of your heroes, a Stowaway on another, Mimics taking your gold; Nero Zira's Attack climbing.",
+  "late": "A hand of Diplomacy with nothing to buy, and one very large fighter."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Plant Golem sits in your caster's support zone and that hero cannot act.",
+   "why": "The Golem is yours to remove: an action and a discard, or The Yeeting, which kills it; a Stowaway goes the moment Tea cures its status. Building under them is impossible."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "One of your heroes is rooted by a Plant Golem, another is blanked by a Stowaway, and Mimics take your gold each turn.",
+   "why": "Free only the hero you need this turn (an action and a discard for the Golem, Tea for the Stowaway) and send the rest at his heroes; his own board is a few small creatures not worth a sweeper turn."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Nero Zira's Attack has grown with every creature placed and he holds Heavy Hit.",
+   "why": "All his damage is one fighter: freeze Nero Zira or strip his Fighting with Fire Bomb."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His hand is Diplomacy and Capture with nothing of yours to take.",
+   "why": "Half his deck is dead against a board without creatures."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Sebastian plants a Plant Golem in front of your Storm caster with a polite nod.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Golem"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn George with the other two"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait with a caster that cannot act"
+     }
+    ]
+   },
+   {
+    "board": "A Stowaway climbs aboard Nicolas: no Alchemy, no effect.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea cures it and the Stowaway is deleted"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build without Nicolas"
+     }
+    ]
+   },
+   {
+    "board": "George collects gold because you ended your turn without creatures.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon George"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A second Plant Golem roots Nicolas while your caster is still under a Stowaway.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the caster free, leave Nicolas rooted, hit George"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon George, who earns gold from your empty board"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche his Mimics"
+     }
+    ]
+   },
+   {
+    "board": "A Powder Keg sits beside the Golem on your side.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Touch neither; Storm ticks at heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb his Diplomacy"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Golden Apple borrows your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing worth sweeping"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Nero Zira, far above his printed Attack, winds up a Heavy Hit.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Nero Zira"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Quick Attack and Heavy Hit in one turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb his Fighting"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun back"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "He re-plants the Golem on your second caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Remove it at once"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cast from the third"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "He holds four Diplomacy and you have nothing to buy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Nero Zira alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on George.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Nero Zira"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

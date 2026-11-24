@@ -1,0 +1,364 @@
+{
+ "name": "Deepsea Terror",
+ "owner": "saoirse",
+ "heroes": [
+  "Teppes, the Deepsea Vampire",
+  "Siphem, the Deepsea Demon",
+  "Barker, the Monster Tamer"
+ ],
+ "main": [
+  [
+   3,
+   "Coffee"
+  ],
+  [
+   5,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Dark Deepsea God"
+  ],
+  [
+   2,
+   "Deepsea Bats"
+  ],
+  [
+   3,
+   "Deepsea Jack O' Lantern"
+  ],
+  [
+   3,
+   "Deepsea Monstrosity"
+  ],
+  [
+   3,
+   "Deepsea Mummy"
+  ],
+  [
+   4,
+   "Deepsea Pirate"
+  ],
+  [
+   3,
+   "Deepsea Primordium"
+  ],
+  [
+   4,
+   "Deepsea Werewolf"
+  ],
+  [
+   4,
+   "Deepsea Witch"
+  ],
+  [
+   1,
+   "Divine Gift of the Guardian"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Sandy Blob"
+  ],
+  [
+   12,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "The Sacred Jewel"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Teppes, the Deepsea Vampire": "Hero",
+  "Siphem, the Deepsea Demon": "Hero",
+  "Barker, the Monster Tamer": "Hero",
+  "Coffee": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Dark Deepsea God": "Creature L4",
+  "Deepsea Bats": "Creature L1",
+  "Deepsea Jack O' Lantern": "Creature L1",
+  "Deepsea Monstrosity": "Creature L2",
+  "Deepsea Mummy": "Creature L1",
+  "Deepsea Pirate": "Creature L1",
+  "Deepsea Primordium": "Creature L0",
+  "Deepsea Werewolf": "Creature L2",
+  "Deepsea Witch": "Creature L2",
+  "Divine Gift of the Guardian": "Spell (Summoning Magic, Reaction)",
+  "Golden Ankh": "Artifact",
+  "Sandy Blob": "Creature L0",
+  "Summoning Magic": "Ability",
+  "The Sacred Jewel": "Artifact"
+ },
+ "gist": {
+  "Teppes, the Deepsea Vampire": "Draws a card each time creatures return from her support zones to her hand, several times a turn.",
+  "Siphem, the Deepsea Demon": "Gains a counter each time she returns cards to hand; once per turn spends them all on one shot that grows with the pile.",
+  "Barker, the Monster Tamer": "Starts the game with a small creature already in play.",
+  "Deepsea Werewolf": "Like every Deepsea creature it can enter by sending an older Deepsea creature back to hand and taking its place; on arrival it bites a target.",
+  "Deepsea Mummy": "On arrival stuns a target for a turn.",
+  "Deepsea Pirate": "On arrival steals gold from you.",
+  "Deepsea Witch": "On arrival searches another Deepsea creature.",
+  "Deepsea Primordium": "One-health starter: on arrival she may summon another Deepsea creature for free.",
+  "Deepsea Jack O' Lantern": "Swaps in for an older creature and draws cards equal to that creature's level.",
+  "Deepsea Monstrosity": "Bounces another Deepsea creature and repeats its arrival effect.",
+  "Deepsea Bats": "On arrival returns a small Deepsea creature from the discard pile to the board.",
+  "Dark Deepsea God": "Enters by returning two older creatures to hand; hits every target you control when it does.",
+  "Sandy Blob": "Stings one of your targets each time an arrival effect of hers goes off, up to three times a turn.",
+  "The Sacred Jewel": "Lets her run extra copies of artifacts; played, both players draw a card.",
+  "Cute Cheese": "Searches any creature."
+ },
+ "plan": "Nothing on Saoirse's board is meant to stay. Each Deepsea creature can arrive by sending an older one back to her hand, so the same Werewolf, Mummy and Pirate land turn after turn, biting, stunning and robbing each time, while a Sandy Blob stings for every arrival, Teppes draws on every bounce and Siphem saves the bounces up for one large shot. The Dark Deepsea God ends games by hitting your whole side. The creatures are small and their value is in arriving, so killing them rarely hurts her, with two exceptions: a creature has to survive a full turn before it can be swapped out, and her hand is where the whole deck lives.",
+ "looks": {
+  "early": "A Pirate and a Primordium, a little of your gold already on her side.",
+  "mid": "Creatures changing every turn in the same two zones, a Sandy Blob stinging, a pile of counters on Siphem.",
+  "late": "Two older creatures left deliberately alone, and the Dark Deepsea God in her hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Her creatures have already used their arrival effects and she swaps them rather than attacking with them.",
+   "why": "The bodies are spent the moment they land and go back to hand anyway; Teppes and Siphem, ordinary heroes, are the engine and they are open."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Siphem carries a thick pile of counters, a Sandy Blob sits in the corner, and she holds seven cards, most of them creatures.",
+   "why": "Her deck lives in her hand and in two pieces: White Eye discards, a freeze on Siphem and the Blob removed hurt far more than killing creatures that are about to be swapped away."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Two creatures have sat untouched on her side for a full turn.",
+   "why": "The Dark Deepsea God needs two older creatures to send back; kill them on your turn and it stays stuck in her hand."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Her hand is finally small and the same single creature is being swapped in and out.",
+   "why": "With few cards left the loop gives her one small effect a turn; her heroes have no other protection."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Barker starts with a Deepsea Pirate in play; she takes some of your gold and leans back.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Teppes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Teppes before the draws begin"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Pirate"
+     }
+    ]
+   },
+   {
+    "board": "A Werewolf swims in over the Pirate, bites your caster, and the Pirate is back in her hand; Teppes draws.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Keep hitting heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the Pirate out of her hand"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Chase the Werewolf"
+     }
+    ]
+   },
+   {
+    "board": "A Primordium chains into a Witch, who searches a Mummy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning the heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea ready for the stun"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the fresh arrivals"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Seven cards in her hand, a heap of counters on Siphem.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Siphem and strip the hand with The White Eye"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Siphem down"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the two creatures"
+     }
+    ]
+   },
+   {
+    "board": "A Sandy Blob stings you three times a turn as creatures arrive.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet or steal the Blob"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Teppes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep everything but miss the hand"
+     }
+    ]
+   },
+   {
+    "board": "The Mummy lands again and stuns your caster again.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the stun onto Siphem"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Cast from the others"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait it out"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "A Mummy and a Werewolf have sat on her board since last turn; she is smiling at her hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill both now: no God this turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Kill one, burn Siphem"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Prepare for the hit"
+     }
+    ]
+   },
+   {
+    "board": "The Dark Deepsea God arrives and your whole side takes a heavy hit.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the creatures she replayed, so there is no second God"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, answer on Teppes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of the Guardian shields her creatures for a turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep next turn instead; hold the card"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Burn heroes this turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Waste the sweep into it"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two cards in her hand, one creature looping.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Siphem and Teppes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard the last two"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it slow"
+     }
+    ]
+   },
+   {
+    "board": "Siphem fires his last counters at your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Trade and win the race"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Teppes for one more turn of draws.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the others"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

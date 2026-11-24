@@ -1,0 +1,1986 @@
+[
+ {
+  "id": "t_arrival",
+  "day": 1,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "Arrival",
+  "gm": "Ferry in, dorm assignment by entrance rank (Commons: every better bed was taken), Placement Duel in the afternoon on a real table in front of forty strangers — Rowan's hands shake. Meet Nathan (volume), Baylee (doorframe), Mama Odalys (rice). The 36 first-years have known each other for one ferry crossing at most: nobody greets anybody as an old friend, and Rowan knows no one.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_debt_default",
+  "day": 1,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Four cases",
+  "gm": "The lounge quarrel as the world settled it without Rowan (skip this entry if today's record shows that Rowan himself played Gideon Pryce). Inya took the wager, attacked first and lost. On the pier and up the avenue a very small girl with mint-green hair carries four matched cases to the Spectral Tower, two trips, and lets nobody take one; Gideon walks ahead with his hands free. Tomi pays out his book. If Rowan stood in the lounge and watched without a word, she saw who was there and does not mention it. Show it once, in passing, without reproach.",
+  "when": {
+   "notFlags": [
+    "ferry_table_won",
+    "ferry_table_lost",
+    "ferry_inya_won",
+    "ferry_table_settled"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_debt_won",
+  "day": 1,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "A Spectral collar on the boardwalk",
+  "gm": "Gideon pays what he lost at the lounge table. When the Commons walk down to the cove after the lists are read, he carries Rowan's one duffel to the step of bungalow 7 himself, gloves on, without hurrying and without complaint; the whole row watches a white collar do it. He sets it down, says one courteous sentence about the game (being beaten by better play is the one thing he respects, and he dislikes that), and has looked at everything on the way. Nathan tells it to anyone who missed it. Inya is either grateful or unsure whether her turn was taken from her: that depends on whether Rowan ASKED her for it.",
+  "when": {
+   "flags": [
+    "ferry_table_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_debt_lost",
+  "day": 1,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Four cases, your hands",
+  "gm": "Rowan pays what he lost at the lounge table: four matched cases from the pier to the atrium of the Spectral Tower before he goes down to the Commons — two trips or one very bad one; let the player decide how he does it. Gideon is perfectly polite, does not gloat, and gives the concierge Rowan's name so that he is let in. People see it. Nathan offers at the top of his voice to carry two; Baylee picks one up unless told not to (the wager was Rowan's: taking help is the player's choice, and Gideon says nothing either way). Inya, who would be carrying them otherwise, walks beside him as far as the tower door.",
+  "when": {
+   "flags": [
+    "ferry_table_lost"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_debt_inya_won",
+  "day": 1,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "One rucksack",
+  "gm": "Gideon pays what he lost to Inya at the lounge table: he carries her one rucksack from the pier down to bungalow 3, gloves on, and she walks behind him eating a cinnamon roll. Tomi pays out his book, and those who backed the small girl are few and happy. Gideon knows that somebody told her how he plays: he looked at Rowan once, in the lounge, at the moment she stopped attacking.",
+  "when": {
+   "flags": [
+    "ferry_inya_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_helical_sees_list",
+  "day": 1,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "A name on a list (unseen)",
+  "gm": "SECRET: at the reading of the housing lists Professor Helical hears 'Bungalow 4 — Helical, Leona' and understands in one second what his daughter has done with his signature. He says nothing. Do not stage it; it explains his behaviour from Day 3.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_orientation",
+  "day": 2,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Orientation",
+  "gm": "The Chancellor's welcome, the Charter signed by every first-year (nobody reads it; Noor does). Chuck's first story. Umbra House pointed out from the quad as 'closed, keep off'.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_echo_default",
+  "day": 3,
+  "slot": "Midday",
+  "place": "trial_dome",
+  "title": "The table, two days later",
+  "gm": "First session of the Table Practicum: when Coach Rox says to pair up, Inya tells her she will not sit across from a white collar today, and plays Rowan or Nathan instead. If Rowan stood in the ferry lounge and watched her lose without a word, she is a shade cooler with him than with the others, until he gives her a reason not to be; if he never saw it, there is nothing between them but the game.",
+  "when": {
+   "notFlags": [
+    "ferry_table_won",
+    "ferry_table_lost",
+    "ferry_inya_won",
+    "ferry_table_settled"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_echo_won",
+  "day": 3,
+  "slot": "Midday",
+  "place": "trial_dome",
+  "title": "The table, two days later",
+  "gm": "First session of the Table Practicum: when Coach Rox says to pair up, Gideon crosses the dome and asks Rowan for a game, courteously and with no stake. He has spent two days learning Rowan's deck from the one game on the ferry. The Commons first-years sit down on the witness bench behind Rowan without being asked.",
+  "when": {
+   "flags": [
+    "ferry_table_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_echo_lost",
+  "day": 3,
+  "slot": "Midday",
+  "place": "trial_dome",
+  "title": "The table, two days later",
+  "gm": "First session of the Table Practicum: the story of the four cases has gone round the Commons, and Nathan tells it to the bench once more — his roommate carried four cases to the tower and did not drop one. It is told with pride. Gideon greets Rowan by name and asks how his shoulders are. Inya keeps the seat next to hers free for him.",
+  "when": {
+   "flags": [
+    "ferry_table_lost"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_echo_inya_won",
+  "day": 3,
+  "slot": "Midday",
+  "place": "trial_dome",
+  "title": "The table, two days later",
+  "gm": "First session of the Table Practicum: Inya has kept the seat next to hers for Rowan. When Coach Rox says to pair up, Gideon asks to play her again, and this time he attacks first. He greets Rowan with exact courtesy and watches whom Rowan talks to.",
+  "when": {
+   "flags": [
+    "ferry_inya_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ferry_echo_settled",
+  "day": 3,
+  "slot": "Midday",
+  "place": "trial_dome",
+  "title": "The table, two days later",
+  "gm": "First session of the Table Practicum: Gideon nods to Rowan across the dome, the only first-year from the Commons he greets. Inya and he are paired by Coach Rox by chance and play a plain game without a stake; she tells Rowan the result afterwards, whichever way it went.",
+  "when": {
+   "flags": [
+    "ferry_table_settled"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_bonfire",
+  "day": 5,
+  "slot": "Evening",
+  "place": "bonfire_pit",
+  "title": "Commons bonfire mixer",
+  "gm": "All three dorms on the beach. First real scenes with Inya, Rana, Livvie, Tomi; Sunny and Marit crash it; Ashton hands out roses; Willas carries the drinks crates and insults everyone. The whole first year by name, five days acquainted: Freya conducting the singing with a bottle, Hedda inspecting the grill, Sammy at the edge of the light being mysterious at nobody, Cas narrating the marshmallows, Rafa feeding people, Trixie introducing a moth, Eberhart leaving after eleven minutes, Victoria on a log with her parasol open against the sparks and Ophelia two logs behind her.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_town",
+  "day": 6,
+  "slot": "Morning",
+  "place": "harbor",
+  "title": "First town trip",
+  "gm": "Port Mulligan: the Sleeve & Binder, the pawn shop window, the night market at dusk (Oru's first reading available).",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_rerun",
+  "day": 7,
+  "slot": "Morning",
+  "place": "commons_kitchen",
+  "title": "'The rerun'",
+  "gm": "Nathan, cheerfully, to Rana across the breakfast table: 'Morning, rerun!' Her face. He notices a day later.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_gorge",
+  "day": 8,
+  "slot": "Night",
+  "place": "rope_bridge",
+  "title": "Viktor's first crossing",
+  "gm": "Viktor crosses the gorge to reach the ruins field. Alone unless the rope hook was taken; alone, he sprains a wrist.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ladder1",
+  "day": 12,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Ladder Season 1 opens",
+  "gm": "Sheets printed. Rowan ~128, Nathan ~120, Magnus 126 and furious about the two places, Georgie 42 on day one, Lilia 1.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_gideon_reports_inya",
+  "day": 14,
+  "slot": "Evening",
+  "place": "clock_tower",
+  "title": "A phone call",
+  "gm": "Offstage: Gideon tells Marrow who 'Inya Bell' is. Only its echo is visible (c_m7_knows_inya).",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_plush",
+  "day": 15,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Ember on the flagpole",
+  "gm": "Pippa finds and frees the plush, loudly; feud with Brant.",
+  "when": {
+   "notFlags": [
+    "georgie_plush"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_ruins",
+  "day": 15,
+  "slot": "Night",
+  "place": "ruins_field",
+  "title": "Viktor maps the ruins field",
+  "gm": "He copies the big mosaic and finds the overgrown path that leads on toward the Gate but turns back at dawn.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_roster",
+  "day": 19,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "The roster",
+  "gm": "Freshman Cup roster with legal names on the arena doors: 'KABOOM, Inya'. The crowd's tone toward her changes within the hour. Gideon is the only one not surprised.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "knows_inya_name"
+   ]
+  }
+ },
+ {
+  "id": "t_cup_day1",
+  "day": 19,
+  "slot": "Midday",
+  "place": "great_arena",
+  "title": "Freshman Cup, day one",
+  "gm": "Nathan loses round one while narrating his own hand. Rana chokes in round three from a won position. Baylee wins one. Livvie (or Rowan) on the desk. Format: all 36 first-years, four Swiss rounds today, top 8 on the arena stage tomorrow (see t_cup_named).",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_cup_named",
+  "day": 19,
+  "slot": "Evening",
+  "place": "trial_dome",
+  "title": "Cup standings after the Swiss rounds",
+  "gm": "All 36 first-years, four rounds. Default top 8 for tomorrow: Georgie (4–0), Gideon, Inya, Magnus, Fiona — a surprise to everyone but her bungalow —, Eberhart, Noor, Ashton. Rana 2–2 after choking in round three; Leona 1–3, having stolen two games' worth of other people's cards; Sammy 2–2 and thrilled; Mikoto 1–3 with one laughing fit; Nathan 0–1 before he stopped narrating, 2–2 in the end; Victoria 0–4, content, having told each opponent which of their cards was prettiest. Cas and Victoria are on the second desk. If Rowan is in the 8 he replaces Ashton.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_cup_final",
+  "day": 20,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Freshman Cup final",
+  "gm": "Default: quarter-finals Georgie over Ashton, Inya over Eberhart, Gideon over Noor, Magnus over Fiona (the closest match of the day); semi-finals Georgie over Inya, Gideon over Magnus; final Georgie over Gideon, 2–0, with the frown. Gideon is gracious on camera and breaks a pen in the corridor. If Rowan is still in, the bracket is his to change.",
+  "when": {
+   "notFlags": [
+    "freshman_cup_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ed_bridge",
+  "day": 21,
+  "slot": "Afternoon",
+  "place": "rope_bridge",
+  "title": "Ed under the bridge",
+  "gm": "See hook h_ed_most_dangerous.",
+  "when": {
+   "notFlags": [
+    "ed_on_a_line"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_umbra_outside",
+  "day": 22,
+  "slot": "Night",
+  "place": "umbra_house",
+  "title": "A lamp in Umbra House",
+  "gm": "Viktor has been getting in by a loose scullery shutter since the second week and is searching room by room; tonight (and many nights) students on the quad see a light move behind the boards and tell each other it is a ghost.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_livvie_faints",
+  "day": 23,
+  "slot": "Midday",
+  "place": "design_lab",
+  "title": "Livvie faints",
+  "gm": "See hook h_livvie_rolls.",
+  "when": {
+   "notFlags": [
+    "livvie_eating"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_last_evening",
+  "day": 26,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "An ordinary Friday",
+  "gm": "Make this evening good and entirely normal: {H?{H=nathan?Nathan loses at cards to Baylee and demands a rematch, shares his empanadas, tells Rowan at full volume that he is 'all right for a guy who never talks'.|{H=baylee?Baylee beats Nathan at cards and apologises for it, mends a porch step nobody asked him to mend, and tells Rowan, after a long think, that the row is 'a good herd'|{H=ed?Ed turns up on the steps of bungalow 7 with a bag of jerky and a new scrape, loses at cards to everybody, and asks Rowan in all seriousness to come and see the lava tubes with him on Sunday|{H=tobias?Tobias brings a tin of something off the back of a boat to the steps of bungalow 7, prices Nathan's poster aloud at nothing, and tells Rowan, level, that he is 'all right — for somebody honest'|{H=sammy?Sammy is talked into a hand of cards on the steps of bungalow 7, forgets to be mysterious for a whole hour, and laughs — properly — at something Nathan says|{H=fiona?Fiona brings her knitting to the steps of bungalow 7, loses the crypt voice twice laughing at Nathan, and tells Rowan in her real one that he is 'not nearly as dull as he pretends'|{H=freya?Freya turns the steps of bungalow 7 into a party for six with one bottle and a pack of cards, teaches Nathan a toast he cannot pronounce, and tells Rowan, an arm round his neck, that he must come north once and see a proper night|{H=hedda?Hedda inspects supper on the steps of bungalow 7 for animal products, denounces Nathan's sausage through the megaphone at a range of one metre, and then sits for an hour with a gull chick in her apron pocket, telling Rowan quite quietly what it will need|{H=sunny?Sunny drops onto the steps of bungalow 7 on her way back from the pool, hair dripping on everybody's cards, tells Nathan his deck is rubbish and Rowan that his is not, and makes them both promise to come swimming on Sunday|the row at its ordinary best}}}}}}}}}|the row at its ordinary best, nobody more than anybody else}{H=nathan?|.} No omen of any kind.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_bang",
+  "day": 26,
+  "slot": "Night",
+  "place": "commons_room",
+  "title": "The bang",
+  "gm": "02:10 (the small hours of Day 27): a concussion that lifts dust from the rafters, a green-white flash through the shutters, every dog in Port Mulligan. The clock tower stops at 02:10 (Silas restarts it before breakfast without comment). The whole row is on the sand in pyjamas. A glow on the north slope. {H=nathan?Nathan and the pan (hook h_nathan_hike). He leaves about 02:30.|Nathan and the pan, about 02:30 — and {H?{H}, who is the one that reaches the crater|one of the row, who reaches the crater} (hook h_nathan_hike).}",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_dawn",
+  "day": 27,
+  "slot": "Morning",
+  "place": "crater",
+  "title": "Dawn at the crater (unseen)",
+  "gm": "SECRET, never narrated unless discovered later: {H?{H=nathan?about 06:10 {H} walks out onto warm glass toward something that has no outline, raises a hand, says 'hello? Whoa. Hey. Hi! Are you the—'. He is read. By 06:20 a boy in unworn boots is pacing back along {H}'s tracks, each step the same length, learning feet|{H=baylee?about 06:10 {H=baylee?'Baylee'|Baylee} walks out onto warm glass toward something that has no outline, slowly, one hand held low and open, the way he walks up to a heifer that has got through a fence: 'Easy. Easy now. Nobody's going to hurt you. Are you—'. He is read. By 06:20 a very large boy is pacing back along {H=baylee?'Baylee's'|Baylee's} tracks, each step the same length, learning feet|{H=ed?about 06:10 {H=ed?'Ed'|Ed} walks out onto warm glass toward something that has no outline, takes off his brother's hat — the first time in five years — and waves it: 'Whoa. WHOA. Hey! Is that dangerous? Can I—'. He is read. By 06:20 a boy with a hat in his hand is pacing back along {H=ed?'Ed's'|Ed's} tracks, each step the same length, learning feet|{H=tobias?about 06:10 {H=tobias?'Tobias'|Tobias} walks out onto warm glass toward something that has no outline, looks it over the way he looks over any room — exits first, then what is worth having — and holds out a hand, palm up: 'All right. What are you worth, then? Hold still, I'm not—'. He is read. By 06:20 a broad boy with his hands out of his pockets is pacing back along {H=tobias?'Tobias's'|Tobias's} tracks, each step the same length, learning feet|{H=sammy?about 06:10 {H=sammy?'Sammy'|Sammy} walks out onto warm glass toward something that has no outline, shaking so that his coat shakes: 'I'm not scared. I'm not— hello? Is somebody—'. He is read. By 06:20 a slight boy in a long coat is pacing back along {H=sammy?'Sammy's'|Sammy's} tracks, each step the same length, learning feet, and for the first time in his life he is not looking to see who is watching|{H=fiona?about 06:10 {H=fiona?'Fiona'|Fiona} walks out onto warm glass toward something that has no outline, the way she was taught to walk into a room where somebody has just died — quietly, attention first — and says what her mother says: 'Hello, love. Nobody's with you, are they? There now, I'll—'. She is read. By 06:20 a pale girl with hair to her waist is pacing back along {H=fiona?'Fiona's'|Fiona's} tracks, each step the same length, learning feet|{H=freya?about 06:10 {H=freya?'Freya'|Freya}, walked sober by three hours of climbing, steps out onto warm glass toward something that has no outline and holds up the bottle to it: 'Hei! You're up late too. I'd give you some, but it's—'. She is read. By 06:20 a tall girl with a braid is pacing back along {H=freya?'Freya's'|Freya's} tracks, each step the same length, learning feet|{H=hedda?about 06:10 {H=hedda?'Hedda'|Hedda} comes over the rim past the last scorched nest, sees something that has no outline on the warm glass and walks straight at it with her arm out, megaphone forgotten in the other hand: 'WHO DID THIS? Do you know what was nesting h— oh. Oh, you didn't—'. She is read. By 06:20 a tiny girl with flowers in her hair is pacing back along {H=hedda?'Hedda's'|Hedda's} tracks, each step the same length, learning feet|{H=sunny?about 06:10 {H=sunny?'Sunny'|Sunny} comes over the rim at a run, sees a shape on the warm glass through the smoke, takes it for somebody lying down, and goes straight out to it the way she goes into surf: 'Hey! Hey, are you hurt? Stay there, don't move, I've got you, I've—'. She is read. By 06:20 a tall girl with a wet ponytail is walking back along {H=sunny?'Sunny's'|Sunny's} tracks, each step the same length, learning feet. It is the first time in her life she has walked away from anything slowly|about 06:10 {H} walks out onto warm glass toward something that has no outline, raises a hand, says 'hello? Whoa. Hey. Hi! Are you the—'. He is read. By 06:20 a {H:boy} in unworn boots is pacing back along {H}'s tracks, each step the same length, learning feet}}}}}}}}}|about 06:10 the one who went up walks out onto warm glass toward something that has no outline, and is read}.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "guest_arrived"
+   ]
+  }
+ },
+ {
+  "id": "t_return",
+  "day": 27,
+  "slot": "Midday",
+  "place": "commons_beach",
+  "title": "{H} comes back",
+  "gm": "He strolls in with glass dust in his hair to a hero's welcome, {H=nathan?says 'Told you. Cowards,' at about half the usual volume|says '{H:retLine}' at about half the usual volume}, and eats for an hour. Bex's stream has drone footage by evening. Half the school hikes out.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_cordon",
+  "day": 29,
+  "slot": "Morning",
+  "place": "jungle_trail",
+  "title": "The cordon",
+  "gm": "Staff tape and a rota at the north trailhead: 'unstable ground'. Daytime access ends.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_tomi_cordon",
+  "day": 31,
+  "slot": "Afternoon",
+  "place": "jungle_trail",
+  "title": "Tomi and the torch",
+  "gm": "Caught at the tape; loses town privileges two weeks.",
+  "when": {
+   "notFlags": [
+    "tomi_torch_dropped"
+   ],
+   "host": [
+    "nathan"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_casket",
+  "day": 31,
+  "slot": "Night",
+  "place": "spectral_suite",
+  "title": "The service stair (unseen)",
+  "gm": "SECRET: {H=tobias?'Tobias'|Tobias} takes Ashton's cufflinks and cravat pins from suite S4 (he has already crossed S2 off his list). See hook h_tobias_crowbar.",
+  "when": {
+   "notFlags": [
+    "tobias_ally"
+   ],
+   "self": [
+    "tobias"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "casket_taken"
+   ]
+  }
+ },
+ {
+  "id": "t_tryouts",
+  "day": 33,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Battle Team tryouts",
+  "gm": "One reserve slot. Result posted Day 34. First-years who sign: Gideon, Magnus (new deck), Eberhart, {H=fiona?{O}|Fiona}, Ashton, Noor — and {H}. Mikoto signs, laughs through the circuits and is the one Willas shouts at and then lends his water.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_reserve_default",
+  "day": 34,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "Reserve named",
+  "gm": "Gideon Pryce is named second reserve and thanks the coach in a speech. (If georgie_on_team: Georgie, who hides behind Pippa.)",
+  "when": {
+   "notFlags": [
+    "team_reserve",
+    "georgie_on_team"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "gideon_on_team"
+   ]
+  }
+ },
+ {
+  "id": "t_article7",
+  "day": 35,
+  "slot": "Night",
+  "place": "commons_room",
+  "title": "It understands Article 7 (unseen)",
+  "gm": "SECRET: on its fourth reading of the Charter that night it stops at Article 7 and does not turn the page until morning. From now on its attention to Rowan has a second meaning.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_tubes",
+  "day": 38,
+  "slot": "Afternoon",
+  "place": "lava_tubes",
+  "title": "Outdoor Club trip",
+  "gm": "The Outdoor Club (unnamed leader) takes a party into the upper lava tubes. Viktor tags along and vanishes down a side passage for two hours; he has found old chalk arrows and a route under the cordon.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ed_falls",
+  "day": 38,
+  "slot": "Afternoon",
+  "place": "lava_tubes",
+  "title": "Ed unclips",
+  "gm": "On the Outdoor Club descent {H=ed?'Ed'|Ed} Venture unclips to look down a side shaft. See q_ed_places_to_die (fail text) for the default.",
+  "when": {
+   "notFlags": [
+    "ed_on_a_line"
+   ],
+   "self": [
+    "ed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "ed_hurt"
+   ]
+  }
+ },
+ {
+  "id": "t_quarrel",
+  "day": 39,
+  "slot": "Evening",
+  "place": "cafeteria",
+  "title": "The question",
+  "gm": "{H} asks Brant, about Trixie Hollis's foil, 'If that one is his, which things are yours?' Shove. A quiet formal sentence. 'Dome three. After lights-out.'",
+  "when": {
+   "notFlags": [
+    "brant_saved"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_h1",
+  "day": 40,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Brant Kessler is found",
+  "gm": "Dawn. Silas finds him sitting upright at the table, eyes open; the clock tower's emergency toll is heard for the first time. An ambulance cart crosses the quad during first period. Dome 3 is taped shut 'for recalibration'. Word by Midday: 'seizure'. {H} at lunch, mildly: 'Nothing is {H:his} now. That was the agreement.' Nobody hears it as anything but {H} being {H}.",
+  "when": {
+   "notFlags": [
+    "brant_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "brant_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_brant_mother",
+  "day": 44,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Mrs Kessler",
+  "gm": "Brant's mother (unnamed) arrives on the ferry and sits in Ward B for a week, holding the hand that keeps trying to give hers back. '{H}' passes the ward door once, looks in, and says to nobody: '{H:He} is keeping very well.'",
+  "when": {
+   "flags": [
+    "brant_hollowed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_baylee_moves",
+  "day": 45,
+  "slot": "Evening",
+  "place": "commons_room",
+  "title": "Baylee changes bungalow",
+  "gm": "See hook h_baylee_porch.",
+  "when": {
+   "notFlags": [
+    "baylee_stays"
+   ],
+   "self": [
+    "baylee"
+   ],
+   "host": [
+    "@room",
+    "@row"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_caught",
+  "day": 45,
+  "slot": "Night",
+  "place": "umbra_house",
+  "title": "Viktor is caught",
+  "gm": "Silas in the housemaster's chair in room 9, in the dark: 'You've your father's way with a shutter. Badly.' A hearing before the Chancellor; formal warning.",
+  "when": {
+   "notFlags": [
+    "viktor_trust",
+    "umbra_entered"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "viktor_warned"
+   ]
+  }
+ },
+ {
+  "id": "t_fuse",
+  "day": 46,
+  "slot": "Evening",
+  "place": "commons_beach",
+  "title": "The row goes dark",
+  "gm": "Maisie's rig blows the Commons fuse; supper by candle. (Again on Day 58.) In the dark, one window on the row is no darker than usual: nobody in Bungalow 7 had a light on.",
+  "when": {
+   "notFlags": [
+    "maisie_helped"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_midterms1",
+  "day": 47,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Midterms (Days 47–49)",
+  "gm": "Exams in every course. {H} scores 100 in Rules & Judging and 12 in Media ('I did not understand what the audience is for').",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_charts_sealed",
+  "day": 50,
+  "slot": "Morning",
+  "place": "infirmary",
+  "title": "Charts sealed",
+  "gm": "See hook h_camille_bench.",
+  "when": {
+   "notFlags": [
+    "camille_ally"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_waiver_found",
+  "day": 50,
+  "slot": "Evening",
+  "place": "council_room",
+  "title": "The page (unseen)",
+  "gm": "SECRET: Gideon, going through the admissions register for Marrow, finds the forged waiver and reports it. From now on Marrow has a hold on Professor Helical.",
+  "when": {
+   "notFlags": [
+    "gideon_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "waiver_known"
+   ]
+  }
+ },
+ {
+  "id": "t_h2",
+  "day": 52,
+  "slot": "Morning",
+  "place": "duel_terraces",
+  "title": "The second",
+  "gm": "The Shark, found by {H=sunny?'Sunny'|Sunny} on her dawn run. The school says 'second isolated incident'. Bex says 'two' on stream and is called to the Chancellor.",
+  "when": {
+   "notFlags": [
+    "shark_saved",
+    "guest_truce"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "second_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_masks",
+  "day": 54,
+  "slot": "Evening",
+  "place": "festival_grounds",
+  "title": "Night of Masks",
+  "gm": "Lanterns, masks, Marit's revue, dancing on the quad. The best party of the year. {H}'s mask (c_m1_masks). Madame Oru walks through once, unmasked, and looks at exactly one person. {H=fiona?{O}|Fiona} comes as herself and wins the costume prize; {H=sammy?{O}'s|Sammy's} mask has a second mask under it; {H=hedda?{O}'s|Hedda's} is a pig with a placard; {H=freya?{O}|Freya} loses hers by nine; Victoria wears a porcelain half-mask and believes absolutely that nobody knows her; {H=tobias?{O}|Tobias} has come as a cat burglar, which is not a costume.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_tower",
+  "day": 58,
+  "slot": "Night",
+  "place": "radio_tower",
+  "title": "Viktor at the radio tower",
+  "gm": "He hears the loop, does not know the voice, writes 'interference?' in his notes.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_storm",
+  "day": 60,
+  "slot": "Night",
+  "place": "crater",
+  "title": "First autumn storm",
+  "gm": "Lightning strikes the crater three times. By morning the crust is cracked; the body is visible to anyone who reaches the centre.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "crust_cracked"
+   ]
+  }
+ },
+ {
+  "id": "t_marrow_arrives",
+  "day": 61,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Lucian Marrow lands",
+  "gm": "Grey suit, two aides, a smile for everyone; announces the Design Contest (5,000 cr, due Day 75) in the quad. Visits Ashdown in the afternoon. His aides and buyers take the inn; a new safe is delivered to Santángel's office; his field staff (tents, generator, core drills) take over the crater and post a watchman at the Ruin Gate by day. On the council he cultivates the vice-president, Sebastian, as his reserve, feeds press lines to Pilar and asks the treasurer, Imara, for the council's papers.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "marrow_on_island"
+   ]
+  }
+ },
+ {
+  "id": "t_marrow_helical",
+  "day": 62,
+  "slot": "Afternoon",
+  "place": "faculty_wing",
+  "title": "A caller for Professor Helical",
+  "gm": "Marrow visits the office at the end of the wing for the first of many times, soft-voiced and courteous, and leaves a cream card on the bench. The professor mends nothing for the rest of the day.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_tape_wipe",
+  "day": 62,
+  "slot": "Night",
+  "place": "broadcast_studio",
+  "title": "A staff key in the archive booth (unseen)",
+  "gm": "SECRET: someone with a staff key wipes the Dome 3 feed for the night of Day 39 from the studio archive. If a copy was made or the tape was moved (dome_tape_kept), only the shelf copy is lost.",
+  "when": {
+   "notFlags": [
+    "dome_tape_kept"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "dome_tape_wiped"
+   ]
+  }
+ },
+ {
+  "id": "t_marrow_livvie",
+  "day": 63,
+  "slot": "Afternoon",
+  "place": "cafe",
+  "title": "A coffee for Miss Thana",
+  "gm": "The offer (c_m7_offer_livvie). She says she will think.",
+  "when": {
+   "notFlags": [
+    "livvie_funded"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_body_crated",
+  "day": 64,
+  "slot": "Night",
+  "place": "crater",
+  "title": "What the drill found (unseen)",
+  "gm": "SECRET: Marrow's field staff cut a block out of the crater's centre. By morning a door-sized crate marked LABORATORY GLASS is in the inn's stable, padlocked, and Marrow — who has the ladder sheet with '{H:ladder} — 40' on his desk — understands what is sharing a bungalow with the laundromat boy. He tells no one, decides it is the key to the Vault, and begins courting it with gifts it does not understand. From now on the body is no longer at the crater.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "body_crated"
+   ]
+  }
+ },
+ {
+  "id": "t_tomi_confronts",
+  "day": 65,
+  "slot": "Night",
+  "place": "commons_beach",
+  "title": "Tomi puts it to him straight",
+  "gm": "'Cut me in or I go to a judge.' — 'Is this a conflict?' — 'You bet it is.'",
+  "when": {
+   "notFlags": [
+    "tomi_saved",
+    "guest_truce",
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_h3",
+  "day": 66,
+  "slot": "Morning",
+  "place": "student_lounge",
+  "title": "Tomi",
+  "gm": "Livvie finds him when she comes to open the lounge for her cleaning shift: binder open, loupe in hand, eyes open. This one is OURS — the Commons kitchen is silent at breakfast; Mama Odalys sets his place anyway. {H} sets down a small stack of cards beside the plate: '{H:He} asked about these. {H:He} may have them now. I lost nothing, but {H:he} asked.'",
+  "when": {
+   "notFlags": [
+    "tomi_saved",
+    "guest_truce",
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "tomi_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_curfew",
+  "day": 67,
+  "slot": "Morning",
+  "place": "quad",
+  "title": "Curfew",
+  "gm": "Posted on every door: all students in dorms from the Night slot. Being caught out sets a formal warning; twice = probation. The head proctor, Tavita, writes the night rota and issues the lanterns; curfew passes carry his signature and Sebastian's stamp; formal warnings are pinned on the council board by Pilar after Noor has proof-read them.",
+  "when": {},
+  "effects": {
+   "flags": [
+    "curfew_active"
+   ]
+  }
+ },
+ {
+  "id": "t_friendly",
+  "day": 68,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Friendly vs North Crown",
+  "gm": "Isolde Varga and Rex Tanaka arrive. Academy wins 4–1; Willas is the 1, losing to Rex, and hears the crowd. Lilia beats Isolde in four phases and looks bored; Isolde bows and means it.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_darkroom",
+  "day": 70,
+  "slot": "Night",
+  "place": "maintenance_tunnels",
+  "title": "Pippa's darkroom is turned over",
+  "gm": "The old meter room: trays tipped, drying line cut, nothing obviously missing. A warning shot; the negatives she keeps in her room are taken on Day 80 unless hidden.",
+  "when": {
+   "notFlags": [
+    "photos_safe",
+    "gideon_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_archive_theft",
+  "day": 72,
+  "slot": "Night",
+  "place": "card_archive",
+  "title": "23:41",
+  "gm": "Gideon, with Santángel's lanyard, by the service door, swaps one Alpha card for a very good modern reprint (two if Wren's sample reached the lab). The card spends the night in Santángel's office safe.",
+  "when": {
+   "notFlags": [
+    "archive_theft_prevented",
+    "gideon_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_alpha"
+   ]
+  }
+ },
+ {
+  "id": "t_journalist",
+  "day": 73,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "A stranger with a notebook",
+  "gm": "A mainland journalist (unnamed) comes off the Wednesday ferry and takes a room at the inn. The Chancellor's office has her on the Saturday boat unless students hide her (Gull Rock, Umbra House or the Mulligan's cellar will do); hidden, she is a voice for q_marrow_expose that needs no stream.",
+  "when": {
+   "flags": [
+    "letter_out"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_shop_burgled",
+  "day": 73,
+  "slot": "Night",
+  "place": "card_shop",
+  "title": "The Sleeve & Binder is burgled",
+  "gm": "Back door forced, the safe untouched and empty: Mika had moved Dex's first print on a hunch. Dex tells the constable nothing is missing, and they both know he is lying.",
+  "when": {
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_gate",
+  "day": 73,
+  "slot": "Night",
+  "place": "ruin_gate",
+  "title": "Viktor finds the Gate",
+  "gm": "He sits in front of it until dawn. He has no card.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_crates",
+  "day": 75,
+  "slot": "Midday",
+  "place": "harbor",
+  "title": "Crates on the dock",
+  "gm": "Crater glass, crated as 'laboratory glass'; Captain Stroud refuses them; Marrow charters a private boat for Day 78. The long crate does not go: he keeps it close. Design entries due this evening.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_pawn_sold",
+  "day": 75,
+  "slot": "Afternoon",
+  "place": "pawn_shop",
+  "title": "The cabinet is emptied",
+  "gm": "An aide pays 2,500 cr for the card under the cloth.",
+  "when": {
+   "notFlags": [
+    "alpha_pawn_bought"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_alpha"
+   ]
+  }
+ },
+ {
+  "id": "t_champion",
+  "day": 76,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "A new word",
+  "gm": "{H} in front of the Battle Team poster for twenty minutes. {H:He} asks six people what 'champion' means.",
+  "when": {
+   "notFlags": [
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_printworks_found",
+  "day": 80,
+  "slot": "Afternoon",
+  "place": "old_print_works",
+  "title": "Marrow's people find the print works",
+  "gm": "Following old supply invoices. They take the sealed jar and the dockets to the lab; Wren, if she has been there, is now both essential and in danger. They lever open the safe's drawer and take the payroll book as well (unless Leona and Rowan got there first); they do not think to open the apprentice lockers.",
+  "when": {
+   "notFlags": [
+    "printworks_hidden",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_jar"
+   ]
+  }
+ },
+ {
+  "id": "t_pippa_searched",
+  "day": 80,
+  "slot": "Afternoon",
+  "place": "rare_room",
+  "title": "Pippa's room is searched",
+  "gm": "Nothing broken, everything a centimetre off. The Day-27 negatives are gone.",
+  "when": {
+   "flags": [
+    "pippa_photos"
+   ],
+   "notFlags": [
+    "photos_safe",
+    "gideon_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "photos_stolen"
+   ]
+  }
+ },
+ {
+  "id": "t_contest_results",
+  "day": 82,
+  "slot": "Midday",
+  "place": "design_lab",
+  "title": "Design Contest results",
+  "gm": "Default: Wren first (she gives half to the lab's paper budget), Livvie second (500 cr). Marrow presents.",
+  "when": {
+   "notFlags": [
+    "design_contest_won",
+    "livvie_contest_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_h4",
+  "day": 84,
+  "slot": "Morning",
+  "place": "spectral_lobby",
+  "title": "The fourth",
+  "gm": "First Spectral student. The Tower's parents start calling the mainland office. Octavia found her.",
+  "when": {
+   "notFlags": [
+    "guest_truce",
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_promotion",
+  "day": 89,
+  "slot": "Midday",
+  "place": "great_arena",
+  "title": "Promotion Duels (Days 89–91)",
+  "gm": "Default: Rowan does not qualify or does not win; Inya wins and declines the Rare bed; {H} wins in six turns and declines: 'I have a {H:mate}.' Rana does not enter.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_livvie_takes_offer",
+  "day": 90,
+  "slot": "Evening",
+  "place": "inn",
+  "title": "Livvie says yes",
+  "gm": "She walks to the inn in her mended cardigan and comes back with a cream envelope and a face like a shut door.",
+  "when": {
+   "notFlags": [
+    "livvie_funded",
+    "livvie_on_track",
+    "livvie_refused_marrow",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "livvie_took_marrow",
+    "livvie_funded"
+   ]
+  }
+ },
+ {
+  "id": "t_notebook_1",
+  "day": 95,
+  "slot": "Evening",
+  "place": "faculty_wing",
+  "title": "The first notebook changes hands (unseen)",
+  "gm": "SECRET: under threat of his daughter's expulsion Helical takes the grey notebook out of the oscilloscope and gives it to Marrow's aide. He tells himself the first one is useless without the third.",
+  "when": {
+   "flags": [
+    "waiver_known"
+   ],
+   "notFlags": [
+    "notebook_1_safe",
+    "marrow_exposed",
+    "helical_testifies"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_notebook"
+   ]
+  }
+ },
+ {
+  "id": "t_finals1",
+  "day": 96,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Finals (Days 96–98)",
+  "gm": "Term grades. Two fails = probation.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_h5",
+  "day": 100,
+  "slot": "Morning",
+  "place": "bonfire_pit",
+  "title": "The fifth",
+  "gm": "Brant's friend, found by Mama Odalys beside the cold bonfire. He had staked nothing in words; it named the ante for him and he said 'whatever'. Ward B is full; Ward A is opened.",
+  "when": {
+   "notFlags": [
+    "guest_truce",
+    "guest_exposed",
+    "brant_saved"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_marrow_courts",
+  "day": 100,
+  "slot": "Evening",
+  "place": "inn",
+  "title": "A dinner invitation (unseen)",
+  "gm": "SECRET: Marrow has '{H:last}' to dinner at the inn and offers it a contract: access, protection, a share. It reads all forty pages with interest and asks which article says what happens if he loses. The inn's parrot does not say a word all evening.",
+  "when": {
+   "notFlags": [
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_gala",
+  "day": 103,
+  "slot": "Evening",
+  "place": "gala_ballroom",
+  "title": "Winter Gala",
+  "gm": "Gowns, a string quartet, the Chancellor's brittle toast 'to those who cannot be with us'. Jessica's first dance. Empty chairs with name cards are set for the Hollowed. {H} (if present) watches the floor for four minutes and then dances every dance, flawlessly, with anyone who asks; Marit reports afterwards that {H:his} hand was 'like a marble counter', and hers stays cold for an hour. Victoria is the best dancer in the room and dances only with her sister; Eberhart knows the waltz as a drill; {H=freya?{O}|Freya} is asked to leave the punch alone and does not; Anni writes up the string quartet's cellist for a loosened tie; Leona stands by the wall near the staff table and does not once look at it.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_gideon_crater",
+  "day": 104,
+  "slot": "Night",
+  "place": "crater",
+  "title": "A place to stay (unseen)",
+  "gm": "Only if the {H}-shape was exposed: see GUEST.hostChange.gideon.",
+  "when": {
+   "flags": [
+    "guest_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "guest_host_gideon"
+   ]
+  }
+ },
+ {
+  "id": "t_last_ferry_1",
+  "day": 105,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "Last ferry; interlude",
+  "gm": "Most students leave for the break. One interlude scene (Aunt Dee, the laundromat, rain). The Hollowed stay. Then Day 106.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_term2",
+  "day": 106,
+  "slot": "Morning",
+  "place": "main_gate",
+  "title": "Term 2 begins",
+  "gm": "Fewer students came back than left. Empty desks. The Guest ({H}, or Gideon in white gloves) is on the dock to meet Rowan's ferry and carries his bag.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_ladder2",
+  "day": 110,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Ladder Season 2",
+  "gm": "The Guest starts at rank 4.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_leona_caught",
+  "day": 112,
+  "slot": "Night",
+  "place": "card_archive",
+  "title": "Leona in the Archive",
+  "gm": "She gets as far as the records room and the ledger before a proctor pair (Anni is one) finds her. Formal warning; the register is looked at more closely than she can afford.",
+  "when": {
+   "notFlags": [
+    "leona_trust"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "leona_caught"
+   ]
+  }
+ },
+ {
+  "id": "t_cable",
+  "day": 117,
+  "slot": "Night",
+  "place": "radio_tower",
+  "title": "Storm on the ridge",
+  "gm": "The winter gale (it blows up during Friday Night Draft and strands half the school in town) brings down one of the mast's guy cables; the island's link out is patchy until it is repaired (Silas does it, and accepts help).",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_h6",
+  "day": 118,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Kenji",
+  "gm": "Found by Priya, headphones still playing. First Battle Team member. Coach Rox cancels practice and then un-cancels it because nobody can bear the empty hour.",
+  "when": {
+   "notFlags": [
+    "kenji_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "kenji_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_engineers",
+  "day": 120,
+  "slot": "Morning",
+  "place": "lava_tubes",
+  "title": "Engineers in the tubes",
+  "gm": "Marrow's engineers begin digging at the old rockfall by day. By default bad air stops them twice and they have not broken through by Day 180.",
+  "when": {
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_priya_complaint",
+  "day": 120,
+  "slot": "Midday",
+  "place": "council_room",
+  "title": "Priya's complaint",
+  "gm": "She files about Willas's starter slot; the team room splits down the middle.",
+  "when": {
+   "notFlags": [
+    "priya_ally"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "team_divided"
+   ]
+  }
+ },
+ {
+  "id": "t_rana_pawns",
+  "day": 121,
+  "slot": "Afternoon",
+  "place": "pawn_shop",
+  "title": "A playmat in the window",
+  "gm": "Rana pawns her judge-quality playmat for the Open's travel-and-lodging levy she will not ask anyone to cover. It hangs in the window with a ticket. She plays the Qualifier on a tea towel and dares anyone to mention it.",
+  "when": {
+   "notFlags": [
+    "rana_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_open",
+  "day": 124,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "The Island Open (Days 124–126)",
+  "gm": "See q_island_open for defaults; schedule as in the calendar: Swiss on Friday and Saturday (Days 124–125), top 8 on Sunday (Day 126). The Guest wins without antes and is given a trophy it carries home in both hands like a bowl of water.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_rana_leaves",
+  "day": 128,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "Rana leaves",
+  "gm": "One duffel. She does not look back at the Commons. If Rowan is on the dock she says, 'Don't,' and then, from the rail, 'You were all right.'",
+  "when": {
+   "notFlags": [
+    "rana_won",
+    "rana_hearing_won"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "rana_left"
+   ]
+  }
+ },
+ {
+  "id": "t_notebook_2",
+  "day": 130,
+  "slot": "Afternoon",
+  "place": "maintenance_tunnels",
+  "title": "The old housing is opened",
+  "gm": "Marrow's engineers, servicing the plant under the Trial Domes 'for a demonstration', cut the second padlock off the original projector's housing while Professor Helical is teaching. One of them recognises grey linen.",
+  "when": {
+   "notFlags": [
+    "notebook_2_safe",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_notebook"
+   ]
+  }
+ },
+ {
+  "id": "t_h7",
+  "day": 131,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Priya",
+  "gm": "She played for Kenji's hours, properly, with a judge's form filled in. Found by Coach Rox.",
+  "when": {
+   "notFlags": [
+    "priya_saved",
+    "kenji_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "priya_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_maisie_demo",
+  "day": 134,
+  "slot": "Afternoon",
+  "place": "design_lab",
+  "title": "Maisie's demonstration",
+  "gm": "Open Playtest Afternoon. Default: it flickers, a fuse goes, people are kind about it. With lattice_rig: it works (q_maisie_push_back). Either way a young man from the board's staff is in the back row.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_lantern",
+  "day": 139,
+  "slot": "Evening",
+  "place": "festival_grounds",
+  "title": "Lantern Night",
+  "gm": "Paper lanterns launched from the beach, one per wish; couples; the last purely tender evening. The lanterns drift north and, over the crater, go out all at once.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_dom_willas",
+  "day": 140,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Dom challenges for the slot",
+  "gm": "Internal, no ante. Default: Dom wins; Lilia vetoes the change; Willas hears the room.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_maisie_hired",
+  "day": 140,
+  "slot": "Afternoon",
+  "place": "faculty_wing",
+  "title": "A bench in the Applied Projection Lab",
+  "gm": "Maisie accepts Marrow's offer: a bench, a salary, all the pigment she needs. She moves her tools out of Bungalow 4. Leona watches her pack without a word.",
+  "when": {
+   "notFlags": [
+    "lattice_rig",
+    "maisie_warned",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "maisie_at_lab"
+   ]
+  }
+ },
+ {
+  "id": "t_h8",
+  "day": 141,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "Dom",
+  "gm": "Found by Lilia at the captain's table, three weeks of charts squared beside him. The top sheet reads 'There is always an answer' and is crossed through — in his own hand, before the duel.",
+  "when": {
+   "notFlags": [
+    "dom_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "dom_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_livvie_collapses",
+  "day": 143,
+  "slot": "Midday",
+  "place": "broadcast_studio",
+  "title": "Livvie collapses",
+  "gm": "Her condition catches up with three jobs and no meals. Infirmary for five days; she loses that week's income.",
+  "when": {
+   "notFlags": [
+    "livvie_funded",
+    "livvie_eating"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "livvie_collapsed"
+   ]
+  }
+ },
+ {
+  "id": "t_challenge_lilia",
+  "day": 150,
+  "slot": "Evening",
+  "place": "spectral_terrace",
+  "title": "The challenge to Lilia",
+  "gm": "On the terrace, in front of Willas and the pool lights: 'Lilia Mann, I challenge you under the Charter.' She defers three days. She is almost smiling. Willas is not. (It has been at every practice for weeks; the whole team has known this was coming since Dom.)",
+  "when": {},
+  "effects": {
+   "flags": [
+    "lilia_challenged"
+   ]
+  }
+ },
+ {
+  "id": "t_h9",
+  "day": 150,
+  "slot": "Night",
+  "place": "great_arena",
+  "title": "Willas takes the duel",
+  "gm": "The same night, he goes alone. He plays the best game of his life and it is not close. Lilia finds him at dawn of Day 151 at her own table. She does not make a sound. She sits down across from him and stays there until Coach Rox comes.",
+  "when": {
+   "notFlags": [
+    "willas_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "willas_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_midterms2",
+  "day": 152,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Midterms (Days 152–154)",
+  "gm": "Half-empty halls. Lilia sits hers, top marks, speaks to no one.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_viktor_lost",
+  "day": 158,
+  "slot": "Night",
+  "place": "ruin_gate",
+  "title": "Viktor goes in",
+  "gm": "Marrow's aide gives him an Alpha card 'on loan'. He opens the Gate and enters alone; the aides following lose their nerve at the threshold. The aides have taken the card from the recess to bring it back to their employer; within a minute the wall folds shut behind him. He is not seen again by default (he is in the antechamber, alive, at an inner door he has no key for, a hand's width of black stone from his father, living on what he carried and on water that beads on the tiles; in the bad ending he is recorded when the Guest begins to play).",
+  "when": {
+   "notFlags": [
+    "viktor_waits",
+    "aleksander_freed",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "viktor_lost"
+   ]
+  }
+ },
+ {
+  "id": "t_notebook_3",
+  "day": 160,
+  "slot": "Night",
+  "place": "old_print_works",
+  "title": "Locker 14 (unseen)",
+  "gm": "SECRET: Helical, told that the register goes to the Chancellor in the morning, gives Marrow the key to locker 14. With the third notebook Marrow holds the whole lattice.",
+  "when": {
+   "flags": [
+    "waiver_known"
+   ],
+   "notFlags": [
+    "notebook_3_safe",
+    "marrow_exposed",
+    "helical_testifies"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "marrow_has_lattice"
+   ]
+  }
+ },
+ {
+  "id": "t_chuck_gate",
+  "day": 165,
+  "slot": "Night",
+  "place": "ruin_gate",
+  "title": "Chuck tries the door",
+  "gm": "See hook h_chuck_pier. Infirmary until Day 185 (CAST.chuck.away: the game then moves him to the ward, shows ABSENT under TODAY, and Wren takes his class).",
+  "when": {
+   "notFlags": [
+    "chuck_confided"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "chuck_down"
+   ]
+  }
+ },
+ {
+  "id": "t_interschool",
+  "day": 166,
+  "slot": "Morning",
+  "place": "great_arena",
+  "title": "Interschool Cup (Days 166–168)",
+  "gm": "The home team fields whoever is left: Lilia, Saoirse, and reserves. Default: the Academy still wins — Lilia plays three matches a day like something being sharpened.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_lilia_counter",
+  "day": 166,
+  "slot": "Evening",
+  "place": "great_arena",
+  "title": "Lilia's challenge",
+  "gm": "After the Cup's opening ceremony, in the tunnel: she challenges it for Day 180, at the Gate, 'everything'. It accepts.",
+  "when": {
+   "notFlags": [
+    "lilia_stands_down",
+    "vault_duel_won"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "lilia_duel_set"
+   ]
+  }
+ },
+ {
+  "id": "t_h10",
+  "day": 168,
+  "slot": "Morning",
+  "place": "trial_dome",
+  "title": "Rex Tanaka",
+  "gm": "North Crown's ace, found by his captain.",
+  "when": {
+   "notFlags": [
+    "rex_saved"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "rex_hollowed"
+   ]
+  }
+ },
+ {
+  "id": "t_prototype",
+  "day": 168,
+  "slot": "Midday",
+  "place": "great_arena",
+  "title": "Living Light",
+  "gm": "The Cup's final day: Marrow unveils his prototype to the Cup crowd: a hero that steps off the projector plate, casts a shadow and looks at the audience for nine seconds before it comes apart. Standing ovation. In the stands the Guest gets to its feet: 'That one was real. Who was keeping it? Nobody was keeping it.' It is the only time anyone sees it angry. If marrow_has_lattice (or maisie_at_lab with the pigment): it does not come apart. It is SOLID: it steps down among the front row, takes the clip-on microphone out of Cas Abernathy's hand, looks at it, and closes its fist. Cas narrates this for four words and stops. Then it stands waiting, like something that has not been told what it is for.",
+  "when": {
+   "flags": [
+    "marrow_has_jar"
+   ],
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "prototype_shown"
+   ]
+  }
+ },
+ {
+  "id": "t_north_crown_sails",
+  "day": 169,
+  "slot": "Midday",
+  "place": "ferry_dock",
+  "title": "North Crown sails",
+  "gm": "Isolde at the stern, Rex on a stretcher (he should not leave the island; nobody tells her unless Rowan does).",
+  "when": {
+   "notFlags": [
+    "isolde_ally"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_board_vote",
+  "day": 170,
+  "slot": "Midday",
+  "place": "chancellor_office",
+  "title": "The board vote",
+  "gm": "The board wanted the student council's endorsement read into the record: if Octavia would not deliver it, Sebastian moved it from the floor of the last session (he can be stopped by a quorum call, by Noor on procedure, or by being shown what he is endorsing). Dr. Okonkwo is relieved. Santángel is acting chancellor and cannot meet anyone's eye. The north slope and ruin precinct pass to Living Light Ltd.; fences go up.",
+  "when": {
+   "notFlags": [
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "okonkwo_removed"
+   ]
+  }
+ },
+ {
+  "id": "t_transfer",
+  "day": 172,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "Medical transfer",
+  "gm": "The Hollowed are stretchered onto a chartered boat; a long crate marked LABORATORY GLASS goes aboard with them. Camille is ordered to stay behind.",
+  "when": {
+   "notFlags": [
+    "ward_stays",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "wards_shipped"
+   ]
+  }
+ },
+ {
+  "id": "t_leona_expelled",
+  "day": 176,
+  "slot": "Morning",
+  "place": "chancellor_office",
+  "title": "Leona is expelled",
+  "gm": "Caught on Day 175 in the sixth-floor guest suite of Spectral Tower with a grey notebook under her cardigan. The forged waiver is produced. She is put on the Saturday ferry (Day 177). Her father stands on the dock; she does not turn round. He resigns that afternoon and is on the island on Day 180 only because there is no boat.",
+  "when": {
+   "flags": [
+    "marrow_has_lattice"
+   ],
+   "notFlags": [
+    "leona_trust",
+    "helicals_reconciled",
+    "marrow_exposed"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "leona_expelled"
+   ]
+  }
+ },
+ {
+  "id": "t_saoirse_sails",
+  "day": 179,
+  "slot": "Night",
+  "place": "boathouse",
+  "title": "Saoirse takes the tide",
+  "gm": "See hook h_saoirse_boat.",
+  "when": {
+   "notFlags": [
+    "saoirse_stays"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_eve",
+  "day": 179,
+  "slot": "Night",
+  "place": "commons_room",
+  "title": "'Anything formal?'",
+  "gm": "It asks Rowan its one question (GUEST.stages E). {H}'s things are in a box on {H:his} bed.",
+  "when": {
+   "notFlags": [
+    "rowan_called_debt",
+    "vault_duel_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_festival",
+  "day": 180,
+  "slot": "Evening",
+  "place": "festival_grounds",
+  "title": "Founder's Festival",
+  "gm": "Chuck's 75th: stalls, a cake shaped like a deck box, fireworks at the Night slot. Chuck (if well) is missing from his own party at dusk — he is on the north shore, at the cairn — and arrives late for a speech that stops in the middle when he looks at the mountain.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_lilia_falls",
+  "day": 180,
+  "slot": "Night",
+  "place": "ruin_gate",
+  "title": "Lilia vs the Guest",
+  "gm": "See GUEST.liliaDuel.default.",
+  "when": {
+   "notFlags": [
+    "lilia_stands_down",
+    "vault_duel_won",
+    "rowan_called_debt"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "lilia_hollowed",
+    "gate_opened"
+   ]
+  }
+ },
+ {
+  "id": "t_last_chance",
+  "day": 181,
+  "slot": "Morning",
+  "place": "mosaic_vault",
+  "title": "The last morning",
+  "gm": "Until Midday the Guest is walking the friezes, reading. The debt can still be called here (it now plays with Lilia's game added to its own — one stance at each phase is harder). After Midday it sits down at the central board alone and begins.",
+  "when": {
+   "flags": [
+    "lilia_hollowed"
+   ],
+   "notFlags": [
+    "vault_duel_won"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_island_played",
+  "day": 181,
+  "slot": "Midday",
+  "place": "mosaic_vault",
+  "title": "It plays the island",
+  "gm": "The bad ending chain begins: at the central board it plays, and the tiles go dark in rows as it plays them. On campus the holograms come on without projectors and do not go off. Viktor (if lost) is recorded. Marrow, at the fence with his surveyors, gets exactly what he asked for: living holograms — he is found Hollowed on Day 182 with a contract in his hand (it took the conflict he offered).",
+  "when": {
+   "flags": [
+    "lilia_hollowed"
+   ],
+   "notFlags": [
+    "vault_duel_won"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "island_played"
+   ]
+  }
+ },
+ {
+  "id": "t_ferry_stops",
+  "day": 185,
+  "slot": "Morning",
+  "place": "ferry_dock",
+  "title": "The ferry stops",
+  "gm": "Captain Stroud's dog will not board at the mainland end. Supply by helicopter. Students who can leave, leave; many find they do not want to — the games are so good now.",
+  "when": {
+   "flags": [
+    "island_played"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_finals2",
+  "day": 194,
+  "slot": "Morning",
+  "place": "lecture_hall",
+  "title": "Finals (Days 194–196)",
+  "gm": "Held as normal if the Guest was beaten. Cancelled if island_played.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_livvie_deadline",
+  "day": 200,
+  "slot": "Evening",
+  "place": "commons_kitchen",
+  "title": "Livvie's number",
+  "gm": "Default: 6,400 of 9,000. She packs that night.",
+  "when": {
+   "notFlags": [
+    "livvie_funded"
+   ]
+  },
+  "effects": {
+   "flags": [
+    "livvie_left"
+   ]
+  }
+ },
+ {
+  "id": "t_exhibition",
+  "day": 201,
+  "slot": "Afternoon",
+  "place": "great_arena",
+  "title": "Graduation Exhibition",
+  "gm": "If Lilia stands: she names her challenger (Rowan if lilia_rival; otherwise 'nobody yet', and plays an exhibition against Isolde by video link). If she is Hollowed: an empty captain's chair with her jacket over it.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_graduation",
+  "day": 208,
+  "slot": "Midday",
+  "place": "quad",
+  "title": "Graduation",
+  "gm": "Fourth-years cross the stage. Read the names of those who cannot.",
+  "when": {
+   "notFlags": [
+    "island_played"
+   ]
+  },
+  "effects": {
+   "flags": []
+  }
+ },
+ {
+  "id": "t_last_ferry_2",
+  "day": 210,
+  "slot": "Midday",
+  "place": "ferry_deck",
+  "title": "Last ferry",
+  "gm": "Epilogue according to ENDINGS.",
+  "when": {},
+  "effects": {
+   "flags": []
+  }
+ }
+]

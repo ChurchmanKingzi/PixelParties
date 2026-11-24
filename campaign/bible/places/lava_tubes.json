@@ -1,0 +1,20 @@
+{
+ "name": "The Lava Tubes",
+ "zone": "wild",
+ "bg": "lava_tubes",
+ "night": false,
+ "hike": 2,
+ "hours": "Open to the foolish; unmapped, unlit. The Outdoor Club runs one guided trip a term to the first chamber only.",
+ "sight": "On the volcano's eastern shoulder a collapsed skylight drops into a tunnel as round and smooth as the inside of a pipe, big enough to drive a ferry through. Your torch slides over walls of ropey black glaze and drip-stalactites of frozen lava. The air is cool and mineral and absolutely silent, and side passages branch off at every angle like the roots of a tooth.",
+ "things": [
+  "Climb down the skylight on the knotted rope",
+  "Walk the main tube to the first chamber, where the roof glitters",
+  "Switch off your torch and experience real dark",
+  "Chalk your turnings — everyone who has not is a story",
+  "Find the pool of still water that shows no reflection of the roof",
+  "Hear, from one side passage only, a faint warm draught and a clicking",
+  "Find old chalk arrows in someone else's hand, with dates"
+ ],
+ "secret": "Outdoor Club trip Day 38 (unnamed leader; Viktor tags along and vanishes down a side passage). The tubes honeycomb the mountain; one branch runs to within a few metres of the Vault's dome — the warm draught and the clicking. This was Chuck's crack: fifty years ago it was open; a rockfall closed it decades back, and the old chalk arrows in a 24-year-old's hand (dated in a Polish scrawl) still point to it. A week of digging with tools could reopen it: a back way into the Vault that needs no Alpha card — Viktor's long project, and Marrow's engineers' from about Day 120. It is dangerous in the plain sense: bad air in the low sections, a real chance of getting lost (lose a day, be reported absent).",
+ "access": "Forbidden without the Outdoor Club. The skylight on the east shoulder is reached by the old tramway and lies just outside the area closed on Day 29; the deeper branches run under it."
+}

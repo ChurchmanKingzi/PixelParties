@@ -1,0 +1,374 @@
+{
+ "name": "Double Entry",
+ "owner": "imara",
+ "heroes": [
+  "Krates, the Smartass",
+  "Koperniko, the Stargazer",
+  "Kassaran, Seer of Everything"
+ ],
+ "main": [
+  [
+   4,
+   "Angry Cheese"
+  ],
+  [
+   3,
+   "Aurora Borealis"
+  ],
+  [
+   4,
+   "Brilliant Idea"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   5,
+   "Destruction Magic"
+  ],
+  [
+   3,
+   "Fireball"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Holy Cheese"
+  ],
+  [
+   3,
+   "Idol of Crestina"
+  ],
+  [
+   5,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Magic Hammer"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   3,
+   "Nerdy Cheese"
+  ],
+  [
+   3,
+   "Support Magic"
+  ],
+  [
+   3,
+   "Teleportal"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Victory Phoenix Cannon"
+  ],
+  [
+   3,
+   "Wisdom"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Krates, the Smartass": "Hero",
+  "Koperniko, the Stargazer": "Hero",
+  "Kassaran, Seer of Everything": "Hero",
+  "Angry Cheese": "Artifact",
+  "Aurora Borealis": "Spell (Magic Arts)",
+  "Brilliant Idea": "Spell (Support Magic)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Destruction Magic": "Ability",
+  "Fireball": "Spell (Destruction Magic)",
+  "Golden Ankh": "Artifact",
+  "Holy Cheese": "Artifact",
+  "Idol of Crestina": "Artifact (Reaction)",
+  "Magic Arts": "Ability",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Magnetic Glove": "Artifact",
+  "Nerdy Cheese": "Artifact",
+  "Support Magic": "Ability",
+  "Teleportal": "Spell (Magic Arts)",
+  "Treasure Chest": "Artifact",
+  "Victory Phoenix Cannon": "Spell (Destruction Magic)",
+  "Wisdom": "Ability"
+ },
+ "gist": {
+  "Koperniko, the Stargazer": "Once per turn, when an artifact or spell lets her search exactly one card, she searches a second, different one of the same kind.",
+  "Kassaran, Seer of Everything": "She names three cards before the game; whenever she draws one of them she adds a second copy from the deck.",
+  "Krates, the Smartass": "Whenever YOU would search a card, you must reveal three different ones: she takes one, gives you one of her choosing, and the third is deleted.",
+  "Magnetic Glove": "Searches any card; with Koperniko, two.",
+  "Brilliant Idea": "Searches any card.",
+  "Angry Cheese": "Hurts her own hero to search a Destruction spell.",
+  "Holy Cheese": "Searches a Support spell; you may heal a target.",
+  "Nerdy Cheese": "Deletes one Magic Arts spell from her deck to add another copy to hand.",
+  "Idol of Crestina": "Replaces her normal draw with a search.",
+  "Aurora Borealis": "Searches several different spells.",
+  "Teleportal": "Sets any card aside for next turn.",
+  "Wisdom": "Ability: cast spells above her level at the cost of discards.",
+  "Victory Phoenix Cannon": "A heavy shot that chains into a cheap Destruction spell.",
+  "Magic Hammer": "One very heavy single-target hit.",
+  "Burning Finger": "Cheap burn; the usual chain after the Cannon."
+ },
+ "plan": "Imara never draws a card she did not choose. Every search finds two cards through Koperniko, every named card arrives twice through Kassaran, and Wisdom lets her cast whatever she found regardless of level. Within a few turns she holds exactly the hand she wants: Victory Phoenix Cannon, Magic Hammer and the burn to chain behind them. Meanwhile Krates turns your own searches into her card advantage. The deck is pure hand and no board: three ordinary heroes, no creatures, no healing, and Wisdom charges her discards for every big spell.",
+ "looks": {
+  "early": "Two cards searched for every one played; a hand kept in neat order.",
+  "mid": "A full, perfect hand; your Magnetic Glove showing her three of your cards.",
+  "late": "Cannon, Burning Finger, Magic Hammer, every turn."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She spends her turns searching and has dealt no damage.",
+   "why": "Her heroes are ordinary and nothing protects them while she assembles her hand; your own searching meanwhile feeds Krates."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her hand is full of exactly the spells she wants; Krates watches your deck.",
+   "why": "The hand is the deck: White Eye discards hurt more than anything, and every Magnetic Glove you play gives her a card and deletes one of yours, so stop searching."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "She casts one very large single-target spell a turn, paying discards through Wisdom.",
+   "why": "One big hit per turn is what Homerun!, Cloud in a Bottle and Firewall answer; each cast also thins her hand."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Her hand is spent and she has no board.",
+   "why": "Nothing stands between the Storm and three ordinary heroes."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Imara plays a Magnetic Glove and takes two cards for it, noting both down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Koperniko"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Koperniko"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Search with your own Glove"
+     }
+    ]
+   },
+   {
+    "board": "Your Magnetic Glove: she makes you show three cards, keeps one and deletes one.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "No more searches; Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Krates first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep searching"
+     }
+    ]
+   },
+   {
+    "board": "Kassaran draws a named card and adds its twin.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Kassaran"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye her hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Seven chosen cards in her hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye hits, one discard each"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Tutor into Krates"
+     }
+    ]
+   },
+   {
+    "board": "Idol of Crestina replaces her draw with a search.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Koperniko so it finds only one"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Aurora Borealis fetches three spells.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Discard them"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Victory Phoenix Cannon into Burning Finger on your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle; Firewall for the next"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Magic Hammer through Wisdom: she discards three to cast it.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "RUSH",
+      "text": "She is out of cards: race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Fireball on two heroes.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No hand, no board.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Krates alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Koperniko for one more double search.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Kassaran"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ]
+ }
+}

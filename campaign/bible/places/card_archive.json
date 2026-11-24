@@ -1,0 +1,20 @@
+{
+ "name": "The Card Archive",
+ "zone": "campus",
+ "bg": "card_archive",
+ "night": false,
+ "part": "library",
+ "hours": "By appointment only; a climate-controlled strongroom behind the library's third gallery, opened by staff for supervised viewing.",
+ "sight": "A steel door gives onto a cold, dim room of flat drawers and glass cases, lit by lamps that click on one at a time as you walk. Under glass lie the treasures: misprints, first-ever tournament decklists in pencil, and a single lit case of Kaboom Alpha cards whose colours look wet. The hum of the dehumidifier is the only sound. Standing in front of the Alpha case you could swear the room was a degree warmer.",
+ "things": [
+  "View the Alpha case under supervision — do not touch the glass",
+  "Read Chuck's framed first rules sheet, typed on a ship's manifest form",
+  "Examine famous misprints and the stories pinned beside them",
+  "Request a specific card for study and fill in the white-glove form",
+  "Count the cards in the Alpha case and compare with the catalogue number",
+  "Look at the oldest object here: a fired-clay square labelled 'game piece (?), interior ruins'",
+  "Notice which drawers have newer locks than the others"
+ ],
+ "secret": "Holds 22 Kaboom Alpha cards (canon) — the catalogue says 22; after the theft (Gideon with Santángel's credential; night of Day 72 in the plot timeline, unless prevented) the case holds 21 and a very good modern reprint. On the production-records shelf stands a tall ledger, PRINT WORKS WELFARE FUND: thirty years of quarterly payments to eleven former print workers, each marked 'no claim', the last ten years initialled L.M. (plot file, M9; Leona Helical is trying to reach it at night). The clay square is a real Tessellate tile, a minor record (a seabird); held in the bare hand it shows the holder one second of flight. Hale's survey report is in drawer H-9 with a map of the surface mosaics and the Ruin Gate marked 'sealed — mechanism responds to FIRST PRINT'. The rules sheet is typed on a manifest of the Agnieszka. In the Alpha case the art really does move at the edge of sight; after D27 the cards have all drifted a few millimetres toward the north wall of the case each morning.",
+ "access": "Locked. Needs written staff permission (ashdown, hana, blum or chuck will sign for a good reason; santangel signs too easily after Day 61) or a job as library assistant. Wren has standing access. Breaking in is possible via the maintenance tunnels and is an expulsion-grade risk."
+}

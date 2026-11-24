@@ -1,0 +1,215 @@
+{
+ "id": "okonkwo",
+ "name": "Chancellor Dr. Marguerite Okonkwo",
+ "firstName": "Marguerite",
+ "age": 58,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Chancellor's rooms, faculty wing",
+ "romance": false,
+ "deck": "An old Elven list (rarely plays; no deck profile)",
+ "look": "Stern and elegant, with grey-streaked braids coiled high, a navy suit cut like armour and reading glasses on a silver chain. She carries herself with a slight forward lean, as if walking into a wind. Her handshake is brief, dry and remembered.",
+ "voice": "Deep, unhurried and exact, Nigerian-British with Oxford consonants; she states positions rather than opinions and uses silence as an instrument. Students are Mr and Miss. Her humour is bone-dry and appears about once a term. When she is not telling the whole truth she becomes more formal, not less. RARE habit (once in a scene at most; most scenes go without it): 'The position is —'.",
+ "lines": [
+  "Mr Vance. The Wildcard entrant. You arrived by the back door; see that you leave by the front.",
+  "The position is that a student suffered a medical episode. That is the whole of the position.",
+  "I have kept this school open through three audits, two typhoons and its own founder. Do not lecture me on what it costs.",
+  "Sit down. You are not in trouble. That is rarer in this room than you would think."
+ ],
+ "intro": "The Chancellor: a stern, elegant woman who has run Pixel Academy for most of its existence and misses very little.",
+ "traits": [
+  {
+   "id": "okonkwo_1",
+   "text": "She has been Chancellor for ten of the Academy's twelve years.",
+   "how": "Orientation; her speech from the main steps on Day 1."
+  },
+  {
+   "id": "okonkwo_2",
+   "text": "She knows every student's name by the end of the first week.",
+   "how": "Meet her on the quad."
+  },
+  {
+   "id": "okonkwo_3",
+   "text": "She walks the whole campus at seven each morning and notes what is broken.",
+   "how": "Be on the quad at Morning."
+  },
+  {
+   "id": "okonkwo_4",
+   "text": "She was a professor of education policy and has never played in a tournament.",
+   "how": "Dr Blum mentions it fondly."
+  },
+  {
+   "id": "okonkwo_5",
+   "text": "She grows orchids in the greenhouse and talks to them more gently than to anyone.",
+   "how": "Greenhouse, weekend."
+  },
+  {
+   "id": "okonkwo_6",
+   "text": "She wrote the scholarship rules herself and has never granted an exception.",
+   "how": "Ask Livvie; or ask her."
+  },
+  {
+   "id": "okonkwo_7",
+   "text": "There is one building on campus she never looks at when she passes it.",
+   "how": "Walk the north path with her, or watch her on the cliff."
+  },
+  {
+   "id": "okonkwo_8",
+   "text": "She keeps a locked drawer of letters from parents, and rereads some of them.",
+   "how": "Trusted only."
+  }
+ ],
+ "secret": "What she knows, exactly. Marguerite Okonkwo was hired ten years ago to turn a rich eccentric's summer camp into an accredited institution, and did. Nine years ago, newly in post, she had on her hands a housemaster — Professor Aleksander Hale of Umbra House, whose research she had personally approved — who had taken four students through the Ruin Gate and not come back. She knows: that there IS a gate and a chamber beyond it (she has seen the gate; she has never been inside); that Hale opened it with a card from the first print run; that the four came back up the ridge at sunset raving ('he's flat', 'still in the game'); that on her order Silas rowed them out to the old quarantine hut on Gull Rock for two nights so that nobody on campus would hear them, and that the ferry then took them home; that Hale did not come out, and that Imogen Ashdown shut the Gate. She made the decision in one night: seal Umbra House, call it structural damage (the building shows no damage at all), call Hale's death a cave collapse on an authorised survey, cut five faces out of that year's yearbook, and settle with the families — four 'legacy obligations', paid every quarter for nine years. The locked file in her office holds the ferry manifest with four names and the silence settlement. She saw Chuck go up the ridge that night and has never asked what he did there, because she did not want the answer on her desk. She knows the first prints are 'unusual' and had them cased in the Archive; she does not know about tile dust. She knows nothing of Visitors or the Tessellate's purpose. She recognised the name Viktor Hale on the admissions list and admitted him — penance, and the wish to keep him where she could watch him.\nShe did it to keep the school alive, and the school is alive: a hundred and forty-four young people have a future because of that night's paperwork. That is the lie she lives — not that she did wrong, but that the account is settled. Lucian Marrow holds the Umbra payment records — he carries a folder and lets her see it — and uses them: funding, accreditation, her post, the school's licence. She gives him ground in inches and hates every one; a board motion to remove her (default Day 170) and transfer the ruins and the north slope to one of his subsidiaries is already drafted.\nDay 40: she writes 'seizure' on the notice herself and knows by lunchtime that it is the old lie in a new coat. Day 52: she knows. Curfew on Day 67 is her doing the only thing she knows how — procedure. She forbids Camille to use the word 'coma' in writing, leans on the stream not to say 'two', and from Day 67 is pressed by the board to ship the patients to the mainland. She is not weak and not wicked; she is a person who made a terrible, defensible choice once and is now watching it come due in other people's children. Her arc turns on whether a student brings her the truth in a form she cannot file. If so, she opens the Umbra records, defies Marrow at the cost of her post, and finally asks Chuck the question. Her letter drawer holds nine years of correspondence from the four families — and one unsent letter to a twelve-year-old boy in Aarhus.",
+ "wants": "For the school to outlive its secrets.",
+ "fears": "That she saved the institution and sacrificed exactly what it was for.",
+ "crush": "blum",
+ "crushNote": "He is the one colleague who has never wanted anything from her and who brings her a problem honestly. It shows as her keeping his late wife's orchids alive without a word, and a second cup set out when he comes to the greenhouse on Sundays.",
+ "crushPace": 0.5,
+ "likes": [
+  "Students who take responsibility without being asked",
+  "Facts brought in order, with sources",
+  "Punctuality and proper address",
+  "Care for the grounds and the orchids",
+  "Courage that has thought about consequences",
+  "Loyalty to the school rather than to her"
+ ],
+ "dislikes": [
+  "Being threatened",
+  "Publicity before she has been informed",
+  "Any mention of Umbra House by a student",
+  "Marrow's soft voice",
+  "Sentiment used as argument",
+  "Breaches of curfew"
+ ],
+ "gifts": [
+  "An orchid cutting from the jungle trail, properly potted",
+  "Card: Elven Druid",
+  "A well-written incident report",
+  "A tin of Earl Grey",
+  "Card: Tree of Golden Apples"
+ ],
+ "events": [
+  {
+   "id": "okonkwo_e1",
+   "stage": 1,
+   "title": "Leave by the front",
+   "condition": "Keep your grades above probation through midterms and take responsibility for one thing that went wrong in the Commons (to her face, in chancellor_office).",
+   "hint": [
+    "She notices who owns up.",
+    "Stay out of academic trouble and take responsibility for a problem in person."
+   ]
+  },
+  {
+   "id": "okonkwo_e2",
+   "stage": 2,
+   "title": "Orchids",
+   "condition": "Find her in greenhouse on a weekend and help without talking business; later bring her a concern about a fellow student (Livvie's health, the cards being extorted) through the proper channel and see it acted on.",
+   "hint": [
+    "She is different among her plants. Not softer — but different.",
+    "Help her in the greenhouse and bring her a real problem the right way."
+   ]
+  },
+  {
+   "id": "okonkwo_e3",
+   "stage": 3,
+   "title": "The position",
+   "condition": "After Day 66, bring her evidence she cannot file (photographs, the incident log, the name Hale said aloud) and ask her — not accuse her — what happened nine years ago; she opens the locked drawer.",
+   "hint": [
+    "She has an official position on everything. She knows a position is not the whole of anything.",
+    "Bring her proof she cannot file away and ask her directly about the sealed dormitory."
+   ]
+  }
+ ],
+ "bonds": {
+  "chuck": {
+   "label": "colleagues",
+   "text": "The founder: brilliant, impossible, and the one audit she has never dared to carry out.",
+   "public": true,
+   "from": 0
+  },
+  "viktor": {
+   "label": "distrusts",
+   "text": "She admitted him knowing exactly who he was, to keep him where she could see him.",
+   "public": false,
+   "from": 1
+  },
+  "octavia": {
+   "label": "mentor",
+   "text": "The ablest council president in the school's history; she worries about the company she keeps.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "distrusts",
+   "text": "The board's representative, to whom she gives ground in inches.",
+   "public": true,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "colleagues",
+   "text": "They share the memory of one night nine years ago and have never spoken of it since.",
+   "public": false,
+   "from": 0
+  },
+  "silas": {
+   "label": "colleagues",
+   "text": "Her groundskeeper, and the keeper of the keys she does not want to hold.",
+   "public": false,
+   "from": 0
+  },
+  "santangel": {
+   "label": "colleagues",
+   "text": "Her head of department. She initialled his 'conservation loan' against her better judgement.",
+   "public": true,
+   "from": 0
+  },
+  "camille": {
+   "label": "colleagues",
+   "text": "A conscientious nurse who must be reminded what may be written down.",
+   "public": false,
+   "from": 0
+  },
+  "hedda": {
+   "label": "distrusts",
+   "text": "Miss Njord has been to the office nine times. On the matter of the birds, she was not wrong.",
+   "public": true,
+   "from": 9
+  },
+  "helical": {
+   "label": "colleagues",
+   "text": "A conscientious colleague who keeps the tables running on nothing. She has noticed the name on the Commons list and has not asked.",
+   "public": true,
+   "from": 0
+  },
+  "trixie": {
+   "label": "mentor",
+   "text": "Miss Hollis asked for a beehive in writing, with a risk assessment in crayon. It was granted. The orchids have never done better.",
+   "public": true,
+   "from": 12
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "quad",
+   "Midday": "chancellor_office",
+   "Afternoon": "chancellor_office",
+   "Evening": "faculty_wing",
+   "Night": "chancellor_office"
+  },
+  "weekend": {
+   "Morning": "greenhouse",
+   "Midday": "chancellor_office",
+   "Afternoon": "greenhouse",
+   "Evening": "faculty_wing",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "A tidy, old-fashioned Elven deck played with a lawyer's patience. She has not played a formal duel in nine years and will not say why.",
+  "tilt": "Any formal challenge. She has arranged her life for nine years so that nobody is in a position to issue her one."
+ }
+}

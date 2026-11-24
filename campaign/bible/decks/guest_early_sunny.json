@@ -1,0 +1,457 @@
+{
+ "name": "Slip 'n Slide",
+ "owner": "guest",
+ "heroes": [
+  "Cooldin, King of Coolness",
+  "Hel, the Bound Specter",
+  "Ingo, Investor of Evil"
+ ],
+ "main": [
+  [
+   4,
+   "Alchemic Journal"
+  ],
+  [
+   2,
+   "Coffee"
+  ],
+  [
+   2,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Defending the Gate"
+  ],
+  [
+   1,
+   "Divine Gift of Balance"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   5,
+   "Leadership"
+  ],
+  [
+   1,
+   "Magic Amethyst"
+  ],
+  [
+   2,
+   "Magnetic Glove"
+  ],
+  [
+   2,
+   "Slippery Ice"
+  ],
+  [
+   2,
+   "Slippery Narw"
+  ],
+  [
+   4,
+   "Slippery Pengu"
+  ],
+  [
+   3,
+   "Slippery Polar"
+  ],
+  [
+   4,
+   "Slippery Skates"
+  ],
+  [
+   4,
+   "Slippery Snobbit"
+  ],
+  [
+   2,
+   "Slippery Snowman"
+  ],
+  [
+   4,
+   "Slippery Spikeblock"
+  ],
+  [
+   3,
+   "Slippery Whoolmoth"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Wheels"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Fire Bomb"
+  ],
+  [
+   1,
+   "Magic Lamp"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Monster in a Bottle"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Cooldin, King of Coolness": "Hero",
+  "Hel, the Bound Specter": "Hero",
+  "Ingo, Investor of Evil": "Hero",
+  "Alchemic Journal": "Artifact",
+  "Coffee": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Defending the Gate": "Spell (Magic Arts, Surprise)",
+  "Divine Gift of Balance": "Spell (Magic Arts)",
+  "Golden Ankh": "Artifact",
+  "Leadership": "Ability",
+  "Magic Amethyst": "Artifact",
+  "Magnetic Glove": "Artifact",
+  "Slippery Ice": "Area (Magic Arts)",
+  "Slippery Narw": "Creature L1",
+  "Slippery Pengu": "Creature L1",
+  "Slippery Polar": "Creature L2",
+  "Slippery Skates": "Artifact (Equipment)",
+  "Slippery Snobbit": "Creature L1",
+  "Slippery Snowman": "Creature L1",
+  "Slippery Spikeblock": "Creature L0",
+  "Slippery Whoolmoth": "Creature L5",
+  "Summoning Magic": "Ability",
+  "Wheels": "Artifact",
+  "Acid Vial": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Fire Bomb": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion",
+  "Monster in a Bottle": "Potion",
+  "Resuscitation Potion": "Potion",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Slippery Spikeblock": "One-health block. Every time it slides to a neighbouring hero it hits your hero in the same position.",
+  "Slippery Snowman": "When it slides, it freezes your hero in the same position for a turn (if none of yours is frozen yet).",
+  "Slippery Whoolmoth": "Huge creature that is free once every one of her heroes has a creature; each slide hits your hero in that lane, or a creature beside it, hard.",
+  "Slippery Narw": "When it slides it destroys any creature; if she picks one of her own she searches a creature.",
+  "Slippery Polar": "When it slides, the hero it arrives at may summon another creature for free.",
+  "Slippery Pengu": "When it slides it pushes another of her creatures along as well.",
+  "Slippery Snobbit": "When it slides she discards and redraws.",
+  "Slippery Skates": "Equipment: once per turn slides a creature from its hero to a neighbour.",
+  "Slippery Ice": "Area (Cooldin fetches it): once per turn each player may slide as many of their creatures as possible.",
+  "Hel, the Bound Specter": "Stands in the middle. Starts with Slippery Skates on, takes half damage while wearing them, has very little health, and is defeated if she ever ends a turn unable to re-equip them.",
+  "Ingo, Investor of Evil": "Gold every time a creature lands in a support zone, slides included.",
+  "Cooldin, King of Coolness": "Plays an Area from the deck regardless of level, ending the turn.",
+  "Defending the Gate": "Trap that cancels something aimed at her support zones.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures.",
+  "Alchemic Journal": "Draws or searches from her large Potion Deck (bombs, vials, revives).",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Everything in Sunny's deck moves. At the start of each of her turns every Slippery creature slides into a free support zone of the neighbouring hero, and each slide does something to whatever stands opposite: a hit, a freeze, a destroyed creature, a free summon. Skates and Slippery Ice add extra slides, and Ingo is paid for every one. Positions are the whole game: the damage lands on the hero in the same lane, and every slide passes through the middle hero. The creatures are small, they need free zones to slide into, and if the hero in the middle falls the two outer heroes are no longer neighbours. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "Hel in the middle already wearing Skates, a Spikeblock and a Pengu beside the outer heroes. And an unfamiliar Area with a starfield on it.",
+  "mid": "Creatures swapping sides every turn across Slippery Ice, the same one of your heroes taking the hits.",
+  "late": "A Whoolmoth sliding back and forth through the middle, a Snowman freezing whoever stands opposite."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Her first creatures are a one-health Slippery Spikeblock and a Slippery Pengu; nothing has slid yet.",
+   "why": "A Slippery creature only matters if it survives to her next turn to slide; killed on your turn it wasted her opening."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "RUSH",
+   "tell": "Every slide passes through Hel in the middle, who has by far the least health and is kept alive by her Skates.",
+   "why": "With the middle hero gone the outer two are not neighbours and nothing can slide; Fire Bomb on her Skates removes her damage reduction and makes her pay to stay alive."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Slippery Whoolmoth and a Snowman are lined up to slide into the lane of your Storm caster.",
+   "why": "The hits always land on the hero opposite the arrival zone: deal with the one slider that threatens that lane, cure the freeze with Tea, and keep everything else on her heroes."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "DISRUPT",
+   "tell": "She has two heroes left that do not stand next to each other.",
+   "why": "Her creatures have nowhere to slide and do nothing standing still."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Sunny sets a Slippery Spikeblock by Cooldin and a Pengu by Ingo; Hel, in the middle, already wears Skates.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill both before they ever slide"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Start on Hel"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build and watch them move"
+     }
+    ]
+   },
+   {
+    "board": "Cooldin fetches Slippery Ice; next turn everything slides twice.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the sliders now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Area"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Ingo"
+     }
+    ]
+   },
+   {
+    "board": "A Polar slides to Hel and she summons a second creature for free.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep while they are bunched"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall on the lane they head for"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Creatures cross through Hel's zones every turn; she is the smallest hero on the table.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb her Skates, then burn her down"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the sliders"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Ingo"
+     }
+    ]
+   },
+   {
+    "board": "Spikeblocks hit the same hero of yours twice a turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Hel, the hub"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "One-health blocks: any sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal through it"
+     }
+    ]
+   },
+   {
+    "board": "A Narw slides and destroys her own Pengu to search out a Whoolmoth.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Hel before the Whoolmoth can slide"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Narw"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Prepare a perfect sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Whoolmoth and a Snowman will arrive opposite your Storm caster next turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Whoolmoth, hold Tea for the freeze"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and hope she has no Deepsea Idol"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Move the Storm"
+     }
+    ]
+   },
+   {
+    "board": "Your caster is frozen by the Snowman; the Storm keeps ticking.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze onto Cooldin"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Cast from the other two"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait it out"
+     }
+    ]
+   },
+   {
+    "board": "Defending the Gate lies face-down by the Whoolmoth.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Untargeted damage, do not aim at it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the trap"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Single-target it anyway"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Hel is gone. Cooldin and Ingo stand apart and their creatures have stopped moving.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Tidy up the stranded creatures"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove an Area that no longer matters"
+     }
+    ]
+   },
+   {
+    "board": "She revives Hel for a single turn of slides.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Ingo meanwhile"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the lane"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     }
+    ]
+   },
+   {
+    "board": "One hero each, a Spikeblock beside hers with nowhere to go.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Go"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick and hold Homerun!"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the block"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "name": "Mama's Kitchen",
+ "zone": "dorms",
+ "bg": "commons_kitchen",
+ "night": false,
+ "part": "commons_beach",
+ "hours": "Breakfast at dawn, supper at dusk, coffee always; Mama Odalys rules it from five in the morning until the last dish is dry.",
+ "sight": "Bungalow 1, the biggest on the row, is one open kitchen and one long table under a tin roof, walls hung with dented pans, strings of garlic and twelve years of group photographs. A blackened range roars; a radio plays boleros through static. There is always a pot of something with beans in it, and always room for one more on the bench. It smells of coffee, cumin and frying plantain, and it is the warmest place on the island.",
+ "things": [
+  "Eat Mama's supper (free for Commons residents; restores more than energy)",
+  "Take a kitchen shift: peel, chop, wash up (20 cr and a plate)",
+  "Find your year's group photograph on the wall — and the gaps in older ones",
+  "Sit at the long table late with coffee and whoever is still up",
+  "Learn to cook one thing properly",
+  "Be told off with the wooden spoon for skipping breakfast",
+  "Listen to the radio news from the mainland, which never mentions the island",
+  "Bring a guest from another dorm and watch them be fed into silence"
+ ],
+ "secret": "Job site and the Commons' heart; birthdays are celebrated here with a tres leches cake whether the person likes it or not. Odalys has been here since the school opened; the photograph wall is her memory. She remembers every student who 'went home early', including the Umbra four, and has a shoebox of unanswered Christmas cards from one of their mothers. She quietly doubles Livvie's portions. All eighteen first-years of the row eat here (B2–B7), and Rafa from Rare Hall works shifts in this kitchen by choice and cooks for anyone who looks sad; Hedda inspects every plate for meat and Mama keeps a separate pot for her without comment. D27+: she sets a place for {H} and watches {H:him} not eat, or eat everything; by Day 35 she has stopped hugging {H:him} and cannot say why — and it is Odalys, not a scholar, who says the first true thing: 'That {H:boy} came back without {H:his} mother in {H:him}.' The Harvest Table dinner (Day 88) is here. D67: the kitchen becomes the Commons' evening common room; everyone crowds in rather than sit in their own bungalows in the quiet."
+}

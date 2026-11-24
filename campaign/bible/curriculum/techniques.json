@@ -1,0 +1,208 @@
+[
+ {
+  "id": "tempo_ledger",
+  "name": "The Ledger",
+  "from": "cp101",
+  "text": "You count what every turn cost each side, and spend your damage only where the books say it pays.",
+  "source": "cp101 — awarded with a midterm grade of B or better in Tempo & Resource, or after Santángel returns a ledger with no red ink.",
+  "effect": {
+   "stance": "BALANCE",
+   "phase": "midgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "on_curve",
+  "name": "On Curve",
+  "from": "cp101",
+  "text": "Your first turns use every point of Gold and every action; nothing is left on the table.",
+  "source": "cp101 — attend at least five of the first six weeks of Tempo & Resource (weeks 4–5 teach it).",
+  "effect": {
+   "stance": "RUSH",
+   "phase": "opening",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "priority_window",
+  "name": "Priority Window",
+  "from": "rj101",
+  "text": "You know exactly when a Reaction may be played — and you make them use theirs at the worst moment.",
+  "source": "rj101 — a final grade of B or better in Rules & Judging, or passing the Judge Circle's Level-1 mock exam (Day 57).",
+  "effect": {
+   "stance": "DISRUPT",
+   "phase": "crisis",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "count_outs",
+  "name": "Count Your Outs",
+  "from": "ma101",
+  "text": "Before every draw you know how many cards save you and what the odds are.",
+  "source": "ma101 — solve one of Dr. Blum's problems of the week on the board, or a midterm grade of B or better.",
+  "effect": {
+   "read": 1
+  }
+ },
+ {
+  "id": "table_hands",
+  "name": "Table Hands",
+  "from": "cp150",
+  "text": "Shuffle, cut, present, announce: your hands know the routine even when your head has gone white.",
+  "source": "cp150 — pass the Table Practicum midterm practical (Day 47), or play ten physical duels in front of witnesses.",
+  "effect": {
+   "nerve": 1
+  }
+ },
+ {
+  "id": "box_breath",
+  "name": "Box Breath",
+  "from": "pc101",
+  "text": "Four counts in, four hold, four out, four hold. Your pulse drops; the table stops swimming.",
+  "source": "pc101 — complete the heartbeat drill under Coach Rox (week 3 onward), or be taught the same exercise by Nurse Camille in the infirmary.",
+  "effect": {
+   "nerve": 1
+  }
+ },
+ {
+  "id": "designers_eye",
+  "name": "Designer's Eye",
+  "from": "gd110",
+  "text": "You ask of every card what it wants to do — and see the opponent's plan in the pieces they chose.",
+  "source": "gd110 — hand in the midterm design in Card Design Basics, or have Chuck take one of your card ideas seriously in his workshop.",
+  "effect": {
+   "read": 1
+  }
+ },
+ {
+  "id": "long_record",
+  "name": "The Long Record",
+  "from": "lh101",
+  "text": "You have studied how the great late-game decks of history were assembled, piece by quiet piece.",
+  "source": "lh101 — a final essay graded B or better in Lore & History, or attending two of Chuck's visiting lectures and asking a real question.",
+  "effect": {
+   "stance": "SETUP",
+   "phase": "midgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "tape_study",
+  "name": "Tape Study",
+  "from": "cm120",
+  "text": "You have watched them play before. Their habits are on film, and now in your head.",
+  "source": "cm120 — sit in on three sessions of Analysis & VOD Review as an extra, or spend an evening in the replay booth with Bex or Pippa.",
+  "effect": {
+   "read": 1
+  }
+ },
+ {
+  "id": "all_out",
+  "name": "All-Out",
+  "from": "lilia",
+  "text": "When the last turns come you stop protecting anything and put every point into the kill.",
+  "source": "lilia — she shows it once, after Rowan plays her without flinching (win or lose) or after she watches him win a match from behind.",
+  "effect": {
+   "stance": "RUSH",
+   "phase": "endgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "egg_timer",
+  "name": "Egg Timer",
+  "from": "georgie",
+  "text": "You let the early turns pass and set the pieces down in exactly the right order — patience with a stopwatch.",
+  "source": "georgie — she explains it, very precisely and without looking up, once Rowan is a friend she trusts (playing her seriously, never talking down to her).",
+  "effect": {
+   "stance": "SETUP",
+   "phase": "opening",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "bug_report",
+  "name": "Bug Report",
+  "from": "rana",
+  "text": "You find the one card their whole machine runs on and take it apart first.",
+  "source": "rana — earned by testing with her for an evening without flinching at her temper; she hands over her matchup notes as if they were an insult.",
+  "effect": {
+   "stance": "DISRUPT",
+   "phase": "midgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "undertow",
+  "name": "Undertow",
+  "from": "saoirse",
+  "text": "You stop fighting the board and let it come to you — then clear it in one pull when they are over-committed.",
+  "source": "saoirse — a lesson at the boathouse, barefoot, after Rowan gets back on the surfboard a third time.",
+  "effect": {
+   "stance": "CONTROL",
+   "phase": "endgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "stand_your_ground",
+  "name": "Stand Your Ground",
+  "from": "baylee",
+  "text": "When everything is coming at you, you answer only the thing that kills you and keep swinging with the rest.",
+  "source": "baylee — he teaches it in about nine words after a shared day of real work (the orchard harvest, the gym, fixing the bungalow steps).",
+  "effect": {
+   "stance": "BALANCE",
+   "phase": "crisis",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "go_wide",
+  "name": "Hop Wide",
+  "from": "inya",
+  "text": "You flood the board faster than one answer can deal with, and attack before they find the second.",
+  "source": "inya — the prize for beating her, or the consolation for losing to her gracefully, in a best-of-three on the Commons ping-pong table.",
+  "effect": {
+   "stance": "RUSH",
+   "phase": "midgame",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "burn_the_boats",
+  "name": "Burn the Boats",
+  "from": "willas",
+  "text": "Cornered, you stop defending altogether and make it a race they did not expect to be in.",
+  "source": "willas — shouted across a practice table, then explained properly while he carries something heavy for Rowan. Available only while Willas is himself.",
+  "effect": {
+   "stance": "RUSH",
+   "phase": "crisis",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "clock_discipline",
+  "name": "Clock Discipline",
+  "from": "noor",
+  "text": "From the first turn you answer threats in the right order and never spend removal on the wrong one.",
+  "source": "noor — taught at the Judge Circle or in a library carrel once she considers Rowan serious about the rules (attend the Circle twice, or ask her to explain the charter).",
+  "effect": {
+   "stance": "CONTROL",
+   "phase": "opening",
+   "bonus": 1
+  }
+ },
+ {
+  "id": "zugzwang",
+  "name": "Zugzwang",
+  "from": "dom",
+  "text": "In the last turns you leave them only moves that make their position worse.",
+  "source": "dom — the Battle Team's vice-captain offers one analysis session to anyone who takes a game off a team member or reaches the ladder top 30.",
+  "effect": {
+   "stance": "DISRUPT",
+   "phase": "endgame",
+   "bonus": 1
+  }
+ }
+]

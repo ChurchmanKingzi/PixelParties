@@ -1,0 +1,20 @@
+{
+ "name": "The Festival Grounds",
+ "zone": "special",
+ "bg": "festival_grounds",
+ "night": true,
+ "hours": "The quad, the avenue and the duel terraces transformed for a festival: Night of Masks (Day 54), Lantern Night (Day 139), Founder's Festival (Day 180).",
+ "sight": "Overnight the campus has become a fair: striped stalls along the colonnades, strings of paper lanterns from the clock tower to every roof, a stage in front of the fountain, the smell of caramel, grilled corn and gunpowder. Everyone is out of uniform. Music comes from three directions and laughter from all of them. After dark the lanterns make a second, lower sky, and the fountain's bronze founder wears a paper hat.",
+ "things": [
+  "Eat everything on a stick",
+  "Play the stalls: ring toss, booster lucky dip, 'beat the judge' rules quiz, speed-duel booth",
+  "Enter the festival's open-air mini-tournament",
+  "Watch the stage: the pageant, the band, the commentary roast",
+  "Walk the lantern avenue with someone",
+  "Win a prize and give it away",
+  "Find the quiet edge of the crowd where the important conversations happen",
+  "Watch the fireworks from wherever you have ended up, with whoever you have ended up with"
+ ],
+ "secret": "Three festivals, three moods. NIGHT OF MASKS (D54): everyone masked; flirtation, mistaken identities, the theatre pageant; the Guest is delighted that everybody wears another face (canon) and spends the night asking masked people who they are 'now' — and once, to Rowan, whether he would like to trade for the evening. No incident tonight by default; the dread is that there could be. LANTERN NIGHT (D139, Valentine): lanterns with written wishes are released from the Commons beach; the main romance checkpoint — whoever Rowan releases a lantern with is his declared route (others notice); the whole flight drifts north and, far off over the crater, goes out all at once. FOUNDER'S FESTIVAL (D180, Chuck's 75th): the biggest; the Interschool Cup guests have gone, the school is brittle and determined to be happy; Chuck is missing at dusk; at the fireworks Lilia is not in the crowd — she is at the Ruin Gate (canon). If Rowan is here instead of there at midnight, the lanterns go out in a wave from the north.",
+ "access": "Exists only on festival days (Days 54, 139, 180); for the same locations on normal days use quad and duel_terraces."
+}

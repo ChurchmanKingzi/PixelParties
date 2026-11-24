@@ -1,0 +1,553 @@
+[
+ {
+  "id": "r01",
+  "dayFrom": 1,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "Lilia Mann hasn't lost a ranked game since her first year. People have stopped keeping count."
+ },
+ {
+  "id": "r02",
+  "dayFrom": 1,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "The Commons gets cold showers because the school wants you to duel your way out. (The boiler is simply broken; nobody budgeted for it.)"
+ },
+ {
+  "id": "r03",
+  "dayFrom": 2,
+  "source": "tomi",
+  "truth": "false",
+  "text": "There's a secret fifth rarity above Spectral and the teachers all have one."
+ },
+ {
+  "id": "r04",
+  "dayFrom": 2,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "Umbra House is haunted. A whole class vanished. (Four students were sent home; one professor did not come back.)"
+ },
+ {
+  "id": "r05",
+  "dayFrom": 3,
+  "source": "bex",
+  "truth": "true",
+  "text": "Chuck Kaboom has never once played the same deck twice in an exhibition. He says he plays 'whoever turns up'."
+ },
+ {
+  "id": "r06",
+  "dayFrom": 3,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "Chuck is senile and the board keeps him around as a mascot."
+ },
+ {
+  "id": "r07",
+  "dayFrom": 4,
+  "source": "tomi",
+  "truth": "true",
+  "text": "A real Alpha common sold on the mainland last year for more than a Commons kid's whole tuition."
+ },
+ {
+  "id": "r08",
+  "dayFrom": 5,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "Willas Tann is only on the Battle Team because he's sleeping with the captain. (He's on it because she wants him there; he also trains harder than anyone.)"
+ },
+ {
+  "id": "r09",
+  "dayFrom": 5,
+  "source": "bex",
+  "truth": "true",
+  "text": "Rana Marika is the only student in the school's history held back a year without failing a single class."
+ },
+ {
+  "id": "r10",
+  "dayFrom": 6,
+  "source": "town",
+  "truth": "true",
+  "text": "The fortune teller at the night market has been there longer than the market. Ask anyone's grandmother."
+ },
+ {
+  "id": "r11",
+  "dayFrom": 6,
+  "source": "town",
+  "truth": "true",
+  "text": "Old Silas pulled the Founder off the north shore half dead, fifty years back. Neither of them will tell it the same way twice."
+ },
+ {
+  "id": "r12",
+  "dayFrom": 7,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "Ashton Beaumont-Lyle's roses are grown in a private greenhouse his father had shipped in. (He buys them at the boutique, on account.)"
+ },
+ {
+  "id": "r13",
+  "dayFrom": 8,
+  "source": "tomi",
+  "truth": "half",
+  "text": "The Hale guy in Bungalow 5 is a treasure hunter and there's gold in the ruins. (He is hunting; it isn't gold.)"
+ },
+ {
+  "id": "r14",
+  "dayFrom": 9,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The girl with the green hair asked for the Commons. On purpose. Who does that?"
+ },
+ {
+  "id": "r15",
+  "dayFrom": 10,
+  "source": "bex",
+  "truth": "half",
+  "text": "Professor Santángel threw the world final. (He lost it fairly and has never forgiven himself.)"
+ },
+ {
+  "id": "r16",
+  "dayFrom": 12,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The fourteen-year-old in Spectral is already ranked above half the third-years."
+ },
+ {
+  "id": "r17",
+  "dayFrom": 14,
+  "source": "town",
+  "truth": "true",
+  "text": "Josie at the Mulligan used to wear a smoke-grey collar up at the school. Don't bring it up."
+ },
+ {
+  "id": "r18",
+  "dayFrom": 15,
+  "source": "tomi",
+  "truth": "false",
+  "text": "The Archive's Alpha cards are replicas; the real ones are in a bank in Zurich."
+ },
+ {
+  "id": "r19",
+  "dayFrom": 19,
+  "source": "bex",
+  "truth": "true",
+  "text": "'Inya Bell' is Inya Kaboom. The Founder's granddaughter has been eating Commons rice for three weeks."
+ },
+ {
+  "id": "r20",
+  "dayFrom": 20,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "Inya's bracket was rigged for her. (She went out in the semi-final to Georgie.)"
+ },
+ {
+  "id": "r21",
+  "dayFrom": 22,
+  "source": "town",
+  "truth": "half",
+  "text": "Some nights there's a lantern on the jungle trail. It's the keeper walking his rounds. (He is walking after someone.)"
+ },
+ {
+  "id": "r22",
+  "dayFrom": 27,
+  "source": "bex",
+  "truth": "half",
+  "text": "BREAKING: something came down on the north slope at ten past two. The Top Deck has drone footage of a crater 'the size of the pool'. (It is forty metres across.)"
+ },
+ {
+  "id": "r23",
+  "dayFrom": 27,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "{H:full} touched the meteor. ({H:He} reached it. What touched what is another matter.)"
+ },
+ {
+  "id": "r24",
+  "dayFrom": 28,
+  "source": "tomi",
+  "truth": "false",
+  "text": "Crater glass sells for 50 cr a chip in town. Tomi has chips. (They're from a broken bottle.)"
+ },
+ {
+  "id": "r25",
+  "dayFrom": 29,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "It was a satellite and the cordon is because of the fuel."
+ },
+ {
+  "id": "r26",
+  "dayFrom": 30,
+  "source": "town",
+  "truth": "true",
+  "text": "The harbour gulls have moved to the breakwater. Fishermen say the catch off the south cove is down to nothing."
+ },
+ {
+  "id": "r27",
+  "dayFrom": 33,
+  "source": "bex",
+  "truth": "true",
+  "text": "{H:ladder} has not dropped a ranked game since the meteor. Chat is calling it 'crater brain'."
+ },
+ {
+  "id": "r28",
+  "dayFrom": 36,
+  "source": "tomi",
+  "truth": "half",
+  "text": "{H}'s got promo cards from a set that isn't out yet. {H:His} uncle works at Kaboom. ({H:He} has no such uncle.)"
+ },
+ {
+  "id": "r29",
+  "when": {
+   "flags": [
+    "brant_hollowed"
+   ]
+  },
+  "dayFrom": 40,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "Brant Kessler took something. Pills. That's why they're calling it a seizure."
+ },
+ {
+  "id": "r30",
+  "when": {
+   "flags": [
+    "brant_hollowed"
+   ]
+  },
+  "dayFrom": 41,
+  "source": "bex",
+  "truth": "half",
+  "text": "The Dome 3 recorder 'malfunctioned' on the night of the Kessler incident. (It worked perfectly. It recorded silence.)"
+ },
+ {
+  "id": "r31",
+  "dayFrom": 44,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The nurse hasn't left the infirmary in four days."
+ },
+ {
+  "id": "r32",
+  "when": {
+   "flags": [
+    "second_hollowed"
+   ]
+  },
+  "dayFrom": 52,
+  "source": "bex",
+  "truth": "true",
+  "text": "That's two. The Top Deck has been asked not to say 'two'."
+ },
+ {
+  "id": "r33",
+  "dayFrom": 53,
+  "source": "town",
+  "truth": "false",
+  "text": "It's the meteor dust. Don't drink from the north streams."
+ },
+ {
+  "id": "r34",
+  "when": {
+   "notFlags": [
+    "tomi_hollowed"
+   ]
+  },
+  "dayFrom": 55,
+  "source": "tomi",
+  "truth": "true",
+  "text": "Every one of them played a game the night before. Tomi has it in a ledger and he's stopped laughing about it."
+ },
+ {
+  "id": "r35",
+  "dayFrom": 61,
+  "source": "bex",
+  "truth": "half",
+  "text": "Kaboom Entertainment has sent a board member to 'support the school through a difficult term'. He brought a prize fund. (He brought a great deal more than that.)"
+ },
+ {
+  "id": "r36",
+  "dayFrom": 64,
+  "source": "town",
+  "truth": "true",
+  "text": "The suits at the inn pay for everything in cash and have asked three different people about the north slope."
+ },
+ {
+  "id": "r37",
+  "dayFrom": 67,
+  "source": "cafeteria",
+  "truth": "false",
+  "text": "Curfew is because there's an animal loose. Something that came out of the crater."
+ },
+ {
+  "id": "r38",
+  "dayFrom": 68,
+  "source": "bex",
+  "truth": "true",
+  "text": "North Crown's captain bowed to Lilia Mann after losing. Chat lost its mind."
+ },
+ {
+  "id": "r39",
+  "dayFrom": 73,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "Someone broke into the Archive. (Someone walked in with a professor's card.)"
+ },
+ {
+  "id": "r40",
+  "dayFrom": 76,
+  "source": "town",
+  "truth": "true",
+  "text": "Captain Stroud turned away paying cargo. Crates that sweat."
+ },
+ {
+  "id": "r41",
+  "dayFrom": 84,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "They only take people who deserve it. Bullies, sharks, snitches. (They take whoever sits down.)"
+ },
+ {
+  "id": "r42",
+  "dayFrom": 90,
+  "source": "bex",
+  "truth": "true",
+  "text": "{H:last} won {H:his} Promotion Duel in six turns and turned down Rare Hall. Quote: 'I have a {H:mate}.' Chat thinks it's adorable."
+ },
+ {
+  "id": "r43",
+  "dayFrom": 106,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "A third of the Spectral upper years didn't come back from break."
+ },
+ {
+  "id": "r44",
+  "dayFrom": 112,
+  "source": "bex",
+  "truth": "half",
+  "text": "The Battle Team has 'closed practice for tactical reasons'. (They are frightened.)"
+ },
+ {
+  "id": "r45",
+  "when": {
+   "flags": [
+    "kenji_hollowed"
+   ]
+  },
+  "dayFrom": 119,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "Kenji Watanabe. In the dome. With his headphones still on."
+ },
+ {
+  "id": "r46",
+  "dayFrom": 127,
+  "source": "town",
+  "truth": "false",
+  "text": "The ones in the ward wake up if you take them off the island. A cousin of a cousin saw it."
+ },
+ {
+  "id": "r47",
+  "dayFrom": 142,
+  "source": "bex",
+  "truth": "half",
+  "text": "The Chancellor is 'considering her position'. (The board is considering it for her.)"
+ },
+ {
+  "id": "r48",
+  "when": {
+   "flags": [
+    "willas_hollowed"
+   ]
+  },
+  "dayFrom": 151,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "Lilia Mann sat across from him all night. She didn't cry. Somebody said that was worse."
+ },
+ {
+  "id": "r49",
+  "dayFrom": 166,
+  "source": "town",
+  "truth": "half",
+  "text": "The Founder's turning seventy-five and they say he'll announce a new set at the festival. (He has something to announce. It is not a set.)"
+ },
+ {
+  "id": "r50",
+  "dayFrom": 170,
+  "source": "bex",
+  "truth": "true",
+  "text": "The Top Deck's last broadcast under this management: there is a fence going up around the ruins, and the name on the fence is not the school's."
+ },
+ {
+  "id": "r51",
+  "dayFrom": 2,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "One of the first-years got in without a placement rank. Somebody's daughter. (Somebody's daughter, yes. Not with somebody's permission.)"
+ },
+ {
+  "id": "r52",
+  "dayFrom": 3,
+  "source": "tomi",
+  "truth": "false",
+  "text": "The pale one in the long coat from Bungalow 6 did time. Or his brother did. Or he says his brother did."
+ },
+ {
+  "id": "r_pa1",
+  "dayFrom": 3,
+  "source": "cati",
+  "truth": "true",
+  "text": "The mail window knows who got a parcel before they do. Ask nicely and she'll tell you that much, and nothing else."
+ },
+ {
+  "id": "r53",
+  "dayFrom": 5,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The girl with the parasol sat on the same bench from lunch till dark and didn't notice."
+ },
+ {
+  "id": "r54",
+  "dayFrom": 6,
+  "source": "bex",
+  "truth": "true",
+  "text": "There's a first-year who was number two to the Wildcard kid online for two years and has taken it personally."
+ },
+ {
+  "id": "r55",
+  "dayFrom": 6,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "The tall blonde from the far north doesn't drink. (She had not started yet.)"
+ },
+ {
+  "id": "r_pa2",
+  "dayFrom": 8,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "You can't take the little prodigy from the Tower anywhere without signing a book. (True. The warden is not as fierce as she sounds.)"
+ },
+ {
+  "id": "r56",
+  "dayFrom": 9,
+  "source": "tomi",
+  "truth": "true",
+  "text": "Somebody in Bungalow 6 owns a crowbar. Tomi isn't saying who. Tomi would like it known he's on good terms with them."
+ },
+ {
+  "id": "r57",
+  "dayFrom": 10,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The green-haired one made Baylee Halvorsen cry over a sausage. Baylee. Cry."
+ },
+ {
+  "id": "r58",
+  "dayFrom": 12,
+  "source": "bex",
+  "truth": "half",
+  "text": "Hologram tech on this island is twenty years behind because the Founder likes it that way. (It is as good as it can be made — without something nobody is supposed to use.)"
+ },
+ {
+  "id": "r_pa3",
+  "dayFrom": 13,
+  "source": "tomi",
+  "truth": "false",
+  "text": "The ladder registrar can be talked into rounding a result. (Nobody has ever managed it, and three people have tried.)"
+ },
+ {
+  "id": "r_pa4",
+  "dayFrom": 16,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "The Commons steward has asked for a new boiler thirty-one times. (He has. Nobody at the school will say where the money went.)"
+ },
+ {
+  "id": "r59",
+  "dayFrom": 20,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The goth from Bungalow 4 made top 8 at the Cup. The goth. Three boys have had to rethink things."
+ },
+ {
+  "id": "r60",
+  "dayFrom": 21,
+  "source": "town",
+  "truth": "true",
+  "text": "A boy in a cowboy hat tried to climb the rope bridge from underneath. The Hale lad pulled him off by the belt."
+ },
+ {
+  "id": "r_pa5",
+  "dayFrom": 22,
+  "source": "bex",
+  "truth": "half",
+  "text": "The arena's stage manager used to be famous for something and won't say what. (He was nine.)"
+ },
+ {
+  "id": "r61",
+  "dayFrom": 30,
+  "source": "town",
+  "truth": "true",
+  "text": "Old print-works people used to get a cough. Ask at the harbour who's left of the ink room. (Two. Neither will say much.)"
+ },
+ {
+  "id": "r62",
+  "dayFrom": 32,
+  "source": "cafeteria",
+  "truth": "half",
+  "text": "Someone's leaving money under doors on the Commons. Guilt, probably. (Something like it.)"
+ },
+ {
+  "id": "r63",
+  "dayFrom": 41,
+  "source": "cafeteria",
+  "truth": "false",
+  "when": {
+   "flags": [
+    "brant_hollowed"
+   ]
+  },
+  "text": "The quiet kid in the black coat put a curse on Brant Kessler. He as good as said so."
+ },
+ {
+  "id": "r_pa6",
+  "dayFrom": 45,
+  "source": "cati",
+  "truth": "true",
+  "text": "Post for the mainland isn't going straight to the ferry any more. It goes up the hill first."
+ },
+ {
+  "id": "r64",
+  "dayFrom": 47,
+  "source": "tomi",
+  "truth": "true",
+  "text": "The Commons blacked out because the girl with the goggles is building a hologram you can touch. She says it nearly works."
+ },
+ {
+  "id": "r65",
+  "dayFrom": 62,
+  "source": "town",
+  "truth": "true",
+  "text": "The suit has been to see the hologram professor three times this month. The professor looks worse each time."
+ },
+ {
+  "id": "r66",
+  "dayFrom": 113,
+  "source": "cafeteria",
+  "truth": "half",
+  "when": {
+   "flags": [
+    "leona_caught"
+   ]
+  },
+  "text": "Helical got caught in the Archive stealing first prints. (She was reading a ledger.)"
+ },
+ {
+  "id": "r_pa7",
+  "dayFrom": 115,
+  "source": "cafeteria",
+  "truth": "true",
+  "text": "The tutor desk girl is entered for the Island Open, and she's stopped taking bookings for that week."
+ }
+]

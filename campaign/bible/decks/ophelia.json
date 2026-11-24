@@ -1,0 +1,389 @@
+{
+ "name": "Last Day",
+ "owner": "ophelia",
+ "heroes": [
+  "Kazena, the Storming Rebel",
+  "Damus, the Prophet of Apocalypse",
+  "Pseudonia, the Skill Devourer"
+ ],
+ "main": [
+  [
+   4,
+   "Angry Cheese"
+  ],
+  [
+   4,
+   "Armageddon"
+  ],
+  [
+   4,
+   "Book of Doom"
+  ],
+  [
+   2,
+   "Cactus Creature"
+  ],
+  [
+   4,
+   "Cloud Pillow"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   1,
+   "Dark Gear"
+  ],
+  [
+   1,
+   "Frolake"
+  ],
+  [
+   4,
+   "Golden Bananas"
+  ],
+  [
+   4,
+   "Ifrit"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   2,
+   "Noble Mummy Guards"
+  ],
+  [
+   4,
+   "Pure Advantage Camel"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "The Yeeting"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   4,
+   "Wealth"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Cloud in a Bottle"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ]
+ ],
+ "types": {
+  "Kazena, the Storming Rebel": "Hero",
+  "Damus, the Prophet of Apocalypse": "Hero",
+  "Pseudonia, the Skill Devourer": "Hero",
+  "Angry Cheese": "Artifact",
+  "Armageddon": "Spell (Destruction Magic)",
+  "Book of Doom": "Artifact",
+  "Cactus Creature": "Creature L0 (Surprise)",
+  "Cloud Pillow": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Dark Gear": "Artifact",
+  "Frolake": "Creature L1",
+  "Golden Bananas": "Artifact",
+  "Ifrit": "Creature L2",
+  "Juice": "Artifact (Reaction)",
+  "Magnetic Glove": "Artifact",
+  "Noble Mummy Guards": "Creature L0 (Surprise)",
+  "Pure Advantage Camel": "Creature L1 (Surprise)",
+  "Summoning Magic": "Ability",
+  "The Yeeting": "Artifact",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability",
+  "Cloud in a Bottle": "Potion (Reaction)",
+  "Elixir of Immortality": "Potion",
+  "Magnetic Potion": "Potion"
+ },
+ "gist": {
+  "Armageddon": "Hits every target on the board, its caster included, and ends the turn. If no hero is left standing, the player with more creatures wins.",
+  "Ifrit": "Each Ifrit makes every Armageddon hit much harder; Ifrits ignore it.",
+  "Damus, the Prophet of Apocalypse": "Places an Ifrit each turn for free; Ifrits take no damage from your cards; Armageddon gets cheaper per Ifrit and does not touch him while an Ifrit stands.",
+  "Kazena, the Storming Rebel": "Draws back to seven every turn.",
+  "Pseudonia, the Skill Devourer": "Very sturdy; inherits the effects of fallen heroes.",
+  "Cloud Pillow": "Halves damage to one of her targets; played before her own blast.",
+  "Angry Cheese": "Searches Armageddon.",
+  "Magnetic Glove": "Searches any card.",
+  "Book of Doom": "Gold for light hits on many targets.",
+  "Pure Advantage Camel": "Trap creature and a body for the tie-break.",
+  "Noble Mummy Guards": "Trap creature that bounces one of your Abilities.",
+  "Cactus Creature": "Trap creature that moves a status.",
+  "The Yeeting": "Removes any non-hero card.",
+  "Wealth": "Extra gold each turn."
+ },
+ "plan": "For five or six turns Ophelia appears to do nothing: an Ifrit a turn, a Cloud Pillow, a searched card. Then Armageddon, made enormous by three Ifrits, takes every hero off the table except Damus, twice if needed, and if everything dies the player with creatures wins. An opponent who does not know the combo watches it assemble and loses on the spot. It needs Damus alive and active, the Ifrits on the board, and time; she has almost no way to defend any of the three early.",
+ "looks": {
+  "early": "Damus and one Ifrit; nothing else happens.",
+  "mid": "Three Ifrits, Cloud Pillows on her other heroes, one card she keeps touching.",
+  "late": "An empty table, Damus and the Ifrits standing."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "She places one Ifrit a turn and does nothing else at all.",
+   "why": "The whole combo is Damus's text: he has ordinary health and no protection yet, and every quiet turn you give her is one Ifrit nearer the end."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Two Ifrits stand beside Damus and she has searched a card.",
+   "why": "Ifrits ignore damage but not Dark Gear or The Yeeting; each one removed shrinks the blast and raises its level, and a stolen Ifrit is a creature for the tie-break."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Three Ifrits, Cloud Pillows on her side: Armageddon is next turn.",
+   "why": "Only health and shields survive it: heal, set Cloud in a Bottle and Homerun! on the right heroes; anything attached this turn does not matter if no hero is left."
+  },
+  "endgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Both sides are low; she has creatures and you have none.",
+   "why": "A second blast that kills everyone wins for the side with creatures: Damus must die first or you must hold a stolen one."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Ophelia sets an Ifrit beside Damus and passes, smiling.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Damus now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Damus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Enjoy the quiet and build"
+     }
+    ]
+   },
+   {
+    "board": "A second Ifrit; a Camel face-down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Everything at Damus"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear an Ifrit"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Angry Cheese searches her a spell she does not show.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Damus before she casts it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it away"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Two Ifrits and a card she keeps touching.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet one Ifrit, steal the other"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Damus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep building"
+     }
+    ]
+   },
+   {
+    "board": "Mummy Guards bounce your Destruction Magic.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Artifacts need no levels: take an Ifrit"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Damus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach"
+     }
+    ]
+   },
+   {
+    "board": "Kazena draws her back to seven.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Damus: no free Ifrit"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Three Ifrits; Cloud Pillows go onto Kazena and Pseudonia.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal, Cloud in a Bottle, Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove an Ifrit"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm"
+     }
+    ]
+   },
+   {
+    "board": "Armageddon lands: only Damus and the Ifrits are untouched.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal before the second one"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Damus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "She searches another Armageddon.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shields again"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal an Ifrit"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One hero each; she has two Ifrits.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal one, or kill Damus first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the cast"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Damus has fallen; Armageddon would now hit her own side.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Still take an Ifrit for the tie-break"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Pseudonia inherits Damus's effect.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze her"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

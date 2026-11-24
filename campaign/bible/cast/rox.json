@@ -1,0 +1,204 @@
+{
+ "id": "rox",
+ "name": "Coach Roxanne \"Rox\" Delgado",
+ "firstName": "Rox",
+ "age": 31,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": false,
+ "deck": "Leg Day (Abilities first, then heavy hits)",
+ "look": "Muscular and compact, cropped dark hair, a whistle on a cord and a stopwatch in her fist. She wears Academy track gear with the sleeves cut off and stands with her weight on the balls of her feet. Her nose has been broken once and set well.",
+ "voice": "Loud, short and warm underneath, Texan; a coach's imperatives and sports metaphors for card play. Surnames or 'rookie'. Her laugh is a bark. When something really matters she speaks very quietly. RARE habit (once in a scene at most; most scenes go without it): 'Again.'",
+ "lines": [
+  "Rookie! Your hands shake because your legs are weak. Don't argue, it's science. Three laps.",
+  "Good. Again. Now do it tired — nobody ever lost a final feeling fresh.",
+  "I don't pick the team. I keep it alive. Different job.",
+  "Flynn, shoes. ...Never mind."
+ ],
+ "intro": "The Battle Team's coach and Physical Conditioning instructor, who believes shaky hands start in weak legs.",
+ "traits": [
+  {
+   "id": "rox_1",
+   "text": "She makes card players run laps and insists it helps their play.",
+   "how": "Physical Conditioning, first week."
+  },
+  {
+   "id": "rox_2",
+   "text": "She coaches the Battle Team but leaves the line-up to the captain.",
+   "how": "Any team scene."
+  },
+  {
+   "id": "rox_3",
+   "text": "She has a specific breathing drill for stage fright.",
+   "how": "Let her see your hands at a table."
+  },
+  {
+   "id": "rox_4",
+   "text": "She was a professional boxer before she was a coach.",
+   "how": "The broken nose; ask."
+  },
+  {
+   "id": "rox_5",
+   "text": "She has written up Saoirse Flynn for bare feet over a hundred times.",
+   "how": "Gym noticeboard."
+  },
+  {
+   "id": "rox_6",
+   "text": "She keeps a wall of photos of every team she has coached and can name each one.",
+   "how": "Her office by the gym."
+  },
+  {
+   "id": "rox_7",
+   "text": "She retired from the ring after one particular fight and does not spar any more.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Roxanne Delgado, from El Paso, was a ranked flyweight until a title eliminator at twenty-five in which she put her opponent in a coma for nine days. The other woman recovered; Rox never fought again. She retrained in sports science and came to the Academy because card players do not bleed. She is the adult on the team — the one who notices who is not sleeping (Kenji), who is carrying something (Willas), who is drowning (Lilia). She defers to Lilia on the line-up on principle: 'A captain has to be allowed one decision the numbers don't like.' Contradiction: she pushes people to their limit daily and lives in dread of pushing one person one step too far. She and Santángel fight politely over who runs the team; she thinks he teaches kids to be afraid of losing.\nThe Hollowed look, to her, exactly like the woman in the hospital bed in Las Vegas: eyes open, nobody home. Day 40 hits her harder than any other member of staff and she tells no one why. She does not believe in ghosts; she believes in what she sees, and by Day 66 what she sees is her players being picked off by something that hits once. In Stage D she tries to pull the whole team from formal play; Lilia overrules her. Her use to Rowan: she can train his Nerve (the breathing drill is real and mechanical: it should raise it), and she will put her body between a student and a threat without a second's thought.",
+ "wants": "To send every one of her players home in one piece.",
+ "fears": "Being in the corner again while someone does not get up.",
+ "crush": "santangel",
+ "crushNote": "They have argued about who runs the team every week for four years, and she would miss it terribly. It shows as fights picked on slow days, his espresso order known by heart, and fury — not triumph — when he is plainly wrong.",
+ "crushPace": 0.7,
+ "likes": [
+  "Effort over talent",
+  "Turning up to conditioning",
+  "Players who look after teammates",
+  "Straight talk",
+  "Breakfast tacos",
+  "Rookies who ask for help with nerves"
+ ],
+ "dislikes": [
+  "Quitting mid-drill",
+  "Mockery of weaker players",
+  "Santángel's fear-coaching",
+  "Bare feet in her gym",
+  "Students training hurt and hiding it",
+  "Being asked about her last fight"
+ ],
+ "gifts": [
+  "Card: Muscle Training",
+  "Hot sauce from the night market",
+  "Athletic tape",
+  "Card: Elixir of Strength",
+  "A photo of your intake for her wall"
+ ],
+ "events": [
+  {
+   "id": "rox_e1",
+   "stage": 1,
+   "title": "Three laps",
+   "condition": "Attend Physical Conditioning and finish a session at gym without quitting; ask her about shaky hands.",
+   "hint": [
+    "She has a theory about nerves. It involves running.",
+    "Finish one of her training sessions and ask for help with stage fright."
+   ]
+  },
+  {
+   "id": "rox_e2",
+   "stage": 2,
+   "title": "Do it tired",
+   "condition": "Complete her breathing-and-conditioning programme over at least two weeks, and play a watched duel afterwards (the Day 33 tryouts count).",
+   "hint": [
+    "Her drills are dull. They also work.",
+    "Stick with her programme for a fortnight and test it in front of a crowd."
+   ]
+  },
+  {
+   "id": "rox_e3",
+   "stage": 3,
+   "title": "The corner",
+   "condition": "After Day 40, find her at infirmary_ward and ask why she comes; back her when she argues to protect the team.",
+   "hint": [
+    "She visits the infirmary more than her job requires.",
+    "Ask her why she visits the infirmary, and support her efforts to keep the team safe."
+   ]
+  }
+ ],
+ "bonds": {
+  "lilia": {
+   "label": "mentor",
+   "text": "The best player she has coached; she worries about what winning has done to her.",
+   "public": true,
+   "from": 0
+  },
+  "willas": {
+   "label": "mentor",
+   "text": "Her steadiest head in a team match, whatever his rating says.",
+   "public": true,
+   "from": 0
+  },
+  "priya": {
+   "label": "mentor",
+   "text": "Never missed a session; Rox would start her tomorrow if it were her call.",
+   "public": true,
+   "from": 0
+  },
+  "saoirse": {
+   "label": "protégé",
+   "text": "Flynn: unmanageable, barefoot, and the calmest hands she has ever coached.",
+   "public": true,
+   "from": 0
+  },
+  "sunny": {
+   "label": "mentor",
+   "text": "An ex-swimmer with a competitor's engine; Rox means to find it a new race.",
+   "public": true,
+   "from": 3
+  },
+  "santangel": {
+   "label": "colleagues",
+   "text": "Thinks he teaches kids to be afraid of losing.",
+   "public": true,
+   "from": 0
+  },
+  "ophelia": {
+   "label": "mentor",
+   "text": "A reserve-level player who will not leave her sister for an away match. Rox keeps the invitation open.",
+   "public": true,
+   "from": 0
+  },
+  "eberhart": {
+   "label": "mentor",
+   "text": "Finally, a card player who does the laps. She is trying to teach him that a team is not an interruption.",
+   "public": true,
+   "from": 3
+  },
+  "tavita": {
+   "label": "mentor",
+   "text": "The one student she would trust with a hall full of frightened people. She has told the Chancellor so.",
+   "public": true,
+   "from": 0
+  },
+  "baraka": {
+   "label": "mentor",
+   "text": "Her fourth-year placement: the best pair of hands on a pool deck, and a player she cannot get to care.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "gym",
+   "Midday": "great_arena",
+   "Afternoon": "gym",
+   "Evening": "pool",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "cliff_path",
+   "Midday": "gym",
+   "Afternoon": "great_arena",
+   "Evening": "bar",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Trains first: several turns of nothing but attaching Abilities, then three enormous heroes taking turns to hit, with a boxer's sense of when the other side is hurt. No finesse and no need of it.",
+  "tilt": "An opponent who looks genuinely distressed. She eases off, every time."
+ }
+}

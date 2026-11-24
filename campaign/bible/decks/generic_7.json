@@ -1,0 +1,380 @@
+{
+ "name": "Join our Cult!",
+ "owner": null,
+ "heroes": [
+  "Tharx, the Never-Losing General",
+  "Klaus, the Cult Leader",
+  "Ingo, Investor of Evil"
+ ],
+ "main": [
+  [
+   4,
+   "Alchemy"
+  ],
+  [
+   4,
+   "Cosmic Skeleton"
+  ],
+  [
+   4,
+   "Crimson Web"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   10,
+   "Decay Magic"
+  ],
+  [
+   1,
+   "Divine Gift of Forgetting"
+  ],
+  [
+   2,
+   "Forbidden Zone"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Icy Grave"
+  ],
+  [
+   2,
+   "Leadership"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Mr. Jiggles"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "The Master's Plan"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Fire Bomb"
+  ]
+ ],
+ "types": {
+  "Tharx, the Never-Losing General": "Hero",
+  "Klaus, the Cult Leader": "Hero",
+  "Ingo, Investor of Evil": "Hero",
+  "Alchemy": "Ability",
+  "Cosmic Skeleton": "Creature L1",
+  "Crimson Web": "Spell (Decay Magic, Surprise)",
+  "Cute Cheese": "Artifact",
+  "Decay Magic": "Ability",
+  "Divine Gift of Forgetting": "Spell (Decay Magic)",
+  "Forbidden Zone": "Spell (Decay Magic)",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Icy Grave": "Spell (Decay Magic)",
+  "Leadership": "Ability",
+  "Magnetic Glove": "Artifact",
+  "Mr. Jiggles": "Creature L2",
+  "Performance": "Ability",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Wheels": "Artifact",
+  "Acid Vial": "Potion",
+  "Elixir of Quickness": "Potion",
+  "Fire Bomb": "Potion"
+ },
+ "gist": {
+  "Klaus, the Cult Leader": "Whenever he casts a Decay spell, a creature of lower level goes from his hand onto the board for free.",
+  "Tharx, the Never-Losing General": "Draws a card per creature that stayed on the board.",
+  "Ingo, Investor of Evil": "Gold every time a creature lands on his side.",
+  "Haressassin": "A hard shot each turn; arrives free behind a level-three spell.",
+  "Mr. Jiggles": "Hits two targets each turn.",
+  "Cosmic Skeleton": "A heavy shot each turn; arrives free behind a level-two spell.",
+  "Icy Grave": "Freezes a target for two turns.",
+  "Forbidden Zone": "Light damage to your side; your heroes cannot act and your creatures go blank for a turn.",
+  "Crimson Web": "Trap: cancels an attack or spell on its hero and sticks to the attacker, who cannot act until you discard a card to tear it off.",
+  "The Master's Plan": "Cancels one card you play from hand.",
+  "Divine Gift of Forgetting": "Once per game: every Ability you have attached (beyond the starting ones) is shuffled back into your deck.",
+  "Performance": "Raises an Ability a level.",
+  "Cute Cheese": "Searches any creature.",
+  "Magnetic Glove": "Searches any card.",
+  "Wheels": "Draws three."
+ },
+ "plan": "Two cards for one, every turn. Klaus casts a Decay spell that takes a hero of yours out of the game for a while and a shooter walks onto the board for free behind it. A few turns in, Haressassins, Mr. Jiggles and Cosmic Skeletons fire every turn at heroes that are frozen or webbed, Tharx draws for the row, and The Master's Plan guards it all. Once per game Divine Gift of Forgetting sends every Ability you have stacked back into your deck. The shooters are small and need a turn before they fire, and without Klaus the deck pays full price for everything.",
+ "looks": {
+  "early": "Your caster frozen for two turns, a Cosmic Skeleton that cost nothing.",
+  "mid": "Three shooters, a Crimson Web waiting on Klaus, Tharx drawing.",
+  "late": "A row of shooters firing every turn at heroes that mostly cannot act."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "A shooter has just arrived for free behind a Decay spell and cannot fire until next turn.",
+   "why": "Every creature here is small and takes a turn to wake up; and stacking Abilities slowly is exactly what Divine Gift of Forgetting undoes in one card."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "RUSH",
+   "tell": "Klaus casts a Decay spell every turn and gets a creature with each; a card lies face-down in front of him.",
+   "why": "The free creatures stop when Klaus is frozen or dead; Snow Cannon is not an attack or spell, so the Crimson Web does not catch it, and Tea hands his own Icy Grave back."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Four shooters are out and one of your heroes is frozen.",
+   "why": "Guard the heroes that can still be hurt: freeze the worst shooter, shield one hero, and keep the sweeper for the turn the Plan has been drawn out."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "DISRUPT",
+   "tell": "It is top-decking and Klaus is gone.",
+   "why": "With no hand it adds one shooter a turn at best, and its heroes were never protected."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Icy Grave on your caster; a Cosmic Skeleton steps out behind it for free.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Skeleton before it fires"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the freeze onto Klaus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit frozen"
+     }
+    ]
+   },
+   {
+    "board": "Wheels and a Magnetic Glove: his hand is full of shooters.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Hold Flame Avalanche for the first two"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Burn Klaus"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A card goes face-down in front of Klaus.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweeps do not choose him"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Aim your key spell at him"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Forbidden Zone: your heroes cannot act this turn; a Haressassin arrives free.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Artifacts still work: Snow Cannon Klaus"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Dark Gear the Haressassin"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Nothing to race with"
+     }
+    ]
+   },
+   {
+    "board": "Your spell at Klaus is caught by a Crimson Web, which sticks to your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Discard a card to tear it off; freeze Klaus instead"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Leave it on"
+     }
+    ]
+   },
+   {
+    "board": "The Master's Plan cancels your sweep.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "It is spent for the turn: Yeet his best shooter"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Second sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Divine Gift of Forgetting: your attached Abilities go back into your deck. Four shooters.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Potions and artifacts need no levels: freeze, shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche needs levels you no longer have: Cataclysm if an Area is out"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Start levelling again"
+     }
+    ]
+   },
+   {
+    "board": "Mr. Jiggles and two Haressassins aim at your weakest hero.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon one, Homerun! held"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Bait the Plan and sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Tharx draws four.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield, then burn Tharx"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Klaus is down; two shooters remain.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the shooters"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Nothing left to disrupt"
+     }
+    ]
+   },
+   {
+    "board": "Ingo alone, rich.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear his last creature"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Klaus.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Tharx"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

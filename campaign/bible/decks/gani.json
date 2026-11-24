@@ -1,0 +1,365 @@
+{
+ "name": "Standing Ovation",
+ "owner": "gani",
+ "heroes": [
+  "Cute Starlet Megu",
+  "Hulijing, the Foxdemon",
+  "Silent Water Mizune"
+ ],
+ "main": [
+  [
+   4,
+   "Fun-Fun Circus Clown"
+  ],
+  [
+   4,
+   "Fun-Fun Circus Director"
+  ],
+  [
+   4,
+   "Fun-Fun Circus Elephant"
+  ],
+  [
+   4,
+   "Fun-Fun Circus Strongman"
+  ],
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Harpyformer Choir"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   2,
+   "Idol of Crestina"
+  ],
+  [
+   3,
+   "Thicket"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Cloud Pillow"
+  ],
+  [
+   7,
+   "Summoning Magic"
+  ],
+  [
+   6,
+   "Magic Arts"
+  ],
+  [
+   4,
+   "Singing"
+  ],
+  [
+   3,
+   "Leadership"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Cute Starlet Megu": "Hero",
+  "Hulijing, the Foxdemon": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Fun-Fun Circus Clown": "Creature L1",
+  "Fun-Fun Circus Director": "Creature L2",
+  "Fun-Fun Circus Elephant": "Creature L2",
+  "Fun-Fun Circus Strongman": "Creature L3",
+  "Aggressive Town Guard": "Creature L0",
+  "Harpyformer Choir": "Creature L0",
+  "Haressassin": "Creature L2",
+  "Idol of Crestina": "Artifact (Reaction)",
+  "Thicket": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Cloud Pillow": "Artifact",
+  "Summoning Magic": "Ability",
+  "Magic Arts": "Ability",
+  "Singing": "Ability",
+  "Leadership": "Ability"
+ },
+ "gist": {
+  "Fun-Fun Circus Strongman": "Whenever any target is defeated, on either side, he gains an Applause Counter; once a turn he hits a target for more the more counters there are on the whole board. Arrives with health to match the count.",
+  "Fun-Fun Circus Clown": "Each turn adds counters to himself or to every other circus creature. Almost no health, but he comes back out of the hand at the end of your turn for the price of one counter.",
+  "Fun-Fun Circus Elephant": "Sits revealed in his hand collecting a counter whenever one is placed on the board; on arrival hits a target for everything it has collected.",
+  "Fun-Fun Circus Director": "When another act dies he may move its counters onto himself and take the act back to hand, for two discards. With enough applause on the board his whole gold-and-draw step repeats.",
+  "Cute Starlet Megu": "Her Singing makes one of his own creatures use its act a second time each turn.",
+  "Hulijing, the Foxdemon": "Once a turn becomes a lower-level creature from deck or hand for the turn — usually a Clown — and uses its act.",
+  "Silent Water Mizune": "The one hero who can summon the whole troupe from the start.",
+  "Thicket": "One of his creatures cannot be chosen for a turn.",
+  "Deepsea Idol": "Cancels one source that would hit two or more of his creatures.",
+  "Haressassin": "A hard shot each turn.",
+  "Aggressive Town Guard": "Free summon with a ping; also something to die and be clapped for."
+ },
+ "plan": "A circus that runs on applause. The Clown hands out counters every turn and Megu makes him do it twice; every creature that dies on either side claps for the Strongman; the Elephant waits in Gani's hand, face up, counting. Then the big acts come out — the Elephant's entrance and the Strongman's daily lift are each worth ten for every counter. Sweepers feed it: every small creature the Storm kills is one more counter, as long as a Strongman is there to hear it. But the troupe is made of paper (Clown and Strongman arrive with almost no health), counters die with their creature unless the Director is out, and the three heroes do nothing themselves.",
+ "looks": {
+  "early": "A Clown and a Town Guard; the Elephant held face up in his hand with a counter on it.",
+  "mid": "Clown, Director, Strongman; counters on everything; Megu calling an encore.",
+  "late": "Thirty counters on the board and the Strongman lifting."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Clown is handing out counters and no Strongman is on the table yet.",
+   "why": "Deaths only clap for a Strongman who is there to hear them: sweep now, while it is free, and the Elephant in his hand stops counting."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "A Strongman is out with a Director beside him; every creature you kill adds a counter.",
+   "why": "Sweeping the small acts now feeds the big one. Remove the Strongman alone (The Yeeting, Dark Gear, Acid Vial) or freeze Megu so nothing takes a second bow; otherwise hit heroes."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Twenty-odd counters; the Elephant is about to enter and the Strongman has his lift.",
+   "why": "Two large single hits in one turn: Homerun! and Cloud in a Bottle are for those, and Dark Gear on the Strongman turns the whole count round."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "The big acts are gone and the Director did not save their counters.",
+   "why": "Three heroes who do nothing themselves, and a Clown starting again from one."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Gani shows you a Fun-Fun Circus Elephant from his hand, as the card demands, and summons a Clown.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: the Clown has no health to speak of"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Megu sings: the Clown hands out counters twice.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Clown before he comes back"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Megu"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Hulijing turns into a Clown for the turn and takes a bow.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep what is really there"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit Hulijing while she counts as a creature"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Strongman walks on; your Storm kills a Town Guard and he gains a counter for it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Strongman alone"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mizune"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: four deaths, four counters"
+     }
+    ]
+   },
+   {
+    "board": "The Director takes a dead Clown's counters and puts the Clown back in Gani's hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear steals the Director"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   },
+   {
+    "board": "Thicket: the Strongman cannot be chosen this turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Megu instead"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning at the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the rest and feed him"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Elephant enters with twelve counters of its own.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on its target"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Director before the next act"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep after the damage is done"
+     }
+    ]
+   },
+   {
+    "board": "The Strongman lifts: ten for every counter on the board.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear: he lifts for you"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill small acts and feed him"
+     }
+    ]
+   },
+   {
+    "board": "Enough applause: the Director gives Gani a second gold-and-draw step.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield and count"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "The Yeeting on the Director"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "The Strongman is gone and nobody caught his counters.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the Clown"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "One Clown, one counter, coming back every turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill him again"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Mizune to summon one last act.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Megu"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

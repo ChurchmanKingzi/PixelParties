@@ -1,0 +1,453 @@
+{
+ "name": "Big Stomp!",
+ "owner": "guest",
+ "heroes": [
+  "Güldefaber, the King of Dwarfs",
+  "Kit, the Shark Researcher",
+  "Alex, Trainer of Heroes"
+ ],
+ "main": [
+  [
+   3,
+   "Alchemic Journal"
+  ],
+  [
+   2,
+   "Cute Cheese"
+  ],
+  [
+   1,
+   "Divine Gift of the Deepsea"
+  ],
+  [
+   3,
+   "Field Standard"
+  ],
+  [
+   3,
+   "Fighting"
+  ],
+  [
+   4,
+   "Giga Steroids"
+  ],
+  [
+   1,
+   "Gigantisaur Ankylos"
+  ],
+  [
+   1,
+   "Gigantisaur Brachion"
+  ],
+  [
+   4,
+   "Gigantisaur Chimera"
+  ],
+  [
+   2,
+   "Gigantisaur King Trex"
+  ],
+  [
+   2,
+   "Gigantisaur Pteranos"
+  ],
+  [
+   2,
+   "Gigantisaur Raptoren"
+  ],
+  [
+   1,
+   "Gigantisaur Spinor"
+  ],
+  [
+   1,
+   "Gigantisaur Stegon"
+  ],
+  [
+   2,
+   "Gigantisaur Stomp"
+  ],
+  [
+   2,
+   "Gigantisaur Triceras"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   2,
+   "Rocket Sneeze"
+  ],
+  [
+   4,
+   "Smuggler's Pier"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "The Great Wall of Deri"
+  ],
+  [
+   3,
+   "Training"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magic Lamp"
+  ],
+  [
+   1,
+   "Magnetic Potion"
+  ]
+ ],
+ "types": {
+  "Güldefaber, the King of Dwarfs": "Hero",
+  "Kit, the Shark Researcher": "Hero",
+  "Alex, Trainer of Heroes": "Hero",
+  "Alchemic Journal": "Artifact",
+  "Cute Cheese": "Artifact",
+  "Divine Gift of the Deepsea": "Spell (Summoning Magic)",
+  "Field Standard": "Artifact",
+  "Fighting": "Ability",
+  "Giga Steroids": "Artifact",
+  "Gigantisaur Ankylos": "Creature L3",
+  "Gigantisaur Brachion": "Creature L3",
+  "Gigantisaur Chimera": "Creature L3",
+  "Gigantisaur King Trex": "Creature L3",
+  "Gigantisaur Pteranos": "Creature L3",
+  "Gigantisaur Raptoren": "Creature L3",
+  "Gigantisaur Spinor": "Creature L3",
+  "Gigantisaur Stegon": "Creature L3",
+  "Gigantisaur Stomp": "Spell (Summoning Magic)",
+  "Gigantisaur Triceras": "Creature L3",
+  "Golden Ankh": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Performance": "Ability",
+  "Rocket Sneeze": "Artifact (Reaction)",
+  "Smuggler's Pier": "Artifact (Area)",
+  "Summoning Magic": "Ability",
+  "The Great Wall of Deri": "Artifact (Equipment)",
+  "Training": "Ability",
+  "Elixir of Quickness": "Potion",
+  "Magic Lamp": "Potion",
+  "Magnetic Potion": "Potion",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Gigantisaur Chimera": "The boss: enormous health, summoned by discarding three different Gigantisaurs from hand (which ends his turn). Each turn it hits one target harder for every different Gigantisaur in his discard pile.",
+  "Gigantisaur King Trex": "Enters by sacrificing another Gigantisaur; while it stands, every Gigantisaur in his hand can be summoned without levels.",
+  "Gigantisaur Stomp": "Free extra hit from any hero that has a truly huge creature beside it; one per hero per turn.",
+  "Gigantisaur Raptoren": "Brings a second Gigantisaur along and draws a card per Gigantisaur he controls.",
+  "Gigantisaur Triceras": "Discards one card to draw three, every turn.",
+  "Gigantisaur Pteranos": "Discards Gigantisaurs from hand to draw twice as many, stocking the discard pile for the Chimera.",
+  "Gigantisaur Stegon": "When one of his Gigantisaurs is hit he may discard a card to bounce the same damage back.",
+  "Gigantisaur Ankylos": "Discards a card to stun one of your targets for a turn.",
+  "Gigantisaur Brachion": "Takes hits meant for its hero, for a discard each.",
+  "Alex, Trainer of Heroes": "When he gains an Ability he fetches another for a team-mate; this is how Summoning Magic reaches level three.",
+  "Kit, the Shark Researcher": "Each Ability she gains fetches a creature or costs you small hits or a card.",
+  "Güldefaber, the King of Dwarfs": "Very tough, makes extra gold.",
+  "Performance": "Ability that copies the one beneath it and raises it a level, for a little self-damage.",
+  "Smuggler's Pier": "Area: either player may buy cards for gold on their turn.",
+  "Giga Steroids": "A second action this turn, usable only for an effect (a Stomp-turn enabler).",
+  "The Great Wall of Deri": "Shaves a little off every hit his creatures take.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Baylee spends the first turns doing nothing visible: Alex, Kit, Training and Performance pile up Summoning Magic until one hero can call a Gigantisaur. Then the board fills with one giant per hero, Triceras, Pteranos and the Pier keep his hand full while feeding the discard pile, every hero beside a giant gets a free Stomp each turn, and the Chimera closes. Stegon makes hitting the dinosaurs painful, Brachion shields a hero. The deck is honest and slow: the heroes are exposed for several turns, each hero holds only one Gigantisaur, and every defensive trick costs a discard. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "Three heroes with growing Ability stacks and no dinosaur yet. And an unfamiliar Area with a starfield on it.",
+  "mid": "One Gigantisaur beside each hero, each bigger than a hero; Stomps every turn, a thick discard pile.",
+  "late": "The Chimera looming, King Trex next to it, Baylee holding one or two cards and saying nothing."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "No Gigantisaur is out; Alex and Kit are still stacking Summoning Magic.",
+   "why": "These are the only turns his heroes stand without a wall, and a Fire Bomb on the Summoning Magic stack buys another one."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "A Stegon stands beside Alex and Baylee holds spare cards for it.",
+   "why": "Damage thrown at the dinosaurs vanishes into huge health pools and comes back through Stegon; answer only the Ankylos stun or the Stomp that would kill and send the rest past the giants."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "The Chimera is out and three different Gigantisaurs lie in his discard pile.",
+   "why": "One card deals with the Chimera better than any amount of damage: Dark Gear takes it, Snow Cannon silences it for a turn, The Yeeting removes it."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "He has one or two cards left, and every Brachion or Stegon trick needs a discard.",
+   "why": "His protection runs on discards and his hand is empty; the heroes behind the dinosaurs are ordinary."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Baylee attaches Summoning Magic to Alex, who passes a second copy to Kit; nothing else is on the table.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Kit before the dinosaurs come"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb a Summoning Magic"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build alongside him"
+     }
+    ]
+   },
+   {
+    "board": "Performance raises Kit's Summoning Magic and costs her a little health; she makes you discard.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning three unprotected heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Alex"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for real targets"
+     }
+    ]
+   },
+   {
+    "board": "He opens Smuggler's Pier and buys two cards.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Deal as much hero damage as possible now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm is free under his Area"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Buy cards yourself and build"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Gigantisaur Stegon plants itself beside Alex; a Triceras draws three a turn next to Kit.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Aim past them at heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Triceras"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche into the giants"
+     }
+    ]
+   },
+   {
+    "board": "Ankylos stuns your Storm caster; two Stomps land on the same hero.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the stun onto Kit and answer back"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon the Ankylos"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Accept the lost turn"
+     }
+    ]
+   },
+   {
+    "board": "King Trex arrives by eating a Raptoren; every dinosaur in his hand is now castable.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield your weakest hero, burn Güldefaber"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet King Trex"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep into a wall"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Three dinosaurs go to the discard pile and the Chimera rises; his turn ends.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Chimera"
+     },
+     {
+      "stance": "RUSH",
+      "text": "He has no hand: hit the heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Chew through the Chimera"
+     }
+    ]
+   },
+   {
+    "board": "The Chimera has just taken most of a hero in one bite.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon it for the turn that would kill"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held, damage to Kit"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig for the perfect answer"
+     }
+    ]
+   },
+   {
+    "board": "A Brachion absorbs everything you aim at Güldefaber.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Brachion"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Keep hitting, his hand runs out first"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Out of cards; two heroes behind two giants.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore the giants and end it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Protect your caster and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Go fishing"
+     }
+    ]
+   },
+   {
+    "board": "Chimera on one side, your doubled Storm on the other.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Race: the Storm picks heroes off faster"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze the Chimera, then Yeet it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Chimera after all"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh brings Kit back for one last Stomp.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the others; she falls at end of turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle for the Stomp"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal up"
+     }
+    ]
+   }
+  ]
+ }
+}

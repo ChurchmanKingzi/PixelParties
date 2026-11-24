@@ -1,0 +1,385 @@
+{
+ "name": "Heal Burn",
+ "owner": null,
+ "heroes": [
+  "Kazena, the Storming Rebel",
+  "Nao, the Barrier Priestess",
+  "Treasure Huntress Semi"
+ ],
+ "main": [
+  [
+   4,
+   "Brilliant Idea"
+  ],
+  [
+   3,
+   "Cure"
+  ],
+  [
+   2,
+   "Dark Gear"
+  ],
+  [
+   1,
+   "Divine Gift of The Light"
+  ],
+  [
+   4,
+   "Friendship"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   1,
+   "Guardian Angel"
+  ],
+  [
+   4,
+   "Heal"
+  ],
+  [
+   4,
+   "Healing Melody"
+  ],
+  [
+   4,
+   "Lifeforce Howitzer"
+  ],
+  [
+   3,
+   "Magnetic Glove"
+  ],
+  [
+   2,
+   "Martyry"
+  ],
+  [
+   4,
+   "Overheal Shock"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   3,
+   "Shard of Chaos"
+  ],
+  [
+   2,
+   "Shield of Death"
+  ],
+  [
+   2,
+   "Shield of Life"
+  ],
+  [
+   4,
+   "Support Magic"
+  ],
+  [
+   3,
+   "The Yeeting"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Kazena, the Storming Rebel": "Hero",
+  "Nao, the Barrier Priestess": "Hero",
+  "Treasure Huntress Semi": "Hero",
+  "Brilliant Idea": "Spell (Support Magic)",
+  "Cure": "Spell (Support Magic, Reaction)",
+  "Dark Gear": "Artifact",
+  "Divine Gift of The Light": "Spell (Support Magic)",
+  "Friendship": "Ability",
+  "Golden Ankh": "Artifact",
+  "Guardian Angel": "Spell (Support Magic, Attachment)",
+  "Heal": "Spell (Support Magic)",
+  "Healing Melody": "Spell (Support Magic)",
+  "Lifeforce Howitzer": "Artifact (Equipment)",
+  "Magnetic Glove": "Artifact",
+  "Martyry": "Spell (Support Magic, Reaction)",
+  "Overheal Shock": "Spell (Support Magic, Attachment)",
+  "Performance": "Ability",
+  "Shard of Chaos": "Artifact",
+  "Shield of Death": "Artifact (Equipment)",
+  "Shield of Life": "Artifact (Equipment)",
+  "Support Magic": "Ability",
+  "The Yeeting": "Artifact",
+  "Wheels": "Artifact"
+ },
+ "gist": {
+  "Lifeforce Howitzer": "Equipment: once per turn, when its hero is healed, the amount healed is fired at one of your targets.",
+  "Overheal Shock": "Attached to one of YOUR heroes: any healing that hero receives becomes damage instead.",
+  "Nao, the Barrier Priestess": "Her heals can push a target above its maximum health.",
+  "Kazena, the Storming Rebel": "Once per turn draws back up to seven cards.",
+  "Treasure Huntress Semi": "Extra gold every turn.",
+  "Friendship": "Ability: one Support spell per turn is a free extra action.",
+  "Heal": "A large heal on one target.",
+  "Healing Melody": "Heals its whole side.",
+  "Cure": "Removes status effects, even during your turn.",
+  "Martyry": "Reaction: a hit aimed at one of its targets is taken by the caster instead.",
+  "Shield of Life": "Heals a team-mate the first time its hero is hit each turn.",
+  "Shield of Death": "Hits back the first time its hero is hit each turn.",
+  "Guardian Angel": "Once: full heal instead of defeat.",
+  "The Yeeting": "Hurts its own hero to remove any non-hero card; a wound it is glad to heal.",
+  "Brilliant Idea": "Searches any card.",
+  "Performance": "Raises an Ability a level."
+ },
+ "plan": "A deck that wins by healing. Heroes carry Lifeforce Howitzers, and every Heal and Healing Melody fires the same amount at you, so it undoes your damage and deals its own with one card; it even wounds itself with The Yeeting and Performance to have something to heal. Overheal Shock goes onto one of your heroes and turns your own healing into self-harm. Kazena keeps the hand full. Against chip damage it is close to unbeatable while the Howitzers stand; without them it is three healers with no attack at all.",
+ "looks": {
+  "early": "Howitzers going onto heroes, Friendship stacked, no damage dealt yet.",
+  "mid": "Every heal a cannon shot; an Overheal Shock stuck to one of your heroes.",
+  "late": "Heroes above their maximum health, three Howitzers firing a turn."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "SETUP",
+   "trap": "CONTROL",
+   "tell": "It is equipping and has dealt no damage; nobody on its side is hurt, so there is nothing to heal.",
+   "why": "A Howitzer only fires when its hero is actually healed, and healers cannot pressure you early; these are the cheapest turns to take one of them down."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Each of its heroes wears a Lifeforce Howitzer.",
+   "why": "The Howitzers are the entire offence, and Fire Bomb takes all of them at once; after that every heal is only a heal."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "An Overheal Shock is attached to one of your heroes.",
+   "why": "While it is there Tarleinn's healing hurts that hero: remove the attachment (The Yeeting) or point your heals elsewhere."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Its heroes sit above their maximum health, with a Guardian Angel on one.",
+   "why": "Out-damaging steady healing takes everything at once on one hero at a time: doubled Storm, Acid Vial, and the Angel sprung with a small hit first."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Two Howitzers are equipped; nobody on its side is hurt yet.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Nao"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build, Fire Bomb in mind"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "It Yeets one of your cards, wounding its own hero, then heals the wound into a shot.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Keep burning one hero only"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Set Firewall"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Martyry pulls your spell from Nao onto Kazena.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Then Kazena first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Nao"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Healing Melody: all three heal, three Howitzers fire.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, focus one hero"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Out-wait it"
+     }
+    ]
+   },
+   {
+    "board": "Kazena draws back to seven every turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Howitzers first, then her"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Kazena"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Nao is healed far above her maximum.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Howitzers first, health later"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Pick a different hero"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Give up on damage"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Overheal Shock lands on your Storm caster; Tarleinn's next heal would hurt it.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Shock"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal your other heroes only"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Carry on as usual"
+     }
+    ]
+   },
+   {
+    "board": "Cure removes your burn during your own turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb what Howitzers remain"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Direct damage, not statuses"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-apply"
+     }
+    ]
+   },
+   {
+    "board": "Shield of Life heals a neighbour every time you hit its hero.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "It is equipment too: Fire Bomb"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Focus Kazena"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Guardian Angel on Nao, the last healer.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Small hit to spring it, then everything"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Angel"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Semi alone, with gold and nothing to buy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Its Howitzers are gone; it heals and passes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Doubled Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ]
+ }
+}

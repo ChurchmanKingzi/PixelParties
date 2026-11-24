@@ -1,0 +1,380 @@
+{
+ "name": "Tempo Lesson",
+ "owner": "santangel",
+ "heroes": [
+  "Reiza, the Chief Tormentor",
+  "Zsos'Ssar, the Serpent Warlord",
+  "Locke, the Unseen Saboteur"
+ ],
+ "main": [
+  [
+   3,
+   "Blade of the Swamp Witch"
+  ],
+  [
+   4,
+   "Blow of the Venom Snake"
+  ],
+  [
+   2,
+   "Decay Magic"
+  ],
+  [
+   6,
+   "Fighting"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Hammer Throw"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Poison Pollen"
+  ],
+  [
+   2,
+   "Poisoned Well"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Sickly Cheese"
+  ],
+  [
+   2,
+   "Slow"
+  ],
+  [
+   2,
+   "Stinky Stables"
+  ],
+  [
+   4,
+   "Stranglehold"
+  ],
+  [
+   3,
+   "Tea"
+  ],
+  [
+   3,
+   "The Master's Plan"
+  ],
+  [
+   4,
+   "The Warlord's Bite"
+  ],
+  [
+   2,
+   "Thieving Strike"
+  ],
+  [
+   3,
+   "Venom Infusion"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Reiza, the Chief Tormentor": "Hero",
+  "Zsos'Ssar, the Serpent Warlord": "Hero",
+  "Locke, the Unseen Saboteur": "Hero",
+  "Blade of the Swamp Witch": "Artifact (Equipment)",
+  "Blow of the Venom Snake": "Attack",
+  "Decay Magic": "Ability",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Hammer Throw": "Attack",
+  "Heavy Hit": "Attack",
+  "Poison Pollen": "Spell (Decay Magic)",
+  "Poisoned Well": "Spell (Decay Magic)",
+  "Quick Attack": "Attack",
+  "Sickly Cheese": "Artifact",
+  "Slow": "Spell (Decay Magic)",
+  "Stinky Stables": "Area (Decay Magic)",
+  "Stranglehold": "Attack",
+  "Tea": "Artifact",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "The Warlord's Bite": "Spell (Decay Magic)",
+  "Thieving Strike": "Attack",
+  "Venom Infusion": "Spell (Decay Magic)"
+ },
+ "gist": {
+  "Reiza, the Chief Tormentor": "Each single-target attack of hers stuns the target for a turn and poisons it. If every target you control is poisoned, she takes two actions a turn.",
+  "Zsos'Ssar, the Serpent Warlord": "Poisons one of his own heroes whenever he casts a Decay spell; his single-target damage grows for every poisoned target on the board, his own side included.",
+  "Locke, the Unseen Saboteur": "At the start of each of his turns switches off the effects of one of your targets; hard to target with cheap cards.",
+  "Heavy Hit": "Attack that stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Blow of the Venom Snake": "Attack that poisons; better as the second attack of a turn.",
+  "Stranglehold": "Attack that hits harder for every status effect on the target.",
+  "Hammer Throw": "Attack that makes you delete a card for each artifact you play next turn.",
+  "The Warlord's Bite": "Poisons an unpoisoned target, several stacks at higher levels.",
+  "Poisoned Well": "Poisons your whole side.",
+  "Poison Pollen": "Stuns every poisoned target and poisons every stunned one.",
+  "Blade of the Swamp Witch": "Equipment: every attack poisons.",
+  "Stinky Stables": "Area: poisoned targets cannot be healed or cured.",
+  "The Master's Plan": "Cancels one card you play from hand.",
+  "Tea": "Moves his own heroes' poison onto yours.",
+  "Sickly Cheese": "Poisons his own hero to search a Decay spell."
+ },
+ "plan": "A lesson in tempo from someone who used to do it for a living. Reiza attacks once and your hero is stunned and poisoned; Quick Attack makes that twice a turn. You control only three targets, so before long all three are poisoned and Reiza gets a second action every turn. Zsos'Ssar deliberately poisons his own side, because his damage counts every poisoned target on the table, then passes his poison to you with Tea. Locke quietly switches off one of your heroes each turn. Nothing is flashy and no turn is wasted. The deck has no creatures and no sweepers, it runs through Reiza, and it poisons itself nearly as much as it poisons you.",
+ "looks": {
+  "early": "Reiza with a Blade of the Swamp Witch; one of your heroes stunned and poisoned on turn two.",
+  "mid": "All three of your heroes poisoned, two of his own as well, Reiza acting twice, Stinky Stables overhead.",
+  "late": "Stacks of poison on everything, Stranglehold lined up on your most afflicted hero."
+ },
+ "profile": {
+  "opening": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Two of your three heroes are already poisoned and Reiza is looking at the third.",
+   "why": "The moment all three are poisoned she acts twice a turn, so the priority is keeping one hero clean (Tea) and making Reiza pay for every attack; a slow setup is taken apart one stun at a time."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Reiza does all the attacking; the other two cast and scheme.",
+   "why": "Freeze or kill Reiza and the stuns stop; Tea, used on a hero she has just hit, hands her the stun and the poison back. There are no creatures to sweep."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His own heroes carry several stacks of poison from Sickly Cheese and Zsos'Ssar, and Stinky Stables stops anyone curing it.",
+   "why": "The Stables cut both ways: his heroes are ticking down too and cannot be healed, so pushing damage now ends the duel before his doubled turns do."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "One attack a turn still stuns, and Stranglehold grows with every status on your last hero.",
+   "why": "Clean the statuses off the hero he is aiming at and Stranglehold is a tap; keep that hero alive one more turn and the poison finishes his side first."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Santángel's Reiza attacks once: your caster is stunned and poisoned before you have done anything.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea it straight back onto Reiza"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Reiza with the other two"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait out the stun and build"
+     }
+    ]
+   },
+   {
+    "board": "Two of your heroes are poisoned; he is clearly saving The Warlord's Bite for the third.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep the third clean; Tea in hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Reiza"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up anyway"
+     }
+    ]
+   },
+   {
+    "board": "Hammer Throw: your next artifacts will each cost you a card.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Play spells this turn, artifacts next"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Reiza regardless"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play out your artifacts and pay"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "All three of your heroes are poisoned and Reiza takes two actions.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Reiza"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Reiza"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "A sweeper with nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Locke switches off Tarleinn for the turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cast from Nicolas; Tea a poison onto Locke"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Reiza"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for Tarleinn"
+     }
+    ]
+   },
+   {
+    "board": "He keeps one card apart: The Master's Plan.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Lead with the lesser spell"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick, it is already on the table"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Commit the key card first"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Stinky Stables is out; his Zsos'Ssar carries four stacks of his own poison.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Push damage: his side cannot heal either"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the double turn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Try to cure, which the Stables forbid"
+     }
+    ]
+   },
+   {
+    "board": "Poison Pollen: every poisoned target is stunned, yours and his.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "His heroes are stunned too: the Storm ticks on"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea one of yours free"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Pass"
+     }
+    ]
+   },
+   {
+    "board": "Zsos'Ssar's next spell will hit for every poisoned target on the table.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for that one"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill him first; he is low from his own poison"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Reiza alone against your last, heavily afflicted hero; Stranglehold in his hand.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea the statuses onto Reiza"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn her"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to clear"
+     }
+    ]
+   },
+   {
+    "board": "One hero each, both poisoned, the Stables gone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Your Storm outpaces her poison"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Zsos'Ssar for one last cast.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish Reiza"
+     }
+    ]
+   }
+  ]
+ }
+}

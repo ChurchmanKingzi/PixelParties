@@ -1,0 +1,20 @@
+{
+ "name": "The Singing Cave",
+ "zone": "wild",
+ "bg": "sea_cave",
+ "night": false,
+ "hike": 2,
+ "hours": "On the west coast below the cliff path; enterable on foot only at low tide, by kayak at mid-tide, not at all at high water.",
+ "sight": "The cliff opens in a pointed arch like a church door and the sea goes in. Inside, the light is blue-green and moving, thrown up from the water onto a roof crusted with shells. Every swell that enters makes the cave give a low organ note, and a higher one as it leaves. At the back, a shelf of dry sand rises to a second chamber, where the air is suddenly still.",
+ "things": [
+  "Kayak in on the swell",
+  "Listen to the cave sing its two notes",
+  "Swim in water lit from below",
+  "Land on the sand shelf and explore the dry chamber",
+  "Find the smugglers' rings set in the rock",
+  "Look at the back wall with a torch",
+  "Watch the tide and leave on time"
+ ],
+ "secret": "Saoirse's secret place (route key scene), reachable from the boathouse or by the iron rungs off the cliff path. The dry chamber's back wall is a Tessellate mosaic of the sea: a spiral descending into waves with small figures in boats laying tiles on the water around it — a record of a Visitor that fell into the ocean and was bound there. It is the origin of the Cosmic Depths imagery; Rowan can match it to the strange cards in '{H}'s' deck. A natural shaft above the back wall climbs, with ropes, into the lowest lava tubes. After D27 the cave's two notes are a semitone lower. Getting the tide wrong means a wet, cold, dangerous hour on the shelf — and a reason for two people to sit very close.",
+ "access": "Tide-dependent; from Day 67 off limits after the Afternoon slot."
+}

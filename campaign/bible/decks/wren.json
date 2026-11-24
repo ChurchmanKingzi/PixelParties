@@ -1,0 +1,385 @@
+{
+ "name": "Prototype Puppets",
+ "owner": "wren",
+ "heroes": [
+  "Tri Fecta, the Puppet Master",
+  "Omikron, the Faceless Illusionist",
+  "Kohta, the Silent Observer"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   2,
+   "Cannon Tower"
+  ],
+  [
+   2,
+   "Cloud Pillow"
+  ],
+  [
+   3,
+   "Create Illusion"
+  ],
+  [
+   5,
+   "Creativity"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   2,
+   "Field Cannon"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Hell Fox"
+  ],
+  [
+   5,
+   "Inventing"
+  ],
+  [
+   4,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Pinaxolotl"
+  ],
+  [
+   3,
+   "Scavenging Crane"
+  ],
+  [
+   2,
+   "Secret Lab Entrance"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Teleportal"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Tri Ad, the Puppet Mistress"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tri Fecta, the Puppet Master": "Hero",
+  "Omikron, the Faceless Illusionist": "Hero",
+  "Kohta, the Silent Observer": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Cannon Tower": "Creature L3",
+  "Cloud Pillow": "Artifact",
+  "Create Illusion": "Spell (Magic Arts)",
+  "Creativity": "Ability",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Field Cannon": "Creature L3",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Hell Fox": "Creature L1",
+  "Inventing": "Ability",
+  "Magic Arts": "Ability",
+  "Pinaxolotl": "Creature L0",
+  "Scavenging Crane": "Creature L0",
+  "Secret Lab Entrance": "Artifact (Equipment)",
+  "Summoning Magic": "Ability",
+  "Teleportal": "Spell (Magic Arts)",
+  "Thicket": "Artifact",
+  "Treasure Chest": "Artifact",
+  "Tri Ad, the Puppet Mistress": "Hero"
+ },
+ "gist": {
+  "Tri Fecta, the Puppet Master": "Starts the game with three Puppet tokens in his support zones. He and the puppets share a single pool of health, and only one puppet may act each turn. With no puppets left he is defeated at once.",
+  "Tri Ad, the Puppet Mistress": "A hero card in the deck that she lays on top of Tri Fecta (and can lift off again); while she is on top the three puppets turn into three different ones.",
+  "Omikron, the Faceless Illusionist": "Each turn creates a one-health copy of any creature, with its effect delayed a turn.",
+  "Kohta, the Silent Observer": "When a small creature of hers kills with its effect, that effect fires a second time.",
+  "Haressassin": "Fragile creature with a hard shot each turn; Kohta's favourite.",
+  "Field Cannon": "Very fragile creature with an enormous shot each turn.",
+  "Cannon Tower": "Sturdy creature with a strong shot each turn.",
+  "Aggressive Town Guard": "Free summon with a small shot.",
+  "Pinaxolotl": "When it dies it fetches another creature.",
+  "Hell Fox": "When it dies it fetches any card.",
+  "Scavenging Crane": "Arranges the top of her deck and draws.",
+  "Create Illusion": "Puts a creature from the deck straight onto the board.",
+  "Teleportal": "Fetches any card for next turn.",
+  "Creativity": "Ability: draws when she attaches an Ability to that hero.",
+  "Inventing": "Ability: discard to draw, and at level three to search.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures."
+ },
+ "plan": "A designer's toolbox built around three puppets. One puppet per turn acts: one searches her deck for any card, one makes you choose which of three cards on the board is discarded, one shields her creatures. Laying Tri Ad over Tri Fecta swaps them for a second set: draw four, a free one-health summon, a redirect. So Wren always has the right tool, and uses it to assemble fragile, hard-hitting creatures that Kohta fires twice. The construction is delicate: the puppets and Tri Fecta share one health pool, a puppet removed is gone for good, and when the last one goes Tri Fecta falls with it.",
+ "looks": {
+  "early": "Tri Fecta with three puppets at his feet, a Scavenging Crane, cards being searched one per turn.",
+  "mid": "A Haressassin and a Field Cannon behind the puppets, Tri Ad laid over Tri Fecta and lifted off again.",
+  "late": "Two puppets left, one-health illusions everywhere, and Wren adjusting something with a pencil."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Tri Fecta and his three puppets share a single pool of health, and each puppet counts as a target.",
+   "why": "Flame Avalanche and Cataclysm hit every target she controls, and Tri Fecta and each of his three puppets take it out of the same pool, four times over; she, meanwhile, searches a card every turn, so a slow game is hers."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Each puppet does a different job, and one of them just made you pick which of your cards to lose.",
+   "why": "A puppet is a card on the board that is not a hero: The Yeeting removes one permanently, each one gone is a third of her toolbox, and the third takes Tri Fecta with it; her creatures are shielded by the puppet that guards them."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "The puppets have changed faces: Tri Ad is on top, and the creatures arriving through them have a single point of health.",
+   "why": "Everything she summons through the second set of puppets, and every illusion from Omikron, dies to any damage at all; one sweep clears the board she has spent the duel assembling."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "One puppet remains under Tri Fecta and her other two heroes are ordinary.",
+   "why": "Remove the last puppet and Tri Fecta is defeated on the spot; her other heroes have no protection once the toolbox is gone."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Wren's puppets sit under Tri Fecta; one of them searches her deck and she nods to herself.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Flame Avalanche: hero and three puppets, one pool"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the searching puppet"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build while she tutors"
+     }
+    ]
+   },
+   {
+    "board": "A Scavenging Crane and a Town Guard; she attaches Inventing and draws off Creativity.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Cataclysm: the shared pool takes it four times"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Kohta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Crane"
+     }
+    ]
+   },
+   {
+    "board": "One puppet shows you three cards on the board and you must choose which to lose.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "That puppet goes first: Yeet it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race the shared pool"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild what you lost"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Haressassin fires, kills, and Kohta makes it fire again.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Haressassin"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn the puppets' pool"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep into the guarding puppet"
+     }
+    ]
+   },
+   {
+    "board": "She lays Tri Ad over Tri Fecta: the puppets change, and she draws four.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet a puppet either way"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Same pool, keep hitting it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Match her card for card"
+     }
+    ]
+   },
+   {
+    "board": "The guarding puppet cancels your sweep on her creatures.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Then hit the puppets themselves"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove that puppet"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "A Field Cannon arrives through a puppet with a single point of health and aims at your caster.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Any sweep kills it and every illusion"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon the Cannon"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take the hit and build"
+     }
+    ]
+   },
+   {
+    "board": "Omikron copies her own Cannon Tower; the copy is asleep until next turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the copies now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the real Tower"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Two puppets left; the pool is low.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet one more"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish the pool"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: the illusions die and the pool takes it three times"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "One puppet under Tri Fecta.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Remove it: Tri Fecta falls with it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn the pool"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear creatures first"
+     }
+    ]
+   },
+   {
+    "board": "Tri Fecta is gone; Omikron and Kohta remain behind one-health copies.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish them"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the copies"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard her hand"
+     }
+    ]
+   },
+   {
+    "board": "A Hell Fox dies and fetches her exactly one card.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "She is a turn short"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shields up, Storm tick wins"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle"
+     }
+    ]
+   }
+  ]
+ }
+}

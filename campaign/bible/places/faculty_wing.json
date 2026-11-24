@@ -1,0 +1,18 @@
+{
+ "name": "The Faculty Wing",
+ "zone": "campus",
+ "bg": "faculty_wing",
+ "night": false,
+ "hours": "Office hours in the Afternoon slot; staff only after dark.",
+ "sight": "A hushed upstairs corridor of frosted-glass doors, each with a name in gold leaf and a personality leaking out underneath: chalk dust by one, a pot of orchids by another, a neat tray of confiscated dice. A long case displays staff trophies and one empty velvet stand. The floorboards announce every step, and somewhere a kettle is always about to boil.",
+ "things": [
+  "Go to office hours and ask for help with a course (study bonus with that teacher)",
+  "Hand in late work under a door and hope",
+  "Read the timetable and exam notices on the staff board",
+  "Look into the trophy case: Kirishima's junior world title, Santángel's silver",
+  "Collect a confiscated item from the tray outside Ms. Kirishima's office",
+  "Knock on Dr. Blum's door and find him working out a problem on the window glass",
+  "Wait on the bench and overhear what staff say when they think the corridor is empty"
+ ],
+ "secret": "Offices of santangel, hana, blum, ashdown, vivienne, rox and — last door at the end of the wing, more workshop than office — helical. Helical's office: benches of dismantled table projectors, a second lab coat on the hook (M. HELICAL — CORE ENG.), a breathing chart taped inside a cabinet door that ends three years ago, and a gutted oscilloscope that is heavier than it should be (the first of three grey linen notebooks; plot file, M9). From Day 62 Marrow calls here weekly. Office hours are the sanctioned way to raise a grade and the start of both teacher routes (secrecy rules apply). Ashdown's office has a locked map chest and a photograph turned face down: five people in field gear at the Ruin Gate — Aleksander Hale, four Umbra students, and Ashdown herself at 29. Santángel's office: a small safe (new, delivered Day 61) and a jeweller's loupe; after the Archive theft (Day 72) an Alpha card rests in it overnight between the Archive and Marrow's rooms. Hana's desk drawer: a wrist brace and her old tournament deck, never unsleeved. Overheard after Day 40: staff arguing about whether to cable the families. ACCESS NOTE: Students are welcome in the Afternoon; being found here at night is a disciplinary matter."
+}

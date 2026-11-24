@@ -1,0 +1,379 @@
+{
+ "name": "Bzzz-BOOM",
+ "owner": "trixie",
+ "heroes": [
+  "Kohta, the Silent Observer",
+  "Alice, the Puppeteer Girl",
+  "Kit, the Shark Researcher"
+ ],
+ "main": [
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Bomblebee"
+  ],
+  [
+   3,
+   "Bomblebee Cluster"
+  ],
+  [
+   4,
+   "Burning Fuse"
+  ],
+  [
+   3,
+   "Carpet Bomblebee"
+  ],
+  [
+   3,
+   "Cute Cheese"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Destruction Magic"
+  ],
+  [
+   3,
+   "Dive Bomblebee"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   2,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Powder Keg"
+  ],
+  [
+   3,
+   "Rain of Arrows"
+  ],
+  [
+   6,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   3,
+   "Time Bomblebee"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Wheels"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Kohta, the Silent Observer": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Kit, the Shark Researcher": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Bomblebee": "Creature L1",
+  "Bomblebee Cluster": "Spell (Summoning Magic, Reaction)",
+  "Burning Fuse": "Spell (Summoning Magic, Reaction)",
+  "Carpet Bomblebee": "Creature L2",
+  "Cute Cheese": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Destruction Magic": "Ability",
+  "Dive Bomblebee": "Creature L1",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Magnetic Glove": "Artifact",
+  "Powder Keg": "Artifact (Creature)",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "Summoning Magic": "Ability",
+  "Thicket": "Artifact",
+  "Time Bomblebee": "Creature L1",
+  "Treasure Chest": "Artifact",
+  "Wheels": "Artifact"
+ },
+ "gist": {
+  "Bomblebee": "Once per turn, when one of YOUR targets is defeated, it hits another of your targets hard.",
+  "Carpet Bomblebee": "When one of your targets is defeated, hits all your heroes.",
+  "Dive Bomblebee": "When one of your targets is defeated, puts one of your non-hero cards on the bottom of your deck.",
+  "Time Bomblebee": "Collects a counter when your targets fall and cannot be hurt while it has one.",
+  "Burning Fuse": "Reaction at your Action Phase: all her older Bomblebees fire as if a target of yours had just been defeated.",
+  "Bomblebee Cluster": "Summons two more different Bomblebees at once.",
+  "Powder Keg": "A one-health barrel she places on YOUR side; when it is destroyed it counts as a target of yours being defeated.",
+  "Aggressive Town Guard": "Free summon whose ping pops the Keg.",
+  "Haressassin": "A hard shot each turn.",
+  "Rain of Arrows": "Hits your side per creature she controls.",
+  "Kohta, the Silent Observer": "A kill by a small creature's effect lets that effect fire again.",
+  "Alice, the Puppeteer Girl": "Hits per creature that stayed on her board.",
+  "Kit, the Shark Researcher": "Fetches creatures as she gains Abilities.",
+  "Cute Cheese": "Searches a creature.",
+  "Deepsea Idol": "Cancels a sweep."
+ },
+ "plan": "Bomblebees go off when something of yours dies. You have no creatures, so Trixie lends you some: a Powder Keg placed on your side, popped by a Town Guard, counts, and so does Burning Fuse at the start of your action. Then every bee fires at once: a heavy hit, damage to all your heroes, a card of yours sent to the bottom of your deck. The swarm is five kinds of small creature that have to survive a turn; without a trigger they do nothing at all.",
+ "looks": {
+  "early": "Two bees and a barrel on YOUR side of the table.",
+  "mid": "Five bees, a Burning Fuse held up at your Action Phase.",
+  "late": "A chain of explosions each time anything of yours falls."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Her Bomblebees are small and a Powder Keg sits in your support zone.",
+   "why": "Bees must be on the board before a trigger to fire: sweep them first, and never destroy the Keg yourself, The Yeeting included, because that is the trigger."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "Four different Bomblebees; she is holding a card for your Action Phase.",
+   "why": "Burning Fuse fires every older bee, so the row has to die before your next action; a second sweep gets past the Idol."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "One of your heroes is about to fall, which would set off every bee.",
+   "why": "A hero dying is the biggest trigger of all: Homerun! and Cloud in a Bottle on that hero matter more than anything you could attach."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "She has two bees and no Fuse.",
+   "why": "Her heroes are ordinary."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Trixie summons a Bomblebee and rolls a Powder Keg onto your side.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the bees; leave the Keg"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Kohta"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Bomblebee Cluster: three bees at once.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "A Town Guard takes aim at her own Keg.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the bees before it pops"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Four bees; Burning Fuse is surely in her hand.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before your action"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the Fuse"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race into it"
+     }
+    ]
+   },
+   {
+    "board": "Deepsea Idol stops your first sweep.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm behind it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Carpet bee"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "A Time Bomblebee has a counter and cannot be hurt this turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the others"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Your caster is one hit from falling; five bees wait.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! and Cloud in a Bottle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach more"
+     }
+    ]
+   },
+   {
+    "board": "The Dive Bomblebee sends your Storm to the bottom of your deck.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the hero, re-attach later"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach now"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Arrows per bee.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two bees, no Fuse.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Kit alone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Alice.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Kohta"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

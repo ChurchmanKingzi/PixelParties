@@ -1,0 +1,232 @@
+{
+ "id": "mika",
+ "name": "Mika Tanabe",
+ "firstName": "Mika",
+ "age": 22,
+ "sex": "f",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Attic room over The Mulligan",
+ "romance": true,
+ "deck": "Flying Sparks (Sparkfly hive that shops in your deck)",
+ "look": "Short teal hair with dark roots, a shop apron so full of enamel pins it clinks, and a sleepy half-smile as if she has just woken from a good nap. She perches on the stool behind the counter with one knee up and a judge's whistle on a cord. Her eyes are half-lidded and miss nothing.",
+ "voice": "Drowsy, drawling and amused, with a Hawaiian-Japanese lilt; she seems half asleep and then says something razor-sharp. She talks in prices and rumours and is in no hurry about either. RARE habit (once in a scene at most; most scenes go without it): calling favoured customers by their favourite card.",
+ "lines": [
+  "Morning, Tarleinn. It's afternoon? Huh. Still morning for me.",
+  "That one's sold. ...To you. I put it aside Tuesday. You looked like you'd be back.",
+  "People forget the girl on the stool has ears. The stool's the best seat in town.",
+  "Dogs don't care if you win. That's the whole deck. That's the whole reason."
+ ],
+ "intro": "The clerk at the Sleeve & Binder and a part-time judge: sleepy-eyed, teal-haired, and somehow aware of every price and rumour in Port Mulligan.",
+ "traits": [
+  {
+   "id": "mika_1",
+   "text": "She works the counter at the card shop and seems to be half asleep at all times.",
+   "how": "Card shop, Day 6."
+  },
+  {
+   "id": "mika_2",
+   "text": "She knows every price and every rumour, and offers both if she likes you.",
+   "how": "Talk to her twice."
+  },
+  {
+   "id": "mika_3",
+   "text": "She puts cards aside under the counter for customers she has decided are all right.",
+   "how": "Become one."
+  },
+  {
+   "id": "mika_4",
+   "text": "She judges weekend events and has never been heard to raise her voice.",
+   "how": "Saturday tournament."
+  },
+  {
+   "id": "mika_5",
+   "text": "She plays a dog deck and has named every one of them.",
+   "how": "Play her."
+  },
+  {
+   "id": "mika_6",
+   "text": "She rents the attic room over the harbour bar and feeds four strays on its fire escape.",
+   "how": "Bar; ask Josie about the barking."
+  },
+  {
+   "id": "mika_7",
+   "text": "She was born on the island and has never applied to the Academy, though she would get in.",
+   "how": "Ask why she is not a student."
+  },
+  {
+   "id": "mika_8",
+   "text": "She draws tiny comics about the customers and keeps them under the till.",
+   "how": "Close stage."
+  },
+  {
+   "id": "mika_9",
+   "text": "She stays because of her grandmother, and is not sure whether that is love or an excuse.",
+   "how": "Dating stage."
+  }
+ ],
+ "secret": "Mika is island-born: her grandmother, Tanabe Fumiko, kept the noodle stall in the night market for forty years and raised her after her parents left for Honolulu and did not send for her. She is as good as most second-years and has never applied to the Academy — officially because Obaa-chan (82, sharp, frail) needs her, actually because she has watched twelve intakes arrive certain they were special and leave as ordinary people with debt, and she would rather be the girl on the stool who knows everything than one more hopeful. Wound: being the one not sent for. Contradiction: she affects total laziness and is the most quietly diligent person in town — opens the shop, closes it, does Dex's books, judges, feeds strays, cooks for her grandmother. The sleepiness is real (she works two jobs) and also camouflage: people talk in front of her. She likes the Commons kids best and tilts her 'aside' drawer their way. She and Josie (her landlady) and Selene are the town's three young women and share a bottle on Mondays; she and Tomi have a price war that both enjoy. Private joke: her comics star a sleepy shop cat who solves crimes; the cat has recently acquired a sidekick in a red jacket.\nShe flirts back easily and lazily but does not flirt first; she is a town girl who has seen students come and go and assumes she is a term-time fling. Her route's question is whether a student will still walk down the hill in spring — and whether she will ever walk up it.\nWhat she knows: rumours, all of them, including the old ones — that her grandmother's generation left rice at the surface mosaics; that Madame Oru was old when Obaa-chan was a girl; that Josie keeps an old jacket with a smoke-grey collar behind the bottles and has bad dreams. She hears Marrow's people asking prices from Day 61 and, on a hunch, starts taking Dex's one first print home in her apron at night. She judged a casual game of '{H}'s' at the shop on Day 34 and for the first time in her life could not follow the stack. Her grandmother, told about the quiet birds, says only: 'Then put the rice out again,' and Mika, feeling foolish, does.",
+ "wants": "To be chosen and stayed for — and to choose something for herself, once.",
+ "fears": "Being left on the island by one more person who was only passing through.",
+ "crush": "tomi",
+ "crushNote": "He is the only student who comes down the hill every single week, and he argues about a one-credit difference as though it were a courtship — which it is. It shows as cards put aside under the counter for 'nobody in particular' and a comic-strip sidekick in a bandana.",
+ "crushPace": 0.9,
+ "likes": [
+  "Regulars who say hello before asking prices",
+  "Dogs, all dogs",
+  "Being brought a snack on a long shift",
+  "Gossip traded fairly",
+  "People who come back when they said they would",
+  "Naps in the sun",
+  "Kindness to her grandmother",
+  "Being asked about her comics"
+ ],
+ "dislikes": [
+  "Being treated as shop furniture",
+  "Students slumming for a term",
+  "Haggling with Dex through her",
+  "Broken promises to return",
+  "Rudeness to strays",
+  "Being told she is wasting her talent"
+ ],
+ "gifts": [
+  "Card: Loyal Labradoodle",
+  "Dog treats for the fire-escape pack",
+  "An enamel pin she does not have",
+  "Card: Enhanced Guard Dog",
+  "Shave ice from the night market",
+  "Card: Loyal Shepherd"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Builds a Sparkfly hive, crowns a queen, and from then on names a card type each turn and makes you hand it over from your own deck; she plays half asleep and never misses a trigger.",
+  "text": "Mika answers flirting without lifting her chin off her hand: a slow smile, 'mmm, smooth', a card slid across the counter that she 'happened' to set aside. She does not start it and does not chase — the counter is her ground and he has to come to it. She likes regularity more than gestures: turn up when you said, remember the dogs' names, ask about the comics. Teasing is her love language. She assumes students leave; the way to her is to keep coming down the hill, especially when there is nothing to buy."
+ },
+ "intimacy": "Relaxed, sensual, unhurried, with a sleepy cat's directness about comfort. Closeness starts as leaning: her head on his shoulder on the shop's back step at closing, feet in his lap on the attic sofa with a dog on each side. She likes warmth, naps, slow afternoons with the rain on the skylight, lazy kisses that go on for a long time and are in no hurry to become anything. When they do, it is drowsy, smiling, skin warm from the sun through the attic window, and the dogs are firmly shut out on the fire escape. Fade as she reaches up, half asleep, to pull the skylight blind.",
+ "events": [
+  {
+   "id": "mika_e1",
+   "stage": 1,
+   "title": "Lemme check the back",
+   "condition": "Visit card_shop at least three times in the first three weeks, greet her before asking a price, and bring her a rumour or a snack.",
+   "hint": [
+    "The clerk sets things aside for people she likes. There is no form to fill in.",
+    "Become a friendly regular at the card shop."
+   ]
+  },
+  {
+   "id": "mika_e2",
+   "stage": 2,
+   "title": "The fire-escape pack",
+   "condition": "Play in a Saturday event she judges; afterwards help feed the strays behind bar and learn their names; ask why she never applied to the Academy and accept the first answer.",
+   "hint": [
+    "She has four dependants on a fire escape and a reason for staying in town.",
+    "Help her feed her strays and ask about her life on the island."
+   ]
+  },
+  {
+   "id": "mika_e3",
+   "stage": 3,
+   "title": "Nothing to buy",
+   "condition": "Keep coming to town through midterms (Days 47–49) even when broke, purely to see her; take her to the night_market on her night off and meet her grandmother at the noodle stall.",
+   "hint": [
+    "She assumes students only come down the hill when they need something.",
+    "Visit her when you have no reason to shop, and meet her grandmother."
+   ]
+  },
+  {
+   "id": "mika_e4",
+   "stage": 4,
+   "title": "Put the rice out",
+   "condition": "After Day 61, warn her about the people asking after first prints, help her keep the shop's most valuable card out of sight, and go with her to leave rice at a surface mosaic on jungle_trail; she lets him read the comics. He stays in the attic.",
+   "hint": [
+    "She has heard something at the counter that worries her, and her grandmother has asked her to do something old-fashioned.",
+    "Help her protect the shop, and go with her on an errand for her grandmother."
+   ]
+  },
+  {
+   "id": "mika_e5",
+   "stage": 5,
+   "title": "Up the hill",
+   "condition": "Under curfew and through the winter interlude, keep coming down the hill (or find a way to stay in touch when you cannot); in Term 2, be with her when she decides about the Academy application or about her grandmother's care — her choice — and still be there in spring.",
+   "hint": [
+    "What she needs to know about you takes a whole winter to find out.",
+    "Stay constant through the hard months and support whatever she decides about her own future."
+   ]
+  }
+ ],
+ "bonds": {
+  "tomi": {
+   "label": "friends",
+   "text": "Undercuts her by a credit and brings her snacks to make up for it.",
+   "public": true,
+   "from": 6
+  },
+  "noor": {
+   "label": "teammates",
+   "text": "Her favourite co-judge: never wrong and never loud.",
+   "public": true,
+   "from": 13
+  },
+  "bex": {
+   "label": "friends",
+   "text": "The loud one from the stream; trades gossip fairly.",
+   "public": true,
+   "from": 0
+  },
+  "dex": {
+   "label": "mentor",
+   "text": "Boss. Taught her everything about cardboard and nothing about getting up in the morning.",
+   "public": true,
+   "from": 0
+  },
+  "josie": {
+   "label": "roommates",
+   "text": "Rents the attic over the bar; pays partly in dog-related apologies.",
+   "public": true,
+   "from": 0
+  },
+  "selene": {
+   "label": "friends",
+   "text": "Monday bottle with Josie; the town's three young women.",
+   "public": true,
+   "from": 0
+  },
+  "anni": {
+   "label": "teammates",
+   "text": "The strict one from the tower names her dogs after judges. Mika thinks she is adorable and has not said so.",
+   "public": true,
+   "from": 13
+  },
+  "lucas": {
+   "label": "teammates",
+   "text": "The tall one does the talking and she does the rulings he is too kind to make.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "card_shop",
+   "Midday": "card_shop",
+   "Afternoon": "card_shop",
+   "Evening": "night_market",
+   "Night": "bar"
+  },
+  "weekend": {
+   "Morning": "card_shop",
+   "Midday": "card_shop",
+   "Afternoon": "harbor",
+   "Evening": "night_market",
+   "Night": "bar"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Loyals: a pack of dogs that protect each other and simply refuse to die; she plays half asleep and never misses a trigger.",
+  "tilt": "Almost nothing. Rude opponents wake her up, which is worse for them."
+ }
+}

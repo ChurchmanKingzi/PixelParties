@@ -1,0 +1,18 @@
+{
+ "campus": {
+  "name": "Pixel Academy — Main Campus",
+  "text": "White colonnades and red roofs around the Quad on the island's sunny southern slope. Lecture halls, the Library, the Great Arena and the Trial Domes, the Design Lab and the Broadcast Studio — everything a duelist, a designer or a caster needs within ten minutes' walk, under the four blue faces of the Clock Tower."
+ },
+ "dorms": {
+  "name": "The Dormitories",
+  "text": "Three houses named for card rarities. The Commons: a row of beach bungalows on the south cove, loud, warm and a little leaky. Rare Hall: the blue-carpeted block on the main campus. Spectral Tower: white and gold on the western cliff, with a pool that pours into the sky. A fourth house on the north ridge has been closed for years for structural repairs."
+ },
+ "town": {
+  "name": "Port Mulligan",
+  "text": "A fishing town of pastel houses climbing from a horseshoe harbour on the south-east bay, half an hour from the main gate. One steep main street, a card shop with the best singles in a thousand miles, a café, an arcade, a harbour bar, a night market twice a month and a lighthouse on the point. The ferry calls on Wednesdays and Saturdays."
+ },
+ "wild": {
+  "name": "The Wild Island",
+  "text": "Most of Caldera Key belongs to nobody: coves and tide pools along the south-west, cliffs and a sea cave on the west, jungle rising from behind the campus to a waterfall, hot springs and a rope bridge over the ravine called the Split. Beyond it lie old ruins in the grass, the long climb to the rim of the sleeping volcano, and a north shore few students ever see. Tell someone where you are going. Take water."
+ }
+}

@@ -1,0 +1,416 @@
+{
+ "name": "Pretty Things",
+ "owner": "victoria",
+ "heroes": [
+  "Beato, the Butterfly Witch",
+  "Cute Princess Mary",
+  "Thalia, the Fun Fairy"
+ ],
+ "main": [
+  [
+   3,
+   "Angelfeather Arrow"
+  ],
+  [
+   2,
+   "Aurora Borealis"
+  ],
+  [
+   3,
+   "Cute Bird"
+  ],
+  [
+   3,
+   "Cute Bunny"
+  ],
+  [
+   2,
+   "Cute Wings"
+  ],
+  [
+   2,
+   "Glass Sword"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Golden Apple"
+  ],
+  [
+   2,
+   "Golden Wings"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   2,
+   "Healing Melody"
+  ],
+  [
+   2,
+   "Heart-Shaped Bow, the Final Proof of Cuteness"
+  ],
+  [
+   2,
+   "Light Ball"
+  ],
+  [
+   1,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Magic Cobalt"
+  ],
+  [
+   2,
+   "Magic Emerald"
+  ],
+  [
+   2,
+   "Magic Ruby"
+  ],
+  [
+   2,
+   "Magic Sapphire"
+  ],
+  [
+   3,
+   "Moonlight Butterfly"
+  ],
+  [
+   2,
+   "Pink Sky"
+  ],
+  [
+   3,
+   "Rainbow's Arrow"
+  ],
+  [
+   3,
+   "Shooting Star"
+  ],
+  [
+   3,
+   "Support Magic"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Beato, the Butterfly Witch": "Hero",
+  "Cute Princess Mary": "Hero",
+  "Thalia, the Fun Fairy": "Hero",
+  "Angelfeather Arrow": "Artifact (Reaction)",
+  "Aurora Borealis": "Spell (Magic Arts)",
+  "Cute Bird": "Creature L1",
+  "Cute Bunny": "Creature L0",
+  "Cute Wings": "Artifact (Equipment)",
+  "Glass Sword": "Artifact (Equipment)",
+  "Golden Ankh": "Artifact",
+  "Golden Apple": "Artifact",
+  "Golden Wings": "Spell (Summoning Magic, Reaction)",
+  "Heal": "Spell (Support Magic)",
+  "Healing Melody": "Spell (Support Magic)",
+  "Heart-Shaped Bow, the Final Proof of Cuteness": "Artifact (Equipment)",
+  "Light Ball": "Spell (Support Magic, Attachment)",
+  "Magic Arts": "Ability",
+  "Magic Cobalt": "Artifact",
+  "Magic Emerald": "Artifact",
+  "Magic Ruby": "Artifact",
+  "Magic Sapphire": "Artifact",
+  "Moonlight Butterfly": "Creature L0",
+  "Pink Sky": "Artifact",
+  "Rainbow's Arrow": "Artifact (Reaction)",
+  "Shooting Star": "Spell (Support Magic)",
+  "Support Magic": "Ability",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Moonlight Butterfly": "Tiny creature that can fly back to hand at the end of your turn and sting the hero opposite.",
+  "Golden Apple": "Borrows one of your heroes for a turn; her only real threat.",
+  "Magic Ruby": "Stuns one of your heroes for a turn.",
+  "Magic Emerald": "Mills three of your cards.",
+  "Magic Sapphire": "Returns a spell from her discard pile.",
+  "Magic Cobalt": "A small heal.",
+  "Rainbow's Arrow": "An attack rider with nothing to attack with.",
+  "Angelfeather Arrow": "Another arrow for attacks she does not have.",
+  "Glass Sword": "One extra-hard hit for a hero with no attack card.",
+  "Cute Bird": "Would fetch a Cute Phoenix she does not own.",
+  "Heal": "A large heal.",
+  "Healing Melody": "Heals her whole side.",
+  "Light Ball": "Her other heroes are immune to statuses.",
+  "Swan of Spun Glass": "Invented card: a fragile swan that heals her heroes a little.",
+  "Rose-Gold Tiara": "Invented card: its hero dodges the first attack or spell each turn."
+ },
+ "plan": "Victoria chose her cards for how they look. There are arrows without attacks, a Cute Bird without a Phoenix, gems of every colour and a great deal of healing. What actually does something is Golden Apple, Magic Ruby, the Butterflies' stings and the fact that three healers take a while to burn down. There is no engine, no finisher and no plan; she wins only if you beat yourself.",
+ "looks": {
+  "early": "A butterfly, a swan and a tiara.",
+  "mid": "Gems played one a turn, a hero healed that was barely hurt.",
+  "late": "The same pretty board, slightly more scratched."
+ },
+ "custom": [
+  {
+   "name": "Swan of Spun Glass",
+   "type": "Creature L1",
+   "text": "A very fragile swan; while it stands, her heroes heal a little each turn."
+  },
+  {
+   "name": "Rose-Gold Tiara",
+   "type": "Artifact (Equipment)",
+   "text": "Expensive; its hero cannot be chosen by the first attack or spell each turn."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "DISRUPT",
+   "tell": "Her board is a butterfly and a glass swan.",
+   "why": "Nothing she has threatens you, so take the free turns for the Storm; there is no engine to disrupt."
+  },
+  "midgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "DISRUPT",
+   "tell": "She heals a hero each turn and plays a gem.",
+   "why": "Healing only matters against slow damage: focus one small hero at a time."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "She holds a Golden Apple and is looking at your caster.",
+   "why": "Her one dangerous card makes your own hero hit you: keep a shield for that turn and finish her."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Mary is alone and out of heals.",
+   "why": "There is nothing left."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Victoria arranges a Swan of Spun Glass and a Moonlight Butterfly so the colours match.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up in peace"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Mary"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Search for an engine to break"
+     }
+    ]
+   },
+   {
+    "board": "She equips a Rose-Gold Tiara and admires it.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the tiara"
+     }
+    ]
+   },
+   {
+    "board": "A Butterfly flutters back to her hand and stings Nicolas.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Ignore it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the butterfly"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Magic Emerald mills three of your cards; she claps.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Thalia down"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard her gems"
+     }
+    ]
+   },
+   {
+    "board": "Healing Melody on three unhurt heroes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "All spells into Mary"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Pink Sky dims creature effects, mostly her own.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Press"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Golden Apple: your caster turns on you for a turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, then finish Beato"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Magic Ruby stuns your caster twice running.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea it away"
+     },
+     {
+      "stance": "RUSH",
+      "text": "The Storm ticks anyway"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Light Ball makes two of her heroes immune to your freeze.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Burn instead"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Mary alone with a Glass Sword and no attack.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "She plays her last Heal.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Out-damage it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Thalia.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Mary"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

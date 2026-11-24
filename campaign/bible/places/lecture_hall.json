@@ -1,0 +1,18 @@
+{
+ "name": "Kowalczyk Lecture Hall",
+ "zone": "campus",
+ "bg": "lecture_hall",
+ "night": false,
+ "hours": "Lectures Mon–Fri in the Morning and Midday slots; open for self-study in the Afternoon; locked at night.",
+ "sight": "A steep wooden amphitheatre of two hundred seats, each with a fold-out felt playmat instead of a writing desk. A holographic demonstration table (flat, flickering figures, as everywhere on the island) sits in the pit, big enough to play out a board state at ten times life size. Chalk dust drifts in the light from the high windows, and generations of students have carved decklists into the bench backs. It smells of old varnish and dry-erase marker.",
+ "things": [
+  "Take a seat — front for Santángel's eye contact, back for trading under the desk",
+  "Study the giant demonstration board left over from the last lecture",
+  "Read the carved decklists and date them by the cards that were legal",
+  "Ask a question after class and catch a professor in a talkative mood",
+  "Look at the wall of framed world-championship final board states",
+  "Find the hall's name plate and wonder who Kowalczyk was",
+  "Use the empty hall in the afternoon to rehearse playing in front of two hundred seats"
+ ],
+ "secret": "Room for Tempo & Resource and Lore & History, for the Day 2 orientation and for the Day 64 industry talk. The name plate is a quiet clue: the hall is named for the founder's birth name, which almost nobody knows; Ashdown or Wren can confirm it mid-Term 1. Among the framed finals is the one Santángel lost — he never looks at that wall. One bench-back carving, nine years old, lists a five-hero 'deck' that is not legal in any format and is signed 'Umbra forever'; three of the five names are on tiles in the Vault. Practising here alone in the Afternoon is a sanctioned way to raise Nerve."
+}

@@ -1,0 +1,385 @@
+{
+ "name": "Nine Circles",
+ "owner": "octavia",
+ "heroes": [
+  "Dante, the Wanderer of Hell",
+  "Feral, the Fortress Breaker",
+  "Madame Guillotine, the Great Equalizer"
+ ],
+ "main": [
+  [
+   3,
+   "Booby Trap"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   3,
+   "Cataclysm"
+  ],
+  [
+   7,
+   "Destruction Magic"
+  ],
+  [
+   3,
+   "Fireball"
+  ],
+  [
+   3,
+   "Fireshield"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Leadership"
+  ],
+  [
+   2,
+   "Luck"
+  ],
+  [
+   2,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Magic Hammer"
+  ],
+  [
+   2,
+   "Reality Crack"
+  ],
+  [
+   2,
+   "The Eighth Circle of Hell"
+  ],
+  [
+   4,
+   "The Fifth Circle of Hell"
+  ],
+  [
+   3,
+   "The Fourth Circle of Hell"
+  ],
+  [
+   3,
+   "The Second Circle of Hell"
+  ],
+  [
+   4,
+   "The Seventh Circle of Hell"
+  ],
+  [
+   3,
+   "The Sixth Circle of Hell"
+  ],
+  [
+   3,
+   "The Third Circle of Hell"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Dante, the Wanderer of Hell": "Hero",
+  "Feral, the Fortress Breaker": "Hero",
+  "Madame Guillotine, the Great Equalizer": "Hero",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Cataclysm": "Spell (Destruction Magic)",
+  "Destruction Magic": "Ability",
+  "Fireball": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Golden Ankh": "Artifact",
+  "Leadership": "Ability",
+  "Luck": "Ability",
+  "Magic Arts": "Ability",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Reality Crack": "Spell (Magic Arts)",
+  "The Eighth Circle of Hell": "Area (Destruction Magic)",
+  "The Fifth Circle of Hell": "Area (Destruction Magic)",
+  "The Fourth Circle of Hell": "Area (Destruction Magic)",
+  "The Second Circle of Hell": "Area (Destruction Magic)",
+  "The Seventh Circle of Hell": "Area (Destruction Magic)",
+  "The Sixth Circle of Hell": "Area (Destruction Magic)",
+  "The Third Circle of Hell": "Area (Destruction Magic)",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Dante, the Wanderer of Hell": "Once per turn deletes her current Area and brings one of her deleted Areas into play instead; or deletes a spell from hand to draw.",
+  "Feral, the Fortress Breaker": "Hits a target every time any Area is played, and can clear all Areas once per turn.",
+  "Madame Guillotine, the Great Equalizer": "During YOUR turn, each time you take an action or use a hero or Ability effect, she removes one Ability from one of your heroes until the end of the turn.",
+  "The Seventh Circle of Hell": "Area: at the end of each turn the turn player must hit one of their own targets. When it leaves play, she hits a target hard.",
+  "The Fifth Circle of Hell": "Area: when it leaves play, the next damage dealt to a single target this turn is doubled.",
+  "The Sixth Circle of Hell": "Area: when it leaves play, she takes control of one of your heroes for the turn.",
+  "The Fourth Circle of Hell": "Area: when it leaves play, she gains gold for every card in her deleted pile.",
+  "The Second Circle of Hell": "Area: when it leaves play, she takes back a deleted card.",
+  "The Third Circle of Hell": "Area: when deleted, digs six cards deep for another Area and plays it.",
+  "The Eighth Circle of Hell": "Area: either player may delete it to copy the other's card draw.",
+  "Cataclysm": "Free while an Area is out: hits everything and sends all Areas away, setting off hers.",
+  "Reality Crack": "Swaps all Areas for one from hand or deck.",
+  "Burning Finger": "Single-target burn; the usual hit to double with the Fifth Circle.",
+  "Magic Hammer": "One very heavy single-target hit.",
+  "Fireshield": "Reaction: returns part of a hit to the attacker.",
+  "Booby Trap": "Face-down trap that punishes the attacker."
+ },
+ "plan": "Octavia does not keep an Area; she rotates them. Every Circle of Hell pays out when it leaves play, and Dante removes one and installs another each turn: the Seventh sits on the table during your turn so that you must hurt yourself, then leaves on hers for a heavy hit; the Fifth doubles the Magic Hammer that follows; the Sixth borrows your hero. Feral adds a hit for every Area played. Meanwhile Madame Guillotine takes an Ability off your heroes each time you do something on your own turn. The machine depends on Dante being free to act, and her three heroes have nothing but two traps and a Fireshield to protect them.",
+ "looks": {
+  "early": "A Circle of Hell in her Area zone, a different one each turn; a growing deleted pile set neatly aside.",
+  "mid": "The Seventh Circle out whenever it is your turn, Feral stinging on each rotation, one of your Abilities missing every time you act.",
+  "late": "A deleted pile like a second deck, a Circle leaving and a doubled Magic Hammer landing in the same breath."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Dante swaps her Area every turn and she controls no creatures.",
+   "why": "The rotation is one hero's once-per-turn effect; Dante has ordinary health and is worth every early point of damage, while removing a Circle yourself just hands her its parting effect."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Each time you act on your own turn, Madame Guillotine lifts one Ability off your heroes until the turn ends.",
+   "why": "Every extra action costs you a level for the turn, so do the one thing that needs your full Destruction Magic first and keep the turn short; a long setup turn strips your own caster."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "The Seventh Circle is out for your end of turn and she is holding the Fifth with a Magic Hammer.",
+   "why": "A frozen Dante cannot rotate: the Seventh then stays for HER end of turn as well and the Fifth never arrives; Cataclysm or The Yeeting on the Circle only triggers its hit on you."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Her heroes are low and her traps have been sprung; the Circles still turn.",
+   "why": "She has no healing, and untargeted Storm ticks ignore what is left of her defences; this is a race you are already winning."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Octavia plays the Fourth Circle of Hell; Feral stings your caster for the Area arriving.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Dante"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Dante before the first swap"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm her Area away"
+     }
+    ]
+   },
+   {
+    "board": "Dante deletes the Fourth for gold and the Seventh takes its place just before your turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Pay the self-hit on your healthiest hero and hit Dante"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Dante so it stays for her turn too"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build and pay each turn"
+     }
+    ]
+   },
+   {
+    "board": "She sets a card face-down on Dante.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning does not pick a target"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the trap"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Feral instead"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "You attach an Ability and Madame Guillotine removes one of your Destruction Magic until end of turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cast the big spell first next time, then stop"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Use potions and artifacts, which need no levels"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Carry on with a long turn"
+     }
+    ]
+   },
+   {
+    "board": "The Fifth Circle leaves and a doubled Burning Finger tears into your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle, answer on Dante"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal and rebuild"
+     }
+    ]
+   },
+   {
+    "board": "The Sixth Circle leaves and she borrows your Storm caster for the turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun! for your other heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang her next turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Remove Areas pre-emptively"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Seventh Circle is on the table for your end of turn; Dante is wounded.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Dante: now she pays the Seventh too"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish Dante"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Yeet the Seventh and take its parting hit"
+     }
+    ]
+   },
+   {
+    "board": "She casts her own Cataclysm; everything is hit and her Circle's parting effect fires as well.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Her heroes took it too: finish the lowest"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Dante before the next rotation"
+     }
+    ]
+   },
+   {
+    "board": "Guillotine has left your caster at Destruction Magic two for this turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Fight with Acid Vial and artifacts this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning still works"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Dante with an artifact, which needs no levels"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Dante is down; Feral and Guillotine remain with one Circle that no longer rotates.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish them"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep your turns short and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Long setup turn"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Dante for one last rotation.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Feral"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the Area"
+     }
+    ]
+   },
+   {
+    "board": "Guillotine alone, sturdy, taking an Ability from you with every action.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "One spell a turn plus the Storm"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Minimal turns, shields up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Many small plays"
+     }
+    ]
+   }
+  ]
+ }
+}

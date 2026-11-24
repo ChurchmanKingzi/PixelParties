@@ -1,0 +1,20 @@
+{
+ "name": "A Suite in Spectral Tower",
+ "zone": "dorms",
+ "bg": "spectral_suite",
+ "night": true,
+ "part": "spectral_lobby",
+ "hours": "Private single suites with housekeeping; the resident decides who comes up.",
+ "sight": "A corner suite the size of a whole Commons bungalow: a bedroom, a sitting room with a private duel table, a bathroom with a tub you could swim in, and a curved window full of ocean. The furniture is pale and the carpets swallow sound. Whatever personal things the owner has brought look small in it. At night the glass turns to a black mirror with the lighthouse blinking in it.",
+ "things": [
+  "Visit by invitation",
+  "Play at a private holo-table with nobody watching",
+  "See how the owner actually lives when the door is shut",
+  "Stand at the curved window in a storm",
+  "Be offered tea from real porcelain",
+  "Admire or be appalled by the wardrobe",
+  "Notice what is not here: other people"
+ ],
+ "secret": "Generic interior, dressed per character: Jessica's has three jewel caskets, fresh flowers and a hidden shelf of annotated strategy books; Lilia's is bare as a monk's cell, one shelf of trophies turned to the wall, Willas's jacket over a chair; Georgie's is all plushies around one very serious desk; Ashton's has a wall of framed photographs with gaps; Octavia's is an office with a bed in it; Gideon's (S5) has a locked writing case with Marrow's retainer letters; Anni's (S3) is immaculate, rule booklets filed by edition, and one shelf of books turned spine-inward; Magnus's (S6) has three tablets on stands, a ladder graph taped across the curved window with one handle circled in red, and sneakers still in their boxes. (S1 Georgie, S2 Jessica, S4 Ashton; Lilia's and Octavia's are on the upper floors.) Private tables here are where high-stakes private duels and several route key scenes occur. If Rowan reaches Spectral by promotion (hard; Term 2) he gets a small north-facing suite whose window looks at the volcano.",
+ "access": "Invitation only."
+}

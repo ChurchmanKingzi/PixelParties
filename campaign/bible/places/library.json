@@ -1,0 +1,19 @@
+{
+ "name": "The Library",
+ "zone": "campus",
+ "bg": "library",
+ "night": false,
+ "hours": "Open Morning to Evening (to midnight in exam weeks before the curfew); an unnamed, whispering head librarian and student assistants. The Tutor Desk on the ground floor is Shirin Daneshvar's (Midday and Afternoon).",
+ "sight": "Three galleried floors of dark shelving around a well of light, with green-shaded lamps on long tables and rolling ladders on brass rails. Half the shelves hold books; the other half hold binders — every card ever printed, sleeved nine to a page, catalogued by set. The air is cool and papery and the silence has a texture, broken only by the soft slap of cards being riffled under a table.",
+ "things": [
+  "Study for a course (the most efficient study spot on campus)",
+  "Pull the reference binder of any set and read the cards themselves",
+  "Read back issues of the Academy paper, the 'Caldera Courier', bound by year",
+  "Look up old tournament reports and decklists in the match archive",
+  "Find the local history shelf: shipwrecks, the plantation years, the founding of the school",
+  "Ask at the desk for a book and be told it is 'in conservation'",
+  "Claim a carrel by the west window and watch the sun go down over Spectral Tower",
+  "Catch someone asleep on an open rulebook"
+ ],
+ "secret": "Best study location (bonus to any course). Research hub for the mystery. The Courier volume of nine years ago has four issues razored out; the index still lists the headlines ('Umbra expedition delayed', 'Prof. Hale to address assembly'). The local history shelf holds 'Wrecks of the Outer Keys' with the entry for the trawler Agnieszka, lost off the north shore fifty years ago, one survivor: deckhand C. Kowalczyk, recovered after eleven weeks. A survey report on 'surface mosaics of the interior' by A. Hale is catalogued but 'in conservation' — it sits in the Card Archive. Viktor and Ashdown both use the west carrels; they avoid each other. After Day 66 the carrels empty early and nobody studies alone."
+}

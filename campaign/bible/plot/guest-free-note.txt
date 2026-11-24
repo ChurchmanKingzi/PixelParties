@@ -1,0 +1,1 @@
+GUEST and HOSTS live in spoilers/. Texts here use {H...} placeholders.

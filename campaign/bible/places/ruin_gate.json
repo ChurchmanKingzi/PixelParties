@@ -1,0 +1,21 @@
+{
+ "name": "The Ruin Gate",
+ "zone": "wild",
+ "bg": "ruin_gate",
+ "night": false,
+ "hike": 2,
+ "hours": "Sealed. At the end of the avenue, a short climb above the ruins field. Nobody admits it is a door.",
+ "sight": "Where the avenue meets the mountain there is a wall of fitted black stone four metres high, set back in a notch of the cliff and half curtained with fig roots. Its surface is a single enormous mosaic of nested squares, thousands of tiles, spiralling in toward a shallow rectangular recess at chest height — about the size of a playing card. There is no handle, no hinge, no seam. The stone is warm on a cold morning, and standing in front of it you feel looked at.",
+ "things": [
+  "Trace the nested squares with your eyes until they seem to turn",
+  "Put your palm flat on the stone",
+  "Examine the recess: its edges are worn smooth as a thumbed coin",
+  "Look for a seam, a hinge, anything — and find none",
+  "Read the scratched graffiti of the very few who have been here: initials, a date nine years old",
+  "Listen with your ear against it",
+  "Hold a card up to the recess and see that it is exactly the size",
+  "Come at dusk, when the low sun makes the tiles look wet"
+ ],
+ "secret": "THE DOOR TO THE VAULT (canon). It opens only when a Kaboom Alpha first print is pressed into the recess: the tiles around it turn like a combination, the wall unfolds outward in leaves like a fanned hand, and stays open while the card remains in the recess (remove the card and it closes within a minute — which matters to anyone inside). Hale opened it nine years ago; the date scratched beside the recess is his. Chuck's original way in was a crack higher up (now collapsed). Ear to the stone: a very slow click, like tiles settling, or someone thinking over a move. The Guest cannot open the Gate: it holds no first print and may not take what was not wagered. It enters only when a human opens the way and a challenger names the Vault as the place and so invites it in (Article 4), or when an ante it has won includes the way in. DEFAULT FINALE, Day 180 Night: Lilia duels the Guest here, on the threshold pavement, ante 'everything'; if she loses, her captain's card (the old first-print Thorad, Chuck's gift when she took the armband) is part of 'everything' and opens the gate for it. Sources of an Alpha for Rowan: Chuck, Dex's back room, the pawn shop's Treasure Chest, the Archive, Lilia's captain's card, Ashdown's 'The Master's Key' (the card that opened it nine years ago; she carries it in her field vest), the reject sheet at the print works, Wren's cracked common (works, barely).",
+ "access": "Beyond the cordon from Day 29; from Day 61 Marrow keeps an unnamed watchman here by day. Opening requires an Alpha card."
+}

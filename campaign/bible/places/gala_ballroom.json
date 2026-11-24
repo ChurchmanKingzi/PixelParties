@@ -1,0 +1,20 @@
+{
+ "name": "The Winter Gala Ballroom",
+ "zone": "special",
+ "bg": "gala_ballroom",
+ "night": false,
+ "hours": "The Great Arena's upper hall, dressed for one night: the Winter Gala, Day 103, Evening and Night slots (by special dispensation from the curfew, with staff at every door).",
+ "sight": "A long mirrored hall under three chandeliers, the parquet polished to water. Round tables with white cloths ring a dance floor; a string quartet saws bravely on a dais; frost-white paper stars hang from the ceiling on threads and turn in the warmth. Everyone you know is here and looks like a slightly different person. The big windows give on the terrace, the dark sea, and one cold star above the mountain.",
+ "things": [
+  "Arrive — and be seen arriving, with or without someone on your arm",
+  "Dance, or be taught to in thirty seconds by someone impatient",
+  "Find your place card at a table arranged, with intent, by the student council",
+  "Eat the kind of dinner you have only read about",
+  "Step out on the terrace for air and a conversation that could not happen inside",
+  "Watch the staff be people for one evening",
+  "Take the last dance",
+  "Notice who is missing, and who is standing alone by the window looking north"
+ ],
+ "secret": "Term 1's emotional finale and second romance checkpoint: who Rowan asks (or is asked by), who he dances with, who sees. Dress matters (boutique; alternatives exist). Table plan by Octavia: Rowan's place card is a small political act — the Commons table by the kitchen door by default, somewhere better if he has earned it or been claimed. Jessica's route peaks here if courted properly; Hana and Vivienne are chaperones (a dance with a teacher is technically permitted and extremely visible); Lilia and Willas dance like people who have done it for years; Marrow works the room. Empty chairs with name cards are set for the Hollowed at the Chancellor's order — Brant's among them. The Guest (as {H}) dances every dance, flawlessly, having learned it by watching for four minutes, with anyone who asks; its partner's hands are cold for an hour afterwards. If Rowan has enough evidence, the terrace at the Gala is the last good moment to expose the shape before the winter break (public exposure before Day 106 → it abandons {H}'s form and takes Gideon over the break, canon).",
+ "access": "Exists only on Day 103. Entry by ticket (free for students) and appropriate dress."
+}

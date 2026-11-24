@@ -1,0 +1,395 @@
+{
+ "name": "Guardians of the Treasure Cave",
+ "owner": "gideon",
+ "heroes": [
+  "Cooldin, King of Coolness",
+  "Mao, the Vengeful Guardian",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   6,
+   "Alchemy"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   4,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of the Guardian"
+  ],
+  [
+   2,
+   "Guardian Beast Gou"
+  ],
+  [
+   3,
+   "Guardian Beast Hou"
+  ],
+  [
+   4,
+   "Guardian Beast Hu"
+  ],
+  [
+   2,
+   "Guardian Beast Ji"
+  ],
+  [
+   3,
+   "Guardian Beast Long"
+  ],
+  [
+   4,
+   "Guardian Beast Ma"
+  ],
+  [
+   3,
+   "Guardian Beast She"
+  ],
+  [
+   3,
+   "Guardian Beast Tu"
+  ],
+  [
+   2,
+   "Guardian Beast Yang"
+  ],
+  [
+   4,
+   "Guardian Beast Zhu"
+  ],
+  [
+   6,
+   "Leadership"
+  ],
+  [
+   3,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Rain of Arrows"
+  ],
+  [
+   2,
+   "The First Circle of Hell"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ],
+  [
+   2,
+   "Tears of Creation"
+  ]
+ ],
+ "types": {
+  "Cooldin, King of Coolness": "Hero",
+  "Mao, the Vengeful Guardian": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Alchemy": "Ability",
+  "Cute Cheese": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of the Guardian": "Spell (Summoning Magic, Reaction)",
+  "Guardian Beast Gou": "Creature L0",
+  "Guardian Beast Hou": "Creature L0",
+  "Guardian Beast Hu": "Creature L0",
+  "Guardian Beast Ji": "Creature L0",
+  "Guardian Beast Long": "Creature L0",
+  "Guardian Beast Ma": "Creature L0",
+  "Guardian Beast She": "Creature L0",
+  "Guardian Beast Tu": "Creature L0",
+  "Guardian Beast Yang": "Creature L0",
+  "Guardian Beast Zhu": "Creature L0",
+  "Leadership": "Ability",
+  "Magnetic Glove": "Artifact",
+  "Rain of Arrows": "Spell (Destruction Magic)",
+  "The First Circle of Hell": "Area (Destruction Magic)",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Resuscitation Potion": "Potion",
+  "Tears of Creation": "Potion"
+ },
+ "gist": {
+  "Guardian Beast Ma": "Sends the top cards of BOTH decks to the discard piles each turn: fuel.",
+  "Guardian Beast Hou": "Deletes cards from either discard pile to hit that many targets.",
+  "Guardian Beast Hu": "Deletes five cards for an extra action with any of his heroes.",
+  "Guardian Beast Long": "Deletes cards to set up to three targets on fire for good.",
+  "Guardian Beast Ji": "Deletes three cards to stun any target.",
+  "Guardian Beast She": "Deletes cards to poison that many targets.",
+  "Guardian Beast Tu": "Deletes cards in threes to draw.",
+  "Guardian Beast Gou": "Deletes cards to make that many targets immune to damage for a turn.",
+  "Guardian Beast Zhu": "Once per game: deletes a large number of cards from each pile, including three different Beasts, to skip your next turn.",
+  "Guardian Beast Yang": "Returns your deleted cards to your discard pile, as more fuel.",
+  "Mao, the Vengeful Guardian": "Lets a Beast summoned this turn use its effect at once for a deletion cost.",
+  "Alice, the Puppeteer Girl": "Once per turn hits a target, harder for every creature that has stayed on his board.",
+  "Rain of Arrows": "Hits your whole side, harder per creature he controls.",
+  "The First Circle of Hell": "Area (Cooldin fetches it): at the start of a player's turn an odd-sized discard pile is deleted whole; an even-sized deleted pile comes back at end of turn.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures."
+ },
+ "plan": "The Guardian Beasts can only be summoned while Gideon's own discard pile is empty, and every one of them pays for its effect by deleting cards from the discard piles, yours included. So he keeps his own pile clean (the First Circle of Hell wipes an odd pile for him), lets Ma fill both, and spends your used spells on stuns, burns, extra actions and cards; Alice and Rain of Arrows turn the row of Beasts into damage and Zhu eventually skips a turn of yours. The condition is also the weakness: any card that lands in his discard pile while no Beast is there to delete it stops him from summoning, and the Beasts are small enough to die together.",
+ "looks": {
+  "early": "Two Beasts out, his discard pile spotless, Ma tipping cards off both decks.",
+  "mid": "A row of Beasts eating your discard pile for stuns and burns; Alice counting them.",
+  "late": "Either a full zodiac and a skipped turn, or a discard pile he cannot empty and a hand of Beasts he cannot play."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "His discard pile is empty and he checks it before every summon.",
+   "why": "Beasts need an empty discard pile: one discard from his hand (The White Eye) or one dead Beast clogs him, while your long setup turns pile up spent cards for his Beasts to eat."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "RUSH",
+   "tell": "Four Beasts are out, his discard pile is clean, and he is holding more Beasts.",
+   "why": "If all the Beasts die at once they land in his own discard pile with nothing on board to delete them, and the ones in his hand are stuck; it also shrinks Alice and Rain of Arrows to nothing."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Three different Beasts already lie in the discard piles and he is counting the cards in yours.",
+   "why": "Zhu is about to skip your turn; removing Zhu itself is the answer, and a turn spent building may not be followed by another."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "He is down to a couple of Beasts and two wounded heroes.",
+   "why": "Without a row of Beasts Alice does little, and his heroes have ordinary health."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Gideon summons Guardian Beast Ma; three cards slide off each deck and he deletes his own at once.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "A White Eye discard clogs his pile"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill Ma: a Beast in his pile blocks the next"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Cycle spells and feed him"
+     }
+    ]
+   },
+   {
+    "board": "Cooldin fetches the First Circle of Hell; an odd discard pile will now vanish at the start of each turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free under his Area"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Beasts on the board"
+     },
+     {
+      "stance": "SETUP",
+      "text": "A long, spell-heavy setup turn"
+     }
+    ]
+   },
+   {
+    "board": "Guardian Beast Ji eats three of your spent spells and stuns your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea the stun onto Mao"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill Ji"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race with the other heroes"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Hou, Ji, Long and Tu stand in a row; his pile is empty and his hand is full of Beasts.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: all four into his pile at once"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Draw out the Deepsea Idol first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore them and burn Cooldin"
+     }
+    ]
+   },
+   {
+    "board": "Your sweep works: four Beasts lie in his discard pile and none is on board.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Keep his pile even so the Circle does not clean it: sweep whatever lands"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards to keep it clogged"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Hit the heroes"
+     }
+    ]
+   },
+   {
+    "board": "Rain of Arrows and Alice both count five Beasts.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before his turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Guardian Beast Zhu sits at the back and both discard piles are thick.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet Zhu"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep, Zhu included"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Spend the turn setting up"
+     }
+    ]
+   },
+   {
+    "board": "Mao lets a fresh Hou fire the moment it lands; Hu gives him an extra action.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Mao"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Beasts again"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Trade damage"
+     }
+    ]
+   },
+   {
+    "board": "Long has set all three of your heroes on fire.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea a burn onto Alice"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Mao, a Gou and a Hu; his other heroes are down.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Mao"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Gou makes Mao immune to damage for the turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Then the turn after: keep cards"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet Gou"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Waste burn into the immunity"
+     }
+    ]
+   },
+   {
+    "board": "He revives Alice; his discard pile is not empty.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "He cannot summon: end it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "name": "The Boathouse",
+ "zone": "town",
+ "bg": "boathouse",
+ "night": false,
+ "hours": "Always open, more or less: Saoirse Flynn lives in the loft and the doors have not shut properly in years.",
+ "sight": "A tarred timber boathouse on the shingle between town and campus, its slipway running down into clear water. Surfboards, kayaks and two rowing shells hang from the rafters; a sailing dinghy sits on a trolley with its name half repainted. A rope ladder goes up to a loft with a hammock, a camp stove and a deck box on a nail. Everything is sandy, sun-warmed and smells of wax and neoprene.",
+ "things": [
+  "Borrow a board and get a surf lesson (and a nose full of Pacific)",
+  "Take a kayak along the coast toward the tide pools or the sea cave",
+  "Help sand and varnish the dinghy",
+  "Play Saoirse on an upturned hull, barefoot, with the tide coming in under the doors",
+  "Climb to the loft when invited",
+  "Sign out a boat for the islet (needs someone who can sail)",
+  "Sit on the slipway at dusk with your feet in the water"
+ ],
+ "secret": "Saoirse's home and route; sea access to tide_pools, sea_cave, islet and — in the endgame, and illegally — round to the north shore past the cordon. She is Battle Team #2 and lives here because Spectral Tower 'has too many doors'. She teaches the technique 'Undertow'. She surfs the north-west break alone and is the first student to notice (about Day 30) that the swell there has gone 'flat and glassy in a circle, like something is breathing under it'. The dinghy's half-repainted name was UMBRA II; she bought it from Silas for a crate of beer and does not know what the name means. If the Guest challenges the team in Stage D, hers is the duel most likely to be dodged by simply not being findable — the Guest never refuses a duel, but it must formally issue one."
+}

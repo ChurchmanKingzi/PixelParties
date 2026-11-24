@@ -1,0 +1,379 @@
+{
+ "name": "Regatta",
+ "owner": "cas",
+ "heroes": [
+  "Madaga, the Forsaken Seafarer",
+  "Codumbus, the Clueless Voyager",
+  "Champion, the Stormbringer"
+ ],
+ "main": [
+  [
+   3,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Attack"
+  ],
+  [
+   3,
+   "Begin the Race!"
+  ],
+  [
+   2,
+   "Cool Repair"
+  ],
+  [
+   3,
+   "Crocodile Race Boat"
+  ],
+  [
+   2,
+   "Declare the Winner"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   4,
+   "Eager Oarsman"
+  ],
+  [
+   6,
+   "Fighting"
+  ],
+  [
+   3,
+   "Frog Race Boat"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   4,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Navigation"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Race Boat Captain"
+  ],
+  [
+   3,
+   "Snake Race Boat"
+  ],
+  [
+   3,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ],
+  [
+   3,
+   "Whale Race Boat"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Madaga, the Forsaken Seafarer": "Hero",
+  "Codumbus, the Clueless Voyager": "Hero",
+  "Champion, the Stormbringer": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Attack": "Attack",
+  "Begin the Race!": "Spell (Summoning Magic)",
+  "Cool Repair": "Artifact",
+  "Crocodile Race Boat": "Artifact (Equipment)",
+  "Declare the Winner": "Attack",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Eager Oarsman": "Creature L0",
+  "Fighting": "Ability",
+  "Frog Race Boat": "Artifact (Equipment)",
+  "Golden Ankh": "Artifact",
+  "Heavy Hit": "Attack",
+  "Navigation": "Ability",
+  "Quick Attack": "Attack",
+  "Race Boat Captain": "Creature L0",
+  "Snake Race Boat": "Artifact (Equipment)",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Whale Race Boat": "Artifact (Equipment)"
+ },
+ "gist": {
+  "Whale Race Boat": "When its hero acts, every other target on the board takes a little damage, more for each creature aboard.",
+  "Frog Race Boat": "Its hero's first single hit each turn is stronger for each creature in its other zones.",
+  "Snake Race Boat": "Searches creatures, one per creature aboard.",
+  "Crocodile Race Boat": "An extra action after its hero's fourth kill in a turn.",
+  "Race Boat Captain": "Makes every Race Boat cheap.",
+  "Eager Oarsman": "Free crew for a hero in a boat.",
+  "Begin the Race!": "With a different boat on every hero: a crew member from the deck for each.",
+  "Declare the Winner": "With different boats on all heroes: sacrifices the others to make one hero the finisher.",
+  "Heavy Hit": "Attack that stuns.",
+  "Quick Attack": "A free first attack.",
+  "Champion, the Stormbringer": "His best attacker.",
+  "Madaga, the Forsaken Seafarer": "Finds second copies of what he holds.",
+  "Codumbus, the Clueless Voyager": "Guessing games on draws.",
+  "Cool Repair": "Re-equips a sunk boat.",
+  "Aggressive Town Guard": "Crew with a ping."
+ },
+ "plan": "A boat on each hero, a different one each, with crew in the remaining support zones. The boats pay per crew member: the Frog sharpens the first hit, the Whale splashes everything when its hero acts, the Snake finds more crew. Once all three are afloat Begin the Race! fills the boats and Declare the Winner stakes everything on one hero. It is showy and needs three expensive artifacts and a board of small creatures to all survive.",
+ "looks": {
+  "early": "One boat, a Captain, a lot of talk.",
+  "mid": "Three boats and six crew; the Whale splashing your side each turn.",
+  "late": "Declare the Winner: one hero, all in."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Race Boat Captain makes his boats cheap.",
+   "why": "The Captain and the crew are small creatures; without them the boats cost a fortune and do nothing."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Three different boats are afloat.",
+   "why": "His two finishing cards need a different boat on every hero: Fire Bomb sinks all of them at once."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "He has declared a winner: one hero left, enormous for a turn.",
+   "why": "He sacrificed his other heroes for it: survive this one turn with Homerun! and a freeze and there is nothing behind it."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "One hero, no boats.",
+   "why": "One target for every tick."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Cas narrates his own Race Boat Captain into play.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Captain"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Madaga"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Frog Race Boat and two Oarsmen on Champion.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the crew"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level"
+     }
+    ]
+   },
+   {
+    "board": "Snake Race Boat searches more crew.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Three boats afloat.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the crew"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Begin the Race! fills every boat from the deck.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Sink the boats under them"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Whale splashes your whole side.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon its hero"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the crew that powers it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Declare the Winner: Champion alone, huge.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!, then freeze him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill his crew"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "His Heavy Hit stuns your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea it back"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Cool Repair refloats the Frog.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the first hit"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Champion alone, boatless.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "One hero, one Oarsman.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "He has no Golden Ankh target left but himself.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

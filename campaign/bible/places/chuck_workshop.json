@@ -1,0 +1,20 @@
+{
+ "name": "Chuck's Workshop",
+ "zone": "campus",
+ "bg": "chuck_workshop",
+ "night": false,
+ "hours": "Whenever the old man is in, which nobody can predict; the half-door is open when he wants company and bolted when he does not. Open storytelling hour most Monday Afternoons.",
+ "sight": "A converted boat shed behind the Design Lab, crammed to the rafters: ship models, a parrot perch with no parrot, jars of brushes, towers of shoeboxes labelled in a looping hand, a hammock, a stove with a kettle shaped like a dragon. Sketches of heroes are tacked over every surface, some so old the paper is brown. It smells of pipe tobacco, turpentine and toast, and something is always just about to fall off a shelf.",
+ "things": [
+  "Listen to a story 'from when Tarleinn and I crossed the Sandlands'",
+  "Drink tea out of a chipped mug shaped like a booster pack",
+  "Look at the oldest sketches — the handwriting gets younger and more frightened the further back you go",
+  "Play a game against his mixed pile, which should not work and does",
+  "Help him look for his glasses, which are on his head",
+  "Ask a direct question and receive a delightful answer to a different one",
+  "Bring him a card you designed and be taken completely seriously",
+  "Notice the shoeboxes nobody is allowed to open"
+ ],
+ "secret": "Chuck owns about 60 Alpha cards; a dozen are in play in his 'mixed pile', the rest in a sea-chest under the hammock with a padlock he keeps on a string round his neck. The oldest sketches are pages from the eleven-week notebooks: drawn by a starving 24-year-old in a cave, with marginal notes in Polish ('they showed me again', 'the squares are warm'). His stories are tile-dreams and literally true as records; contradictions between tellings are him forgetting, never inventing. The empty parrot perch: animals will not stay in a room with that many first prints. He recognises what '{H}' is within days of D27 (he feels the tiles lean) and is paralysed by it — he guards, deflects, and starts quietly making sure Inya is never alone with {H=@near?that girl from the row|her bungalow neighbour}. He can be brought to tell the whole truth only late (not before Day 150 by default) and only by Inya and Rowan together, or by Rowan showing him the notebooks' missing counterpart from the Vault side. From Day 61 his door is bolted whenever Marrow is on campus.",
+ "access": "Open when the half-door is open. The sea-chest and the shoeboxes are his alone."
+}

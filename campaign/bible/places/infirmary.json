@@ -1,0 +1,18 @@
+{
+ "name": "The Infirmary",
+ "zone": "campus",
+ "bg": "infirmary",
+ "night": false,
+ "hours": "Always staffed; Nurse Camille Moreau has the day shift and, increasingly, the night shift too. A visiting doctor comes with the Wednesday ferry. Student first-aider Baraka Otieno covers the desk at Midday and in the Evening.",
+ "sight": "A cool whitewashed bungalow with a verandah, at the quiet end of campus where the path dips toward the Commons cove. Inside: six curtained beds, a dispensary hatch, an eye chart made of card symbols, a jar of barley sugar. The windows are open to the sea and the curtains breathe. It smells of antiseptic and frangipani.",
+ "things": [
+  "Get patched up after a bad hike, a sunburn or a Conditioning class",
+  "Ask for something for the shakes before a big match (she will give you tea and a straight answer)",
+  "Rest a slot in a real bed with clean sheets",
+  "Read the health notices: hydration, jellyfish, do not eat the red berries",
+  "Talk to Camille while she restocks, if she has a minute",
+  "Bring someone here who should not have skipped three meals",
+  "Volunteer as an orderly (from Day 41; 15 cr a slot)"
+ ],
+ "secret": "Camille's route and the medical thread. Livvie's condition surfaces here (see her profile); Camille keeps it confidential and is furious about the missed meals. Rowan's stage fright can be treated honestly here: no pills, but breathing drills that give a small Nerve bonus once. Job site from Day 41 (orderly), which is the legitimate way into Ward B. After D40 Camille's notes change tone: 'not seizure. Everything works. Asleep and awake at once, and nobody there. Follows a first-print card with his eyes.' She is the first adult to believe Rowan. The visiting doctor signs whatever the Chancellor's office drafts."
+}

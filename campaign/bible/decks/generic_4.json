@@ -1,0 +1,389 @@
+{
+ "name": "Hellfire Battery",
+ "owner": null,
+ "heroes": [
+  "Tempeste, the Weather Fairy",
+  "Baaliel, the Demon General",
+  "Thalia, the Fun Fairy"
+ ],
+ "main": [
+  [
+   2,
+   "Boiling Oil"
+  ],
+  [
+   4,
+   "Booby Trap"
+  ],
+  [
+   4,
+   "Brilliant Idea"
+  ],
+  [
+   4,
+   "Burning Finger"
+  ],
+  [
+   8,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Explosion"
+  ],
+  [
+   2,
+   "Fireball"
+  ],
+  [
+   1,
+   "Fireshield"
+  ],
+  [
+   4,
+   "Haste"
+  ],
+  [
+   4,
+   "Horned Demon"
+  ],
+  [
+   2,
+   "Juice"
+  ],
+  [
+   2,
+   "Laser Volley"
+  ],
+  [
+   1,
+   "Magic Hammer"
+  ],
+  [
+   4,
+   "Phoenix Tackle"
+  ],
+  [
+   2,
+   "Piercer of Heavens"
+  ],
+  [
+   2,
+   "Rolling Boulder"
+  ],
+  [
+   3,
+   "Shield of Death"
+  ],
+  [
+   2,
+   "Shield of Life"
+  ],
+  [
+   1,
+   "Smug Coin"
+  ],
+  [
+   2,
+   "Supply Chain"
+  ],
+  [
+   4,
+   "Victory Phoenix Cannon"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Tempeste, the Weather Fairy": "Hero",
+  "Baaliel, the Demon General": "Hero",
+  "Thalia, the Fun Fairy": "Hero",
+  "Boiling Oil": "Spell (Destruction Magic)",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Brilliant Idea": "Spell (Support Magic)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Destruction Magic": "Ability",
+  "Explosion": "Spell (Destruction Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Haste": "Spell (Support Magic)",
+  "Horned Demon": "Creature L2",
+  "Juice": "Artifact (Reaction)",
+  "Laser Volley": "Spell (Destruction Magic)",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Phoenix Tackle": "Spell (Destruction Magic)",
+  "Piercer of Heavens": "Spell (Destruction Magic)",
+  "Rolling Boulder": "Spell (Destruction Magic, Surprise)",
+  "Shield of Death": "Artifact (Equipment)",
+  "Shield of Life": "Artifact (Equipment)",
+  "Smug Coin": "Artifact (Equipment)",
+  "Supply Chain": "Spell (Support Magic)",
+  "Victory Phoenix Cannon": "Spell (Destruction Magic)"
+ },
+ "gist": {
+  "Horned Demon": "Gains a Demon Counter at the end of each of its controller's turns and shoots one target each turn, harder for every counter.",
+  "Baaliel, the Demon General": "Summons Horned Demons regardless of level, one a turn for free; every time any target on the table is defeated, all Horned Demons gain a counter.",
+  "Tempeste, the Weather Fairy": "All damage her team-mates take is reduced by a large flat amount; damage to her is never reduced.",
+  "Thalia, the Fun Fairy": "Makes Support spells (Haste, Brilliant Idea, Supply Chain) cheap.",
+  "Victory Phoenix Cannon": "Heavy shot that chains into a cheap Destruction spell.",
+  "Phoenix Tackle": "Strong single-target burn with recoil on the caster.",
+  "Piercer of Heavens": "Heavy shot that ignores every protection.",
+  "Laser Volley": "Heavy damage to your whole side unless you discard to spare targets.",
+  "Burning Finger": "Single-target burn.",
+  "Booby Trap": "Trap that punishes the attacker.",
+  "Rolling Boulder": "Trap: cancels a creature effect and destroys that creature.",
+  "Shield of Death": "Hits back the first time its hero is hit each turn.",
+  "Shield of Life": "Heals a team-mate the first time its hero is hit each turn.",
+  "Haste": "Draws cards.",
+  "Supply Chain": "Draws up to a full hand."
+ },
+ "plan": "Artillery behind a weather shield. Tempeste cuts a large slice off every hit her two team-mates take, so chip damage does almost nothing to them, while Baaliel puts out a Horned Demon a turn: each grows a counter every turn and another whenever anything on the table dies, and shoots for its counters. Baaliel adds plain burn and Thalia keeps the hand full. The longer the game, the larger the Demons. Tempeste is small and unprotected, the Demons arrive with no counters at all, and the recoil spells hurt their caster.",
+ "looks": {
+  "early": "Tempeste in the middle, a first Horned Demon with no counters.",
+  "mid": "Three Demons with growing counters, your small hits bouncing off Baaliel and Thalia.",
+  "late": "Demons that one-shot heroes, each death on the table making them stronger."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Tempeste stands between the other two and your small hits on them shrink to nothing.",
+   "why": "While she lives, Storm ticks barely register on her team-mates, and damage to her can never be reduced; the first Demon has no counters and is not yet worth a card."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Two or three Horned Demons carry only a counter or two each.",
+   "why": "A Demon is a mid-sized body that becomes lethal with time: sweep them together while they are cheap; every turn of waiting is a counter on each."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "One Horned Demon is loaded with counters.",
+   "why": "Dark Gear takes the Demon with all its counters and points it the other way; killing a hero now would only hand every remaining Demon another counter."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Tempeste is gone, so its heroes take full damage.",
+   "why": "Without the shield it is two ordinary casters, one of whom has been paying recoil all game."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Baaliel summons a Horned Demon for free; your burn on Thalia is mostly absorbed.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Everything at Tempeste"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Thalia anyway"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Spend a card on a Demon with no counters"
+     }
+    ]
+   },
+   {
+    "board": "Phoenix Tackle costs Baaliel some of his own health.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tempeste first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Punish Baaliel"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Booby Trap is set on Tempeste.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Chain Lightning and Storm ticks trigger nothing"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire into it"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Three Demons, a counter or two each.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Baaliel"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait a turn"
+     }
+    ]
+   },
+   {
+    "board": "You kill a Demon and the others each gain a counter.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill them together, not one by one"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal one instead"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Laser Volley: discard, or your whole side is hit.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Take it on the sturdy heroes, keep the sweeper"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Discard for one hero"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Discard everything"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "One Demon carries a heap of counters and aims at your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Snow Cannon it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill a hero and feed it"
+     }
+    ]
+   },
+   {
+    "board": "Rolling Boulder waits for your stolen Demon to shoot.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the trap first"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shoot a hero without one"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold"
+     }
+    ]
+   },
+   {
+    "board": "Tempeste is nearly down.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Finish her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Tempeste has fallen.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Doubled Storm, full damage"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield the last Demon"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Baaliel alone with one fresh Demon.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Demon"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Piercer of Heavens ignores your shields.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Then race: he is lower than you"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

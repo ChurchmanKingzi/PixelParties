@@ -1,0 +1,239 @@
+{
+ "id": "eloise",
+ "name": "Eloise Lafayette",
+ "firstName": "Eloise",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R201",
+ "romance": true,
+ "deck": "Vernissage (illusion spells; her own hand-painted cards around real heroes)",
+ "look": "Long honey-brown hair with dried paint in it under a wine-red beret, faraway brown eyes, and a paint-flecked white top under her gold Game Design jacket, worn open so that the blue collar frames a hundred small colours. She smells of turpentine and linseed. There is always a brush in one hand and usually a palette she has forgotten in the other.",
+ "voice": "Soft, drifting and unhurried, a Louisiana cadence, sentences that wander off to look at something and occasionally come back. She speaks in colours and light rather than facts, loses the thread, finds a better one. Not stupid: when the subject is painting she is exact and can be severe. RARE habit (once in a scene at most; most scenes go without it): stopping mid-sentence to stare at a colour and name it.",
+ "lines": [
+  "Stand there. No — there, where the window does that to your ear.",
+  "I was going to say something about your deck. It's gone. It was mostly blue.",
+  "A card is a very small door. I paint mine big first so I can see what's on the other side.",
+  "That isn't quite right, Felix. You've painted what it looks like. I wanted what it's doing."
+ ],
+ "intro": "A dreamy, paint-spattered Game Design first-year from Rare Hall who paints her card ideas on canvases taller than she is, and always smells faintly of turpentine.",
+ "traits": [
+  {
+   "id": "eloise_1",
+   "text": "She paints every card idea as a full-size canvas first, and the canvases are remarkable.",
+   "how": "Design lab or Rare Hall room 201."
+  },
+  {
+   "id": "eloise_2",
+   "text": "Her room's window is open in all weathers because of the turpentine.",
+   "how": "Ask Marit."
+  },
+  {
+   "id": "eloise_3",
+   "text": "She loses the end of most sentences and the beginning of most appointments.",
+   "how": "Arrange to meet her."
+  },
+  {
+   "id": "eloise_4",
+   "text": "She plays with cards she has painted herself, and the judges have given up objecting.",
+   "how": "Play her."
+  },
+  {
+   "id": "eloise_5",
+   "text": "She is from New Orleans, where her mother paints carnival floats and her grandmother painted shop signs.",
+   "how": "Ask about the smock."
+  },
+  {
+   "id": "eloise_6",
+   "text": "She gets headaches most afternoons and says it is the light.",
+   "how": "Notice her pressing her temples; the nurse has views."
+  },
+  {
+   "id": "eloise_7",
+   "text": "She asks people to stand still so she can look at them, and means nothing by it — usually.",
+   "how": "Be asked."
+  },
+  {
+   "id": "eloise_8",
+   "text": "She says she paints what a card is doing, not what it looks like, and cannot explain further.",
+   "how": "Ask about a canvas."
+  },
+  {
+   "id": "eloise_9",
+   "text": "Since arriving she keeps painting the same room without meaning to, and turns those canvases to the wall.",
+   "how": "Close stage; or find the stack behind her bed."
+  }
+ ],
+ "secret": "Eloise Lafayette is the daughter and granddaughter of New Orleans painters — floats, signs, saints — and has had a brush in her hand since she could stand. She lives for art with a completeness that leaves little room for anything else: meals, laundry, time and the names of people she met yesterday all slide off her. Some of that is temperament and some is chemistry: she has worked for years in closed rooms with turpentine, cheap thinners and worse, and it has left her with daily headaches, a fog over her short-term memory and a tremor in her left hand that she hides by holding a brush in it. Nurse Camille spots it in one visit and wants her on odourless solvents and open windows; Eloise agrees warmly and forgets. It is manageable and reversible if someone keeps at her. Wound: a teacher once told her that she had a great eye and nothing behind it, and she half believes that the haze is simply who she is. Contradiction: the vaguest person on the island is its most exact observer. Ask her what day it is and she cannot say; ask her the colour of the shadow under your jaw and she will tell you, and be right.\nShe is at the Academy because a card is 'a very small door' and she wants to paint what is on the other side. Chuck adores her canvases — she paints what a card is DOING — and that is the trouble: she is painting, without knowing it, things that are on the tiles. Since the first week she has several times found herself painting a tiled floor with no ceiling and a figure at a table, back turned; she dislikes them and stacks them against the wall. (Felix Okoro is drawing the same room from other people's dreams; neither knows about the other's until someone puts them side by side.) After Day 27 she tries, as she tries with everyone, to paint '{H:full}': the canvas will not take {H:him}. The ground stays bare where {H:he} should be; the paint will not hold an edge. She shows nobody, and paints the outline of the gap. Her deck, 'Vernissage', is real heroes among her own hand-painted non-hero cards, tolerated in casual play; under a first-print card's hologram, her painted cards do something they should not, which interests several people for several reasons.\nHer route is gentle and odd: she asks him to pose, forgets he is there, and then one day does not forget. It needs someone to bring her back from the haze without making her feel managed.",
+ "wants": "To paint the thing on the other side of the card and have it look back.",
+ "fears": "That there is nothing behind the eye; that the fog is all of her.",
+ "crush": "felix",
+ "crushNote": "He draws what people see behind their eyes; she paints what a card is doing; he is the only person whose pictures she remembers. It shows as her wandering to his end of the design lab and standing there, and as her knowing what day his market stall is.",
+ "crushPace": 0.8,
+ "likes": [
+  "Sitting for her, patiently",
+  "Being told what a painting made you feel, not what it is 'of'",
+  "Colour named exactly",
+  "Fresh air she did not have to remember",
+  "Someone keeping track of the time for her without scolding",
+  "Good brushes, real pigments",
+  "Being found when she has wandered off",
+  "Felix's drawings"
+ ],
+ "dislikes": [
+  "'What's it supposed to be?'",
+  "Hurry",
+  "Being told she is 'away with the fairies'",
+  "Strip lighting",
+  "People moving her canvases",
+  "Being reminded of something in a tone",
+  "Flat, flickering holograms"
+ ],
+ "gifts": [
+  "A bottle of odourless solvent from the boutique (give it more than once)",
+  "Card: Pink Sky",
+  "A tube of real cobalt",
+  "Card: Living Illusion",
+  "A written note of where and when you will meet her, pinned to her easel",
+  "Card: Rainbow's Arrow"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": true,
+  "style": "Absent-minded, visual, accidentally intimate.",
+  "text": "Eloise initiates without knowing it: she tells a near-stranger to stand in the light, tilts his chin with painty fingers, studies his mouth for a full minute and says something exact about it. It is looking, not flirting — at first. She shows real interest by remembering: his is the name she does not lose, the appointment she keeps. Approach her by sitting for her, by saying honestly what a canvas does to you, by bringing air and tea and the time of day without reproach. Do not try to sharpen her up. One afternoon she puts the brush down mid-stroke, looks at him as a person rather than a subject, and says so, surprised."
+ },
+ "intimacy": "Dreamy, tactile and unselfconscious. Her way in is the eye and then the hand: charcoal smudged along his collarbone to see where the shadow falls, her thumb leaving a print of ochre on his cheek. She likes long quiet hours, being read to while she works, falling asleep on a drop-cloth in the afternoon light with her head on his arm. When it becomes more it is slow and curious, colour everywhere, the window wide open and the canvases turned to the wall; she is most present of all then, which moves her, and she says so. Fade as a jar of brushes is nudged off the sill and neither of them looks round.",
+ "events": [
+  {
+   "id": "eloise_e1",
+   "stage": 1,
+   "title": "Where the window does that",
+   "condition": "Agree to sit for her in design_lab or rare_room and hold still for the whole session; afterwards say what the picture makes you feel.",
+   "hint": [
+    "She asks people to stand in the light. It takes an afternoon and she may forget you are there.",
+    "Pose for the painter from Rare Hall, and tell her honestly what you see in the result."
+   ]
+  },
+  {
+   "id": "eloise_e2",
+   "stage": 2,
+   "title": "Mostly blue",
+   "condition": "Keep an appointment she forgot without reproach, twice; bring her outside (rooftop_garden, greenhouse) for air when the headache comes, and get her to see Camille once.",
+   "hint": [
+    "She loses track of time and has headaches most days. Both have the same cause.",
+    "Be patient with her forgetfulness and get her out of the fumes."
+   ]
+  },
+  {
+   "id": "eloise_e3",
+   "stage": 3,
+   "title": "Not a subject",
+   "condition": "Around the Design Contest (opens Day 61), help her turn one canvas into an actual card and keep her on the safer solvent for a fortnight; she remembers your name, the day and the hour, puts down the brush and tells you so.",
+   "hint": [
+    "She remembers colours and forgets people. There is one exception forming.",
+    "Help her finish a design for the contest and look after her health while she does."
+   ]
+  },
+  {
+   "id": "eloise_e4",
+   "stage": 4,
+   "title": "Turned to the wall",
+   "condition": "Find the stack of canvases she does not show; look at them with her and, after Day 27, at the one that will not take paint. Bring Felix's sketchbook and hers together. She does not want to be alone in the room that night.",
+   "hint": [
+    "Some of her paintings she keeps facing the wall. She does not know why she made them.",
+    "Ask to see the paintings she hides, and show her that someone else has been drawing the same thing."
+   ]
+  },
+  {
+   "id": "eloise_e5",
+   "stage": 5,
+   "title": "What it is doing",
+   "condition": "In Term 2, stand with her when others want her painted cards for their own purposes; go with her to see what she has been painting (card_archive, or further), and be there when the haze has lifted enough for her to say what she wants. She paints you, finished, for the first time.",
+   "hint": [
+    "She has been painting a place she has never seen. Sooner or later she ought to see it.",
+    "Protect her work from people who want to use it, and take her to the thing she has been painting."
+   ]
+  }
+ ],
+ "bonds": {
+  "marit": {
+   "label": "roommates",
+   "text": "Marit is very loud and a wonderful colour. Eloise has painted her nine times and remembers her name every morning.",
+   "public": true,
+   "from": 1
+  },
+  "victoria": {
+   "label": "friends",
+   "text": "Victoria can tell her which blue it was from memory. Eloise has never met anyone so useful.",
+   "public": true,
+   "from": 10
+  },
+  "felix": {
+   "label": "crush",
+   "text": "He draws what people see behind their eyes. His are the only pictures she remembers.",
+   "public": true,
+   "from": 6
+  },
+  "wren": {
+   "label": "protégé",
+   "text": "Wren looked at a canvas for ten minutes and then asked what it felt like to lose to. Nobody had asked the right question before.",
+   "public": true,
+   "from": 9
+  },
+  "chuck": {
+   "label": "protégé",
+   "text": "The Founder stood in front of her painting of a hero and said 'that's how he held his shoulders'. She does not know how he would know.",
+   "public": false,
+   "from": 5
+  },
+  "livvie": {
+   "label": "teammates",
+   "text": "Design-class neighbours: Livvie remembers the deadlines and Eloise lends her real paper.",
+   "public": true,
+   "from": 5
+  },
+  "camille": {
+   "label": "owes",
+   "text": "The nurse says it is the turpentine. Eloise agrees every time and then it is gone again.",
+   "public": false,
+   "from": 20
+  },
+  "junho": {
+   "label": "friends",
+   "text": "The neat one tells her what time it is and puts the lids back on. She has painted him once, very straight.",
+   "public": true,
+   "from": 6
+  },
+  "tariq": {
+   "label": "friends",
+   "text": "He shows her the paintings before they were cards. She remembers his name, which he takes as the compliment it is.",
+   "public": true,
+   "from": 9
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "design_lab",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "rooftop_garden",
+   "Midday": "boutique",
+   "Afternoon": "design_lab",
+   "Evening": "night_market",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 2,
+  "style": "Plays her hand-painted cards for the pictures they make on the table and wins, when she wins, by a combination nobody saw because she did not either.",
+  "tilt": "A beautiful card on the other side. She stops to look at it and forgets it is her turn."
+ }
+}

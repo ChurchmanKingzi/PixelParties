@@ -1,0 +1,18 @@
+{
+ "name": "The Drowned Anchor Inn",
+ "zone": "town",
+ "bg": "inn",
+ "night": false,
+ "hours": "Always open to guests; the dining room serves Evening meals to anyone. Twelve rooms, mostly visiting parents, sponsors and scouts.",
+ "sight": "A half-timbered inn on the quay with flower boxes, a low beamed dining room and a staircase that leans. A fire burns in the grate even in mild weather. The guest book on the hall table is as thick as a dictionary; the landlady's parrot greets every arrival with 'Mulligan! Mulligan!' It smells of woodsmoke, fish pie and furniture polish.",
+ "things": [
+  "Eat the fish pie in the dining room (9 cr; the best meal in town)",
+  "Leaf through the guest book: pros, scouts, parents, a few famous signatures",
+  "Meet a visitor staying here: a sponsor's scout, a journalist, a rival school's coach",
+  "Carry bags for arriving guests on ferry days (tips)",
+  "Sit by the fire in a storm when the ferry is cancelled and everyone is stranded together",
+  "Teach the parrot a new word",
+  "Notice who takes the back stairs"
+ ],
+ "secret": "Where outsiders stay: scouts during the Freshman Cup and Island Open; the North Crown delegation (Days 68–69 and 164–169; Isolde's limited windows are mostly here, at the harbour and at the arena); visiting parents after the incidents (Brant's mother arrives on Day 44 (a special run of the ferry) and sits in Ward B for a week — an unnamed, devastating minor figure). Marrow's unnamed assistants and buyers lodge here from Day 61 while he takes the tower suite; the back stairs are theirs, and the crates in the stable are labelled as laboratory glass. A mainland journalist (unnamed) takes a room around Day 72 if a letter got out through the town post office; the Chancellor has her on the next ferry unless students hide her. The parrot will not say 'Mulligan' when '{H}' walks in. It says nothing at all."
+}

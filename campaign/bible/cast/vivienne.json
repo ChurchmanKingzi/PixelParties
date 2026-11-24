@@ -1,0 +1,239 @@
+{
+ "id": "vivienne",
+ "name": "Ms. Vivienne Laurent",
+ "firstName": "Vivienne",
+ "age": 25,
+ "sex": "f",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "Faculty wing",
+ "romance": true,
+ "deck": "Encore (borrows your cards; her showpiece deck)",
+ "look": "Honey-blonde waves set as if for a camera, red lipstick, and a fitted stage blazer over something silk. She has a caster's bright, mobile face and knows her angles. A single thin gold chain; perfect nails; a voice you have heard before and cannot place until she says 'Welcome back'.",
+ "voice": "Rich, bright and trained, with a Québécoise polish; every sentence has a hook and a button, and she flirts as a professional reflex with everyone and everything. In the rare unguarded moment the pitch drops, the pace slows and a drier, more tired woman shows. RARE habit (once in a scene at most; most scenes go without it): 'darling', to students and furniture alike.",
+ "lines": [
+  "Welcome back. I'm Vivienne Laurent — yes, that one — and for the next ninety minutes your job is to make me care.",
+  "Never say 'he plays a card'. He stakes it. He slams it. He offers it up like a bad apology.",
+  "I flirt with everyone, darling. It's a reflex, like a knee. Don't read into the knee.",
+  "'She retired at the top.' That's the line. It's a good line, isn't it?"
+ ],
+ "intro": "The Casting & Media instructor: a glamorous, recently retired star caster with a famous voice and a professional's charm.",
+ "traits": [
+  {
+   "id": "vivienne_1",
+   "text": "She was the voice of three World Championship broadcasts before she was twenty-four.",
+   "how": "Common knowledge; her catchphrase is on T-shirts."
+  },
+  {
+   "id": "vivienne_2",
+   "text": "She flirts with everybody, automatically, and says so.",
+   "how": "Any conversation."
+  },
+  {
+   "id": "vivienne_3",
+   "text": "She marks commentary exercises with a red lipstick pencil.",
+   "how": "Hand one in."
+  },
+  {
+   "id": "vivienne_4",
+   "text": "She can make any match sound like a final and any student sound like a star.",
+   "how": "Casting class."
+  },
+  {
+   "id": "vivienne_5",
+   "text": "She says she retired at the top; she left one season after a contract dispute.",
+   "how": "Mika or Dex, with raised eyebrows."
+  },
+  {
+   "id": "vivienne_6",
+   "text": "She has Friday wine with the two other young women on staff and does most of the talking.",
+   "how": "The bar or faculty wing, Friday Evening."
+  },
+  {
+   "id": "vivienne_7",
+   "text": "She rehearses her own voice alone in the broadcast studio, with the monitors off.",
+   "how": "Broadcast studio at Night."
+  },
+  {
+   "id": "vivienne_8",
+   "text": "She grew up in a mill town in the Saguenay and paid for elocution lessons by waitressing.",
+   "how": "Close stage."
+  },
+  {
+   "id": "vivienne_9",
+   "text": "She is afraid she is charming instead of being anything.",
+   "how": "Dating stage."
+  }
+ ],
+ "secret": "Vivienne Laurent — born Vivianne Tremblay in Jonquière, daughter of a paper-mill shift worker — built 'Vivienne' from the vowels up. Star caster at twenty-one. At twenty-four the network offered her renewal on worse terms and a younger co-host; she pushed back, discovered how replaceable a voice is, and was 'retiring at the top' within a month. The Academy post is a shop window: she fully intends to go back, bigger, and Lucian Marrow has dangled exactly that — a Kaboom Entertainment network show — in exchange for her help shaping how the island's 'incidents' are narrated. She has not said yes. She has not said no. The flirting is a professional reflex — the camera rewards women who make every viewer feel chosen — and she no longer knows where it stops. Contradiction: the most socially fluent person on staff is intensely lonely and suspects that nobody has liked her off-camera since Jonquière. She is a good teacher: generous with craft, honest about the business, quick to spot the real thing (Jessica's composure, Bex's nerve, Marit's fire — she is hard on Marit because Marit is what she was before she was sanded). Private joke: she narrates the staff meetings under her breath for Hana, who has twice had to leave the room.\nRoute: fast to flirt, first to flirt, and for a long time it means nothing — she flirts with Rowan the way she breathes, and the trap for the player is believing it. The same regulation applies as with Hana (staff code 7.2; her dismissal, his disciplinary), and she treats it at first as a delicious game of how close one can stand. The route is real only once he has seen her without the voice: the mill-town accent, the 3 a.m. doubt. Then she is frightened, because she has something to lose. Secrecy with Vivienne is harder than with Hana, because everybody watches her; Bex, her protégée, will work it out. Her ambition is a live conflict: Marrow's offer versus the truth, the camera versus a person.\nPlot: she is the voice the administration uses to calm the student body after each Hollowing — and she is superb at it, and she hates how good she is. She guesses Hana's secret before anyone and covers for her. If she takes Marrow's side she becomes the smiling face of the cover-up; if not, she lends Bex the one thing Bex lacks — reach.",
+ "wants": "To be back on the biggest stage — and to be known by one person who would not miss the stage if it went.",
+ "fears": "That when the red light goes off there is nobody in the chair.",
+ "crush": "marrow",
+ "crushNote": "He is offering the one thing she wants and he listens as if she were the only person in the room; she knows precisely what that is worth and it works on her anyway. It shows as dinners she calls meetings and a different lipstick.",
+ "crushPace": 0.8,
+ "likes": [
+  "Wit, timing, a line delivered well",
+  "Being flirted back at with confidence",
+  "Talent, and seeing it work",
+  "Being asked what she actually thinks, off the record",
+  "Champagne, good shoes, late nights",
+  "Discretion with a smile",
+  "Hearing her old accent and not being teased for it",
+  "Ambition in others"
+ ],
+ "dislikes": [
+  "Dullness",
+  "Being taken literally when she is performing — and not being taken seriously when she is not",
+  "Clinginess",
+  "Moralising about her career",
+  "Bad lighting",
+  "Indiscretion",
+  "Being called 'Miss' by someone she has kissed"
+ ],
+ "gifts": [
+  "Card: Harpyformer Choir",
+  "A lipstick in exactly her red (the boutique knows the shade)",
+  "Card: Cute Starlet Megu",
+  "A bottle of something sparkling from the bar",
+  "A recording of your own commentary, for her notes",
+  "Card: Singing"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Performs with your cards: borrows your Abilities, takes a card from your hand each turn and, at the top of her act, one of your heroes for a whole turn. Crowd-pleasing, with real fundamentals underneath from years of watching the best.",
+  "text": "Vivienne flirts with Rowan in the first class, as she does with everyone: a look held a second long, 'darling', a hand on his shoulder to fix his posture at the desk. It is technique, and she will tell him so, laughing. She enjoys being flirted back at by someone with nerve and timing, and will happily play the game of standing too close in an empty studio. What changes it is him declining to be dazzled — answering the performance with a real question, noticing when the voice slips. She will make the first real move herself, lightly, as a dare; and then be the one who is suddenly serious. She wants confidence, wit and total discretion. She does not want to be worshipped, and she does not want to be rescued from her ambition."
+ },
+ "intimacy": "Outwardly the fastest of anyone — standing close, adjusting his collar, a whisper at the commentary desk with the microphones live and her hand on his knee beneath it. She likes the game, the risk, the dressing-room mirror ringed with bulbs. But the real thing is slower than the tease suggests: she is used to being looked at and not at all used to being seen, and the first time it is in earnest she wipes off the lipstick first, on purpose. She enjoys luxury — silk, perfume, a glass on the nightstand — and enjoys him enjoying her; she talks, laughs, directs a little; and afterwards, voice low and unpolished, she tells the truth about something. Fade on the mirror bulbs clicking off one by one.",
+ "events": [
+  {
+   "id": "vivienne_e1",
+   "stage": 1,
+   "title": "Make me care",
+   "condition": "Take a commentary exercise in broadcast_studio seriously (even as a CP student guesting in her class or on Bex's stream) and flirt back, once, with good timing rather than nerves.",
+   "hint": [
+    "She flirts with everyone. She notices who can keep up.",
+    "Do a turn at the commentary desk for her and hold your own when she teases."
+   ]
+  },
+  {
+   "id": "vivienne_e2",
+   "stage": 2,
+   "title": "Don't read into the knee",
+   "condition": "Find her alone in broadcast_studio at Night rehearsing with the monitors off; listen; ask what she actually thought of the day's match, off the record — and do not flirt.",
+   "hint": [
+    "There is a version of her that is not on air. It keeps odd hours.",
+    "Catch her practising alone at night and talk to her without the performance."
+   ]
+  },
+  {
+   "id": "vivienne_e3",
+   "stage": 3,
+   "title": "The dare",
+   "condition": "After Day 54, when she tests him with a real risk (a private drink at bar in town, a note in his marked exercise), accept discreetly and tell no one; hear the Jonquière accent. She kisses him first and calls it research.",
+   "hint": [
+    "She will make a joke that is also a question. Answer the question.",
+    "Accept a discreet invitation from her and keep it entirely secret."
+   ]
+  },
+  {
+   "id": "vivienne_e4",
+   "stage": 4,
+   "title": "Red light off",
+   "condition": "After Day 66, be with her after she has gone on camera to reassure the student body with a script she knows is false; do not judge and do not let her off. She takes the lipstick off.",
+   "hint": [
+    "She is very good at something she is beginning to hate doing.",
+    "Be there after one of her official broadcasts and be honest with her about it."
+   ]
+  },
+  {
+   "id": "vivienne_e5",
+   "stage": 5,
+   "title": "The better line",
+   "condition": "In Term 2, when Marrow's offer comes due, stand with her — without telling her what to choose — and keep the secret through whatever inquiry follows; if she chooses the truth she goes on Bex's stream and says it in her own accent.",
+   "hint": [
+    "She has been offered everything she wants, at a price. It is her decision. She would rather not make it alone.",
+    "Stay beside her when she has to choose between her comeback and the truth."
+   ]
+  }
+ ],
+ "bonds": {
+  "jessica": {
+   "label": "mentor",
+   "text": "The most natural screen presence in the year, and smarter than she lets the lens see.",
+   "public": true,
+   "from": 8
+  },
+  "marit": {
+   "label": "mentor",
+   "text": "Is hard on her because Marit is what she herself was before she was sanded down.",
+   "public": true,
+   "from": 4
+  },
+  "bex": {
+   "label": "mentor",
+   "text": "Her sharpest student, and already half a rival.",
+   "public": true,
+   "from": 0
+  },
+  "hana": {
+   "label": "friends",
+   "text": "Her favourite straight face to break.",
+   "public": true,
+   "from": 0
+  },
+  "camille": {
+   "label": "friends",
+   "text": "Friday wine; brings the bottle and the gossip.",
+   "public": true,
+   "from": 0
+  },
+  "marrow": {
+   "label": "colleagues",
+   "text": "He has offered her the comeback she wants. She has not said yes or no.",
+   "public": false,
+   "from": 61
+  },
+  "victoria": {
+   "label": "mentor",
+   "text": "The oddest natural talent she has taught: an audience will listen to that girl describe a sky for five minutes. Vivienne guards her like a contract.",
+   "public": true,
+   "from": 4
+  },
+  "cas": {
+   "label": "mentor",
+   "text": "The best natural play-by-play voice she has had. She hears the catch under it and has decided to say nothing until he does.",
+   "public": true,
+   "from": 4
+  },
+  "pilar": {
+   "label": "mentor",
+   "text": "A natural presenter who chose to become a spokeswoman. Vivienne recognises the bargain exactly.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "broadcast_studio",
+   "Afternoon": "faculty_wing",
+   "Evening": "broadcast_studio",
+   "Night": "faculty_wing"
+  },
+  "weekend": {
+   "Morning": "boutique",
+   "Midday": "cafe",
+   "Afternoon": "spa",
+   "Evening": "bar",
+   "Night": "faculty_wing"
+  }
+ },
+ "duel": {
+  "skill": 5,
+  "style": "Harpyformers: a noisy, crowd-pleasing band deck she plays for the camera, with real fundamentals underneath from years of watching the best.",
+  "tilt": "No audience. Alone in a quiet room she loses focus; with a crowd she is two points better."
+ }
+}

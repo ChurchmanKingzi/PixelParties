@@ -1,0 +1,20 @@
+{
+ "name": "Wheelhouse Door",
+ "zone": "campus",
+ "bg": "ferry_bridge",
+ "night": false,
+ "part": "ferry_deck",
+ "hours": "Captain Abel Stroud is at the wheel on every crossing. ARRIVAL DAY (Day 1, 08:00–10:40) at the wheelhouse: abel — at the wheel, feet apart, talking without turning round; he counts heads, gives the weather and says when she docks (ten-forty). He does not play at sea. rana — sitting on the top step of the iron stair with her arms round her knees and her back to the rail, away from everyone; she has made this crossing before and tells nobody why. She refuses any game in under six words. teobalt — at the wheelhouse door with a clipboard, asking the captain in what order the luggage comes off; he declines a game politely, he is making a list, and offers Thursday.",
+ "sight": "An iron stair climbs from the fore deck to a narrow wing outside the wheelhouse. Through the open door you see a brass wheel, a compass in a glass bowl and a chart held flat by a mug. The passenger list hangs on a clipboard beside the door, typed, with one name added in ink at the bottom. From up here the whole ship lies below you, fore deck, funnel and stern, and the island stands straight ahead.",
+ "things": [
+  "Read the passenger list: thirty-five typed names and one in ink",
+  "Read the brass plate by the door: 'M/V Second Chance — everybody gets one'",
+  "Ask the captain when she docks, and about the crossing",
+  "Look down on the fore deck and the stern and see who is where",
+  "Look at the chart: the outline of the island, the pier, the bay with the town",
+  "Borrow the binoculars from their hook and find the lighthouse",
+  "Sit on the stair next to the girl who is sitting alone"
+ ],
+ "secret": "The name in ink is 'Vance, R. — Wildcard': the visible mark of the late admission; anyone who reads the list knows who the Wildcard is. Rana is repeating first year; aboard she says so to nobody, and pressing her costs standing with her. Teobalt already has the unloading order on a list and will give Rowan a copy. THE CAPTAIN ON LATER CROSSINGS: Abel knows the old story of the deckhand who was pulled off the north shore fifty years ago — he was a boy on the rescue boat's sister ship — but tells it only as harbour gossip and never names Chuck unless Rowan has earned it (late Term 1). From D27 he mentions that the gulls no longer follow the ferry all the way in on the Commons side. On Day 61 the ferry carries a visitor in a grey suit and three crates marked as laboratory glass.",
+ "access": "Only during a crossing."
+}

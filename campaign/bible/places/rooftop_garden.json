@@ -1,0 +1,20 @@
+{
+ "name": "The Rooftop Garden",
+ "zone": "campus",
+ "bg": "rooftop_garden",
+ "night": true,
+ "hours": "Open by an unmarked stair from the library's top gallery; officially closes at dusk, in practice never locked until the curfew.",
+ "sight": "A hidden square of green on the main building's roof: raised beds of herbs and tomatoes, a pergola heavy with passionfruit, mismatched deckchairs and a rusty telescope on a tripod. The whole campus lies below, the sea beyond it, and behind you the volcano fills the northern sky. By night the town lights string along the bay, the lighthouse sweeps, and the stars come down very close.",
+ "things": [
+  "Eat lunch up here away from the cafeteria's seating politics",
+  "Have the kind of conversation that needs a horizon",
+  "Help water the beds for the gardening club (tomatoes in return)",
+  "Look through the telescope at the town, the ferry, the tower terrace",
+  "Trace the paths north with your eye: ridge, jungle, the grey shoulder of the volcano",
+  "Fold paper lanterns here before Lantern Night",
+  "At night: lie on a deckchair and count satellites",
+  "Find the initials inside the pergola post"
+ ],
+ "secret": "Prime location for one-to-one scenes at night; several routes have a key scene here (Noor, Livvie, Hana, Octavia). From here on the night of Day 26 one would have had the best view of the green-white flash over the north slope — anyone up here with Rowan shares the memory. Through the telescope from D29 one can see the lights of the cordon at the crater track, and from D61 a second, brighter camp. The lantern workshop is Day 136. D67: the stair door is locked at dusk; Wren has the gardening club's spare key on a string with her pencils.",
+ "access": "From Day 67 locked at dusk (keys: the gardening club — wren; staff)."
+}

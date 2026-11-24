@@ -1,0 +1,19 @@
+{
+ "name": "Main Street",
+ "zone": "town",
+ "bg": "main_street",
+ "night": true,
+ "hours": "Shops open Morning to Evening, half day Sunday; market stalls on Saturday mornings.",
+ "sight": "One steep cobbled street runs from the harbour to the church, hung with bunting and booster-wrapper garlands, every shopfront painted a different sherbet colour. There is a bakery, a chemist, a barber with a duel table in the window, a noodle bar, a post office the size of a cupboard. Half the town's income wears an Academy jacket, and the shop signs know it: STUDENT DISCOUNT, SLEEVES SOLD HERE. After dark the lamps are amber and cats own the steps.",
+ "things": [
+  "Window-shop the length of the street",
+  "Buy a warm coconut bun at the bakery (2 cr)",
+  "Browse the Saturday market: fruit, fried dough, second-hand playmats, hand-carved dice",
+  "Post a letter at the cupboard post office (faster than campus mail)",
+  "Get a haircut and a ruling from the barber, a retired judge",
+  "Eat at the noodle bar counter (6 cr) elbow to elbow with fishermen",
+  "Read the town noticeboard: boat for sale, room to let, the church fete",
+  "At night: follow the sound of a radio up the steps"
+ ],
+ "secret": "Connects every town location. Market days: Days 13, 160 and every Saturday morning in lighter form. The post office is the way to get a letter off the island that does not pass through the Chancellor's office (needed after Day 40 to reach a family, a journalist, or Aunt Dee with the truth). The barber judged the Academy's first tournaments and remembers Umbra House students as 'the ones who never needed the holograms'. From Day 61 strangers in good shoes take rooms and ask who has old cards to sell. From D67 students in town after the Evening slot are reported; townspeople mostly do not report them."
+}

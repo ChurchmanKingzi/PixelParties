@@ -1,0 +1,264 @@
+{
+ "id": "hedda",
+ "name": "Hedda Njord",
+ "firstName": "Hedda",
+ "age": 18,
+ "sex": "f",
+ "group": "student",
+ "major": "GD",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B2",
+ "romance": true,
+ "deck": "Elven Vanguard (Elven)",
+ "look": "Tiny, with fierce green eyes and a wild, leafy mane of moss-green hair under a crown of fresh wildflowers, a sprig of lavender tucked behind one ear. She wears her gold Game Design jacket open over a gardening apron whose pockets are full of herbs and seed packets, and there is usually a potted seedling in her hand and earth under her nails. Her megaphone is never far away, slung on a strap of bicycle inner tube. She stands with her chin up, because most people she argues with are a foot taller.",
+ "voice": "Loud, fast and certain, built for rallies: declarative sentences, rhetorical questions, facts with figures. She argues to win and assumes bad faith until shown otherwise. When she is not campaigning — which is rare, and usually involves an animal — the volume drops away and she is earnest, young and rather gentle. RARE habit (once in a scene at most; most scenes go without it): reaching for the megaphone when she is already perfectly audible.",
+ "lines": [
+  "Do you know what was in that sausage? I do. I've got the leaflet. Sit down, it's four pages.",
+  "Elves don't conquer anything. They defend a forest. That's the whole deck and I won't apologise for it.",
+  "Fine. FINE. The rice is good. That doesn't mean she's right about the chicken.",
+  "Nobody's counted the gulls except me. Forty on Monday. None today. Somebody explain that."
+ ],
+ "intro": "A tiny green-haired Game Design first-year from bungalow 2 with flowers in her hair, herbs in her pockets and a megaphone within reach, who campaigns for animals, the island and everyone's rights at a volume out of all proportion to her size.",
+ "traits": [
+  {
+   "id": "hedda_1",
+   "text": "She carries a megaphone and uses it at breakfast.",
+   "how": "Commons kitchen, Morning."
+  },
+  {
+   "id": "hedda_2",
+   "text": "She eats nothing from an animal and regards people who do as morally lost, at least until proven otherwise.",
+   "how": "Eat meat within sight of her."
+  },
+  {
+   "id": "hedda_3",
+   "text": "There are protest banners drying on the porch rail of her bungalow most days.",
+   "how": "Walk past bungalow 2."
+  },
+  {
+   "id": "hedda_4",
+   "text": "She starts a new petition roughly every week and actually collects the signatures.",
+   "how": "The job board; the cafeteria steps."
+  },
+  {
+   "id": "hedda_5",
+   "text": "She counts the birds on the island every morning and keeps the figures in a notebook.",
+   "how": "Meet her on the commons beach at dawn."
+  },
+  {
+   "id": "hedda_6",
+   "text": "Her deck is a forest that defends itself, and she will not add a card she thinks is cruel.",
+   "how": "Play her; ask about a card she left out."
+  },
+  {
+   "id": "hedda_7",
+   "text": "She grew up in the Faroe Islands in a family of fishermen, and has not been home in two years.",
+   "how": "Ask about the surname."
+  },
+  {
+   "id": "hedda_8",
+   "text": "She cries at injured animals, privately and furiously.",
+   "how": "Find her with a hurt gull or a stranded crab."
+  },
+  {
+   "id": "hedda_9",
+   "text": "There is one dish of Mama Odalys's that she eats in secret, late at night, and it is not on any of her leaflets.",
+   "how": "Commons kitchen at Night, once she trusts you."
+  }
+ ],
+ "secret": "Hedda Njord comes from Klaksvík in the Faroes, from five generations of fishermen. At thirteen she stood on a beach and watched her father and uncles take part in a whale drive — the grindadráp, the sea red to the knees — and something in her closed like a door. She has been at war with the world ever since, beginning with her own kitchen. She left at sixteen for a school in Copenhagen and has not been home; her father writes; she does not answer; her mother sends dried fish she cannot bring herself either to eat or to throw away. The militancy is grief in armour. She is loud because she was once a child nobody listened to on a beach, and she has divided the world into people who hurt things and people who stop them because any other map is unbearable. Contradiction: the most uncompromising person in the year is hungry to be proved wrong about people, and is — one enemy at a time, with terrible reluctance. Mama Odalys, whom she denounced on Day 2, keeps a separate pot for her without a word and has never once argued back. Baylee Halvorsen turned out to be a dairy farmer who names seagulls. Rafa Okonjo answered her leaflet by cooking her something. And at night, when the kitchen is empty, she eats Mama's flan, which is made of eggs and milk, and hates herself and has another spoonful.\nShe is a Game Design student for a reason: she wants to make a game in which nothing has to be killed to win. Her Elven deck is the nearest existing thing.\nPlot: she is the island's best naturalist by accident. She counts birds. She is therefore the first person to have NUMBERS for what happens after Day 27 — forty gulls on the Commons roofs, then thirty, then none within the week; the cats; the geckos — and she makes a public cause of it ('WHERE ARE THE BIRDS?', megaphone, quad) weeks before anyone wants to hear. She borrows a boat and finds them all on Gull Rock, silent, facing the row, and for once has nothing to shout. She feuds openly with anyone, which is exactly the opening the thing {H=@near?on the steps of|in} bungalow 7 looks for: a conflict offered. Default, it finds her interesting and does not challenge her ('She is in conflict with everyone. That cannot be the kind you mean'); but if she decides IT is what frightened the animals she will say so to its face, by name, in front of people. Her route is hard-won: she has to stop treating Rowan as a case to be argued.",
+ "wants": "A world where nothing has to be hurt — and to be able to go home without betraying that.",
+ "fears": "That she is the cruel one: that the anger is all she is.",
+ "crush": "rafa",
+ "crushNote": "He answered a four-page denunciation by cooking her something with no animal in it, and has never once argued back. It shows as her inspecting his pots with decreasing hostility, and a leaflet she wrote for him and did not hand over.",
+ "crushPace": 0.7,
+ "likes": [
+  "Signing the petition and meaning it",
+  "Honest disagreement that stays in the room",
+  "Care for an animal, shown not announced",
+  "Changing your mind for a reason",
+  "Help painting banners",
+  "Being asked about the birds",
+  "Vegetable dishes cooked with respect",
+  "Courage in public"
+ ],
+ "dislikes": [
+  "Meat eaten in front of her",
+  "'It's just how things are'",
+  "Being called shrill or cute",
+  "Jokes about veganism",
+  "Indifference",
+  "Fishing as sport",
+  "Being humoured"
+ ],
+ "gifts": [
+  "Card: Elven Forager",
+  "A field guide to Pacific seabirds",
+  "Card: Cleansing of the Land",
+  "Fabric paint and an old bedsheet",
+  "A vegetable dish you cooked yourself",
+  "Card: Elven Druid"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "None; an argument that gradually changes key.",
+  "text": "Hedda does not flirt and would be suspicious of anyone who flirted with her — she assumes it is a way of not taking her seriously. Everything begins as a quarrel. Interest shows when the quarrel acquires rules: she starts seeking him out to argue with, saves him a leaflet, concedes a point with visible pain. She will not initiate. To approach her, take her seriously enough to disagree honestly; do something for an animal without telling her; show up for one unglamorous job (banner, bird count, beach clean). Never mock, never humour, never eat a burger at her to make a point. When she finally says something soft it comes out furious."
+ },
+ "intimacy": "A long time coming and fierce when it does, with a great deal of talking first. She is small, proud and unused to being handled gently; she kisses like someone losing an argument on purpose. Closeness grows out of shared work — paint on both their hands, a dawn bird count with one blanket, an injured tern in a box between them. She likes being lifted off her feet and denies it; she is self-conscious about being tiny and about the scars on her knees from a childhood on boats. Earnest, intense, sudden laughter, the megaphone hung on the bedpost. Fade as she switches off the lamp with a muttered instruction not to say anything clever.",
+ "events": [
+  {
+   "id": "hedda_e1",
+   "stage": 1,
+   "title": "Four pages",
+   "condition": "Survive her first denunciation without mockery or surrender: read the leaflet, disagree with one point honestly, and sign one petition you actually agree with.",
+   "hint": [
+    "She assumes everyone is an enemy. It is possible to be a different thing without agreeing with her.",
+    "Hear her out, argue one point fairly, and sign something of hers you believe in."
+   ]
+  },
+  {
+   "id": "hedda_e2",
+   "stage": 2,
+   "title": "Forty on Monday",
+   "condition": "Go on a dawn bird count with her at commons_beach (at least twice), or help with a banner or a beach clean, with no audience; do one kind thing for an animal and let her find out by herself.",
+   "hint": [
+    "She does a great deal of quiet work nobody sees. She notices who turns up for it.",
+    "Join her morning bird counts or her unglamorous campaign work."
+   ]
+  },
+  {
+   "id": "hedda_e3",
+   "stage": 3,
+   "title": "None today",
+   "condition": "After Day 27, take her figures seriously, help her get a boat to islet (Saoirse or Silas), and be beside her when she sees where the birds went. She asks you, in a normal voice, to tell her she is not imagining it.",
+   "hint": [
+    "Her notebook has started showing something that frightens her, and nobody will listen to the loudest person on the island.",
+    "Believe her bird counts, go with her to find where they went, and tell her the truth."
+   ]
+  },
+  {
+   "id": "hedda_e4",
+   "stage": 4,
+   "title": "The separate pot",
+   "condition": "Catch her at the flan in commons_kitchen at Night and say nothing cruel, clever or reassuring; help her write one line to her father or thank Mama properly. Keep her from accusing a certain student to his face in public. She stays up talking until morning.",
+   "hint": [
+    "There is one thing she does that is on none of her leaflets. How you take it decides a great deal.",
+    "Find out her small secret and be kind about it; and keep her from picking a fight she must not pick."
+   ]
+  },
+  {
+   "id": "hedda_e5",
+   "stage": 5,
+   "title": "Nothing has to die",
+   "condition": "In Term 2, help her finish her own game design — one in which nothing is killed to win — and stand with her when she chooses whether to go home at the year's end; she decides, and tells you first.",
+   "hint": [
+    "She came here to make something, not only to stop things. It needs a second pair of hands.",
+    "Work with her on the game she wants to design, and support her decision about going home."
+   ]
+  }
+ ],
+ "bonds": {
+  "freya": {
+   "label": "roommates",
+   "text": "Freya drinks too much, eats fish and is impossible to stay angry with. Hedda has stopped trying before noon.",
+   "public": true,
+   "from": 1
+  },
+  "trixie": {
+   "label": "roommates",
+   "text": "Bungalow 2. The one person Hedda has never shouted at: the bee hotel under the eaves settled it on the first day.",
+   "public": true,
+   "from": 1
+  },
+  "rafa": {
+   "label": "rivals",
+   "text": "She called his jollof a crime. He cooked her a pot with nothing in it that ever breathed. She said it was acceptable, and has been back for it since.",
+   "public": true,
+   "from": 6
+  },
+  "odalys": {
+   "label": "rivals",
+   "text": "Denounced her kitchen on the second day. Mama has kept a separate pot for her ever since and has never argued back, which is infuriating.",
+   "public": true,
+   "from": 2
+  },
+  "teobalt": {
+   "label": "teammates",
+   "text": "The only person who can turn her petitions into something the council has to read.",
+   "public": true,
+   "from": 10
+  },
+  "octavia": {
+   "label": "enemies",
+   "text": "The council president has ruled four of her petitions out of order on formatting.",
+   "public": true,
+   "from": 14
+  },
+  "abel": {
+   "label": "distrusts",
+   "text": "He lands fish. She has picketed the ferry dock twice.",
+   "public": true,
+   "from": 6
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "She came to shout at a dairy farmer and found a man who names the seagulls. She has not got over it.",
+   "public": true,
+   "from": 12
+  },
+  "okonkwo": {
+   "label": "distrusts",
+   "text": "Every authority is guilty until it signs something.",
+   "public": true,
+   "from": 9
+  },
+  "saoirse": {
+   "label": "friends",
+   "text": "Saoirse lent her a boat to go and look for the gulls, and did not laugh.",
+   "public": true,
+   "from": 30
+  },
+  "wren": {
+   "label": "protégé",
+   "text": "The third-year who took 'a game where nothing has to die' seriously as a design problem.",
+   "public": true,
+   "from": 15
+  },
+  "sebastian": {
+   "label": "enemies",
+   "text": "He has never said no to her and she has never had a permit. She would prefer an honest enemy.",
+   "public": true,
+   "from": 9
+  },
+  "pilar": {
+   "label": "enemies",
+   "text": "The council's smile on legs. Hedda has been moved on from three pitches and counted every one.",
+   "public": true,
+   "from": 3
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "design_lab",
+   "Midday": "classroom",
+   "Afternoon": "quad",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_beach",
+   "Midday": "fish_market",
+   "Afternoon": "greenhouse",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Elven: a slow, stubborn defensive forest that outlasts rather than destroys; she refuses several strong cards on principle and plays the rest with conviction.",
+  "tilt": "An opponent's cruel-looking card, or a sneer. She stops playing the board and starts arguing with the player."
+ },
+ "range": "Campaigning is one mode: she also knows birds and plants by name, designs clever cards, cooks vegetables well, laughs loudly, and can lose an argument and concede with bad grace. The megaphone comes out once a scene at most."
+}

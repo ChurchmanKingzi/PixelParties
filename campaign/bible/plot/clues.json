@@ -1,0 +1,2014 @@
+{
+ "c_m1_bed": {
+  "m": "M1",
+  "where": [
+   "commons_room"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 34
+  },
+  "text": "{H=nathan?{H}'s bed is made. Not {H}-made — made exactly like Baylee's across the room, the same fold at the corner, the same crease in the blanket, as if someone had copied it line for line. His pillow has no dent. It had no dent yesterday either.|{H=baylee?Baylee's bed is made, military corners, as always. That is not the strange part. He made it at half past four, as always, and you were awake and watched him do it: he did not once look at what his hands were doing. The pillow has no dent. It had no dent yesterday either.|{H=fiona?Maisie says it without being asked, because it is bothering her: Fiona's bed in bungalow 4 is made. Fiona never made a bed in her life; she said a made bed looked like a coffin and she got enough of those at home. It is made exactly like Leona's across the room, fold for fold. The pillow has no dent. It had no dent yesterday either.|{H=freya?Three in the afternoon, a Tuesday, and Freya is alone on the steps of number 7 with nothing in her hand, doing nothing at all. She once told you the quiet hour of an ordinary afternoon was the only thing on this island she was afraid of. She is sitting in it with her hands on her knees, perfectly content. She looks up and smiles at exactly the moment you look at her.|{H=hedda?Supper on the steps of number 7. Somebody passes Hedda the wrong plate — ribs — and the row holds its breath for the megaphone. She looks at the plate, and eats. All of it, steadily, looking at each piece before it goes in. Mama's separate pot stands on the stove with the lid on. Rafa watches the pot, not her.|{H=sunny?Six in the morning at the pool. Sunny swims her four hundred, and Baraka, who holds the watch for her, looks at it and then at her and then at it. Every length the same, to the hundredth. It is the time she swam at seventeen, before the shoulder — the time everybody in Cairns said would take her to the Games. She climbs out breathing as she was when she went in, and does not ask what it was.|{H}'s cot — the spare one from the laundry, carried in on a pink slip — is made. Made exactly like Baylee's across the room, the same fold at the corner, the same crease in the blanket, as if someone had copied it line for line. The pillow has no dent. It had no dent yesterday either.}}}}}}",
+  "journal": "{H=@near?{H}'s bed in {H:bungalow} is made every morning now and never looks slept in. The people who share her room say so.|{H=nathan?{H} has started making his bed — exactly the way Baylee makes his.|{H=baylee?Baylee makes his bed as always — and it no longer looks slept in.|{H}'s cot is made exactly the way Baylee makes his bed, and never looks slept in.}}}"
+ },
+ "c_m1_eating": {
+  "m": "M1",
+  "where": [
+   "commons_kitchen",
+   "cafeteria"
+  ],
+  "who": [
+   "odalys",
+   "baylee"
+  ],
+  "when": {
+   "dayFrom": 30
+  },
+  "text": "{H} eats six bowls of rice, steadily, without speaking, looking at each spoonful before it goes in. The next day {H:he} takes a tray, sits with it for the whole meal and returns it untouched. Mama Odalys watches the tray come back and says nothing, which is not like her.",
+  "journal": "{H}'s appetite swings between enormous and none."
+ },
+ "c_m1_no_insult": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "commons_kitchen",
+   "duel_terraces"
+  ],
+  "who": [
+   "rana",
+   "tomi",
+   "inya"
+  ],
+  "when": {
+   "dayFrom": 32
+  },
+  "text": "{H=nathan?Rana misplays in a casual game and braces for it. {H} looks at the board, then at her, and says, quite gently, \"That lost you the game.\" No nickname. No laugh. She seems more rattled than if he had crowed.|{H=baylee?Rana misplays in a casual game against Baylee and waits for it — he apologises when he wins. Baylee looks at the board, then at her, and says, without the pause, \"That lost you the game. The fourth turn was the last one where it could be saved.\" No 'sorry'. No looking at his hands. She seems more rattled than if he had crowed.|{H=ed?Rana misplays in a casual game and braces for the whoop — Ed cheers other people's disasters like fireworks. He looks at the board, then at her, and says, quite gently, \"That lost you the game.\" No whoop. No 'do it again!'. She seems more rattled than if he had crowed.|{H=tobias?Rana misplays in a casual game and braces for it — Tobias prices a mistake aloud, as a rule. He looks at the board, then at her, and says, quite gently, \"That lost you the game.\" No figure. He does not look at her binder once. She seems more rattled than if he had crowed.|{H=sammy?Rana misplays in a casual game against Sammy and waits for the pronouncement — one dark line in five, and then the anxious glance to see whether it landed. He looks at the board, then at her, and says, at ordinary speed, \"That lost you the game.\" No pause. No glance. The stare stays where it is. She seems more rattled than if he had crowed.|{H=fiona?Rana misplays in a casual game against Fiona and waits for the sepulchral remark and the dry little laugh after it. Fiona looks at the board, then at her, and says in the low slow voice, \"That lost you the game.\" The pause is right. The laugh does not come. It has not come in days. She seems more rattled than if Fiona had crowed.|{H=freya?Rana misplays in a casual game against Freya and braces for the roar of laughter and the drink that is always pushed across afterwards. Freya looks at the board, then at her, and says, level, \"That lost you the game.\" No laugh. No glass. She has had four and it is as if she had had none. Rana seems more rattled than if she had crowed.|{H=hedda?Rana misplays in a casual game against Hedda and braces for the lecture — Hedda argues a misplay like a court case, with figures. Hedda looks at the board, then at her, and says, quite gently, \"That lost you the game.\" No sermon. No finger. She seems more rattled than if Hedda had crowed.|{H=sunny?Rana misplays in a casual game against Sunny and braces for the laugh and the arm round her shoulders and the 'mate, we have ALL done that'. Sunny looks at the board, then at her, and says, easily, \"That lost you the game.\" No laugh. No arm. She is standing a clear arm's length off, where she always stands now. Rana seems more rattled than if she had crowed.|Rana misplays in a casual game and braces for it. {H} looks at the board, then at her, and says, quite gently, \"That lost you the game.\" No nickname. No laugh. She seems more rattled than if he had crowed.}}}}}}}}}",
+  "journal": "{H=nathan?{H} has stopped teasing people. Asked why, he said he didn't see the point any more.|{H=baylee?Baylee has stopped apologising, and he answers at once now. Asked why, he said nobody had bumped into him.|{H=ed?Ed has stopped asking whether things are dangerous. He tells you, in metres.|{H=tobias?Tobias has stopped pricing things. Asked why, he said none of it was his.|{H=sammy?Sammy has stopped performing. Asked why he dropped the act, he asked which act.|{H=fiona?Fiona's real laugh — the one that jumps an octave and annoys her — has not been heard since the meteor.|{H=freya?Freya drinks as much as ever and it no longer does anything to her. She has stopped laughing at other people's misplays.|{H=hedda?Hedda has stopped campaigning. Asked what happened to the cause, she said she no longer knew which side she was on.|{H=sunny?Sunny has stopped touching people, and she no longer laughs in the middle of her sentences.|{H} has stopped teasing people. Asked why, {H:he} said {H:he} didn't see the point any more.}}}}}}}}}"
+ },
+ "c_m1_question": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "commons_beach"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 36
+  },
+  "text": "{H=@near?Late on the steps of number 7; the lamp has burned low and everyone else has gone in. From the step below yours, in {H}'s voice, level, as if read from a page: \"Partner. Why do you close your eyes at night?\" A pause, patient. \"What do you see in there?\"|Lights out. From the other bed, {H=nathan?in {H}'s voice at an indoor volume he has never used|in {H}'s voice, level, as if read from a page}: \"{H:Mate}. Why do you close your eyes at night?\" A pause, patient. \"What do you see in there?\"}",
+  "journal": "{H} asked why people close their eyes at night.",
+  "hostWho": "swap"
+ },
+ "c_m1_blink": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "lecture_hall",
+   "classroom",
+   "library"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 41
+  },
+  "text": "{H=@near?Across the library table {H} is reading the Charter handbook. You watch for a slow count of sixty because something is bothering you, and at sixty you have it: she has not blinked. Then she notices you, and blinks — twice, evenly, like someone remembering a step.|Across the room {H} is reading the Charter handbook. You watch for a slow count of sixty because something is bothering you, and at sixty you have it: he has not blinked. Then he notices you, and blinks — twice, evenly, like someone remembering a step.}",
+  "journal": "Watched {H} read for a full minute. {H:He} didn't blink until {H:he} saw me looking."
+ },
+ "c_m1_listening": {
+  "m": "M1",
+  "where": [
+   "commons_room"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 42
+  },
+  "text": "{H=@near?You wake at some dead hour and look out. {H} is standing on the sand below your window, hands at her sides, eyes open, face turned toward the volcano. She is not on her phone. Her head is tilted the way people tilt it at a faint radio. In the morning she is on your steps before you are up, and says she slept great.|You wake at some dead hour. {H} is sitting upright on his bed in the dark, hands on his knees, eyes open, face turned toward the volcano. He is not on his phone. His head is tilted the way people tilt it at a faint radio. In the morning he says he slept great.}",
+  "journal": "{H=@near?Woke in the night: {H} was standing below my window in the dark with her eyes open, facing the mountain.|Woke in the night: {H} was sitting up in the dark with his eyes open, facing the mountain.}"
+ },
+ "c_m1_birds": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "bonfire_pit",
+   "commons_kitchen"
+  ],
+  "who": [
+   "odalys",
+   "baylee"
+  ],
+  "when": {
+   "dayFrom": 42
+  },
+  "text": "The gulls that used to raid the Commons bins at breakfast are sitting in a line on the far breakwater, two hundred metres off. The palms over the bungalows are empty. You can hear the surf very clearly. It takes a moment to work out what is missing.",
+  "journal": "The birds have stopped coming to the Commons."
+ },
+ "c_m1_islet_birds": {
+  "m": "M1",
+  "where": [
+   "islet"
+  ],
+  "who": [
+   "saoirse",
+   "silas",
+   "hedda"
+  ],
+  "when": {
+   "dayFrom": 43,
+   "flags": [
+    "islet_seen"
+   ]
+  },
+  "text": "Gull Rock is crowded. Every ledge, every stone of the ruined hut, the one bent tree: gulls, frigatebirds, terns, the fat pigeons from the quad, shoulder to shoulder, hawks beside what hawks eat. None of them is calling. All of them are facing the same way — back across the water, toward the south cove and the row of bungalows.",
+  "journal": "The birds that left the Commons are all on Gull Rock, silent, facing the island."
+ },
+ "c_m1_cat": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "commons_kitchen"
+  ],
+  "who": [
+   "baylee",
+   "odalys",
+   "inya"
+  ],
+  "when": {
+   "dayFrom": 43
+  },
+  "text": "{H} crouches by the kitchen step with a saucer of tinned fish for Biscuit, the Commons stray — {H=nathan?Nathan, who used to call it 'the rat'|{H:catWas}}. {H:He} holds the saucer out with enormous care. The cat flattens, backs away without turning round, and is gone under the boardwalk. {H} stays crouched, holding the saucer, for a long time. {H=baylee?Nathan, watching from the doorway, for once says nothing at all.|Baylee, watching from the doorway, quietly goes back inside.}",
+  "journal": "{H} tried to feed the stray cat. It fled from {H:him}."
+ },
+ "c_m1_shadow": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "quad",
+   "duel_terraces",
+   "beach_cove"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 43
+  },
+  "text": "Low evening sun, long shadows on the sand. {H} raises a hand to wave at you. {H:His} shadow raises its hand a moment later — not much; the time it takes to notice. When {H:he} lowers it, the shadow's arm is still up.",
+  "journal": "In low light {H}'s shadow seemed to move slightly after {H:he} did."
+ },
+ "c_m1_cards": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "duel_terraces",
+   "trial_dome",
+   "card_shop"
+  ],
+  "who": [
+   "tomi",
+   "mika",
+   "dex",
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 44
+  },
+  "text": "There is a card in {H}'s {H:deck} deck you have never seen: 'Gatherer from the Cosmic Depths'. The frame is right, the back is right, the stock is right. There is no set symbol and no collector number. Tomi, who knows every price on the island, turns it over twice and hands it back as if it were hot. Asked where {H:he} got it, {H} says, pleasantly, \"They were always mine.\"",
+  "journal": "{H}'s deck contains cards from an archetype — Cosmic Depths — that nobody can find in any set list.",
+  "hostWho": "swap"
+ },
+ "c_m1_ladder": {
+  "m": "M1",
+  "where": [
+   "job_board",
+   "student_lounge",
+   "trial_dome"
+  ],
+  "who": [
+   "kenji",
+   "noor",
+   "bex"
+  ],
+  "when": {
+   "dayFrom": 38
+  },
+  "text": "The ladder printout: {H:ladder} — rank 40. Twelve days ago {H:he} was 120. The match log beside it shows forty-one ranked games, forty-one wins, no game longer than nine turns. Kenji has circled the column in red and written one word next to it: 'how'.",
+  "journal": "{H} has climbed about 80 ladder places in under two weeks without losing a game."
+ },
+ "c_m1_viktor_dawn": {
+  "m": "M1",
+  "where": [],
+  "who": [
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 40,
+   "flags": [
+    "viktor_trust"
+   ]
+  },
+  "text": "Viktor, low-voiced: he reached the crater rim on Day 27 about an hour after sunrise, sure he was first. {H} was already walking back toward {H:him} along {H:his} own line of boot prints — slowly, setting each foot down flat and waiting on it, like a {H:man} crossing ice. Smoke was pouring off the glass and Viktor's eyes were streaming; {H}'s were dry and wide. \"He said 'Good morning, Viktor Hale.' I had never told him my surname.\"",
+  "journal": "Viktor met {H} at the crater on the first morning. {H} walked oddly, {H:his} eyes did not water in the smoke, and {H:he} used Viktor's full name."
+ },
+ "c_m1_pippa_dawn": {
+  "m": "M1",
+  "where": [
+   "rare_room",
+   "broadcast_studio",
+   "rooftop_garden"
+  ],
+  "who": [
+   "pippa"
+  ],
+  "when": {
+   "dayFrom": 41,
+   "flags": [
+    "pippa_photos"
+   ]
+  },
+  "text": "Pippa's contact sheet from midday on Day 27, shot down the bungalow row: the welcome party, arms up, everybody with a small hard noon shadow pooled at their feet. One figure is walking in from the trail with glass dust in {H:his} hair — {H}. She taps the frame with a fingernail. On the sand under him there is no shadow at all. In the next frame, three seconds later, there is one.",
+  "journal": "Pippa has a photograph of {H} returning on Day 27 in which {H:he} casts no shadow; in the next frame {H:he} does."
+ },
+ "c_m1_cold_dome": {
+  "m": "M1",
+  "where": [
+   "trial_dome"
+  ],
+  "who": [
+   "hana",
+   "noor"
+  ],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "Dome 3 is sealed with tape, not a lock. Inside, the score clock over the table has stopped at 02:10. The climate panel by the door logs the room at 21 degrees all night, then 3 degrees for eleven minutes, then 21 again. The dais is ringed with a melting rime of frost. The microphone track of the dome's match recorder for the same eleven minutes is not noisy and not corrupted. It is a flat line.",
+  "journal": "The dome where Brant was found dropped to 3°C for eleven minutes that night; its clock stopped at 02:10 and its recorder captured total silence."
+ },
+ "c_m1_masks": {
+  "m": "M1",
+  "where": [
+   "festival_grounds",
+   "quad"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 54,
+   "dayTo": 54
+  },
+  "text": "Night of Masks. {H}'s mask is a printed photograph of {H:his} own face, cut out and tied on with string, the eyes punched through. Behind the eyeholes {H:his} eyes are very bright. \"Everybody is wearing someone,\" he tells you, delighted, almost tender. \"Tonight I understand this place completely.\"",
+  "journal": "At the Night of Masks {H} wore a mask of {H:his} own face and said {H:he} understood the place completely.",
+  "hostWho": "swap"
+ },
+ "c_m1_roommate_word": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "commons_beach"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 42
+  },
+  "text": "Gideon's friends corner you by the Commons steps about a ladder result. {H} is suddenly there, between you and them, not angry, not loud. \"This one is {H:mate},\" {H:he} says, the way someone says 'this is load-bearing'. They leave. Afterwards he asks you whether '{H:mate}' ends when the term ends, and listens to the answer with his whole body.",
+  "journal": "{H} stepped in for me and called me '{H:mate}' as if it were a rank. {H:He} asked whether it ends with the term.",
+  "hostWho": "swap"
+ },
+ "c_m1_radio": {
+  "m": "M1",
+  "where": [
+   "radio_tower"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 42,
+   "flags": [
+    "radio_heard"
+   ]
+  },
+  "text": "Dusk in the relay hut. Tuned slowly toward the top of the dial, past the last station, the monitor speaker gives a soft regular clicking in groups — three, a pause, five, a pause — like pieces being set out on a board. Under it, very faint, a boy's voice repeats with identical intonation every forty seconds: \"—{H:hello} \" and stops in the same place each time. The engineer's logbook, open beside the set: 'Day 27 — all bands, 02:10, eleven minutes of dead carrier. Not interference. ABSENCE.'",
+  "journal": "The radio tower picks up a clicking like a board being set up, and a looping fragment of a voice that sounds like {H} saying hello."
+ },
+ "c_m1_alpha_flinch": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "duel_terraces",
+   "trial_dome"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 44,
+   "flags": [
+    "has_alpha_card"
+   ]
+  },
+  "text": "You set the Alpha card on the table between you. {H}'s eyes go to it and stop, the way eyes stop at a closed door. {H:He} reaches out, does not quite touch it, and withdraws {H:his} hand. \"That one I can't hear,\" {H:he} says. \"That one is only a card. How strange.\" He smiles, but he keeps looking at it.",
+  "journal": "Shown an Alpha card, {H} said it was one {H:he} 'can't hear'.",
+  "hostWho": "swap"
+ },
+ "c_m1_name_record": {
+  "m": "M1",
+  "where": [
+   "trial_dome",
+   "great_arena",
+   "card_shop",
+   "duel_terraces"
+  ],
+  "who": [
+   "hana",
+   "noor",
+   "mika",
+   "anni"
+  ],
+  "when": {
+   "dayFrom": 40,
+   "flags": [
+    "charter_studied"
+   ]
+  },
+  "text": "A sanctioned match, a judge at the table, the formal opening: \"Players, state your names for the record.\" {H} opens {H:his} mouth. Nothing comes. A long second. Then, carefully: \"The record of {H:full} is here.\" The judge, pen hovering, says that will do. It is written down as his name. {H:He} has never once, since Day 27, said 'I am {H}' — and now you realise you have been listening for it.",
+  "journal": "Asked by a judge to state {H:his} name for the record, {H} said only: 'The record of {H:full} is here.'"
+ },
+ "c_m1_debt": {
+  "m": "M1",
+  "where": [
+   "commons_room",
+   "bonfire_pit",
+   "crater"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 60,
+   "flags": [
+    "host_body_found",
+    "charter_studied"
+   ]
+  },
+  "text": "You ask it — {H=@near?in the dark, on the steps of number 7|in the dark, across the room} — whether {H} wagered anything. The silence is longer than any it has let fall before. \"No,\" it says. \"I had not learned games. I only looked at him. I looked at all of him at once.\" Its hands turn over on its knees, palms up, a gesture that is not {H}'s. \"Article seven. I have read it four thousand times. It is the only rule on this island that is about me.\"",
+  "journal": "It admitted {H} wagered nothing, and that Article 7 of the Charter is 'about' it.",
+  "hostWho": "swap"
+ },
+ "c_m2_lastwords": {
+  "m": "M2",
+  "where": [
+   "commons_beach",
+   "commons_kitchen",
+   "bonfire_pit"
+  ],
+  "who": [
+   "tomi",
+   "rana",
+   "inya",
+   "baylee",
+   "odalys"
+  ],
+  "when": {
+   "dayFrom": 27
+  },
+  "text": "{H=nathan?Everyone in the bungalow row can still do the impression: {H} at half past two in the morning, banging a pan, torch strapped to his head with a belt, deck box in his jacket 'in case it wants a game'. \"It's a SPACESHIP. I'm gonna be the first human to shake hands with it and you're all COWARDS.\" He took Tomi's good torch and two of Mama's empanadas. Tomi wants the torch back. {H} says he doesn't remember a torch.|{H=baylee?Nathan with the pan, of course, COWARDS and all. What nobody saw was Baylee: ten minutes after Nathan had gone he filled a water bottle at the kitchen tap, said 'Somebody ought to walk behind him,' and went up the trail without a light. Nathan was back by four with a dead torch. He had not seen Baylee. Ask Baylee about the walk now and he says, at once and in a whole sentence, that he does not remember being thirsty.|{H=ed?Nathan with the pan, of course, COWARDS and all. And then Ed, out of bungalow 5 at a dead run with his hat on and no torch, 'IS IT DANGEROUS?', past Nathan before the trailhead. Nathan came back at four with a dead torch, swearing the cowboy had cheated. Ask Ed about the run now and he says, pleasantly, that it was eleven kilometres and that he does not remember being out of breath.|{H=tobias?Nathan with the pan, of course, COWARDS and all — and while the whole row was watching that, somebody went out of the back window of bungalow 6. Dmitri has it in his notebook: '02:20 — T., rucksack, no light, north.' Nathan came back at four with a dead torch and had met nobody. Ask Tobias where he went and he says, level, that he went to see what it was worth, and that it was not for sale.|{H=sammy?Nathan with the pan, of course, COWARDS and all. Sammy was at the edge of the crowd, where he always is, and wrote one line in his notebook. Fifty paces behind Nathan, without a light, a long black coat went up the trail. Nathan came back at four with a dead torch and says nobody was behind him. Ask Sammy about it now and he looks at you — the stare does not slip — and says, 'I went. That was the whole of the idea.'|{H=fiona?Nathan with the pan, of course, COWARDS and all. Fiona was knitting on the porch of bungalow 4. She put the needles down, said in her real voice — the light one nobody is meant to hear — 'Well. Somebody ought to see it properly,' took the storm lantern off the kitchen hook and walked up after his torch at her own pace. Nathan passed her coming down at the rope bridge and told her it was closed. She said 'Mm.' Ask her about the walk now and she leaves her pause and says it was a pleasant night for it.|{H=freya?Nathan with the pan, of course, COWARDS and all — and Freya, already three drinks in, announcing that the night had finally become worth staying up for. She went up after his torch with a bottle in her hand, singing something Norwegian. Nathan came back at four with a dead torch and says she was sitting on the rope bridge finishing the bottle. Ask her about it now and she says, quite sober, that she remembers every step.|{H=hedda?Nathan with the pan, of course, COWARDS and all — and then Hedda, on the kitchen steps with the megaphone, informing the whole row that the north slope is where the frigatebirds nest and had ANYONE thought of that. Nobody had. She went up after his torch with the megaphone and her tin of bandages. Nathan came back at four with a dead torch; she had left the trail to look for nests. Ask her about the birds now and she says, quietly, that there were none to find, and that it is nobody's fault.|{H=sunny?Nathan with the pan, of course, COWARDS and all; he was back at four with a dead torch. Nobody else from the row went. The one who went was not from the row: at five Sunny came down from Rare Hall for her run, heard from Dmitri on his porch that somebody had gone up the mountain alone in the dark, did not wait to hear that he was back, and ran. Ask her about the run now and she says it was eleven kilometres and she does not remember her time.|Everyone in the bungalow row can still do the impression: {H} at half past two in the morning, banging a pan, torch strapped to {H:his} head with a belt, deck box in {H:his} jacket 'in case it wants a game'. \"It's a SPACESHIP. I'm gonna be the first human to shake hands with it and you're all COWARDS.\" He took Tomi's good torch and two of Mama's empanadas. Tomi wants the torch back. {H} says {H:he} doesn't remember a torch.}}}}}}}}}",
+  "journal": "{H=nathan?{H} left for the crash site alone around 02:30 on Day 27 with Tomi's torch and his deck box. He now says he doesn't remember the torch.|{H=baylee?Baylee followed Nathan up the trail around 02:40 on Day 27 with a water bottle and no light. Nathan came back alone; Baylee came back at midday. He says he does not remember the walk.|{H=ed?Ed ran up the trail past Nathan around 02:30 on Day 27, without a light. Nathan came back alone; Ed came back at midday. He says he does not remember being out of breath.|{H=tobias?Tobias left bungalow 6 by the back window around 02:20 on Day 27 with a rucksack and no light. He came back at midday by the front steps.|{H=sammy?Sammy followed Nathan up the trail around 02:30 on Day 27, fifty paces behind and without a light. Nathan came back alone; Sammy came back at midday.|{H=fiona?Fiona walked up the trail after Nathan around 02:40 on Day 27 with the kitchen lantern. Nathan came back alone; Fiona came back at midday.|{H=freya?Freya followed Nathan up the trail around 02:30 on Day 27 with a bottle. Nathan came back alone; Freya came back at midday, sober.|{H=hedda?Hedda went up the trail after Nathan around 02:40 on Day 27 to look for the nesting birds. Nathan came back alone; Hedda came back at midday.|{H=sunny?Sunny ran up the trail at about five on Day 27, thinking somebody was still up there alone. She came back at midday. She says she does not remember her time.|{H} left for the crash site alone around 02:30 on Day 27 with Tomi's torch and his deck box. He now says he doesn't remember the torch.}}}}}}}}}"
+ },
+ "c_m2_boots": {
+  "m": "M2",
+  "where": [
+   "commons_room"
+  ],
+  "who": [
+   "baylee"
+  ],
+  "when": {
+   "dayFrom": 40,
+   "dayTo": 60
+  },
+  "text": "{H=nathan?{H}'s hiking boots, orange laces, are by his bed, side by side, toes to the wall. {H} never untied a boot in his life: he trod the heels flat and kicked them into the middle of the floor. These heels stand up. The laces are tied in two identical bows. There is crater ash on the uppers — and when you turn one over, the tread is as sharp as the day it left the shop.|{H=baylee?Baylee's bed — the one with a door laid under the mattress so that it will carry him — is made as always. The door is leaning against the wall. You press the mattress with your hand: the bare slats under it are not bowed, and they do not give. Six foot seven of farm boy lay down here last night. The pillow has no dent.|{H=ed?Ed's map of the island is pinned over the cot now. He had ringed every place marked dangerous as somewhere to go. Beside each ring there is a new note in pencil, in handwriting that is too even: a height in metres, a depth, a temperature, and under three of them one word — 'fatal'. On the nail above it hangs the hat. It has not been on his head since he came down.|{H=tobias?The loose floorboard that came over with his footlocker sits flat now; somebody has nailed it. On Keoni's lost-property crate outside the kitchen lie a crowbar, a set of picks and a roll of credits, each with a pink slip in very tidy handwriting: 'found'. And Tobias, who always kept his hands in his pockets and his back to a wall, is sitting in the middle of the room with his hands open on his knees.|{H=sammy?The numbered notebook lies open on the cot. Entry 23, in Sammy's cramped hand, underlined twice: 'Be the one who went.' Entry 24 is in handwriting that is too even: 'They come nearer now. I did nothing. Explain.' The black cloth he hung over the mirror to practise his stare is folded on the footlocker. The long coat on its peg is dry — in this heat it has never once been dry.|{H=fiona?Fiona's knitting lies on the top step of number 7, where she leaves it every evening now. It was a scarf with one dropped stitch near the start, left in on purpose — 'so it looks made by a person'. The stitch is gone. Every row since has the same number of stitches, pulled to the same tension, and the scarf is four metres long. She has not cast off. Nobody has seen her count.|{H=freya?Dmitri put a glass of water on the step of bungalow 2 every night, for when Freya could not find her door. The glass is there this morning, full, as it has been every morning since the meteor. She finds her door now. She walks home in a straight line at the same minute each night, and Dmitri, who used to see her to the step, has stopped getting up.|{H=hedda?The megaphone hangs on its nail by the kitchen door, where she has left it every evening since the meteor. Hedda used to change the flowers in her hair every morning before breakfast; these are the ones she wore up the mountain. They have not wilted. On the sill of bungalow 2 her seedlings stand in a row, watered to the same line in every pot, and not one has grown.|{H=sunny?Sunny's stopwatch hangs on the rail of the lifeguard chair by its cord, where she left it on the first morning. She has not picked it up since. She timed everything — lengths, lessons, how long you took to answer a question. Her hair is dry. In all the weeks you have known her it has never once been dry. And she is standing at the end of lane four, perfectly still, watching the water as if it might do something.|{H}'s hiking boots, orange laces, are by {H:his} bed, side by side, toes to the wall. {H} never untied a boot in {H:his} life: {H:he} trod the heels flat and kicked them into the middle of the floor. These heels stand up. The laces are tied in two identical bows. There is crater ash on the uppers — and when you turn one over, the tread is as sharp as the day it left the shop.}}}}}}}}}",
+  "journal": "{H=nathan?The boots {H} came back in look like his, but the heels are no longer trodden down and the soles show no wear.|{H=baylee?Baylee has taken the door out from under his mattress. The bed no longer sags under him.|{H=ed?Ed has written exact heights and depths beside every dangerous place on his map, and he no longer wears the hat.|{H=tobias?Tobias has handed a crowbar, a set of picks and a roll of credits in at the lost-property crate, each labelled 'found'.|{H=sammy?Sammy's notebook has a new entry in handwriting that is too even: 'They come nearer now. I did nothing. Explain.'|{H=fiona?Fiona's scarf is four metres long now, every stitch identical. The dropped stitch she left in on purpose is gone.|{H=freya?Freya finds her own door every night now. The glass of water Dmitri leaves on her step is never touched.|{H=hedda?Hedda has not touched the megaphone since the meteor. The flowers in her hair are the same ones, and they have not wilted.|{H=sunny?Sunny no longer carries her stopwatch, and her hair is dry. She says she does not need to know how long things take.|The boots {H} came back in look like {H:his}, but the heels are no longer trodden down and the soles show no wear.}}}}}}}}}"
+ },
+ "c_m2_phone": {
+  "m": "M2",
+  "where": [
+   "commons_room"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "{H=@near?{H}'s phone goes off at 07:00 in the bag at her feet, on the steps of number 7. It rings for the full minute. She is sitting right there. She turns her head and regards the bag with mild interest until it stops. The lock screen, when it lights, shows nineteen unanswered calls from '{H:caller}'.|{H}'s phone alarm goes off at 07:00 under his pillow{H=nathan? — the air-horn one|}. It rings for the full minute. He is sitting right there. He turns his head and regards the pillow with mild interest until it stops. The lock screen, when it lights, shows nineteen unanswered calls from '{H:caller}'.}",
+  "journal": "{H} no longer answers {H:his} phone. {H=nathan?His mother has called nineteen times.|There are nineteen missed calls from '{H:caller}'.}"
+ },
+ "c_m2_mother_call": {
+  "m": "M2",
+  "where": [
+   "commons_room",
+   "commons_beach"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 44
+  },
+  "text": "{H=tobias?He finally takes the call on speaker, on the porch. It is his sister, on a payphone, and she asks him straight whether the money is clean. He tells her. All of it — the warehouse, the list, the window he used — in a kind, even voice, getting every date right. There is a long quiet on the line. Then she says, very small, \"You always said the thing. Say the thing, Tobes.\" He doesn't know what the thing is. He searches for it; you can see him searching. \"Goodbye, Keeley,\" he says. After she hangs up he asks you what the thing was. You don't know either.|He finally takes the call on speaker, on the porch. He gets everything right — the dog's name, the cousin's wedding, the thing about the car. His mother laughs in the right places. At the end she says, \"You sound so grown up, hon. Say the thing.\" He doesn't know what the thing is. He searches for it; you can see him searching. \"Goodbye, {H:mom},\" he says. After she hangs up he asks you what the thing was. You don't know either.}",
+  "journal": "On the phone with {H:kin}, {H} knew every fact but not the family's private sign-off.",
+  "hostWho": "swap"
+ },
+ "c_m2_bootprint": {
+  "m": "M2",
+  "where": [
+   "crater"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 27,
+   "dayTo": 60,
+   "flags": [
+    "saw_crater"
+   ]
+  },
+  "text": "In the ash between the flattened trees and the glass: one line of boot prints going in — deep, uneven, toes dug in, a boy half running. The same tread coming out. Each print coming out is exactly as deep as the last and exactly the same distance from it, as if paced with a ruler. Where the two lines meet, at the edge of the glass, the surface is dished, as though something had knelt there while it was still soft. On the rim lies a torch with a belt through its strap. It is still switched on.",
+  "journal": "At the crater, boot prints go in unevenly and come out with perfectly even spacing. The glass is dished where they meet. A torch lies at the rim, still lit."
+ },
+ "c_m2_body": {
+  "m": "M2",
+  "where": [
+   "crater"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 60,
+   "dayTo": 64,
+   "flags": [
+    "saw_crater"
+   ]
+  },
+  "text": "The storm has split the crust from the centre outward in long white cracks, and a plate of glass the size of a door has lifted. The glass beneath is clear as lake ice. A hand is under it, held out, fingers a little apart, {H=nathan?the way you offer a handshake|{H:pose}}. Behind the hand, a red sleeve, a plain grey collar. Behind that, a face you eat breakfast with, mouth open on the first syllable of something, eyes open. {H=nathan?Orange bootlaces, the heels trodden flat.|{H:bodyDetail}} A deck box by his hip, lid sprung, ordinary {H=nathan?War Counselors|cards} fanned out in the glass like leaves in ice. There is frost on the inside of the pane. It is twenty-eight degrees out here.",
+  "journal": "Under the cracked glass at the centre of the crater lies a body in a red jacket with a Commons collar, hand held out, deck box beside it. It has {H}'s face."
+ },
+ "c_m2_crate": {
+  "m": "M2",
+  "where": [
+   "inn",
+   "harbor"
+  ],
+  "who": [
+   "abel",
+   "josie"
+  ],
+  "when": {
+   "dayFrom": 64,
+   "dayTo": 171,
+   "notFlags": [
+    "host_body_found"
+   ]
+  },
+  "text": "The inn's stable is stacked with crates stencilled LABORATORY GLASS — K.E. BOARD. All of them sweat. One is longer than the rest, the length of a door, and it is the only one with a padlock. The straw under it is white and stiff. Through the gap between two slats, by torchlight: black glass, then clear glass, then, deep in the clear, something red, and five pale shapes spread like a hand.",
+  "journal": "One of the 'laboratory glass' crates in the inn's stable is door-sized, padlocked and frozen. Something red and a shape like a hand are inside the glass."
+ },
+ "c_m2_guest_answer": {
+  "m": "M2",
+  "where": [
+   "commons_room",
+   "bonfire_pit",
+   "crater",
+   "commons_beach"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 41,
+   "flags": [
+    "guest_suspected"
+   ]
+  },
+  "text": "You ask it straight: where is {H}. It does not pretend to misunderstand. \"In two places,\" it says. \"The part that was meat is where he stopped. The part that was {H} is here.\" It touches its own chest with two fingers, precisely, like pointing at a map. \"I have not lost any of it. I check every night. Would you like to hear him? I can do him exactly.\" {H=nathan?And for one breath the grin is back, the volume is back — \"LAUNDRY!\" (his name for you, which it has not used since the first morning) — and then it is gone again|{H:doHim}} and the thing is looking at you, hopeful, to see whether that helped.",
+  "journal": "Asked where {H} is, it said: 'In two places.' Then it did {H:his} voice, perfectly, for one word.",
+  "hostWho": "swap"
+ },
+ "c_m3_brant_quarrel": {
+  "m": "M3",
+  "where": [
+   "cafeteria",
+   "commons_beach",
+   "student_lounge"
+  ],
+  "who": [
+   "tomi",
+   "georgie",
+   "pippa",
+   "livvie",
+   "trixie",
+   "tobias"
+  ],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "The evening before he was found, Brant Kessler shook down Trixie Hollis for a foil by the cafeteria doors, the usual way. {H} walked up and asked {H:him}, in front of twenty people, with real curiosity: \"If that one is {H:his}, and you have it, which things are yours?\" Brant shoved him. {H} didn't move — not 'stood {H:his} ground'; did not move, like shoving a wall. Then {H} said something quiet and formal, and Brant laughed and said, \"Dome three. After lights-out. Bring your binder.\"",
+  "journal": "Brant quarrelled with {H} in public the evening before his collapse and agreed to meet {H:him} at Trial Dome 3 that night."
+ },
+ "c_m3_dome_tape": {
+  "m": "M3",
+  "where": [
+   "broadcast_studio"
+  ],
+  "who": [
+   "bex",
+   "pippa",
+   "vivienne"
+  ],
+  "when": {
+   "dayFrom": 40,
+   "dayTo": 69,
+   "notFlags": [
+    "dome_tape_wiped"
+   ]
+  },
+  "text": "The studio keeps every dome feed for thirty days. The Dome 3 tape for the night before Brant was found: two figures at a table, perfectly sharp. At 02:10 the sound does not hiss or crackle; it stops, as if the tape itself were holding its breath, for eleven minutes. In those eleven minutes the holograms on the table throw shadows across the floor. Long ones. They move with the figures that cast them. The far player's own shadow moves a little late.",
+  "journal": "The studio's recording of Dome 3 that night has eleven minutes of total silence, during which the holograms cast real shadows."
+ },
+ "c_m3_brant_table": {
+  "m": "M3",
+  "where": [
+   "trial_dome"
+  ],
+  "who": [
+   "hana",
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 40,
+   "dayTo": 46
+  },
+  "text": "Nobody has cleaned Dome 3. Brant's Chaorcs are still laid out on the near side of the table in a losing position — three heroes down, hand empty, the last card he drew face-up where he dropped it. His deck box stands open and gutted. On the far side there is no deck and no counter, and the chair is pushed in — but there are nine small stacks of cards, squared, each with a slip of paper under it in very tidy handwriting. The slips are names. Commons names. They are the cards he took.",
+  "journal": "Brant was found at a table with a lost game laid out. On the opponent's side, the cards he had extorted were stacked and labelled by owner."
+ },
+ "c_m3_frost": {
+  "m": "M3",
+  "where": [
+   "trial_dome",
+   "duel_terraces",
+   "library"
+  ],
+  "who": [
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "Silas is scraping at the dome's glass door with a thumbnail and scowling. On the inside of the pane, at about the height of a seated head, there is a bloom of frost ferns the size of a dinner plate. It is a humid tropical morning. \"Third time I've wiped this,\" he says. \"Comes back.\"",
+  "journal": "Frost keeps forming on the inside of the door of the dome where Brant was found."
+ },
+ "c_m3_charts": {
+  "m": "M3",
+  "where": [
+   "infirmary",
+   "infirmary_ward"
+  ],
+  "who": [
+   "camille"
+  ],
+  "when": {
+   "dayFrom": 44,
+   "flags": [
+    "camille_ally"
+   ]
+  },
+  "text": "Camille lets you see the chart because she needs someone to see it. Brant Kessler: EEG awake-normal. Reflexes normal. Bloods normal. Pupils reactive. He swallows when fed. He turns toward nothing, tracks nothing, wants nothing. In the margin, in her small tired handwriting: 'This is not a seizure. This is not catatonia. Everything works. It is as if the house is in perfect order and someone moved out.'",
+  "journal": "Nurse Camille's chart for Brant shows no medical abnormality at all; she does not believe it was a seizure."
+ },
+ "c_m3_gives_away": {
+  "m": "M3",
+  "where": [
+   "infirmary_ward"
+  ],
+  "who": [
+   "camille"
+  ],
+  "when": {
+   "dayFrom": 44
+  },
+  "text": "Ward B is quiet enough to hear the drip stands. Camille says his name — \"Brant. Brant?\" — and he does not so much as flicker; it might be anyone's. She puts a rolled bandage in his palm to stop the fingers stiffening. His hand opens and holds it out — to her, to you, to the empty air — until someone takes it. His gold chain is in a kidney dish on the locker. \"I had to take it off him,\" she says. \"He kept trying to give it away.\"",
+  "journal": "Brant does not answer to his own name and holds out anything put in his hand, as if nothing were his."
+ },
+ "c_m3_ante_overheard": {
+  "m": "M3",
+  "where": [],
+  "who": [
+   "trixie",
+   "georgie",
+   "pippa",
+   "livvie"
+  ],
+  "when": {
+   "dayFrom": 41
+  },
+  "text": "Trixie Hollis, whom Brant had been shaking down, was still standing there, close enough to hear what {H} said so quietly. She tells it — not sunny at all, very still — like something she has been repeating to herself: \"He said, 'Brant Kessler, I challenge you under the Charter. The ante is what you call yours.' And Brant said 'my what?' and laughed and said fine. And {H} said, 'Then mine is the same weight. If I lose you may have what I call mine. It is not much yet.' Who talks like that?\"",
+  "journal": "A witness heard {H} formally challenge Brant under the Charter and name the ante: 'what you call yours'."
+ },
+ "c_m3_decklist": {
+  "m": "M3",
+  "where": [
+   "trial_dome",
+   "faculty_wing"
+  ],
+  "who": [
+   "hana",
+   "noor"
+  ],
+  "when": {
+   "dayFrom": 42
+  },
+  "text": "The dome booking sheet for the night of Day 39 has one entry after hours, in very tidy handwriting: a formal Charter challenge, Kessler, B. / {H:ladder} The two boxes of the ante column have been blacked out with a marker — today, by the Chancellor's office; the ink is still glossy. The table's automatic transcript, which takes dictation from the microphone, logged a complete legal duel: nine turns, result {H:last}. Under 'ante (challenger)' and 'ante (challenged)' it has two entries. Both read: [inaudible].",
+  "journal": "A legal Charter Duel between Brant and {H} was booked and logged that night. The antes are blacked out on paper and '[inaudible]' in the transcript."
+ },
+ "c_m3_shark_note": {
+  "m": "M3",
+  "where": [
+   "rare_lobby",
+   "rare_common_room"
+  ],
+  "who": [
+   "kenji",
+   "priya",
+   "sunny"
+  ],
+  "when": {
+   "dayFrom": 52
+  },
+  "text": "The second one, the Rare Hall second-year everyone called the Shark, left his door open. On his desk a notepad, top sheet torn off, the pencil dents readable against the light: '{H:last} won't take a money game. Says name something that matters. Fine — my EDGE. Let him try. Terraces 11pm.' Under it, pressed hard: 'easy 300'.",
+  "journal": "The second victim's notes show he agreed to a game with {H} and named his 'edge' as the stake."
+ },
+ "c_m3_tomi_ledger": {
+  "m": "M3",
+  "where": [
+   "commons_room",
+   "commons_beach"
+  ],
+  "who": [
+   "tomi",
+   "livvie",
+   "rana"
+  ],
+  "when": {
+   "dayFrom": 55
+  },
+  "text": "Tomi's betting ledger has a page headed 'N.B.' with every game {H} has played since Day 27 that Tomi could find a witness for. Next to four of them he has drawn a small empty circle. Next to the circles, dates. You know two of the dates. Tomi, not hustling for once: \"He never plays those ones for credits. I asked. He said credits aren't yours, they're just near you.\"",
+  "journal": "Tomi tracks {H}'s games; the ones that precede collapses were never played for credits."
+ },
+ "c_m3_alpha_warm": {
+  "m": "M3",
+  "where": [
+   "infirmary_ward"
+  ],
+  "who": [
+   "camille"
+  ],
+  "when": {
+   "dayFrom": 44,
+   "flags": [
+    "has_alpha_card"
+   ]
+  },
+  "text": "You hold the Alpha card where Brant's open eyes are pointed. Nothing. Then you move it, and his eyes move. Left; left. Up; up. Camille's hand closes on your sleeve. His fingers, on the blanket, have uncurled a little toward it, and when she touches his wrist she says, very quietly, \"He's warm. He hasn't been warm in days.\"",
+  "journal": "A Hollowed patient's eyes followed an Alpha card and his skin warmed."
+ },
+ "c_m3_guest_list": {
+  "m": "M3",
+  "where": [
+   "commons_room",
+   "bonfire_pit",
+   "commons_beach"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 41,
+   "flags": [
+    "guest_suspected"
+   ]
+  },
+  "text": "You ask what it took from Brant. It brightens: this is a question about its things. \"What he called his. It is here.\" Two fingers to the sternum again, a little left of where it pointed for {H}. \"I keep it apart from the others so it does not get into them. The things that were other people's I gave back; those were never in it. Would you like it returned? Then you play me for it. That is how it is done here.\" A small puzzled crease. \"Nobody has asked. I thought someone would ask.\"",
+  "journal": "It says it holds what it won from Brant, kept separately and intact, and that anyone may play to win it back.",
+  "hostWho": "swap"
+ },
+ "c_m3_noor_ruling": {
+  "m": "M3",
+  "where": [
+   "library",
+   "rare_common_room",
+   "trial_dome"
+  ],
+  "who": [
+   "noor"
+  ],
+  "when": {
+   "dayFrom": 41,
+   "flags": [
+    "charter_studied"
+   ]
+  },
+  "text": "Noor has the Charter open to Article 6 and a ruler under the line. \"'The ante is paid at once and in full.' Paid — not destroyed. In every ruling on file, an ante held by a winner can be staked again. If I win your binder, you may challenge me for the binder.\" She looks up. \"If something was taken from those students by a duel, then by the same article it can be played for. By anyone. The rule does not say the original loser.\"",
+  "journal": "Noor's reading of the Charter: anything paid as an ante can be staked again and won back by any challenger."
+ },
+ "c_m4_story_detail": {
+  "m": "M4",
+  "where": [
+   "lecture_hall",
+   "chuck_workshop",
+   "cafeteria"
+  ],
+  "who": [
+   "chuck"
+  ],
+  "when": {
+   "dayFrom": 3
+  },
+  "text": "Chuck is telling the class how he and Tarleinn crossed the Sandlands. Halfway through he stops being funny. \"—and she always tied the left boot first, and hummed, three notes, flat on the third, because her mother hummed it flat—\" He trails off and looks at his own hands as if they should be someone else's. Then he claps, grins and asks who wants to see a card with a typo that cost him forty thousand dollars.",
+  "journal": "Chuck's stories about his heroes include small personal details that appear on no card."
+ },
+ "c_m4_mosaic_match": {
+  "m": "M4",
+  "where": [
+   "ruins_field",
+   "jungle_trail"
+  ],
+  "who": [
+   "ashdown",
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "Half-swallowed by roots, a mosaic the size of a tabletop: a traveller in a wide hat, a staff, a storm folded small in one hand. The tiles are older than the trees growing through them. The traveller's left boot is tied. The right is not. You have her card in your deck.",
+  "journal": "A jungle mosaic far older than the game shows a figure that is unmistakably Tarleinn the Traveler."
+ },
+ "c_m4_silas_log": {
+  "m": "M4",
+  "where": [
+   "lighthouse"
+  ],
+  "who": [
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "The keeper's logs go back sixty years on a shelf that smells of paraffin. One spine is more worn than the rest. A single entry, in a square, careful hand: 'Took off one man, N shore, eleven weeks ashore by his count. Would not let go of a sack of notebooks. Kept saying the squares were warm. Did not charge him.' On the cottage wall hangs a photograph: a boy of thirteen at the oars, and a much thinner man wrapped in a blanket, with a shock of dark hair and round glasses.",
+  "journal": "Silas's old log records taking a castaway off the north shore fifty years ago, with a sack of notebooks, 'saying the squares were warm'."
+ },
+ "c_m4_shore_camp": {
+  "m": "M4",
+  "where": [
+   "north_shore"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "The ribs of a wooden trawler stand out of the north-shore shingle like a picked fish. Above the tide line a shallow cave is black with old smoke. On its wall, scratched with a nail: tally marks in sevens, seventy-seven of them. Beside them, drawn with a burnt stick and never washed off because no rain reaches here: figures. A traveller with a staff. A bunny mid-bounce. A warrior with a hammer. You have seen every one of them on cardboard. Outside, on a rise, a cairn with a tobacco tin wedged in it; the top card in the tin is this year's.",
+  "journal": "A castaway's cave on the north shore has 77 tally marks and burnt-stick drawings of Pixel Parties heroes that look fifty years old."
+ },
+ "c_m4_sleepwalk": {
+  "m": "M4",
+  "where": [
+   "quad",
+   "jungle_trail",
+   "ruins_field",
+   "ruin_gate"
+  ],
+  "who": [
+   "inya",
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 10
+  },
+  "text": "Past midnight, a figure in a Hawaiian shirt and no shoes is walking the jungle trail with the unhurried certainty of a man going to work. Chuck. His eyes are open and not looking at anything. He is speaking, steadily, in a language with a lot of clicks in it. Silas is following ten paces behind with a blanket and a lantern, the way you would follow a child. \"Don't wake him,\" Silas says without turning. \"He always stops at the gate.\"",
+  "journal": "Chuck sleepwalks toward the ruins at night, speaking an unknown language. Silas follows and says he always stops at the gate."
+ },
+ "c_m4_inya_lullaby": {
+  "m": "M4",
+  "where": [],
+  "who": [
+   "inya"
+  ],
+  "when": {
+   "dayFrom": 19,
+   "flags": [
+    "knows_inya_name"
+   ]
+  },
+  "text": "Inya, hood up, not looking at you: when she was small her grandfather sang her to sleep in a language he said he'd made up for the game. Last year she found out it isn't made up — the same clicks are in a field recording Professor Ashdown plays in Lore class, of nothing at all, just wind in the ruins. \"He said I must have dreamed that he sang it. He's a terrible liar. He looked scared.\"",
+  "journal": "Inya says Chuck's 'made-up' lullaby language sounds like a recording made in the ruins."
+ },
+ "c_m4_notebook": {
+  "m": "M4",
+  "where": [
+   "chuck_workshop"
+  ],
+  "who": [
+   "chuck",
+   "wren"
+  ],
+  "when": {
+   "dayFrom": 20
+  },
+  "text": "On the top shelf of the workshop, behind a stuffed pufferfish, a sack of notebooks stiff with old salt. One lies open on the bench under a magnifier. Warped pages, pencil: a hero's stat line, crossed out and corrected, and beside it not a sketch of a character but a sketch of a square, with the character inside it, and a note in English: 'tile 41, 3rd row — she is CROSS with me for watching.' In the margin, smaller, in Polish, and then translated underneath in the same hand as if for someone else to find: 'they showed me again — the squares are warm.' The date at the top of the page is fifty years old, and the game is thirty.",
+  "journal": "Chuck's shipwreck notebooks describe heroes as figures on numbered tiles, twenty years before the game was published."
+ },
+ "c_m4_charter_draft": {
+  "m": "M4",
+  "where": [
+   "card_archive",
+   "library"
+  ],
+  "who": [
+   "noor",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 12,
+   "flags": [
+    "charter_studied"
+   ]
+  },
+  "text": "The Archive keeps the Charter's first rules sheet in a flat drawer: typed on the back of an old ship's manifest — the heading AGNIESZKA shows through the paper — and annotated in Chuck's green ink. Beside Article 9 — 'Where no one counts, nothing was played' — he has written: 'their word is nearer WITNESS-WHO-KEEPS-THE-NUMBER. No English for it. Leave ugly.' Beside Article 7: 'Do NOT soften. This one has teeth for a reason I don't remember.'",
+  "journal": "Chuck's first draft of the Charter is annotated as a translation from 'their word'."
+ },
+ "c_m4_crack": {
+  "m": "M4",
+  "where": [
+   "lava_tubes"
+  ],
+  "who": [
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "tube_route"
+   ]
+  },
+  "text": "Deep in the tubes, chalk arrows on the wall, old and half sweated away, with dates beside them in a cramped foreign scrawl — a young man's hand, a Polish month. They lead to a rockfall. A warm, dry draught comes through it, smelling of dust and struck flint, and with it a sound: a very slow clicking, like tiles settling, or someone thinking over a move. At one place the stones leave a gap the width of a hand. Put your eye to it and the dark beyond is not quite dark: far off, small squares of colour, row on row, each one faintly lit from inside, like windows at dusk.",
+  "journal": "Old chalk arrows in the lava tubes lead to a rockfall; through a gap, a chamber of faintly glowing tiles can be seen."
+ },
+ "c_m4_castaway": {
+  "m": "M4",
+  "where": [
+   "vault_antechamber",
+   "mosaic_vault"
+  ],
+  "who": [
+   "chuck"
+  ],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "vault_entered"
+   ]
+  },
+  "text": "Low on the antechamber wall, at the height of a sleeping man's head, one tile is newer than its neighbours — fifty years new instead of five thousand. A thin young sailor with a wild shock of dark hair, curled on his side, asleep, one hand flat against the wall. The tilework around his hand has grown over the fingers a little, the way bark grows over wire. He has no moustache yet. The round glasses are already there.",
+  "journal": "A tile in the Vault's antechamber shows a young, sleeping castaway who is recognisably Chuck."
+ },
+ "c_m5_archive_case": {
+  "m": "M5",
+  "where": [
+   "card_archive"
+  ],
+  "who": [
+   "ashdown",
+   "wren"
+  ],
+  "when": {
+   "dayFrom": 3
+  },
+  "text": "The Alpha case in the Card Archive is the only one with a thermometer inside it. The brass plate says KABOOM ALPHA — FIRST PRINT — 22 CARDS. The thermometer reads 26.4. The room's wall display reads 22.0. If you look at one card and let your eyes drift to the next, the first one's art does something at the corner of your sight that printed ink should not do.",
+  "journal": "The Archive's 22 Alpha cards are kept in a case that reads four degrees warmer than the room."
+ },
+ "c_m5_warm": {
+  "m": "M5",
+  "where": [
+   "card_shop",
+   "chuck_workshop",
+   "card_archive",
+   "pawn_shop"
+  ],
+  "who": [
+   "dex",
+   "mika",
+   "chuck",
+   "wren"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "The Alpha card is put into your hand for exactly as long as it takes to feel it. It is warm — not sun-warm, body-warm, like a coin from someone's pocket. The art is a little cruder than the modern print. You hand it back, and your thumb, where it touched the picture, keeps the warmth for a minute after.",
+  "journal": "Held an Alpha card: it is warm to the touch, like something alive."
+ },
+ "c_m5_dex_price": {
+  "m": "M5",
+  "where": [
+   "card_shop"
+  ],
+  "who": [
+   "dex",
+   "mika"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "Dex keeps a ledger of every Alpha sale he has heard of in twenty years. Common: 40,000 dollars. The last hero that surfaced: a number with two commas. \"And every single one that leaves the island,\" he says, pushing his glasses up, \"the buyer calls me within the year. 'It's gone cold, Dex. Did you sell me a fake?' I didn't. They go cold over the water. Nobody knows why and I've stopped giving refunds.\"",
+  "journal": "Dex says Alpha cards lose their warmth when they leave the island."
+ },
+ "c_m5_pawn": {
+  "m": "M5",
+  "where": [
+   "pawn_shop"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "dayTo": 74,
+   "notFlags": [
+    "alpha_pawn_bought"
+   ]
+  },
+  "text": "Behind the pawnbroker's grille stands a locked cabinet with a cloth over it. A draught lifts the cloth's corner: one old card in a brittle toploader — 'Treasure Chest', rounded corners — on a square of velvet, and beside it a ferry ticket stub nine years old. The glass in front of the card is fogged in a small oval, as if something behind it had been breathing. \"Not in the trays,\" the pawnbroker says without looking up. \"Twenty-five hundred. Or we can play for it. I'm a sporting man.\"",
+  "journal": "The pawn shop keeps an old 'Treasure Chest' card under a cloth, pawned nine years ago with a ferry ticket stub: 2,500 cr, or a wager."
+ },
+ "c_m5_wren_ink": {
+  "m": "M5",
+  "where": [
+   "design_lab"
+  ],
+  "who": [
+   "wren"
+  ],
+  "when": {
+   "dayFrom": 14
+  },
+  "text": "Wren has a cracked Alpha common under the lab's raking lamp and has not slept. \"Look. Modern ink is pigment in a binder, it sits ON the stock. This—\" she angles the lamp \"—is IN it. And it's not pigment. It's mineral. Ground. See the grain?\" Under magnification the red of a dragon's wing is made of tiny flat-sided flecks, each one a slightly different red, fitted edge to edge. \"It's tessellated. Ink doesn't do that. Chuck says 'old recipe' and changes the subject to soup.\"",
+  "journal": "Wren found that Alpha ink is ground mineral, not pigment, and that its grains fit together like tiny tiles."
+ },
+ "c_m5_hologram": {
+  "m": "M5",
+  "where": [
+   "great_arena",
+   "trial_dome",
+   "duel_terraces"
+  ],
+  "who": [
+   "lilia",
+   "willas",
+   "dom",
+   "rox"
+  ],
+  "when": {
+   "dayFrom": 12
+  },
+  "text": "Battle Team practice. Lilia plays her captain's card — the old Thorad with the rounded corners. The other holograms on the field are light. This one has weight: the arena's dust lifts where it sets its feet, the projector fans do not change pitch, and Willas, across the table, takes half a step back before he catches himself. Lilia touches the card's edge with one finger, apologetically, as you would settle a dog. \"He does that,\" she says.",
+  "journal": "Lilia's Alpha captain's card produces a hologram that raises real dust and seems to have weight."
+ },
+ "c_m5_printworks": {
+  "m": "M5",
+  "where": [
+   "old_print_works"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "printworks_seen"
+   ]
+  },
+  "text": "The creeper that has swallowed the print works stops dead at the ink-room door. Inside: stone mullers, crusted tins, shelves of pigment jars, and one jar sealed with wax whose contents glitter every colour at once. On the foreman's spike, the last docket but one: 'KA run 1 — pigment per C.K.'s own mix — DO NOT SUBSTITUTE.' Out in the yard stands a stone crushing trough with a heap of pale gravel beside it. Pick up a piece: flat on one side, glazed, a corner of a painted eye.",
+  "journal": "The old print works has a sealed jar of glittering pigment, a docket reading 'KA run 1 — pigment per C.K.'s own mix', and a trough of crushed tile."
+ },
+ "c_m5_archive_count": {
+  "m": "M5",
+  "where": [
+   "card_archive"
+  ],
+  "who": [
+   "wren",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 73,
+   "notFlags": [
+    "archive_theft_prevented"
+   ]
+  },
+  "text": "The brass plate says 22 CARDS and there are twenty-two. But the case thermometer, which has read 26.4 since September, reads 26.1 — and when you let your eyes drift along the second row, twenty-one pictures do the thing at the edge of sight and one sits perfectly still. Its corners are two millimetres too square. It is a very, very good modern reprint.",
+  "journal": "One of the Archive's 22 Alpha cards has been replaced by an excellent modern reprint."
+ },
+ "c_m5_socket": {
+  "m": "M5",
+  "where": [
+   "ruin_gate"
+  ],
+  "who": [
+   "viktor",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "gate_found"
+   ]
+  },
+  "text": "The Ruin Gate is a wall of fitted black stone in a notch of the cliff, one enormous mosaic of nested squares spiralling in toward a shallow rectangular recess at chest height. No handle, no hinge, no seam. The recess is worn smooth at its lower edge, like a thumbed coin, and a date nine years old is scratched beside it. You hold a sleeved card against it without thinking. The modern card is two millimetres too square at the corners. The recess is exactly the size of the old print.",
+  "journal": "The Ruin Gate has a recess the exact size and shape of a first-print card, and a date nine years old scratched beside it."
+ },
+ "c_m6_no_damage": {
+  "m": "M6",
+  "where": [
+   "umbra_house"
+  ],
+  "who": [
+   "viktor",
+   "teobalt"
+  ],
+  "when": {
+   "dayFrom": 4
+  },
+  "text": "Umbra House from the ridge path: boarded windows, a chain on the door, a faded UNSAFE STRUCTURE sign. The roofline is dead straight. The walls are plumb. There is not one crack in the stucco, and the boards over the windows are nailed from the outside in neat rows by someone who took his time. In an upstairs gap between two boards, a curtain. It is still tied back.",
+  "journal": "Umbra House, closed for 'structural damage', shows no visible damage at all."
+ },
+ "c_m6_yearbook": {
+  "m": "M6",
+  "where": [
+   "library"
+  ],
+  "who": [
+   "noor",
+   "teobalt",
+   "octavia"
+  ],
+  "when": {
+   "dayFrom": 4
+  },
+  "text": "The library's yearbook shelf runs twelve volumes. Volume three is thinner than the others. The Umbra House pages are there — smoke-grey collars, a house photo on the ridge, thirty-one faces — but four portraits and one staff photograph have been cut out with a blade, cleanly, and the captions under the holes blacked. On the staff page the remaining caption fragment reads: '—nder Hale, Archaeology, Housemaster'.",
+  "journal": "The yearbook from nine years ago has four Umbra students and one staff member — a Hale — cut out."
+ },
+ "c_m6_viktor_journal": {
+  "m": "M6",
+  "where": [],
+  "who": [
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 8,
+   "flags": [
+    "viktor_trust"
+   ]
+  },
+  "text": "Viktor unwraps it from oilcloth: a field journal, A. HALE embossed on the cover, crammed with sketches of tile patterns and a small exact handwriting. He opens it at the back. The binding thread hangs loose. Twelve leaves have been torn out along the gutter — not ripped; removed, carefully, by someone who then closed the book and left the stubs. The last surviving line reads: 'Tomorrow, with the Key. Imogen will hold the line. If I am right, they are not pictures.'",
+  "journal": "Viktor carries his father's field journal. Its last twelve pages were deliberately removed."
+ },
+ "c_m6_silas_keys": {
+  "m": "M6",
+  "where": [
+   "lighthouse"
+  ],
+  "who": [
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 8
+  },
+  "text": "By the lighthouse door hangs a big iron ring: a dozen keys, old and dull — and two that are not. One is brass, polished bright by handling, with a paper tag: 9. The other is not metal at all: a short black key of stone, square in section, that looks as if it would fit nothing made in the last thousand years. Silas sees you looking and moves, without hurry, to stand between you and the ring. \"Them's for a building that's shut,\" he says. \"I oil the locks. A shut thing should still be looked after.\" He does not say what the stone one is for.",
+  "journal": "Silas keeps the keys to Umbra House on an iron ring. The key tagged 9 is worn from use; one key is made of black stone."
+ },
+ "c_m6_room9_lock": {
+  "m": "M6",
+  "where": [
+   "umbra_house"
+  ],
+  "who": [
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 8,
+   "flags": [
+    "umbra_entered"
+   ]
+  },
+  "text": "Inside, Umbra House is a held breath: an October nine years gone. Mugs on the common-room table with a black crust in them. Jackets with smoke-grey collars on their hooks. A kitchen rota with one name on it. A duel left mid-turn on a stone table under nine years of dust. Upstairs every door stands open — except the one at the end of the corridor. It has its own lock. Someone has pressed a hand flat against the wood at head height so often the varnish is worn pale.",
+  "journal": "Umbra House was abandoned mid-life. The housemaster's study, room 9, is locked."
+ },
+ "c_m6_pages": {
+  "m": "M6",
+  "where": [
+   "umbra_room9"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 45,
+   "flags": [
+    "umbra_entered"
+   ]
+  },
+  "text": "Room 9 is a narrow study under the eaves. A child's drawing of a man with a shovel is pinned over the desk, signed VIKTOR. The oil lamp on the desk is heavier than a lamp should be, and its brass base unscrews. Rolled inside: twelve journal leaves in a small exact hand. A measured drawing of a card-shaped recess. A copied row of pictures — a thing falling; spears passing through it; a board laid down between two figures. A line underscored twice: 'to take one out is to offer yourself in exchange.' A plan to take one out anyway, 'for study'. And on the last leaf, in the same hand but shaking, written at a different hour: 'If I am wrong, play for me.'",
+  "journal": "Found the twelve missing pages in the lamp in Umbra room 9: Hale knew how the Gate opens, planned to remove a tile, and ended: 'If I am wrong, play for me.'"
+ },
+ "c_m6_ashdown_card": {
+  "m": "M6",
+  "where": [
+   "faculty_wing",
+   "ruins_field",
+   "classroom"
+  ],
+  "who": [
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 30,
+   "flags": [
+    "ashdown_confided"
+   ]
+  },
+  "text": "Ashdown unbuttons the inner pocket of her field vest. The card has been in there so long the vest has a pale rectangle worn through the lining: 'The Master's Key', first print, one corner crushed where a hand once closed on it hard. \"I was the one at the door,\" she says. \"I heard them screaming and I pulled this out of the stone. I have had nine years to work out whether I shut him in or whether he was already gone. It does not get warmer or colder. I check.\"",
+  "journal": "Professor Ashdown has carried the Alpha card that opened the Ruin Gate nine years ago; she closed the Gate with Hale inside."
+ },
+ "c_m6_josie_night": {
+  "m": "M6",
+  "where": [
+   "bar"
+  ],
+  "who": [
+   "josie"
+  ],
+  "when": {
+   "dayFrom": 20,
+   "flags": [
+    "josie_confided"
+   ]
+  },
+  "text": "After closing, Josie pours two and takes an old red jacket down from behind the bottles — the collar smoke-grey, Umbra's, the embroidery gone pale. \"Four of them came up the ridge about sunset, holding on to each other. Dara kept saying 'he's flat, he's flat, he looked at me and he's flat.' They rowed them out to Gull Rock for two nights so nobody would hear them, and then the ferry. And at midnight I'm at my window and Kaboom goes up the ridge path by himself — no torch, walking like he knew the way blind. He came back down at first light.\" She drinks. \"He went up a man of sixty-five. I swear to you he came down old.\"",
+  "journal": "Josie saw four Umbra students return raving nine years ago ('he's flat'), and saw Chuck go up to the ruins alone that night."
+ },
+ "c_m6_islet_hut": {
+  "m": "M6",
+  "where": [
+   "islet"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "islet_seen"
+   ]
+  },
+  "text": "The ruined hut on Gull Rock still has one bunk frame and most of its plaster. Low on the wall by the bunk, where a person lying down could reach, someone has scratched a grid of small squares with a fingernail or a pin — row after row, pressed harder toward the end — and under it, four times, in four different hands: 'he is still in the game'.",
+  "journal": "In the hut on Gull Rock, a grid of squares and the words 'he is still in the game' are scratched in the plaster, in four hands."
+ },
+ "c_m6_okonkwo_file": {
+  "m": "M6",
+  "where": [
+   "chancellor_office"
+  ],
+  "who": [
+   "okonkwo"
+  ],
+  "when": {
+   "dayFrom": 61
+  },
+  "text": "The Chancellor's cabinet has one drawer with a second lock. The tab on the folder at the front is typed UMBRA — STRUCTURAL. The folder is thick. An engineer's report would be ten pages. What sticks out of the top is not a report: it is the corner of a ferry manifest, four names ruled through in red, and a sheet headed 'Settlement — in consideration of silence'.",
+  "journal": "The Chancellor keeps a locked file on Umbra House containing a ferry manifest with four names and a silence settlement."
+ },
+ "c_m6_payments": {
+  "m": "M6",
+  "where": [
+   "chancellor_office",
+   "council_room"
+  ],
+  "who": [
+   "octavia",
+   "teobalt"
+  ],
+  "when": {
+   "dayFrom": 70
+  },
+  "text": "The student council sees the Academy's summary accounts. Octavia has flagged one line with a silver clip: 'Legacy obligations (4)', paid quarterly for nine years, never itemised, larger than the Commons' entire food budget. Next to it, in her precise hand: 'Who are the four? Why does Mr. Marrow have a copy of this page?'",
+  "journal": "The Academy has paid four unnamed 'legacy obligations' every quarter for nine years."
+ },
+ "c_m6_viktor_dream": {
+  "m": "M6",
+  "where": [
+   "commons_beach",
+   "campsite",
+   "bonfire_pit"
+  ],
+  "who": [
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 15,
+   "flags": [
+    "viktor_trust"
+   ]
+  },
+  "text": "Viktor doesn't sleep in the bungalow when he can help it. By the fire he tells you why he sleeps worse here than anywhere on earth: the same dream, every night on this island and never off it. His father's voice, close, unhurried, counting. Not up. Not down. Just numbers, as if reading them off something. \"Last night it stopped and said 'Vitya, you've got taller.' I was twelve when he left. I woke up on the trail with my boots on.\"",
+  "journal": "On the island Viktor dreams every night of his father's voice counting; once it remarked that he had grown."
+ },
+ "c_m6_trespasser": {
+  "m": "M6",
+  "where": [
+   "mosaic_vault"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 45,
+   "flags": [
+    "vault_entered",
+    "stone_key"
+   ]
+  },
+  "text": "The west frieze. Thousands of tiles, each a face or a beast or a moment, each holding a little light. One sits proud of its bed, a pry-mark at its edge. The tile beside it is newer. A man in a field vest, mid-forties, on one knee, a small steel bar in his hand, looking up over his shoulder — out — with the expression of someone who has just understood something. He has Viktor's jaw. As you step sideways, the light in the tile shifts, and you are fairly sure the eyes are now on you. Hold a hand near it and there is something at the very edge of hearing: a tired, dry whisper, counting.",
+  "journal": "A newer tile in the Vault's west frieze shows a kneeling man in a field vest with a pry bar. He resembles Viktor. The eyes seem to follow."
+ },
+ "c_m7_plaque": {
+  "m": "M7",
+  "where": [
+   "faculty_wing",
+   "great_arena"
+  ],
+  "who": [
+   "santangel"
+  ],
+  "when": {
+   "dayFrom": 3
+  },
+  "text": "The new hologram lab off the faculty wing has a door plaque so fresh the screws still shine: 'Applied Projection Laboratory — a gift of the Kaboom Entertainment Board, L. Marrow, Representative'. The lab has its own card reader. Students' cards do not open it. Through the wire glass: a bench, a fume hood, a row of small ceramic crucibles.",
+  "journal": "Professor Santángel's new lab was funded by a board member named L. Marrow and is closed to students."
+ },
+ "c_m7_knows_inya": {
+  "m": "M7",
+  "where": [
+   "spectral_lobby",
+   "spectral_terrace",
+   "duel_terraces"
+  ],
+  "who": [
+   "gideon",
+   "inya"
+  ],
+  "when": {
+   "dayFrom": 14,
+   "dayTo": 18
+  },
+  "text": "Gideon Pryce passes Inya on the terraces, peels off one white glove to offer his hand, and says, with the thin smile, \"Miss Bell. Give my regards to your grandfather's workshop.\" Inya's face does something complicated and goes blank. The Freshman Cup roster with legal names is not printed for another five days.",
+  "journal": "Gideon hinted that he knows who Inya's grandfather is — days before the roster was printed."
+ },
+ "c_m7_okonkwo_fear": {
+  "m": "M7",
+  "where": [
+   "chancellor_office",
+   "faculty_wing",
+   "gala_ballroom",
+   "quad"
+  ],
+  "who": [
+   "okonkwo",
+   "marrow"
+  ],
+  "when": {
+   "dayFrom": 61
+  },
+  "text": "Marrow talks to the Chancellor on the faculty steps the way one talks to a waiter one intends to tip well. He never raises his soft voice. At one point he taps the folder under his arm, once, lightly, and smiles with all the perfect teeth. Dr. Okonkwo — who faced down a typhoon evacuation without loosening her collar — puts a hand out to the balustrade to steady herself, and then pretends she was adjusting her cuff.",
+  "journal": "The Chancellor is afraid of Lucian Marrow. He carries a folder he lets her see."
+ },
+ "c_m7_lab_ash": {
+  "m": "M7",
+  "where": [
+   "faculty_wing",
+   "maintenance_tunnels"
+  ],
+  "who": [
+   "wren",
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "The lab's waste goes out through the tunnels in sealed yellow tubs. One has split a seam. The spill is fine grey ash with tiny scraps in it that did not burn: rounded card corners, the old-print radius, each scrap still faintly warm. Mixed through the ash, catching the tunnel light, are flat-sided flecks of colour.",
+  "journal": "Waste from Santángel's lab contains burnt first-print cards and coloured mineral flecks."
+ },
+ "c_m7_santangel_ledger": {
+  "m": "M7",
+  "where": [
+   "faculty_wing"
+  ],
+  "who": [
+   "santangel"
+  ],
+  "when": {
+   "dayFrom": 61,
+   "flags": [
+    "santangel_confessed"
+   ]
+  },
+  "text": "Santángel slides the lab notebook across his desk without looking at it. Columns: specimen, treatment, yield. 'A-common #6 — calcined — 0.31 g residue. A-common #7 — acid — 0.28 g. Reconstitution trial 14: projection achieved mass 0.4 s, then failed. Insufficient source.' The last page has one line: 'L.M. — source must be in situ. Find the quarry.' \"I told myself it was a paper,\" he says. \"I have not written a paper in six years.\"",
+  "journal": "Santángel's lab notebook: he has destroyed Alpha cards to extract a residue for Marrow, who wants its 'quarry'."
+ },
+ "c_m7_gideon_call": {
+  "m": "M7",
+  "where": [
+   "clock_tower"
+  ],
+  "who": [
+   "gideon"
+  ],
+  "when": {
+   "dayFrom": 30
+  },
+  "text": "The clock tower gallery is the one spot on campus with a clean signal to the mainland. Gideon is up there with a satellite handset no first-year should own, back to the stairs. \"—no, sir, the Hale boy keeps his maps in the left pannier. Yes. The girl visits the workshop Thursdays. Twenty-two in the case. The professor's card opens the service door.\" A pause. \"My father's note, sir — you said after the—\" He listens, and his free hand, in its white glove, closes slowly on the rail.",
+  "journal": "Overheard Gideon reporting to someone he calls 'sir' about Viktor's maps, Inya's visits to Chuck and the Archive's Alpha case."
+ },
+ "c_m7_archive_log": {
+  "m": "M7",
+  "where": [
+   "card_archive"
+  ],
+  "who": [
+   "wren",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 73,
+   "notFlags": [
+    "archive_theft_prevented"
+   ]
+  },
+  "text": "The Archive's after-hours door log for Day 72 has one entry: 23:41, service door, staff credential SANTÁNGEL, A. The corridor camera for 23:41 shows the professor's lanyard on a figure a head shorter than the professor, hood up, who never faces the lens. At 23:52 the figure leaves and, in the doorway, tugs something straight at the wrist.",
+  "journal": "Someone entered the Archive late on Day 72 using Santángel's credential. The figure on camera is not Santángel's height."
+ },
+ "c_m7_gloves": {
+  "m": "M7",
+  "where": [
+   "card_archive",
+   "spectral_suite",
+   "spectral_lobby"
+  ],
+  "who": [
+   "pippa",
+   "wren"
+  ],
+  "when": {
+   "dayFrom": 73,
+   "notFlags": [
+    "archive_theft_prevented"
+   ]
+  },
+  "text": "Caught in the hinge of the Alpha case, where the lid was eased up in a hurry: a single white thread, fine cotton, the kind dress gloves are sewn from. On the glass itself there is not one fingerprint. Not even the curator's.",
+  "journal": "A white cotton thread was caught in the hinge of the Archive's Alpha case. The glass had been wiped."
+ },
+ "c_m7_offer_livvie": {
+  "m": "M7",
+  "where": [],
+  "who": [
+   "livvie"
+  ],
+  "when": {
+   "dayFrom": 63,
+   "notFlags": [
+    "livvie_funded"
+   ]
+  },
+  "text": "Livvie shows you a cream business card as if it were a diagnosis. A man in a grey suit bought her a coffee and knew her tuition figure to the credit. He would cover it — all nine thousand — for 'a little local knowledge': who on the Commons row owns old cards, who goes up the north trail at night, and whether she, as a design student, could get him ten minutes alone with the Archive's reference prints. \"He said to think about my mother. He knew her name.\"",
+  "journal": "Marrow offered Livvie her full tuition in exchange for information about old cards, night hikers and Archive access."
+ },
+ "c_m7_selene": {
+  "m": "M7",
+  "where": [
+   "spa",
+   "hot_springs"
+  ],
+  "who": [
+   "selene"
+  ],
+  "when": {
+   "dayFrom": 64
+  },
+  "text": "Selene, folding towels, amused and a little uneasy: the gentleman from the board takes the private spring every evening at six and takes his calls there, because steam is bad for microphones. \"He said to someone, 'I don't need the old man's blessing, I need his quarry.' And later: 'The boy in the gloves is cheap. Debt is the only honest leash.' He tips beautifully. I counted my fingers afterwards.\"",
+  "journal": "Selene overheard Marrow say he needs 'the old man's quarry' and that 'the boy in the gloves' is kept on a leash of debt."
+ },
+ "c_m7_crates": {
+  "m": "M7",
+  "where": [
+   "harbor",
+   "ferry_dock",
+   "inn"
+  ],
+  "who": [
+   "abel",
+   "silas"
+  ],
+  "when": {
+   "dayFrom": 64
+  },
+  "text": "Captain Stroud is refusing cargo, which he never does. Crates from the inn's stable, stencilled LABORATORY GLASS — K.E. BOARD, stand on the dock. One has been dropped; black glass shows through the split slat. The crate is sweating: water beads on the wood and runs. The dock boards under it are white with frost at noon. \"Not on my boat,\" Stroud says. \"My dog won't cross the gangway since they stacked 'em.\"",
+  "journal": "Marrow's people are crating crater glass as 'laboratory glass'. The crates are cold enough to frost the dock."
+ },
+ "c_m7_board_letter": {
+  "m": "M7",
+  "where": [
+   "chancellor_office",
+   "council_room",
+   "inn"
+  ],
+  "who": [
+   "octavia",
+   "okonkwo"
+  ],
+  "when": {
+   "dayFrom": 110
+  },
+  "text": "A draft on Kaboom Entertainment letterhead, marked CONFIDENTIAL — BOARD: a motion to relieve Dr. M. Okonkwo 'in light of the concealment of the Umbra House incident and the mishandling of the present medical emergency', to appoint Prof. A. Santángel acting chancellor, and to transfer 'the north slope, the ruin precinct and all archaeological assets' to a subsidiary named Living Light Ltd. Vote scheduled: Day 170. Clipped to it, a handwritten card: 'Octavia — a school is a company. Help me run this one properly. — L.'",
+  "journal": "A draft board motion would remove the Chancellor on Day 170 and transfer the ruins and north slope to a Marrow subsidiary."
+ },
+ "c_m8_oru_reading1": {
+  "m": "M8",
+  "where": [
+   "night_market"
+  ],
+  "who": [
+   "oru"
+  ],
+  "when": {
+   "dayFrom": 6,
+   "dayTo": 26
+  },
+  "text": "Madame Oru's tent is patched indigo, a lamp, and a woman whose age you cannot fix. She takes YOUR deck, shuffles it without looking, and lays five of your own cards face down — each on a small square of fired clay she sets out first. She turns only one: your Tarleinn. \"You came by water with a name that isn't on your papers and hands that are braver on glass than on wood,\" she says, bored. \"Someone who eats at your table is wearing half a name. Before the month is out it will be printed whole. Five credits.\" She will not explain. She does not turn the other four.",
+  "journal": "Madame Oru read my cards: 'Someone who eats at your table is wearing half a name. It will be printed whole.'"
+ },
+ "c_m8_oru_hour": {
+  "m": "M8",
+  "where": [
+   "night_market",
+   "main_street",
+   "card_shop",
+   "bar"
+  ],
+  "who": [
+   "mika",
+   "josie",
+   "dex"
+  ],
+  "when": {
+   "dayFrom": 27
+  },
+  "text": "On the customs-yard wall, at the far end where the indigo tent always stands, somebody has chalked numerals a hand high: 02:10. The man who sells octopus balls next to her says she wrote it at the last market — a week before the bang — packed up early for the first time in his life, and told him to bring his washing in on Friday. It has rained twice since. The chalk has not run.",
+  "journal": "Madame Oru chalked '02:10' on the market wall a week before the meteor struck at that minute."
+ },
+ "c_m8_oru_deck": {
+  "m": "M8",
+  "where": [
+   "night_market"
+  ],
+  "who": [
+   "oru",
+   "mika"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "She reads from the customer's own deck — but what she lays the cards ON is hers: squares of fired clay as thick as a biscuit, painted and glazed, edges worn round by handling. They click when she stacks them. Mika, who can price anything, says she once offered Oru four hundred for the set and Oru laughed for a full minute. \"She said, 'Child, these aren't a deck. They're the receipt.'\"",
+  "journal": "Madame Oru lays her readings on square, glazed clay pieces she calls 'the receipt'."
+ },
+ "c_m8_never_plays": {
+  "m": "M8",
+  "where": [
+   "night_market",
+   "bar",
+   "card_shop"
+  ],
+  "who": [
+   "josie",
+   "dex",
+   "abel"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "On an island where the ferry captain will duel you for the last doughnut, nobody has ever seen Madame Oru play. Not once. Dex has tried for twenty years. She will sit at any table. She will watch any game to the end and can tell you the turn count afterwards without having seemed to look. If a card is pushed toward her she folds her hands. \"Somebody has to not,\" is all she says.",
+  "journal": "Madame Oru has never been seen to play a single game. She watches and keeps count."
+ },
+ "c_m8_mosaic_third": {
+  "m": "M8",
+  "where": [
+   "ruins_field",
+   "jungle_trail",
+   "ruin_gate"
+  ],
+  "who": [
+   "ashdown",
+   "viktor"
+  ],
+  "when": {
+   "dayFrom": 6
+  },
+  "text": "The largest surface mosaic in the ruins field: two figures seated either side of a grid of small squares. One figure is drawn like the others on the island. The other is drawn as an outline only, empty, filled with the plain grey of the mortar. Between and above them stands a third, smaller figure, apart, one hand raised with the fingers spread, the other holding a row of knots on a cord.",
+  "journal": "A large mosaic shows two players at a grid — one of them an empty outline — and a third figure standing apart, counting on a knotted cord."
+ },
+ "c_m8_ashdown_lecture": {
+  "m": "M8",
+  "where": [
+   "classroom",
+   "lecture_hall",
+   "ruins_field"
+  ],
+  "who": [
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 10
+  },
+  "text": "Lore & History, slide eleven. Ashdown: \"We call them the Tessellate because we do not know what they called themselves. No weapons in any stratum. No walls. No burials — not one. What we find, everywhere, is game pieces, and this figure—\" the one with the knotted cord \"—who appears in every scene of play and is never shown playing. My teacher believed the game was their law. That the island had no fights, only matches, and that this person's whole office was to make a match count.\" She clicks on, a little fast. \"My teacher believed a great many things.\"",
+  "journal": "Ashdown's lecture: the island's first people left no weapons or graves, only game pieces and a recurring non-playing 'counter' figure."
+ },
+ "c_m8_long_panel": {
+  "m": "M8",
+  "where": [
+   "vault_antechamber"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "vault_entered"
+   ]
+  },
+  "text": "Over the antechamber's inner door runs a long panel, a story in pictures simple enough for a child. A thing falls from the sky. Spears pass through it. One of the people sits down and lays a board between them. The thing sits too. Both rise changed: the loser has a square-shaped piece missing; the winner holds a tile. A sixth picture, chipped: a person at the board, and a line joining them to another who stands behind. And at the very end the panel forks: above, the fallen thing is inside a square on a wall; below, it is rising again, its tail on the other side.",
+  "journal": "A picture panel in the antechamber shows a thing from the sky made to sit at a board, a loser with a square missing, someone playing for another — and two endings: the thing in a square, or rising again."
+ },
+ "c_m8_sea_spiral": {
+  "m": "M8",
+  "where": [
+   "sea_cave"
+  ],
+  "who": [
+   "saoirse"
+  ],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "sea_cave_found"
+   ]
+  },
+  "text": "The back wall of the cave's dry chamber is mosaic, salt-bleached: a spiral going down into waves, and round it small figures in boats, leaning out, laying squares on the water — a ring of tiles closing on the place where the spiral went under. The spiral's arms are set in a blue-black stone flecked like a night sky.",
+  "journal": "A mosaic in the sea cave shows people in boats laying tiles on the sea around a spiral that has fallen into it."
+ },
+ "c_m8_shrine_stars": {
+  "m": "M8",
+  "where": [
+   "summit_shrine"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "shrine_seen"
+   ]
+  },
+  "text": "On the highest point of the rim: a small roofless square of fitted black stones, wind going through it like breath through teeth. In the middle a waist-high block, its top cut with a grid of shallow squares, nine by nine, one tile set in a corner. Three sides of the block carry the same low picture, each in a different, older style: a falling star; below it a square; inside the square, a shape that is hard to look at — as if the carver had tried to show something with no outline using only outlines. The fourth side has been prepared the same way — the star's bed cut, the square's bed cut — and left empty. The cuts are as weathered as the rest.",
+  "journal": "At the summit shrine a gridded stone block shows, on three sides, a falling star and a strange shape enclosed in a square. The fourth side was prepared long ago and left blank."
+ },
+ "c_m8_shrine_tile": {
+  "m": "M8",
+  "where": [
+   "summit_shrine"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 27,
+   "flags": [
+    "shrine_seen"
+   ]
+  },
+  "text": "The single tile on the block's grid is not in the corner. It is one square in from the corner. The square it left is clean stone, unweathered, the colour of a thing that has been covered for a very long time. Nothing up here could have moved it. Lay a palm on the block and the mountain hums through it, patient, like someone who has made a move and is waiting.",
+  "journal": "After the meteor, the lone tile on the summit block has moved one square."
+ },
+ "c_m8_charter_old": {
+  "m": "M8",
+  "where": [
+   "library",
+   "card_archive",
+   "ruin_gate"
+  ],
+  "who": [
+   "noor",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 12,
+   "flags": [
+    "charter_studied"
+   ]
+  },
+  "text": "Noor has laid Hale's old survey rubbing of the Gate next to the Charter. The Gate's mosaic is nested squares: nine rings, each a band of one small scene repeated. The Charter has nine articles. In the fourth ring, and only there, is a doorway with a small figure outside it and a hand extended from within; Article 4 is the one about being invited in. In the seventh ring a square has been set with its picture missing. \"I do not believe in coincidences of nine,\" she says. \"I believe the Founder copied his homework.\"",
+  "journal": "The Ruin Gate's nine rings of pictures correspond, ring for ring, to the nine articles of the Academy Charter."
+ },
+ "c_m8_pays": {
+  "m": "M8",
+  "where": [
+   "duel_terraces",
+   "commons_beach",
+   "trial_dome"
+  ],
+  "who": [
+   "nathan",
+   "georgie",
+   "inya"
+  ],
+  "when": {
+   "dayFrom": 44
+  },
+  "text": "Georgie beats {H}. It is a casual game on the terraces and she takes {H:him} apart in seven turns with the merciless little frown. He had said, before it began, \"If I lose I will tell you one thing I know.\" He sits very still. Then he leans over and tells her — and she goes white, then pink — the exact day, hour and wording of the kindest thing anyone has ever said about her behind her back, and who said it. \"It is paid,\" he says, and for a moment looks almost relieved, as if he had been afraid of something.",
+  "journal": "{H} lost a casual game to Georgie and immediately, exactly, paid the small stake {H:he} had named. {H:He} seemed relieved to be able to.",
+  "hostWho": "swap"
+ },
+ "c_m8_guest_ground": {
+  "m": "M8",
+  "where": [
+   "commons_room",
+   "bonfire_pit",
+   "beach_cove"
+  ],
+  "who": [
+   "nathan"
+  ],
+  "when": {
+   "dayFrom": 60,
+   "flags": [
+    "guest_suspected"
+   ]
+  },
+  "text": "You ask why it doesn't simply take what it wants. It considers the fire. \"Where I was, there is no where. There is no before, no mine, no next to. Then I fell here, and here there are rules.\" It presses its palm flat on the sand, hard, the way you test a floor. \"A rule is the only thing I have ever stood on. If I stepped off one—\" It does not finish. For the first time since Day 27 it looks, unmistakably, afraid. \"{H} did not know how lucky {H:he} was. {H:He} had a floor everywhere {H:he} went.\"",
+  "journal": "It says a rule is 'the only thing it has ever stood on', and seemed frightened by the idea of breaking one.",
+  "hostWho": "swap"
+ },
+ "c_m8_oru_asked": {
+  "m": "M8",
+  "where": [
+   "night_market"
+  ],
+  "who": [
+   "oru"
+  ],
+  "when": {
+   "dayFrom": 62,
+   "flags": [
+    "oru_reading_2"
+   ]
+  },
+  "text": "You say it the way the Charter says it: aloud, by name. Madame Oru, will you count? The lamp does not flicker; nothing so cheap. But she stops being a market act the way a held note stops. She draws a cord from her sleeve — old, dark, knotted along its whole length, more knots than you could number in an evening. \"Three before this one,\" she says. \"My mother's mothers counted them. I had hoped to die uncalled.\" She looks at you as if reading a total. \"I do not play. I do not advise. I will not tell you the move. But where I count, it holds — for that one more than for you. My price is not credits.\"",
+  "journal": "Asked by name to 'count', Madame Oru produced an ancient knotted cord and said her family counted 'three before this one'."
+ },
+ "c_m9_two_helicals": {
+  "m": "M9",
+  "where": [
+   "trial_dome",
+   "cafeteria",
+   "quad"
+  ],
+  "who": [
+   "leona",
+   "helical",
+   "maisie"
+  ],
+  "when": {
+   "dayFrom": 3
+  },
+  "text": "The first Table Tech demonstration in the Trial Dome: a gaunt professor in a lab coat with burn holes, coaxing a flat, flickering figure out of a table. Maisie Voltage, goggles on her forehead, reads the name off the timetable and turns round to the quiet girl from her own bungalow, delighted: \"Helical! Any relation?\" Leona says \"No\" without looking up. At the table the professor has stopped with a screwdriver in mid-air. He also says \"No\" — a beat late, to the table, as if it had asked.",
+  "journal": "Leona Helical and Professor Helical both deny being related. Neither looked at the other."
+ },
+ "c_m9_steals": {
+  "m": "M9",
+  "where": [
+   "duel_terraces",
+   "trial_dome",
+   "commons_beach"
+  ],
+  "who": [
+   "leona"
+  ],
+  "when": {
+   "dayFrom": 5
+  },
+  "text": "Leona plays an ordinary game, a little worse than ordinary, until Lilly comes down — and then she is playing your cards: your own storm piece, out of your own deck, turned round to face you. She does it without relish, like someone doing her job. When you say that's quite a deck for a quiet person she squares the stolen card neatly in front of her. \"It's what I came to do,\" she says. A beat. \"In the game.\" She has counted the exits of the terrace twice while you were shuffling.",
+  "journal": "Leona plays a deck that steals the opponent's cards. She said stealing is 'what she came to do'."
+ },
+ "c_m9_waiver": {
+  "m": "M9",
+  "where": [
+   "council_room",
+   "chancellor_office"
+  ],
+  "who": [
+   "anni",
+   "noor",
+   "octavia"
+  ],
+  "when": {
+   "dayFrom": 10
+  },
+  "text": "Anni has the admissions register open for a judging exercise and has stopped on one line with her red pen hovering. Thirty-five first-years have an entrance rank. One has a dash, and in the remarks column: 'faculty dependant's waiver — C. Helical'. The signature is the professor's. It is exactly the professor's: laid over the one on this term's timetable sheet, every loop falls on every loop. \"Nobody signs their name the same way twice,\" Anni says. \"Unless they are not the one signing.\"",
+  "journal": "Leona was admitted without an entrance rank, on a faculty dependant's waiver signed 'C. Helical'. The signature looks traced."
+ },
+ "c_m9_office": {
+  "m": "M9",
+  "where": [
+   "faculty_wing"
+  ],
+  "who": [
+   "helical"
+  ],
+  "when": {
+   "dayFrom": 8
+  },
+  "text": "Professor Helical's office is a workshop with a desk in it. On the hook behind the door hangs a second lab coat, a woman's, clean, the name tape reading M. HELICAL — CORE ENG. Taped inside the open cabinet door is a chart in his small hand: a column of dates, a column of numbers under the heading 'peak flow', the numbers falling line by line down two full sheets. The last entry is three years old. Beside the chart, a photograph: a girl of twenty in ink-stained overalls, laughing, under a sawtooth roof.",
+  "journal": "Professor Helical keeps a woman's lab coat marked 'M. Helical', a breathing chart that ends three years ago, and a photo of a young woman at the print works."
+ },
+ "c_m9_payroll": {
+  "m": "M9",
+  "where": [
+   "old_print_works"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "printworks_seen"
+   ]
+  },
+  "text": "The manager's office over the press floor. The safe's outer door stands open; the inner drawer has rusted shut and takes two people and a lever. In it, swollen with damp: the payroll book for 'K.A. run 1'. Ink room, nine names; the last, 'M. Vane — apprentice — 20'. Clipped behind it, the sick list for the following winter: 'cough' against seven of the nine, and beside each, in another hand, 'hazard supplement — discretionary'. Across the top of the page someone has written, and underlined: 'Company physician advises: do NOT record cause.'",
+  "journal": "The print works' payroll lists nine ink-room workers, one 'M. Vane, apprentice'; seven of the nine developed a cough, and a note says not to record the cause."
+ },
+ "c_m9_ledger": {
+  "m": "M9",
+  "where": [
+   "card_archive"
+  ],
+  "who": [
+   "wren",
+   "ashdown"
+  ],
+  "when": {
+   "dayFrom": 12
+  },
+  "text": "Shelved with the production records, a tall ledger: PRINT WORKS WELFARE FUND. Eleven names, quarterly payments, thirty years of them. One by one the rows end in the word 'deceased'. Each living row carries, every year, a countersigned phrase: 'no claim'. The seventh name is 'M. Helical (née Vane)'; her row ends three years ago. For the first twenty years the entries are initialled C.K. For the last ten, in a soft neat hand, L.M.",
+  "journal": "A 'Print Works Welfare Fund' ledger in the Archive records thirty years of payments to former workers marked 'no claim', among them 'M. Helical (née Vane)'. The recent entries are initialled L.M."
+ },
+ "c_m9_locker": {
+  "m": "M9",
+  "where": [
+   "old_print_works"
+  ],
+  "who": [],
+  "when": {
+   "dayFrom": 6,
+   "flags": [
+    "printworks_seen"
+   ]
+  },
+  "text": "Off the ink room, a row of apprentice lockers, doors rusted open on nothing. Number 14 is shut. Its hinges have been oiled and its padlock is new. Scratched into the paint at eye level, old, small: M.V. On top of the locker lies a bunch of sea-pinks, dried but not dusty. Somebody comes here.",
+  "journal": "One apprentice locker at the print works, number 14, marked 'M.V.', has a new padlock and fresh flowers on it."
+ },
+ "c_m9_junction": {
+  "m": "M9",
+  "where": [
+   "maintenance_tunnels",
+   "trial_dome"
+  ],
+  "who": [
+   "maisie",
+   "silas",
+   "helical"
+  ],
+  "when": {
+   "dayFrom": 20
+  },
+  "text": "Under the Trial Domes the hologram plant hums in the dark: racks, cable trunks, and at the far end the original projector, a squat grey housing the size of a wardrobe, long since bypassed. It has the school's padlock, and under that a second, smaller one that is not the school's. Chalked low on the plate, where only someone kneeling would see it: a little spiral, drawn in one line — a helix. The dust on the floor in front of the housing has two knee-prints in it.",
+  "journal": "The old projector housing in the plant under the Trial Domes has a second private padlock and a small chalk helix on it."
+ },
+ "c_m9_notebook": {
+  "m": "M9",
+  "where": [
+   "faculty_wing",
+   "maintenance_tunnels",
+   "old_print_works"
+  ],
+  "who": [
+   "helical",
+   "leona"
+  ],
+  "when": {
+   "dayFrom": 20,
+   "flags": [
+    "helical_trust"
+   ]
+  },
+  "text": "A notebook bound in grey linen, the corners worn round. A woman's fast upright hand. Page after page of a projector unlike the ones in the domes: coils wound in a double spiral, the beam folded back through itself. On one page she has drawn a hologram hero leaning on the edge of a table — and shaded the table edge where the hand presses it. In the margin: 'It holds. God help me, it holds.' On the facing page, boxed twice: 'Needs the K.A. pigment. Nothing else carries it. Remember the ink room. DO NOT BUILD. — M.'",
+  "journal": "A grey linen notebook in a woman's hand describes a projector that makes holograms solid, says it needs 'the K.A. pigment', and ends: 'DO NOT BUILD. — M.'"
+ },
+ "c_m9_night_walks": {
+  "m": "M9",
+  "where": [
+   "commons_beach"
+  ],
+  "who": [
+   "dmitri",
+   "fiona",
+   "maisie"
+  ],
+  "when": {
+   "dayFrom": 16
+  },
+  "text": "Dmitri, from his porch chair, not unkindly: twice a week, a little after one, the door of Bungalow 4 opens and Leona goes up the boardwalk with a torch she does not switch on. She is back before five. Once she had rust to the elbow of her cardigan; once, brick dust in her hair; once she was carrying her shoes. \"She walks like somebody who has practised walking quietly,\" he says. \"Most people here haven't had to.\"",
+  "journal": "Leona leaves Bungalow 4 after one in the morning twice a week with an unlit torch and comes back before five, sometimes with rust or brick dust on her."
+ },
+ "c_m9_rig": {
+  "m": "M9",
+  "where": [
+   "commons_beach",
+   "design_lab",
+   "trial_dome"
+  ],
+  "who": [
+   "maisie"
+  ],
+  "when": {
+   "dayFrom": 20,
+   "flags": [
+    "maisie_helped"
+   ]
+  },
+  "text": "Maisie's rig on the porch of Bungalow 4 is an arcade emitter, a lighthouse lens and a great deal of solder. It throws a Debt-O-Tron the size of a cat, flat and flickering like every hologram on the island. Then a first-print card comes within a hand's breadth of the coil. The flicker stops. The little machine turns its head, takes one step — and a loose screw rolls off the bench, pushed. Maisie's welding goggles are on her forehead and her mouth is open. \"It pushed back,\" she says. \"Do that again. Don't do that again. Do that again.\"",
+  "journal": "Next to a first-print card, the hologram from Maisie's rig stopped flickering and pushed a screw off the bench."
+ },
+ "c_m9_argument": {
+  "m": "M9",
+  "where": [
+   "faculty_wing",
+   "boathouse",
+   "old_print_works"
+  ],
+  "who": [
+   "leona",
+   "helical"
+  ],
+  "when": {
+   "dayFrom": 40
+  },
+  "text": "Two voices behind a door that is not quite shut, both kept low, which makes it worse. Hers: \"You sold her.\" His: \"I sold paper. To keep her breathing.\" Hers: \"And did she?\" A long silence. His, almost inaudible: \"You forged my name, Leona.\" \"You let it stand.\" \"Yes.\" Something is set down on a bench, carefully. \"He has two-fifths. He will not get the rest while I am alive.\" \"That's not the same as him not getting it.\"",
+  "journal": "Overheard Leona and Professor Helical: he sold 'paper' to pay for someone's treatment; she forged his name; someone has 'two-fifths' and wants the rest."
+ },
+ "c_m9_two_fifths": {
+  "m": "M9",
+  "where": [
+   "spa",
+   "hot_springs",
+   "inn"
+  ],
+  "who": [
+   "selene",
+   "marrow"
+  ],
+  "when": {
+   "dayFrom": 64
+  },
+  "text": "Selene, on what the grey suit says into his telephone in the steam: \"'I own two-fifths of a dead woman's idea and the widower is sitting on the other three.' Then: 'No, he'll hand them over. The daughter's admission is a forgery — the boy in the gloves found the page. A father will do a great deal to keep a girl from being put on a boat.' He asked me for a fresh towel in the same voice.\"",
+  "journal": "Selene overheard Marrow: he owns 'two-fifths of a dead woman's idea', and means to get the rest by threatening 'the daughter's' forged admission."
+ },
+ "c_m1_printed_clean": {
+  "m": "M1",
+  "where": [
+   "quad",
+   "duel_terraces",
+   "broadcast_studio",
+   "rooftop_garden"
+  ],
+  "who": [
+   "victoria"
+  ],
+  "when": {
+   "dayFrom": 41
+  },
+  "text": "Victoria Capulet, on her bench, parasol across her knees, watching the terraces with the same grave attention she gives to card art. {H} passes below. \"That {H:boy} is printed too clean,\" she says, to nobody, in her clear carrying voice. \"There is no line round {H:him}. And {H:his} shadow is late. It is unpunctual of it.\" Two people nearby smile at each other. {H} stops, looks up at her, and says, with every appearance of sincerity, \"I apologise. I am working on it.\" She inclines her head, satisfied.",
+  "journal": "Victoria remarked aloud that {H} is 'printed too clean', has 'no line round {H:him}', and that {H:his} shadow is late. {H:He} apologised to her."
+ },
+ "c_m1_dmitri_log": {
+  "m": "M1",
+  "where": [
+   "commons_beach"
+  ],
+  "who": [
+   "dmitri"
+  ],
+  "when": {
+   "dayFrom": 41
+  },
+  "text": "{H=@near?Dmitri keeps a notebook of the row at night, because he is awake and it passes the time. He turns it round for you. Every night since the meteor, one line the same: '02:10 — {H:ini} under the window of 7, no sound. Then to the waterline. Stands.' You look for the line where {H} goes home. Dmitri shakes his head. \"I never see her go. I don't sleep, and I never see it. And in the morning she is sitting on your steps.\"|Dmitri keeps a notebook of the row at night, because he is awake and it passes the time. He turns it round for you. Every night since the meteor, one line the same: '02:10 — door of 7, no sound. {H:ini} to the waterline. Stands.' You look for the line where {H} comes back. Dmitri shakes his head. \"I never see him come back. I don't sleep, and I never see it. And in the morning he walks out of your door to breakfast.\"}",
+  "journal": "{H=@near?Dmitri logs {H} standing under my window at 02:10 every night and then at the waterline, and has never once seen her leave.|Dmitri logs {H} walking to the waterline at 02:10 every night and has never once seen him return, though he is inside by morning.}"
+ },
+ "c_m1_plank_wall": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "commons_kitchen"
+  ],
+  "who": [
+   "sammy",
+   "tobias"
+  ],
+  "when": {
+   "dayFrom": 28,
+   "self": [
+    "sammy",
+    "tobias"
+   ]
+  },
+  "text": "Bungalow 6 shares a plank wall with yours. They used to bang on it about the snoring. Tobias, mouth full: there's no snoring now — there's no anything; he put his ear to the boards and couldn't hear a person breathe. So for a laugh he knocked: shave-and-a-haircut. The answer came back at once, the same five knocks, same weight, same gaps. He tried a different rhythm. \"It came back before I'd finished,\" he says, and stops chewing. Sammy has moved his bed to the far wall and says it's for the light.",
+  "journal": "The boys in Bungalow 6 hear no snoring and no breathing through the wall. When Tobias knocked, his knock was returned exactly — once before he had finished it."
+ },
+ "c_m1_bees": {
+  "m": "M1",
+  "where": [
+   "commons_beach"
+  ],
+  "who": [
+   "trixie"
+  ],
+  "when": {
+   "dayFrom": 42
+  },
+  "text": "Trixie is on her knees in the sand below the eaves of Bungalow 2 with a matchbox. Her bees have changed their flight line: they leave the bee hotel, go out over the water in a wide arc and come in again at the far end of the row. The arc bends round one bungalow. \"Some of them forget,\" she says, very small, not sunny at all, and opens the matchbox. Seven bees, dead, laid out by her in a row as she found them under your window — and she found them, she says, all pointing the same way. Up the mountain.",
+  "journal": "Trixie's bees now fly a wide arc around Bungalow 7. The ones she finds dead under its window all point toward the mountain."
+ },
+ "c_m1_meat": {
+  "m": "M1",
+  "where": [
+   "commons_kitchen",
+   "cafeteria"
+  ],
+  "who": [
+   "hedda",
+   "rafa"
+  ],
+  "when": {
+   "dayFrom": 33,
+   "dayTo": 45,
+   "self": [
+    "hedda"
+   ]
+  },
+  "text": "Hedda went for {H} across the supper table over a plate of ribs — megaphone, 'murderer', the full sermon. {H:He} heard her out with total attention and asked, \"Is this a conflict?\" She said it certainly was. He thought about that. \"You are in conflict with everyone,\" he said. \"That cannot be the kind they mean.\" But he put the rib down all the same. He has not eaten meat since; some days he has not eaten. \"I have stopped,\" he told her the next morning. \"Is it over?\" Hedda, who has waited her whole life for someone to give in that completely, cannot explain why it made her want to cry. Rafa says the gulls on the breakwater will not take scraps from a plate he has touched.",
+  "journal": "When Hedda attacked {H} for eating meat {H:he} asked 'Is this a conflict?', stopped at once, and asked the next day 'Is it over?'"
+ },
+ "c_m1_aquavit": {
+  "m": "M1",
+  "where": [
+   "bonfire_pit",
+   "commons_beach"
+  ],
+  "who": [
+   "freya"
+  ],
+  "when": {
+   "dayFrom": 43,
+   "self": [
+    "freya"
+   ]
+  },
+  "text": "Freya can drink the row under the boardwalk and says so. At the fire she handed {H} her bottle of aquavit as a dare. He drank it the way you drink water after a run — all of it, in one, without his eyes watering — and handed it back empty. Then he sat and waited, politely, hands on his knees. After a minute he asked her, \"When does it begin?\" She leaned in to smell his breath, laughing. She stopped laughing. \"Nothing,\" she says. \"Not even the caraway.\"",
+  "journal": "{H} drank a whole bottle of Freya's aquavit without effect and asked 'When does it begin?'. {H:His} breath did not smell of it."
+ },
+ "c_m1_wearing_someone": {
+  "m": "M1",
+  "where": [
+   "commons_beach",
+   "duel_terraces"
+  ],
+  "who": [
+   "fiona"
+  ],
+  "when": {
+   "dayFrom": 44,
+   "self": [
+    "fiona"
+   ]
+  },
+  "text": "Fiona works hard at being unsettling — the voice, the lace, the stare — and three boys adore her for it. Out of the make-up, on the steps of Bungalow 4, she tells you about the one thing on this island she calls wrong — 'not eerie; eerie is a costume'. {H} stopped in front of her, studied her face from very close, and said with real warmth: \"You are wearing someone as well. It is very well done.\" Then he asked whether it was tiring. \"I said yes,\" she says. \"I don't know why I told him the truth. He nodded like we were colleagues.\"",
+  "journal": "{H} told Fiona, admiringly, that she is 'wearing someone as well', and asked whether it was tiring."
+ }
+}

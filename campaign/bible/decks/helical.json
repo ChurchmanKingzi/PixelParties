@@ -1,0 +1,396 @@
+{
+ "name": "Bench Prototype",
+ "owner": "helical",
+ "heroes": [
+  "Omikron, the Faceless Illusionist",
+  "Garius, the Great Reformer",
+  "Don Quisto, the Gold Seeker"
+ ],
+ "main": [
+  [
+   2,
+   "Ancient Tech Infinite Energy Core"
+  ],
+  [
+   3,
+   "Blueprints"
+  ],
+  [
+   3,
+   "Cannon Tower"
+  ],
+  [
+   2,
+   "Clone"
+  ],
+  [
+   4,
+   "Communication Device"
+  ],
+  [
+   2,
+   "Cool Repair"
+  ],
+  [
+   3,
+   "Create Illusion"
+  ],
+  [
+   3,
+   "Deepsea Idol"
+  ],
+  [
+   3,
+   "Field Cannon"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Inventing"
+  ],
+  [
+   2,
+   "Leadership"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   3,
+   "Monster Nest"
+  ],
+  [
+   2,
+   "Mysterious Core"
+  ],
+  [
+   3,
+   "Pocket Catapult"
+  ],
+  [
+   3,
+   "Summoning Circle"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   3,
+   "Test Dummy"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Omikron, the Faceless Illusionist": "Hero",
+  "Garius, the Great Reformer": "Hero",
+  "Don Quisto, the Gold Seeker": "Hero",
+  "Ancient Tech Infinite Energy Core": "Artifact (Equipment)",
+  "Blueprints": "Artifact",
+  "Cannon Tower": "Creature L3",
+  "Clone": "Creature L2",
+  "Communication Device": "Artifact (Equipment)",
+  "Cool Repair": "Artifact",
+  "Create Illusion": "Spell (Magic Arts)",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Field Cannon": "Creature L3",
+  "Golden Ankh": "Artifact",
+  "Inventing": "Ability",
+  "Leadership": "Ability",
+  "Magic Arts": "Ability",
+  "Monster Nest": "Creature L2",
+  "Mysterious Core": "Artifact",
+  "Pocket Catapult": "Artifact (Equipment)",
+  "Summoning Circle": "Artifact (Equipment)",
+  "Summoning Magic": "Ability",
+  "Test Dummy": "Creature L1",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Omikron, the Faceless Illusionist": "Each turn creates a one-health copy of any creature, active a turn later.",
+  "Garius, the Great Reformer": "Sacrifices a creature to place another of the same or lower level from the deck.",
+  "Monster Nest": "Each turn places a creature from the deck on top of itself.",
+  "Summoning Circle": "Creatures its hero summons have double health.",
+  "Cannon Tower": "Sturdy turret with a strong shot.",
+  "Field Cannon": "Fragile turret with an enormous shot; sturdy under a Summoning Circle.",
+  "Test Dummy": "Takes a hit aimed at its hero.",
+  "Clone": "Repeats its hero's attack or spell.",
+  "Communication Device": "Heroes wearing one share each other's spell access.",
+  "Pocket Catapult": "A small free shot each turn.",
+  "Blueprints": "Fetches another copy of an artifact in the discard pile.",
+  "Cool Repair": "Re-equips a broken artifact.",
+  "Deepsea Idol": "Cancels a sweep.",
+  "Hologram Emitter Mk IV": "Invented card: a creature fires a second, weaker shot.",
+  "Calibration Error": "Invented card: redirects a hit on his creatures at random."
+ },
+ "plan": "An engineer's deck: turrets. A Summoning Circle doubles the health of everything its hero summons, a Monster Nest and Garius fetch Cannon Towers and Field Cannons from the deck, Omikron projects copies of the best one, and Test Dummies absorb what is aimed at the heroes. It is tidy and slow, and all of it is equipment and creatures: Fire Bomb, sweepers and one stolen turret set him back several turns.",
+ "looks": {
+  "early": "Devices on all three heroes, a Test Dummy.",
+  "mid": "A double-health Field Cannon, a Tower, a flickering copy of each.",
+  "late": "Five turrets and a Dummy in front of every hero."
+ },
+ "custom": [
+  {
+   "name": "Hologram Emitter Mk IV",
+   "type": "Artifact (Equipment)",
+   "text": "Once per turn its hero's creature fires at a second target for half effect."
+  },
+  {
+   "name": "Calibration Error",
+   "type": "Spell (Reaction)",
+   "text": "A hit on one of his creatures is redirected to a random target."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "He is equipping devices and has only a Test Dummy out.",
+   "why": "He needs many turns; so do you, and yours end in a Storm that ignores Dummies."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Summoning Circle sits on Garius and a Monster Nest beside him.",
+   "why": "Fire Bomb on the Circle and Dark Gear on the Nest remove the two machines that make turrets; the turrets already out are too sturdy for one sweep."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "Omikron's copies have one health each and no Idol has been shown.",
+   "why": "Half his board dies to any sweep; the real Field Cannon needs a freeze or a steal."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "The turrets are gone and Blueprints find nothing.",
+   "why": "His heroes do not fight."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Professor Helical clips a Communication Device to each hero.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Omikron"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "A Test Dummy steps in front of Garius.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Dummy"
+     }
+    ]
+   },
+   {
+    "board": "Mysterious Core sends three artifacts to his discard pile.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Garius"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "A Field Cannon arrives with double health under the Summoning Circle.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Circle, steal the Cannon"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep at a sturdy turret"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "The Monster Nest hatches a Cannon Tower.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Nest"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Hologram Emitter: the Cannon fires twice.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb his equipment"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Three one-health copies flicker beside the real turrets.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze the real Cannon"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Calibration Error sends your shot somewhere else.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Untargeted sweeps"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   },
+   {
+    "board": "Deepsea Idol saves his row.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Cataclysm behind it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Three heroes, one Catapult.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Don Quisto alone, attacking for once.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Garius.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Omikron"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

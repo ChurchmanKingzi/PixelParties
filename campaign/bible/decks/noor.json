@@ -1,0 +1,373 @@
+{
+ "name": "Countdown",
+ "owner": "noor",
+ "heroes": [
+  "Sabrina, the Psychic Witch",
+  "Silent Water Mizune",
+  "Baaliel, the Demon General"
+ ],
+ "main": [
+  [
+   4,
+   "Archer of Teocuilatl"
+  ],
+  [
+   4,
+   "Basketskull"
+  ],
+  [
+   3,
+   "Burning Finger"
+  ],
+  [
+   3,
+   "Chosen Sacrifice"
+  ],
+  [
+   4,
+   "Decay Magic"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   4,
+   "Destruction Magic"
+  ],
+  [
+   3,
+   "Doom Clock"
+  ],
+  [
+   4,
+   "Doom Prophecy"
+  ],
+  [
+   4,
+   "Ferocious Jaguar Warrior"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Guardian of Teocuilatl"
+  ],
+  [
+   3,
+   "Harpyformer Choir"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Swift Eagle Warrior"
+  ],
+  [
+   2,
+   "The Master's Plan"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ],
+  [
+   4,
+   "Warrior of Teocuilatl"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Sabrina, the Psychic Witch": "Hero",
+  "Silent Water Mizune": "Hero",
+  "Baaliel, the Demon General": "Hero",
+  "Archer of Teocuilatl": "Creature L1",
+  "Basketskull": "Spell (Destruction Magic)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Chosen Sacrifice": "Creature L0",
+  "Decay Magic": "Ability",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Destruction Magic": "Ability",
+  "Doom Clock": "Area (Destruction Magic)",
+  "Doom Prophecy": "Spell (Decay Magic)",
+  "Ferocious Jaguar Warrior": "Creature L1",
+  "Golden Ankh": "Artifact",
+  "Guardian of Teocuilatl": "Creature L1",
+  "Harpyformer Choir": "Creature L0",
+  "Summoning Magic": "Ability",
+  "Swift Eagle Warrior": "Creature L1",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Treasure Chest": "Artifact",
+  "Warrior of Teocuilatl": "Creature L1"
+ },
+ "gist": {
+  "Doom Clock": "Area. At the end of each turn the turn player adds a Doom Counter; whenever a player's targets are defeated, that player adds one (up to four times a turn). Whoever places the twentieth counter loses the game.",
+  "Doom Prophecy": "Fetches the Doom Clock into play with three counters on it and ends her turn; at higher Decay Magic she can put it into YOUR Area zone.",
+  "Basketskull": "Removes any number of counters from the Clock and hits one target for each removed.",
+  "Swift Eagle Warrior": "Summoned for free by removing a counter; each turn may add a counter; draws a card when a counter is placed.",
+  "Ferocious Jaguar Warrior": "Summoned for free by removing a counter; hits a target whenever she sacrifices a creature.",
+  "Archer of Teocuilatl": "Summoned by sacrificing an older creature; hits a target whenever a counter goes onto the Clock during her turn.",
+  "Guardian of Teocuilatl": "Can be sacrificed from hand or board to cancel anything that would affect an Area.",
+  "Warrior of Teocuilatl": "Removes a counter to cancel anything that would affect a creature.",
+  "Chosen Sacrifice": "Stands in for a creature that would be sacrificed and replaces itself.",
+  "Sabrina, the Psychic Witch": "Sacrifices a creature to search and spring a trap from the deck.",
+  "Baaliel, the Demon General": "Her Destruction caster for Basketskull and Burning Finger.",
+  "Silent Water Mizune": "Her summoner.",
+  "The Master's Plan": "Cancels one card you play from hand.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures."
+ },
+ "plan": "Noor plays the Doom Clock and then plays the count. Twenty counters end the game for whoever places the last one, and only she can take counters off: her Eagle and Jaguar Warriors enter by removing one, Basketskull removes a fistful and turns them into damage, the Warrior of Teocuilatl spends them as shields. She adds counters when it suits her (the Archers shoot whenever one lands on her turn) and arranges for the twentieth to fall on you. The deck is exact and fragile: her creatures are small, each of them that dies makes HER add a counter, the Clock is a single Area, and with no creatures left she can no longer adjust the count.",
+ "looks": {
+  "early": "A Doom Clock with three counters on it, two small warriors, Noor writing the count on a slip of paper.",
+  "mid": "The Clock near ten, Eagles and Archers trading counters for cards and shots, a Guardian of Teocuilatl held back in hand.",
+  "late": "Seventeen or eighteen on the Clock and both players counting who places what, in which order."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "SETUP",
+   "trap": "RUSH",
+   "tell": "The Doom Clock has just arrived with three counters; no Guardian of Teocuilatl is on the board yet.",
+   "why": "The Clock is one Area, and while it is in play Cataclysm is free; removing it before a Guardian can protect it deletes her win condition, whereas racing ignores a count that only she can turn back."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "A Swift Eagle Warrior and two Archers of Teocuilatl turn every counter into a card and a shot.",
+   "why": "Her engine pieces are what let her steer the count; take the Eagle and the Archers away and the Clock is just a slow timer, while passing turns to build puts counters on by your own hand."
+  },
+  "crisis": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "The Clock stands a few counters short of twenty and she controls three small creatures.",
+   "why": "Every creature of hers that dies on your turn makes her add a counter, and you never add one for kills on her side; passing quietly means you place the end-of-turn counter yourself."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "One counter short of twenty on your turn, and she still has one small creature on the board.",
+   "why": "Whoever ends a turn at nineteen places the last counter, and only she can remove counters; your way out is to defeat something of hers this turn so that she places the twentieth, so never sweep away your last killable target early."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Noor casts Doom Prophecy: the Doom Clock comes down with three counters and her turn ends.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Cataclysm, free while her Clock is out"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build, with one eye on the count"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Sabrina and ignore the Clock"
+     }
+    ]
+   },
+   {
+    "board": "She puts a second Clock into YOUR Area zone, blocking your Floating Island.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it before a Guardian shows up"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Play around the blocked zone"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke Mizune"
+     }
+    ]
+   },
+   {
+    "board": "An Eagle Warrior flies in by taking a counter off; she adds it back and draws.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the Eagle, her dial on the Clock"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Ten counters. Two Archers of Teocuilatl shoot whenever a counter lands on her turn.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear an Archer, Yeet the Eagle"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep; each death costs her a counter"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Pass a quiet turn"
+     }
+    ]
+   },
+   {
+    "board": "You aim The Yeeting at the Clock and she sacrifices a Guardian of Teocuilatl from her hand to protect it.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Then her creatures: sweep them"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards for the next Guardian"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Give up on the Clock and build"
+     }
+    ]
+   },
+   {
+    "board": "Basketskull: she pulls four counters off and throws them at your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! or Cloud in a Bottle, then count again"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill creatures to push the count back up on her"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the next Basketskull out of her hand"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Seventeen. She has an Eagle, a Jaguar and an Archer; it is your turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill two of them: she adds two"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill a hero: she adds one for that as well"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Pass and add one yourself"
+     }
+    ]
+   },
+   {
+    "board": "Eighteen, and she is holding a Basketskull to pull the count back.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Make her place the next ones now"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the Basketskull out of her hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hope she miscounts"
+     }
+    ]
+   },
+   {
+    "board": "She protects her last creatures with a Warrior of Teocuilatl, paying counters to do it.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Keep attacking them, each shield lowers the count for her but costs a card"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Split damage between heroes and creatures"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Nineteen on the Clock, your turn, and one Jaguar Warrior stands on her side.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Kill the Jaguar: she places the twentieth"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep everything for the same result"
+     },
+     {
+      "stance": "SETUP",
+      "text": "End the turn and place it yourself"
+     }
+    ]
+   },
+   {
+    "board": "Nineteen, your turn, and her board is empty; her heroes are healthy.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Spread damage across all her heroes"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Remove the Clock itself"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Everything into the one hero that can die this turn: she places the last counter"
+     }
+    ]
+   },
+   {
+    "board": "Eighteen on her turn; she must end at nineteen and hand you the last one unless she removes counters.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Discard her hand so no Basketskull comes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Keep a killable creature of hers alive for your turn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear her board now"
+     }
+    ]
+   }
+  ]
+ }
+}

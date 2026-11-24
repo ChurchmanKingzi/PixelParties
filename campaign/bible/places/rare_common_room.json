@@ -1,0 +1,19 @@
+{
+ "name": "Rare Hall — Common Room",
+ "zone": "dorms",
+ "bg": "rare_common_room",
+ "night": false,
+ "part": "rare_lobby",
+ "hours": "Open to residents and their guests; busiest in the Evening.",
+ "sight": "A long first-floor lounge with blue sofas, a kitchenette, a karaoke machine under a dust cover and a big table permanently set up for eight-player draft. A whiteboard tracks the floor-versus-floor ladder league in four colours of marker. Somebody is always making toast. The windows look onto the quad through the tops of the palms.",
+ "things": [
+  "Join an eight-player cube draft at the big table (the hall's shared cube: free, cards go back in the box)",
+  "Sing karaoke when the cover comes off",
+  "Read the floor league whiteboard and its trash talk",
+  "Join a study group over toast",
+  "Watch The Top Deck with a room that argues back at the screen",
+  "Play the long-running house game: a chaos format with a house-rules scroll six metres long",
+  "Raid the communal biscuit tin (leave a credit)"
+ ],
+ "secret": "Cube draft nights are free table practice in front of a friendly audience; karaoke night is Day 145 (Bex and Marit duet; Noor can be coaxed; Cas commentates everyone else's song). The regulars of the first-year table are named people: Junho rebalances the house cube weekly, Mikoto laughs at the wrong moments, Eberhart drafts in silence and leaves, Rafa brings food. Inter-dorm scrimmage hospitality Day 63. After each incident this room is where the fear gets spoken aloud — the whiteboard league stops being updated on Day 52 with the shark's name still at the top. From D67 this is where Rare Hall spends its nights, and where the first student petition to close the school is drafted (Teobalt rewrites it into a petition for the truth)."
+}

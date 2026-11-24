@@ -1,0 +1,257 @@
+{
+ "id": "anni",
+ "name": "Anneliese \"Anni\" Brandt",
+ "firstName": "Anni",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "spectral",
+ "room": "S3",
+ "romance": true,
+ "deck": "Man's Best Friends (Loyals)",
+ "look": "A tight auburn bun without a hair out of place, level grey eyes behind large square glasses, and a black Auxiliary jacket so immaculate that its white-and-gold Spectral collar looks starched, worn with a red tie. She keeps the rule booklet and a red pen within reach and stands very straight with her heels together. A faint flush climbs her neck when she is caught off guard, and she hates it.",
+ "voice": "Crisp, correct and a shade too formal for nineteen, in exact English with a north-German edge; she states the rule, then the infraction, then the remedy. It is not unkind — she believes sincerely that rules are how the small are protected from the charming. When flustered she becomes more precise, not less, and speaks faster. RARE habit (once in a scene at most; most scenes go without it): citing the paragraph number of whatever has just been broken.",
+ "lines": [
+  "Your collar is turned under on the left. I am not reporting it. I am telling you.",
+  "Lights out on this floor is half past ten, and it is twenty-eight minutes past. You have time to say good night properly, so do.",
+  "A dog does not care whether you are popular. That is the entire appeal of the deck and I would thank you not to smile.",
+  "That book is a set text. For a course. Which I am not obliged to name."
+ ],
+ "intro": "A first-year judging student from the Spectral Tower with a tight bun, a rule booklet and a red pen, who has appointed herself monitor of her floor and notes every infraction she sees.",
+ "traits": [
+  {
+   "id": "anni_1",
+   "text": "She has appointed herself monitor of the Spectral first-year floor and walks the corridor at ten each night.",
+   "how": "Spectral lobby, Evening."
+  },
+  {
+   "id": "anni_2",
+   "text": "She carries a red pen and writes people up, legibly, with the paragraph number — though some people she only tells.",
+   "how": "Break a small rule near her; notice whether it goes in the book."
+  },
+  {
+   "id": "anni_3",
+   "text": "She attends parties in order to note infractions, and stays to the end.",
+   "how": "Any evening on the Spectral terrace."
+  },
+  {
+   "id": "anni_4",
+   "text": "Her rule booklets are filed by edition, and she can tell you what changed in each.",
+   "how": "Visit Spectral suite 3."
+  },
+  {
+   "id": "anni_5",
+   "text": "Her deck is a pack of loyal dogs, each named after a famous jurist.",
+   "how": "Play her."
+  },
+  {
+   "id": "anni_6",
+   "text": "She checks on the fourteen-year-old two doors down every night before lights out.",
+   "how": "Ask Georgie."
+  },
+  {
+   "id": "anni_7",
+   "text": "Her father is a customs officer in Lübeck, and she grew up hearing who had tried to get what past him.",
+   "how": "Ask why rules matter so much."
+  },
+  {
+   "id": "anni_8",
+   "text": "One shelf of books in her suite is turned spine-inward.",
+   "how": "Visit; look; say nothing."
+  },
+  {
+   "id": "anni_9",
+   "text": "She has written four hundred pages of something under another name, and nobody on the island has read a line of it.",
+   "how": "Dating stage."
+  }
+ ],
+ "secret": "Anneliese Brandt is the daughter of a customs officer in Lübeck and a notary's clerk, raised in a household where the day's dinner conversation was who had tried to smuggle what. She absorbed two convictions: that rules are the only protection ordinary people have against the charming and the rich, and that the charming and the rich will always try it on. She is at the Academy to become a head judge, and she is conscientious to a degree other students find comic: floor monitor by self-appointment, red pen, paragraph numbers. She is not a prig by nature. She is shy, was mocked at school for being 'the policeman's daughter', and discovered that a rule booklet is something to hold on to in a room full of people who all seem to know how to talk to one another. Her spotless Spectral collar is from a judging scholarship, not family money, and she is braced every day for someone to say so.\nAnd she has a secret life. The shelf turned spine-inward is romance novels — eighty of them, shipped in a crate marked REFERENCE — and under the name 'Liese von Brandenburg' she has written four hundred pages of one herself: a sweeping, earnest, rather good story about a customs inspector and a smuggler. She would die if it were found. Contradiction: the island's sternest hall monitor is its most hopeless romantic, and half the infractions she writes up are things her own heroines do in chapter three. She disapproves of Ashton Beaumont-Lyle so thoroughly because he is, word for word, a cad from one of her books. She admires Teobalt Ferrant — a man with a rota — with what really is professional respect.\nShe and Noor Al-Sayed are the first year's two judges-to-be and regard each other with wary esteem: Noor loves what rules are for, Anni loves that they are written down. Hana Kirishima, who sees a younger and more frightened version of her own classroom armour, is gently trying to teach her that a penalty is information, not punishment. She watches over Georgie's door at night with complete seriousness.\nPlot use: she writes everything down. Her infraction book is an accidental log of who was out after hours, where, with whom — including, from Day 27, a first-year {H=@near?who sits outside|from} bungalow 7 noted again and again on the cliff path at 02:10 'standing; no infraction identified'. As a judge on duty she can also do the one formal thing that exposes it: require a player to state his name for the record. She would do it without hesitation, because that is the procedure, and has no idea what would happen. Someone has to like the hall monitor, discover the novelist, and keep both secrets.\nPLAYER-CRUSH (CORE 9.8): Anni has `crush: rowan`, secretly, from the first week: the Wildcard is exactly the kind of hero she writes. She cites him for small infractions in order to have a reason to talk to him, and none of those citations reaches the book. Her route is deliberately easier and faster to START than most (the first two steps ask little, and her affinity rises readily); the later steps keep their weight. Play it honestly: interest, concealed and flustered — never instant devotion; she denies it if challenged.",
+ "wants": "To be a judge nobody can charm — and, in an entirely separate compartment, to be swept off her feet.",
+ "fears": "Being laughed at: the manuscript read aloud in the cafeteria.",
+ "crush": "rowan",
+ "crushNote": "She has liked him since the first week and would die before admitting it: he is the Wildcard who came in by the back door and plays by the book, straight out of chapter one. It shows as small infractions cited to his face rather than written up — a collar, a late shuffle — because a citation is a reason to talk to him; and as a flush she blames on the stairs.",
+ "crushPace": 1.1,
+ "likes": [
+  "Rules kept without being asked",
+  "Being told she was right, afterwards, by someone who doubted her",
+  "Punctuality, tidy uniforms, proper good-nights",
+  "Old-fashioned courtesy, especially when she pretends not to notice",
+  "Dogs",
+  "Being asked what she is reading and having her evasion respected",
+  "Being walked back to her door",
+  "Honesty about an infraction"
+ ],
+ "dislikes": [
+  "Charm used to get out of things",
+  "Being called a snitch or a robot",
+  "Mess",
+  "Anyone touching the spine-inward shelf",
+  "Teasing about blushing",
+  "Favouritism",
+  "Being asked what her parents do, in that tone"
+ ],
+ "gifts": [
+  "Card: Orthos, the Loyal Guard Dog",
+  "A box of red pens",
+  "Card: Loyal Shepherd",
+  "A novel in a plain brown wrapper (say nothing; she will know that you know)",
+  "Marzipan from the boutique",
+  "Card: Loyal Terrier"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": false,
+  "style": "Citations as conversation; disapproval that is plainly a pretext.",
+  "text": "Anni has liked Rowan since the first week, secretly. She does not flirt and would write it up — what she does instead is cite him: his collar, his sleeve, a shuffle begun before the judge's word. The infractions are real, tiny, and never reach the book; they are her only way of starting a conversation. This is one of the easy routes: any good-humoured answer is met more than halfway, and she finds it hard to stay stern with him. It is interest, not devotion — she will deny it, flush, and retreat if teased about it. Approach her with respect for her rules and, within them, the old-fashioned gallantry she claims to find ridiculous: own up before she asks, be on time, walk her to her door. Never mock the booklet. The route turns when he discovers the novels and treats it as the most natural thing in the world."
+ },
+ "intimacy": "Very slow, formal and secretly thrilled. For a long time it is a hand offered on the tower stairs and taken with a frown; being walked to the door of suite 3 at twenty-eight minutes past ten; a good-night said properly. She has read a thousand love scenes and experienced none, and she is at once the best-prepared and the most nervous person imaginable: she talks quickly, corrects his grammar, blushes to the collar and then, having decided, kisses him with a novelist's sense of timing. She likes being courted — the door held, the coat offered — and being told, afterwards, that she was wonderful. The bun comes down last, and it is a great deal of hair. Fade as she turns the reading lamp to the wall and says, severely, that lights-out does not apply to her suite.",
+ "events": [
+  {
+   "id": "anni_e1",
+   "stage": 1,
+   "title": "I am telling you",
+   "condition": "In the first week she stops you over something small (a collar, a sleeve); answer with good humour rather than annoyance and thank her. That is enough.",
+   "hint": [
+    "The floor monitor from the tower keeps finding small things wrong with you in particular. Notice that none of it is written down.",
+    "Take her corrections with good humour."
+   ]
+  },
+  {
+   "id": "anni_e2",
+   "stage": 2,
+   "title": "Twenty-eight minutes past",
+   "condition": "Seek her out once without having been cited — ask her a rules question, play her at the Loyals, or walk the Spectral corridor round with her at Evening — and see her to her door on time.",
+   "hint": [
+    "She would be glad of a reason to talk to you that is not an infraction.",
+    "Go and talk to her of your own accord, and walk her to her door."
+   ]
+  },
+  {
+   "id": "anni_e3",
+   "stage": 3,
+   "title": "A set text",
+   "condition": "Notice the shelf in spectral_suite and say nothing; later bring her a novel in a plain wrapper. When she finally asks, scarlet, whether you intend to mention it to anyone, answer in the right spirit. She asks, formally, whether you are 'paying your addresses'.",
+   "hint": [
+    "One shelf in her room faces the wall. The correct response is a matter of some delicacy.",
+    "Discover what she really reads, keep it entirely to yourself, and be gallant about it."
+   ]
+  },
+  {
+   "id": "anni_e4",
+   "stage": 4,
+   "title": "No infraction identified",
+   "condition": "After Day 27, read her infraction book with her and show her what the 02:10 entries mean; persuade her not to demand a certain student's name for the record until there is a plan. She lets you read chapter one. You stay past half past ten.",
+   "hint": [
+    "She has been writing down something for weeks without understanding it. And she has something else written down that she has shown nobody.",
+    "Go through her logbook together, and earn the right to read what she writes in secret."
+   ]
+  },
+  {
+   "id": "anni_e5",
+   "stage": 5,
+   "title": "For the record",
+   "condition": "In Term 2, stand beside her when she uses a judge's authority at the moment it counts, and when the manuscript comes to light (it will) make sure nobody laughs; she finishes it, and the dedication is not in code.",
+   "hint": [
+    "Sooner or later she will have to use her red pen on something that matters, and somebody will find what she hides.",
+    "Back her when she acts as a judge in earnest, and defend her secret when it gets out."
+   ]
+  }
+ ],
+ "bonds": {
+  "teobalt": {
+   "label": "friends",
+   "text": "A man with a rota and a clean collar: she attends every volunteer day and regards him with what she has classified, correctly, as professional respect.",
+   "public": true,
+   "from": 10
+  },
+  "noor": {
+   "label": "rivals",
+   "text": "The other judge of the year. Noor asks what a rule is for; Anni asks where it is written. They check each other's calls.",
+   "public": true,
+   "from": 4
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "Ms Kirishima is what a judge should be. She has also said, twice, that a penalty is information.",
+   "public": true,
+   "from": 4
+  },
+  "mika": {
+   "label": "teammates",
+   "text": "They play the same dogs and floor-judge the shop's Saturdays. Mika has never once been on time and never once been wrong.",
+   "public": true,
+   "from": 13
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "The suite two doors down keeps hours that are not in any timetable. It is in the book.",
+   "public": true,
+   "from": 5
+  },
+  "saoirse": {
+   "label": "enemies",
+   "text": "Bare feet at a sanctioned table: forty-one entries, all ignored.",
+   "public": true,
+   "from": 9
+  },
+  "georgie": {
+   "label": "friends",
+   "text": "She checks on the door of suite 1 every night at ten and has never missed one.",
+   "public": true,
+   "from": 2
+  },
+  "ashton": {
+   "label": "distrusts",
+   "text": "A cad from chapter three, word for word. Six entries, mostly roses in the lift.",
+   "public": true,
+   "from": 3
+  },
+  "lucas": {
+   "label": "protégé",
+   "text": "He countersigns her infraction slips and has quietly withdrawn eleven of them. She finds him maddening and correct.",
+   "public": true,
+   "from": 4
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "The vice-president applies the rules unevenly and smiles while he does it. It is in the book, with the dates.",
+   "public": true,
+   "from": 10
+  },
+  "tavita": {
+   "label": "protégé",
+   "text": "The head proctor withdraws a slip only after reading it, and has never once laughed at the red pen.",
+   "public": true,
+   "from": 14
+  },
+  "thandi": {
+   "label": "protégé",
+   "text": "The junior warden reads her corridor reports all the way through. Nobody else does.",
+   "public": true,
+   "from": 4
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "classroom",
+   "Midday": "classroom",
+   "Afternoon": "library",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  },
+  "weekend": {
+   "Morning": "spectral_suite",
+   "Midday": "library",
+   "Afternoon": "card_shop",
+   "Evening": "spectral_lobby",
+   "Night": "spectral_suite"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Loyals: a wall of dogs that protect one another and never break formation. She plays strictly by the book, announces every step and calls her own missed triggers.",
+  "tilt": "An opponent who flirts or flatters. She flushes, speeds up and makes exactly one terrible attack."
+ }
+}

@@ -1,0 +1,258 @@
+{
+ "id": "fiona",
+ "name": "Fiona Blackwood",
+ "firstName": "Fiona",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B4",
+ "romance": true,
+ "deck": "The Wheel (Cycling Demons)",
+ "look": "Very pale even before the make-up, with black lipstick, heavy black liner and jet-black hair falling dead straight to her waist. She wears dark lace and velvet chokers with the red jacket, its grey collar pinned with a small silver coffin. She moves slowly on purpose, tilts her head when she looks at people, and has cultivated a stillness that makes rooms go quiet.",
+ "voice": "Low, slow and deliberately sepulchral, each sentence placed like a candle; she enjoys a pause. It is a performance and a good one, undercut by a dry sense of fun she cannot always keep out of it — when she really laughs her voice jumps a full octave to its natural, rather sweet pitch, which annoys her. RARE habit (once in a scene at most; most scenes go without it): a calm remark about mortality offered as small talk.",
+ "lines": [
+  "You've a pleasant face. It will make a lovely skull, eventually. That was a compliment.",
+  "I discard a demon, I draw a demon. Things that are thrown away come back. People should find that more worrying than they do.",
+  "Three boys have left flowers on our porch this week. One of them had the sense to leave dead ones.",
+  "Maisie, if you set fire to my curtains again I will haunt you while I am still alive."
+ ],
+ "intro": "A pale first-year from bungalow 4 in black lace and black lipstick, with a carefully deep voice, who works hard at being unsettling — and has an alarming number of admirers for it.",
+ "traits": [
+  {
+   "id": "fiona_1",
+   "text": "She dresses in black lace, speaks in a deliberately deep voice and does her best to be eerie.",
+   "how": "Visible and audible at once."
+  },
+  {
+   "id": "fiona_2",
+   "text": "Several boys in the year are plainly smitten with her, and she is more irritated than flattered.",
+   "how": "The porch of bungalow 4; count the flowers."
+  },
+  {
+   "id": "fiona_3",
+   "text": "She has hung black lace over the bungalow window and keeps a candle on the sill.",
+   "how": "Visit bungalow 4."
+  },
+  {
+   "id": "fiona_4",
+   "text": "Her deck throws its own demons away and brings them back, and it is far stronger than her rank suggests.",
+   "how": "Play her seriously; lose."
+  },
+  {
+   "id": "fiona_5",
+   "text": "Her family are undertakers in Whitby, and she talks about death the way a baker talks about bread.",
+   "how": "Ask where the manner comes from."
+  },
+  {
+   "id": "fiona_6",
+   "text": "When she laughs properly her voice goes up an octave, and she clears her throat and pretends it did not.",
+   "how": "Make her laugh."
+  },
+  {
+   "id": "fiona_7",
+   "text": "She knits, extremely well, and everything she makes is black.",
+   "how": "Catch her at it on the porch at Night."
+  },
+  {
+   "id": "fiona_8",
+   "text": "She is the one people in the bungalow go to when something has actually died or actually gone wrong.",
+   "how": "A dead gull; a bad letter from home."
+  },
+  {
+   "id": "fiona_9",
+   "text": "She would like to meet one person who is neither frightened of the act nor in love with it.",
+   "how": "Dating stage."
+  }
+ ],
+ "secret": "Fiona is the daughter of Blackwood & Daughters, Funeral Directors, of Whitby, the third generation of women in the trade. She grew up in a house where death was the family business, discussed over tea, and she is in consequence the calmest person on the island about the things that frighten everyone else. The gothic manner began at fourteen as a joke on the tourists who came to Whitby for exactly that; she discovered that people keep a respectful distance from a girl who talks like a crypt, liked the distance, and kept it. It is an act she enjoys and a filter she relies on. Beneath it she is warm, practical, funny and a knitter. Her real voice is light and northern, and she guards it like a secret. What she did not expect is that the look would make her the object of half the first-year boys: Sammy Counts worships from the edge of the firelight, Tobias Crowe leaves stolen flowers, and even the immaculate Gideon Pryce watches her with a face like a man reading his own death warrant. It irritates her: they are in love with the lace. Contradiction: the girl who performs dread is the least morbid person in the Commons, and the one her roommates come to when a real grief arrives. She is also, quietly, one of the strongest players in the year — Cycling Demons is a serious deck and she plays it without mercy — and has let everyone go on underestimating her.\nHer own interest is Dmitri Volkov, the insomniac two doors down: genuinely nocturnal, genuinely hollow-eyed, and not trying to be anything. He has not noticed.\nAfter Day 27 she is the first student to say the plain thing aloud: 'That isn't eerie. Eerie is a costume. That is wrong.' The thing in bungalow 7 is curious about her — 'You pretend to be what I am. Why would anyone choose it?' — and she, who has sat with the dead since she was six, is not afraid of it in the way the others are, which makes her either very useful or in great danger. In ward B she volunteers without being asked: she knows how to sit with a body and talk to it properly. Her route is about dropping the voice for someone, and it begins with being beaten — or beating him — at the table.",
+ "wants": "To be seen under the lace by someone who then stays.",
+ "fears": "That the act is all anyone will ever want of her — and that one day it will be all there is.",
+ "crush": "dmitri",
+ "crushNote": "He is actually nocturnal and actually hollow-eyed and is not trying to be anything, which is more than she can say for herself or her admirers. It shows as her taking her knitting out to the porch at one in the morning, and using her real voice with him by accident.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being unfazed by — and unfazed in return",
+  "A hard game against someone who does not hold back",
+  "Dry humour, deadpan matched",
+  "Rain, fog, candlelight, wool",
+  "People who ask about the family trade without squeamishness",
+  "Being caught laughing and not teased for it",
+  "Practical kindness to her roommates",
+  "Dead flowers, sincerely given"
+ ],
+ "dislikes": [
+  "Being adored for the costume",
+  "Boys who stare and do not speak",
+  "Squeamishness about death",
+  "Being told to smile",
+  "Sunburn",
+  "Jokes about witches",
+  "Anyone doing her voice"
+ ],
+ "gifts": [
+  "Card: Skull Necklace",
+  "A ball of black merino from the boutique",
+  "Card: Deepsea Jack O' Lantern",
+  "A properly dead rose",
+  "Black tea, strong",
+  "Card: Graveyard Gathering"
+ ],
+ "flirt": {
+  "pace": "medium",
+  "initiates": true,
+  "style": "Ominous compliments, delivered deadpan, as a test.",
+  "text": "Fiona flirts in character: a slow look, a remark about his bones or his probable epitaph, a candle lit between them on the porch. It is partly play and partly a sieve — boys who gape or grovel are dismissed; one who answers in the same dry key, or simply laughs, gets a second look. She initiates because the act gives her cover, and she stays in control of the pace. What moves her is being treated as a person and an opponent: play her hard, ask about Whitby, catch the real laugh and say nothing about it. She will not be one of a collection, and she has excellent hearing."
+ },
+ "intimacy": "Deliberate and atmospheric, then disarmingly warm. She likes to set a scene — lace over the lamp, a candle, rain if she can get it — and she likes slowness: cool fingers at his collar, a low word in his ear, the theatre of it. The real intimacy is the moment the voice goes: she laughs, it jumps the octave, and she lets it stay there. Without the make-up she is freckled and looks about sixteen, and letting him see that is the last thing she offers. Tender, wry, unhurried, with wool blankets and cold feet. Fade as she leans over and pinches out the candle with her fingers.",
+ "events": [
+  {
+   "id": "fiona_e1",
+   "stage": 1,
+   "title": "A lovely skull",
+   "condition": "Answer her eeriness in kind or simply laugh — no gaping, no flattery — and then play her a duel without going easy.",
+   "hint": [
+    "She unsettles people on purpose and watches what they do. Most people do one of two things.",
+    "Stay unbothered by her manner and give her a proper game."
+   ]
+  },
+  {
+   "id": "fiona_e2",
+   "stage": 2,
+   "title": "The trade",
+   "condition": "Ask about her family without squeamishness, on the porch of bungalow 4 at Night; make her laugh properly once and do not remark on the voice.",
+   "hint": [
+    "Her manner comes from somewhere quite ordinary. She likes being asked about it.",
+    "Talk to her about home, and let her laugh without teasing her."
+   ]
+  },
+  {
+   "id": "fiona_e3",
+   "stage": 3,
+   "title": "Not the lace",
+   "condition": "Show that it is not the costume: seek her out on a day she is not performing (knitting; a real grief in the bungalow; ward B after Day 40) and treat her exactly the same. Be courting nobody else when she asks, low and level, what precisely you want.",
+   "hint": [
+    "Several people like how she looks. She is waiting to see whether anyone likes anything else.",
+    "Spend time with her when she is not putting on the act, and be straight when she asks your intentions."
+   ]
+  },
+  {
+   "id": "fiona_e4",
+   "stage": 4,
+   "title": "An octave up",
+   "condition": "After Day 27, take seriously what she says about a certain student, and go with her when she chooses to speak to him directly; afterwards, alone, she talks in her own voice all evening. You stay.",
+   "hint": [
+    "She is the one person not frightened in the usual way. That is not the same as being safe.",
+    "Listen to her judgement about what is wrong on the row, stay close when she tests it, and hear her real voice."
+   ]
+  },
+  {
+   "id": "fiona_e5",
+   "stage": 5,
+   "title": "Without the paint",
+   "condition": "In Term 2, sit ward shifts with her and let her teach you how; when she is tempted to bargain with the thing over someone it has taken, make the plan together instead. She lets you see her without the make-up, and writes home about you.",
+   "hint": [
+    "She knows how to sit with the dead. She has started thinking about how to bring some of them back.",
+    "Keep vigil in the infirmary with her, and plan together rather than letting her act alone."
+   ]
+  }
+ ],
+ "bonds": {
+  "maisie": {
+   "label": "roommates",
+   "text": "Maisie is noise, sparks and kindness. Fiona knits her fireproof sleeves.",
+   "public": true,
+   "from": 1
+  },
+  "leona": {
+   "label": "roommates",
+   "text": "Bungalow 4. Fiona has noticed that the quiet one's corner looks unoccupied and that her suitcase is always locked, and has decided it is none of her business.",
+   "public": true,
+   "from": 1
+  },
+  "sammy": {
+   "label": "friends",
+   "text": "The boy in the coat is sweet under the act. She wishes he would drop it and say good morning.",
+   "public": true,
+   "from": 5
+  },
+  "dmitri": {
+   "label": "crush",
+   "text": "Truly nocturnal, truly hollow-eyed, and not trying. She has taken her knitting to the porch at one in the morning.",
+   "public": true,
+   "from": 9
+  },
+  "tobias": {
+   "label": "friends",
+   "text": "He leaves flowers on the porch and then has nothing to say. She would like him better if he said it.",
+   "public": true,
+   "from": 6
+  },
+  "gideon": {
+   "label": "distrusts",
+   "text": "The boy in white gloves is rude to everyone near her and has never spoken to her directly. She finds it tiresome.",
+   "public": false,
+   "from": 10
+  },
+  "marit": {
+   "label": "rivals",
+   "text": "Two stage managers of their own entrances. Fiona thinks Marit is all footlights; she also goes to every rehearsal.",
+   "public": true,
+   "from": 5
+  },
+  "oru": {
+   "label": "friends",
+   "text": "She went to the night market intending to out-eerie the fortune teller, and came away feeling about nine years old.",
+   "public": true,
+   "from": 13
+  },
+  "camille": {
+   "label": "friends",
+   "text": "From Day 41 she volunteers on the ward without being asked. She knows how to sit with a body and speak to it properly.",
+   "public": true,
+   "from": 41
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "Pippa photographs her without the usual nonsense, and once caught her laughing and deleted nothing but promised silence.",
+   "public": true,
+   "from": 8
+  },
+  "selene": {
+   "label": "friends",
+   "text": "The spa attendant asked her straight off what she sounds like when she is not working. Nobody else has.",
+   "public": true,
+   "from": 12
+  },
+  "nathan": {
+   "label": "distrusts",
+   "text": "He asked her on the first day whether she was ill or 'doing it on purpose'.",
+   "public": true,
+   "from": 1
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "duel_terraces",
+   "Evening": "commons_kitchen",
+   "Night": "commons_beach"
+  },
+  "weekend": {
+   "Morning": "commons_room",
+   "Midday": "boutique",
+   "Afternoon": "old_observatory",
+   "Evening": "bonfire_pit",
+   "Night": "commons_beach"
+  }
+ },
+ "duel": {
+  "skill": 6,
+  "style": "Cycling Demons: she discards her own creatures for value and they return bigger; a relentless engine hidden behind a slow, theatrical manner. Most first-years find out how good she is on the turn they lose.",
+  "tilt": "Being made to laugh mid-match — the voice goes, the mask goes, and for a turn or two she plays like a girl enjoying herself instead of a machine."
+ },
+ "range": "The crypt voice is a performance she can lower: dry practical kindness, knitting, Whitby weather, real appetite for a hard game, exasperation with Maisie's experiments. One remark about mortality per scene at most."
+}

@@ -1,0 +1,20 @@
+{
+ "name": "The Wild Hot Springs",
+ "zone": "wild",
+ "bg": "hot_springs",
+ "night": true,
+ "hike": 1,
+ "hours": "Open; forty minutes up the east fork. The campus spa pipes its water from here.",
+ "sight": "On a shelf of the mountain's eastern skirt, steam rises through bamboo from a staircase of natural rock pools, each a little cooler than the one above. The water is milky blue, the stone stained ochre and white, and the air smells faintly of struck matches. A tin hut holds the valve for the spa pipe. At night the steam catches the moon and the pools look like a row of lit windows in the ground.",
+ "things": [
+  "Soak in the pool whose temperature suits you",
+  "Work your way up the staircase to the hottest pool anyone can stand",
+  "Lie back at night and watch the steam cross the stars",
+  "Boil eggs in the source vent in a net bag, an island tradition",
+  "Talk — hot water makes people honest",
+  "Find the carved channel that leads the overflow away in neat right angles",
+  "Check the valve hut's pressure gauge for Silas"
+ ],
+ "secret": "The outdoor counterpart to the spa: recovery, plus the intimacy of place for late-route scenes (keep them tasteful; swimwear; no scenes here involving Georgie other than a supervised group outing). Selene comes up on her days off and knows the springs' 'moods'. The right-angled overflow channel is Tessellate work. The mountain is not erupting, but since D27 the top pool is too hot to enter and the gauge in the valve hut creeps upward — a slow clock for the GM; by Day 150 only the bottom two pools are usable; on Day 180 the source vent whistles.",
+ "access": "From Day 67 off limits after the Afternoon slot (a classic curfew-breaking destination)."
+}

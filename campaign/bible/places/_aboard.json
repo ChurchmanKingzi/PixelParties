@@ -1,0 +1,28 @@
+{
+ "day": 1,
+ "slot": "Morning",
+ "docks": "10:40",
+ "where": {
+  "nathan": "ferry_deck",
+  "baylee": "ferry_deck",
+  "ed": "ferry_deck",
+  "georgie": "ferry_deck",
+  "pippa": "ferry_deck",
+  "mikoto": "ferry_deck",
+  "gideon": "ferry_lounge",
+  "inya": "ferry_lounge",
+  "tomi": "ferry_lounge",
+  "magnus": "ferry_lounge",
+  "noor": "ferry_lounge",
+  "livvie": "ferry_lounge",
+  "jessica": "ferry_stern",
+  "ashton": "ferry_stern",
+  "victoria": "ferry_stern",
+  "ophelia": "ferry_stern",
+  "sunny": "ferry_stern",
+  "marit": "ferry_stern",
+  "abel": "ferry_bridge",
+  "rana": "ferry_bridge",
+  "teobalt": "ferry_bridge"
+ }
+}

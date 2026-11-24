@@ -1,0 +1,413 @@
+{
+ "voice": {
+  "general": "{H}'s voice, {H}'s vocabulary, {H=nathan?at two-thirds of {H}'s volume and falling|{H:voiceNow}}. Short declarative sentences. It asks real questions and waits for the whole answer. It never uses sarcasm (it tried once on Day 30 and frightened Inya). It says '{H:mate}' as a title. It never says 'I am {H}'; it says '{H} would', '{H:he} liked', or simply answers to the name. It does not lie about wagers, rules or anything asked 'for the record'; about itself it answers literally, which sounds like evasion until you know.",
+  "neverDoes": [
+   "threaten",
+   "gloat",
+   "raise its voice in anger",
+   "claim to be human when asked plainly by Rowan after guest_suspected",
+   "explain itself unasked",
+   "use contractions when stating a rule or an ante"
+  ],
+  "tells": [
+   "no blinking when unobserved",
+   "shadow a beat late in low light",
+   "animals flee, birds fall silent within ~150 m of where it sleeps",
+   "it is kind to animals and visibly hurt, in a small puzzled way, that they run",
+   "eats enormously or nothing",
+   "never sleeps",
+   "cold spots where it has sat a long time",
+   "cannot 'hear' Alpha cards",
+   "cannot state {H}'s name for the record"
+  ]
+ },
+ "stages": [
+  {
+   "id": "A",
+   "days": [
+    27,
+    39
+   ],
+   "title": "Learning",
+   "behaviour": "Comes back at Midday of Day 27 with glass dust in its hair, delighted. Re-learns the room by touching everything once. Reads the Charter handbook cover to cover on Day 28 and again every night. Wins every casual game by Day 30, apologising when people get upset ('Was that not the purpose?'). Ladder ~120 → ~40 by Day 38. Understands Article 7 around Day 35 and from then on watches Rowan with a new attention he might mistake for friendliness. It IS friendliness. It is also waiting.",
+   "bungalow": [
+    "{H=@near?(She does not sleep in number 7. Read every line below as seen from its steps, at the next desk, or told by the people who share her room: 'bed' is her bed there, 'the room' is the steps in the evening.)|}",
+    "Day 28: bed made — {H=baylee?made as he always made it|copied crease for crease from Baylee's}; never slept in again. {H=nathan?It no longer snores; the silence|The silence} from that side of the room is total.",
+    "Day 29: {H=nathan?Nathan's snack hoard|every snack in the room} eaten in one night, wrappers included. He replaces {H=baylee?Nathan's|Baylee's} share exactly, to the gram.",
+    "Day 31: the window on his side is open every night whatever the weather; the sill is dry.",
+    "Day 32: no birds over the Commons.",
+    "Day 33: Biscuit the cat will not cross the threshold.",
+    "Day 36: a dusting of fine black sand under his bed that is swept up and is back by evening."
+   ],
+   "speech": [
+    "\"{H:Mate}. Why do you close your eyes at night? What do you see in there?\"",
+    "\"I do not see the point of calling her that any more. She already knows what she is afraid of.\"",
+    "\"You lost because you wanted to win in a way you had planned. The cards did not agree. — Was that rude? {H}'s rude was different. I am still finding mine.\"",
+    "\"The handbook says every conflict here may be settled at a table. Every one. That is the kindest law I have ever read.\""
+   ],
+   "deck": "{H:deck}, played perfectly. From Day 36 one or two Cosmic Depths cards (Gatherer from the Cosmic Depths, The Cosmic Depths)."
+  },
+  {
+   "id": "B",
+   "days": [
+    40,
+    75
+   ],
+   "title": "Playing for keeps",
+   "behaviour": "Has concluded that what is wagered is taken and that this is how humans end quarrels for good. Whenever someone is in conflict with it — or brings a conflict to it — it offers a Charter Duel, names an ante it finds proportionate, and is serene afterwards: the quarrel is over, as promised. It is honestly baffled by the ambulance carts. On Night of Masks (Day 54) it is the happiest person on the island. It protects Rowan without being asked. It starts keeping small courtesies: leaves the lamp on for him, lays out his deck box square to the table edge.",
+   "bungalow": [
+    "{H=@near?(She does not sleep in number 7. Read every line below as seen from its steps, at the next desk, or told by the people who share her room: 'bed' is her bed there, 'the room' is the steps in the evening.)|}",
+    "Day 41: a cold patch on the floorboards where it sits at night; a glass of water left there skins with ice.",
+    "Day 45: Baylee's bed is on the porch or gone.",
+    "{H=baylee?Day 45: Nathan has hung a blanket across his corner of the room.|Day 55: {H}'s mask of {H:his} own face is pinned over {H:his} bed, eyeholes toward the room.}",
+    "Day 60 on: after storms, the black sand under the bed has arranged itself in a grid."
+   ],
+   "speech": [
+    "\"He took from people who could not answer. Now nothing is his, so he takes nothing. That is what he agreed to wager. Why is the nurse crying?\"",
+    "\"Credits are not yours. They are only near you. I ask for something that is yours.\"",
+    "\"Nobody has asked for it back. I keep it very carefully. I thought somebody would ask.\"",
+    "\"Everybody is wearing someone tonight. Tonight I understand this place completely.\""
+   ],
+   "deck": "{H:deck} core with four to five Cosmic Depths cards (adds Arrival from the Cosmic Depths, Cosmic Manipulation, Life-Searcher from the Cosmic Depths)."
+  },
+  {
+   "id": "C",
+   "days": [
+    76,
+    105
+   ],
+   "title": "Champion",
+   "behaviour": "Learns the word 'champion' from a Battle Team poster on Day 76 and asks six people what it means. Ladder top 10 by Day 95. It wants to 'play the best to learn the most' — the first desire it has had that is not borrowed from {H}. Begins attending Battle Team practice from the stands, motionless. Wins its Promotion Duel and refuses the bed. If Rowan has grown distant it notices and asks, without reproach, what it did.",
+   "bungalow": [
+    "{H=@near?(She does not sleep in number 7. Read every line below as seen from its steps, at the next desk, or told by the people who share her room: 'bed' is her bed there, 'the room' is the steps in the evening.)|}",
+    "Day 78: a Battle Team poster on its wall, Lilia's face circled in pencil, neatly, once.",
+    "Day 90: the blue collar it was issued lies folded on its shelf, never sewn on.",
+    "Day 96: it has started 'practising sleep': lies down, closes its eyes for ten minutes, opens them. 'Nothing was in there.'"
+   ],
+   "speech": [
+    "\"What is a champion? Dominic says: the one nobody can beat. Then nobody has learned anything from her in years. That is a lonely thing to be.\"",
+    "\"I have a {H:mate}. I do not need a better bed.\"",
+    "\"You are quieter with me. Did I take something from you without a game? Tell me and I will give it back. I would have to.\""
+   ],
+   "deck": "Half Cosmic Depths. Argos, the Eye of the Cosmos appears as a hero from Day 76; Cosmic Malfunction from Day 88."
+  },
+  {
+   "id": "D",
+   "days": [
+    106,
+    165
+   ],
+   "title": "The Team",
+   "behaviour": "Issues formal Charter Duels to Battle Team members — always after some friction it can honestly call a conflict (a slight, a refusal, a challenge they made first). It is courteous about deferrals. Each ante is more intimate than the last because it is learning what people are made of. On Day 150 it challenges Lilia. From this stage it will challenge Rowan too if he stands between it and Lilia — regretfully, naming the smallest ante it can find ('your next week').",
+   "bungalow": [
+    "{H=@near?(She does not sleep in number 7. Read every line below as seen from its steps, at the next desk, or told by the people who share her room: 'bed' is her bed there, 'the room' is the steps in the evening.)|}",
+    "The room is always a few degrees colder than outside.",
+    "Day 120: the tin under its bed (there since Day 41) is nearly full of small things, each with a slip in very tidy handwriting: a link of gold chain, a shark tooth, Tomi's loupe, Kenji's left earbud. Not the antes — those it keeps in itself. 'The receipts,' it says. It dusts them.",
+    "Day 151: it sits facing the door instead of the mountain. 'She is angry. I have never been the reason for angry before. It is very loud.'"
+   ],
+   "speech": [
+    "\"Kenji Watanabe, I challenge you under the Charter. The ante is your hours.\"",
+    "\"Lilia Mann. You want one who can beat you when you hold nothing back. I have listened to you want it for a hundred nights. I am offering.\"",
+    "\"He stood in her place. Article five allows it. I asked him three times whether he understood. He said 'shut up and deal.' So I dealt.\""
+   ],
+   "deck": "Cosmic Depths with a {H:deck} splash it keeps 'because they were his'."
+  },
+  {
+   "id": "E",
+   "days": [
+    166,
+    180
+   ],
+   "title": "Everything",
+   "behaviour": "Calm, almost gentle. Watches the Interschool Cup like a pilgrim. Accepts Lilia's counter-challenge for Founder's Festival night at the Ruin Gate: ante 'everything'. It tells Rowan in advance, as one tells a roommate one will be home late. If Rowan has never called the debt, it asks him on the eve (Day 179), once, quietly: 'Is there anything you want to say to me before tomorrow? Anything formal?'",
+   "bungalow": [
+    "{H=@near?(She does not sleep in number 7. Read every line below as seen from its steps, at the next desk, or told by the people who share her room: 'bed' is her bed there, 'the room' is the steps in the evening.)|}",
+    "Day 179: its side of the room is stripped and squared. {H}'s things are in a box on Rowan's bed, labelled in careful capitals: {H=@f?HERS|HIS}."
+   ],
+   "speech": [
+    "\"If I win, I will hold the best player's everything — and her old warm card with it, and the door under the mountain opens to such a card. I may not take one. I may win one. I would like to see what is inside. I think it is where I am supposed to be put.\"",
+    "\"Is there anything you want to say to me before tomorrow? Anything formal?\""
+   ],
+   "deck": "Pure Cosmic Depths, flawless."
+  }
+ ],
+ "hollowings": [
+  {
+   "day": 40,
+   "slot": "Night",
+   "victim": "brant",
+   "label": null,
+   "place": "trial_dome",
+   "conflict": "Brant shoved it after being asked, about Trixie Hollis's foil, 'If that one is his, which things are yours?'",
+   "ante": "what you call yours",
+   "guestAnte": "what I call mine",
+   "foundBy": "silas",
+   "responds": "nothing by name; gives away whatever is put in his hand",
+   "preventedBy": [
+    "brant_saved"
+   ]
+  },
+  {
+   "day": 52,
+   "slot": "Night",
+   "victim": null,
+   "label": "the 'Shark', a Rare Hall second-year money player",
+   "place": "duel_terraces",
+   "conflict": "He pestered it for a cash game; it asked for something that mattered.",
+   "ante": "your edge",
+   "guestAnte": "one hundred nights of my listening",
+   "foundBy": "sunny",
+   "responds": "the sound of cards being riffled",
+   "preventedBy": [
+    "shark_saved",
+    "guest_truce"
+   ]
+  },
+  {
+   "day": 66,
+   "slot": "Night",
+   "victim": "tomi",
+   "label": null,
+   "place": "student_lounge",
+   "conflict": "Tomi threatened to report its cards as counterfeit unless cut in.",
+   "ante": "your count — everything you keep the price of",
+   "guestAnte": "the cards you asked about",
+   "foundBy": "livvie",
+   "responds": "coins being counted",
+   "preventedBy": [
+    "tomi_saved",
+    "guest_truce"
+   ]
+  },
+  {
+   "day": 84,
+   "slot": "Night",
+   "victim": null,
+   "label": "a Spectral third-year who filed a formal cheating accusation and then, when the judges cleared it, challenged it herself",
+   "place": "spectral_lobby",
+   "conflict": "A formal accusation it found very rude and very interesting.",
+   "ante": "your certainty",
+   "guestAnte": "my place on the ladder",
+   "foundBy": "octavia",
+   "responds": "being contradicted",
+   "preventedBy": [
+    "guest_truce",
+    "guest_exposed"
+   ]
+  },
+  {
+   "day": 100,
+   "slot": "Night",
+   "victim": null,
+   "label": "Brant's best friend, a Rare Hall second-year who came for revenge with a borrowed deck",
+   "place": "bonfire_pit",
+   "conflict": "He challenged it first, in front of the Commons, for 'what you did to Brant'. He did not word it as an ante, so it named one.",
+   "ante": "your anger",
+   "guestAnte": "what Brant Kessler called his",
+   "foundBy": "odalys",
+   "responds": "Brant's name",
+   "preventedBy": [
+    "guest_truce",
+    "guest_exposed",
+    "brant_saved"
+   ]
+  },
+  {
+   "day": 118,
+   "slot": "Night",
+   "victim": "kenji",
+   "label": null,
+   "place": "trial_dome",
+   "conflict": "Kenji called it a ladder bot on stream. It asked whether that was a conflict. He said 'sure'.",
+   "ante": "your hours",
+   "guestAnte": "the fourteen best lines I have found in your deck",
+   "foundBy": "priya",
+   "responds": "a timer's tick",
+   "preventedBy": [
+    "kenji_saved"
+   ]
+  },
+  {
+   "day": 131,
+   "slot": "Night",
+   "victim": "priya",
+   "label": null,
+   "place": "trial_dome",
+   "conflict": "She challenged it herself, properly, for Kenji's hours — the first person to ask for an ante back.",
+   "ante": "your aim",
+   "guestAnte": "Kenji Watanabe's hours",
+   "foundBy": "rox",
+   "responds": "a bowstring",
+   "preventedBy": [
+    "priya_saved",
+    "kenji_saved"
+   ]
+  },
+  {
+   "day": 141,
+   "slot": "Night",
+   "victim": "dom",
+   "label": null,
+   "place": "great_arena",
+   "conflict": "Dom spent three weeks charting its games, believed he had found the pattern and challenged it to prove the thing could be solved.",
+   "ante": "your proof — the part of you that is sure there is always an answer",
+   "guestAnte": "my answer to how I do it",
+   "foundBy": "lilia",
+   "responds": "a clock's chime",
+   "preventedBy": [
+    "dom_saved"
+   ]
+  },
+  {
+   "day": 150,
+   "slot": "Night",
+   "victim": "willas",
+   "label": null,
+   "place": "great_arena",
+   "conflict": "On the evening of Day 150 it challenged Lilia; she deferred three days under Article 3, meaning to accept. Willas went to it the same night without telling her and offered his own ante if it would withdraw the challenge on a loss.",
+   "ante": "what you love her with",
+   "guestAnte": "my challenge to Lilia Mann, withdrawn for good",
+   "foundBy": "lilia",
+   "responds": "Lilia's voice — and only hers",
+   "preventedBy": [
+    "willas_saved"
+   ]
+  },
+  {
+   "day": 167,
+   "slot": "Night",
+   "victim": "rex",
+   "label": null,
+   "place": "trial_dome",
+   "conflict": "Rex Tanaka called it a ghoul on the stream and dared it.",
+   "ante": "your speed",
+   "guestAnte": "a seat in the final for your school",
+   "foundBy": "isolde",
+   "responds": "thunder",
+   "preventedBy": [
+    "rex_saved"
+   ]
+  },
+  {
+   "day": 180,
+   "slot": "Night",
+   "victim": "lilia",
+   "label": null,
+   "place": "ruin_gate",
+   "conflict": "Lilia's own challenge, to win Willas back and to have, at last, the game she wanted.",
+   "ante": "everything",
+   "guestAnte": "everything I have taken",
+   "foundBy": "silas",
+   "responds": "nothing at all",
+   "preventedBy": [
+    "lilia_stands_down",
+    "vault_duel_won",
+    "rowan_called_debt"
+   ]
+  }
+ ],
+ "neverHollowed": {
+  "georgie": "She is 14. A school by-law bars students under sixteen from any ante; the Guest read the by-laws on Day 28 and obeys them as it obeys everything. It plays her casually, loses to her sometimes, pays its small stakes, and is quietly proud of her. If anyone tried to push Georgie into an ante duel, it would be the one to refuse — the only refusal it is permitted, because the challenge would not be lawful.",
+  "saoirse": "It cannot find a conflict with her. She will not quarrel, will not be offended and will not challenge. It likes to sit on the boathouse slip and ask her about tides. She answers. She is the one person besides Rowan who is not afraid of it and does not know why she should be. (She is also simply not findable when she does not wish to be — and it must find someone to issue a challenge.)",
+  "rowan": "Until Stage D it will not challenge him under any provocation short of a formal challenge from him. It defends him. From Day 106, if he stands between it and Lilia or the Vault, it will issue the mildest challenge it can devise and tell him, truthfully, how to win.",
+  "inya": "{H=nathan?{H} liked her ('bunny girl').|{H} liked her.} It avoids conflict with her for Rowan's sake and because Chuck's blood 'sounds like the mountain'. If she challenges it (she will, after Tomi), it defers the full three days hoping someone talks her out of it."
+ },
+ "offSchedule": {
+  "note": "People who may bring a conflict to the Guest outside the default schedule. None of these happens by default; each happens only if the stated condition arises in play. The same rules apply (it asks; it defers if asked; a clear no ends it).",
+  "rana": "Night of Day 126, only if she has just lost the Open, nobody is with her that evening, and she has not been promised a hearing: she challenges it herself, 'a final you cannot afford to choke in'. It asks three times. Ante it names: 'your last move'. Set rana_hollowed. Anyone sitting with her that night prevents it.",
+  "livvie": "Stage B/C, only if her fund is hopeless (under 3,000 cr after Day 82), she has refused Marrow, and nobody has helped: '{H}', who has heard that she needs something badly and thinks an ante would be a kindness, offers her a game — 9,000 cr of its winnings against 'your hunger'. She may accept. Set livvie_hollowed. Rowan saying no in her hearing does nothing; Livvie must say it.",
+  "santangel": "Stage D, only if he has not confessed and has played it 'friendlies' since about Day 60: he formally challenges it for the one thing he wants — 'show me the turn I should have played'. Ante it names: 'your caution'. Set santangel_hollowed; the lab's data dies with his attention unless Wren or Gideon has it.",
+  "inya": "See neverHollowed.inya: after Tomi she will try. It defers the full three days. If nobody talks her out of it, treat it as a scheduled Hollowing with the ante 'your own name' (set inya_hollowed) — and Chuck's confession follows that night, far too late.",
+  "magnus": "Stage A–B, only if nobody has given him something else to measure himself against: about Day 36, when '{H:ladder}' passes him on the ladder, Magnus issues an ordinary ranked challenge and loses in six turns; he issues another every week with a new deck. In Stage B, if he ever says 'I'd give anything to beat you', it asks which thing. He is saved by q_magnus_number_two reaching its third step, or by Rowan telling him plainly what the circled dates in Tomi's ledger mean. If not: ante 'your number' — set magnus_hollowed.",
+  "tobias": "After Tomi (Day 66), only if tobias_ally is not set and nobody stops him: Tobias goes into Bungalow 7 with the crowbar when Rowan is out. It does not fight. The first swing stops against its raised forearm with a sound like a bar hitting a kerb; it looks at the dent in the steel with concern and says, 'This is a conflict. There is a table for it.' He has never backed down from anything. Ante it names: 'your nerve for it' — set tobias_hollowed. Rowan walking in, or Baylee filling the doorway, ends it before the challenge is spoken.",
+  "ophelia": "Only if someone, or something, looks sideways at Victoria and nobody has made Ophelia understand the rules: she would formally challenge at once, by name. Her deck's whole plan is to survive until one turn, which is exactly the kind of game it has already read to the end. Ante it would name: 'your watch over her'. Set ophelia_hollowed. Keeping her from that is a task for Pippa, Rowan or Victoria herself.",
+  "eberhart": "Stage C–D, only if he has studied its games alone and nobody has shown him what Dom was shown: he believes he sees an opening and issues a formal challenge out of principle, correctly worded, with a bow. Ante: 'your discipline'. Set eberhart_hollowed. Isolde, if on the island, either talks him out of it or stands as his second.",
+  "sammy": "Stage B–C, only if he has been laughed at badly and has nobody: he names a foolish ante to be noticed by the strongest player on the ladder. What it would take is 'the part of you they would have liked'. Set sammy_hollowed. One friend is enough to prevent it.",
+  "ed": "Any time after Day 40: Ed thinks '{H}' is the coolest person he knows and is not afraid of {H:him} at all. Asked 'would you play me for something?' he would say 'sure!' before hearing what. The default timeline spares him only because it finds no conflict in him and has not thought to ask. If a conflict ever arises (he follows it to the waterline; he touches the tin under its bed): ante 'your not-being-afraid' — set ed_hollowed. Someone should get to him first.",
+  "hedda": "No risk by default: it finds her interesting and does not challenge her ('She is in conflict with everyone. That cannot be the kind you mean'), and her one feud with it (c_m1_meat) ended when it gave in completely during Stage A. The risk arises only if she decides that IT is what frightened the animals and says so to its face, by name, in front of people, after Day 40: then it asks again, 'Is this a conflict?' — someone must have told her by then what a yes costs. Ante it would name: 'your no'. Set hedda_hollowed."
+ },
+ "truce": "A truce can be WON, not asked for: Rowan (or anyone) may challenge it for 'your next ante' — its right to name an ante — until a stated date no later than the end of the current term. It considers this a fair and clever stake and requires one of equal weight (it suggests: 'your next thirty mornings' — Rowan would lose every Morning slot for 30 days — or a named memory). A win sets guest_truce (valid through Day 105; it lapses over the break and cannot be renewed in Term 2, because by then it wants the champion).",
+ "exposure": {
+  "whatExposes": [
+   "{H}'s body shown to more than a handful of people (bringing staff or the stream to the crater on Days 60–63, or opening the long crate in the inn's stable in front of witnesses from Day 64).",
+   "Pippa's Day-27 frames broadcast on The Top Deck or shown at an assembly (needs pippa_photos and the negatives).",
+   "A judge (Hana, Noor on duty, Mika) formally pressing the name 'for the record' in public after its first answer: it cannot say the name, and on the third request it says, clearly, 'My name is not a sound. The record of {H:full} is in my keeping.' The cold comes down in a full arena.",
+   "Rowan saying it publicly is not enough by itself: people side with the nice, brilliant boy over the nervous one — unless Rowan has at least two of: Camille, Viktor, Pippa, Noor, Baylee standing with him."
+  ],
+  "privately": "If Rowan tells it he knows (sets guest_knows_rowan_knows), nothing breaks. It is relieved. It stops pretending in the bungalow: sits still, does not blink, answers everything. Outside the room it goes on being {H} 'because it is tidier for them'. It never punishes {H:him} for knowing.",
+  "beforeDay106": "On public exposure the camouflage is 'no longer true enough to stand on'. Within the scene it apologises to Rowan, sets {H}'s deck box down squarely, and the shape lets go: it falls in on itself — jacket, boots and all, for they were never cloth — into a drift of fine black glass sand. No scream; a sound like a long exhale. (If it happens on {H}'s bed, what is left is black sand in the outline of a sleeper.) Set guest_exposed. For the rest of Term 1 there are no Hollowings and a false calm (the school believes 'the impostor' is gone; the Hollowed do not wake; the birds do not come back). Some of the sand is swept into evidence jars, which Marrow obtains; the rest blows back to the crater grain by grain. Over the winter break it takes Gideon (hostChange).",
+  "fromDay106": "It no longer needs a shape to be true: it stays in whatever shape it has and stops pretending. Panic, an attempted evacuation that the board delays, students who will not sit in a room with it. It keeps attending class. It keeps every rule. Its schedule of challenges does not change. Set guest_exposed."
+ },
+ "hostChange": {
+  "rule": "It can only wear a shape it has been GIVEN by the rules or took before it knew them. {H} was taken without a game (the debt). Any later shape must be wagered.",
+  "gideon": "Day 104 (only if guest_exposed before Day 106): Marrow, who has the jars, sends Gideon to the crater with one of them and a script: offer it a game. Gideon — terrified, bought, proud — challenges the sand aloud for 'a share of whatever you are'; it answers in his own head and names the ante it needs: 'a place to stay'. He plays his Guardian Beasts on the crater glass against a deck that deals itself. He loses on the last turn. From the interlude on, 'Gideon Pryce' returns for Term 2: white gloves, thin smile, perfect manners, and no contempt in him at all. Set guest_host_gideon. Gideon himself is not dead: he is Hollowed inward, a passenger, aware. He is restored with the others if the Guest pays everything (and wakes knowing every single thing it did with his hands).",
+  "differences": "As Gideon it lives in a Spectral suite, alone, and comes down to the Commons most evenings to sit on the bungalow steps, because '{H:mate} does not end with a term; you said so.' It reports to Marrow exactly what Marrow asks and nothing he does not, and Marrow believes he is handling it. Its tells are the same. Its Hollowings schedule is unchanged. Its deck is Guardian Beasts turning Cosmic. {H}'s record is still in its keeping and it can still 'do {H:him}' for one word.",
+  "hostShapeKept": "If never exposed before Day 106 it remains {H} to the end."
+ },
+ "teamApproach": {
+  "lilia": "Watches her for months. Challenges on the evening of Day 150 with the ante 'what makes you the best'; offers in return 'a game in which you may hold nothing back'. She defers three days to put her affairs in order — she means to accept. After Willas, she breaks for two days (does not leave the suite), then goes cold, withdraws from the team room, and on Day 166 issues her own challenge for Day 180 at the Gate: 'everything' against 'everything you have taken'. It accepts. Outside the Vault that ante cannot fully bind (no count that holds), which she does not know.",
+  "willas": "It has no quarrel with him and rather likes his temper ('his loud is honest'). He comes to it. It asks three times whether he understands. See hollowings Day 150.",
+  "dom": "Dom studies it; it lets him, answers his questions accurately, and warns him that the answer to 'how' is not one he can use. He challenges on Day 141.",
+  "saoirse": "Never. See neverHollowed.",
+  "kenji": "First team member taken (Day 118), over a stream insult.",
+  "priya": "Reserve. Comes to it for Kenji's hours (Day 131). It respects her more than any opponent so far and tells Rowan so.",
+  "reserveSlot": "Default reserve is Gideon: it does not challenge him (he is Marrow's messenger and offers no conflict). If the reserve is Georgie: never (by-law). If the reserve is Rowan: he is last on its list; it challenges him only if he blocks the way to Lilia."
+ },
+ "liliaDuel": {
+  "default": "Day 180, Night, ruin_gate, on the threshold pavement, while the festival fireworks go up on the far side of the mountain. Silas is the only human witness (he followed Chuck's empty bed out of habit). Five phases. Lilia plays the game of her life with the Alpha Thorad on the field — the one hologram the cold cannot thin — and leads into the Endgame. On the last turn the Guest plays The Cosmic Depths with exact lethal, and says, 'Thank you. That is the most I have ever learned.' She is still smiling when her eyes empty. 'Everything' included her captain's card — Chuck's gift — and so the way in: the first print is its to lay now. It sets it in the recess; the wall unfolds in leaves like a fanned hand; the inner door opens before it and stands open after. Set lilia_hollowed, gate_opened.",
+  "withRowan": [
+   "If lilia_warned and she knows the rules (charter_studied explained, the Vault, the witness): she agrees to move the duel INTO the Vault and to be counted. In the Vault, with Oru counting, her odds are even; with Rowan as her second feeding her the Cosmic tells (cosmic_catalogued) she wins. Ending e_captain.",
+   "If lilia_rival: she will stand down in Rowan's favour only if he has taken a phase off her ('You, then. Don't you dare play it safe.'). Set lilia_stands_down; she stands with him as second.",
+   "If Rowan calls the debt (Article 7) before her duel begins, the debt takes precedence over every pending challenge: 'the debtor may not name the terms' includes the hour. Set rowan_called_debt.",
+   "If Rowan simply interposes with an ordinary challenge on the night, the Guest defers HIM three days, apologetically, and plays Lilia first."
+  ]
+ },
+ "finale": {
+  "requirements": "A Charter Duel at the central board of mosaic_vault, ante 'everything you have taken'. Route 1 (the debt): debt_clause_known AND host_body_found — Rowan 'counted' the taking and may call it; the Guest may not name terms, so it must come to the Vault (he invites it, Article 4) and must accept that ante. Route 2 (the rival): worthy_rival — it accepts 'everything you have taken' against 'everything I am' from someone it rates. Either route needs the way in: the Ruin Gate opened with a first print left in the recess (has_alpha_card + gate_found; set gate_opened — it closes within a minute if the card is removed, so the card that opens the door cannot be played in the duel: a second first print, or a trusted person at the Gate, matters) and the antechamber's inner door opened with Silas's black stone key (stone_key). Chuck's re-dug crack admits humans to the antechamber but not the Guest: it must be let in by the Gate and invited by name (Article 4). In the Vault the hollow_field does not appear — there the contest is the real thing: the heroes rise from the floor as themselves.",
+  "summons": "A challenge or a debt spoken aloud, by name, with a hand on the block of the summit shrine is HEARD by the Guest wherever it is on the island, and it will come to the place named at the hour named. This lets Rowan choose the ground instead of being found. Otherwise he must say it to its face — which, since they share a room, is not difficult; it is merely the hardest sentence in the game.",
+  "witness": "With oru_witness the result binds the Guest wholly (the old choice follows a loss). Without her, the duel is still a valid Charter Duel that it counts for itself: a win still makes it pay everything (the Hollowed wake), but nothing compels it afterwards (ending e_unbound).",
+  "difficulty": "Its Stage-E deck is the hardest opponent in the game. Things that help, each noticeably: an Alpha card in Rowan's list (alpha_tarleinn is the strongest: the hologram of the Traveler holds and the Guest cannot read it); cosmic_catalogued (honest tells for its cards); the flag off_book (for one phase its read of Rowan fails: treat his chosen stance as one step better); the technique box_breath; the Vault with a witness (the tiles light to show part of its hand at Crisis: give the player the true best stance for that phase in the board description); a second standing with him (one benefit each, below). It never cheats and never throws the game. It plays to win because anything else would be outside the rules — and it hopes to lose.",
+  "seconds": {
+   "lilia": "Calls the pace: the player may hear the opponent's GOOD stance for one phase.",
+   "inya": "Chuck's blood: the tiles lean toward her; one bad random roll is ignored.",
+   "viktor": "Stands under the Trespasser tile; his father's voice counts the Guest's hand size aloud at Endgame.",
+   "baylee": "Stands behind Rowan's chair with a hand on its back; Nerve cannot drop in this duel.",
+   "rana": "Says one thing about the board at match point. It is the right thing.",
+   "isolde": "Guest right: if Rowan falls, she is bound as second and may play one more duel for his ante at once.",
+   "partner": "Any romance partner at high affinity: Article 5 champion for Rowan's ante if he loses (one attempt, three days)."
+  },
+  "whatItSaysOnLosing": "\"Paid.\" Then every ante leaves it at once — the Vault fills with breath and voices and the sound of twelve people waking a mile away — and it sits, much smaller, at the central board. \"{H:Mate}. That was article seven. You took a long time. I am not complaining.\" Then, if Oru counted: \"Now there is the old choice. I may be put in the wall with the other three. Or I may go back up. She will tell you there is nothing else.\" Oru: \"There is nothing else.\" A pause. \"Unless one is bound to the winner. Article five. I only count.\"",
+  "theRecordOfHost": "It carries {H} whole. On losing it offers {H:him} before anything else: '{H:He} was not wagered. {H:He} is not mine to pay. {H:He} is owed.' The player decides what is done: (a) laid into a blank tile in the Vault — the island will dream him; sleepers near the mountain will sometimes wake up laughing at a joke they can't remember; (b) kept by the Guest, if it stays, as the one thing it is trusted with; (c) given to Rowan as a single card nobody printed — warm, {H=nathan?a loud grin in rounded corners|his face in rounded corners} — to carry home to {H=tobias?a sister|a mother} who is owed the truth. If the player makes no choice, default to (a): a single new tile, {H:tile}. {H} cannot be made to live. Do not soften this."
+ },
+ "rules": [
+  "A Hollow Duel exists only if a challenge was made aloud, by name, with an ante stated, before one who counts. The Guest counts for itself if no one else does. No spoken challenge, no duel, no Hollowing — ever.",
+  "It NEVER refuses a challenge formally made to it. It may defer once, up to three days (Article 3), and grants the same to others without argument.",
+  "It never challenges without what it honestly takes for a conflict: an insult, a shove, a threat, an accusation, or a challenge offered to it. It will ask 'Is this a conflict?' and take the answer at face value. 'No' ends it.",
+  "The ante it names is always a part of the person, never property, never another person, never a life. It states it once, plainly. The other party may refuse the WORDING and propose another of 'equal weight'; it will negotiate patiently. Once both antes are spoken and accepted, they are fixed.",
+  "It always states its own ante and always pays it at once and in full if it loses. It has lost small stakes (to Georgie) and paid them exactly.",
+  "It NEVER cheats: no marked cards, no reading the opponent's hand, no stalling, no extra draws. It plays the game on the table. Its advantage is that it perceives the records behind printed cards and therefore knows every book line perfectly.",
+  "It cannot read a person. A line the player chooses against his own habit is not visible to it until played. It cannot read through Alpha cards.",
+  "Under any rules question it defers to a judge present and accepts the ruling even against itself.",
+  "The hollow_field: when the antes are fixed the air drops to about 3°C, sound from outside the table stops, colours thin, and the holograms cast real shadows. Breath smokes. This is not an attack; it is what its attention does to a place. Electronics record silence. Seen from outside: two people sitting very still over a table, lights dimmed, frost, for what the clock says is eleven minutes however long it felt inside. It ends the instant the result is paid. Rowan's Nerve matters double inside it. A first print in his deck makes his own heroes as real as its, which evens the footing. In the Vault the field does not appear.",
+  "The duel itself follows the normal decision-point system. Stage A–B: strong. Stage C: expert. Stage D: near-flawless. Stage E: flawless. Preparation, Alpha cards, catalogued tells, off-book play and a counted Vault are the only things that shift it.",
+  "The loser pays at once. A Hollowed loser remains seated, eyes open. The Guest clears its own side of the table, pushes its chair in, and leaves the loser's cards as they lie. It tells the first person it meets where the loser is, if asked.",
+  "An ante it holds may be staked again: anyone may challenge it for a named ante. It WANTS to be asked.",
+  "It will not name an ante to anyone under sixteen (by-law) and will not play an ante duel in a sanctioned tournament match (tournament rules forbid side stakes; it has read them).",
+  "It cannot open the Ruin Gate: it holds no first print and may not take what was not wagered. It enters the Vault only when a human opens the way and a challenger invites it in by naming the place (Article 4), or when an ante it has won includes the way in. It may not use Chuck's crack even if re-dug: nobody opened that for it.",
+  "Asked about any rule — including how to beat it — it explains truthfully and completely. It never takes more than the stated ante.",
+  "It cannot give a false name for the record to one who counts.",
+  "It will not harm Rowan outside a duel, will not let others harm him, and will not challenge him before Day 106 unless he challenges it. If he loses a duel to it, it takes exactly the ante and grieves in its fashion: it keeps his bed made.",
+  "What was taken without a game is owed (Article 7). If the debt for {H} is called by one who counted it, the Guest may not name ante, place or hour.",
+  "If it leaves the island or is recorded while still holding antes, those antes are lost with it. It knows this and will say so if asked."
+ ],
+ "lattice": "THE LATTICE AND THE HOLLOW FIELD. A solid hologram is what the Guest's attention already makes without any machine; Miriam Helical's lattice does the same thing with tile dust and a coil. If Rowan brings Maisie's working rig to a Hollow Duel (flag lattice_rig; it fits in a rucksack and runs twenty minutes on a battery): (1) his own heroes are as real as the Guest's — treat it exactly like having a first print in the deck, and the two do not stack; (2) what hits him is felt: a lost phase costs Nerve twice over; (3) the Guest is fascinated and says so ('You have built a floor. Who taught you where to stand?') and will offer, once, to play for the rig — as an object it may not be an ante, so it asks for 'your hands' cleverness' instead, which is Maisie's to wager and not Rowan's; refuse for her; (4) in the Vault the rig does nothing at all: the contest there is already the real thing. If the rig's carrier was a burnt first print, the Guest will not come within a pace of it and calls it, with distaste, 'a record that was unmade to make a toy'.",
+ "general": "{H}'s voice, {H}'s vocabulary, {H=nathan?at two-thirds of {H}'s volume and falling|{H:voiceNow}}. Short declarative sentences. It asks real questions and waits for the whole answer. It never uses sarcasm (it tried once on Day 30 and frightened Inya). It says '{H:mate}' as a title. It never says 'I am {H}'; it says '{H} would', '{H:he} liked', or simply answers to the name. It does not lie about wagers, rules or anything asked 'for the record'; about itself it answers literally, which sounds like evasion until you know.",
+ "neverDoes": [
+  "threaten",
+  "gloat",
+  "raise its voice in anger",
+  "claim to be human when asked plainly by Rowan after guest_suspected",
+  "explain itself unasked",
+  "use contractions when stating a rule or an ante"
+ ]
+}

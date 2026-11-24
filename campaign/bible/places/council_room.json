@@ -1,0 +1,18 @@
+{
+ "name": "Student Council Chamber",
+ "zone": "campus",
+ "bg": "council_room",
+ "night": false,
+ "hours": "Council sessions Monday and Thursday Afternoon; office hours for petitions at Midday; otherwise locked.",
+ "sight": "A panelled room with a horseshoe table, high-backed chairs and a gavel resting on a folded dorm banner. One wall is a cabinet of binders in perfect colour order; another holds portraits of past presidents, all with the same careful smile. The windows look straight across the quad to the Chancellor's balcony. It is the tidiest room on the island and it smells of beeswax and toner.",
+ "things": [
+  "File a petition (club funding, a room change, a formal complaint)",
+  "Register a Charter Duel — challenge form in triplicate, ante stated, two witnesses",
+  "Sit in the public chairs during an open session",
+  "Read the framed copy of the Academy charter, the full text, with amendments",
+  "Ask Teobalt for help with something broken; watch it get fixed within the week",
+  "Study the wall calendar of school events, colour coded by Octavia",
+  "Look at the presidents' portraits and find the missing year"
+ ],
+ "secret": "Octavia's seat of power; Teobalt works here as a first-year delegate; Noor clerks the charter register. THE CHARTER REGISTER is the legal heart of the plot: every formally issued challenge is entered here — or is binding anyway if made aloud, by name, before one who counts (Articles 1 and 9). The framed full text is nine articles (CHARTER in the plot file). Two decide the finale, and Noor can argue both: Article 4 (the challenger names the place; nobody may be called to a place they may not enter unless the challenger invites them in) and Article 7 (what was taken without a game is owed, and the debtor may not name the terms). The register entries for the Guest's duels are all in order; that is the horror. Marrow courts Octavia here from Day 61. Student council election Day 173. ACCESS NOTE: Open during sessions and office hours; the register cabinet is locked (octavia, noor, teobalt have keys)."
+}

@@ -1,0 +1,20 @@
+{
+ "name": "The Old Orchard",
+ "zone": "wild",
+ "bg": "orchard",
+ "night": false,
+ "hike": 1,
+ "hours": "Open; twenty minutes east of campus on the plantation road. Harvest work in autumn and again for citrus in late winter.",
+ "sight": "Row on row of mango, guava, breadfruit and gnarled orange trees run down a sunny slope in the grid the plantation planted a century ago, the grass between them cropped by a few half-wild goats. Windfalls ferment sweetly in the heat and bees work the blossom. A tumbledown packing shed stands at the bottom with ladders, crates and a cider press. It is the most peaceful hour's walk on the island.",
+ "things": [
+  "Pick fruit for Mama's kitchen or the cafeteria (paid by the crate at harvest)",
+  "Eat a mango straight off the tree and wear it",
+  "Climb a ladder into the canopy",
+  "Nap in the grass with a book over your face",
+  "Befriend, or be robbed by, a goat",
+  "Press cider or juice at the old shed",
+  "Walk the rows with someone who needs to talk about home",
+  "Find the oldest tree, with a swing and a hundred carved hearts"
+ ],
+ "secret": "Harvest day Day 38 (paid, sociable; Baylee is in his element and, for once, talks — about soil; Livvie earns well; Odalys runs it). The gentlest location; good for Baylee's friendship arc and for anyone homesick. From D27 the goats will not go to the north rows, and fruit on the trees nearest the mountain ripens and drops in a single night. Carved on the oldest tree among the hearts: 'A.H. + I.A.' — Aleksander Hale and Imogen Ashdown; the survivor's guilt has another layer, and Viktor does not know."
+}

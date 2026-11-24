@@ -1,0 +1,359 @@
+{
+ "name": "Null and Void",
+ "owner": null,
+ "heroes": [
+  "Luna Pele, the Flame Dancer",
+  "Null, the Mage Slayer",
+  "Elana, the Rocky Rebel"
+ ],
+ "main": [
+  [
+   4,
+   "Blade of the Frostbringer"
+  ],
+  [
+   4,
+   "Blade of the Swamp Witch"
+  ],
+  [
+   4,
+   "Blow of the Venom Snake"
+  ],
+  [
+   4,
+   "Critical Strike"
+  ],
+  [
+   2,
+   "Divine Gift of Fire"
+  ],
+  [
+   8,
+   "Fighting"
+  ],
+  [
+   3,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Magnetic Glove"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   4,
+   "Stranglehold"
+  ],
+  [
+   4,
+   "Tea"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   6,
+   "Wealth"
+  ],
+  [
+   3,
+   "Wheels"
+  ],
+  [
+   4,
+   "Whirlwind Strike"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Luna Pele, the Flame Dancer": "Hero",
+  "Null, the Mage Slayer": "Hero",
+  "Elana, the Rocky Rebel": "Hero",
+  "Blade of the Frostbringer": "Artifact (Equipment)",
+  "Blade of the Swamp Witch": "Artifact (Equipment)",
+  "Blow of the Venom Snake": "Attack",
+  "Critical Strike": "Attack",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Fighting": "Ability",
+  "Golden Ankh": "Artifact",
+  "Magnetic Glove": "Artifact",
+  "Quick Attack": "Attack",
+  "Stranglehold": "Attack",
+  "Tea": "Artifact",
+  "Treasure Chest": "Artifact",
+  "Wealth": "Ability",
+  "Wheels": "Artifact",
+  "Whirlwind Strike": "Attack"
+ },
+ "gist": {
+  "Null, the Mage Slayer": "Very high Attack; whatever his attacks hit has its effects switched off for two turns. Takes only half damage from anything that also hits other targets.",
+  "Luna Pele, the Flame Dancer": "Whenever a target is poisoned it also burns for good; she draws a card for every burn.",
+  "Elana, the Rocky Rebel": "Once per turn shuffles her hand away and draws one more than that.",
+  "Blade of the Frostbringer": "Its hero's single-target attacks freeze the target.",
+  "Blade of the Swamp Witch": "Its hero's attacks poison (and so, with Luna Pele, burn).",
+  "Blow of the Venom Snake": "Attack that poisons.",
+  "Critical Strike": "An attack for twice the hero's Attack.",
+  "Stranglehold": "Attack that grows with the statuses on its target.",
+  "Whirlwind Strike": "Hits two of your heroes at once; needs Fighting at level three.",
+  "Quick Attack": "A free first attack each turn.",
+  "Tea": "Hands your status effects back, or its own to you.",
+  "Wealth": "Ability: extra gold every turn.",
+  "Divine Gift of Fire": "Once per game: one side burns for good.",
+  "Magnetic Glove": "Searches any card.",
+  "Wheels": "Draws three."
+ },
+ "plan": "A deck built to beat spell-casters. Null's attacks switch off the effects of whatever they hit, and he takes only half of any damage that hits him together with other targets, which is how sweepers, Chain Lightning and Storm ticks all work. The blades freeze and poison, Luna Pele turns every poison into a permanent burn and a card, and Stranglehold and Critical Strike cash the statuses in. Elana and Wheels keep the attacks coming. It has no creatures and no tricks beyond that: single-target damage works on Null perfectly well, and all of its damage is one fighter swinging once or twice a turn.",
+ "looks": {
+  "early": "Null with a blade, your caster frozen and its effects dark.",
+  "mid": "All your heroes poisoned and burning, Luna Pele drawing, your Storm ticks half-sliding off Null.",
+  "late": "Fighting at level three, Whirlwind Strike across two heroes, Stranglehold on the third."
+ },
+ "profile": {
+  "opening": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Null does all the attacking, and whatever he hits goes dark and freezes.",
+   "why": "Freeze Null first: a frozen hero cannot attack and loses his damage reduction too; damage that hits only him, a single spell or Acid Vial, is never reduced."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Your multi-target damage is halved on Null, and each of his attacks leaves a freeze, a poison and a burn.",
+   "why": "Sweepers have no board to hit: answer the statuses with Tea (it hands all of them to Null), shield the big hit, and aim single-target damage at Luna Pele and Elana, who have no protection."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Null has Fighting at level three and holds Whirlwind Strike and Critical Strike.",
+   "why": "A frozen or stunned Null does nothing at all, and Fire Bomb takes a Fighting off the stack and Whirlwind Strike out of reach; building on while he swings twice a turn does not work."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Its last hero attacks once a turn and has no cards in hand.",
+   "why": "Against one remaining hero the Storm's tick hits a single target and is no longer halved."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Null equips a Blade of the Frostbringer; his Quick Attack freezes your caster and switches its effects off.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Null in return"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Single-target burn on Null"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Sit frozen and build"
+     }
+    ]
+   },
+   {
+    "board": "A Blade of the Swamp Witch: your hero is poisoned, so it also burns, and Luna Pele draws.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Tea all of it onto Null"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Luna Pele"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Elana reshuffles her hand for a better one.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb Null's blades"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Your Flame Avalanche does half to Null and there are no creatures to hit.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Single-target damage at Luna Pele and Elana"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Null"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep again"
+     }
+    ]
+   },
+   {
+    "board": "Stranglehold lines up on your frozen, poisoned, burning caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea first, then shield"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Null"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Fire: your whole side burns.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Tea a burn onto Null, heal through Tarleinn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Whirlwind Strike hits two of your heroes; both go dark.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb a Fighting off Null"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Null"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Critical Strike is aimed at your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Null before he swings"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn him down first"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Take it"
+     }
+    ]
+   },
+   {
+    "board": "Null is wounded; Luna Pele holds eight cards.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards, then finish Null"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Finish Null"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Null alone: a tick that hits only him is no longer shared.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Freeze and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "It has no hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Luna Pele.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Null"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

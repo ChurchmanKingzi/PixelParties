@@ -1,0 +1,372 @@
+{
+ "name": "Deep End",
+ "owner": "baraka",
+ "heroes": [
+  "Rakah, the Loan Shark",
+  "Kit, the Shark Researcher",
+  "Serket, Dread of the Desert"
+ ],
+ "main": [
+  [
+   4,
+   "Greatmaw Shark"
+  ],
+  [
+   4,
+   "Greatmaw Siren"
+  ],
+  [
+   4,
+   "Infected Greatmaw"
+  ],
+  [
+   8,
+   "Infinitely Reproducing Slime"
+  ],
+  [
+   4,
+   "Aggressive Town Guard"
+  ],
+  [
+   3,
+   "Harpyformer Choir"
+  ],
+  [
+   2,
+   "Doctor Fester"
+  ],
+  [
+   2,
+   "Hardy Slime"
+  ],
+  [
+   4,
+   "Quick Attack"
+  ],
+  [
+   3,
+   "Heavy Hit"
+  ],
+  [
+   2,
+   "Blow of the Venom Snake"
+  ],
+  [
+   2,
+   "Thicket"
+  ],
+  [
+   3,
+   "Treasure Chest"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   2,
+   "Deepsea Idol"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Fighting"
+  ],
+  [
+   2,
+   "Occultism"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Rakah, the Loan Shark": "Hero",
+  "Kit, the Shark Researcher": "Hero",
+  "Serket, Dread of the Desert": "Hero",
+  "Greatmaw Shark": "Creature L1",
+  "Greatmaw Siren": "Creature L2",
+  "Infected Greatmaw": "Creature L1",
+  "Infinitely Reproducing Slime": "Creature L0",
+  "Aggressive Town Guard": "Creature L0",
+  "Harpyformer Choir": "Creature L0",
+  "Doctor Fester": "Creature L1",
+  "Hardy Slime": "Creature L0",
+  "Quick Attack": "Attack",
+  "Heavy Hit": "Attack",
+  "Blow of the Venom Snake": "Attack",
+  "Thicket": "Artifact",
+  "Treasure Chest": "Artifact",
+  "Golden Ankh": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Summoning Magic": "Ability",
+  "Fighting": "Ability",
+  "Occultism": "Ability"
+ },
+ "gist": {
+  "Rakah, the Loan Shark": "Starts with no Attack at all. Whenever he sacrifices a small creature, Rakah's Attack grows for good by that creature's health.",
+  "Kit, the Shark Researcher": "Whenever an Ability is attached to her she reveals a creature from the deck and either takes it, or makes you choose two of your targets for a small hit, or makes you discard at random.",
+  "Serket, Dread of the Desert": "Counts every sacrifice; once a turn stings a target for more the more he has been fed.",
+  "Greatmaw Shark": "Once a turn eats one of his creatures that has been out for a turn: a hero's Attack jumps for that turn.",
+  "Infected Greatmaw": "Once a turn eats another of his creatures and bites a target for one of his heroes' full Attack, as that hero's attack.",
+  "Greatmaw Siren": "Lets the sharks eat creatures on the very turn they arrive.",
+  "Infinitely Reproducing Slime": "One-health food with no copy limit; another crawls out every turn.",
+  "Hardy Slime": "On arrival forces your attacks, spells and creature effects onto itself where possible.",
+  "Doctor Fester": "Makes a target bleed for the rest of the game: damage every time it acts.",
+  "Deepsea Idol": "Cancels one source that would hit two or more of his creatures.",
+  "Heavy Hit": "Rakah's attack; stuns.",
+  "Quick Attack": "A free first attack each turn.",
+  "Aggressive Town Guard": "Free summon with a ping."
+ },
+ "plan": "Baraka feeds the sharks. Slimes and Town Guards arrive every turn as food; each one a Greatmaw eats makes Rakah's Attack permanently bigger, loads Serket's sting and bites for a hero's whole Attack. The Siren lets the feeding start on the turn the food arrives. For several turns very little happens, and then Rakah, who began with no Attack at all, swings for more than a hero has. But the food has one health and normally has to survive a turn before it can be eaten: sweepers and the Storm's zaps starve the whole deck, Rakah is the frailest hero on the table, and without a Greatmaw in play nothing gets eaten at all.",
+ "looks": {
+  "early": "Slimes stacking up beside a Greatmaw Shark; Rakah's Attack still at nothing.",
+  "mid": "A Siren out, creatures eaten as they arrive, Rakah's Attack climbing, Serket stinging.",
+  "late": "Rakah with the Attack of four heroes and a Heavy Hit in hand."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Slimes and a Greatmaw Shark; nothing has been eaten yet.",
+   "why": "The food has to live through your turn to count: every sweep is a missed meal, and Rakah still hits for nothing at all."
+  },
+  "midgame": {
+   "best": "CONTROL",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Greatmaw Siren is out: creatures are eaten the turn they arrive.",
+   "why": "Now the sharks themselves are the problem — Siren and Infected Greatmaw have real health. Sweep them or steal one with Dark Gear, and freeze Rakah while his Attack is still middling."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Rakah's Attack stands far above any hero's health and he holds Heavy Hit.",
+   "why": "One enormous single hit a turn: Homerun! and Cloud in a Bottle answer it, Snow Cannon on Rakah skips it, and he has the least health on the table."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "CONTROL",
+   "trap": "SETUP",
+   "tell": "Rakah is down, or the sharks are gone.",
+   "why": "Serket and Kit alone are two ordinary heroes with a small sting."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Baraka lays a Greatmaw Shark beside two Slimes and seems content to wait.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche the food"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Rakah while he has no Attack"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up in peace"
+     }
+    ]
+   },
+   {
+    "board": "An Ability goes onto Kit: she reveals a Greatmaw Siren and takes it.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep before it lands"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "A Hardy Slime arrives: your next spell has to aim at it.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche does not aim"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spend Chain Lightning's first bolt on it"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait a turn"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Siren is out; a Slime is eaten the moment it lands and Rakah's Attack ticks up.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche: Siren and sharks together"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear steals the Siren"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Attach the Storm and ignore it"
+     }
+    ]
+   },
+   {
+    "board": "Infected Greatmaw eats a Town Guard and bites your caster with Rakah's whole Attack.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Infected Greatmaw"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Rakah"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Heal and build"
+     }
+    ]
+   },
+   {
+    "board": "Doctor Fester: your caster bleeds every time he acts.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep Fester with the rest"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Tea hands the bleeding to Serket"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep casting through it"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Rakah's Attack has passed anything a hero can survive; Heavy Hit is coming.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held for it"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon on Rakah"
+     },
+     {
+      "stance": "SETUP",
+      "text": "One more level first"
+     }
+    ]
+   },
+   {
+    "board": "Serket's sting counts eleven sacrifices.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Burn Serket: he has fed enough"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Deepsea Idol cancels your Flame Avalanche over his creatures.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield first, a second sweep next turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Chain Lightning goes for heroes regardless"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Rakah has fallen; the sharks have nobody left to make stronger.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Kit and Serket"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Clear the sharks"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh: Rakah up for one swing with everything he ever ate.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill the other two"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Homerun!, then sweep"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Only Slimes left, multiplying politely.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Ignore them"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep once"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

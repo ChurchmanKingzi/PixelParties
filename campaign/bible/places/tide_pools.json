@@ -1,0 +1,20 @@
+{
+ "name": "The Tide Pools",
+ "zone": "wild",
+ "bg": "tide_pools",
+ "night": false,
+ "hike": 1,
+ "hours": "Reachable at low tide (Morning or Afternoon, alternating by the week); cut off at high water.",
+ "sight": "Beyond the cove the lava shelf runs out flat into the sea, pitted with a hundred pools like spilled mirrors. Each is a small world: anemones, hermit crabs in borrowed shells, a blue starfish, fish the size of a fingernail. The rock is sharp and warm underfoot. When the tide turns it comes in between your feet with a sound like tearing silk.",
+ "things": [
+  "Crouch over a pool and watch it for long enough that things forget you",
+  "Photograph the blue starfish (Pippa knows where it lives)",
+  "Collect shells, legally: empty ones only",
+  "Find the pool the locals call the Board — nine square basins in a grid",
+  "Race the tide back",
+  "Pick sea-snails for Mama's pot",
+  "Spot the octopus that plays with a dropped die"
+ ],
+ "secret": "Pippa's favourite photo walk (Day 147 and any low tide); quiet scenes for shy characters (Baylee, Livvie, Noor). 'The Board' is not natural: nine cut basins in a three-by-three grid, the nearest Tessellate working to the campus, used for teaching the contest with shells — Ashdown knows, Chuck knows. After D27 the pool creatures slowly migrate to the southernmost pools; by Day 60 the northern ones are empty and very clear.",
+ "access": "Only at low tide; getting cut off costs a slot and a soaking."
+}

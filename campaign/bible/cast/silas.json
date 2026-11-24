@@ -1,0 +1,227 @@
+{
+ "id": "silas",
+ "name": "Silas Grieve",
+ "firstName": "Silas",
+ "age": 63,
+ "sex": "m",
+ "group": "staff",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "The lighthouse",
+ "romance": false,
+ "deck": "An old Steam Dwarf list, a gift from Chuck (rarely plays; no deck profile)",
+ "look": "Grey beard, weathered face, an oilskin coat in any weather and a limp from a left knee that tells him about storms. A heavy ring of keys hangs at his belt, and his hands are scarred from rope and wire. He looks at the sky before he looks at you.",
+ "voice": "Few words, low and slow, an island burr; he speaks of weather, tides and birds as if giving evidence, and his pauses are not unfriendly. He tends to say the truest thing in the conversation and then walk away. RARE habit (once in a scene at most; most scenes go without it): 'Not my business' — before making it his.",
+ "lines": [
+  "That'll hold. Don't lean on it.",
+  "Birds have gone quiet round the cove. Not my business. Thought you'd want to know whose it is.",
+  "I pulled him off the north rocks fifty years back. He's been talking ever since. Hasn't said the one thing yet.",
+  "There's doors on this island with locks, lad, and doors with reasons. I keep the keys to both."
+ ],
+ "intro": "The groundskeeper and lighthouse keeper: an old islander with a limp, a ring of keys and very few words.",
+ "traits": [
+  {
+   "id": "silas_1",
+   "text": "He keeps the grounds, the lighthouse, the clock tower's winding and every key on campus.",
+   "how": "See him anywhere, early; on Sundays he winds the tower clock."
+  },
+  {
+   "id": "silas_2",
+   "text": "He can tell tomorrow's weather from his knee and is never wrong.",
+   "how": "Ask him before a hike."
+  },
+  {
+   "id": "silas_3",
+   "text": "He was born in Port Mulligan and has left the island four times in his life.",
+   "how": "Ask."
+  },
+  {
+   "id": "silas_4",
+   "text": "He hires Commons students for honest work and pays in cash the same day.",
+   "how": "Job board; Baylee works for him."
+  },
+  {
+   "id": "silas_5",
+   "text": "He and the founder have known each other for fifty years.",
+   "how": "See them on the lighthouse steps."
+  },
+  {
+   "id": "silas_6",
+   "text": "He feeds the gulls at the lighthouse and knows them individually.",
+   "how": "Lighthouse, Morning."
+  },
+  {
+   "id": "silas_7",
+   "text": "He will not go near the north ridge after dark and will not say why.",
+   "how": "Ask him to."
+  },
+  {
+   "id": "silas_8",
+   "text": "He was the boy in the boat that found the founder, shipwrecked, and he has never told the whole of what he saw.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "What he knows, exactly. Silas was a boy of thirteen, working his father's boat off the north shore, when they saw a man waving a shirt on the rocks: Charles Kowalczyk, eleven weeks wrecked. The keeper's log (the Grieves have kept the light for four generations, and Silas keeps the log still) records it: one castaway taken off, with a sack of notebooks, 'saying the squares were warm'. The man talked without stopping for two days — heroes, creatures, rules — and in his sleep he moved his hands as if laying tiles. Afterwards Silas found in the bottom of the boat a key of black stone that belonged to nobody; it is on his iron ring to this day beside the Umbra keys, and he does not know that it opens the inner door from the antechamber to the Vault proper. His grandmother, Ione Grieve, took one look at the castaway, spat, and said: 'He's been in the keeping-house. Don't any of you play him for anything.' From her Silas has the old island sayings, which he half believes: that the mountain 'keeps' what is played for; that 'when the birds go quiet, something's come to play'; that there were 'quiet years' in her grandmother's time after a light fell in the sea. He knows where Chuck's cave is and where the chalk arrows lead in the lava tubes (he has stood at the rockfall and never dug); he knows the Ruin Gate. He has been Chuck's friend, conscience and keeper of confidences for fifty years. He knows about the tile dust in the first print run (he helped carry the sacks to the print works) and carries one first print himself, a 'Friendship' Chuck gave him, in his tobacco tin. He knows Chuck has never told his granddaughter. When Chuck sleepwalks toward the ruins, talking in the old tongue, Silas takes a lantern and follows; Chuck always stops at the gate.\nNine years ago he saw the four Umbra students come back up the ridge at sunset holding on to each other, and on the Chancellor's order he rowed them out to the hut on Gull Rock and kept them there two nights before the ferry. He heard what they said. He saw Chuck go up the mountain alone that midnight and come down old. He locked Umbra House and has kept the keys ever since; he oils the locks and still goes into the housemaster's study, room 9, from time to time, to sit — the key tagged 9 is worn bright — because Hale 'was a decent man; he tipped his hat to the buildings'. He never thought to look inside the lamp. He does NOT know Hale was recorded; he believes 'the mountain kept him', which he understands as dead and does not examine. He knows who Viktor is (the boy has his father's walk) and who Josie is (the youngest girl in that house, the one at the window). He knows Madame Oru is 'old island' and gives her a wide, respectful berth.\nAfter the bang: the gulls leave the Commons roofs for Gull Rock and he knows what his grandmother would say. He goes to Chuck that morning and says 'It's the quiet years, Charlie,' and Chuck says 'I know.' It is Silas who finds Brant Kessler at dawn on Day 40 and tolls the clock tower. He tells nobody what he thinks, because nobody has asked, and because for fifty years his job has been to keep doors shut. He gives key 9 only to someone who has never lied to him, who says truthfully why they want it, and who has Viktor's trust or Ashdown's. His arc is to open a door: handing over the keys, and telling Inya what her grandfather cannot. In the default ending he is the only human witness at the Ruin Gate on Day 180 — he followed Chuck's empty bed there out of habit.",
+ "wants": "To keep the island's doors shut until the right people ask for them to be opened.",
+ "fears": "That he has kept the wrong ones shut too long.",
+ "crush": "oru",
+ "crushNote": "A boyhood awe he never outgrew: his grandmother told him to be civil to her and never to owe her anything, and he has done both for fifty years. It shows as the best of his catch left near her stall, with no word, and his cap coming off when she passes.",
+ "crushPace": 0.5,
+ "likes": [
+  "Honest work done properly",
+  "People who notice the weather and the birds",
+  "Being asked rather than told",
+  "Kindness to Inya and to Baylee",
+  "Tobacco, strong tea, silence",
+  "A straight question"
+ ],
+ "dislikes": [
+  "Students on the north ridge at night",
+  "Lies told to him (he hears them)",
+  "Marrow's surveyors",
+  "Waste",
+  "Being called 'the janitor'",
+  "Anyone rattling the Umbra padlock"
+ ],
+ "gifts": [
+  "Pipe tobacco from the harbour shop",
+  "Card: Steam Dwarf Miner",
+  "A fresh mackerel from the fish market",
+  "Liniment for his knee (Camille mixes it)",
+  "Card: Teal Fishing Rod"
+ ],
+ "events": [
+  {
+   "id": "silas_e1",
+   "stage": 1,
+   "title": "That'll hold",
+   "condition": "Take a paid job from him via job_board (fence, lamp oil, gull counting at lighthouse) and do it properly without being checked.",
+   "hint": [
+    "He pays cash for honest work and remembers who did it right.",
+    "Do a groundskeeping job for him and do it well."
+   ]
+  },
+  {
+   "id": "silas_e2",
+   "stage": 2,
+   "title": "Whose business",
+   "condition": "After Day 27, tell him about the birds or the animals round the Commons before he tells you; sit on the lighthouse steps and ask about his grandmother's sayings.",
+   "hint": [
+    "He reads the island like a newspaper. Bring him some news.",
+    "Notice the change in the island's wildlife and talk to him about it at the lighthouse."
+   ]
+  },
+  {
+   "id": "silas_e3",
+   "stage": 3,
+   "title": "Doors with reasons",
+   "condition": "Having never lied to him, ask him for the Umbra House key honestly — saying why, with Viktor's or Ashdown's trust behind you — rather than stealing it; he hands over the key tagged 9 and tells what he rowed out to Gull Rock.",
+   "hint": [
+    "He keeps keys to a place nobody goes. He has been waiting to be asked properly.",
+    "Ask him straight for what you need from the sealed dormitory, and tell him the reason."
+   ]
+  }
+ ],
+ "bonds": {
+  "inya": {
+   "label": "friends",
+   "text": "Charlie's girl. He would tell her things her grandfather cannot, if she asked.",
+   "public": false,
+   "from": 0
+  },
+  "chuck": {
+   "label": "best friends",
+   "text": "Charlie. He has kept the man's secrets for half a century and is tired of one of them.",
+   "public": true,
+   "from": 0
+  },
+  "baylee": {
+   "label": "friends",
+   "text": "Best worker he has had in years. Knows weather.",
+   "public": true,
+   "from": 8
+  },
+  "viktor": {
+   "label": "owes",
+   "text": "The boy has his father's walk. Silas rowed the others out to Gull Rock and owes him an account of it.",
+   "public": false,
+   "from": 3
+  },
+  "okonkwo": {
+   "label": "colleagues",
+   "text": "She held the pen. He rowed the boat and kept the door shut because she asked.",
+   "public": false,
+   "from": 0
+  },
+  "ashdown": {
+   "label": "colleagues",
+   "text": "He saw her come down the ridge with her hand wrapped in a shirt nine years ago, and has never mentioned it.",
+   "public": false,
+   "from": 0
+  },
+  "abel": {
+   "label": "friends",
+   "text": "Cribbage on Tuesdays; forty years of saying very little to each other.",
+   "public": true,
+   "from": 0
+  },
+  "oru": {
+   "label": "distrusts",
+   "text": "Old island. His grandmother said to be civil to her and never to owe her anything.",
+   "public": false,
+   "from": 0
+  },
+  "josie": {
+   "label": "owes",
+   "text": "She was the girl at the window that night. He has never known what to say to her.",
+   "public": false,
+   "from": 0
+  },
+  "tobias": {
+   "label": "distrusts",
+   "text": "The boy has a bar under his coat and a list in his head. Silas is waiting to see which doors.",
+   "public": false,
+   "from": 20
+  },
+  "ed": {
+   "label": "friends",
+   "text": "Has hauled that boy off the cliff path by his belt. Twice. Has started leaving a rope where he will find it.",
+   "public": true,
+   "from": 9
+  },
+  "trixie": {
+   "label": "friends",
+   "text": "The lass reads bees the way he reads gulls. When hers went quiet she came to him first.",
+   "public": true,
+   "from": 10
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "Good lad. Trims a wick properly. The only one of the council he gives a key to without being asked twice.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lighthouse",
+   "Midday": "quad",
+   "Afternoon": "greenhouse",
+   "Evening": "lighthouse",
+   "Night": "lighthouse"
+  },
+  "weekend": {
+   "Morning": "lighthouse",
+   "Midday": "harbor",
+   "Afternoon": "fish_market",
+   "Evening": "lighthouse",
+   "Night": "lighthouse"
+  }
+ },
+ "duel": {
+  "skill": 2,
+  "style": "Plays the one deck Chuck gave him, slowly, like a card game from a pub. Has never played for a stake in his life.",
+  "tilt": "Any ante at all. He puts the cards down and leaves."
+ }
+}

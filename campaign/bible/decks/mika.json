@@ -1,0 +1,395 @@
+{
+ "name": "Flying Sparks",
+ "owner": "mika",
+ "heroes": [
+  "Enigma, the Seller of Secrets",
+  "Lilly, the Charming Infiltrator",
+  "Alice, the Puppeteer Girl"
+ ],
+ "main": [
+  [
+   2,
+   "Aggressive Town Guard"
+  ],
+  [
+   4,
+   "Booby Trap"
+  ],
+  [
+   4,
+   "Cute Cheese"
+  ],
+  [
+   2,
+   "Dark Gear"
+  ],
+  [
+   4,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of Fire"
+  ],
+  [
+   2,
+   "Fireshield"
+  ],
+  [
+   4,
+   "Hive's Crown"
+  ],
+  [
+   1,
+   "Initiation Ritual"
+  ],
+  [
+   3,
+   "Juice"
+  ],
+  [
+   4,
+   "Performance"
+  ],
+  [
+   4,
+   "Ska Harpyformer"
+  ],
+  [
+   4,
+   "Sparkfly Architect"
+  ],
+  [
+   4,
+   "Sparkfly Attendant"
+  ],
+  [
+   4,
+   "Sparkfly Queen"
+  ],
+  [
+   4,
+   "Sparkfly Worker"
+  ],
+  [
+   5,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ],
+  [
+   2,
+   "Monster in a Bottle"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ]
+ ],
+ "types": {
+  "Enigma, the Seller of Secrets": "Hero",
+  "Lilly, the Charming Infiltrator": "Hero",
+  "Alice, the Puppeteer Girl": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Cute Cheese": "Artifact",
+  "Dark Gear": "Artifact",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of Fire": "Spell (Destruction Magic)",
+  "Fireshield": "Spell (Destruction Magic, Reaction)",
+  "Hive's Crown": "Artifact",
+  "Initiation Ritual": "Artifact",
+  "Juice": "Artifact (Reaction)",
+  "Performance": "Ability",
+  "Ska Harpyformer": "Creature L0",
+  "Sparkfly Architect": "Creature L0",
+  "Sparkfly Attendant": "Creature L1",
+  "Sparkfly Queen": "Creature L3",
+  "Sparkfly Worker": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Treasure Chest": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Magnetic Potion": "Potion",
+  "Monster in a Bottle": "Potion",
+  "Resuscitation Potion": "Potion"
+ },
+ "gist": {
+  "Sparkfly Queen": "Only arrives through Hive's Crown. Each turn Mika names a card type and you must pick cards of that type out of your own deck and hand them to her, one for every Sparkfly she controls.",
+  "Hive's Crown": "Sacrifices a Sparkfly to put the Queen in its place: from hand, or from the deck if the Sparkfly had survived a turn.",
+  "Sparkfly Architect": "Fetches a Sparkfly card or the Crown on arrival.",
+  "Sparkfly Attendant": "While it stands, your cards and effects cannot touch the Queen.",
+  "Sparkfly Worker": "With the Queen out, returns a non-hero card on the board to hand when it arrives.",
+  "Enigma, the Seller of Secrets": "Each turn reveals the top five cards of your deck and takes one of them; you put the rest back.",
+  "Lilly, the Charming Infiltrator": "Draws a card every time Mika takes a card from your deck or hand.",
+  "Alice, the Puppeteer Girl": "Once per turn hits a target, harder for every creature that has stayed on her board.",
+  "Ska Harpyformer": "Free summon that fetches Performance.",
+  "Performance": "Ability that raises the one beneath it a level.",
+  "Booby Trap": "Face-down trap that punishes the attacker.",
+  "Fireshield": "Reaction: returns part of a hit.",
+  "Dark Gear": "Steals a creature.",
+  "Deepsea Idol": "Cancels a sweep on two or more creatures.",
+  "Cute Cheese": "Searches any creature."
+ },
+ "plan": "Mika builds a hive and then shops in your deck. Architects find the pieces, a Sparkfly that has survived a turn is crowned, and the Queen comes out of the deck. From then on Mika names a card type each turn and you have to hand her cards of that type out of your own deck, while Enigma takes the best of your top five; Lilly draws a card for every one of those thefts, and Alice turns the hive into damage. The hive is small creatures all the way down: the Queen cannot arrive without a Sparkfly to crown, and the Attendant that shields her has no shield of its own.",
+ "looks": {
+  "early": "Two Sparkflies and a Ska Harpyformer; a Hive's Crown in her hand.",
+  "mid": "The Queen with an Attendant at her side, your deck getting thinner in exactly the wrong places, your cards in her hand.",
+  "late": "A full hive, Alice counting it, and Mika reading the top of your deck with a sleepy smile."
+ },
+ "profile": {
+  "opening": {
+   "best": "CONTROL",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "She has small Sparkflies on the board and no Queen yet.",
+   "why": "The Crown needs a Sparkfly to sacrifice, and one that has survived a turn to fetch the Queen from the deck; a sweep now delays the hive by several turns."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "A Sparkfly Attendant stands next to the Queen.",
+   "why": "The Attendant makes the Queen untouchable and is itself an ordinary small creature: remove it first, then the Queen falls to The Yeeting or Dark Gear. Every turn she lives, key cards leave your deck."
+  },
+  "crisis": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Your deck has lost most of its Destruction Magic; what you hold is what you have.",
+   "why": "The long game is gone with the deck, so the cards in hand must become hero damage now; her hive is too well protected to be worth them."
+  },
+  "endgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Alice and a few Sparkflies are her remaining damage; her heroes are ordinary.",
+   "why": "Blunt the one hit that would kill each turn and spend everything else on heroes; there is no deck left to dig through."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Mika summons a Sparkfly Architect, which fetches a Hive's Crown, and a Ska Harpyformer.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Sweep the Sparkflies"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Enigma"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build"
+     }
+    ]
+   },
+   {
+    "board": "Enigma turns over your top five cards and takes the best one; Lilly draws for it.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill the Sparkflies while she shops"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Enigma"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Stack what is left and carry on"
+     }
+    ]
+   },
+   {
+    "board": "An Attendant and a Worker join; the Crown stays in her hand until one has survived a turn.",
+    "options": [
+     {
+      "stance": "CONTROL",
+      "text": "Kill them this turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye the Crown"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "The Queen arrives from the deck with an Attendant beside her and Mika names \"Ability\".",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill the Attendant, then Yeet the Queen"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race before the deck is gone"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Keep building from a shrinking deck"
+     }
+    ]
+   },
+   {
+    "board": "A Worker lifts your Gathering Storm back to your hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Attendant first, Queen second, Storm third"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Re-attach and shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-attach and hope"
+     }
+    ]
+   },
+   {
+    "board": "Three Sparkflies around the Queen: you hand over three cards a turn, and Lilly draws three.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Queen once the Attendant is dead"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche hits everything but her"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Your deck holds no more Destruction Magic.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Use what is in hand on heroes"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick with the Storm you have"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Spend your hand on the hive"
+     }
+    ]
+   },
+   {
+    "board": "Alice hits for five creatures.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Alice has ordinary health: burn her"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun!"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep into a Deepsea Idol"
+     }
+    ]
+   },
+   {
+    "board": "A Booby Trap is set on Lilly.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning and the Storm trigger nothing"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Alice alone with two Sparkflies.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the hit, burn Alice"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Alice"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Your deck is nearly empty of spells.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Protect the caster; the Storm on the table is enough"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Everything left at heroes"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Dig anyway"
+     }
+    ]
+   },
+   {
+    "board": "Resuscitation Potion on Enigma.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Keep Homerun!, kill Alice"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

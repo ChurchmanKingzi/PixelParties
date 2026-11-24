@@ -1,0 +1,19 @@
+{
+ "name": "Rare Hall — Lobby",
+ "zone": "dorms",
+ "bg": "rare_lobby",
+ "night": false,
+ "hours": "Front desk staffed by resident advisors Morning to Evening; non-residents sign in.",
+ "sight": "A proper dormitory at last: a four-storey sandstone block on the main campus with a blue-carpeted lobby, a wall of brass mailboxes, a noticeboard under glass and a lift that works on alternate days. Blue collars come and go with the briskness of people who have somewhere to be. A trophy shelf displays the inter-dorm shield. It smells of carpet shampoo and microwave popcorn.",
+ "things": [
+  "Sign in as a guest and visit a friend upstairs",
+  "Read the Rare Hall noticeboard: floor meetings, quiet hours, ladder leaders by floor",
+  "Leave a note in somebody's brass mailbox",
+  "Look at the inter-dorm shield and the engraved years",
+  "Wait on the lobby sofa and watch the middle class of the Academy go by",
+  "Ask the desk who is in",
+  "Notice which mailboxes are overflowing"
+ ],
+ "secret": "FIRST-YEAR CORRIDORS (canon, CORE 9.2; twin rooms, all occupants named): first floor R101 eberhart and mikoto, R102 teobalt and junho, R103 cas and rafa; second floor R201 marit and eloise, R202 noor and sunny, R203 pippa and victoria. Upper years live on the third and fourth floors: brant, kenji, priya, bex, felix, and ophelia (year 2) — who is on the first-year landing more than her own, checking on her sister without seeming to. The middle dorm is where ambition is rawest — these are the people with something to gain and to lose at Promotion Duels. Brant's mailbox overflows from Day 40 and nobody empties it. The second victim lives here; by Day 66 the noticeboard carries a black-bordered card and a sign-up sheet for 'walking buddies'. The inter-dorm shield has no entry for the year nine years back. If Rowan is promoted at Days 89–91 he moves here on Day 106.",
+ "access": "Guests sign in; no guests after the Evening slot (strictly enforced from Day 67)."
+}

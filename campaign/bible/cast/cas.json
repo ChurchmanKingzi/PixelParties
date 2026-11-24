@@ -1,0 +1,204 @@
+{
+ "id": "cas",
+ "name": "Caspian \"Cas\" Abernathy",
+ "firstName": "Cas",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CM",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R103",
+ "romance": false,
+ "deck": "Regatta (Race Boats)",
+ "look": "Handsome in a way that suggests radio: wavy dark hair, an easy mobile mouth, a long striped scarf over the black Auxiliary jacket's blue collar, and a small clip-on microphone fastened to the lapel whether or not it is connected to anything. He gestures with an open hand as though passing the audience to a colleague. He is rarely silent and looks slightly lost when he is.",
+ "voice": "A rich, smooth, practised broadcast baritone, quick with a phrase — and prone to slipping, without warning, into third-person commentary on whatever is happening in front of him, himself included. It is funny and it is a shield. With the microphone voice off he is hesitant, careful, and on some consonants catches for half a second. RARE habit (once in a scene at most; most scenes go without it): narrating his own embarrassment as it occurs.",
+ "lines": [
+  "And he's dropped the tray. Unforced error from Abernathy, who'll want to see that one again. Sorry. Sorry. Let me get that.",
+  "My whole deck is a regatta. Nobody dies. Somebody wins a little cup. I think there should be more of that.",
+  "Rafa's frying something. It's eleven at night. The crowd — that's me — the crowd is on its feet.",
+  "Could we… could we not, for a minute? I'd like to just say something the ordinary way."
+ ],
+ "intro": "A first-year commentator from Rare Hall with a scarf, a clip-on microphone and a rich broadcast voice, who narrates real life as it happens — including his own mistakes.",
+ "traits": [
+  {
+   "id": "cas_1",
+   "text": "He commentates whatever is in front of him, in a caster's voice, whether or not anyone is listening.",
+   "how": "Stand near him; the Day 5 bonfire."
+  },
+  {
+   "id": "cas_2",
+   "text": "He wears a clip-on microphone that is usually not plugged into anything.",
+   "how": "Look at his lapel."
+  },
+  {
+   "id": "cas_3",
+   "text": "He narrates his own embarrassments in the third person while they are happening.",
+   "how": "Watch him drop something."
+  },
+  {
+   "id": "cas_4",
+   "text": "His deck is a boat race in which nothing is destroyed, and he calls every game of it aloud.",
+   "how": "Play him."
+  },
+  {
+   "id": "cas_5",
+   "text": "His room always smells of someone frying, and he is always describing it.",
+   "how": "Rare Hall room 103."
+  },
+  {
+   "id": "cas_6",
+   "text": "He grew up in a lock-keeper's cottage on the Thames and called the boats going through from the age of six.",
+   "how": "Ask why Race Boats."
+  },
+  {
+   "id": "cas_7",
+   "text": "Without the commentary voice he speaks slowly and carefully, and it costs him something.",
+   "how": "Friend stage; a quiet room."
+  },
+  {
+   "id": "cas_8",
+   "text": "He had a stammer until he was thirteen, and the microphone voice is how he lost it.",
+   "how": "Trusted."
+  }
+ ],
+ "secret": "Caspian Abernathy is the son of a lock-keeper at Boveney on the Thames. As a small boy he stammered so badly he would not speak at school; what he would do, alone on the lock gate, was call the boats — a pretend commentary, in a pretend voice, on every punt and cruiser that came through. In that voice the words did not catch. A speech therapist had the sense to build on it, and by thirteen the stammer was gone, or rather had been built over: Cas speaks fluently as long as some part of him is on air. The compulsive narration is therefore not vanity. It is scaffolding. Narrating his own embarrassment is how he stays ahead of it. Wound: he is afraid that the broadcaster is the only fluent person in there. Contradiction: a boy with a beautiful voice who does not believe he can talk. Off air, in a quiet room, with someone he trusts, he speaks slowly, in a much plainer voice, and on b's and m's the old catch is still there. Race Boats is the lock again: a regatta, a little cup, nothing killed.\nHe is good — the best natural play-by-play voice in the year, and he knows the game. Vivienne Laurent hears herself at nineteen and is unusually kind; Bex Calloway has him on The Top Deck by week three and is, for once, a little flustered by a co-host; he sits next to Victoria Capulet on the student desk and has made himself her interpreter, turning 'the red is rather sad in that one' into something an audience can follow without ever making her the joke. He is dazzled by Marit Solberg, who performs for the love of it where he performs from need, and narrates his own attempts to talk to her with a sportsman's rueful accuracy. Captain Stroud, discovering a student who plays his one silly deck, has adopted him.\nAfter Day 40 the administration wants calm voices, and his is the calmest. On the morning of the second incident he is put on the stream to read a statement, and for the first time since he was thirteen the voice will not come: there is no way to commentate a boy sitting at a table with nobody home. He stammers through it on air. It is the most honest broadcast of the term and he thinks it is the end of him. What he does next — goes silent, or learns to speak in his own voice — is his arc. The thing in bungalow 7 enjoys him ('he says what is happening while it happens; that is very clear') and once asked him to narrate IT; he tried, got three words in, and stopped, and could not say why.",
+ "wants": "To be the voice of a world final — and to be able to say one important thing without the microphone.",
+ "fears": "Opening his mouth, off air, and finding the stammer is all that is there.",
+ "crush": "marit",
+ "crushNote": "She performs for joy where he performs out of need, and he cannot take his eyes off it. It shows as rueful third-person commentary on his own attempts to talk to her, and as him being the one person who learns his lines for her revue.",
+ "crushPace": 1,
+ "likes": [
+  "Being listened to off air, patiently",
+  "A co-commentator with good timing",
+  "Boats, rivers, locks, the ferry",
+  "Rafa's cooking, described",
+  "Being allowed to finish a difficult word",
+  "Kindness to Victoria",
+  "A well-called match"
+ ],
+ "dislikes": [
+  "Being interrupted mid-word",
+  "Having his sentences finished for him",
+  "Impressions of his voice",
+  "Dead air he did not choose",
+  "Being told he 'never switches off'",
+  "Reading someone else's script"
+ ],
+ "gifts": [
+  "Card: Race Boat Captain",
+  "A windshield for his clip-on microphone",
+  "Card: Declare the Winner",
+  "Throat lozenges from the infirmary",
+  "A recording of a match with the commentary track left blank, 'for you to fill'"
+ ],
+ "events": [
+  {
+   "id": "cas_e1",
+   "stage": 1,
+   "title": "Unforced error",
+   "condition": "Be commentated on by him without taking offence, and give him a line back; sit second chair for one casual game he calls at broadcast_studio or the student_lounge.",
+   "hint": [
+    "There is a first-year who narrates everything, including you. He is rather good.",
+    "Take his running commentary in good humour and join him at the desk for a game."
+   ]
+  },
+  {
+   "id": "cas_e2",
+   "stage": 2,
+   "title": "The ordinary way",
+   "condition": "Find him off air in a quiet place (harbor, ferry_dock or rare_room) and talk without hurrying him or finishing his sentences; ask about the lock.",
+   "hint": [
+    "He has two voices. One of them takes patience to hear.",
+    "Have a quiet, unhurried conversation with him away from the microphone."
+   ]
+  },
+  {
+   "id": "cas_e3",
+   "stage": 3,
+   "title": "Dead air",
+   "condition": "Be in the studio on the morning of Day 52 when the voice fails him on air, and afterwards tell him it was the truest thing broadcast all term; later, stop him narrating a certain student at that student's request.",
+   "hint": [
+    "He is going to be asked to say something that cannot be said in a commentator's voice.",
+    "Stand by him when his broadcast goes wrong, and help him find his own voice afterwards."
+   ]
+  }
+ ],
+ "bonds": {
+  "rafa": {
+   "label": "roommates",
+   "text": "Rare Hall 103. His roommate fries things at eleven at night on an illegal hotplate, and Cas commentates every one.",
+   "public": true,
+   "from": 1
+  },
+  "victoria": {
+   "label": "teammates",
+   "text": "He 'translates' for her on air and has never once let her be the joke.",
+   "public": true,
+   "from": 4
+  },
+  "marit": {
+   "label": "crush",
+   "text": "She performs for joy; he performs because he must. He narrates his own failures to talk to her with rueful accuracy.",
+   "public": true,
+   "from": 5
+  },
+  "bex": {
+   "label": "mentor",
+   "text": "She gave him a slot in week three and taught him how a rundown works. He thinks she is the bravest broadcaster he has met.",
+   "public": true,
+   "from": 14
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "Ms Laurent interrupts him twice a sentence and has never once imitated him.",
+   "public": true,
+   "from": 4
+  },
+  "jessica": {
+   "label": "rivals",
+   "text": "The other first-year people listen to. She makes the call a turn early in half the words.",
+   "public": true,
+   "from": 6
+  },
+  "abel": {
+   "label": "friends",
+   "text": "The ferry captain plays the same silly boat deck. Cas calls his one game a year as if it were a final.",
+   "public": true,
+   "from": 6
+  },
+  "pippa": {
+   "label": "friends",
+   "text": "She shoots, he talks; between them they are most of The Top Deck's first-year coverage.",
+   "public": true,
+   "from": 5
+  },
+  "lucas": {
+   "label": "friends",
+   "text": "The judge who gives him a beat to finish the word. Cas would walk through a wall for him.",
+   "public": true,
+   "from": 8
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "classroom",
+   "Afternoon": "broadcast_studio",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "harbor",
+   "Midday": "broadcast_studio",
+   "Afternoon": "ferry_dock",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Race Boats: a harmless, charming regatta he calls aloud lap by lap; wins by crossing a line rather than by hurting anyone. He often gives away his own hand in the commentary.",
+  "tilt": "Silence. Told not to talk during a match, he loses his rhythm and half his skill."
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "name": "The Cold Table",
+ "zone": "special",
+ "bg": "hollow_field",
+ "night": false,
+ "hours": "Not a place on any map. It happens wherever a certain kind of duel is formally begun, and ends when the duel does.",
+ "sight": "The room you were standing in is still there, but far away, as if seen through thick ice. Sound drains out of the world until you can hear your own pulse and the tick of a card being turned. Your breath smokes. The holograms no longer flicker: they stand on the table with weight, they cast shadows, and the shadows fall the wrong way. Across from you, the thing that is being very polite waits for your move.",
+ "things": [
+  "Play. There is nothing else to do here",
+  "Look at your opponent, really look",
+  "Notice that the heroes are looking at you too",
+  "Watch your breath, your hands, the frost growing across the table edge",
+  "State the ante again, aloud, and hear it accepted",
+  "Try to speak to someone outside the cold — they cannot hear",
+  "Try to leave — the duel has been formally issued; you find you will not"
+ ],
+ "secret": "The arena overlay of a HOLLOW DUEL (canon 4.3): it manifests around any Charter Duel in which the Guest is a party and an ante of self has been named. Witnesses outside see two people sitting very still over a table for what the clock says is eleven minutes; frost; lights dimmed; afterwards one of them does not get up. Rules the GM must keep absolutely: the Guest never cheats, never refuses a formally issued duel, never takes more than the stated ante, always pays its own ante if it loses, and explains anything about the rules truthfully if asked. Inside the field Rowan's Nerve matters double: the cold reads as stage fright made physical. Duel system per CORE 8; the Guest's deck profile gives stances and tells. A first-print card in Rowan's deck makes his own heroes 'real' here too, which evens the footing. In the Vault the field does not appear — there the contest is the real thing and needs no overlay.",
+ "access": "Never reachable by travel. Entered only through a formally issued Charter Duel with the Guest."
+}

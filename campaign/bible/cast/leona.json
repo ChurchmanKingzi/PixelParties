@@ -1,0 +1,251 @@
+{
+ "id": "leona",
+ "name": "Leona Helical",
+ "firstName": "Leona",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B4",
+ "romance": true,
+ "deck": "Borrowed Brilliance (Enigma and Lilly: plays your cards)",
+ "look": "Medium everything: long, straight mousy-brown hair parted in the middle, grey-blue eyes, a plain pleasant face you have to look at twice to remember, the red jacket with its grey collar buttoned exactly as issued and sensible flat shoes. She carries a canvas satchel with a broken buckle she has not replaced. In a group photograph she is the one the eye slides past, and she stands as if she knows it.",
+ "voice": "Even, mild, unremarkable on purpose: short complete sentences, no slang, no emphasis. She asks more than she tells and has a way of ending a subject by agreeing with it. When something touches the thing she actually cares about, the mildness goes flat and exact, like a form being filled in. RARE habit (once in a scene at most; most scenes go without it): answering a personal question with a small factual one of her own.",
+ "lines": [
+  "I got in the same way everyone did. There was a form.",
+  "That card was yours a minute ago. I'd apologise, but you'd only think I meant it.",
+  "Which building holds the old staff records, do you know? Idle interest.",
+  "People tell me things because they forget I'm in the room. It isn't a talent. It's a face."
+ ],
+ "intro": "A quiet, entirely ordinary-looking first-year from bungalow 4 whom nobody can quite remember meeting — and nobody can explain how she placed into the Academy.",
+ "traits": [
+  {
+   "id": "leona_1",
+   "text": "Nobody remembers seeing her at any qualifier, and she changes the subject pleasantly when asked how she got in.",
+   "how": "Tomi brings it up in the first week; so does Bex."
+  },
+  {
+   "id": "leona_2",
+   "text": "Her deck wins by taking cards out of the opponent's deck and playing them better than they would.",
+   "how": "Play her."
+  },
+  {
+   "id": "leona_3",
+   "text": "Her corner of the bungalow is so tidy it looks unoccupied, apart from a locked suitcase under the bed.",
+   "how": "Visit bungalow 4."
+  },
+  {
+   "id": "leona_4",
+   "text": "She shares a surname with the professor of Hologram Engineering, and both of them say it is a coincidence.",
+   "how": "First Table Tech demonstration; Maisie asks outright."
+  },
+  {
+   "id": "leona_5",
+   "text": "She is in the library's local-history corner and the card archive's reading room far more than at a practice table.",
+   "how": "Library or card archive, Afternoon."
+  },
+  {
+   "id": "leona_6",
+   "text": "She is an average player and says so without any embarrassment at all.",
+   "how": "Ask about her ladder rank."
+  },
+  {
+   "id": "leona_7",
+   "text": "She grew up in company housing near a factory town and can identify any Kaboom print run by its copyright line.",
+   "how": "Show her an old card."
+  },
+  {
+   "id": "leona_8",
+   "text": "She wears a plain steel wristwatch a size too large, set five minutes fast, and winds it every evening.",
+   "how": "Notice it; ask whose it was once she is Close."
+  },
+  {
+   "id": "leona_9",
+   "text": "She has not spoken to her father in three years.",
+   "how": "Close stage, said as a plain fact."
+  }
+ ],
+ "secret": "Leona is Professor Cornelius Helical's daughter (CORE 9.7 is canon; this expands it). Her mother, Miriam Helical, was a twenty-year-old apprentice at the print works on Caldera Key during the Alpha run thirty years ago — she swept the pigment room and breathed what was in the air — and went on to become lead engineer of Kaboom Entertainment's hologram core. From what she had seen of the tile-dust ink she designed the HELICAL LATTICE, a projector that would make holograms solid to the touch; it needs tile dust; she shelved it as dangerous. Like several print workers she developed the slow 'print-works cough' and died three years ago, at fifty, in a company flat. The company admitted nothing. The steel watch is hers.\nAfter the funeral Leona, sixteen, found the bank transfers: to pay for the last year of treatment her father had sold part of Miriam's notes to Lucian Marrow. She has not spoken to him since. She finished school living with an aunt in Swindon, taught herself the game from her mother's test decks, and got onto the island with a faculty dependant's tuition waiver on which she forged his signature. He found her name on the Day 1 lists, stood for a long minute, and let it stand. They pass in corridors like strangers; he leaves a light on in his office in case she knocks; she has not.\nWhat she is here for: (1) her mother's three grey linen notebooks — the real lattice — which her father hid somewhere on the island, before Marrow finds them (her own guesses, in order, are his office in the faculty wing, the hologram plant under the Trial Domes, and the old print works — and all three are right, one notebook in each: the first inside a gutted oscilloscope in his office; the second in the sealed housing of the original projector in the plant; the third, with the pigment tables, in her mother's old apprentice locker, number 14, at the print works, marked M.V., where he leaves sea-pinks); (2) proof that the company knew the dust was killing its workers: the payroll book and sick list of 'K.A. run 1' in the rusted inner drawer of the print works' office safe (nine ink-room workers, one 'M. Vane — apprentice'; seven with 'cough'; 'do NOT record cause'), and the PRINT WORKS WELFARE FUND ledger in the card archive: thirty years of quarterly payments to eleven former workers, each marked 'no claim', her mother's row ('M. Helical, née Vane') ending three years ago, the last ten years initialled L.M. By default she is caught in the Archive's records room on Day 112 and, if her father loses all three notebooks, in Marrow's suite on Day 175, and is expelled on the forged waiver (Day 176). She is ordinary at the game and knows it; she steals cards in duels because stealing is what she came to do, and she finds it honest to be open about that in the one place she can be. Her ordinariness is real and is also her best tool: clerks, porters and professors talk in front of her. Wound: she watched her mother be used up by a company and her father sell what was left, and has concluded that the only safe relation to anything precious is to take it first. Contradiction: the least noticeable person on the island is the one carrying the most anger, and it never once shows on her face. Private habit: she keeps the watch five minutes fast 'so that I'm always early for bad news'.\nCollisions: Maisie Voltage, her roommate, is cheerfully trying to invent exactly what Miriam shelved, and Leona likes her, which is a problem. Viktor Hale is the only other student who is here for a parent rather than a rank, and they recognise it in each other without discussing it. She knows Marrow by sight from the funeral; when he arrives on Day 61 he does not recognise the plain girl in the cardigan, and she intends to keep it so. Tobias Crowe, the row's actual thief, is the first person to notice that she moves like someone casing a building, and says nothing — which she finds, to her annoyance, attractive. After Day 40 she understands sooner than most what a solid hologram in a duel means, because she has read enough of her mother's work to know it should be impossible without a lattice. Her arc: from taking to trusting — she cannot open the print works safe, face her father or decide what to do with the notebooks alone. The hinge of her route is whether Rowan, once he knows, helps her steal the truth, or helps her read it with her father in the room.",
+ "wants": "Her mother's notebooks out of everyone else's hands, and one page with the company's name on it that proves they knew.",
+ "fears": "That her father sold the notes because her mother asked him to — and that she has been angry at the wrong person for three years.",
+ "crush": "tobias",
+ "crushNote": "He noticed how she moves through a building, understood what it meant, and said nothing to anyone. It shows as her being unremarkable slightly closer to him than to other people, and asking him one professional question too many.",
+ "crushPace": 0.7,
+ "likes": [
+  "Being remembered — a name, a detail, where she said she would be",
+  "Practical help with no questions",
+  "Knowing how a building or an office works",
+  "Quiet competence and people who keep things to themselves",
+  "Old print, copyright lines, small factual puzzles",
+  "Being beaten by her own stolen card (it makes her laugh)",
+  "Tea, plainly made",
+  "Being asked what she thinks rather than who she is"
+ ],
+ "dislikes": [
+  "Being asked how she got in",
+  "Jokes about her surname",
+  "Company slogans",
+  "People who touch her suitcase",
+  "Being pitied as 'out of her depth'",
+  "Kaboom Entertainment merchandise",
+  "Being steered toward Professor Helical 'since you must be related'"
+ ],
+ "gifts": [
+  "Card: Enigma, the Seller of Secrets",
+  "A replacement buckle for her satchel, fitted",
+  "Card: Treasure Theft",
+  "A watch-repair kit from the pawn shop",
+  "A photocopy of something from the archive she could not reach herself",
+  "Card: Lilly, the Charming Infiltrator"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Barely visible; attention as the whole message.",
+  "text": "Leona does not flirt and has no practice at being flirted with — she assumes it is aimed at someone standing behind her. Interest shows as presence: she is where he said he would be, she remembers the exact thing he said last week, she lets him see her looking something up. She will not start anything; she is busy and trusts nobody. Approach her by noticing her (she is unused to it and it lands hard), by helping with something concrete and not asking why, and by being someone who does not repeat things. Charm makes her politely vanish. The first sign that it is working is that she tells him a true fact about herself without being asked, in the same voice she uses for the weather."
+ },
+ "intimacy": "Slow, private and hard-won, because closeness to her means being let into the plan. For a long time it is shoulders together over a ledger in the archive, his coat lent on the walk back from the print works, her hand closing over his wrist to stop him speaking when a guard passes — and not letting go at once. She is shy about being looked at, having been overlooked all her life, and is undone by being found worth looking at; she likes the watch being unbuckled last and laid where she can hear it. Quiet, intent, very present, with a dry murmur of humour. Her corner of the bungalow when the others are out, or the reading room after hours. Fade as she reaches over and turns the lamp to face the wall.",
+ "events": [
+  {
+   "id": "leona_e1",
+   "stage": 1,
+   "title": "There was a form",
+   "condition": "Remember her: greet her by name on at least three separate occasions in the first three weeks, and once repeat back something she told you earlier. Do not ask how she got in.",
+   "hint": [
+    "There is a first-year people keep failing to notice. She notices who does.",
+    "Remember the quiet girl from bungalow 4 — her name, and what she said last time."
+   ]
+  },
+  {
+   "id": "leona_e2",
+   "stage": 2,
+   "title": "Idle interest",
+   "condition": "Help her with one of her 'idle' errands without asking why (fetch a volume at library, sit as lookout in card_archive's reading room, carry something to the faculty_wing) and keep it to yourself; play her a duel and laugh when she beats you with your own card.",
+   "hint": [
+    "She asks small practical questions and does not explain them.",
+    "Help her with a research errand, no questions asked, and keep quiet about it."
+   ]
+  },
+  {
+   "id": "leona_e3",
+   "stage": 3,
+   "title": "Five minutes fast",
+   "condition": "After Day 40, go with her to old_print_works (a long walk; she will not go alone twice) and help her search the old office; when she tells you whose watch it is, do not tell her what she ought to feel. She takes your arm on the way back and does not mention it.",
+   "hint": [
+    "She is looking for something a long way from campus, and she has started asking whether you are free.",
+    "Go with her to the abandoned print works and listen to what she tells you there."
+   ]
+  },
+  {
+   "id": "leona_e4",
+   "stage": 4,
+   "title": "The surname",
+   "condition": "Learn who Professor Helical is to her — from her, not by confronting him — and after Day 61 help her stay unrecognised by a certain visitor; when she decides whether to knock on the lit office door in faculty_wing, go as far as the corridor and no further. She stays the night afterwards, whichever way it went.",
+   "hint": [
+    "There is a door on campus with a light left on for her. She has not decided.",
+    "Let her tell you about the professor herself, and be nearby when she chooses whether to speak to him."
+   ]
+  },
+  {
+   "id": "leona_e5",
+   "stage": 5,
+   "title": "Read, not taken",
+   "condition": "In Term 2, find the grey notebooks with her before anyone else does and stand with her in the decision about them (destroy, publish, hand to her father, or use); she keeps Rowan in the plan to the end and says so in front of someone else.",
+   "hint": [
+    "What she came for can be stolen or it can be understood. She cannot do the second one alone.",
+    "Help her find what she came to the island for, and be part of deciding what happens to it."
+   ]
+  }
+ ],
+ "bonds": {
+  "maisie": {
+   "label": "roommates",
+   "text": "Maisie talks about her projector to anyone who will listen, and Leona listens to all of it. She likes her more than she meant to.",
+   "public": true,
+   "from": 1
+  },
+  "fiona": {
+   "label": "roommates",
+   "text": "Fiona misses very little and repeats nothing. Leona is careful around her and grateful for it.",
+   "public": true,
+   "from": 1
+  },
+  "helical": {
+   "label": "family",
+   "text": "Her father. He sold part of her mother's notes; she has not spoken to him in three years and got onto the island with his forged signature.",
+   "public": false,
+   "from": 0
+  },
+  "tobias": {
+   "label": "crush",
+   "text": "He saw how she moves through a building, understood, and said nothing. She finds that more attractive than she would like.",
+   "public": false,
+   "from": 12
+  },
+  "wren": {
+   "label": "friends",
+   "text": "The third-year who can tell a print run by its smell. Leona asks her careful questions about the oldest cards and has not said why.",
+   "public": true,
+   "from": 20
+  },
+  "tomi": {
+   "label": "owes",
+   "text": "Buys information from him — who has keys, who works where — and pays on the nail.",
+   "public": true,
+   "from": 8
+  },
+  "viktor": {
+   "label": "friends",
+   "text": "The only other student who is here for a parent rather than a rank. They have never discussed it and both know.",
+   "public": false,
+   "from": 30
+  },
+  "marrow": {
+   "label": "distrusts",
+   "text": "The man who bought her mother's notes. She saw him at the funeral; he does not know the plain girl in the cardigan, and she means to keep it so.",
+   "public": false,
+   "from": 0
+  },
+  "santangel": {
+   "label": "distrusts",
+   "text": "A professor with a locked lab paid for by the company that killed her mother.",
+   "public": false,
+   "from": 25
+  },
+  "dex": {
+   "label": "friends",
+   "text": "He answers questions about old print runs without asking why she wants to know.",
+   "public": true,
+   "from": 12
+  },
+  "tariq": {
+   "label": "distrusts",
+   "text": "The archivist notices everything and has stopped pretending not to notice her. He is the largest obstacle between her and one particular ledger.",
+   "public": false,
+   "from": 12
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "library",
+   "Evening": "card_archive",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "library",
+   "Midday": "main_street",
+   "Afternoon": "card_archive",
+   "Evening": "commons_kitchen",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Enigma and Lilly lift the best cards out of your deck and play them against you; her own cards are forgettable on purpose. She plays an honest, average game with other people's weapons.",
+  "tilt": "An opponent whose deck has nothing worth taking — and any duel her father is watching."
+ }
+}

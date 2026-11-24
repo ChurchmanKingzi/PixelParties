@@ -1,0 +1,179 @@
+{
+ "id": "abel",
+ "name": "Captain Abel Stroud",
+ "firstName": "Abel",
+ "age": 60,
+ "sex": "m",
+ "group": "town",
+ "major": null,
+ "year": null,
+ "dorm": null,
+ "room": "A room at the inn; the ferry",
+ "romance": false,
+ "deck": "Race Boats (a novelty deck; one game a year)",
+ "look": "Barrel-chested, with a full white beard, in a navy suit and tie and a blue bowler hat gone soft with age. His face is the colour and texture of a good saddle. He stands with his feet apart even on dry land and squints at students as if estimating their weight for ballast.",
+ "voice": "Bluff, salty and cheerful, a merchant seaman's plain speech; he counts heads aloud, gives the weather as a greeting and tells the same six jokes on rotation, admitting it. He turns shy and formal only when Mama Odalys is mentioned. RARE habit (once in a scene at most; most scenes go without it): a head count in the middle of a sentence.",
+ "lines": [
+  "All aboard that's coming aboard! A hundred and forty-four out in September, I like a hundred and forty-four back in June. Don't spoil my sums.",
+  "Sea's lumpy. If you're going to be sick, do it leeward — that's the side that isn't me.",
+  "Twenty-two years on this run. I've carried champions, and I've carried trunks home without their owners. I know which I'd rather.",
+  "The snapper's for Mrs Fuentes, if you see her. No message. Just — it's good snapper."
+ ],
+ "intro": "Captain of the island ferry, the Second Chance: twenty-two years on the run, six jokes, and a head count he takes personally.",
+ "traits": [
+  {
+   "id": "abel_1",
+   "text": "He has captained the ferry for twenty-two years and counts every student on and off.",
+   "how": "Day 1, ferry deck."
+  },
+  {
+   "id": "abel_2",
+   "text": "He tells the same six jokes and numbers them.",
+   "how": "Any crossing."
+  },
+  {
+   "id": "abel_3",
+   "text": "He brings the best of the catch to the Commons kitchen and stays for coffee.",
+   "how": "Commons kitchen, some Mornings."
+  },
+  {
+   "id": "abel_4",
+   "text": "He plays cribbage with the lighthouse keeper on Tuesday nights.",
+   "how": "Lighthouse."
+  },
+  {
+   "id": "abel_5",
+   "text": "He lets the barefoot surfer crew for him in rough weather.",
+   "how": "Ferry dock on a bad day."
+  },
+  {
+   "id": "abel_6",
+   "text": "He remembers every student he carried home early, and why.",
+   "how": "Friend stage."
+  },
+  {
+   "id": "abel_7",
+   "text": "He has been meaning to say something to Mrs Fuentes for six years.",
+   "how": "Everyone knows; ask anyone but them."
+  }
+ ],
+ "secret": "Abel Stroud, ex-merchant navy, widower, came to the Port Mulligan run after his wife Margaret died and found that a boat with a timetable was a thing a man could hold on to. He is exactly what he seems: decent, observant in a seaman's way, sentimental under the bluff. He knows nothing of the island's hidden truth and is firmly of the mainland world: lists, manifests, weather. That is his value: the ferry log is an objective record. He carried the four Umbra students off nine years ago, strapped in blankets, and was told 'food poisoning'; he has never believed it and never asked. His manifest shows who came and went and when — including Marrow's geologist and crates on Day 61, a sealed container shipped out around Day 80, and that '{H:sig}' has not once boarded since September {H=nathan?though his mother has twice booked him a ticket home|though a ticket home has twice been booked for him}. He is in love with Odalys Fuentes in a slow, fish-bearing way that the whole island finds adorable and the two of them find unmentionable. Since the night of the bang the compass on the Belle swings a few degrees wrong inside the reef, and the dolphins that used to ride the bow have gone. After curfew the administration asks him to stop carrying students to the mainland without a signed pass; on Day 105 he runs the last ferry and counts heads, and the number is wrong.",
+ "wants": "To bring back as many as he took out.",
+ "fears": "A June head count that does not match September's.",
+ "crush": "odalys",
+ "crushNote": "Six years of snapper and no message. It shows as a pressed shirt on delivery days, a stammer nobody hears anywhere else, and his fourth joke told only for her.",
+ "crushPace": 0.6,
+ "likes": [
+  "Students who say good morning",
+  "Help with lines and luggage",
+  "Being asked for joke number four",
+  "News of the Commons kitchen",
+  "Respect for the sea",
+  "A full head count"
+ ],
+ "dislikes": [
+  "Fooling about at the rail",
+  "Sealed cargo with no manifest",
+  "Being lied to about why a child is going home",
+  "Lateness at the dock",
+  "Teasing about Mrs Fuentes",
+  "A compass that will not hold true"
+ ],
+ "gifts": [
+  "Card: Whale Race Boat",
+  "A flask of Mama Odalys's coffee",
+  "A new cribbage peg, whittled",
+  "Card: Pinta, the Singing Ship"
+ ],
+ "events": [
+  {
+   "id": "abel_e1",
+   "stage": 1,
+   "title": "Joke number four",
+   "condition": "On Day 1 on ferry_deck or any later crossing, lend a hand with lines or luggage and ask for a joke by number.",
+   "hint": [
+    "The ferry captain counts heads and tells jokes. Be a head worth counting.",
+    "Help out on the ferry and chat with the captain."
+   ]
+  },
+  {
+   "id": "abel_e2",
+   "stage": 2,
+   "title": "Good snapper",
+   "condition": "Carry his delivery up to commons_kitchen at least twice and, the second time, carry a message back from Mama Odalys (she will pretend there is none).",
+   "hint": [
+    "He sends fish up the hill. He would like to send something else and does not know how.",
+    "Run fish — and perhaps a word or two — between the captain and the Commons kitchen."
+   ]
+  },
+  {
+   "id": "abel_e3",
+   "stage": 3,
+   "title": "The manifest",
+   "condition": "After Day 61, ask to see the ferry log at ferry_dock and tell him why; he shows what came ashore, what left sealed, and who has never boarded.",
+   "hint": [
+    "He writes down everything that crosses the water. That is worth more than he knows.",
+    "Ask the captain, honestly, to show you his passenger and cargo records."
+   ]
+  }
+ ],
+ "bonds": {
+  "saoirse": {
+   "label": "friends",
+   "text": "Best deckhand he has had, and she will not take a wage.",
+   "public": true,
+   "from": 0
+  },
+  "silas": {
+   "label": "friends",
+   "text": "Cribbage, tobacco and weather.",
+   "public": true,
+   "from": 0
+  },
+  "odalys": {
+   "label": "crush",
+   "text": "Six years of snapper and no message. Everyone knows but the two of them.",
+   "public": true,
+   "from": 0
+  },
+  "hedda": {
+   "label": "distrusts",
+   "text": "The wee green one with the loudhailer. He raised his cap to her and she called him a murderer; he has not known what to say since.",
+   "public": true,
+   "from": 6
+  },
+  "cas": {
+   "label": "friends",
+   "text": "A lock-keeper's boy who knows a bow line from a spring. He lets him do the announcements on the crossing.",
+   "public": true,
+   "from": 6
+  },
+  "cati": {
+   "label": "mentor",
+   "text": "His deckhand on ferry days: takes the stern line, counts the heads twice, laughs at four of the six jokes.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "ferry_deck",
+   "Midday": "ferry_dock",
+   "Afternoon": "harbor",
+   "Evening": "bar",
+   "Night": "inn"
+  },
+  "weekend": {
+   "Morning": "ferry_dock",
+   "Midday": "harbor",
+   "Afternoon": "fish_market",
+   "Evening": "lighthouse",
+   "Night": "inn"
+  }
+ },
+ "duel": {
+  "skill": 1,
+  "style": "Knows the rules of his one silly boat deck and nothing else; plays once a year at the Founder's Festival and loses to children with dignity.",
+  "tilt": "He is not in a state from which tilting is possible."
+ }
+}

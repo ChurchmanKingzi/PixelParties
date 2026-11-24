@@ -1,0 +1,334 @@
+{
+ "ferry_deck": [
+  72,
+  95
+ ],
+ "ferry_lounge": [
+  76,
+  97
+ ],
+ "ferry_stern": [
+  77,
+  93
+ ],
+ "ferry_bridge": [
+  68,
+  97
+ ],
+ "ferry_dock": [
+  66,
+  84
+ ],
+ "main_gate": [
+  60,
+  79
+ ],
+ "quad": [
+  48,
+  68
+ ],
+ "lecture_hall": [
+  44,
+  64
+ ],
+ "classroom": [
+  52,
+  64
+ ],
+ "design_lab": [
+  57,
+  60
+ ],
+ "broadcast_studio": [
+  60,
+  64
+ ],
+ "library": [
+  48,
+  60
+ ],
+ "card_archive": [
+  51,
+  57
+ ],
+ "great_arena": [
+  40,
+  58
+ ],
+ "trial_dome": [
+  36,
+  62
+ ],
+ "duel_terraces": [
+  36,
+  67
+ ],
+ "cafeteria": [
+  53,
+  71
+ ],
+ "student_lounge": [
+  56,
+  67
+ ],
+ "council_room": [
+  41,
+  68
+ ],
+ "faculty_wing": [
+  44,
+  56
+ ],
+ "chancellor_office": [
+  46,
+  52
+ ],
+ "chuck_workshop": [
+  61,
+  56
+ ],
+ "infirmary": [
+  40,
+  78
+ ],
+ "infirmary_ward": [
+  43,
+  81
+ ],
+ "gym": [
+  33,
+  72
+ ],
+ "pool": [
+  37,
+  75
+ ],
+ "spa": [
+  32,
+  79
+ ],
+ "rooftop_garden": [
+  55,
+  55
+ ],
+ "clock_tower": [
+  44,
+  72
+ ],
+ "campus_store": [
+  57,
+  74
+ ],
+ "theatre": [
+  62,
+  69
+ ],
+ "old_observatory": [
+  37,
+  50
+ ],
+ "greenhouse": [
+  65,
+  60
+ ],
+ "job_board": [
+  52,
+  75
+ ],
+ "maintenance_tunnels": [
+  48,
+  76
+ ],
+ "commons_beach": [
+  47,
+  91
+ ],
+ "commons_room": [
+  43,
+  87
+ ],
+ "commons_shore": [
+  45,
+  94
+ ],
+ "commons_kitchen": [
+  51,
+  87
+ ],
+ "bonfire_pit": [
+  54,
+  92
+ ],
+ "rare_lobby": [
+  56,
+  79
+ ],
+ "rare_room": [
+  53,
+  82
+ ],
+ "rare_common_room": [
+  57,
+  83
+ ],
+ "spectral_lobby": [
+  22,
+  66
+ ],
+ "spectral_suite": [
+  19,
+  62
+ ],
+ "spectral_terrace": [
+  17,
+  68
+ ],
+ "umbra_house": [
+  40,
+  40
+ ],
+ "umbra_room9": [
+  43,
+  37
+ ],
+ "harbor": [
+  80,
+  86
+ ],
+ "main_street": [
+  80,
+  78
+ ],
+ "card_shop": [
+  84,
+  75
+ ],
+ "night_market": [
+  76,
+  82
+ ],
+ "bar": [
+  85,
+  83
+ ],
+ "cafe": [
+  77,
+  74
+ ],
+ "arcade": [
+  88,
+  79
+ ],
+ "boutique": [
+  81,
+  71
+ ],
+ "pawn_shop": [
+  88,
+  71
+ ],
+ "fish_market": [
+  75,
+  88
+ ],
+ "boathouse": [
+  70,
+  89
+ ],
+ "lighthouse": [
+  94,
+  90
+ ],
+ "inn": [
+  84,
+  90
+ ],
+ "beach_cove": [
+  36,
+  92
+ ],
+ "tide_pools": [
+  28,
+  90
+ ],
+ "cliff_path": [
+  21,
+  78
+ ],
+ "jungle_trail": [
+  52,
+  46
+ ],
+ "waterfall": [
+  62,
+  44
+ ],
+ "hot_springs": [
+  69,
+  50
+ ],
+ "rope_bridge": [
+  56,
+  38
+ ],
+ "ruins_field": [
+  40,
+  30
+ ],
+ "ruin_gate": [
+  44,
+  27
+ ],
+ "vault_antechamber": [
+  48,
+  25
+ ],
+ "mosaic_vault": [
+  52,
+  28
+ ],
+ "lava_tubes": [
+  61,
+  30
+ ],
+ "volcano_rim": [
+  56,
+  23
+ ],
+ "crater": [
+  57,
+  11
+ ],
+ "old_print_works": [
+  76,
+  38
+ ],
+ "radio_tower": [
+  29,
+  34
+ ],
+ "north_shore": [
+  50,
+  4
+ ],
+ "islet": [
+  12,
+  90
+ ],
+ "sea_cave": [
+  13,
+  52
+ ],
+ "orchard": [
+  71,
+  63
+ ],
+ "campsite": [
+  29,
+  46
+ ],
+ "summit_shrine": [
+  53,
+  18
+ ]
+}

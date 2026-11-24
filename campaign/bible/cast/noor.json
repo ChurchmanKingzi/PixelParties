@@ -1,0 +1,275 @@
+{
+ "id": "noor",
+ "name": "Noor Al-Sayed",
+ "firstName": "Noor",
+ "age": 19,
+ "sex": "f",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "rare",
+ "room": "R202",
+ "romance": true,
+ "deck": "Countdown (Doom Clock)",
+ "look": "Calm hazel eyes under a blue hijab (her own choice of colour), pinned with a small silver judge's-gavel brooch. She carries the Academy rulebook under her arm, its margins full of pencil tabs, and has the stillness of someone who reads to the end of the sentence before reacting. Her handwriting is the neatest on the island.",
+ "voice": "Quiet, exact and complete: she finishes her sentences and other people's arguments, never interrupts, and says the one thing that settles the matter. Deadpan legal humour; sincere respect even in disagreement. She can quote the Charter's nine articles word for word but seldom needs to. RARE habit (once in a scene at most; most scenes go without it): 'To be precise —' before a correction.",
+ "lines": [
+  "To be precise, you didn't lose on time. Your opponent failed to call it, so the turn stands. You lost on the next one.",
+  "'Everyone does it' is not a ruling.",
+  "My deck tells you exactly when it will win. It seems only fair to give notice.",
+  "Being asked twice doesn't trouble me. Being asked carelessly does."
+ ],
+ "intro": "A quiet Rare Hall first-year who wants to become a head judge and already knows the Academy charter better than most of the staff.",
+ "traits": [
+  {
+   "id": "noor_1",
+   "text": "She knows the Academy Charter's nine articles by heart and runs a Thursday-evening reading group in the library that almost nobody attends.",
+   "how": "Any rules dispute within earshot of her; or the hand-ruled notice on the job board."
+  },
+  {
+   "id": "noor_2",
+   "text": "She wants to be a head judge, not a champion, and says so without apology.",
+   "how": "Ask why she is in Competitive Play."
+  },
+  {
+   "id": "noor_3",
+   "text": "She volunteers as a floor judge at the card shop's weekend events.",
+   "how": "Be at the card shop on a Saturday."
+  },
+  {
+   "id": "noor_4",
+   "text": "She prays five times a day and has worked out which campus rooms are quiet at each of them.",
+   "how": "Meet her leaving the rooftop garden or the old observatory; she explains simply if asked."
+  },
+  {
+   "id": "noor_5",
+   "text": "Her deck counts down to a fixed turn, and she always tells her opponent the number.",
+   "how": "Play her."
+  },
+  {
+   "id": "noor_6",
+   "text": "She is from Alexandria by way of Rotterdam, and learned Dutch, English and the comprehensive rules in the same two years.",
+   "how": "Ask about her accent."
+  },
+  {
+   "id": "noor_7",
+   "text": "Her father is a port arbitrator; she grew up doing homework at the back of hearings.",
+   "how": "A longer talk at the library once she is a Friend."
+  },
+  {
+   "id": "noor_8",
+   "text": "She keeps a list of rulings she believes are unjust though correct, and intends to change them one day.",
+   "how": "Ask what the pencil tabs are for."
+  },
+  {
+   "id": "noor_9",
+   "text": "She has never broken a rule on purpose and privately wonders what kind of person that makes her.",
+   "how": "Close stage; said lightly, meant seriously."
+  }
+ ],
+ "secret": "Noor is the second daughter of Karim Al-Sayed, a maritime arbitrator, and Dr Laila Hassan, a paediatrician; the family moved from Alexandria to Rotterdam when she was eleven. She learned early that being the new girl in a headscarf meant people would decide what she was before she spoke, and that rules — real ones, written down, applying to everyone — were the one place that did not happen. Judging is not coldness for her; it is her idea of mercy: nobody should lose because they did not know. Wound: at fifteen she called a correct penalty on her closest friend in a school final and lost the friend; she has never been sure since whether she chose principle or hid behind it. Contradiction: the island's strictest proceduralist is its most genuinely forgiving person, and is drawn — to her own irritation — to people who colour outside the lines (Saoirse, Marit, a certain wildcard). Her faith is sincere, unshowy and hers; she is not interested in debating it and is perfectly able to explain a boundary once, pleasantly. She is an adult making her own choices; her family are warm and would simply like to be told things before the rest of Rotterdam hears. Private joke: she gives her friends 'advisory opinions' on their love lives, numbered.\nHer importance to the plot: she is the Charter expert, and the Charter has exactly nine articles (see the plot file; she quotes them verbatim). She can explain that a challenge must be made aloud, by name, before one who counts (1); that the challenger names the ante and the challenged answers with one of equal weight (2); that a formal challenge may NOT be refused, only deferred once, up to three days (3); the rule about place and invitation (4); the PROXY rule — one who is bound to a party may stand in that party's place (5), which is how Willas takes Lilia's duel; that the result binds both and is paid at once (6); that what was taken without a game is owed and the debtor may not name the terms (7); that who plays outside the rules forfeits all antes held (8); and that where no one counts, nothing was played (9). She has always found the wording strange for a school document; laying Hale's old rubbing of the Ruin Gate beside it, she sees that the Gate's nine rings match the nine articles: 'I do not believe in coincidences of nine. I believe the Founder copied his homework.' After Day 41, shown the Dome 3 log, she rules that anything paid as an ante can be staked again and won back by any challenger; if someone raises 'taken without a game' she reads Article 7 aloud twice. She is appalled by the Hollow Duels on a level the others are not: they are RULES being used to do this. Her arc is from believing rules are safety to understanding rules are a tool, and choosing to wield them: she drafts the wording of the final ante ('everything you have taken') so that it cannot be twisted. On duty as a judge she can also press '{H}' to state {H:his} name for the record — which {H:he} cannot do.\nRoute: slow, formal, sincere. Courtship in the open, with intent stated; she will not be anyone's secret or anyone's experiment, and multiple routes at once is the fastest way to lose her.",
+ "wants": "A world where the rules protect the person who knows them least.",
+ "fears": "That she uses correctness to avoid choosing, and that one day a rule she upheld will hurt someone beyond repair.",
+ "crush": "eberhart",
+ "crushNote": "His exactness, his bow and his complete lack of small talk read to her as respect. It shows as her choosing the table next to his in the library, an exchange of correct greetings that both of them time, and a ruling in his favour she double-checks for bias.",
+ "crushPace": 0.6,
+ "likes": [
+  "Being asked for a ruling and having it respected",
+  "Precision, punctuality, kept promises",
+  "Stated intentions — saying what one means by an invitation",
+  "Curiosity about her faith or home that is not a debate",
+  "People who admit a mistake plainly",
+  "Tea, long walks, libraries",
+  "Respect shown in public as well as private",
+  "Rule-breakers who are honest about it (she will not admit this)"
+ ],
+ "dislikes": [
+  "Cheating, angle-shooting, 'it's only casual'",
+  "Being treated as exotic or as a rulebook with legs",
+  "Ambiguity about what a relationship is",
+  "Being one of several",
+  "Pressure about physical closeness",
+  "Gossip",
+  "Contempt for judges"
+ ],
+ "gifts": [
+  "Card: Doom Clock",
+  "A set of fine pencil lead and index tabs",
+  "Mint tea from the night market",
+  "Card: The Great Clock Tower \"Big Gwen\"",
+  "A first-edition comprehensive rules booklet from the pawn shop",
+  "Dates and almonds from the boutique"
+ ],
+ "flirt": {
+  "pace": "slow",
+  "initiates": false,
+  "style": "Formal, sincere, in the open.",
+  "text": "Noor does not flirt in the usual sense and is not coy either: she is attentive, remembers what he said, seeks out his company for a walk or a study hour, and at a certain point will ask, calmly, what his intentions are. She will not begin a courtship herself but she will make it clear that an honest question would be welcome. She wants to be approached with seriousness: ask her properly, say what you mean, be seen with her in daylight, be patient. Humour helps — she loves being made to laugh against her will. Carelessness, secrecy or a hint that he is courting others ends it with a polite, final ruling."
+ },
+ "intimacy": "Her pace is her own, set by her convictions, and the GM respects it completely: closeness for most of the route is emotional and conversational — long walks along the cliff path, shared tea, sitting side by side over a rulebook with shoulders almost touching, a hand briefly on his sleeve that both of them notice. She is warm, even teasing, within the limits she chooses, and she chooses them aloud. Physical intimacy belongs, for her, to a committed bond she and Rowan have spoken about seriously and that she has shared with her family (Partner stage); if the story arrives there it is treated with tenderness and privacy — she takes his hand, the door closes, and the scene ends there. Never push; her saying 'not yet' is not an obstacle but part of how she loves.",
+ "events": [
+  {
+   "id": "noor_e1",
+   "stage": 1,
+   "title": "Nine articles",
+   "condition": "Ask her for a ruling on a real dispute (yours or a friend's) and abide by it even though it goes against you; or volunteer beside her at a card_shop weekend event.",
+   "hint": [
+    "She respects people who accept a fair call when it costs them.",
+    "Bring her a rules question, accept her answer, or help her judge an event in town."
+   ]
+  },
+  {
+   "id": "noor_e2",
+   "stage": 2,
+   "title": "Unjust but correct",
+   "condition": "Spend several study sessions with her at library; ask about the pencil tabs and argue one of her 'unjust rulings' with her seriously — and concede when she is right.",
+   "hint": [
+    "She keeps a list of rules she would change. She has nobody to argue them with.",
+    "Study with her regularly and debate the rules she thinks are unfair."
+   ]
+  },
+  {
+   "id": "noor_e3",
+   "stage": 3,
+   "title": "Intentions",
+   "condition": "When she asks what your intentions are (after Day 54), answer plainly and truthfully, and be courting nobody else; walk with her openly at the next public event. She says yes to a courtship.",
+   "hint": [
+    "She will ask one direct question. Have one direct answer.",
+    "When she asks what you want from her, tell her honestly — and be free to mean it."
+   ]
+  },
+  {
+   "id": "noor_e4",
+   "stage": 4,
+   "title": "The wording",
+   "condition": "After Day 66, read the founder's annotated first draft of the Charter with her at card_archive and bring her what you know about the Hollowed, holding nothing back; trust her with the truth about {H=@near?your study partner|your roommate}. She trusts Rowan with her doubt about herself.",
+   "hint": [
+    "She has noticed something in the rules themselves. She needs all the facts to finish the thought.",
+    "Tell her everything you know and study the Charter's first draft with her."
+   ]
+  },
+  {
+   "id": "noor_e5",
+   "stage": 5,
+   "title": "Advisory opinion, final",
+   "condition": "In Term 2, speak with her family at her request (a call from the broadcast_studio or a letter she helps write), and stand as her witness when she drafts and files a formal charter instrument of her own; she names Rowan her partner in front of others.",
+   "hint": [
+    "For her, some things are only real once they are said properly to the people who matter.",
+    "Meet her family on her terms and stand beside her when she uses the charter for the first time."
+   ]
+  }
+ ],
+ "bonds": {
+  "saoirse": {
+   "label": "distrusts",
+   "text": "Has written her up twice for bare feet at a sanctioned table and likes her more than is proper.",
+   "public": true,
+   "from": 14
+  },
+  "teobalt": {
+   "label": "friends",
+   "text": "A dependable ally in every rota and rules dispute. She has not noticed.",
+   "public": false,
+   "from": 4
+  },
+  "marit": {
+   "label": "friends",
+   "text": "Gives Marit numbered advisory opinions and laughs at her more than she lets on.",
+   "public": true,
+   "from": 6
+  },
+  "hana": {
+   "label": "protégé",
+   "text": "The teacher she means to become.",
+   "public": true,
+   "from": 4
+  },
+  "mika": {
+   "label": "teammates",
+   "text": "Floor-judges the shop's weekend events with her.",
+   "public": true,
+   "from": 13
+  },
+  "sunny": {
+   "label": "roommates",
+   "text": "Her roommate is on a different timetable and a different volume. They get on absurdly well.",
+   "public": true,
+   "from": 1
+  },
+  "eberhart": {
+   "label": "friends",
+   "text": "He bows before a duel and accepts a ruling without a word. She finds his company restful, and notices that she finds it so.",
+   "public": true,
+   "from": 9
+  },
+  "mikoto": {
+   "label": "friends",
+   "text": "He checks every call twice and thanks her for both. Patience is not difficult with someone so sincere.",
+   "public": true,
+   "from": 7
+  },
+  "anni": {
+   "label": "rivals",
+   "text": "Miss Brandt is never wrong on the text and sometimes wrong on the purpose. Noor would not judge an event without her.",
+   "public": true,
+   "from": 4
+  },
+  "lucas": {
+   "label": "protégé",
+   "text": "Mr Brennan checks her calls without ever making her feel checked.",
+   "public": true,
+   "from": 4
+  },
+  "sebastian": {
+   "label": "distrusts",
+   "text": "The vice-president once asked her to enter a late filing under an earlier date. She declined, in writing.",
+   "public": true,
+   "from": 12
+  },
+  "imara": {
+   "label": "friends",
+   "text": "The treasurer is exact, kind and never rounds. Noor trusts her figures as she trusts the text.",
+   "public": true,
+   "from": 8
+  },
+  "tavita": {
+   "label": "friends",
+   "text": "The head proctor asks before he acts and applies one rule to everybody. She considers him the council's conscience.",
+   "public": true,
+   "from": 14
+  },
+  "pilar": {
+   "label": "colleagues",
+   "text": "Miss Estévez writes very well and not always accurately. Noor corrects the second part.",
+   "public": true,
+   "from": 8
+  },
+  "zeynep": {
+   "label": "protégé",
+   "text": "The ladder registrar lets her check the ledger sums on Mondays. Noor has not found an error and keeps looking.",
+   "public": true,
+   "from": 12
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "library",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "card_shop",
+   "Midday": "card_shop",
+   "Afternoon": "rooftop_garden",
+   "Evening": "library",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "Sets a Doom Clock, announces the turn you will lose on, and defends it with modest, well-chosen Creatures. Never makes a rules error; you will.",
+  "tilt": "Opponents who cheat or bend rules — she stops playing the game and starts judging it. Also, being rushed out of her count."
+ }
+}

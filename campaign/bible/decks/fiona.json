@@ -1,0 +1,395 @@
+{
+ "name": "The Wheel",
+ "owner": "fiona",
+ "heroes": [
+  "Elana, the Rocky Rebel",
+  "Calamitusk, the Chaorc War Chief",
+  "Asriel, the Sapling Sacrificer"
+ ],
+ "main": [
+  [
+   2,
+   "Bouldor Demon"
+  ],
+  [
+   1,
+   "Chaorc Cannon Fodder"
+  ],
+  [
+   4,
+   "Chaorc Corpse Cannibal"
+  ],
+  [
+   3,
+   "Chaorc Friendly Fireballer"
+  ],
+  [
+   1,
+   "Chaorc Pyre Grill Master"
+  ],
+  [
+   2,
+   "Chaorc Rider Warg"
+  ],
+  [
+   3,
+   "Chaorc Ruin Mourner"
+  ],
+  [
+   4,
+   "Chosen Sacrifice"
+  ],
+  [
+   4,
+   "Deepsea Idol"
+  ],
+  [
+   1,
+   "Divine Gift of the Deepsea"
+  ],
+  [
+   2,
+   "Fireball"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Guardian of Teocuilatl"
+  ],
+  [
+   4,
+   "Harpyformer Choir"
+  ],
+  [
+   2,
+   "Herbithorn Demon"
+  ],
+  [
+   2,
+   "Hydrogen Demon"
+  ],
+  [
+   2,
+   "Infernous Demon"
+  ],
+  [
+   2,
+   "Occultism"
+  ],
+  [
+   2,
+   "Serpentous Demon"
+  ],
+  [
+   8,
+   "Summoning Magic"
+  ],
+  [
+   2,
+   "Suspicious Monster"
+  ],
+  [
+   4,
+   "Temple of Sacrifice"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Elana, the Rocky Rebel": "Hero",
+  "Calamitusk, the Chaorc War Chief": "Hero",
+  "Asriel, the Sapling Sacrificer": "Hero",
+  "Bouldor Demon": "Creature L1",
+  "Chaorc Cannon Fodder": "Creature L1",
+  "Chaorc Corpse Cannibal": "Creature L1",
+  "Chaorc Friendly Fireballer": "Creature L1",
+  "Chaorc Pyre Grill Master": "Creature L1",
+  "Chaorc Rider Warg": "Creature L2 (Reaction)",
+  "Chaorc Ruin Mourner": "Creature L4",
+  "Chosen Sacrifice": "Creature L0",
+  "Deepsea Idol": "Artifact (Reaction)",
+  "Divine Gift of the Deepsea": "Spell (Summoning Magic)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Golden Ankh": "Artifact",
+  "Guardian of Teocuilatl": "Creature L1",
+  "Harpyformer Choir": "Creature L0",
+  "Herbithorn Demon": "Creature L1",
+  "Hydrogen Demon": "Creature L1",
+  "Infernous Demon": "Creature L1",
+  "Occultism": "Ability",
+  "Serpentous Demon": "Creature L1",
+  "Summoning Magic": "Ability",
+  "Suspicious Monster": "Creature L1",
+  "Temple of Sacrifice": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Serpentous Demon": "When it dies a Hydrogen Demon takes its place from the deck. Arriving through the cycle it draws two.",
+  "Hydrogen Demon": "When it dies a Herbithorn Demon replaces it. Arriving through the cycle it freezes one of your heroes.",
+  "Herbithorn Demon": "When it dies a Bouldor Demon replaces it. Arriving through the cycle it takes a card from any discard pile.",
+  "Bouldor Demon": "When it dies an Infernous Demon replaces it. Arriving through the cycle it makes you discard two.",
+  "Infernous Demon": "When it dies a Serpentous Demon replaces it. Arriving through the cycle it hits three times.",
+  "Asriel, the Sapling Sacrificer": "May sacrifice creatures with Occultism the very turn they arrive.",
+  "Calamitusk, the Chaorc War Chief": "Sacrifices an older creature to summon a Chaorc from the deck.",
+  "Elana, the Rocky Rebel": "Reshuffles her hand for one more card.",
+  "Occultism": "Ability: sacrifice a creature to hit a target.",
+  "Temple of Sacrifice": "Her sacrifice outlet beyond the heroes.",
+  "Chaorc Ruin Mourner": "Hits a target on every sacrifice.",
+  "Chaorc Corpse Cannibal": "Draws on sacrifices.",
+  "Chaorc Friendly Fireballer": "Fetches and casts Fireball on sacrifices.",
+  "Chosen Sacrifice": "Sacrificed from hand instead of a creature.",
+  "Guardian of Teocuilatl": "Sacrificed to protect her Area.",
+  "Deepsea Idol": "Cancels a sweep."
+ },
+ "plan": "Five Demons, each replaced from the deck by the next when it dies, each arriving with a gift: two cards, a frozen hero, a card from a discard pile, two discards from you, three hits. Fiona kills her own Demons with Occultism and the Chaorc sacrifice engine, so one creature slot turns the whole wheel in a turn, and the Ruin Mourner and Fireballer pay again for every sacrifice. It does not matter who kills a Demon: your sweepers, your Storm and The Yeeting turn the wheel for her. It is one of the strongest decks in the year. The way in is through the heroes who do the sacrificing, and through taking a Demon without killing it.",
+ "looks": {
+  "early": "One Demon and a quiet girl.",
+  "mid": "The same support zone holding a different Demon five times in one turn; your caster frozen, your hand two cards shorter.",
+  "late": "A Ruin Mourner hitting on every turn of the wheel."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "A single Demon sits on her side; killing it would only bring the next one, with its gift.",
+   "why": "Every Demon that dies is replaced and pays her, so the board must be left alone: her heroes are ordinary and the sacrificing runs through them."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Asriel sacrifices a Demon the turn it lands and the wheel turns three times.",
+   "why": "Freeze Asriel and the wheel needs a full turn per step; Dark Gear takes a Demon without killing it. Sweeping, the Storm's ticks on creatures and The Yeeting all count as kills and turn it for her."
+  },
+  "crisis": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "A Ruin Mourner is out and every sacrifice hits you; your caster is frozen by a Hydrogen Demon.",
+   "why": "Tea the freeze back, shield the hero the Mourner is working on, and keep hero damage going; clearing Demons feeds the Mourner."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "CONTROL",
+   "tell": "Her deck is running out of Demons to fetch and Asriel is low.",
+   "why": "The wheel stops when a Demon has no successor left in the deck."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Fiona summons a Serpentous Demon and waits for you to kill it.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Leave it; burn Asriel"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Demon"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill it and meet the next"
+     }
+    ]
+   },
+   {
+    "board": "She sacrifices it herself: a Hydrogen Demon arrives and freezes your caster.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Tea it back, burn Asriel"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Asriel"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "A Chosen Sacrifice from hand feeds Occultism.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning: heroes only"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb her Occultism"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Flame Avalanche"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Three sacrifices in one turn: you discard two, take three hits, she draws two.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Asriel"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Calamitusk"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep and turn it again"
+     }
+    ]
+   },
+   {
+    "board": "Your Storm tick kills a Demon she offered up; the next arrives with its gift.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Steal the Demon standing now"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Heroes"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Keep killing them"
+     }
+    ]
+   },
+   {
+    "board": "Herbithorn takes your Flame Avalanche out of your discard pile.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye it back out of her hand"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Elana"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "The Ruin Mourner hits on every step of the wheel.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Shield the target, Tea the freeze, burn Asriel"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Dark Gear the Mourner"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Yeet a Demon"
+     }
+    ]
+   },
+   {
+    "board": "The Fireballer casts a Fireball it fetched from a sacrifice.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "Deepsea Idol protects her board anyway.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Good: hero damage only"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Calamitusk"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Second sweep"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "No Serpentous left in her deck: the wheel has a gap.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Asriel"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze him"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Now sweeping is safe"
+     }
+    ]
+   },
+   {
+    "board": "Elana alone with one Demon.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Steal it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Kill it"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Asriel.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Elana"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   }
+  ]
+ }
+}

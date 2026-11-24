@@ -1,0 +1,432 @@
+{
+ "name": "Whatever I Remember",
+ "owner": "chuck",
+ "heroes": [
+  "Chuck, the Crazy Veteran",
+  "Tarleinn the Traveler",
+  "Nomu, Wanderer of Worlds"
+ ],
+ "main": [
+  [
+   2,
+   "Aggressive Town Guard"
+  ],
+  [
+   2,
+   "Booby Trap"
+  ],
+  [
+   1,
+   "Brilliant Idea"
+  ],
+  [
+   3,
+   "Burning Finger"
+  ],
+  [
+   1,
+   "Cataclysm"
+  ],
+  [
+   2,
+   "Chaos Magic"
+  ],
+  [
+   5,
+   "Destruction Magic"
+  ],
+  [
+   2,
+   "Experimentation"
+  ],
+  [
+   2,
+   "Fireball"
+  ],
+  [
+   1,
+   "Firewall"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   1,
+   "Guardian Angel"
+  ],
+  [
+   3,
+   "Haste"
+  ],
+  [
+   3,
+   "Heal"
+  ],
+  [
+   2,
+   "Lifeforce Howitzer"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   1,
+   "Magic Hammer"
+  ],
+  [
+   2,
+   "Meteor Crash"
+  ],
+  [
+   1,
+   "Relic in the Sky"
+  ],
+  [
+   2,
+   "Shield of Life"
+  ],
+  [
+   2,
+   "Shooting Star"
+  ],
+  [
+   4,
+   "Support Magic"
+  ],
+  [
+   1,
+   "Tarleinn's Floating Island"
+  ],
+  [
+   2,
+   "Teleportal"
+  ],
+  [
+   2,
+   "Time Distortion"
+  ],
+  [
+   2,
+   "Training"
+  ],
+  [
+   2,
+   "Treasure Chest"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Chuck, the Crazy Veteran": "Hero",
+  "Tarleinn the Traveler": "Hero",
+  "Nomu, Wanderer of Worlds": "Hero",
+  "Aggressive Town Guard": "Creature L0",
+  "Booby Trap": "Spell (Destruction Magic, Surprise)",
+  "Brilliant Idea": "Spell (Support Magic)",
+  "Burning Finger": "Spell (Destruction Magic)",
+  "Cataclysm": "Spell (Destruction Magic)",
+  "Chaos Magic": "Spell (Destruction Magic)",
+  "Destruction Magic": "Ability",
+  "Experimentation": "Spell (Magic Arts)",
+  "Fireball": "Spell (Destruction Magic)",
+  "Firewall": "Spell (Destruction Magic, Surprise)",
+  "Golden Ankh": "Artifact",
+  "Guardian Angel": "Spell (Support Magic, Attachment)",
+  "Haste": "Spell (Support Magic)",
+  "Heal": "Spell (Support Magic)",
+  "Lifeforce Howitzer": "Artifact (Equipment)",
+  "Magic Arts": "Ability",
+  "Magic Hammer": "Spell (Destruction Magic)",
+  "Meteor Crash": "Spell (Destruction Magic)",
+  "Relic in the Sky": "Artifact",
+  "Shield of Life": "Artifact (Equipment)",
+  "Shooting Star": "Spell (Support Magic)",
+  "Support Magic": "Ability",
+  "Tarleinn's Floating Island": "Area (Support Magic)",
+  "Teleportal": "Spell (Magic Arts)",
+  "Time Distortion": "Spell (Magic Arts)",
+  "Training": "Ability",
+  "Treasure Chest": "Artifact"
+ },
+ "gist": {
+  "Chuck, the Crazy Veteran": "Tiny health, but takes no damage from anything as long as his other heroes could still be hurt by it. He falls last or not at all.",
+  "Tarleinn the Traveler": "Heals one of his targets whenever a two-school hero casts a spell.",
+  "Nomu, Wanderer of Worlds": "Extra draws on single draws; no hand limit.",
+  "Chaos Magic": "Flips cards off the deck until a spell turns up and casts it, whatever it is.",
+  "Time Distortion": "Looks at three cards and casts a spell among them for free.",
+  "Experimentation": "Reveals the top card; an artifact is played for free.",
+  "Meteor Crash": "Small hit, or a very large one if he has dealt no damage yet this game.",
+  "Burning Finger": "Single-target burn.",
+  "Lifeforce Howitzer": "Whenever its hero is healed, the same amount is fired at one of your targets.",
+  "Heal": "A large heal, and with the Howitzer a large shot.",
+  "Tarleinn's Floating Island": "Area: once per turn, a player who heals something draws a card. It works for you too.",
+  "Brilliant Idea": "Searches any card.",
+  "Haste": "Draws cards.",
+  "Guardian Angel": "Once per game: the hero it is attached to is fully healed instead of defeated.",
+  "Firewall": "Face-down trap that burns the attacker for good.",
+  "Cataclysm": "Hits everything and clears Areas; free while one is out."
+ },
+ "plan": "There is no plan, and that is the difficulty. Chuck plays a heap of old cards that half belong to three different decks: burn, healing, random spells off the top, one of everything. Sometimes Chaos Magic finds a Cataclysm and sometimes a Heal on a healthy hero. What holds it together is Tarleinn healing into a Lifeforce Howitzer, Nomu's extra draws and Chuck himself, who cannot be damaged while the other two stand. He plays it far better than the pile deserves. It has no consistency and no defence beyond one Firewall and a Guardian Angel; the two real heroes are ordinary.",
+ "looks": {
+  "early": "A bit of everything: a Town Guard, a Floating Island, an Ability on each hero that does not match the next.",
+  "mid": "Tarleinn with a Howitzer, heals turning into shots, spells arriving off the top of the deck that surprise him as much as you.",
+  "late": "Chuck alone at the end, untouched all game, grinning over a hand he swears he drew in the Sandlands."
+ },
+ "custom": [
+  {
+   "name": "Sandlands Souvenir",
+   "type": "Artifact",
+   "text": "Does something different every time he plays it; he insists it was always like that."
+  },
+  {
+   "name": "The One That Got Away",
+   "type": "Spell",
+   "text": "A big burn spell from a set nobody else remembers."
+  }
+ ],
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "SETUP",
+   "trap": "DISRUPT",
+   "tell": "His Abilities and creatures do not belong to any one plan, and Chuck himself shrugs off every hit.",
+   "why": "A pile has no key piece to disrupt; Tarleinn and Nomu are ordinary heroes and the only ones that can be hurt, so damage on them is never wasted."
+  },
+  "midgame": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "A Lifeforce Howitzer sits on Tarleinn and every Heal becomes a shot at you.",
+   "why": "The Howitzer is the one piece that turns his harmless healing into a clock; remove it (Fire Bomb, The Yeeting) and the pile goes back to being a pile."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "RUSH",
+   "trap": "SETUP",
+   "tell": "Tarleinn is nearly down, and a Guardian Angel glows on him.",
+   "why": "The Angel turns your finishing blow into a full heal exactly once: strip it with The Yeeting first, or spring it with a small hit while your big spells are still in hand."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "Only Chuck is left: very little health, and nothing shielding him any more.",
+   "why": "Once the other two are gone he takes damage like anyone, and he has almost no health; there is nothing left on the table to control."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Chuck plays a Town Guard, a Floating Island and a Magic Arts on the wrong hero, humming.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Nomu; Chuck cannot be hurt yet"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Use his Island too and build"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Look for a key card that is not there"
+     }
+    ]
+   },
+   {
+    "board": "Chaos Magic flips six cards and casts a Fireball at you; he seems delighted.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning, Tarleinn and Nomu take it"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Firewall up, poke Tarleinn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Level up"
+     }
+    ]
+   },
+   {
+    "board": "Meteor Crash, his first damage of the game, lands very hard on your caster.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn and return fire"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race Nomu"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Tarleinn wears a Lifeforce Howitzer; a Heal on Nomu becomes a shot into your caster.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Howitzer"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle and hit Tarleinn"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep one Town Guard"
+     }
+    ]
+   },
+   {
+    "board": "Time Distortion finds him a Cataclysm; everything on the table is hit and the Island is gone.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "His heroes took it too: press"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal first"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Fire Bomb the Howitzer before he heals it all back"
+     }
+    ]
+   },
+   {
+    "board": "Experimentation flips a Shield of Life onto Nomu for free.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Break it with the Howitzer in one Fire Bomb"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Tarleinn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Tarleinn is one spell from falling and a Guardian Angel is attached to him.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet the Angel, then finish him"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Spring it with a small hit, then the big one"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Hold everything"
+     }
+    ]
+   },
+   {
+    "board": "Nomu holds eleven cards and Chuck is telling a story instead of playing them.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish Nomu before the story ends"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard some of it"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "A face-down card on Nomu; he winks.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Storm ticks do not attack anyone: let them work"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Yeet it"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Fire into it"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Chuck alone, a sliver of health under two Trainings.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Anything finishes him now"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! held in case he top-decks"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep"
+     }
+    ]
+   },
+   {
+    "board": "He Golden Ankhs Tarleinn back and Chuck is untouchable again for a turn.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Wait the turn out behind shields"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Kill Tarleinn again"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Chaos Magic, his last card. He does not look at what it flips.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "End it on your turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle ready"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Reshuffle"
+     }
+    ]
+   }
+  ]
+ }
+}

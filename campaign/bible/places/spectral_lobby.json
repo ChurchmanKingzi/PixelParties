@@ -1,0 +1,19 @@
+{
+ "name": "Spectral Tower — Atrium",
+ "zone": "dorms",
+ "bg": "spectral_lobby",
+ "night": false,
+ "hours": "A concierge at the desk day and night; non-residents enter by invitation only. The under-age residents' sign-out book lies on the atrium desk, kept by the junior warden, Thandi Mokoena (Midday and Evening).",
+ "sight": "A white tower stands on the western cliff, and its atrium is seven storeys of air: marble floor, a glass lift, a chandelier of prismatic card-shaped crystals that throws slow rainbows on the walls. A fountain whispers. Portraits of Battle Team captains hang in gilt, the newest of them a calm woman with a platinum undercut. Everything is cool, perfumed and faintly echoing, and your plain grey collar has never looked so plain.",
+ "things": [
+  "Be announced by the concierge — or be politely stopped",
+  "Ride the glass lift and watch the sea rise through the west wall",
+  "Look at the captains' portraits",
+  "Read the gilt board of residents ranked by ladder position, updated daily",
+  "Deliver something (the tower tips well; job slips sometimes ask for runners)",
+  "Wait for whoever invited you on a sofa you are afraid to crease",
+  "Meet Ashton holding court by the fountain with a rose and an opinion"
+ ],
+ "secret": "FIRST-YEAR FLOOR (canon, CORE 9.2; the second floor, six single suites, all named): S1 georgie, S2 jessica, S3 anni, S4 ashton, S5 gideon, S6 magnus. Upper years on the floors above: lilia, willas, dom, octavia. The elite are not happier; the tower is quiet in a lonely way. Georgie has a suite to herself and is frightened in it at night — Pippa and Willas both check on her, and Anni next door in S3 has appointed herself floor monitor and walks the corridor at ten. From Day 61 the best guest suite on the sixth floor is Marrow's; two unnamed assistants and a locked equipment case come with him. Gideon's reports are delivered there. D106+: if the Guest wears Gideon, the concierge mentions that Mr. Pryce no longer takes the lift, he takes the stairs, all seven floors, without his breathing changing.",
+ "access": "Invitation only for non-residents (a named resident must receive you). Residents: by promotion."
+}

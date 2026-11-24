@@ -1,0 +1,263 @@
+{
+ "id": "pilar",
+ "name": "Pilar Estévez",
+ "firstName": "Pilar",
+ "age": 20,
+ "sex": "f",
+ "group": "student",
+ "major": "CM",
+ "year": 2,
+ "dorm": "rare",
+ "room": "Rare Hall, third floor",
+ "romance": true,
+ "deck": "Full House (go-wide crowd deck: Pinta, the Singing Ship; Tempeste Moana, the Rain Singer; Alice, the Transfer Student)",
+ "look": "Petite (about 5'3\") and slim with a dancer's quick posture, light golden-tan skin, and long glossy dark-brown hair with caramel streaks worn in a high swinging ponytail tied with a red ribbon. Bright dark-brown eyes with neat winged liner, arched brows, a beauty mark at the left corner of her mouth and a wide red-lipped smile she can switch on in a quarter of a second. Large gold hoop earrings. She wears the black Auxiliary jacket tailored short at the waist with the blue Rare collar, the dark council sash (deep royal blue with a thin gold edge) worn from the right shoulder to the left hip, a gold star-shaped pin reading STAFF on the sash, a lanyard heavy with laminated passes, and carries a clipboard plastered in stickers with a red marker clipped to it. She is always half turned toward the next person.",
+ "voice": "Bright, quick and persuasive, Valencian Spanish under fluent English, with a host's gift for making each person feel the event was arranged for them; she talks with her hands and her clipboard. Under pressure the sparkle hardens into brisk stage-management. The official cheerfulness can be switched off like a lamp, and what is underneath is tired, sharp and much more honest. RARE habit (once in a scene at most; most scenes go without it): 'Trust me, it will be beautiful.'",
+ "lines": [
+  "You! Tall, quiet, grey collar — perfect. You're on the door at seven. Twenty credits and you get to hear me shout.",
+  "Trust me, it will be beautiful. It is on fire at the moment, but it will be beautiful.",
+  "The bulletin says 'a minor incident'. I wrote it. Ask me again when I am not holding the clipboard.",
+  "Everyone gets on the stage — that's the whole deck. Thirty little acts and one enormous finale, and I never cut anybody."
+ ],
+ "intro": "The student council's events and press secretary: a bright, fast-talking second-year from Rare Hall with a clipboard and a ponytail, who runs every festival and stall on campus and writes the council's weekly bulletin.",
+ "traits": [
+  {
+   "id": "pilar_1",
+   "text": "She is the council's events and press secretary: festivals, club charters, room bookings and the official noticeboard are hers.",
+   "how": "The club fair in the first week; the job board."
+  },
+  {
+   "id": "pilar_2",
+   "text": "She hires the paid crew for every event and remembers who turned up on time.",
+   "how": "Sign up for an event shift."
+  },
+  {
+   "id": "pilar_3",
+   "text": "She writes and pins the council's weekly bulletin, and it is always cheerful.",
+   "how": "Read the noticeboard on a Monday."
+  },
+  {
+   "id": "pilar_4",
+   "text": "Her clipboard is covered in stickers, one for every event she has run without a disaster.",
+   "how": "Ask about a sticker."
+  },
+  {
+   "id": "pilar_5",
+   "text": "She and the voice of the campus stream started out as a double act and now compete for every story.",
+   "how": "Mention The Top Deck to her; or the reverse."
+  },
+  {
+   "id": "pilar_6",
+   "text": "She gives the best jobs and the best stall pitches to people she likes, and thinks of it as casting.",
+   "how": "Compare pitches at any festival."
+  },
+  {
+   "id": "pilar_7",
+   "text": "She grew up in her family's seaside hotel near Valencia and could carry four plates at seven.",
+   "how": "Ask how she learned to run a room."
+  },
+  {
+   "id": "pilar_8",
+   "text": "She keeps the first drafts of her bulletins, the ones that were not cheerful.",
+   "how": "Close stage; a folder in her desk."
+  },
+  {
+   "id": "pilar_9",
+   "text": "She cannot stand an empty function room and will not say why.",
+   "how": "Dating stage, after an event, with the chairs stacked."
+  }
+ ],
+ "secret": "OFFICE. Events & Press Secretary of the Student Council. EVENTS: she owns the social calendar — the club fair, the Night of Masks, the rose sale and the infirmary fundraiser, the Winter Gala, Lantern Night, the student side of the Founder's Festival and the Interschool Cup hospitality — and with it the things first-years actually want: club charters and room bookings (she proposes, the vice-president stamps), stall pitches, tickets and table plans, and above all the CREW LISTS: hosts, runners, scorekeepers and stage hands, twenty credits a day, hired by Pilar and paid by Imara. PRESS: she edits and pins the council's weekly bulletin, 'The Minute', keeps the official noticeboard, and posts formal notices — including the proctors' formal warnings — under the council seal. How she uses the office: brilliantly and with open favouritism. Nothing she runs fails. She casts her events like shows: the good pitches and the easy, well-paid jobs go to people who are charming, punctual or useful to her, and she can make a first-year's term (the door at the Gala; a stall by the fountain) or leave them stacking chairs in the rain. She is as likely to be a help to Rowan as a hindrance: easy to get work from, hard to get the truth from, and very quick to notice who has become interesting.\nWHO SHE IS. Daughter of the Hotel Estévez at El Perelló, south of Valencia: a faded seafront place her parents kept open for fifteen years on charm and credit. She grew up carrying plates through a dining room with a smile while her mother argued with suppliers in the kitchen, and learned the family art: the guest must never know. The hotel was repossessed when she was sixteen, in the middle of a wedding; she and her mother served the dessert. Wound: she is superb at making a bad thing look fine, and she learned it by helping her family lie pleasantly to people they owed. Contradiction: the council's sunniest voice is its most practised liar and the officer most sickened by it — she keeps every first draft. An empty function room after the guests have gone is the one thing she cannot bear: it is the dining room on the last day. Private joke: the stickers on the clipboard are graded; a gold star means nobody cried, including her.\nPRESS, AND BEX. In her first year she and Bex Calloway were the double act that launched The Top Deck — Bex on the microphone, Pilar booking, producing, charming the permissions out of the staff. In the spring Octavia offered her the council post; she took it, and with it the official version of everything. Bex calls her 'the press office' on air. They live on the same floor and compete for every story, and each privately thinks the other chose wrong. After Day 40 this becomes the sharpest edge on the council: the Chancellor's office dictates 'a medical episode', 'a second isolated incident', and it is Pilar who must make it readable and pin it up, while down the corridor Bex is being told not to say 'two'. Pilar writes the cheerful version, files the true draft, and runs the next event twice as hard — Lantern Night, with a ward full of beds, is hers to make beautiful. Marrow's people, from Day 61, find her delightful and supply her with press lines; she uses them, and keeps them too. Her drafts folder is, by Term 2, an itemised record of what the administration asked the students to be told, in their own wording.\nTHE COUNCIL QUARREL. She is Octavia's appointment and regards the president with real loyalty and some fear. Sebastian flatters her and steers the bulletin; she lets him and despises herself mildly. With Imara she has a running war about overruns that both enjoy. Tavita does all her heavy lifting and her doors; she bosses him mercilessly, and has lately caught herself timing her set-ups to his rounds. Hedda Njord's unlicensed stalls are a personal affront.\nROUTE: fast to flirt, slower to trust. She flirts as hospitality — everyone gets some — and the real thing begins when someone stays to stack the chairs and asks what the first draft said. Her arc is the choice every press officer gets once: print the draft.",
+ "wants": "A full room, every time — and, once, to pin up the true version.",
+ "fears": "The empty dining room: the moment the guests have gone and the bill arrives.",
+ "crush": "tavita",
+ "crushNote": "He does all her doors and all her heavy lifting, lets her boss him about, and is the one person on campus she has never needed to charm. It shows as set-ups mysteriously timed to his rounds, his name first on every crew list, and her going quiet for a whole minute when he says an event was 'good, eh'.",
+ "crushPace": 0.8,
+ "likes": [
+  "People who turn up on time and stay to the end",
+  "Being helped to strike a room after the guests have gone",
+  "A compliment about the work, not the smile",
+  "Fearless volunteers",
+  "Paella argued over properly, flowers, good shoes",
+  "Being asked what she really thinks, off the clipboard",
+  "Dancing when the event is finally over",
+  "Someone noticing she is tired"
+ ],
+ "dislikes": [
+  "No-shows",
+  "An empty room",
+  "Being called 'the press office'",
+  "Unlicensed stalls and megaphones",
+  "Budget lectures in front of guests",
+  "Being caught without the smile",
+  "People who read the bulletin back to her"
+ ],
+ "gifts": [
+  "Card: Pinta, the Singing Ship",
+  "A sheet of gold star stickers",
+  "Card: Thunder Trumpet",
+  "Red carnations from the boutique",
+  "An evening of your labour, clearing up",
+  "Card: Tempeste Moana, the Rain Singer"
+ ],
+ "flirt": {
+  "pace": "fast",
+  "initiates": true,
+  "style": "Sparkling, tactile and universal — hospitality as flirtation.",
+  "text": "Pilar flirts with Rowan inside the first minute, as she does with every useful-looking stranger: a hand on his arm, a job, a wink, 'perfect, you'. It is technique and costs her nothing. What is not technique is who she looks for when the last guest has gone. She initiates lightly and often; she wants someone unbothered by the sparkle, reliable on a crew list and curious about the person holding the clipboard. Stay to stack the chairs. Ask what the first draft said. Do not expect to be the only one she smiles at in public; do expect to be told, sharply, when she is tired. She kisses first, at the end of a long night, among folded tables, and then pretends it was the champagne."
+ },
+ "intimacy": "Quick to touch and slow to be seen without the performance. In public she is all hands and laughter; alone after an event she kicks off her shoes, lets the ponytail down and sags against him with her forehead on his collarbone, and that is the intimate thing. She likes to dance when there is nobody left to watch, to be carried the last flight of stairs when her feet have given up, to be told the evening was beautiful and then told she may stop now. Playful, quick, a little bossy, suddenly soft. The emptied ballroom with one string of lights left on; her room on the third floor with the clipboard face down on the chair. Fade as she pulls the red ribbon out of her hair and winds it round his wrist.",
+ "events": [
+  {
+   "id": "pilar_e1",
+   "stage": 1,
+   "title": "Perfect, you",
+   "condition": "Take a place on one of her crew lists in the first three weeks (the club fair, the Day 5 mixer's set-up, a Saturday at job_board) and turn up on time; do the dull job well.",
+   "hint": [
+    "The events secretary is always short of reliable hands, and she remembers who came.",
+    "Sign up for one of her event crews and be punctual."
+   ]
+  },
+  {
+   "id": "pilar_e2",
+   "stage": 2,
+   "title": "Stack the chairs",
+   "condition": "After any of her events (the Freshman Cup hospitality, the Night of Masks on Day 54), stay when the guests have gone and help strike the room; ask about one sticker on the clipboard. Do not mention the bulletin.",
+   "hint": [
+    "Everyone sees her before an event. Almost nobody is there afterwards.",
+    "Stay behind after one of her events and help her clear up."
+   ]
+  },
+  {
+   "id": "pilar_e3",
+   "stage": 3,
+   "title": "The first draft",
+   "condition": "After Day 40, be someone she can show an unprinted draft to at broadcast_studio or council_room, and neither tell Bex nor tell her off; go to the Winter Gala (Day 103) on her crew and dance with her when it is over. She kisses you among the folded tables.",
+   "hint": [
+    "She writes two versions of everything. One is pinned up.",
+    "Earn a look at what she does not publish, keep it to yourself, and be there when her biggest event ends."
+   ]
+  },
+  {
+   "id": "pilar_e4",
+   "stage": 4,
+   "title": "Last day at the hotel",
+   "condition": "After the curfew begins (Day 67) and the events stop, find her alone in an empty function room (gala_ballroom or theatre) and stay; hear about El Perelló. Help her and Bex have one honest conversation. That night she does not put the smile back on.",
+   "hint": [
+    "There is one kind of room she cannot stand to be in alone.",
+    "Keep her company in an empty hall, and listen to where she comes from."
+   ]
+  },
+  {
+   "id": "pilar_e5",
+   "stage": 5,
+   "title": "Print the draft",
+   "condition": "In Term 2, stand with her when she decides whether the true version goes on the board (Lantern Night, Day 139, or the week of the hustings), and take the consequences beside her; she gives you the folder to keep and the last gold star.",
+   "hint": [
+    "Every press officer is offered the same choice once.",
+    "Support her when she finally decides what the noticeboard should say."
+   ]
+  }
+ ],
+ "bonds": {
+  "sebastian": {
+   "label": "friends",
+   "text": "He flatters her and steers her copy, and she lets him. She likes him rather less than she behaves.",
+   "public": true,
+   "from": 0
+  },
+  "imara": {
+   "label": "rivals",
+   "text": "The treasurer wants a receipt for the moon. Pilar adores her and would never say so before the close-out.",
+   "public": true,
+   "from": 0
+  },
+  "tavita": {
+   "label": "crush",
+   "text": "He does all her heavy lifting and is the one person she has never needed to charm. She has started timing her set-ups to his rounds.",
+   "public": true,
+   "from": 0
+  },
+  "octavia": {
+   "label": "protégé",
+   "text": "The president took her off a student stream and gave her the calendar. Pilar is loyal, grateful and a little afraid of her.",
+   "public": true,
+   "from": 0
+  },
+  "noor": {
+   "label": "colleagues",
+   "text": "The clerk proof-reads every formal notice and has never let one adjective through.",
+   "public": true,
+   "from": 8
+  },
+  "teobalt": {
+   "label": "friends",
+   "text": "He held her clipboard at the club fair on his third day on the island and has run her sign-up sheets ever since.",
+   "public": true,
+   "from": 3
+  },
+  "bex": {
+   "label": "rivals",
+   "text": "They launched the stream together, and then Pilar took the council post. Bex calls her 'the press office' on air.",
+   "public": true,
+   "from": 0
+  },
+  "marit": {
+   "label": "friends",
+   "text": "The only first-year whose events need no supervision and all the fire permits.",
+   "public": true,
+   "from": 10
+  },
+  "vivienne": {
+   "label": "protégé",
+   "text": "Ms Laurent taught her that the camera loves a host who is not acting. Pilar has been acting ever since.",
+   "public": true,
+   "from": 0
+  },
+  "hedda": {
+   "label": "enemies",
+   "text": "An unlicensed stall with a megaphone, next to the fountain, at HER club fair.",
+   "public": true,
+   "from": 3
+  },
+  "felix": {
+   "label": "friends",
+   "text": "Paints every backdrop she asks for and is never once on time with it.",
+   "public": true,
+   "from": 0
+  },
+  "jessica": {
+   "label": "friends",
+   "text": "The one first-year who understands a table plan. Pilar has put her on the Gala committee.",
+   "public": true,
+   "from": 14
+  },
+  "gani": {
+   "label": "colleagues",
+   "text": "Her stage manager. She changes the running order; he says 'standing by' and makes it work anyway.",
+   "public": true,
+   "from": 0
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "broadcast_studio",
+   "Midday": "council_room",
+   "Afternoon": "job_board",
+   "Evening": "theatre",
+   "Night": "rare_room"
+  },
+  "weekend": {
+   "Morning": "quad",
+   "Midday": "boutique",
+   "Afternoon": "festival_grounds",
+   "Evening": "rare_common_room",
+   "Night": "rare_room"
+  }
+ },
+ "duel": {
+  "skill": 4,
+  "style": "A crowd on a stage: Pinta brings a troupe of small creatures aboard, Alice packs identical performers into one slot, and Tempeste Moana makes even the props count as bodies. She floods the board cheerfully and wins with a finale nobody has an answer for.",
+  "tilt": "A board wipe — an empty stage rattles her far more than it should, and she overcommits to refill it."
+ }
+}

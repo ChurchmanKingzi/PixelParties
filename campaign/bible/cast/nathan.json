@@ -1,0 +1,224 @@
+{
+ "id": "nathan",
+ "name": "Nathan Whisper",
+ "firstName": "Nathan",
+ "age": 19,
+ "sex": "m",
+ "group": "student",
+ "major": "CP",
+ "year": 1,
+ "dorm": "commons",
+ "room": "B7",
+ "romance": false,
+ "deck": "War Room (War Counselors)",
+ "look": "Square face, spiky black hair he cuts with kitchen scissors and keeps out of his eyes with a grey headband whose ends trail behind him, thick eyebrows and a loud grin with a chipped front tooth. His jacket hangs open over a yellow T-shirt, and there is usually food somewhere on him. He stands too close and talks before he has finished arriving.",
+ "voice": "Very loud, very fast, New Jersey, with no gap at all between thought and mouth. He says the tactless true thing, laughs first at his own jokes, and is honestly baffled when people are hurt; under the noise he is loyal and oddly kind. RARE habit (once in a scene at most; most scenes go without it): 'No offence' — always after the offence.",
+ "lines": [
+  "Laundry! You're the wildcard guy! So you're, like, good but poor, right? I'm only saying what the form says.",
+  "That haircut's bad. Somebody should tell you as a friend, so I'm telling you as a friend.",
+  "My deck's six old guys who argue until somebody wins. It's basically Thanksgiving.",
+  "There's a difference between mean and honest. My mom explained it to me like four hundred times."
+ ],
+ "intro": "Your roommate: loud, tactless, incapable of keeping a thought to himself, and — once you get past the first ten insults — not a bad guy.",
+ "traits": [
+  {
+   "id": "nathan_1",
+   "text": "He says whatever he is thinking, at full volume, and is honestly surprised when it lands badly.",
+   "how": "Unavoidable; first thirty seconds."
+  },
+  {
+   "id": "nathan_2",
+   "text": "He snores, leaves wet towels on other people's beds and eats in his.",
+   "how": "Share a room."
+  },
+  {
+   "id": "nathan_3",
+   "text": "He is one of four brothers from Bayonne, New Jersey, and grew up shouting to be heard at dinner.",
+   "how": "Ask about his family; he lists the brothers by who he can beat up."
+  },
+  {
+   "id": "nathan_4",
+   "text": "He owes the Commons betting pool money and keeps betting on himself.",
+   "how": "Tomi brings it up."
+  },
+  {
+   "id": "nathan_5",
+   "text": "He is loyal in a blunt way: he will insult you to your face and flatten anyone who does it behind your back.",
+   "how": "Have someone mock Rowan within his hearing."
+  },
+  {
+   "id": "nathan_6",
+   "text": "He believes in aliens, bigfoot and a secret fourth major, and has a notebook of evidence.",
+   "how": "Any Night in the bungalow; he reads from it."
+  },
+  {
+   "id": "nathan_7",
+   "text": "He calls his mother every Sunday and holds the phone away from his ear.",
+   "how": "Be in the room on a Sunday."
+  },
+  {
+   "id": "nathan_8",
+   "text": "He was told all through school that he was stupid and decided that being honest was the one thing he could be best at.",
+   "how": "Only if you are a real Friend before the end of September."
+  }
+ ],
+ "secret": "{H=nathan?THE REAL NATHAN (Days 1–26). |}Third of four sons of a Bayonne plumber, Sal Whisper, and a dental receptionist, Angie. Dyslexic, undiagnosed until fourteen, called thick by teachers and by two of his brothers. He made a virtue of the one thing he had: he would never lie, never pretend, never be the kid who smiled and said nothing. He got into the Academy on a regional War Counselors run that surprised everyone including him, and he is so proud he cannot stop talking. He is not clever and he is never malicious; every wound he deals is an accident and he feels terrible when it is explained to him, slowly. He likes Rowan enormously and immediately ('my roommate's top ten on the ladder, he's basically famous, he's also broke, it's fine') and without knowing it he is the first person on the island to treat Rowan's poverty as simply a fact rather than a shame. He stood up to Brant Kessler in week two for squeezing cards out of Tomi's customers — loudly, publicly, got his own rares taken for it, and was planning to 'handle it'. He has a crush on Bex Calloway's voice and has never seen her. Private joke: his evidence notebook is titled 'STUFF THEY DON'T WANT ME TO KNOW (ME SPECIFICALLY)'.\nThe GM's job in Days 1–26 is to make the player find him annoying and then, against their will, fond of him — at least one moment of clumsy, real kindness (he gives Rowan his spare sleeves; he tells a sneering Spectral kid that Rowan 'could beat you with a phone'){H=nathan? — so that the loss lands later|}.",
+ "wants": "To prove he is not the dumb one.",
+ "fears": "Being laughed at for something he cannot help.",
+ "crush": "bex",
+ "crushNote": "He fell for the voice of The Top Deck before he ever saw her face, and tells everyone, loudly. It shows as him shouting answers at the common-room screen and rehearsing an introduction he will get wrong.{H=nathan? (From Day 27 the interest remains as a habit: it watches her broadcasts with great attention and asks why she says 'two' as if it hurt.)|}",
+ "crushPace": 0.8,
+ "likes": [
+  "Being argued with loudly",
+  "Food, any food, shared",
+  "People who say what they mean",
+  "Anyone who listens to the evidence notebook",
+  "Rowan keeping his word"
+ ],
+ "dislikes": [
+  "Being called stupid",
+  "Whispering, hints, sarcasm he does not get",
+  "Bullies who pick on small kids"
+ ],
+ "gifts": [
+  "A family-size bag of chips",
+  "Card: War Chest",
+  "A new notebook for the evidence",
+  "Card: Harpthenean War Counselor",
+  "A torch of his own, so he stops borrowing Tomi's (before Day 26: he will be delighted{H=nathan?; after Day 27: it studies it for an hour|})"
+ ],
+ "events": [
+  {
+   "id": "nathan_e1",
+   "stage": 1,
+   "title": "No offence",
+   "condition": "Survive the first week of rooming with him without freezing him out: answer one of his tactless questions straight, or go to the Day 5 bonfire mixer with him.",
+   "hint": [
+    "Your roommate is a lot. He is also paying more attention than he seems.",
+    "Put up with him for a week and answer him honestly once."
+   ]
+  },
+  {
+   "id": "nathan_e2",
+   "stage": 2,
+   "title": "Stuff they don't want me to know",
+   "condition": "Before Day 26: back him up once against Brant Kessler (at cafeteria or trial_dome), or sit through the evidence notebook one Night; he gives Rowan his spare sleeves and says something accidentally kind.",
+   "hint": [
+    "He is in a quarrel he cannot win alone, and he has a notebook he wants to show someone.",
+    "Before the end of the month, stand with him against the bully or listen to his theories."
+   ]
+  },
+  {
+   "id": "nathan_e3",
+   "stage": 3,
+   "title": "The new page",
+   "condition": "After Day 27: sit through the new page of the evidence notebook with him at Night (commons_room or commons_beach) without laughing, tell him plainly that he is not stupid for noticing, and make him promise not to 'handle it' alone. He promises badly, and keeps it.",
+   "hint": [
+    "Your loud roommate has gone quiet about one thing, and he has been writing it down.",
+    "Listen to what he has noticed since the meteor, take it seriously, and make him promise not to act on it alone."
+   ]
+  }
+ ],
+ "bonds": {
+  "rowan": {
+   "label": "roommates",
+   "text": "'Laundry.' His famous, broke, top-ten roommate, of whom he is noisily proud.",
+   "public": true,
+   "from": 1
+  },
+  "baylee": {
+   "label": "roommates",
+   "text": "'Big Guy.' Nathan talks; Baylee listens; it suits them both.",
+   "public": true,
+   "from": 1
+  },
+  "tomi": {
+   "label": "owes",
+   "text": "Owes the betting pool and keeps betting on himself.",
+   "public": true,
+   "from": 5
+  },
+  "brant": {
+   "label": "enemies",
+   "text": "Called him out in front of everyone for squeezing first-years, and had his own rares taken for it.",
+   "public": true,
+   "from": 12
+  },
+  "rana": {
+   "label": "friends",
+   "text": "Thinks they are friends. Announced her hold-back to the whole dock on Day 1.",
+   "public": true,
+   "from": 1
+  },
+  "odalys": {
+   "label": "friends",
+   "text": "The only person who can shut him up, usually with food.",
+   "public": true,
+   "from": 1
+  },
+  "bex": {
+   "label": "crush",
+   "text": "Has a crush on the voice of the Top Deck and has never seen her face.",
+   "public": false,
+   "from": 3
+  },
+  "sammy": {
+   "label": "friends",
+   "text": "The umbrella kid from next door. Nathan thinks they get on great.",
+   "public": true,
+   "from": 2
+  },
+  "mikoto": {
+   "label": "friends",
+   "text": "The glasses kid laughs at stuff that isn't funny. Nathan gets it. He says stuff that isn't okay.",
+   "public": true,
+   "from": 3
+  },
+  "fiona": {
+   "label": "friends",
+   "text": "The spooky one! Nathan thinks she is hilarious and has told her so, loudly, in the kitchen.",
+   "public": true,
+   "from": 1
+  },
+  "ed": {
+   "label": "friends",
+   "text": "The cowboy believes every word of the notebook. Finally, somebody.",
+   "public": true,
+   "from": 1
+  },
+  "dmitri": {
+   "label": "friends",
+   "text": "The blanket guy never sleeps. Nathan figures that's a superpower and has told him so.",
+   "public": true,
+   "from": 2
+  },
+  "rafa": {
+   "label": "friends",
+   "text": "The food guy. Nathan told him the empanadas needed salt and he fixed it. Legend.",
+   "public": true,
+   "from": 5
+  }
+ },
+ "schedule": {
+  "weekday": {
+   "Morning": "lecture_hall",
+   "Midday": "classroom",
+   "Afternoon": "cafeteria",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  },
+  "weekend": {
+   "Morning": "commons_room",
+   "Midday": "arcade",
+   "Afternoon": "trial_dome",
+   "Evening": "bonfire_pit",
+   "Night": "commons_room"
+  }
+ },
+ "duel": {
+  "skill": 3,
+  "style": "Plays every War Counselor the turn he draws it and announces his hand; wins when the counselors happen to line up, loses loudly.",
+  "tilt": "Being laughed at; he overcommits to prove a point."
+ },
+ "range": "{H=nathan?(The real Nathan, Days 1–26.) |}Not only accidental insults: enthusiasms that change weekly, the evidence notebook and its theories, Bayonne and three brothers, his deck's six old men, honest questions about things he does not understand, real pride in his roommates; he notices a beat too late that he has hurt someone and tries clumsily to mend it. 'No offence' at most once a scene."
+}

@@ -1,0 +1,426 @@
+{
+ "name": "Denied",
+ "owner": "guest",
+ "heroes": [
+  "Natas, the Master of Hell",
+  "Fiedel, the Mercenary Mage",
+  "Sabrina, the Psychic Witch"
+ ],
+ "main": [
+  [
+   3,
+   "Anti Magic Shield"
+  ],
+  [
+   3,
+   "Cosmic Skeleton"
+  ],
+  [
+   4,
+   "Decay Magic"
+  ],
+  [
+   2,
+   "Divine Punishment"
+  ],
+  [
+   2,
+   "Drowned Remains"
+  ],
+  [
+   2,
+   "Golden Ankh"
+  ],
+  [
+   3,
+   "Haressassin"
+  ],
+  [
+   3,
+   "Magic Arts"
+  ],
+  [
+   2,
+   "Misfire"
+  ],
+  [
+   3,
+   "Mr. Jiggles"
+  ],
+  [
+   3,
+   "Off Duty"
+  ],
+  [
+   3,
+   "Rusty Touch"
+  ],
+  [
+   2,
+   "See through the Ruse"
+  ],
+  [
+   3,
+   "Shamanic Curse"
+  ],
+  [
+   3,
+   "Sickly Cheese"
+  ],
+  [
+   1,
+   "Silence"
+  ],
+  [
+   3,
+   "Slow"
+  ],
+  [
+   2,
+   "Spike Trap"
+  ],
+  [
+   2,
+   "Storm Ring"
+  ],
+  [
+   4,
+   "Summoning Magic"
+  ],
+  [
+   4,
+   "The Master's Plan"
+  ],
+  [
+   3,
+   "Tool Freezer"
+  ],
+  [
+   1,
+   "The Cosmic Depths"
+  ],
+  [
+   2,
+   "Arrival from the Cosmic Depths"
+  ],
+  [
+   2,
+   "Analyzer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Gatherer from the Cosmic Depths"
+  ],
+  [
+   1,
+   "Life-Searcher from the Cosmic Depths"
+  ]
+ ],
+ "potions": [],
+ "types": {
+  "Natas, the Master of Hell": "Hero",
+  "Fiedel, the Mercenary Mage": "Hero",
+  "Sabrina, the Psychic Witch": "Hero",
+  "Anti Magic Shield": "Spell (Magic Arts, Reaction)",
+  "Cosmic Skeleton": "Creature L1",
+  "Decay Magic": "Ability",
+  "Divine Punishment": "Spell (Decay Magic, Reaction)",
+  "Drowned Remains": "Artifact (Reaction)",
+  "Golden Ankh": "Artifact",
+  "Haressassin": "Creature L2",
+  "Magic Arts": "Ability",
+  "Misfire": "Spell (Decay Magic, Reaction)",
+  "Mr. Jiggles": "Creature L2",
+  "Off Duty": "Spell (Decay Magic, Reaction)",
+  "Rusty Touch": "Spell (Decay Magic, Reaction)",
+  "See through the Ruse": "Spell (Decay Magic, Reaction)",
+  "Shamanic Curse": "Spell (Decay Magic, Reaction)",
+  "Sickly Cheese": "Artifact",
+  "Silence": "Spell (Decay Magic, Reaction)",
+  "Slow": "Spell (Decay Magic)",
+  "Spike Trap": "Spell (Decay Magic, Surprise)",
+  "Storm Ring": "Artifact (Reaction)",
+  "Summoning Magic": "Ability",
+  "The Master's Plan": "Spell (Decay Magic, Reaction)",
+  "Tool Freezer": "Artifact (Reaction)",
+  "Analyzer from the Cosmic Depths": "Creature L1",
+  "Arrival from the Cosmic Depths": "Spell (Summoning Magic)",
+  "Gatherer from the Cosmic Depths": "Creature L2",
+  "Invader from the Cosmic Depths": "Creature L4",
+  "Life-Searcher from the Cosmic Depths": "Creature L3",
+  "The Cosmic Depths": "Area (Summoning Magic)"
+ },
+ "gist": {
+  "Natas, the Master of Hell": "May skip his draw to take a fresh copy of The Master's Plan instead, every turn.",
+  "The Master's Plan": "Reaction: cancels any one card you play from hand, once per turn.",
+  "Rusty Touch": "Cancels an artifact; you still pay for it.",
+  "Tool Freezer": "Cancels an artifact cheaply.",
+  "Storm Ring": "Cancels a spell that would hit more than one target.",
+  "Shamanic Curse": "Raises the level of a spell you cast, often out of reach.",
+  "Divine Punishment": "Cancels a hero's active effect.",
+  "Off Duty": "Cancels a summoned creature and shuffles it away.",
+  "Silence": "Once: cancels a spell and stops you casting more that turn.",
+  "Anti Magic Shield": "Cancels a cheap spell that hits its hero.",
+  "Fiedel, the Mercenary Mage": "Sturdy; uses reaction spells a level cheaper.",
+  "Mr. Jiggles": "His damage: hits two targets a turn.",
+  "Haressassin": "A hard single shot each turn.",
+  "Cosmic Skeleton": "A heavy shot each turn.",
+  "Slow": "Makes you discard.",
+  "The Cosmic Depths": "Area: once per turn a player may shuffle a hand card away to search out and summon a creature of a level they do not yet control (its effect is off for that turn).",
+  "Arrival from the Cosmic Depths": "Places a Cosmic Depths creature from his deck on YOUR side, then summons a bigger one for himself, all as a free action.",
+  "Gatherer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect; counters can be cashed in for cards.",
+  "Life-Searcher from the Cosmic Depths": "Arrives through Cosmic effects, searches another Cosmic card and can later swap itself for something from the deck.",
+  "Analyzer from the Cosmic Depths": "Collects a Change Counter whenever its controller's opponent draws or searches by an effect and spends them to drop Invader Tokens. While a token is out, a player who controls no card with Change Counters must discard a card or take a small hit at the end of each of their turns.",
+  "Invader from the Cosmic Depths": "A large creature that only Cosmic cards can summon; arrives with two Invader Tokens and discards spells for heavy hits."
+ },
+ "plan": "Sammy says no. Natas produces a Master's Plan every turn, and around it sits a reaction for every kind of card: artifacts, sweepers, hero effects, cheap spells, big spells. He taps nothing on his own turn except to add one shooter. The damage is three kinds of small creature and takes for ever. He can only cancel what is played from hand, one or two things a turn, and nothing he has answers damage that is already on the table. AS THE GUEST PLAYS IT: it is still this deck, and it is no longer played the way its owner played it. A handful of cards that were never in the list (The Cosmic Depths, Arrival, Analyzer, Gatherer, Life-Searcher) let it fetch the exact piece it is missing every turn, and the pilot holds resources back and keeps its answers for the right moment. The deck's strengths and weaknesses are unchanged; what has changed is that the mistakes are gone.",
+ "looks": {
+  "early": "Three heroes, no board, a full hand held very still. And an unfamiliar Area with a starfield on it.",
+  "mid": "One or two shooters and a hand of seven; every card you play gets a card in reply.",
+  "late": "A discard pile full of your negated Spells and three small creatures finishing the job."
+ },
+ "profile": {
+  "opening": {
+   "best": "SETUP",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "He passes his turns with a full hand and no board.",
+   "why": "Nothing he holds stops Ability attachments, and an attached Gathering Storm ticks without being played again; he has no pressure early, so levels are free, while sweepers have nothing to hit."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "He keeps one card apart and has two shooters out.",
+   "why": "Two real plays a turn, lesser one first: he cancels one. The key spell cast first is the one that gets cancelled."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "RUSH",
+   "tell": "His hand is seven reactions; Natas takes another Plan instead of drawing.",
+   "why": "The White Eye discards from that hand blind, and a frozen or dead Natas ends the supply; racing just feeds every spell into a cancel."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "His hand is down to two cards and the Storm is ticking.",
+   "why": "He cannot cancel ticks, and his heroes have no other defence."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Sammy passes with seven cards and nothing on the table.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Attach Destruction Magic; it cannot be cancelled"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Chain Lightning into a waiting Plan"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for no one"
+     }
+    ]
+   },
+   {
+    "board": "A Haressassin appears; he still holds six cards.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Lesser spell as bait, then attach the Storm"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye... once it is equipped"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Natas"
+     }
+    ]
+   },
+   {
+    "board": "Tool Freezer cancels your Magnetic Glove.",
+    "options": [
+     {
+      "stance": "SETUP",
+      "text": "Keep levelling by hand"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Poke with what resolves"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "One card held apart; two shooters firing.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Bait with Tea, then Flame Avalanche"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Natas"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Lead with the Storm itself"
+     }
+    ]
+   },
+   {
+    "board": "Storm Ring cancels your sweep.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Second sweep the same turn"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Discard his hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Shamanic Curse pushes your spell out of reach.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Follow with an artifact he must also answer"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Re-level"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Natas takes a Plan instead of a card again.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Kill Natas"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Two plays, lesser first"
+     },
+     {
+      "stance": "RUSH",
+      "text": "All in, into the Plan"
+     }
+    ]
+   },
+   {
+    "board": "Seven reactions in his hand.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye hits strip them"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Let the Storm tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Biggest spell first"
+     }
+    ]
+   },
+   {
+    "board": "Divine Punishment cancels Nicolas's potion draw.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Freeze Natas with a second Snow Cannon"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Race"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Two cards left in his hand.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Three plays this turn: one lands"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield and tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Fiedel alone, sturdy, with a Spike Trap.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks are not aimed"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Golden Ankh on Natas.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Fiedel"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ]
+ }
+}

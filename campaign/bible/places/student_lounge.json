@@ -1,0 +1,18 @@
+{
+ "name": "The Student Lounge",
+ "zone": "campus",
+ "bg": "student_lounge",
+ "night": false,
+ "hours": "Open Morning to Evening (closed at night from the curfew); movie night every other Thursday.",
+ "sight": "A sprawling room of mismatched sofas, beanbags and low tables above the cafeteria, with a pull-down screen, two ancient arcade cabinets and a vending machine that sells boosters as well as soda. A corkboard wall is thick with flyers. Someone is always asleep under a jacket; someone is always losing loudly at a card game invented last week.",
+ "things": [
+  "Flop on a sofa and recover between slots",
+  "Buy a booster from the vending machine (45 cr, list price) and open it with an audience",
+  "Play the home-brew format of the week (currently: one-hero pauper)",
+  "Come to movie night and argue about the film",
+  "Read the flyer wall for clubs, tutoring and things for sale",
+  "Beat the high score on the cabinet 'Pixel Party Panic' (held for six years by 'LIL')",
+  "Join the open deck clinic where upper-years tear lists apart for fun"
+ ],
+ "secret": "Low-stakes social hub: movie nights (Days 11, 30, 72 relocated, 143), the Fool's Draft (Day 185). The vending machine boosters are a small gamble that sometimes pays; Tomi knows which column was restocked. The six-year high score 'LIL' is not Lilia (she has been here four years) — it is an old Umbra House student, Lil, one of the four sent home; Josie knew her. D27+: Marit's improv troupe notices that '{H}' laughs half a second after everyone else, every time, at the same pitch. Third incident (Day 66, plot timeline, preventable): Tomi is found here by Livvie when she opens up for her cleaning shift, binder open, loupe in hand."
+}

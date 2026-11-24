@@ -1,0 +1,411 @@
+{
+ "name": "Lightning Caller",
+ "owner": "rex",
+ "heroes": [
+  "Fiona, the Princess of Blackport",
+  "Sol Rym, the Thunder Djinn",
+  "Nicolas, the Hidden Alchemist"
+ ],
+ "main": [
+  [
+   2,
+   "Acid Vial"
+  ],
+  [
+   4,
+   "Butterfly Cloud"
+  ],
+  [
+   4,
+   "Chain Lightning"
+  ],
+  [
+   2,
+   "Cloud in a Bottle"
+  ],
+  [
+   4,
+   "Dark Gear"
+  ],
+  [
+   1,
+   "Divine Gift of Rain"
+  ],
+  [
+   1,
+   "Elixir of Immortality"
+  ],
+  [
+   4,
+   "Golden Ankh"
+  ],
+  [
+   1,
+   "Healing Potion"
+  ],
+  [
+   8,
+   "Leadership"
+  ],
+  [
+   4,
+   "Magnetic Glove"
+  ],
+  [
+   1,
+   "MOE Bomb"
+  ],
+  [
+   2,
+   "Punch in the Box"
+  ],
+  [
+   3,
+   "Renewable Energy"
+  ],
+  [
+   1,
+   "Resuscitation Potion"
+  ],
+  [
+   2,
+   "Smug Coin"
+  ],
+  [
+   4,
+   "Snow Cannon"
+  ],
+  [
+   3,
+   "Tea"
+  ],
+  [
+   1,
+   "Tears of Creation"
+  ],
+  [
+   2,
+   "The Yeeting"
+  ],
+  [
+   2,
+   "Tool Freezer"
+  ],
+  [
+   4,
+   "Wheels"
+  ]
+ ],
+ "potions": [
+  [
+   2,
+   "Elixir of Quickness"
+  ],
+  [
+   1,
+   "Horn in a Bottle"
+  ],
+  [
+   2,
+   "Magnetic Potion"
+  ]
+ ],
+ "types": {
+  "Fiona, the Princess of Blackport": "Hero",
+  "Sol Rym, the Thunder Djinn": "Hero",
+  "Nicolas, the Hidden Alchemist": "Hero",
+  "Acid Vial": "Potion",
+  "Butterfly Cloud": "Spell (Magic Arts)",
+  "Chain Lightning": "Spell (Destruction Magic)",
+  "Cloud in a Bottle": "Potion (Reaction)",
+  "Dark Gear": "Artifact",
+  "Divine Gift of Rain": "Spell (Magic Arts, Reaction)",
+  "Elixir of Immortality": "Potion",
+  "Golden Ankh": "Artifact",
+  "Healing Potion": "Potion",
+  "Leadership": "Ability",
+  "Magnetic Glove": "Artifact",
+  "MOE Bomb": "Artifact",
+  "Punch in the Box": "Potion (Reaction)",
+  "Renewable Energy": "Artifact",
+  "Resuscitation Potion": "Potion",
+  "Smug Coin": "Artifact (Equipment)",
+  "Snow Cannon": "Artifact",
+  "Tea": "Artifact",
+  "Tears of Creation": "Potion",
+  "The Yeeting": "Artifact",
+  "Tool Freezer": "Artifact (Reaction)",
+  "Wheels": "Artifact",
+  "Elixir of Quickness": "Potion",
+  "Horn in a Bottle": "Potion",
+  "Magnetic Potion": "Potion"
+ },
+ "gist": {
+  "Sol Rym, the Thunder Djinn": "Casts Chain Lightning regardless of its level, from the first turn. Can only ever take one action per turn and has very little health.",
+  "Chain Lightning": "You must choose three of your own targets, heroes first: a heavy hit, a medium one, a lighter one. With three heroes and no creatures, every cast lands on all of them.",
+  "Butterfly Cloud": "Light damage to your whole side, and its caster cannot be chosen by you until his next turn.",
+  "Fiona, the Princess of Blackport": "Gains a pile of gold whenever she is afflicted by a status effect, including the ones he moves onto her himself.",
+  "Nicolas, the Hidden Alchemist": "Potion draws; potions in the main deck.",
+  "Snow Cannon": "Freezes one of your targets for a turn; four copies.",
+  "Renewable Energy": "Shuffles three spent cards (the Chain Lightnings) back into his deck.",
+  "Tea": "Moves status effects from one of his targets to another, usually onto Fiona for gold.",
+  "Dark Gear": "Steals a creature.",
+  "Tool Freezer": "Reaction: cancels an artifact you play.",
+  "Smug Coin": "Equipment: once per game its hero survives a lethal hit on a sliver.",
+  "Divine Gift of Rain": "Once per game: cancels a card or effect that would affect his side.",
+  "MOE Bomb": "Destroys every creature on the board.",
+  "Punch in the Box": "Reaction potion: half of a hit on his side is thrown back.",
+  "Golden Ankh": "Revives a hero for a turn: one more Chain Lightning from Sol Rym. Four copies.",
+  "Magnetic Glove": "Searches any card."
+ },
+ "plan": "North Crown's ace does one thing from the first turn: Sol Rym casts Chain Lightning. The spell makes you choose three of your own targets, heroes first, and a deck with three heroes and no creatures takes all three hits every time. Leadership, Magnetic Glove and Wheels find the next copy, Renewable Energy shuffles them back, four Snow Cannons keep your caster frozen, and four Golden Ankhs bring Sol Rym back for one more cast each. Everything rests on one very fragile hero who can take a single action per turn; the other two do not attack at all.",
+ "looks": {
+  "early": "Sol Rym casting on turn one; all three of your heroes already hurt.",
+  "mid": "A Chain Lightning every turn, your caster frozen, a Smug Coin on Sol Rym.",
+  "late": "Sol Rym revived for the third time, your heroes on their last legs, his deck reshuffled with the same four spells."
+ },
+ "profile": {
+  "opening": {
+   "best": "RUSH",
+   "good": "DISRUPT",
+   "trap": "SETUP",
+   "tell": "Sol Rym has cast Chain Lightning on the first turn and has barely any health.",
+   "why": "He is the only hero who can cast it and the smallest on the table: every point of damage goes at him now; a slow setup means taking three hits a turn while you build."
+  },
+  "midgame": {
+   "best": "BALANCE",
+   "good": "RUSH",
+   "trap": "CONTROL",
+   "tell": "Each Chain Lightning hits all three of your heroes, the first one hardest; he controls no creatures.",
+   "why": "You choose the order: put the heavy hit on the hero with Cloud in a Bottle or Firewall (which burns Sol Rym back) and keep finishing him; there is nothing to sweep."
+  },
+  "crisis": {
+   "best": "DISRUPT",
+   "good": "BALANCE",
+   "trap": "SETUP",
+   "tell": "Sol Rym wears a Smug Coin and Rex holds Golden Ankhs; each revival is one more cast.",
+   "why": "Stop the casts rather than the caster: The White Eye discards the Chain Lightning from his hand, and a frozen Sol Rym loses his single action; building further is pointless under this clock."
+  },
+  "endgame": {
+   "best": "RUSH",
+   "good": "BALANCE",
+   "trap": "CONTROL",
+   "tell": "His Golden Ankhs are spent and the other two heroes have never attacked.",
+   "why": "Without Sol Rym the deck has almost no damage; Fiona and Nicolas simply need to be finished."
+  }
+ },
+ "situations": {
+  "opening": [
+   {
+    "board": "Rex's Sol Rym casts Chain Lightning on turn one: you assign three hits among your three heroes.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Everything at Sol Rym"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Sol Rym"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Build and take three hits a turn"
+     }
+    ]
+   },
+   {
+    "board": "He Snow Cannons your caster and casts again.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Burn Sol Rym with the other two"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tea the freeze onto Sol Rym"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for the thaw"
+     }
+    ]
+   },
+   {
+    "board": "Butterfly Cloud: Sol Rym cannot be chosen until his next turn.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm ticks and your own Chain Lightning choose nothing"
+     },
+     {
+      "stance": "DISRUPT",
+      "text": "White Eye discards from his hand"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   }
+  ],
+  "midgame": [
+   {
+    "board": "Another Chain Lightning: you decide which hero takes the heavy hit.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Heavy hit onto the Firewall hero, Cloud in a Bottle ready"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Ignore it and finish Sol Rym"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Hold a sweeper for no creatures"
+     }
+    ]
+   },
+   {
+    "board": "Sol Rym is on a sliver under a Smug Coin.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "A Storm tick strips the coin; shield this turn"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Two hits this turn: coin, then kill"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "Tool Freezer cancels your Snow Cannon.",
+    "options": [
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the hero that would fall"
+     },
+     {
+      "stance": "RUSH",
+      "text": "Burn Sol Rym instead"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait for another"
+     }
+    ]
+   }
+  ],
+  "crisis": [
+   {
+    "board": "Golden Ankh: Sol Rym stands up for one turn and reaches for a card.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Flashbang does not stop a first action: White Eye the spell away"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Cloud in a Bottle on the heavy hit"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Rebuild"
+     }
+    ]
+   },
+   {
+    "board": "Renewable Energy shuffles three Chain Lightnings back; Magnetic Glove fetches one.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "Snow Cannon Sol Rym: no action, no cast"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Heal through Tarleinn"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Wait"
+     }
+    ]
+   },
+   {
+    "board": "Divine Gift of Rain cancels your finishing spell.",
+    "options": [
+     {
+      "stance": "DISRUPT",
+      "text": "It works once per game: cast again, discard his hand"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Shield"
+     },
+     {
+      "stance": "SETUP",
+      "text": "Regroup"
+     }
+    ]
+   }
+  ],
+  "endgame": [
+   {
+    "board": "Sol Rym is down for good; Fiona and Nicolas remain.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Finish them"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick and keep a shield"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to sweep"
+     }
+    ]
+   },
+   {
+    "board": "One hero each; his is Fiona, rich and harmless.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Storm and Acid Vial"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Tick"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Sweep nothing"
+     }
+    ]
+   },
+   {
+    "board": "His last Golden Ankh brings Sol Rym back once more.",
+    "options": [
+     {
+      "stance": "RUSH",
+      "text": "Kill Nicolas; Sol Rym falls at end of turn"
+     },
+     {
+      "stance": "BALANCE",
+      "text": "Homerun! for the heavy hit"
+     },
+     {
+      "stance": "CONTROL",
+      "text": "Nothing to clear"
+     }
+    ]
+   }
+  ]
+ }
+}
