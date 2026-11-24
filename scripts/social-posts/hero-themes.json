@@ -740,7 +740,11 @@
     "glow",
     24
    ]
-  ]
+  ],
+  "px": 12,
+  "deepshow": true,
+  "opener": "wind",
+  "showLoops": 6
  },
  "Sol Rym, the Thunder Djinn": {
   "px": 12,
