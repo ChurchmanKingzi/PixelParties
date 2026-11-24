@@ -664,10 +664,10 @@ function askName(){
   return new Promise(res => {
     const o = $('overlay'); o.hidden = false;
     const fld = 'font:inherit;font-size:22px;padding:6px 10px;background:#1b1626;color:#f3e9c8;border:2px solid #c8a85a;width:100%;box-sizing:border-box';
-    o.innerHTML = '<div><h2>Your name</h2><p>What name was written on your acceptance letter?</p>'
+    o.innerHTML = '<div><p style="font-size:22px">What name was written on your acceptance letter?</p>'
       + '<p style="display:flex;gap:12px;flex-wrap:wrap"><label style="flex:1;min-width:200px">First name<br><input id="pnIn" maxlength="14" value="' + esc(PN()) + '" style="' + fld + '"></label>'
       + '<label style="flex:1;min-width:200px">Last name<br><input id="plIn" maxlength="14" value="' + esc(LN()) + '" style="' + fld + '"></label></p>'
-      + '<p><button id="pnOk">Start</button></p></div>';
+      + '<p style="text-align:center;margin-top:20px"><button id="pnOk" style="font:inherit;font-size:28px;padding:12px 56px">Start</button></p></div>';
     const clean = (v, d) => (v || '').replace(/[<>&]/g, '').trim().slice(0, 14) || d;
     const go = () => { S.vars = S.vars || {}; S.vars.pn = clean($('pnIn').value, 'Rowan'); S.vars.pl = clean($('plIn').value, 'Vance'); S.flags.pn_set = true; save(); o.hidden = true; o.innerHTML = ''; res(); };
     $('pnOk').onclick = go; for (const id of ['pnIn', 'plIn']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
