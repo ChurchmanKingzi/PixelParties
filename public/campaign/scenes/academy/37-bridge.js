@@ -1203,11 +1203,12 @@ scene("chat_hedda_ferry", {
       { text: "Her eyes keep going up, past your shoulder. Ask what's up there.", when: (s)=>!s.flags["chat_hedda_ferry_1"], steps: [
         { say: "rowan", text: "You keep looking up over my shoulder. What's up there?" },
         { text: "You turn. Behind the ship the gulls are strung out along the wake like washing. Her lips are moving." },
-        { say: "hedda", text: "\"Eleven. There were fourteen at the harbour wall.\" All the rally has gone out of her voice; what is left is quieter, and a good deal younger. \"Three turned back at the first buoy. They always do. I don't know how they agree which three.\"" },
+        { say: "hedda", text: "\"Eleven. There were fourteen at the harbour wall.\" All the rally has gone out of her voice; what is left is quieter, and a good deal younger. \"Three turned back at the first buoy. Just turned, all together, and went home. I'd love to know how they agreed which three.\"" },
         { choice: [
-          { text: "\"You count them every time?\"", steps: [
-            { say: "rowan", text: "You count them every time?" },
-            { say: "hedda", text: "Every morning, wherever I am. I've a notebook." },
+          { text: "\"You counted them? From the harbour?\"", steps: [
+            { say: "rowan", text: "You counted them? From the harbour?" },
+            { say: "hedda", text: "From the harbour wall. I count them every morning, wherever I am. I've a notebook." },
+            { say: "hedda", text: "This is the first morning I've had a ship to count them from. I didn't know they'd follow it. Nobody tells you that." },
             { say: "hedda", text: "Nobody counts gulls. Everybody counts *on* them: they'll be there, shouting, on the roof. And then one year there are fewer, and nobody can say how many fewer, because nobody wrote it down." },
             { say: "rowan", text: "So you write it down." },
             { say: "hedda", text: "Somebody has to be able to say." }
