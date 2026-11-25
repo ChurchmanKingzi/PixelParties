@@ -24,6 +24,14 @@
         # Von außen gibt es sie nicht — selbst mit gültigem Geheimnis nicht.
         @botapi path /api/bot /api/bot/*
         respond @botapi 404
+        # Sicherheits-Header (Audit 25.11.). Die App setzt dieselben selbst; hier stehen sie zusaetzlich, damit auch Fehlerseiten von Caddy
+        # und Antworten ohne Node sie tragen. Kein HSTS-includeSubDomains: andere Subdomains sind nicht Teil dieses Dienstes.
+        header {
+                Strict-Transport-Security "max-age=31536000"
+                X-Content-Type-Options "nosniff"
+                Referrer-Policy "strict-origin-when-cross-origin"
+                -Server
+        }
         reverse_proxy 127.0.0.1:3000
         log {
                 output file /var/log/caddy/pixelparties.log {

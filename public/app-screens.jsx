@@ -2747,12 +2747,13 @@ function ProfileScreen() {
   const [emailStage, setEmailStage] = useState('idle'); // 'idle' | 'code'
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailEditing, setEmailEditing] = useState(false);
+  const [emailPw, setEmailPw] = useState('');   // aktuelles Passwort: nötig, um eine bestehende E-Mail zu ersetzen
 
   const requestEmailCode = async () => {
     if (!emailInput.trim()) { notify('Enter an email address', 'error'); return; }
     setEmailBusy(true);
     try {
-      const data = await api('/profile/email/request', { method: 'POST', body: JSON.stringify({ email: emailInput.trim() }) });
+      const data = await api('/profile/email/request', { method: 'POST', body: JSON.stringify({ email: emailInput.trim(), currentPassword: emailPw }) });
       setEmailInput(data.email); setEmailStage('code'); setEmailCode('');
       notify('Verification code sent — check your inbox.', 'success');
     } catch (e) { notify(e.message, 'error'); }
@@ -2764,7 +2765,7 @@ function ProfileScreen() {
     try {
       const data = await api('/profile/email/confirm', { method: 'POST', body: JSON.stringify({ email: emailInput.trim(), code: emailCode.trim() }) });
       setUser(data.user);
-      setEmailStage('idle'); setEmailEditing(false); setEmailCode(''); setEmailInput('');
+      setEmailStage('idle'); setEmailEditing(false); setEmailCode(''); setEmailInput(''); setEmailPw('');
       notify('Email verified!', 'success');
     } catch (e) { notify(e.message, 'error'); }
     setEmailBusy(false);
@@ -3077,7 +3078,7 @@ function ProfileScreen() {
   const changePassword = async () => {
     if (!oldPw || !newPw) { notify('Fill in all password fields', 'error'); return; }
     if (newPw !== confirmPw) { notify('New passwords do not match', 'error'); return; }
-    if (newPw.length < 3) { notify('New password must be 3+ characters', 'error'); return; }
+    if (newPw.length < 8) { notify('New password must be 8+ characters', 'error'); return; }
     setPwSaving(true);
     try {
       await api('/profile/password', { method: 'POST', body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }) });
@@ -3707,6 +3708,11 @@ function ProfileScreen() {
                     <input className="input" type="email" placeholder="your@email.com" value={emailInput}
                       onChange={e => setEmailInput(e.target.value)} style={{ flex: 1 }}
                       onKeyDown={e => e.key === 'Enter' && requestEmailCode()} />
+                    {user.email && emailEditing && (
+                      <input className="input" type="password" placeholder="current password" value={emailPw}
+                        onChange={e => setEmailPw(e.target.value)} style={{ flex: 1 }} autoComplete="current-password"
+                        onKeyDown={e => e.key === 'Enter' && requestEmailCode()} />
+                    )}
                     <button className="btn" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap' }}
                       onClick={requestEmailCode} disabled={emailBusy}>{emailBusy ? '...' : 'SEND CODE'}</button>
                     {user.email && emailEditing && (

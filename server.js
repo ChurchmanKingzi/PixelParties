@@ -442,6 +442,34 @@ function flushSelfPlayTrail(reason) {
 const DEBUG_TOOLS_ENABLED = process.env.PP_DEBUG_TOOLS === '1';
 
 const app = express();
+app.disable('x-powered-by');
+
+// ───────────────────────────────────────────────────────────────
+//  ASYNC-HANDLER-HUELLE (Sicherheitsaudit 25.11.)
+//  Express 4 faengt abgelehnte Promises von `async`-Handlern NICHT ab: eine
+//  Exception vor der Antwort (z. B. `bcrypt.compare` mit einem Objekt als Passwort,
+//  `username.trim()` auf einer Zahl) liess die Verbindung ewig offen — jede
+//  kaputte Anfrage belegte einen Slot, nur der globale unhandledRejection-Fänger
+//  protokollierte den Fehler. Jede Route (auch die aus seo.js, wheel-api.js,
+//  bot-api.js, social.js — sie nutzen dasselbe `app`) reicht Fehler jetzt per
+//  `next(err)` an den Fehler-Handler am Dateiende (JSON-500, ohne Stacktrace).
+// ───────────────────────────────────────────────────────────────
+function _asyncHuelle(fn) {
+  if (typeof fn !== 'function' || fn.length === 4) return fn;   // Fehler-Middleware unveraendert
+  return function (req, res, next) {
+    try {
+      const r = fn(req, res, next);
+      if (r && typeof r.catch === 'function') r.catch(next);
+    } catch (e) { next(e); }
+  };
+}
+for (const _m of ['get', 'post', 'put', 'delete', 'patch']) {
+  const _orig = app[_m].bind(app);
+  app[_m] = function (pfad, ...handler) {
+    if (_m === 'get' && handler.length === 0) return _orig(pfad);   // app.get('einstellung')
+    return _orig(pfad, ...handler.flat(Infinity).map(_asyncHuelle));
+  };
+}
 
 // ───────────────────────────────────────────────────────────────
 //  BETRIEB HINTER EINEM REVERSE PROXY (15.8., netcup-Umzug)
@@ -588,8 +616,84 @@ if (process.env.PP_NET_STATS === '1') {
   }
 }
 
-app.use(express.json({ limit: '10mb' }));
+// ───────────────────────────────────────────────────────────────
+//  JSON-GROESSENSTUFEN (Sicherheitsaudit 25.11.)
+//  Vorher: 10 MB fuer JEDEN Endpunkt, auch unangemeldet (/api/auth/*). Jetzt:
+//  Anmeldung 16 KB, normale Endpunkte 256 KB, nur Bild-/Profil-/Kampagnen-Endpunkte 4 MB.
+// ───────────────────────────────────────────────────────────────
+const _jsonAuth = express.json({ limit: '16kb' });
+const _jsonKlein = express.json({ limit: '256kb' });
+const _jsonGross = express.json({ limit: '4mb' });
+const JSON_GROSS = new Set(['/api/profile', '/api/profile/avatar', '/api/profile/cardback', '/api/campaign/state']);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/auth/')) return _jsonAuth(req, res, next);
+  if (JSON_GROSS.has(req.path)) return _jsonGross(req, res, next);
+  return _jsonKlein(req, res, next);
+});
 app.use(cookieParser());
+
+// ───────────────────────────────────────────────────────────────
+//  SICHERHEITS-HEADER (Sicherheitsaudit 25.11.)
+//  Keine volle CSP (die App nutzt Inline-Skripte/Google GSI), aber die
+//  risikoarmen Header: nosniff, kein Einbetten in fremde Seiten (Clickjacking),
+//  keine <object>/<base>-Tricks, Referrer sparsam, HSTS wenn HTTPS-Betrieb.
+//  /api/img setzt seine eigene, strengere CSP (der Handler schreibt nach diesem Header).
+// ───────────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+  if (process.env.COOKIE_SECURE === '1') res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  next();
+});
+
+// ───────────────────────────────────────────────────────────────
+//  RATE-LIMITS (Sicherheitsaudit 25.11.)
+//  Es gab KEINE Begrenzung: 100 parallele Logins stellten den Event-Loop knapp 7 s
+//  still (bcryptjs rechnet auf dem Hauptfaden), Gaeste und Raeume liessen sich ohne Limit
+//  anlegen. Einfache Fenster-Zaehler im Arbeitsspeicher (reicht fuer EINEN Prozess).
+//  `rlTreffer(name, key, fensterMs, max)` zaehlt einen Treffer und sagt, ob er noch erlaubt ist.
+//  `rateLimit(name, fensterMs, max)` ist die Express-Middleware je IP.
+// ───────────────────────────────────────────────────────────────
+const _rl = new Map();   // "name|key" -> { n, bis }
+function rlTreffer(name, key, fensterMs, max) {
+  const k = name + '|' + key, jetzt = Date.now();
+  let e = _rl.get(k);
+  if (!e || e.bis <= jetzt) { e = { n: 0, bis: jetzt + fensterMs }; _rl.set(k, e); }
+  e.n++;
+  return { ok: e.n <= max, retryAfter: Math.max(1, Math.ceil((e.bis - jetzt) / 1000)) };
+}
+/** Nur lesen (zaehlt nicht): wie viele Treffer stehen gerade? */
+function rlStand(name, key) {
+  const e = _rl.get(name + '|' + key);
+  return e && e.bis > Date.now() ? e.n : 0;
+}
+function rateLimit(name, fensterMs, max) {
+  return (req, res, next) => {
+    const r = rlTreffer(name, req.ip || 'x', fensterMs, max);
+    if (r.ok) return next();
+    res.setHeader('Retry-After', String(r.retryAfter));
+    return res.status(429).json({ error: `Too many requests. Please try again in ${r.retryAfter}s.` });
+  };
+}
+setInterval(() => {   // abgelaufene Zaehler wegwerfen (sonst wuchs die Map mit jeder IP)
+  const jetzt = Date.now();
+  for (const [k, e] of _rl) if (e.bis <= jetzt) _rl.delete(k);
+}, 60000).unref?.();
+// Grenzen je IP; hinter NAT/Schule teilen sich viele Spieler eine IP — daher grosszuegig.
+app.use('/api/auth/signup', rateLimit('signup', 10 * 60 * 1000, 20));
+app.use('/api/auth/forgot-password', rateLimit('forgot', 10 * 60 * 1000, 20));
+app.use('/api/auth/reset-password', rateLimit('reset', 10 * 60 * 1000, 30));
+app.use('/api/auth/verify-email', rateLimit('verify', 10 * 60 * 1000, 40));
+app.use('/api/auth/resend', rateLimit('resend', 10 * 60 * 1000, 20));
+app.use('/api/auth/guest', rateLimit('guest', 10 * 60 * 1000, 60));
+app.use('/api/auth/google', rateLimit('google', 10 * 60 * 1000, 60));
+app.use('/api/auth/login', rateLimit('login-ip', 10 * 60 * 1000, 60));
+app.use('/api/auth/remember', rateLimit('remember', 10 * 60 * 1000, 120));
+app.use('/api/profile/password', rateLimit('pw', 10 * 60 * 1000, 20));
+app.use('/api/profile/email', rateLimit('email', 10 * 60 * 1000, 20));
+app.use('/api/profile/import', rateLimit('import', 60 * 60 * 1000, 10));
+app.use('/api/game/result', rateLimit('gameresult', 60 * 1000, 30));
 
 // ───────────────────────────────────────────────────────────────
 //  Front-end build (public/*.jsx → public/dist/*.js)
@@ -850,7 +954,8 @@ app.use((req, res, next) => {
   let abs = null;
   for (const [mount, dir] of GZIP_ROOTS) {
     if (!req.path.startsWith(mount)) continue;
-    const rel = decodeURIComponent(req.path.slice(mount.length));
+    let rel;
+    try { rel = decodeURIComponent(req.path.slice(mount.length)); } catch { return next(); }   // kaputte Prozentkodierung: nicht 500, sondern an express.static (400/404)
     const candidate = path.join(dir, rel);
     if (!candidate.startsWith(dir + path.sep)) continue; // path traversal guard
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) { abs = candidate; break; }
@@ -1041,6 +1146,8 @@ async function initDatabase() {
   )`);
 
   await db.execute('CREATE INDEX IF NOT EXISTS idx_decks_user ON decks(user_id)');
+  // Bestenliste (WHERE ranked_games > 0 ORDER BY elo DESC, username): ohne Index SCAN + TEMP B-TREE bei jeder Anfrage (Audit). Teilindex nur ueber Ranked-Spieler.
+  try { await db.execute('CREATE INDEX IF NOT EXISTS idx_users_ranked_elo ON users(elo DESC, username) WHERE ranked_games > 0'); } catch (e) { console.warn('[db] Bestenlisten-Index:', e.message); }
 
   // Safe column migrations
   try { await db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''"); } catch {}
@@ -1181,7 +1288,8 @@ async function initDatabase() {
     attempts INTEGER DEFAULT 0,
     created_at INTEGER DEFAULT (unixepoch())
   )`);
-  await db.execute('CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_email_codes_email_nc ON email_codes(email COLLATE NOCASE)');   // Abfragen nutzen COLLATE NOCASE → sonst SCAN (Audit)
+  try { await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_signups_email_nc ON pending_signups(email COLLATE NOCASE)'); } catch (e) { console.warn('[db] pending_signups-Index:', e.message); }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -1528,13 +1636,50 @@ function getRandomDefaultColor() {
 }
 // Simple token-based auth using cookies
 const sessions = new Map(); // token -> { userId, username }
+// Sitzungen laufen serverseitig nach 7 Tagen ab (Sicherheitsaudit 25.11.: vorher nur der Cookie — ein abgegriffenes Token
+// galt bis zum Neustart). Die Erstellzeit steht getrennt, damit das Sitzungsobjekt (geht ans Socket) unveraendert bleibt.
+const SESSION_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+const REMEMBER_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+const sessionCreated = new Map(); // token -> ms
+/** Gueltige Sitzung zum Token oder null (abgelaufene werden dabei entfernt). */
+function sitzungFuerToken(token) {
+  if (typeof token !== 'string' || !token) return null;
+  const sess = sessions.get(token);
+  if (!sess) return null;
+  const t = sessionCreated.get(token);
+  if (t && Date.now() - t > SESSION_MAX_MS) {
+    sessions.delete(token); sessionCreated.delete(token);
+    try { db.run('DELETE FROM sessions WHERE token = ?', [token]).catch(() => {}); } catch (_) {}
+    return null;
+  }
+  return sess;
+}
+/** Alle Sitzungen und Merk-Marken eines Kontos beenden (nach Passwortwechsel/-Reset). `behalte`: Token der aktuellen Sitzung. */
+async function alleSitzungenBeenden(userId, behalte) {
+  for (const [tok, sess] of sessions) {
+    if (sess.userId === userId && tok !== behalte) { sessions.delete(tok); sessionCreated.delete(tok); }
+  }
+  try { await db.run('DELETE FROM sessions WHERE user_id = ? AND token != ?', [userId, behalte || '']); } catch (e) { console.error('[auth] Sitzungen loeschen:', e.message); }
+  try { await db.run('DELETE FROM remember_tokens WHERE user_id = ?', [userId]); } catch (e) { console.error('[auth] Merk-Marken loeschen:', e.message); }
+}
+setInterval(() => {   // abgelaufene Sitzungen/Marken regelmaessig wegraeumen (vorher nur beim Start)
+  for (const tok of [...sessions.keys()]) sitzungFuerToken(tok);
+  const jetzt = Date.now();
+  db.run('DELETE FROM sessions WHERE created_at < ?', [jetzt - SESSION_MAX_MS]).catch(() => {});
+  db.run('DELETE FROM remember_tokens WHERE created_at < ?', [jetzt - REMEMBER_MAX_MS]).catch(() => {});
+  // Offene Anmeldungen/Codes: wurden nur beim Bestaetigen aufgeraeumt (Audit) — abgelaufene regelmaessig entfernen.
+  db.run('DELETE FROM pending_signups WHERE expires_at < ?', [jetzt]).catch(() => {});
+  db.run('DELETE FROM email_codes WHERE expires_at < ?', [jetzt]).catch(() => {});
+  for (const [k, hits] of _emailSends) if (!hits.length || jetzt - hits[hits.length - 1] > 2 * 60 * 60 * 1000) _emailSends.delete(k);
+}, 60 * 60 * 1000).unref?.();
 
 function authMiddleware(req, res, next) {
   const token = req.cookies?.pp_token || req.headers['x-auth-token'];
-  if (!token || !sessions.has(token)) {
+  const sess = sitzungFuerToken(token);
+  if (!sess) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  req.user = sessions.get(token);
+  req.user = sess;
   req.authToken = token;
   next();
 }
@@ -1549,7 +1694,47 @@ const MAX_SENDS_PER_WINDOW = 6;          // max emails per address per window
 
 function genCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
 function hashCode(code) { return crypto.createHash('sha256').update(String(code)).digest('hex'); }
-function normEmail(e) { return String(e || '').trim(); }
+// E-Mail: nur Strings, hoechstens 254 Zeichen (RFC 5321) — DAVOR lief die Regex ueber beliebig lange Eingaben (quadratisch: 120 k Zeichen = 4 s Stillstand).
+function normEmail(e) { const t = typeof e === 'string' ? e.trim() : ''; return t.length > 254 ? '' : t; }
+
+// Passwort-Regeln (Sicherheitsaudit 25.11.): min. 8 (vorher 3), hoechstens 128 Zeichen (bcrypt nutzt nur die ersten 72 Byte, die
+// Obergrenze verhindert nur, dass riesige Passwoerter Rechenzeit fressen: 9,9 MB = 0,7 s Stillstand je Login).
+const PASSWORD_MIN = 8, PASSWORD_MAX = 128;
+function passwortFehler(pw) {
+  if (typeof pw !== 'string') return 'Password required';
+  if (pw.length < PASSWORD_MIN) return `Password must be ${PASSWORD_MIN}+ characters`;
+  if (pw.length > PASSWORD_MAX) return `Password must be ${PASSWORD_MAX} characters or fewer`;
+  return null;
+}
+// Benutzernamen: lateinische Buchstaben (inkl. Umlaute/Akzente), Ziffern, Leerzeichen, _ . - — keine Steuer-/Zero-Width-/RTL-Zeichen,
+// keine Emojis, kein HTML, keine kyrillischen/griechischen Doppelgaenger (Homoglyphen), NFC-normalisiert, kein doppeltes Leerzeichen.
+function benutzernameFehler(raw) {
+  if (typeof raw !== 'string') return 'Username required';
+  const u = raw.trim();
+  if (u.length < 3) return 'Username must be 3+ characters';
+  if (u.length > 10) return 'Username must be 10 characters or fewer';
+  if (u !== u.normalize('NFC') || /  /.test(u) || !/^[\p{Script=Latin}0-9][\p{Script=Latin}0-9 _.\-]*$/u.test(u)) {
+    return 'Username may only contain letters, digits, spaces and _ . -';
+  }
+  return null;
+}
+
+// bcryptjs rechnet auf dem Hauptfaden (≈ 70 ms je Aufruf). Hoechstens 2 gleichzeitig, der Rest wartet in einer begrenzten
+// Schlange — so bleibt der Event-Loop zwischen den Aufrufen frei, und eine Flut von Logins fuellt nicht den Speicher.
+let _bcAktiv = 0; const _bcSchlange = [];
+function _bcSlot(arbeit) {
+  return new Promise((resolve, reject) => {
+    const lauf = () => {
+      _bcAktiv++;
+      arbeit().then(resolve, reject).finally(() => { _bcAktiv--; const n = _bcSchlange.shift(); if (n) n(); });
+    };
+    if (_bcAktiv < 2) return lauf();
+    if (_bcSchlange.length >= 40) return reject(Object.assign(new Error('busy'), { status: 503, expose: true }));
+    _bcSchlange.push(lauf);
+  });
+}
+const pwHash = (pw) => _bcSlot(() => bcrypt.hash(pw, 10));
+const pwVergleich = (pw, hash) => _bcSlot(() => bcrypt.compare(pw, hash));
 
 // In-memory send throttle (resets on restart — fine for abuse damping).
 const _emailSends = new Map(); // lowercased email -> number[] (timestamps)
@@ -1634,12 +1819,14 @@ async function issueAndSendCode({ userId, email, purpose, lang }) {
 }
 
 // Validate a code from email_codes. On success deletes it and returns the row.
-async function consumeEmailCode({ email, purpose, code }) {
+async function consumeEmailCode({ email, purpose, code, userId }) {
   const row = await db.get(
     'SELECT * FROM email_codes WHERE email = ? COLLATE NOCASE AND purpose = ? ORDER BY created_at DESC LIMIT 1',
     [email, purpose],
   );
-  if (!row) return { ok: false, error: 'No code was requested for this email. Please request a new one.' };
+  // Gleiche Antwort wie bei falschem Code (kein Orakel, ob fuer die Adresse ein Code ausgestellt wurde). `userId`: der Code
+  // gehoert zu dem Konto, das ihn angefordert hat — fremde Konten koennen ihn nicht einloesen (Audit: user_id wurde nie geprueft).
+  if (!row || (userId && row.user_id !== userId)) return { ok: false, error: 'Incorrect code.' };
   if (Date.now() > row.expires_at) {
     await db.run('DELETE FROM email_codes WHERE id = ?', [row.id]);
     return { ok: false, error: 'That code has expired. Please request a new one.' };
@@ -1682,6 +1869,7 @@ const COOKIE_OPTS = {
 async function startSession(res, user) {
   const token = uuidv4();
   sessions.set(token, { userId: user.id, username: user.username });
+  sessionCreated.set(token, Date.now());
   // ── SCHREIBEN MIT AWAIT UND LAUTEM FEHLER (17.8.) ─────────────────
   // Erster Wurf: `.catch(() => {})` ohne await. Das war doppelt falsch.
   // Al meldete `[auth] 0 Sitzung(en) wiederhergestellt` — die Tabelle
@@ -1715,7 +1903,11 @@ async function startSession(res, user) {
         'INSERT OR REPLACE INTO remember_tokens (token, user_id, username, created_at) VALUES (?, ?, ?, ?)',
         [merk, user.id, user.username ?? null, Date.now()],
       );
-      res.cookie('pp_remember', merk, { ...COOKIE_OPTS, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      // Je Konto hoechstens 5 Merk-Marken (neueste); aeltere als 30 Tage fliegen raus (vorher wuchs die Tabelle mit jedem Login).
+      await db.run(
+        'DELETE FROM remember_tokens WHERE user_id = ? AND (created_at < ? OR token NOT IN (SELECT token FROM remember_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT 5))',
+        [user.id, Date.now() - REMEMBER_MAX_MS, user.id]);
+      res.cookie('pp_remember', merk, { ...COOKIE_OPTS, maxAge: REMEMBER_MAX_MS });
       console.log(`[auth] Merk-Marke gesetzt (${user.username || 'ohne Namen'})`);
     } catch (err) {
       console.error('[auth] ★ Merk-Marke konnte nicht gespeichert werden:', err?.message || err);
@@ -1734,10 +1926,11 @@ async function restoreSessions() {
     // UND aus der Tabelle — sonst antwortet /auth/me mit „User not found".
     await db.run('DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)');
     const zeilen = await db.all(
-      'SELECT s.token AS token, s.user_id AS user_id, s.username AS username '
+      'SELECT s.token AS token, s.user_id AS user_id, s.username AS username, s.created_at AS created_at '
       + 'FROM sessions s JOIN users u ON u.id = s.user_id');
     for (const z of (zeilen || [])) {
       sessions.set(z.token, { userId: z.user_id, username: z.username });
+      sessionCreated.set(z.token, Number(z.created_at) || Date.now());
     }
     // Rohbestand mitmelden: „0 wiederhergestellt" allein sagt nicht, ob
     // nie etwas geschrieben wurde oder ob die Bereinigung alles wegnahm.
@@ -1824,21 +2017,32 @@ async function uniqueUsernameFrom(raw) {
 // Step 1 of registration: validate, stash a pending signup, email a code.
 // The real `users` row is only created on /verify-email.
 app.post('/api/auth/signup', async (req, res) => {
-  const { username, password } = req.body;
-  const email = normEmail(req.body.email);
+  const { username, password } = req.body || {};
+  const email = normEmail(req.body?.email);
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   if (!email) return res.status(400).json({ error: 'Email is required' });
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
-  if (username.trim().length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
-  if (username.trim().length > 10) return res.status(400).json({ error: 'Username must be 10 characters or fewer' });
-  if (password.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
+  const nameErr = benutzernameFehler(username);
+  if (nameErr) return res.status(400).json({ error: nameErr });
+  const pwErr = passwortFehler(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
 
   const uname = username.trim();
   if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [uname])) {
     return res.status(409).json({ error: 'Username already taken' });
   }
   if (await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE', [email])) {
-    return res.status(409).json({ error: 'That email is already registered. Try logging in or resetting your password.' });
+    // Kein E-Mail-Orakel (Audit): dieselbe Antwort wie bei einer neuen Adresse; die Adresse bekommt stattdessen
+    // eine Hinweis-Mail ("du hast schon ein Konto"). Gleiche Drosselung wie fuer jeden Versand.
+    const st = emailSendStatus(email);
+    if (!st.ok) return res.status(429).json({ error: st.capped ? 'Too many emails requested. Please try again later.' : `Please wait ${st.retryAfter}s before requesting another code.` });
+    try {
+      await sendMail({ to: email, subject: 'Pixel Parties – you already have an account',
+        text: 'Someone (hopefully you) tried to create a Pixel Parties account with this email address, but it is already registered.\n\nYou can log in, or use "Forgot password" on the login screen.\nIf this was not you, you can ignore this email.',
+        html: '<p>Someone (hopefully you) tried to create a Pixel Parties account with this email address, but it is already registered.</p><p>You can log in, or use "Forgot password" on the login screen. If this was not you, you can ignore this email.</p>' });
+    } catch (e) { console.error('[mailer] signup notice failed:', e.message); }
+    recordEmailSend(email);
+    return res.json({ needsVerification: true, email, username: uname });
   }
 
   const status = emailSendStatus(email);
@@ -1855,7 +2059,7 @@ app.post('/api/auth/signup', async (req, res) => {
   await db.run('DELETE FROM pending_signups WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE', [uname, email]);
   await db.run(
     'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [uuidv4(), uname, email, await bcrypt.hash(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
+    [uuidv4(), uname, email, await pwHash(password), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
   );
   const signupLang = normLang(req.body.lang);
   await db.run('UPDATE pending_signups SET lang = ? WHERE username = ? COLLATE NOCASE', [signupLang, uname]);
@@ -1873,12 +2077,12 @@ app.post('/api/auth/signup', async (req, res) => {
 
 // Step 2 of registration: confirm the code, create the real account, log in.
 app.post('/api/auth/verify-email', async (req, res) => {
-  const email = normEmail(req.body.email);
-  const code = String(req.body.code || '').trim();
+  const email = normEmail(req.body?.email);
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim().slice(0, 12) : '';
   if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
 
   const pending = await db.get('SELECT * FROM pending_signups WHERE email = ? COLLATE NOCASE', [email]);
-  if (!pending) return res.status(400).json({ error: 'No pending registration for this email. Please sign up again.' });
+  if (!pending) return res.status(400).json({ error: 'Incorrect code.' });   // gleiche Antwort wie bei falschem Code (kein Orakel fuer offene Anmeldungen)
   if (Date.now() > pending.expires_at) {
     await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
     return res.status(400).json({ error: 'That code has expired. Please sign up again.' });
@@ -1929,11 +2133,9 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
 // Resend the signup verification code for a pending registration.
 app.post('/api/auth/resend', async (req, res) => {
-  const email = normEmail(req.body.email);
+  const email = normEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: 'Email is required' });
-  const pending = await db.get('SELECT * FROM pending_signups WHERE email = ? COLLATE NOCASE', [email]);
-  // Don't reveal whether a pending registration exists.
-  if (!pending) return res.json({ ok: true });
+  // Drosselung ZUERST und fuer jede Adresse gleich — sonst verriet das 429, ob eine Anmeldung offen ist.
   const status = emailSendStatus(email);
   if (!status.ok) {
     return res.status(429).json({
@@ -1942,6 +2144,9 @@ app.post('/api/auth/resend', async (req, res) => {
         : `Please wait ${status.retryAfter}s before requesting another code.`,
     });
   }
+  const pending = await db.get('SELECT * FROM pending_signups WHERE email = ? COLLATE NOCASE', [email]);
+  // Don't reveal whether a pending registration exists.
+  if (!pending) { recordEmailSend(email); return res.json({ ok: true }); }
   const code = genCode();
   await db.run('UPDATE pending_signups SET code_hash = ?, expires_at = ?, attempts = 0 WHERE id = ?',
     [hashCode(code), Date.now() + CODE_TTL_MS, pending.id]);
@@ -1954,9 +2159,13 @@ app.post('/api/auth/resend', async (req, res) => {
 
 // Forgot password — always responds ok (no account enumeration).
 app.post('/api/auth/forgot-password', async (req, res) => {
-  const email = normEmail(req.body.email);
+  const email = normEmail(req.body?.email);
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  // Drosselung fuer JEDE Adresse gleich (vorher nur fuer existierende Konten → 429 verriet, ob die Adresse registriert ist).
+  const st = emailSendStatus(email);
+  if (!st.ok) return res.status(429).json({ error: st.capped ? 'Too many emails requested. Please try again later.' : `Please wait ${st.retryAfter}s before requesting another code.` });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
+  if (!user) recordEmailSend(email);
   if (user) {
     const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset', lang: user.lang || normLang(req.body.lang) });
     // Swallow rate-limit/send errors into the generic response except the
@@ -1968,36 +2177,50 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
 // Reset password using the emailed code.
 app.post('/api/auth/reset-password', async (req, res) => {
-  const email = normEmail(req.body.email);
-  const code = String(req.body.code || '').trim();
-  const newPassword = req.body.newPassword || '';
+  const email = normEmail(req.body?.email);
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim().slice(0, 12) : '';
+  const newPassword = req.body?.newPassword;
   if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
-  if (newPassword.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
+  const pwErr = passwortFehler(newPassword);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   const result = await consumeEmailCode({ email, purpose: 'reset', code });
   if (!result.ok) return res.status(400).json({ error: result.error });
   const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
   if (!user) return res.status(400).json({ error: 'No account found for this email.' });
-  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, 10), user.id]);
-  // Invalidate any live sessions for this account after a reset.
-  for (const [tok, sess] of sessions) if (sess.userId === user.id) sessions.delete(tok);
-  try { db.run('DELETE FROM sessions WHERE user_id = ?', [user.id]).catch(() => {}); } catch (_) {}
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [await pwHash(newPassword), user.id]);
+  // Alle Sitzungen UND alle Merk-Marken dieses Kontos entwerten (vorher blieb die Marke gueltig: ein gestohlenes Cookie ueberlebte den Reset).
+  await alleSitzungenBeenden(user.id);
   res.json({ ok: true });
 });
 
 app.post('/api/auth/login', async (req, res) => {
   // Accept either a username or an email in `identifier` (legacy clients
   // send `username`).
-  const identifier = String(req.body.identifier ?? req.body.username ?? '').trim();
-  const { password } = req.body;
+  const idRoh = req.body?.identifier ?? req.body?.username ?? '';
+  const password = req.body?.password;
+  if (typeof idRoh !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'Username/email and password required' });
+  const identifier = idRoh.trim().slice(0, 254);
   if (!identifier || !password) return res.status(400).json({ error: 'Username/email and password required' });
+  if (password.length > 1024) return res.status(401).json({ error: 'Invalid username/email or password' });   // kein bcrypt-Aufwand fuer Riesen-Passwoerter
 
+  // Fehlversuche begrenzen (Audit: kein Limit, 60 falsche Logins in 4 s): je IP+Name 8 / 15 min, je Name insgesamt 40 / 15 min.
+  const idKey = identifier.toLowerCase();
+  const ipKey = (req.ip || 'x') + '|' + idKey;
+  if (rlStand('login-fail', ipKey) >= 8 || rlStand('login-fail-id', idKey) >= 40) {
+    res.setHeader('Retry-After', '900');
+    return res.status(429).json({ error: 'Too many failed attempts. Please try again in a few minutes.' });
+  }
   const looksEmail = identifier.includes('@');
   const user = looksEmail
     ? await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [identifier])
     : await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [identifier]);
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+  // IMMER einen bcrypt-Vergleich rechnen (gegen einen Dummy-Hash, wenn es das Konto nicht gibt) — sonst verraet die Antwortzeit (1 ms gegen 69 ms), ob der Name existiert.
+  const passwortOk = await pwVergleich(password, user ? user.password_hash : unusablePasswordHash());
+  if (!user || !passwortOk) {
+    rlTreffer('login-fail', ipKey, 15 * 60 * 1000, 8); rlTreffer('login-fail-id', idKey, 15 * 60 * 1000, 40);
     return res.status(401).json({ error: 'Invalid username/email or password' });
   }
+  _rl.delete('login-fail|' + ipKey);
 
   const token = await startSession(res, user);
   // Assign a random default avatar if the user doesn't have one
@@ -2091,7 +2314,7 @@ app.post('/api/auth/logout', async (req, res) => {
     const sess = sessions.get(token);
     try { await purgeGuest(sess.userId); } catch (err) { console.error('[logout] purgeGuest failed:', err.message); }
   }
-  if (token) sessions.delete(token);
+  if (token) { sessions.delete(token); sessionCreated.delete(token); }
   if (token) { try { db.run('DELETE FROM sessions WHERE token = ?', [token]).catch(() => {}); } catch (_) {} }
   res.clearCookie('pp_token', COOKIE_OPTS);
   // `pp_remember` bleibt ABSICHTLICH stehen — das ist der Unterschied
@@ -2108,7 +2331,7 @@ app.get('/api/auth/remember', async (req, res) => {
   try {
     const row = await db.get(
       'SELECT r.user_id AS user_id, u.username AS username FROM remember_tokens r '
-      + 'JOIN users u ON u.id = r.user_id WHERE r.token = ?', [merk]);
+      + 'JOIN users u ON u.id = r.user_id WHERE r.token = ? AND r.created_at > ?', [typeof merk === 'string' ? merk : '', Date.now() - REMEMBER_MAX_MS]);
     if (!row) return res.status(401).json({ error: 'unknown token' });
     res.json({ username: row.username });
   } catch (err) {
@@ -2122,7 +2345,7 @@ app.post('/api/auth/remember', async (req, res) => {
   const merk = req.cookies?.pp_remember;
   if (!merk) return res.status(401).json({ error: 'no remembered device' });
   try {
-    const row = await db.get('SELECT user_id FROM remember_tokens WHERE token = ?', [merk]);
+    const row = await db.get('SELECT user_id FROM remember_tokens WHERE token = ? AND created_at > ?', [typeof merk === 'string' ? merk : '', Date.now() - REMEMBER_MAX_MS]);
     if (!row) return res.status(401).json({ error: 'unknown token' });
     const user = await db.get('SELECT * FROM users WHERE id = ?', [row.user_id]);
     if (!user) {
@@ -2130,6 +2353,7 @@ app.post('/api/auth/remember', async (req, res) => {
       res.clearCookie('pp_remember', COOKIE_OPTS);
       return res.status(401).json({ error: 'account gone' });
     }
+    await db.run('DELETE FROM remember_tokens WHERE token = ?', [merk]);   // Marke bei Gebrauch erneuern (startSession gibt eine neue aus)
     const token = await startSession(res, user);
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
@@ -2152,6 +2376,7 @@ app.delete('/api/auth/remember', async (req, res) => {
 // accounts — the `is_guest = 1` guard makes this safe to call with any id.
 async function purgeGuest(userId) {
   funnel.forget(userId);
+  if (typeof _userIp !== 'undefined') _userIp.delete(userId);
   if (!userId) return;
   const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
   if (!row || !row.is_guest) return;
@@ -2176,8 +2401,30 @@ async function purgeAllGuests() {
 // just the starter-deck opponents and pinned to a random starter. Guests
 // schalten Gegner nur sitzungsweit frei (siehe endCpuBattle + unlock-rules.js)
 // und werden beim Abmelden weggeraeumt.
+// Gaeste-Aufraeumen (Audit: Gaeste wurden nur beim Abmelden oder Neustart geloescht — ohne Limit wuchs die DB mit jedem Aufruf):
+// alle 20 min fliegen Gaeste raus, die keine Sitzung mehr haben (Sitzung abgelaufen / Tab einfach geschlossen) und aelter als 15 min sind.
+async function purgeVerwaisteGaeste() {
+  try {
+    const aktiv = new Set([...sessions.values()].map(x => x.userId));
+    const rows = await db.all('SELECT id FROM users WHERE is_guest = 1 AND created_at < ?', [Math.floor(Date.now() / 1000) - 15 * 60]);
+    let n = 0;
+    for (const g of rows) {
+      if (aktiv.has(g.id) || (typeof activeGames !== 'undefined' && activeGames.has(g.id))) continue;
+      await purgeGuest(g.id); n++;
+    }
+    if (n) console.log(`[guest cleanup] ${n} verwaiste(s) Gastkonto/-konten entfernt`);
+  } catch (err) { console.error('[guest cleanup] periodisch:', err.message); }
+}
+setInterval(purgeVerwaisteGaeste, 20 * 60 * 1000).unref?.();
+const GAESTE_MAX = 3000;   // gleichzeitig vorhandene Gastkonten (Schutz vor Massenanlage)
+
 app.post('/api/auth/guest', async (req, res) => {
   try {
+    const gesamt = await db.get('SELECT COUNT(*) AS n FROM users WHERE is_guest = 1');
+    if ((gesamt?.n || 0) >= GAESTE_MAX) { await purgeVerwaisteGaeste(); }
+    if (((await db.get('SELECT COUNT(*) AS n FROM users WHERE is_guest = 1'))?.n || 0) >= GAESTE_MAX) {
+      return res.status(503).json({ error: 'The server is very busy right now. Please try again in a few minutes.' });
+    }
     const id = uuidv4();
     const { username, avatar: gastAvatar } = await neuerGastName(id);
     const passwordHash = unusablePasswordHash(); // nie bekanntes Passwort dahinter: Gaeste koennen sich nicht per Passwort anmelden
@@ -2298,9 +2545,10 @@ app.post('/api/profile/lang', authMiddleware, async (req, res) => {
 // green/red feedback. Mirrors the validation in PUT /api/profile so the two
 // never disagree. The user's own current name reads as available (id != self).
 app.get('/api/profile/check-username', authMiddleware, async (req, res) => {
-  const name = String(req.query.name || '').trim();
+  const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
   if (name.length < 3) return res.json({ available: false, reason: 'Too short (3+ characters)' });
   if (name.length > 10) return res.json({ available: false, reason: 'Too long (max 10 characters)' });
+  if (benutzernameFehler(name)) return res.json({ available: false, reason: 'Only letters, digits, spaces and _ . -' });
   if (containsProfanity(name)) return res.json({ available: false, reason: 'Inappropriate language' });
   const taken = await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [name, req.user.userId]);
   res.json({ available: !taken, reason: taken ? 'Already taken' : 'Available' });
@@ -2333,9 +2581,9 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   // re-saving your current name, or just a case change, is allowed).
   let newUsername;
   if (b.username !== undefined) {
-    newUsername = String(b.username || '').trim();
-    if (newUsername.length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
-    if (newUsername.length > 10) return res.status(400).json({ error: 'Username must be 10 characters or fewer' });
+    const nameErr = benutzernameFehler(b.username);
+    if (nameErr) return res.status(400).json({ error: nameErr });
+    newUsername = b.username.trim();
     if (containsProfanity(newUsername)) return res.status(400).json({ error: 'Username: please remove inappropriate language.' });
     if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [newUsername, req.user.userId])) {
       return res.status(409).json({ error: 'Username already taken' });
@@ -2443,11 +2691,22 @@ app.put('/api/profile/hero-display', authMiddleware, async (req, res) => {
 // Request an email-verification code for the logged-in account (used by
 // grandfathered accounts adding an email, or anyone changing it).
 app.post('/api/profile/email/request', authMiddleware, async (req, res) => {
-  const email = normEmail(req.body.email);
+  const email = normEmail(req.body?.email);
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  // Eine bestehende, bestaetigte Adresse zu ERSETZEN verlangt das aktuelle Passwort (Audit: mit gestohlener Sitzung liess sich die
+  // Konto-E-Mail ohne Weiteres umbiegen und danach per "Forgot password" das Passwort setzen). Google-Konten ohne eigenes Passwort
+  // sind ausgenommen (sie haben keines); die Erstvergabe einer Adresse braucht kein Passwort.
+  const cur = await db.get('SELECT email, email_verified, google_id, password_hash, lang FROM users WHERE id = ?', [req.user.userId]);
+  if (cur && cur.email && cur.email_verified && !cur.google_id) {
+    const pw = req.body?.currentPassword;
+    if (typeof pw !== 'string' || !pw || pw.length > 1024 || !(await pwVergleich(pw, cur.password_hash))) {
+      return res.status(403).json({ error: 'Please enter your current password to change your email address.' });
+    }
+  }
   const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
-  if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
-  const meRow = await db.get('SELECT lang FROM users WHERE id = ?', [req.user.userId]);
+  // Kein Orakel (Audit): bei vergebener Adresse dieselbe Antwort wie sonst, nur ohne Mail.
+  if (taken) { recordEmailSend(email); return res.json({ ok: true, email }); }
+  const meRow = cur;
   const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email', lang: (meRow && meRow.lang) || normLang(req.body.lang) });
   if (!r.ok) return res.status(r.status || 500).json({ error: r.error });
   res.json({ ok: true, email });
@@ -2455,15 +2714,23 @@ app.post('/api/profile/email/request', authMiddleware, async (req, res) => {
 
 // Confirm the code and attach the verified email to the account.
 app.post('/api/profile/email/confirm', authMiddleware, async (req, res) => {
-  const email = normEmail(req.body.email);
-  const code = String(req.body.code || '').trim();
+  const email = normEmail(req.body?.email);
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim().slice(0, 12) : '';
   if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
-  const result = await consumeEmailCode({ email, purpose: 'add_email', code });
+  const result = await consumeEmailCode({ email, purpose: 'add_email', code, userId: req.user.userId });
   if (!result.ok) return res.status(400).json({ error: result.error });
+  const vorher = await db.get('SELECT email, email_verified FROM users WHERE id = ?', [req.user.userId]);
   // Guard the race on the unique-email index.
   const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
   if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
   await db.run('UPDATE users SET email = ?, email_verified = 1 WHERE id = ?', [email, req.user.userId]);
+  // Hinweis an die ALTE Adresse: wer sein Konto verloren hat, merkt es wenigstens (best effort).
+  if (vorher && vorher.email && vorher.email_verified && vorher.email.toLowerCase() !== email.toLowerCase()) {
+    sendMail({ to: vorher.email, subject: 'Pixel Parties – your account email was changed',
+      text: 'The email address of your Pixel Parties account was just changed. If this was not you, please contact us immediately.',
+      html: '<p>The email address of your Pixel Parties account was just changed. If this was not you, please contact us immediately.</p>' })
+      .catch(e => console.error('[mailer] email-change notice failed:', e.message));
+  }
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ ok: true, user: sanitizeUser(user) });
 });
@@ -2684,16 +2951,20 @@ app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }),
 
 // ===== CHANGE PASSWORD =====
 app.post('/api/profile/password', authMiddleware, async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-  if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Both old and new password required' });
-  if (newPassword.length < 3) return res.status(400).json({ error: 'New password must be 3+ characters' });
+  const { oldPassword, newPassword } = req.body || {};
+  if (typeof oldPassword !== 'string' || !oldPassword || !newPassword) return res.status(400).json({ error: 'Both old and new password required' });
+  const pwErr = passwortFehler(newPassword);
+  if (pwErr) return res.status(400).json({ error: 'New password: ' + pwErr.replace(/^Password /, '') });
+  if (oldPassword.length > 1024) return res.status(401).json({ error: 'Current password is incorrect' });
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (!(await bcrypt.compare(oldPassword, user.password_hash))) {
+  if (!(await pwVergleich(oldPassword, user.password_hash))) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
-  const hash = await bcrypt.hash(newPassword, 10);
+  const hash = await pwHash(newPassword);
   await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
+  // Alle ANDEREN Sitzungen und alle Merk-Marken beenden (vorher blieben sie nach dem Passwortwechsel gueltig); die aktuelle bleibt.
+  await alleSitzungenBeenden(user.id, req.authToken);
   res.json({ success: true });
 });
 
@@ -2724,34 +2995,10 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
 
 // ===== GAME RESULT RECORDING =====
 // Called when a game ends — records win/loss for the player and their 3 heroes
-app.post('/api/game/result', authMiddleware, async (req, res) => {
-  const { won, heroes, opponentId } = req.body;
-  if (typeof won !== 'boolean') return res.status(400).json({ error: 'won must be boolean' });
-  // v1167: Zhigao-Aufstellungen melden zwei Helden.
-  if (!Array.isArray(heroes) || !heldenzahlOk(heroes)) return res.status(400).json({ error: 'heroes must list your starting Heroes (3, or 2 with Zhigao)' });
-
-  const userId = req.user.userId;
-
-  // Update user wins/losses
-  if (won) {
-    await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [userId]);
-  } else {
-    await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [userId]);
-  }
-
-  // Update hero stats (aggregate)
-  for (const heroName of heroes) {
-    if (heroName) {
-      await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [userId, heroName, won ? 1 : 0, won ? 0 : 1]);
-    }
-  }
-
-  // Record in game history
-  await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [uuidv4(), userId, heroes[0] || null, heroes[1] || null, heroes[2] || null, won ? 1 : 0, opponentId || null]);
-
-  const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
-  res.json({ success: true, user: sanitizeUser(user) });
-});
+// Stillgelegt (Sicherheitsaudit 25.11.): der Client meldete Sieg/Niederlage SELBST — ohne Bezug zu einem echten Spiel, ohne Limit
+// (50 Aufrufe = 50 Siege, beliebige Helden-/Gegner-Namen, wachsende hero_stats/game_history). Kein Client ruft den Endpunkt mehr auf;
+// Siege, Niederlagen und Heldenstatistik zaehlt der Server in endGame().
+app.post('/api/game/result', authMiddleware, (req, res) => res.status(410).json({ error: 'Game results are recorded by the server.' }));
 
 // ===== LEADERBOARD =====
 // Returns up to the top 20 ranked players ordered by ELO. A player counts
@@ -2956,9 +3203,13 @@ getCardArray().forEach(c => { nameByStripped[strippedKey(c.name)] = c.name; });
 
 // Die Zuordnung „Karte → Bilddatei" liegt in card-images.js (gleiche Quelle nutzt der Skill Test für seinen Kartenpool).
 // Farbvarianten (v818): „Queen of Kings [B]" / „[W]" liegen als `Queen of Kings.png` / `Queen of Kings.1.png` auf der Platte.
+let _verfuegbarCache = { t: 0, v: null };   // 10 s gemeinsam nutzen (readdir + stat je Anfrage, ohne Anmeldung erreichbar)
 app.get('/api/cards/available', async (req, res) => {
   try {
-    res.json({ available: require('./card-images').availableImageMap(getCardArray()) });
+    if (!_verfuegbarCache.v || Date.now() - _verfuegbarCache.t > 10000) {
+      _verfuegbarCache = { t: Date.now(), v: require('./card-images').availableImageMap(getCardArray()) };
+    }
+    res.json({ available: _verfuegbarCache.v });
   } catch {
     res.json({ available: {} });
   }
@@ -3250,8 +3501,29 @@ app.get('/api/decks', authMiddleware, async (req, res) => {
   res.json({ decks: decks.map(parseDeck) });
 });
 
+// Deck-Grenzen (Sicherheitsaudit 25.11.): vorher unbegrenzt — ein 700.000-Karten-Deck (4,7 MB) wurde angenommen und blockierte jeden PUT/GET
+// 0,35–0,5 s lang, ebenso 100.000 Zeichen lange Namen und beliebig viele Decks je Konto.
+const DECK_MAX_JE_KONTO = 100, DECK_NAME_MAX = 60;
+const DECK_ZONEN_MAX = { mainDeck: 600, heroes: 6, potionDeck: 120, sideDeck: 250 };   // Cube = 512 Karten im Hauptdeck
+function deckEingabeFehler(body) {
+  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.length > DECK_NAME_MAX)) return `Deck name must be at most ${DECK_NAME_MAX} characters`;
+  for (const [zone, max] of Object.entries(DECK_ZONEN_MAX)) {
+    const z = body[zone];
+    if (z === undefined || z === null) continue;
+    if (!Array.isArray(z) || z.length > max) return `Invalid ${zone} (max ${max} entries)`;
+    if (z.some(k => typeof k === 'string' ? k.length > 120 : (k !== null && typeof k === 'object' ? JSON.stringify(k).length > 400 : false))) return `Invalid ${zone} entry`;
+  }
+  if (body.coverCard !== undefined && body.coverCard !== null && (typeof body.coverCard !== 'string' || body.coverCard.length > 120)) return 'Invalid cover card';
+  if (body.skins !== undefined && body.skins !== null && (typeof body.skins !== 'object' || Array.isArray(body.skins) || JSON.stringify(body.skins).length > 4000)) return 'Invalid skins';
+  if (body.rarities !== undefined && body.rarities !== null && (typeof body.rarities !== 'object' || JSON.stringify(body.rarities).length > 20000)) return 'Invalid rarities';
+  return null;
+}
 app.post('/api/decks', authMiddleware, async (req, res) => {
-  const { name, mode } = req.body;
+  const { name, mode } = req.body || {};
+  const eingabeFehler = deckEingabeFehler({ name });
+  if (eingabeFehler) return res.status(400).json({ error: eingabeFehler });
+  const anzahl = await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', [req.user.userId]);
+  if ((anzahl?.n || 0) >= DECK_MAX_JE_KONTO) return res.status(400).json({ error: `You can have at most ${DECK_MAX_JE_KONTO} decks.` });
   const id = uuidv4();
   const deckMode = mode === 'cube' ? 'cube' : 'standard';
   await db.run('INSERT INTO decks (id, user_id, name, mode) VALUES (?, ?, ?, ?)', [id, req.user.userId, name || 'New Deck', deckMode]);
@@ -3260,7 +3532,9 @@ app.post('/api/decks', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/decks/:id', authMiddleware, async (req, res) => {
-  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins, rarities } = req.body;
+  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins, rarities } = req.body || {};
+  const eingabeFehler = deckEingabeFehler(req.body || {});
+  if (eingabeFehler) return res.status(400).json({ error: eingabeFehler });
   const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!deckRow) return res.status(404).json({ error: 'Deck not found' });
 
@@ -3437,9 +3711,12 @@ async function ensureValidDefaultDeck(userId) {
 
 app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name } = req.body || {};
+    const eingabeFehler = deckEingabeFehler({ name });
+    if (eingabeFehler) return res.status(400).json({ error: eingabeFehler });
     const original = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
     if (!original) return res.status(404).json({ error: 'Deck not found' });
+    if (((await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', [req.user.userId]))?.n || 0) >= DECK_MAX_JE_KONTO) return res.status(400).json({ error: `You can have at most ${DECK_MAX_JE_KONTO} decks.` });
 
     const newId = uuidv4();
     await db.run(
@@ -4127,7 +4404,19 @@ app.get('/api/tutorial-assets', authMiddleware, (req, res) => {
   } catch (e) { console.error('[tutorial-assets]', e.message); res.json({ cards: [], heroes: [], abilities: [] }); }
 });
 
+// Ergebnis 10 s lang gemeinsam nutzen (Sicherheits-/Performanceaudit 25.11.: jeder Aufruf las ~650 JSON-Dateien + stat je PNG — ohne Anmeldung erreichbar,
+// ca. 23 Aufrufe/s Gesamtdurchsatz). Neue Sheets erscheinen weiter binnen Sekunden.
+const _animCache = { hero: null, creature: null };
+function animMemo(art, bauen) {
+  const e = _animCache[art], jetzt = Date.now();
+  if (e && jetzt - e.t < 10000) return e.p;
+  const p = bauen();
+  _animCache[art] = { t: jetzt, p };
+  p.catch(() => { if (_animCache[art]?.p === p) _animCache[art] = null; });
+  return p;
+}
 app.get('/api/hero-animations', async (req, res) => {
+  const animations = await animMemo('hero', async () => {
   const animations = {};
   try {
     const files = (await fs.promises.readdir(HERO_ANIM_DIR)).filter(f => f.endsWith('.json'));
@@ -4146,6 +4435,8 @@ app.get('/api/hero-animations', async (req, res) => {
       } catch {}
     }));
   } catch {}
+  return animations;
+  });
   res.set('Cache-Control', 'no-cache');
   res.json({ animations });
 });
@@ -4157,6 +4448,7 @@ app.get('/api/hero-animations', async (req, res) => {
 const CREATURE_ANIM_DIR = path.join(__dirname, 'data', 'creature-animations');
 const animSlug = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 app.get('/api/creature-animations', async (req, res) => {
+  const animations = await animMemo('creature', async () => {
   const animations = {};
   try {
     const files = (await fs.promises.readdir(CREATURE_ANIM_DIR)).filter(f => f.endsWith('.json'));
@@ -4177,6 +4469,8 @@ app.get('/api/creature-animations', async (req, res) => {
       } catch {}
     }));
   } catch {}
+  return animations;
+  });
   res.set('Cache-Control', 'no-cache');
   res.json({ animations });
 });
@@ -5253,10 +5547,18 @@ async function getCardOfDayInfo(nowMs = Date.now()) {
   return { date, card: row.card, amount: eintrag ? eintrag.amount : 0 };
 }
 
+// Raumliste an ALLE senden — gebuendelt (Sicherheits-/Performanceaudit 25.11.: jede Raum-Aenderung schickte die ganze Liste sofort an jede Verbindung;
+// 500 Sockets × 6 Wechsel = 29,7 MB und 1,3 s Server-CPU). Aenderungen binnen 200 ms ergeben EINE Nachricht mit dem dann aktuellen Stand.
+let _raumlisteTimer = null;
+function raumlisteSenden() {
+  if (_raumlisteTimer) return;
+  _raumlisteTimer = setTimeout(() => { _raumlisteTimer = null; try { io.emit('rooms', getRoomList()); } catch (e) { console.error('[rooms] Broadcast:', e.message); } }, 200);
+}
 function getSocketIP(socket) {
-  return socket?.handshake?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
-    || socket?.handshake?.address
-    || 'unknown';
+  // X-Forwarded-For nur glauben, wenn ein Proxy davorsteht (TRUST_PROXY, siehe oben) — sonst setzt sich jeder Client eine beliebige IP
+  // (Audit: umging die „gleiche IP"-Sperre gegen SC-Farming und die neuen Verbindungs-/Raum-Limits).
+  const xff = process.env.TRUST_PROXY ? socket?.handshake?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() : null;
+  return xff || socket?.handshake?.address || 'unknown';
 }
 
 // ===== GAME ROOMS (Socket.io) =====
@@ -5280,6 +5582,7 @@ function destroyRoom(roomId) {
   return rooms.delete(roomId);
 }
 const activeGames = new Map(); // userId -> roomId
+const _eloPaare = new Map(); // "userA|userB" (sortiert) -> Zeitstempel gewerteter Ranked-Saetze (Elo-Schutz gegen Win-Trading)
 const disconnectTimers = new Map(); // userId -> timeout handle
 
 // ===== SOCIAL: Who's Online, private Chats, Herausforderungen (social.js) =====
@@ -5432,12 +5735,12 @@ async function startChallengeGame({ challengerId, challengeeId, ranked, challeng
     for (const p of room.players) activeGames.delete(p.userId);
     sockA.leave('room:' + roomId); sockB.leave('room:' + roomId);
     destroyRoom(roomId);
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
     return { error: 'Could not start the game.' };
   }
   // Die Clients stehen irgendwo im Menü; `challengeStart` schickt sie ins Spiel (app-main.jsx).
   for (let i = 0; i < 2; i++) sendGameState(room, i, { challengeStart: true });
-  io.emit('rooms', getRoomList());
+  raumlisteSenden();
   console.log(`[challenge] ${uA.username} vs ${uB.username} (${room.type}, Bo${bo}) gestartet`);
   return { ok: true };
 }
@@ -7458,9 +7761,19 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
 
   // Elo only changes when the full set is decided
   let eloChanges = null;
+  // Elo-Schutz gegen Win-Trading (Sicherheitsaudit 25.11.: zwei Gaeste auf derselben IP, einer gibt sofort auf → Elo 1000 → 1044 ueber drei Runden,
+  // beliebig wiederholbar mit frischen Konten). Keine Elo-Buchung, wenn (a) beide Seiten dieselbe IP haben, (b) ein Gastkonto beteiligt ist,
+  // (c) dieselben zwei Konten sich in 24 h schon 5x gewertet haben. Aufgeben zaehlt weiter normal (sonst koennte man Elo-Verluste per Abbruch umgehen).
   if (setOver && isRanked) {
     const wUser = await db.get('SELECT * FROM users WHERE id = ?', [winner.userId]);
     const lUser = await db.get('SELECT * FROM users WHERE id = ?', [loser.userId]);
+    const ips = gs._playerIPs || [];
+    const gleicheIp = ips[0] && ips[1] && ips[0] !== 'unknown' && ips[0] === ips[1];
+    const paarKey = [winner.userId, loser.userId].sort().join('|');
+    const paarListe = (_eloPaare.get(paarKey) || []).filter(t => Date.now() - t < 24 * 3600 * 1000);
+    const eloSperre = gleicheIp || wUser?.is_guest || lUser?.is_guest || paarListe.length >= 5;
+    if (!eloSperre) { paarListe.push(Date.now()); _eloPaare.set(paarKey, paarListe); }
+    if (!eloSperre) {
     const wElo = wUser?.elo || 1000; const lElo = lUser?.elo || 1000;
     const K = 32;
     const expectedW = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
@@ -7474,6 +7787,7 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
     // UI re-fetches. Without this the leaderboard stays stale until the
     // 60s poll fires or the user manually navigates away and back.
     io.emit('leaderboard_updated');
+    }
   }
 
   // Always track wins/losses and hero stats per round
@@ -7517,7 +7831,7 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
     }
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-  io.emit('rooms', getRoomList());
+  raumlisteSenden();
 
   // ── Emit updated profile stats (wins/losses/elo) to both players ──
   for (let i = 0; i < 2; i++) {
@@ -8252,7 +8566,7 @@ function cleanupRoom(roomId) {
     if (t) { clearTimeout(t); disconnectTimers.delete(p.userId); }
   }
   destroyRoom(roomId);
-  io.emit('rooms', getRoomList());
+  raumlisteSenden();
 }
 
 // ─── Card movement animation ───
@@ -15970,7 +16284,7 @@ async function startGameEngine(room, roomId, activePlayer, afterInit) {
   room.gameState.mulliganDecisions = [null, null];
   for(let i=0;i<2;i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.to('room:' + room.id).emit('game_started', sanitizeRoom(room));
-  io.emit('rooms', getRoomList());
+  raumlisteSenden();
 }
 
 // ── v385: von der Verbindungs-Closure auf MODULEBENE gehoben ──────
@@ -16062,8 +16376,68 @@ const AKTION_VERWORFEN_NACH_MS = 2000;
 // Laeuft die Engine nach der Frist noch, wird nachgesehen — hoechstens so lange.
 const AKTION_PRUEFUNG_MAX_MS = 30000;
 
+// ───────────────────────────────────────────────────────────────
+//  VERBINDUNGS-/EREIGNIS-LIMITS (Sicherheitsaudit 25.11.)
+//  Gemessen: 3000 Sockets einer IP = +623 MB RSS und 1,4 s Loop-Stillstand; 5000 `get_rooms` = 1,9 s CPU; ein Client erzeugte 500
+//  Raeume in 3 s (jeder Raum = Broadcast der ganzen Liste an ALLE). Jetzt: hoechstens 60 gleichzeitige Verbindungen je IP
+//  (Schulen/NAT teilen sich eine IP), je Socket ein Ereignis-Limit (allgemein + engere Grenzen fuer teure Ereignisse).
+// ───────────────────────────────────────────────────────────────
+const VERBINDUNGEN_JE_IP = 60;
+const _verbIp = new Map();
+io.use((socket, next) => {
+  const ip = getSocketIP(socket);
+  const n = _verbIp.get(ip) || 0;
+  if (n >= VERBINDUNGEN_JE_IP) return next(new Error('too many connections'));
+  _verbIp.set(ip, n + 1);
+  socket.once('disconnect', () => { const m = (_verbIp.get(ip) || 1) - 1; if (m <= 0) _verbIp.delete(ip); else _verbIp.set(ip, m); });
+  next();
+});
+// Engere Grenzen je Socket: Ereignis → [Fenster ms, max]. Alles andere faellt unter die allgemeine Grenze.
+const EREIGNIS_LIMITS = {
+  create_room: [20000, 6], join_room: [10000, 20], get_rooms: [10000, 20], spectate_lookup: [10000, 20],
+  chat_message: [10000, 10], chat_private: [10000, 10], request_chat_history: [10000, 10],
+  start_cpu_battle: [30000, 6], rematch_cpu_battle: [30000, 6], start_tutorial_attempt: [30000, 8], start_puzzle_attempt: [30000, 8],
+  start_puzzle: [30000, 8], start_campaign_duel: [30000, 8], export_puzzle: [30000, 6], get_puzzles: [10000, 10], get_tutorials: [10000, 10],
+  ping_card: [5000, 20], refresh_identity: [10000, 10],
+};
+const EREIGNIS_ALLGEMEIN = [2000, 200];   // je Socket 100 Ereignisse/s im Schnitt — weit ueber jedem normalen Spiel
+// Solo-Partien (CPU/Tutorial/Puzzle/Kampagne) je IP und insgesamt begrenzen — das CPU-Limit (30) galt nur fuer `singleplayer`,
+// Tutorial-/Puzzle-/Kampagnenraeume waren frei (Audit: 100 Gast-Sockets = 100 Raeume, bleiben nach dem Trennen 3 min im Speicher).
+const _userIp = new Map();            // userId -> IP (im 'auth'-Handler gesetzt)
+const SOLO_MAX_JE_IP = 8, SOLO_MAX_GESAMT = 300;
+function soloGrenzeErreicht(userId) {
+  const ip = _userIp.get(userId);
+  let gesamt = 0, jeIp = 0;
+  for (const [uid, rid] of activeGames) {
+    const r = rooms.get(rid);
+    if (!r || !(r.type === 'singleplayer' || r.type === 'puzzle')) continue;
+    gesamt++;
+    if (ip && _userIp.get(uid) === ip) jeIp++;
+  }
+  return gesamt >= SOLO_MAX_GESAMT || jeIp >= SOLO_MAX_JE_IP;
+}
+
 io.on('connection', (socket) => {
   let currentUser = null;
+
+  // Ereignis-Limits (siehe EREIGNIS_LIMITS). Ueberschreitung: Ereignis verwerfen; wer es dauerhaft treibt, fliegt raus.
+  {
+    const zaehler = new Map();   // Ereignis -> { n, bis }
+    let verstoesse = 0;
+    const treffer = (name, [fenster, max]) => {
+      const jetzt = Date.now();
+      let e = zaehler.get(name);
+      if (!e || e.bis <= jetzt) { e = { n: 0, bis: jetzt + fenster }; zaehler.set(name, e); }
+      return ++e.n <= max;
+    };
+    socket.use(([ereignis, nutzlast], next) => {
+      if (nutzlast === null) return;   // `null` als Nutzlast liess die zerlegenden Handler (`({ roomId }) => …`) mit TypeError abbrechen (Audit) — kein legitimer Client sendet es
+      const eng = EREIGNIS_LIMITS[ereignis];
+      if (treffer('*', EREIGNIS_ALLGEMEIN) && (!eng || treffer(ereignis, eng))) return next();
+      if (++verstoesse >= 50) { console.warn(`[socket] ${getSocketIP(socket)} trennt wegen Ereignis-Flut (${ereignis})`); socket.disconnect(true); }
+      // verworfen: kein next() — der Handler laeuft nicht
+    });
+  }
 
   // ★ RUECKMELDUNG BEI STILL VERWORFENEN AKTIONEN. Die Handler (und die
   // Engine dahinter: `advancePhase`, `validateActionPlay`, Index-Pruefungen,
@@ -16132,9 +16506,10 @@ io.on('connection', (socket) => {
   socket.on('client_clock', (data) => { if (currentUser) noteClientClock(currentUser.userId, data); });
 
   socket.on('auth', (token) => {
-    const session = sessions.get(token);
+    const session = sitzungFuerToken(token);
     if (session) {
       currentUser = { ...session, ip: socketIP };
+      _userIp.set(session.userId, socketIP);
       socket.data.userId = session.userId;
       socket.emit('auth_ok', session);
       grantTutorialSkinIfDone(session.userId, 4000);   // wer das Tutorial schon geschafft hat, bekommt den Skin nachtraeglich
@@ -16211,10 +16586,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft, skillTest: skillTestRaw }) => {
+  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft, skillTest: skillTestRaw } = {}) => {
     if (!currentUser) return;
     const fmt = [1, 3, 5].includes(format) ? format : 1;
     const roomId = uuidv4().substring(0, 8);
+    // Hoechstens 3 gleichzeitig offene Raeume je Gastgeber (Audit: ein Client erzeugte 500 Raeume in 3 s — jeder Raum loest einen Broadcast der ganzen Liste an alle aus).
+    if ([...rooms.values()].filter(r => r.hostId === currentUser.userId && r.status !== 'playing').length >= 3) return socket.emit('join_error', 'You already have open rooms. Close one first.');
 
     // Cube Draft branch: 8-seat room, host's cube is the source pool, no
     // per-player deck yet (decks are built post-draft). The host is
@@ -16293,10 +16670,10 @@ io.on('connection', (socket) => {
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
     socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
   });
 
-  socket.on('join_room', ({ roomId, password, asSpectator, deckId }) => {
+  socket.on('join_room', ({ roomId, password, asSpectator, deckId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room) return socket.emit('join_error', 'Room not found');
@@ -16390,7 +16767,7 @@ io.on('connection', (socket) => {
     socket.join('room:' + roomId);
     socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
     // If the game is already playing, send initial game state to the new spectator
     if (room.status === 'playing' && room.gameState && room.spectators.some(s => s.userId === currentUser.userId)) {
       sendSpectatorGameState(room);
@@ -16423,16 +16800,16 @@ io.on('connection', (socket) => {
     reply({ ok: true, roomId: room.id, hasSpecPw: !!room.specPw, type: room.type, label: room.skillTest ? 'Skill Test' : 'Game' });
   });
 
-  socket.on('swap_to_spectator', ({ roomId }) => {
+  socket.on('swap_to_spectator', ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     room.players = room.players.filter(p => p.username !== currentUser.username);
     room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
   });
 
-  socket.on('swap_to_player', ({ roomId, deckId }) => {
+  socket.on('swap_to_player', ({ roomId, deckId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     const cap = room.maxPlayers || 2;
@@ -16448,10 +16825,10 @@ io.on('connection', (socket) => {
     const hs = room.players[0]?.socketId;
     if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
   });
 
-  socket.on('change_deck', ({ roomId, deckId }) => {
+  socket.on('change_deck', ({ roomId, deckId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     const playerIdx = room.players.findIndex(p => p.userId === currentUser.userId);
@@ -16477,7 +16854,7 @@ io.on('connection', (socket) => {
     socket.emit('deck_changed', { deckId: player.deckId });
   });
 
-  socket.on('start_game', async ({ roomId }) => {
+  socket.on('start_game', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
@@ -16493,7 +16870,7 @@ io.on('connection', (socket) => {
   // them out. For M1 the handler stops at the seat-fill + phase change
   // so the lobby UI can be smoke-tested end-to-end before the actual
   // drafting engine lands.
-  socket.on('start_cube_draft', async ({ roomId }) => {
+  socket.on('start_cube_draft', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room.cubeDraft) return;
@@ -16526,7 +16903,7 @@ io.on('connection', (socket) => {
     room.cubeDraft.humanCount = humanCount;
     room.status = 'playing';
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
     console.log(`[cube_draft] room ${roomId} starting draft — ${humanCount} humans + ${cap - humanCount} bots`);
     // Kick off the actual draft engine (loads cube, builds packs, opens
     // round 1, starts bot pick + timeout schedulers).
@@ -16535,7 +16912,7 @@ io.on('connection', (socket) => {
 
   // Host-only: einen Mitspieler in der Draft-Lobby befoerdern (Co-Host) bzw. wieder abstufen.
   // Befoerderte Spieler duerfen — wie der Host — Leute in den Raum einladen (social.js `room_invite_send`).
-  socket.on('cube_promote_player', ({ roomId, username, promote }) => {
+  socket.on('cube_promote_player', ({ roomId, username, promote } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room.cubeDraft || room.cubeDraft.phase !== 'lobby') return;
@@ -16548,7 +16925,7 @@ io.on('connection', (socket) => {
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
   });
 
-  socket.on('cube_draft_pick', ({ roomId, cardName }) => {
+  socket.on('cube_draft_pick', ({ roomId, cardName } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room.cubeDraft || !room.cubeDraft.draftState) return;
@@ -16562,7 +16939,7 @@ io.on('connection', (socket) => {
   // a Bo3/5 set). The opponent wins immediately; the bracket advances;
   // the surrendering player keeps their parent-room membership and
   // becomes a spectator like any other eliminated player.
-  socket.on('cube_surrender_match', ({ parentRoomId, childRoomId }) => {
+  socket.on('cube_surrender_match', ({ parentRoomId, childRoomId } = {}) => {
     if (!currentUser) return;
     const parent = rooms.get(parentRoomId);
     if (!parent?.cubeDraft?.bracket) return;
@@ -16587,7 +16964,7 @@ io.on('connection', (socket) => {
   // Cross-game spectator switcher. The client tells the server which
   // child match they want to spectate; the server moves them between
   // child-room sockets. They keep parent-room membership throughout.
-  socket.on('cube_spectate_match', ({ parentRoomId, childRoomId }) => {
+  socket.on('cube_spectate_match', ({ parentRoomId, childRoomId } = {}) => {
     if (!currentUser) return;
     const parent = rooms.get(parentRoomId);
     if (!parent || parent.cubeDraft?.phase !== 'tournament') return;
@@ -16647,7 +17024,7 @@ io.on('connection', (socket) => {
   // against their drafted pool, persists to their deck list under the
   // "Drafted Decks" category, and marks the seat as Ready. When all
   // human seats are Ready, advances to the tournament phase (M4).
-  socket.on('cube_draft_ready', async ({ roomId, deck }) => {
+  socket.on('cube_draft_ready', async ({ roomId, deck } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room.cubeDraft || room.cubeDraft.phase !== 'building') return;
@@ -16710,7 +17087,7 @@ io.on('connection', (socket) => {
   // online humans is the threshold — once met, the seat is converted
   // to a bot, the draft resumes, and the kicked player is marked for
   // an ELO loss (consumed in M5's cube-ELO update path).
-  socket.on('cube_draft_vote_kick', ({ roomId, targetSeat }) => {
+  socket.on('cube_draft_vote_kick', ({ roomId, targetSeat } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room.cubeDraft || !room.cubeDraft.draftState) return;
@@ -16748,7 +17125,7 @@ io.on('connection', (socket) => {
   });
 
   // ── MULLIGAN ──
-  socket.on('mulligan_decision', ({ roomId, accept }) => {
+  socket.on('mulligan_decision', ({ roomId, accept } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState?.mulliganPending) return;
@@ -16823,7 +17200,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leave_game', async ({ roomId }) => {
+  socket.on('leave_game', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     const hadResult = !!room.gameState?.result;
@@ -16907,7 +17284,7 @@ io.on('connection', (socket) => {
    * Frage aufgeworfen, welche Handmarken auf den Vorrat zeigen
    * duerfen. Antwort: keine.
    */
-  socket.on('reorder_creation', ({ roomId, creationZone }) => {
+  socket.on('reorder_creation', ({ roomId, creationZone } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -16927,7 +17304,7 @@ io.on('connection', (socket) => {
   });
 
   // Reorder hand (cosmetic, persists across reconnect)
-  socket.on('reorder_hand', ({ roomId, hand, indexMap }) => {
+  socket.on('reorder_hand', ({ roomId, hand, indexMap } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17004,7 +17381,7 @@ io.on('connection', (socket) => {
   // bonus action (Claussss/Ba/Torchure-style grants). Engine-internal
   // auto-advance call sites (doPlaySpell, doPlayCreature, …) do NOT
   // pass `manual` and keep the grace behavior.
-  socket.on('advance_phase', ({ roomId, targetPhase }) => {
+  socket.on('advance_phase', ({ roomId, targetPhase } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -17043,7 +17420,7 @@ io.on('connection', (socket) => {
   });
 
   // Summon a creature placed by Ushabti from surprise zone
-  socket.on('summon_ushabti', async ({ roomId, heroIdx }) => {
+  socket.on('summon_ushabti', async ({ roomId, heroIdx } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -17526,7 +17903,7 @@ io.on('connection', (socket) => {
   socket.on('client_fx', (d) => { socket.data = socket.data || {}; socket.data.pfeilSalve = !!(d && d.salve); });
 
   // Broadcast targeting selections to opponent
-  socket.on('targeting_update', ({ roomId, selectedIds }) => {
+  socket.on('targeting_update', ({ roomId, selectedIds } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17538,7 +17915,7 @@ io.on('connection', (socket) => {
   });
 
   // Card ping — broadcast to opponent and spectators
-  socket.on('ping_card', ({ roomId, ping, color }) => {
+  socket.on('ping_card', ({ roomId, ping, color } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17580,7 +17957,7 @@ io.on('connection', (socket) => {
     || (room.spectators || []).some(sp => sp.userId === userId));
   const CHAT_MAX_HAUPT = 300, CHAT_MAX_PRIVAT = 200, CHAT_MAX_PAARE = 50;
 
-  socket.on('chat_message', ({ roomId, text }) => {
+  socket.on('chat_message', ({ roomId, text } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room) return;
@@ -17688,7 +18065,7 @@ io.on('connection', (socket) => {
   });
 
   // Relay pending creature placement (for additional action selection visual)
-  socket.on('pending_placement', ({ roomId, heroIdx, zoneSlot, cardName }) => {
+  socket.on('pending_placement', ({ roomId, heroIdx, zoneSlot, cardName } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17697,7 +18074,7 @@ io.on('connection', (socket) => {
     // ★ W63d (Al, 22.10.2026): die Vorschau „diese Creature soll hierhin" (Wahl des Zusatzaktions-Gebers) ist noch ABBRECHBAR — der Gegner darf die Karte da nicht sehen
     // (ein Abbruch verriete verdeckte Information). Keine Weitergabe mehr; der Auftritt kommt mit dem Spielen (`play_creature` → Auftritts-Puffer). Alter Aufruf bleibt gueltig, tut nichts.
   });
-  socket.on('pending_placement_clear', ({ roomId }) => {
+  socket.on('pending_placement_clear', ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17709,7 +18086,7 @@ io.on('connection', (socket) => {
   });
 
   // Cancel potion targeting
-  socket.on('cancel_potion', ({ roomId }) => {
+  socket.on('cancel_potion', ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState?.potionTargeting) return;
@@ -17723,7 +18100,7 @@ io.on('connection', (socket) => {
   });
 
   // General-purpose effect prompt response (confirm, card gallery, zone pick)
-  socket.on('effect_prompt_response', ({ roomId, response, promptId }) => {
+  socket.on('effect_prompt_response', ({ roomId, response, promptId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState?.effectPrompt) return;
@@ -17748,7 +18125,7 @@ io.on('connection', (socket) => {
   });
 
   // Relay blind-pick selection to the victim so they see highlighted cards
-  socket.on('blind_pick_update', ({ roomId, indices }) => {
+  socket.on('blind_pick_update', ({ roomId, indices } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -17761,7 +18138,7 @@ io.on('connection', (socket) => {
 
   // ── Side-Deck Phase Handlers (Bo3/Bo5) ──
 
-  socket.on('side_deck_swap', ({ roomId, from, fromIdx, to, toIdx }) => {
+  socket.on('side_deck_swap', ({ roomId, from, fromIdx, to, toIdx } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._sideDeckPhase || !room._currentDecks) return;
@@ -17906,7 +18283,7 @@ io.on('connection', (socket) => {
   });
 
   // Move a card from one pool to another (not swap — add/remove)
-  socket.on('side_deck_move', ({ roomId, from, fromIdx, to }) => {
+  socket.on('side_deck_move', ({ roomId, from, fromIdx, to } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._sideDeckPhase || !room._currentDecks) return;
@@ -17972,7 +18349,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('side_deck_reset', ({ roomId }) => {
+  socket.on('side_deck_reset', ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._sideDeckPhase || !room._originalDecks || !room._currentDecks) return;
@@ -17991,7 +18368,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('side_deck_done', async ({ roomId }) => {
+  socket.on('side_deck_done', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._sideDeckPhase || !room._sideDeckDone) return;
@@ -18017,7 +18394,7 @@ io.on('connection', (socket) => {
 
   // ── Hero Ascension ──
 
-  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation, heroOwner }) => {
+  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex, fromCreation, heroOwner } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState || room.gameState.result) return;
@@ -18066,7 +18443,7 @@ io.on('connection', (socket) => {
 
   // ── Surrender Game vs Surrender Match (Bo3/Bo5) ──
 
-  socket.on('surrender_game', async ({ roomId }) => {
+  socket.on('surrender_game', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState || room.gameState.result) return;
@@ -18078,7 +18455,7 @@ io.on('connection', (socket) => {
     await endGame(room, winnerIdx, 'surrender');
   });
 
-  socket.on('surrender_match', async ({ roomId }) => {
+  socket.on('surrender_match', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
@@ -18098,7 +18475,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('request_rematch', async ({ roomId }) => {
+  socket.on('request_rematch', async ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState?.result) return;
@@ -18124,7 +18501,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('rematch_first_choice', async ({ roomId, goFirst }) => {
+  socket.on('rematch_first_choice', async ({ roomId, goFirst } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?._pendingRematch) return;
@@ -18156,6 +18533,7 @@ io.on('connection', (socket) => {
 
   // Shared function: create and start a puzzle game from puzzle data
   async function createPuzzleGame(puzzleData, opts = {}) {
+    if (soloGrenzeErreicht(currentUser.userId)) { socket.emit('puzzle_error', 'The server is very busy right now — please try again in a minute.'); return; }
     const roomId = 'pz-' + uuidv4().substring(0, 8);
     const cardsByName = getCardDB();
     const usr = await db.get('SELECT color, avatar, cardback, board FROM users WHERE id = ?', [currentUser.userId]);
@@ -19181,15 +19559,20 @@ io.on('connection', (socket) => {
   });
 
   // Attempt an official puzzle: decrypt file, start game
-  socket.on('start_puzzle_attempt', ({ puzzleId, difficulty }) => {
+  socket.on('start_puzzle_attempt', ({ puzzleId, difficulty } = {}) => {
     if (!currentUser) return;
     if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
 
     (async () => {
       try {
-        if (!PUZZLE_SCHWIERIGKEITEN.includes(difficulty)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
-        const filePath = path.join(__dirname, 'data', 'puzzles', difficulty, puzzleId.split('/')[1] + '.json');
+        if (!PUZZLE_SCHWIERIGKEITEN.includes(difficulty) || typeof puzzleId !== 'string') { socket.emit('puzzle_error', 'Puzzle not found'); return; }
+        // Die ID wird SERVERSEITIG aus Schwierigkeit + Dateiname gebildet (Audit: der Client-String zaehlte als Einmal-Schluessel fuer die SC-Belohnung,
+        // geladen wurde aber nur der Teil nach dem Schraegstrich — `a/Name`, `b/Name`, `c/Name` zahlten dasselbe Puzzle mehrfach aus).
+        const puzzleName = puzzleId.split('/')[1];
+        if (!puzzleName || /[\\/]|^\./.test(puzzleName)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
+        const filePath = path.join(__dirname, 'data', 'puzzles', difficulty, puzzleName + '.json');
         if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
+        puzzleId = difficulty + '/' + puzzleName;
 
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const puzzleData = decryptPuzzle(raw.data);
@@ -19217,6 +19600,7 @@ io.on('connection', (socket) => {
   async function createCpuBattle({ playerDeckId, cpuDeckId, campaign }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
+    if (soloGrenzeErreicht(currentUser.userId)) { socket.emit('cpu_battle_error', 'The server is very busy right now — please try again in a minute.', { busy: true }); return; }
     // Zulassungsgrenze: jede laufende CPU-Partie rechnet im selben Prozess (Lasttest: ab ~10 gleichzeitigen wird der Server traege). Lieber einer
     // wartet kurz, als dass alle ruckeln. Kampagne und Tutorials (kein MCTS) sind ausgenommen.
     if (!campaign && aktiveCpuPartien() >= MAX_CPU_PARTIEN) {
@@ -19556,7 +19940,7 @@ io.on('connection', (socket) => {
   }
 
   // Der Mensch hat gewonnen und eine Karte aus dem Pool gewählt.
-  socket.on('campaign_ante_pick', ({ roomId, cardName }) => {
+  socket.on('campaign_ante_pick', ({ roomId, cardName } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._campaign || !room._campaign.ante) return;
@@ -19579,7 +19963,7 @@ io.on('connection', (socket) => {
   // createCpuBattle auch ausgewertet, fiel aber genau hier unter den
   // Tisch. Ergebnis: das Kampffeld fiel weiter auf den Zuschnitt des
   // mittleren Helden zurück.
-  socket.on('start_campaign_duel', ({ duelId, opponent, opponentName, opponentAvatar, ante }) => {
+  socket.on('start_campaign_duel', ({ duelId, opponent, opponentName, opponentAvatar, ante } = {}) => {
     if (!currentUser) return;
     createCpuBattle({ campaign: { duelId, opponent, opponentName, opponentAvatar, ante: !!ante } })
       .catch(err => {
@@ -19593,7 +19977,7 @@ io.on('connection', (socket) => {
   // Niederlage — damit lassen sich Verzweigungen prüfen, ohne jedes
   // Mal ein ganzes Spiel zu spielen. Greift AUSSCHLIESSLICH in Räumen
   // mit `_campaign`; reguläre CPU- und PvP-Kämpfe kennen den Weg nicht.
-  socket.on('campaign_debug_end', ({ roomId, win }) => {
+  socket.on('campaign_debug_end', ({ roomId, win } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || !room._campaign) return;
@@ -20019,6 +20403,7 @@ io.on('connection', (socket) => {
   // Emit BEFORE launching a run to change settings. Persists until
   // changed again or process restarts.
   onDebug('debug_self_play_config', ({ rolloutHorizon, rolloutBrain } = {}) => {
+    if (!currentUser) return;
     if (rolloutHorizon != null) setRolloutHorizon(rolloutHorizon);
     if (rolloutBrain != null) setRolloutBrain(rolloutBrain);
     const cfg = { rolloutHorizon: getRolloutHorizon(), rolloutBrain: getRolloutBrain() };
@@ -21031,7 +21416,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('start_cpu_battle', ({ playerDeckId, cpuDeckId }) => {
+  socket.on('start_cpu_battle', ({ playerDeckId, cpuDeckId } = {}) => {
     if (!currentUser) return;
     db.get('SELECT is_guest FROM users WHERE id = ?', [currentUser.userId]).then(u => { if (u && u.is_guest) funnel.record('cpu_guest_start', { userId: currentUser.userId, once: true }); }).catch(() => {});
     createCpuBattle({ playerDeckId, cpuDeckId }).catch(err => {
@@ -21047,7 +21432,7 @@ io.on('connection', (socket) => {
   // "Rematch" means "same opponent, your chosen deck". The current
   // room is destroyed (activeGames cleared) so createCpuBattle can
   // spin up a fresh one without tripping the "already in a game" guard.
-  socket.on('rematch_cpu_battle', ({ roomId, cpuDeckId }) => {
+  socket.on('rematch_cpu_battle', ({ roomId, cpuDeckId } = {}) => {
     console.log('[CPU rematch] received', { roomId, cpuDeckId, user: currentUser?.username });
     if (!currentUser) { console.warn('[CPU rematch] no currentUser — aborting'); return; }
     const room = rooms.get(roomId);
@@ -21128,13 +21513,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('start_tutorial_attempt', ({ tutorialId }) => {
+  socket.on('start_tutorial_attempt', ({ tutorialId } = {}) => {
     if (!currentUser) return;
     if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
 
     (async () => {
       try {
+        if (typeof tutorialId !== 'string') { socket.emit('puzzle_error', 'Tutorial not found'); return; }
         const fileName = tutorialId.replace('tutorial/', '');
+        if (!fileName || /[\\/]|^\./.test(fileName)) { socket.emit('puzzle_error', 'Tutorial not found'); return; }   // kein Pfad aus Client-Eingabe (../)
         const filePath = path.join(__dirname, 'data', 'puzzles', 'tutorial', fileName + '.json');
         if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Tutorial not found'); return; }
 
@@ -21219,12 +21606,12 @@ io.on('connection', (socket) => {
   });
 
   // ── Tutorial mid-game state modifications ──
-  socket.on('tutorial_modify', ({ type }) => {
+  socket.on('tutorial_modify', ({ type } = {}) => {
     if (!currentUser) return;
     const activeRoomId = activeGames.get(currentUser.userId);
     if (!activeRoomId) return;
     const room = rooms.get(activeRoomId);
-    if (!room?.gameState || !room.gameState.isPuzzle) return;
+    if (!room?.gameState || !room.gameState.isPuzzle || !room.gameState.isTutorial) return;   // nur im Tutorial (Audit: wirkte in JEDEM Puzzle — Gold 999 → SC-Belohnung erschleichbar)
 
     const gs = room.gameState;
     const engine = room.engine;
@@ -21323,7 +21710,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leave_room', ({ roomId }) => handleLeaveRoom(socket, roomId, currentUser));
+  socket.on('leave_room', ({ roomId } = {}) => handleLeaveRoom(socket, roomId, currentUser));
 
   // Debug: add a card to a player's hand
   socket.on('disconnect', () => {
@@ -21449,12 +21836,12 @@ function handleLeaveRoom(socket, roomId, user) {
         const r = rooms.get(roomId);
         if (r) {
           delete r._verlassenTimer;
-          if (!r.players.some(p => !p.isBot && p.socketId)) { destroyRoom(roomId); io.emit('rooms', getRoomList()); }
+          if (!r.players.some(p => !p.isBot && p.socketId)) { destroyRoom(roomId); raumlisteSenden(); }
         }
       }, 10 * 60 * 1000);
     }
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
     return;
   }
 
@@ -21465,7 +21852,7 @@ function handleLeaveRoom(socket, roomId, user) {
   if (room.skillTest && !skillTest.isLobbyPhase(room)) {
     skillTest.onSeatLeft(room, user, socket, skillTestHost, { permanent: true });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
+    raumlisteSenden();
     return;
   }
 
@@ -21487,7 +21874,7 @@ function handleLeaveRoom(socket, roomId, user) {
         room.hostId = newHost.userId;
         room.spectators = room.spectators.filter(s => s.username !== user.username);
         io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
-        io.emit('rooms', getRoomList());
+        raumlisteSenden();
         return;
       }
       // No humans left — fall through to room destruction.
@@ -21501,7 +21888,7 @@ function handleLeaveRoom(socket, roomId, user) {
     room.spectators = room.spectators.filter(s => s.username !== user.username);
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
   }
-  io.emit('rooms', getRoomList());
+  raumlisteSenden();
 }
 
 // Schnittstelle, über die die Skill-Test-Module (skilltest/*.js) an die
@@ -23953,6 +24340,18 @@ app.get('*', (req, res, next) => {
   }
   return next();
 }, serveIndexHtml);
+
+// Zentraler Fehler-Handler (Sicherheitsaudit 25.11.): abgelehnte async-Handler (siehe _asyncHuelle), zu grosse/kaputte JSON-Bodys,
+// kaputte Prozentkodierung. Nie ein Stacktrace oder Dateipfad in der Antwort; Serverfehler stehen im Log.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = Number(err?.status || err?.statusCode) || 500;
+  const ok4xx = status >= 400 && status < 500;
+  if (!ok4xx) console.error('[http]', req.method, req.path, err?.stack || err);
+  const text = ok4xx ? (err.type === 'entity.too.large' ? 'Request too large' : (err.expose ? err.message : 'Bad request')) : (status === 503 && err.expose ? 'Server busy, please try again' : 'Internal error');
+  if (req.path.startsWith('/api/')) return res.status(ok4xx || status === 503 ? status : 500).json({ error: text });
+  return res.status(ok4xx || status === 503 ? status : 500).type('text/plain').send(text);
+});
 
 // ===== START =====
 // Headless training mode — no DB, no socket server. Sample decks come
