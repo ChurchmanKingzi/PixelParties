@@ -189,8 +189,9 @@ scene("chat_maisie_ferry", {
       { text: "Do you mend everything you walk past?", when: (s)=>!s.flags["chat_maisie_ferry_3"], steps: [
         { say: "rowan", text: "Do you mend everything you walk past?" },
         { say: "maisie", text: "Only what ticks at me. If it ticks I can't sit still. Me mum says I mended the toaster that often it gave up and worked." },
-        { when: (s)=>!s.flags["fiona_ferry_candle"], text: "She glances along the walkway to the stern end, where a girl in black lace is sitting under a parasol, striking a match at a small lantern. The match goes out. The girl lays it down in a row with the others." },
-        { when: (s)=>!!s.flags["fiona_ferry_candle"], text: "She glances along the walkway to the stern end, where a girl in black lace is sitting under a parasol beside a small lantern. The flame inside it ducks and shivers with every gust. The girl watches it, one hand resting on a box of matches." },
+        { when: (s)=>!s.flags["met_fiona"], text: "She glances along the walkway to the stern end, where a girl in black lace is sitting under a parasol, striking a match at a small lantern. The match goes out. The girl lays it down in a row with the others." },
+        { when: (s)=>!!s.flags["met_fiona"] && !s.flags["fiona_ferry_candle"], text: "She glances along the walkway to the stern end, where Fiona is sitting under her parasol, striking a match at the small lantern. The match goes out. Fiona lays it down in the row with the others." },
+        { when: (s)=>!!s.flags["fiona_ferry_candle"], text: "She glances along the walkway to the stern end, where Fiona is sitting under her parasol beside the small lantern. The flame inside it ducks and shivers with every gust. Fiona watches it, one hand resting on a box of matches." },
         { say: "maisie", text: "See that? Draught's coming in at the hinge side of the little door. Bit of card, thirty seconds. It's doing me head in." },
         { say: "maisie", text: "But she's not asked. And you don't mend folk's things unasked. Learnt that one off next door's doorbell. It played three tunes, after. They only wanted the one." },
         { choice: [
@@ -201,8 +202,9 @@ scene("chat_maisie_ferry", {
           { text: "Maybe she likes striking the matches.", steps: [
             { say: "rowan", text: "Maybe she likes striking the matches." },
             { say: "maisie", text: "Nobody *likes* striking matches, Rowan." },
-            { when: (s)=>!s.flags["fiona_ferry_candle"], text: "The girl in black strikes another, with ceremony." },
-            { when: (s)=>!!s.flags["fiona_ferry_candle"], text: "The girl in black takes a match out of the box, considers it, and lays it ready on the locker, with ceremony." },
+            { when: (s)=>!s.flags["met_fiona"], text: "The girl in black strikes another, with ceremony." },
+            { when: (s)=>!!s.flags["met_fiona"] && !s.flags["fiona_ferry_candle"], text: "Fiona strikes another, with ceremony." },
+            { when: (s)=>!!s.flags["fiona_ferry_candle"], text: "Fiona takes a match out of the box, considers it, and lays it ready on the locker, with ceremony." },
             { say: "maisie", text: "…Oh, heck. Maybe she does." }
           ] }
         ] },
@@ -373,7 +375,7 @@ scene("chat_fiona_ferry", {
         { time: 3 }
       ] },
       { text: "Somebody keeps walking past us.", when: (s)=>!s.flags["chat_fiona_ferry_2"], steps: [
-        { text: "A boy with a blue collar comes along the walkway, deeply interested in the lifeboats. He looks at the lace, then at the sea, then at his own shoes, and is gone round the corner." },
+        { text: "A boy with a blue collar comes along the walkway, not for the first time, deeply interested in the lifeboats. He looks at the lace, then at the sea, then at his own shoes, and is gone round the corner." },
         { say: "rowan", text: "Somebody keeps walking past us." },
         { say: "fiona", text: "That was his fourth. You missed one while you were arriving." },
         { say: "fiona", text: "They do not speak. They orbit." },
@@ -398,7 +400,7 @@ scene("chat_fiona_ferry", {
           ] },
           { text: "Keep the lace. Change the moths.", hint: "Dry", steps: [
             { say: "rowan", text: "Keep the lace. Change the moths." },
-            { say: "fiona", text: "\"Change the —\" A sound very nearly escapes her. She looks out to sea until it has passed. \"Yes. I shall put up a notice.\"" },
+            { say: "fiona", text: "\"Change the —\" She looks out to sea for some time. \"Yes. I shall put up a notice.\"" },
             AFF("fiona", 2, "Matched her deadpan")
           ] }
         ] },
@@ -421,7 +423,8 @@ scene("chat_fiona_ferry", {
             { say: "fiona", text: "People who will say good morning and mean nothing whatever by it. It is a great deal to ask of three strangers. I have brought shortbread, in case it helps." }
           ] }
         ] },
-        { text: "Up the walkway something small and metal hits the deck, and a cheerful voice calls a lamp a name it has probably earned." },
+        { when: (s)=>!s.flags["met_maisie"], text: "Up the walkway something small and metal hits the deck, and a cheerful voice calls a lamp a name it has probably earned." },
+        { when: (s)=>!!s.flags["met_maisie"], text: "Up the walkway something small and metal hits the deck, and Maisie's voice, cheerfully, calls it a name it has probably earned." },
         { say: "fiona", text: "If that one is mine, I shall need more lace." },
         { when: (s)=>!!s.flags["leona_told_b4"], think: "Bungalow four. According to Leona, the girl with the lamp is in four as well. I think I'll let the door tell her." },
         { say: "fiona", text: "And you? Where have they put you?" },
@@ -644,7 +647,7 @@ scene("chat_leona_ferry", {
         { flag: "leona_told_b4" },
         REL("maisie", "leona"),
         AFF("leona", 1, "Kept it to himself"),
-        NOTE("leona", "Is in bungalow 4, and worked out on the ferry that Maisie is too."),
+        NOTE("leona", "Is in bungalow 4, and worked out on the ferry that the girl in overalls who mended the lamp is too."),
         { flag: "chat_leona_ferry_3" },
         { time: 3 }
       ] },
@@ -832,7 +835,10 @@ scene("chat_sammy_ferry", {
         { time: 3 }
       ] },
       { text: "Do you know the two on the benches behind us?", when: (s)=>!s.flags["chat_sammy_ferry_3"], steps: [
-        { text: "On the middle bench a broad boy with a broken nose is sitting with his hands in his pockets. On the bench nearest the bow somebody long is laid out flat under a grey blanket." },
+        { when: (s)=>!s.flags["met_tobias"] && !s.flags["met_dmitri"], text: "On the middle bench a broad boy with a broken nose is sitting with his hands in his pockets. On the bench nearest the bow somebody long is laid out flat under a grey blanket." },
+        { when: (s)=>!!s.flags["met_tobias"] && !s.flags["met_dmitri"], text: "On the middle bench Tobias is sitting with his hands in his pockets. On the bench nearest the bow somebody long is laid out flat under a grey blanket." },
+        { when: (s)=>!s.flags["met_tobias"] && !!s.flags["met_dmitri"], text: "On the middle bench a broad boy with a broken nose is sitting with his hands in his pockets. On the bench nearest the bow Dmitri is laid out flat under his grey blanket." },
+        { when: (s)=>!!s.flags["met_tobias"] && !!s.flags["met_dmitri"], text: "On the middle bench Tobias is sitting with his hands in his pockets. On the bench nearest the bow Dmitri is laid out flat under his grey blanket." },
         { say: "rowan", text: "Do you know the two on the benches behind us?" },
         { say: "sammy", text: "No. The one with the nose looked at me when I came up the steps, and I checked my pockets. I don't know why. Then he looked at the coat and he didn't laugh." },
         { say: "sammy", text: "And the one under the blanket hasn't moved since the harbour. I've been checking he's breathing. From here. I didn't want to be rude." },
@@ -849,7 +855,7 @@ scene("chat_sammy_ferry", {
           ] }
         ] },
         { say: "dmitri", alias: "Boy under a blanket", text: "…I am breathing. Thank you. Continue." },
-        { text: "The blanket has not moved. Sammy has gone the colour of his collar." },
+        { text: "The blanket has not moved. Sammy has gone scarlet to the ears." },
         { say: "sammy", text: "\"Oh no.\" In a whisper, in the ordinary voice. \"How long has he been able to hear?\"" },
         AFF("sammy", 1, "Asked about the others"),
         NOTE("sammy", "Kept an eye on the sleeping boy on the bench all morning, from a polite distance."),
@@ -1035,8 +1041,8 @@ scene("chat_tobias_ferry", {
         { flag: "chat_tobias_ferry_2" },
         { time: 3 }
       ] },
-      { text: "The boy in the black coat says you looked at his pockets.", when: (s)=>!!s.flags["chat_sammy_ferry_3"] && !s.flags["chat_tobias_ferry_3"], hint: "From Sammy", steps: [
-        { say: "rowan", text: "The boy in the black coat says you looked at his pockets." },
+      { text: "The boy in the black coat says you looked at him and he checked his pockets.", when: (s)=>!!s.flags["chat_sammy_ferry_3"] && !s.flags["chat_tobias_ferry_3"], hint: "From Sammy", steps: [
+        { say: "rowan", text: "The boy in the black coat says you looked at him and he checked his pockets." },
         { say: "tobias", text: "I looked at everybody's pockets. His have a notebook, a comb and a bag of mints in. He's safe." },
         { say: "rowan", text: "He also said you didn't laugh at the coat." },
         { say: "tobias", text: "Why would I? He's skint, by the shoes, and he's spent what he had on turning up as somebody. That's the bravest thing on this deck." },
@@ -1117,7 +1123,7 @@ scene("ferry_dmitri", {
         AFF("dmitri", 1, "Didn't call him lazy")
       ] }
     ] },
-    { say: "dmitri", text: "Tell me something, Rowan Vance. They say there is an island. Is it true?" },
+    { say: "dmitri", text: "Tell me something. They say there is an island. Is it true?" },
     { say: "rowan", text: "It's right there. Off the bow." },
     { say: "dmitri", text: "I am facing the other way. I will take your word. Is it large?" },
     { choice: [
@@ -1168,7 +1174,7 @@ scene("chat_dmitri_ferry", {
     { label: "top" },
     { when: (s)=>!(s.flags["chat_dmitri_ferry_1"] && s.flags["chat_dmitri_ferry_2"] && s.flags["chat_dmitri_ferry_3"]), jump: "menu" },
     { flag: "chat_dmitri_ferry_done" },
-    { say: "dmitri", text: "That was more words than I had budgeted until evening. They were well spent. Now go away, kindly, Rowan Vance." },
+    { say: "dmitri", text: "That was more words than I had budgeted until evening. They were well spent. Now go away, kindly." },
     { end: true },
     { label: "menu" },
     { choice: [
@@ -1279,7 +1285,7 @@ scene("row_b4", {
     { when: (s)=>!!s.flags["met_freddie"], say: "maisie", text: "You've missed Freddie. She's gone back in the sea. She's only been out of it long enough to choose a bed." },
     { when: (s)=>!s.flags["met_fiona"], jump: "fiona_new" },
     { when: (s)=>!!s.flags["fiona_ferry_met"], text: "Next to the bench, in the deep shade of the porch, Fiona sits very straight under her parasol with a leather-bound book. A candle is burning on the rail beside her, steadily, with no lantern round it at all." },
-    { when: (s)=>!s.flags["fiona_ferry_met"], text: "Next to the bench, in the deep shade of the porch, Fiona sits very straight under a black parasol with a leather-bound book. A candle is burning on the rail beside her, steadily, in broad daylight." },
+    { when: (s)=>!s.flags["fiona_ferry_met"], text: "Next to the bench, in the deep shade of the porch, Fiona sits very straight under a black parasol with a leather-bound book, a small silver coffin pinned to her grey collar. A candle is burning on the rail beside her, steadily, in broad daylight." },
     { when: (s)=>!!s.flags["fiona_ferry_candle"], say: "fiona", text: "\"Rowan Vance.\" Low, slow. \"Observe. It stays lit. On land it does not require your hands. I find I rather miss the ceremony.\"" },
     { when: (s)=>!!s.flags["fiona_ferry_met"] && !s.flags["fiona_ferry_candle"], say: "fiona", text: "\"Rowan Vance.\" Low, slow. \"Observe. One match. The island has better manners than the sea.\"" },
     { when: (s)=>!s.flags["fiona_ferry_met"], say: "fiona", text: "\"Rowan Vance.\" Low, slow, each syllable placed like a candle. \"You have found the only civilised shade on the row.\"" },
@@ -1303,7 +1309,7 @@ scene("row_b4", {
     { when: (s)=>!!s.flags["leona_ferry_met"], text: "This time you look at the step first. Leona is sitting on it, satchel on her knee, as much a part of the porch as the boards." },
     { when: (s)=>!!s.flags["leona_ferry_met"], say: "leona", text: "\"Rowan.\" Even and mild. \"You looked at the step before you looked at the bench. Thank you.\"" },
     { when: (s)=>!s.flags["leona_ferry_met"], text: "It takes you a moment to see that there is a third person: Leona, on the step, satchel on her knee, as much a part of the porch as the boards." },
-    { when: (s)=>!s.flags["leona_ferry_met"], say: "leona", text: "\"Hello, Rowan.\" Even and mild. \"It's all right. It took Maisie until one o'clock.\"" },
+    { when: (s)=>!s.flags["leona_ferry_met"], say: "leona", text: "\"Hello, Rowan.\" Even and mild. \"It's all right. It took Maisie an hour.\"" },
     { jump: "leona_done" },
     { label: "leona_new" },
     { text: "A third girl is sitting on the step, so ordinary that for a second you take her for part of the porch. Medium everything: mousy-brown hair parted in the middle, grey-blue eyes, a canvas satchel on her knee." },
@@ -1321,14 +1327,14 @@ scene("row_b4", {
     { choice: [
       { text: "What are you building, Maisie? Is that a hologram projector?", when: (s)=>!s.flags["maisie_ferry_holo"], hint: "Tech", steps: [
         { say: "rowan", text: "What are you building, Maisie? Is that a hologram projector?" },
-        { say: "maisie", text: "\"Oh! Oh, you're a person who asks.\" She comes alive. \"Every hologram on this island is a lantern slide with ambitions. I've been here four hours and I've checked. I want one you can shake hands with.\"" },
+        { say: "maisie", text: "\"Oh! Oh, you're a person who asks.\" She comes alive. \"Every hologram on this island is a lantern slide with ambitions. I've not been here a day and I've checked. I want one you can shake hands with.\"" },
         { flag: "maisie_holo_island" },
         AFF("maisie", 3, "Asked about her work")
       ] },
-      { text: "Is that the one I'm down to shake hands with, Maisie?", when: (s)=>!!s.flags["maisie_ferry_holo"], hint: "From the ferry", steps: [
-        { say: "rowan", text: "Is that the one I'm down to shake hands with, Maisie?" },
+      { text: "Is that the one you mean to shake hands with, Maisie?", when: (s)=>!!s.flags["maisie_ferry_holo"], hint: "From the ferry", steps: [
+        { say: "rowan", text: "Is that the one you mean to shake hands with, Maisie?" },
         { say: "maisie", text: "\"You remembered!\" She comes alive. \"This is its great-great-grandad. But yes. Same family.\"" },
-        { say: "maisie", text: "I've had a look at theirs now, an' all. I was right. Lantern slides with ambitions, every one. So it's still a when, and I'm still first." },
+        { say: "maisie", text: "I've had a look at theirs now, an' all. I was right. Lantern slides with ambitions, every one. So nobody's got there before me." },
         { flag: "maisie_holo_island" },
         AFF("maisie", 3, "Remembered the handshake")
       ] },
@@ -1350,7 +1356,7 @@ scene("row_b4", {
       { text: "Sit with Leona.", hint: "Quiet", steps: [
         { text: "You sit down on the step beside Leona. She moves her satchel to her other knee to make room." },
         { when: (s)=>!s.flags["leona_said_face"], say: "leona", text: "\"Thank you.\" A small pause. \"People rarely do. It isn't a talent. It's a face.\"" },
-        { when: (s)=>!!s.flags["leona_said_face"], say: "leona", text: "\"Thank you.\" A small pause. \"People rarely do. You have now done it twice, counting the ship. I am keeping count.\"" },
+        { when: (s)=>!!s.flags["leona_said_face"], say: "leona", text: "\"Thank you.\" A small pause. \"People rarely do. On the ship you apologised for not seeing me. Now you sit down. I am keeping count.\"" },
         AFF("leona", 3, "Sat with her")
       ] }
     ] },
@@ -1365,7 +1371,7 @@ scene("chat_row_b4", {
     { label: "top" },
     { when: (s)=>!(s.flags["chat_maisie_done"] && s.flags["chat_fiona_done"] && s.flags["chat_leona_done"]), jump: "menu" },
     { flag: "chat_row_b4_done" },
-    { say: "maisie", text: "Right! That's the lot of us that's dry. You can come by any time, love. Just mind the hot end." },
+    { say: "maisie", text: "Right! That's the lot of us that's dry. You can come by any time. Just mind the hot end." },
     { end: true },
     { label: "menu" },
     { choice: [
@@ -1376,8 +1382,8 @@ scene("chat_row_b4", {
             { say: "rowan", text: "How does it work? The projector, I mean." },
             { say: "maisie", text: "A lamp, some lenses and a lot of faith." },
             { text: "She holds up the coil of wire like a trophy." },
-            { when: (s)=>!s.flags["maisie_holo_island"], say: "maisie", text: "Every hologram on the island is a slide with ambitions. I'm trying to make the light *stay put* long enough to be a thing. A thing you could shake hands with." },
-            { when: (s)=>!!s.flags["maisie_holo_island"], say: "maisie", text: "Slides with ambitions, like I said. I'm trying to make the light *stay put* long enough to be a thing." },
+            { when: (s)=>!s.flags["maisie_holo_island"] && !s.flags["maisie_ferry_holo"], say: "maisie", text: "Every hologram on the island is a slide with ambitions. I'm trying to make the light *stay put* long enough to be a thing. A thing you could shake hands with." },
+            { when: (s)=>!!s.flags["maisie_holo_island"] || !!s.flags["maisie_ferry_holo"], say: "maisie", text: "Slides with ambitions, like I said. I'm trying to make the light *stay put* long enough to be a thing." },
             { say: "rowan", text: "Is that possible?" },
             { say: "maisie", text: "Not yet. But 'not yet' is the best phrase in any language. It's got hope in it." },
             { choice: [
@@ -1552,6 +1558,7 @@ scene("row_b6", {
     { end: true },
     { label: "first" },
     { flag: "row_b6_seen" },
+    { when: (s)=>!!s.flags["met_tobias"] && !s.flags["tobias_ferry_met"], flag: "tobias_said_saltgate" },
     { when: (s)=>!s.flags["met_sammy"] || !s.flags["met_tobias"] || !s.flags["met_dmitri"], flag: "row_b6_names" },
     { text: "The porch of bungalow 6 has a long shade, a hammock, a dented steel thermos on the boards, and three people keeping carefully out of one another's way." },
     { when: (s)=>!s.flags["met_sammy"], jump: "sammy_new" },
@@ -1584,7 +1591,7 @@ scene("row_b6", {
     { text: "In the hammock, under a grey blanket, Dmitri has one eye open." },
     { when: (s)=>!!s.flags["dmitri_ferry_met"], say: "dmitri", text: "Rowan Vance. You find me horizontal again. They tell me it is afternoon now, which is apparently worse." },
     { when: (s)=>!!s.flags["dmitri_ferry_tea"], say: "dmitri", text: "I have not forgotten the tea. You are owed a fresh one. I pay my debts at midnight." },
-    { when: (s)=>!s.flags["dmitri_ferry_met"], say: "dmitri", text: "…Rowan. Morning is a rumour. It is afternoon. I am keeping my strength." },
+    { when: (s)=>!s.flags["dmitri_ferry_met"], say: "dmitri", text: "…Rowan. You find me horizontal. I am keeping my strength." },
     { jump: "dmitri_done" },
     { label: "dmitri_new" },
     { text: "A hollow-eyed boy in a grey beanie is lying in the hammock under a blanket, one eye open." },
@@ -1621,7 +1628,7 @@ scene("row_b6", {
         { say: "tobias", text: "Good. That's the first right answer today." },
         AFF("tobias", 3, "Plain question")
       ] },
-      { text: "Is the row anything like Saltgate, Tobias?", when: (s)=>!!s.flags["tobias_said_saltgate"], hint: "From the ferry", steps: [
+      { text: "Is the row anything like Saltgate, Tobias?", when: (s)=>!!s.flags["tobias_said_saltgate"], hint: "From what he said", steps: [
         { say: "rowan", text: "Is the row anything like Saltgate, Tobias?" },
         { say: "tobias", text: "It's got a beach. Saltgate's got a canal with a trolley in it." },
         { say: "tobias", text: "\"Same sort of people, mind.\" A dry beat. \"That's a compliment to the row.\"" },
@@ -1645,7 +1652,7 @@ scene("chat_row_b6", {
     { label: "top" },
     { when: (s)=>!(s.flags["chat_sammy_done"] && s.flags["chat_tobias_done"] && s.flags["chat_dmitri_done"]), jump: "menu" },
     { flag: "chat_row_b6_done" },
-    { say: "dmitri", text: "\"Hm.\" Slow and dry. \"That was a very full afternoon for bungalow 6. Come after midnight. It's better.\"" },
+    { say: "dmitri", text: "\"Hm.\" He draws the blanket up. \"That was a very full afternoon for bungalow 6. We shall need the evening to recover from it.\"" },
     { end: true },
     { label: "menu" },
     { choice: [
@@ -1662,7 +1669,7 @@ scene("chat_row_b6", {
           ] },
           { text: "What brings you here, Sammy?", when: (s)=>!s.flags["chat_sammy_2"], steps: [
             { say: "rowan", text: "What brings you here, Sammy?" },
-            { say: "sammy", text: "\"The cards. And the — the chance to be somebody.\" He clears his throat. \"Somebody who stands at the edge of a room and is *looked at*, not *looked past*.\"" },
+            { say: "sammy", text: "\"The cards. And the — the chance to be somebody.\" He tries it again, lower. \"Somebody who stands at the edge of a room and is *looked at*, not *looked past*.\"" },
             { say: "sammy", text: "It's a bit more difficult than I planned." },
             { choice: [
               { text: "I'm looking at you.", steps: [
@@ -1738,7 +1745,7 @@ scene("chat_row_b6", {
         { choice: [
           { text: "Do you ever actually sleep, Dmitri?", when: (s)=>!s.flags["chat_dmitri_1"], steps: [
             { say: "rowan", text: "Do you ever actually sleep, Dmitri?" },
-            { say: "dmitri", text: "\"In the mornings. At school it was in class, with my eyes open. Here it will be the same.\" A slow, dry smile. \"It is a very efficient system. Nobody has ever noticed, apart from the teachers.\"" },
+            { say: "dmitri", text: "\"In the mornings. At school it was in class, with my eyes open. Here it will be the same.\" The open eye considers you. \"It is a very efficient system. Nobody has ever noticed, apart from the teachers.\"" },
             { say: "rowan", text: "And the nights?" },
             { say: "dmitri", text: "\"The nights I watch. Tea, a thermos, a very good view of who comes home when.\" A beat. \"I do not repeat it. That is the other half of the system.\"" },
             { choice: [
@@ -1759,7 +1766,7 @@ scene("chat_row_b6", {
             { say: "rowan", text: "What kind of tea is in the thermos?" },
             { say: "dmitri", text: "Strong. Black. Harbour-strong, which is a different kind of strong." },
             { text: "For the first time he opens his eyes fully." },
-            { say: "dmitri", text: "You ask about the tea first. Not the name, not the deck. The tea." },
+            { say: "dmitri", text: "You ask about the tea. Not the name, not the deck. The tea." },
             { scene: "row_b6_tea" }
           ] },
           { text: "Is the tea any better on dry land?", when: (s)=>!s.flags["chat_dmitri_2"] && !!s.flags["chat_dmitri_ferry_1"], hint: "From the ferry", steps: [

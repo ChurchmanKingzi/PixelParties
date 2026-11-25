@@ -147,6 +147,7 @@ scene("ferry_gideon", {
     { choice: [
       { text: "I'll play you myself, instead.", when: (s)=>!s.flags["table_resolved"], steps: [
         { say: "rowan", text: "I'll play you myself, instead." },
+        { flag: "gideon_challenge_said" },
         { scene: "table_challenge_gideon" }
       ] },
       { text: "She should get her game. I'll vouch for her.", when: (s)=>!s.flags["table_resolved"], steps: [
@@ -322,8 +323,8 @@ scene("chat_gideon", {
         NOTE("gideon", "Reads faces while he waits. What he enjoys is the moment before an opponent understands."),
         { time: 2 },
       ] },
-      { text: "You keep calling the Commons 'the cove'. What do you know about it that I don't?", when: (s)=>!s.flags["chat_gideon_x"] && !!s.flags["gideon_said_cove"], steps: [
-        { say: "rowan", text: "You keep calling the Commons 'the cove'. What do you know about it that I don't?" },
+      { text: "You called the Commons 'the cove'. What do you know about it that I don't?", when: (s)=>!s.flags["chat_gideon_x"] && !!s.flags["gideon_said_cove"], steps: [
+        { say: "rowan", text: "You called the Commons 'the cove'. What do you know about it that I don't?" },
         { say: "gideon", text: "\"The cove.\"" },
         { text: "He says it with great precision, as if holding the word at arm's length." },
         { say: "gideon", text: "\"Nothing at first hand. Nobody aboard has set foot on the island. I merely read what I am sent, which most people do not.\"" },
@@ -379,7 +380,8 @@ scene("deck_gideon", {
       ] },
       { text: "What is it you run, exactly?", steps: [
         { say: "rowan", text: "What is it you run, exactly?" },
-        { say: "gideon", text: "\"A deck.\" Mild. \"I should hate to spoil it for someone who might one day have to beat it.\"" },
+        { when: (s)=>!s.flags["ferry_table_won"], say: "gideon", text: "\"A deck.\" Mild. \"I should hate to spoil it for someone who might one day have to beat it.\"" },
+        { when: (s)=>!!s.flags["ferry_table_won"], say: "gideon", text: "\"A deck.\" Mild. \"You have beaten it once. I had rather thought that counted as an introduction.\"" },
         { text: "He relents, by a quarter of an inch." },
         { say: "gideon", text: "\"Guardians of the Treasure Cave, Vance. I imagine you will meet them again.\"" }
       ] },
@@ -463,6 +465,7 @@ scene("ferry_inya", {
             { when: (s)=>!!s.flags["met_tomi"], say: "inya", text: "Then yes. Take it. But if you lose, you owe me a real game, on a real table, and you don't tell Tomi what I said." },
             { when: (s)=>!s.flags["met_tomi"], say: "inya", text: "Then yes. Take it. But if you lose, you owe me a real game, on a real table, and you don't tell the one with the binder what I said. He'd put a price on it." },
             { flag: "inya_yielded" },
+            { flag: "inya_asked_first" },
             AFF("inya", 4, "Asked her first"),
             { scene: "table_challenge_gideon" }
           ] },
@@ -493,7 +496,8 @@ scene("ferry_inya", {
         { say: "inya", alias: "Girl with the bunny clip", text: "Inya. And — fine. Take it. But if you lose, you owe me a real game." },
         MET("inya", "Inya Bell"),
         { flag: "inya_yielded" },
-        AFF("inya", 4, "Asked her first"),
+        { flag: "inya_asked_first" },
+            AFF("inya", 4, "Asked her first"),
         { scene: "table_challenge_gideon" }
       ] },
       { text: "Step aside. I'll handle him.", steps: [
@@ -570,6 +574,7 @@ scene("ferry_inya", {
         { say: "rowan", text: "Would you let me take him on in your place?" },
         { say: "inya", text: "\"You'd ask.\" A beat. \"Yes. Take it.\"" },
         { flag: "inya_yielded" },
+        { flag: "inya_asked_first" },
         AFF("inya", 3, "Asked her first"),
         { scene: "table_challenge_gideon" }
       ] },
@@ -727,7 +732,7 @@ scene("chat_inya", {
             { say: "rowan", text: "Your own name?" },
             { say: "inya", text: "\"It's — a figure of speech.\" Fast and flat. \"I want the seat to be mine. That's all.\"" }
           ] },
-          { text: "Earned how? By beating people like the one in the white gloves?", when: (s)=>!!s.flags["lounge_seen"], steps: [
+          { text: "Earned how? By beating people like the one in the white gloves?", when: (s)=>!!s.flags["lounge_seen"] && !s.flags["ferry_inya_won"], steps: [
             { say: "rowan", text: "Earned how? By beating people like the one in the white gloves?" },
             { say: "inya", text: "\"By beating everyone. In order.\" She counts it off on the edge of the deck box. \"He's only first because he was rude about it.\"" },
             { say: "inya", text: "\"You're on the list too. Don't look like that, it's a compliment.\"" }
@@ -754,7 +759,7 @@ scene("chat_inya", {
             { say: "rowan", text: "I replay mine in my head. Yours sounds tidier." },
             { say: "inya", text: "\"…You do it too.\" She looks at you properly, for about a second. \"In your head's worse. In your head they change.\"" }
           ] },
-          { text: "What's the newest line?", when: (s)=>!!s.flags["lounge_seen"], steps: [
+          { text: "What's the newest line?", when: (s)=>!!s.flags["lounge_seen"] && !s.flags["rowan_beat_inya"] && !s.flags["ferry_inya_lost"] && !s.flags["ferry_table_settled"], steps: [
             { say: "rowan", text: "What's the newest line?" },
             { say: "inya", text: "\"'Don't tell a room who you've beaten until you've checked who they were.'\" Flat as a ruler. \"This morning's. It's not even a game and it's going in.\"" }
           ] },
@@ -801,7 +806,8 @@ scene("chat_inya", {
       ] },
       { text: "I'll leave you to it. Good talking to you, Inya.", steps: [
         { say: "rowan", text: "I'll leave you to it. Good talking to you, Inya." },
-        { say: "inya", text: "Don't forget about the real game. I mean it." },
+        { when: (s)=>!!s.flags["inya_yielded"] && !s.flags["flag_inya_played"], say: "inya", text: "Don't forget about the real game. I mean it." },
+        { when: (s)=>!(!!s.flags["inya_yielded"] && !s.flags["flag_inya_played"]), say: "inya", text: "\"Okay.\" A beat. \"You know where I am.\"" },
         { end: true }
       ] }
     ] },
@@ -813,17 +819,22 @@ scene("deck_inya", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_inya"], end: true },
     { choice: [
-      { text: "Bunny hairclip, a bunny charm on the deck box. I'm going to guess a pile of bunnies.", hint: "From her look", when: (s)=>!s.flags["inya_said_bunnies"], steps: [
+      { text: "Bunny hairclip, a bunny charm on the deck box. I'm going to guess a pile of bunnies.", hint: "From her look", when: (s)=>!s.flags["inya_said_bunnies"] && !(!!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), steps: [
         { say: "rowan", text: "Bunny hairclip, a bunny charm on the deck box. I'm going to guess a pile of bunnies." },
         { say: "inya", text: "\"It is *not* a pile.\" Instantly. \"Hop and Pop. It's a deck. There's a plan.\"" },
         AFF("inya", 2, "Spotted the bunnies")
       ] },
-      { text: "What do you play, Inya? I won't say a word about the clip.", when: (s)=>!s.flags["inya_said_bunnies"], steps: [
+      { text: "What do you play, Inya? I won't say a word about the clip.", when: (s)=>!s.flags["inya_said_bunnies"] && !(!!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), steps: [
         { say: "rowan", text: "What do you play, Inya? I won't say a word about the clip." },
         { say: "inya", text: "\"Hop and Pop. Bunnies.\" A narrow look. \"You promised.\"" },
         AFF("inya", 1, "Asked about her deck")
       ] },
-      { text: "You said bunnies. What's the plan?", when: (s)=>!!s.flags["inya_said_bunnies"], steps: [
+      { text: "I've sat across from it now. Has the deck got a name?", when: (s)=>(!!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), steps: [
+        { say: "rowan", text: "I've sat across from it now. Has the deck got a name?" },
+        { say: "inya", text: "\"Hop and Pop.\" A narrow look. \"It's a deck. There's a plan. You've met the plan.\"" },
+        AFF("inya", 1, "Asked about her deck")
+      ] },
+      { text: "You said bunnies. What's the plan?", when: (s)=>!!s.flags["inya_said_bunnies"] && !(!!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), steps: [
         { say: "rowan", text: "You said bunnies. What's the plan?" },
         { say: "inya", text: "\"Hop and Pop. It's a deck.\" A narrow look. \"There's a plan. Don't say 'pile'.\"" },
         AFF("inya", 1, "Asked about her deck")
@@ -851,7 +862,7 @@ scene("post_inya", {
     DECK("inya"),
     { flag: "deck_known_inya" },
     { when: (s)=>!(s.duels["ferry_inya"]==="won"), jump: "lost" },
-    { text: "Inya looks at the board for a long time. Her last bunny is still on it." },
+    { text: "She does not get far. On the bench by the galley the cards are still laid out under the coffee cup, and Inya stops and looks at the board for a long time. Her last bunny is still on it." },
     { say: "inya", text: "I should have set off the Bomb on turn five." },
     { say: "rowan", text: "You waited because you wanted to see whether I'd kill Bubbles. I didn't, and that was the mistake." },
     { say: "inya", text: "\"Don't be nice.\" Quick, sharp, almost cheerful. \"You attacked the Haressassins instead of the hero. They're my whole clock.\"" },
@@ -859,7 +870,7 @@ scene("post_inya", {
     { text: "She takes a pencil stub out of the hoodie pocket and writes one line on the back of her hand, because the notebook is in her bag. She does not show it to you." },
     { jump: "done" },
     { label: "lost" },
-    { text: "Inya's bunnies are scattered across the table in an enormous, happy mess." },
+    { text: "She does not get far. On the bench by the galley the cards are still laid out under the coffee cup, and Inya's bunnies are scattered across the board in an enormous, happy mess." },
     { say: "inya", text: "That was *my* turn five. You kept the Bomb ticking and you didn't set it off, and it took three of your heroes down with it." },
     { say: "rowan", text: "I tried to wait you out. You didn't blink." },
     { say: "inya", text: "\"Rabbits turn ninety degrees at full speed.\"" },
@@ -882,9 +893,10 @@ scene("ferry_tomi", {
     MET("tomi", "Tomás Reyes"),
     NOTE("tomi", "Runs the betting book on the ship. Everything has a friend price."),
     { text: "A girl in a blue collar leans in, murmurs, and leaves two coins on the open page. They are gone before she has straightened up." },
-    { say: "tomi", text: "\"Two on 'sits down before ten'. Bold.\" The pencil moves. \"You're a market this morning, you know that? There's a line on whether you sit at that table, and a line on who walks off this boat carrying somebody else's luggage.\"" },
+    { when: (s)=>!s.flags["table_resolved"], say: "tomi", text: "\"Two on 'sits down before ten'. Bold.\" The pencil moves. \"You're a market this morning, you know that? There's a line on whether you sit at that table, and a line on who walks off this boat carrying somebody else's luggage.\"" },
+    { when: (s)=>!!s.flags["table_resolved"], say: "tomi", text: "\"Two on 'has his jacket by noon'. Bold.\" The pencil moves. \"You're a market this morning, you know that? The table's closed and the book on it is paid, and they still want a line on you.\"" },
     { choice: [
-      { text: "You opened a book on me before I'd reached the bottom of the stairs.", steps: [
+      { text: "You opened a book on me before I'd reached the bottom of the stairs.", when: (s)=>!!s.flags["rowan_singled_out"], steps: [
         { say: "rowan", text: "You opened a book on me before I'd reached the bottom of the stairs." },
         { say: "tomi", text: "\"Everybody in this room was going to bet on you anyway.\" Easily. \"The only question was whether somebody kept it honest.\"" },
         { say: "rowan", text: "And that's you." },
@@ -892,7 +904,7 @@ scene("ferry_tomi", {
         AFF("tomi", 1, "Asked who keeps it honest"),
         { flag: "tomi_honest" }
       ] },
-      { text: "What are the odds I sit down, out of curiosity?", steps: [
+      { text: "What are the odds I sit down, out of curiosity?", when: (s)=>!s.flags["table_resolved"], steps: [
         { say: "rowan", text: "What are the odds I sit down, out of curiosity?" },
         { flag: "tomi_quoted_odds" },
         { say: "tomi", text: "Even money. And even money that you don't throw up on the felt if you do. I've got ten of my own on you, both ways up." },
@@ -902,7 +914,8 @@ scene("ferry_tomi", {
       ] },
       { text: "I'm not sure I'm ready to be a market.", steps: [
         { say: "rowan", text: "I'm not sure I'm ready to be a market." },
-        { say: "tomi", text: "\"Fair.\" The pencil stops, which seems to be rare. \"Here's the rule. I price what's public. He pointed, the room looked, that's public. What you tell me yourself is inventory, and I don't trade yours for free.\"" },
+        { when: (s)=>!!s.flags["rowan_singled_out"], say: "tomi", text: "\"Fair.\" The pencil stops, which seems to be rare. \"Here's the rule. I price what's public. He pointed, the room looked, that's public. What you tell me yourself is inventory, and I don't trade yours for free.\"" },
+        { when: (s)=>!s.flags["rowan_singled_out"], say: "tomi", text: "\"Fair.\" The pencil stops, which seems to be rare. \"Here's the rule. I price what's public. A name in ink on a list by a door, that's public. What you tell me yourself is inventory, and I don't trade yours for free.\"" },
         { say: "rowan", text: "That's reassuring. I think." },
         { say: "tomi", text: "It's not meant to be reassuring. It's meant to be *accurate*." },
         AFF("tomi", 2, "Was straight about it")
@@ -982,7 +995,7 @@ scene("ferry_tomi", {
         Object.assign(AFF("tomi", 1, "Did business"), { when: (s)=>!s.flags["tomi_book_asked"] }),
         { flag: "tomi_book_asked" }
       ] },
-      { text: "You write down every game at that table. What have you got on him?", when: (s)=>!s.flags["saw_counter"], steps: [
+      { text: "You write down every game at that table. What have you got on him?", when: (s)=>!s.flags["saw_counter"] && !s.flags["table_resolved"], steps: [
         { say: "rowan", text: "You write down every game at that table. What have you got on him?" },
         { say: "tomi", text: "On Pryce? Plenty. I don't set a line on a man without watching his hands first." },
         { say: "tomi", text: "Three Smug Coins and it's yours." },
@@ -1011,9 +1024,9 @@ scene("ferry_tomi", {
         { when: (s)=>!s.flags["bet_gideon"] && !s.flags["bet_inya"] && (!!s.flags["ferry_table_lost"] || !!s.flags["ferry_inya_lost"]), say: "tomi", text: "House did fine. Gideon came in and the romantics paid. I'd feel worse if I hadn't told them the odds to their faces." },
         { when: (s)=>!s.flags["bet_gideon"] && !s.flags["bet_inya"] && (!!s.flags["ferry_inya_won"] || !!s.flags["ferry_table_won"]), say: "tomi", text: "\"The longshot side came in and cleaned me out.\" He sounds delighted. \"Worst book I ever ran. Best morning I've had.\"" },
         { when: (s)=>!s.flags["bet_gideon"] && !s.flags["bet_inya"] && (!!s.flags["ferry_table_settled"] || !!s.flags["ferry_table_denied"]), say: "tomi", text: "Void. Every coin back where it came from. A whole morning's arithmetic, robbed by a total absence of events." },
-        { say: "rowan", text: "And the line on me sitting down?" },
-        { when: (s)=>!!s.flags["ferry_table_won"] || !!s.flags["ferry_table_lost"] || !!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"], say: "tomi", text: "\"Paid. You sat.\" He salutes you with the pencil. \"I had ten on that. You're the only investment on this boat that's come good.\"" },
-        { when: (s)=>!(!!s.flags["ferry_table_won"] || !!s.flags["ferry_table_lost"] || !!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), say: "tomi", text: "\"You never sat at it. Cost me ten.\" He shrugs, without rancour. \"I don't hold it against the horse.\"" }
+        { when: (s)=>!!s.flags["rowan_singled_out"], say: "rowan", text: "And the line on me sitting down?" },
+        { when: (s)=>!!s.flags["rowan_singled_out"] && (!!s.flags["ferry_table_won"] || !!s.flags["ferry_table_lost"] || !!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), say: "tomi", text: "\"Paid. You sat.\" He salutes you with the pencil. \"I had ten on that. You're the only investment on this boat that's come good.\"" },
+        { when: (s)=>!!s.flags["rowan_singled_out"] && !(!!s.flags["ferry_table_won"] || !!s.flags["ferry_table_lost"] || !!s.flags["rowan_beat_inya"] || !!s.flags["rowan_lost_to_inya"]), say: "tomi", text: "\"You never sat at it. Cost me ten.\" He shrugs, without rancour. \"I don't hold it against the horse.\"" }
       ] },
       { text: "Could I look through one of those binders?", steps: [
         { say: "rowan", text: "Could I look through one of those binders?" },
@@ -1089,7 +1102,7 @@ scene("chat_tomi", {
         { say: "rowan", text: "'Friend price.' Does everybody get that one?" },
         { say: "tomi", text: "\"Everyone's a friend. Some are better friends. Commons kids get the best price.\" He taps the binder. \"I never cheat a Commons kid, and a first-timer gets one bad trade back, free. That's not charity. That's investment.\"" },
         { choice: [
-          { text: "I'm for the Commons myself.", steps: [
+          { text: "I'm for the Commons myself.", when: (s)=>!s.flags["isle_tomi_done"], steps: [
             { say: "rowan", text: "I'm for the Commons myself." },
             { say: "tomi", text: "\"I know. I can read a list.\" He flicks his own grey collar. \"So that's you sorted: best price, one bad trade back. *One.* I write it down.\"" },
             { say: "tomi", text: "Grey collars look after grey collars. You'll have one by tonight. Start practising." }
@@ -1098,7 +1111,8 @@ scene("chat_tomi", {
             { say: "rowan", text: "And the tower?" },
             { say: "tomi", text: "Tower pays tower prices. The gentleman in the gloves pays double, when he gets round to wanting something." },
             { say: "rowan", text: "That sounds personal." },
-            { say: "tomi", text: "\"It's not personal. It's *marketing*.\" A beat, and the grin thins a little. \"He turned a grey collar away from a public table. That goes on the price. Everything goes on the price.\"" }
+            { say: "tomi", text: "\"It's not personal. It's *marketing*.\" A beat, and the grin thins a little. \"He turned a grey collar away from a public table. That goes on the price. Everything goes on the price.\"" },
+            NOTE("tomi", "The tower pays tower prices, and the one in the white gloves pays double.")
           ] },
           { text: "Investment in what?", steps: [
             { say: "rowan", text: "Investment in what?" },
@@ -1108,7 +1122,7 @@ scene("chat_tomi", {
         ] },
         AFF("tomi", 2, "Asked about his rules"),
         { flag: "chat_tomi_2" },
-        NOTE("tomi", "Commons kids get the best price and one bad trade back. Gideon pays double."),
+        NOTE("tomi", "Commons kids get the best price and one bad trade back."),
         { time: 2 },
       ] },
       { text: "You've a line on everything. What's your line on the year?", when: (s)=>!s.flags["chat_tomi_3"], steps: [
@@ -1119,7 +1133,8 @@ scene("chat_tomi", {
         { choice: [
           { text: "And the line on me? Past the first table.", steps: [
             { say: "rowan", text: "And the line on me? Past the first table." },
-            { say: "tomi", text: "\"Top eight of the year, twelve to one.\" No pause to work it out; it has been sitting there. \"It was twenty before you came down those stairs, got pointed at, and didn't leave.\"" },
+            { when: (s)=>!!s.flags["rowan_singled_out"], say: "tomi", text: "\"Top eight of the year, twelve to one.\" No pause to work it out; it has been sitting there. \"It was twenty before you came down those stairs, got pointed at, and didn't leave.\"" },
+            { when: (s)=>!s.flags["rowan_singled_out"], say: "tomi", text: "\"Top eight of the year, twelve to one.\" No pause to work it out; it has been sitting there." },
             { say: "tomi", text: "Don't get proud. Twelve to one is still me saying no eleven times." }
           ] },
           { text: "You'd bet against your own collar for the first week?", steps: [
@@ -1224,7 +1239,8 @@ scene("ferry_anni", {
         { say: "rowan", text: "It's been a long morning. Could I be written up tomorrow?" },
         { say: "anni", alias: "Girl with a red pen", text: "\"Infractions are not scheduled for convenience.\"" },
         { text: "Then the level grey eyes come up, and take in the rain jacket, and the one duffel, and whatever your face is doing." },
-        { say: "anni", alias: "Girl with a red pen", text: "\"…You are the one who was pointed at. That is not conduct. Nobody may be written up for being pointed at.\" The pen is capped. \"I have checked.\"" }
+        { when: (s)=>!!s.flags["rowan_singled_out"], say: "anni", alias: "Girl with a red pen", text: "\"…You are the one who was pointed at. That is not conduct. Nobody may be written up for being pointed at.\" The pen is capped. \"I have checked.\"" },
+        { when: (s)=>!s.flags["rowan_singled_out"], say: "anni", alias: "Girl with a red pen", text: "\"…You are the one the whole ship is talking about. That is not conduct. Nobody may be written up for being talked about.\" The pen is capped. \"I have checked.\"" }
       ] }
     ] },
     { say: "rowan", text: "Rowan Vance." },
@@ -1261,7 +1277,8 @@ scene("ferry_anni", {
       ] }
     ] },
     { when: (s)=>!s.flags["table_resolved"], jump: "ask_sit" },
-    { say: "anni", text: "You were nearer than I was. Was it fair, in your opinion? I ask for the record." },
+    { when: (s)=>!!s.flags["rowan_singled_out"], say: "anni", text: "You are the one he named. Was it fair, in your opinion? I ask for the record." },
+    { when: (s)=>!s.flags["rowan_singled_out"], say: "anni", text: "Was it fair, in your opinion? I am asking everybody, for the record." },
     { choice: [
       { text: "Fair enough. Nobody broke anything.", steps: [
         { say: "rowan", text: "Fair enough. Nobody broke anything." },
@@ -1342,8 +1359,8 @@ scene("chat_anni", {
     { end: true },
     { label: "ask" },
     { choice: [
-      { text: "Why write it all down, if there's nobody aboard to give it to?", when: (s)=>!s.flags["chat_anni_1"], steps: [
-        { say: "rowan", text: "Why write it all down, if there's nobody aboard to give it to?" },
+      { text: "Why write it all down? Who is going to read it?", when: (s)=>!s.flags["chat_anni_1"], steps: [
+        { say: "rowan", text: "Why write it all down? Who is going to read it?" },
         { say: "anni", text: "Because otherwise the only account of a room is the one given by whoever was most at ease in it." },
         { say: "anni", text: "My father is a customs officer. In Lübeck. I grew up at a table where the conversation was who had tried to bring what past him that day, and how pleasant they had been about it." },
         { say: "anni", text: "The pleasant ones were always the worst. That was the entire lesson. Rules are how people who are not charming are protected from people who are." },
@@ -1454,9 +1471,16 @@ scene("table_rowan_vs_inya", {
     { label: "end_1" },
     { flag: "inya_engaged" },
     {
+      when: (s)=>!!s.flags["met_gideon"],
       text: "Gideon rises from the brass-rimmed table for the first time all morning, takes his gloves, and steps aside onto the nearest bench. He sets himself down with his hands folded, as if the room had been built around a show."
     },
-    { say: "gideon", text: "The table is yours, Vance. For the demonstration." },
+    {
+      when: (s)=>!s.flags["met_gideon"],
+      text: "The boy in the white gloves rises from the brass-rimmed table for the first time all morning, takes his gloves, and steps aside onto the nearest bench. He sets himself down with his hands folded, as if the room had been built around a show."
+    },
+    { when: (s)=>!!s.flags["met_gideon"], say: "gideon", text: "The table is yours, Vance. For the demonstration." },
+    { when: (s)=>!s.flags["met_gideon"], say: "gideon", alias: "Boy in white gloves", text: "Gideon Pryce. The table is yours, Vance. For the demonstration." },
+    MET("gideon", "Gideon Pryce"),
     {
       text: "The saloon closes around you like a crowd round a street fight. Half the ship. The boy in the yellow bandana is writing in the lid of his binder at a speed that suggests he has been waiting for this all morning."
     },
@@ -1527,6 +1551,7 @@ scene("table_rowan_vs_inya", {
         { label: "opt_8" },
         { say: "rowan", text: "Then play me, Gideon. You wanted to see the Wildcard. Here he is." },
         { say: "gideon", text: "How very agreeable." },
+        { flag: "gideon_challenge_said" },
         { scene: "table_challenge_gideon" },
         { jump: "choiceend_7" },
         { label: "opt_9" },
@@ -1589,13 +1614,16 @@ scene("table_challenge_gideon", {
     { text: "Inya looks at you across the felt as you pull out the chair. She says nothing. She does not need to." },
     { label: "next_4" },
     { label: "end_3" },
-    { say: "rowan", text: "Gideon. I'll play you." },
+    { when: (s)=>!s.flags["gideon_challenge_said"] && !!s.flags["met_gideon"], say: "rowan", text: "Gideon. I'll play you." },
+    { when: (s)=>!s.flags["gideon_challenge_said"] && !s.flags["met_gideon"], say: "rowan", text: "You, at the table. I'll play you." },
     {
       text: "The room goes quiet in the particular way rooms go quiet when somebody is about to be embarrassed on purpose."
     },
-    { say: "gideon", text: "\"Vance.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"Vance.\"" },
     { text: "He looks you over, grey eyes taking inventory." },
-    { say: "gideon", text: "\"I did not think you would volunteer. How very interesting.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"I did not think you would volunteer. How very interesting.\"" },
+    { when: (s)=>!s.flags["met_gideon"], say: "gideon", alias: "Boy in white gloves", text: "Gideon Pryce. One ought to know whose luggage one may be carrying." },
+    MET("gideon", "Gideon Pryce"),
     {
       say: "gideon",
       text: "The loser carries the winner's luggage from the dock to the winner's door. I have four cases. You have, I take it, one duffel."
@@ -1939,7 +1967,7 @@ scene("lounge_first", {
       text: "\"Gideon Pryce. Since you have chosen to join the conversation.\""
     },
     { text: "He does not offer a gloved hand." },
-    { say: "gideon", alias: "Boy in white gloves", text: "\"You are Vance, I think. The ink name.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"And you are Vance. The ink name.\"" },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["gideon"]) s.names["gideon"] = "Gideon Pryce"; if (io && io.popup && !s.flags["met_gideon"]) io.popup({ type: 'met', id: "gideon", name: "Gideon Pryce" }); }
     },
@@ -2032,7 +2060,8 @@ scene("lounge_first", {
     { jump: "choiceend_5" },
     { label: "opt_10" },
     { say: "rowan", text: "Gideon. I'll play you myself. She's waited long enough." },
-    { say: "gideon", alias: "Boy in white gloves", text: "Will you. How very interesting." },
+    { say: "gideon", alias: "Boy in white gloves", text: "Will you." },
+    { flag: "gideon_challenge_said" },
     {
       say: "inya",
       alias: "Girl with the bunny clip",
@@ -2134,6 +2163,11 @@ scene("lounge_first", {
 scene("inya_finds_rowan", {
   steps: [
     {
+      when: (s)=>s.location==="ferry_lounge",
+      text: "A small figure with two mint-green tails and a bunny-shaped clip leaves the end of the card table, marches the length of the saloon and plants herself directly in front of you. Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas."
+    },
+    {
+      when: (s)=>s.location!=="ferry_lounge",
       text: "A small figure with two mint-green tails and a bunny-shaped clip marches the length of the deck and plants herself directly in front of you. Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas."
     },
     { when: (s)=>!(!!!s.flags["met_inya"]), jump: "next_2" },
@@ -2301,14 +2335,14 @@ scene("inya_rolls", {
     { label: "end_4" },
     {
       choice: [
-        { text: "Is it true that you know every rabbit breed by the length of its ears?", goto: "opt_8" },
+        { text: "How do you tell one breed from another, anyway? Is it the ears?", goto: "opt_8" },
         { text: "What did you really think of him? The one in the gloves.", when: (s)=>!!s.flags["lounge_seen"], goto: "opt_9" },
         { text: "Eat, and say nothing, and watch the island get bigger.", goto: "opt_10" }
       ]
     },
     { jump: "choiceend_7" },
     { label: "opt_8" },
-    { say: "rowan", text: "Is it true that you know every rabbit breed by the length of its ears?" },
+    { say: "rowan", text: "How do you tell one breed from another, anyway? Is it the ears?" },
     { say: "inya", text: "\"It's not *only* the ears.\"" },
     { text: "Flat, brisk, the tone other people keep for tax law." },
     {
@@ -2333,8 +2367,9 @@ scene("inya_rolls", {
       say: "inya",
       text: "\"That he's scared.\" A mouthful of roll. \"People who need a wall that tall are scared of something. I just don't know what yet.\""
     },
-    { say: "rowan", text: "He said I carry his cases if I lose." },
+    { when: (s)=>!!s.flags["rowan_singled_out"] && !s.flags["ferry_table_won"] && !s.flags["ferry_table_lost"], say: "rowan", text: "He said I'd carry his cases if I lost." },
     {
+      when: (s)=>!!s.flags["rowan_singled_out"] && !s.flags["ferry_table_won"] && !s.flags["ferry_table_lost"],
       say: "inya",
       text: "He'd have carried yours if you'd won. People don't say that about him. It's the only fair thing about him."
     },
@@ -2380,8 +2415,8 @@ scene("isle_gideon", {
     { text: "A dome door opens. Somebody comes out very red in the face, and somebody else goes in. His eyes follow both, and return." },
     { say: "gideon", text: "They call us by tower, and then by letter. I am P. I have stood here an hour, and I can tell you what nine people play from the way they came out of that door." },
     { when: (s)=>!!s.flags["placement_won"], say: "gideon", text: "You won yours. Dome two, against a repeating year. The board by the path is public; I read it before I read my own." },
-    { when: (s)=>!!s.flags["placement_lost"], say: "gideon", text: "You lost yours. Dome two, to a repeating year. The board by the path is public. I should not let it weigh; it is one number, and they have a whole year in which to change it." },
-    { when: (s)=>!s.flags["placement_done"] && !s.flags["placement_won"] && !s.flags["placement_lost"], say: "gideon", text: "You have not been in yet. They call the cove at half past one. I shall be reading the board." },
+    { when: (s)=>!!s.flags["placement_lost"], say: "gideon", text: "You lost yours. Dome two, to a repeating year. The board by the path is public; I read it before I read my own. I should not let it weigh; it is one number, and they have a whole year in which to change it." },
+    { when: (s)=>!s.flags["placement_done"] && !s.flags["placement_won"] && !s.flags["placement_lost"], say: "gideon", text: "You have not been in yet. They call the cove at half past one. I shall be reading the board; your line before my own." },
     { choice: [
       { text: "You looked for my name before your own?", steps: [
         { say: "rowan", text: "You looked for my name before your own?" },
@@ -2395,7 +2430,7 @@ scene("isle_gideon", {
         { say: "gideon", text: "\"One is not nervous of a measurement, Vance. One is nervous of whoever is holding the ruler.\" He glances, once, at the tall figure in the doorway of the furthest dome. \"I should like to know who that is, today.\"" },
         AFF("gideon", 2, "Asked, without mocking")
       ] },
-      { text: "And the view from suite five?", steps: [
+      { text: "And the view from suite five?", when: (s)=>!!s.flags["gideon_said_cove"], steps: [
         { say: "rowan", text: "And the view from suite five?" },
         { say: "gideon", text: "Exactly as described. The Quad, the gate, the harbour, these domes. Everything but the cove, which is behind a hill, as the plans said it would be." },
         { when: (s)=>!!s.flags["gideon_invited"], say: "gideon", text: "\"Your invitation stands, I take it.\" He does not look at you to say it. \"I have not decided. I merely ask whether it stands.\"" },
@@ -2472,7 +2507,8 @@ scene("isle_inya", {
     { when: (s)=>!!s.flags["met_inya"], say: "inya", text: "Rowan. In or out, you're letting the flies in. Don't sit on the hoodies, they're in an order." },
     MET("inya", "Inya Bell"),
     { when: (s)=>!!s.flags["ferry_inya_won"], say: "inya", text: "\"He carried it. All the way to this door.\" She points at the step, as at a monument. \"He didn't come in. He looked at the bunting for about four seconds and said 'Miss Bell' and left. I'm keeping the four seconds.\"" },
-    { when: (s)=>!!s.flags["ferry_table_lost"], say: "inya", text: "\"Four cases, up that hill. Show me your hands.\" She looks, briskly, the way one checks a rabbit's feet. \"…You'll live. Don't do that for me again without asking.\"" },
+    { when: (s)=>!!s.flags["ferry_table_lost"] && !s.flags["inya_asked_first"], say: "inya", text: "\"Four cases, up that hill. Show me your hands.\" She looks, briskly, the way one checks a rabbit's feet. \"…You'll live. Don't do that for me again without asking.\"" },
+    { when: (s)=>!!s.flags["ferry_table_lost"] && !!s.flags["inya_asked_first"], say: "inya", text: "\"Four cases, up that hill. Show me your hands.\" She looks, briskly, the way one checks a rabbit's feet. \"…You'll live.\"" },
     { when: (s)=>!!s.flags["ferry_table_won"], say: "inya", text: "\"I saw him go past with your duffel. On his shoulder. In the gloves.\" A tiny, fierce grin. \"The whole row came out. Nobody said a word. It was the best thing I've seen all day.\"" },
     { when: (s)=>!!s.flags["ferry_inya_lost"], say: "inya", text: "\"Four cases. Tower door. I didn't let the porter touch one.\" She flexes her fingers. \"It's written down. One line. Don't ask what it says.\"" },
     { text: "She goes on unpacking while she talks: four notebooks squared on the shelf, a tiny radio, a paper bag of carrots, the deck box last and nearest the pillow." },
@@ -2512,7 +2548,8 @@ scene("isle_inya", {
     { end: true },
     { label: "later" },
     { text: "The hoodies are in a drawer now. She is sitting on the bed with the deck box in her lap and her eyes shut, not shuffling." },
-    { say: "inya", text: "\"I'm thinking. It's harder without the weight.\" One amber eye opens. \"You can stay if you're quiet, or you can talk and I'll pretend I was finished.\"" },
+    { when: (s)=>!s.flags["chat_inya_x"], say: "inya", text: "\"I'm thinking.\" One amber eye opens. \"You can stay if you're quiet, or you can talk and I'll pretend I was finished.\"" },
+    { when: (s)=>!!s.flags["chat_inya_x"], say: "inya", text: "\"I'm thinking. It's harder without the weight.\" One amber eye opens. \"You can stay if you're quiet, or you can talk and I'll pretend I was finished.\"" },
     { choice: [
       { text: "Talk.", when: (s)=>!s.flags["chat_inya_done"], steps: [
         { scene: "chat_inya" }

@@ -11,7 +11,7 @@ scene("ferry_sunny", {
     { text: "She is, at the exact moment you notice her, doing something with a deck of cards that involves flipping half of it into the air and catching it behind her back." },
     { text: "She catches it. Every card. She does not look at them." },
     { text: "She sees you looking and grins with her whole face." },
-    { when: (s)=>!!s.flags["ship_knows_wildcard"], say: "sunny", alias: "Girl on the rail", text: "You're the wildcard! Nice shoulders for a bloke who took the last seat. That's a compliment, don't make it weird." },
+    { when: (s)=>!!s.flags["ship_knows_wildcard"], say: "sunny", alias: "Girl on the rail", text: "You're the Wildcard! Nice shoulders for a bloke who took the last seat. That's a compliment, don't make it weird." },
     { when: (s)=>!s.flags["ship_knows_wildcard"], say: "sunny", alias: "Girl on the rail", text: "You're the one without the jacket! Nice shoulders. That's a compliment, don't make it weird." },
     { choice: [
       { text: "Thank you, I think. Nobody has ever complimented me before breakfast.", steps: [
@@ -56,6 +56,7 @@ scene("ferry_sunny", {
       ] },
       { text: "Badly. Mostly sideways.", steps: [
         { say: "rowan", text: "Badly. Mostly sideways." },
+        { flag: "sunny_rowan_sideways" },
         { say: "sunny", text: "Brilliant! No, really. 'Badly' I can fix. It's 'fine, thanks' that drowns." },
         { say: "sunny", text: "Sideways is just forwards with the wrong arm. Give me a week." },
         AFF("sunny", 2, "Admitted he's bad at it")
@@ -219,7 +220,7 @@ scene("chat_sunny", {
       ] },
       { text: "'I like you. There, said it.' Do you say that to everyone?", when: (s)=>!!s.flags["sunny_said_likes"] && !s.flags["chat_sunny_3"], steps: [
         { say: "rowan", text: "'I like you. There, said it.' Do you say that to everyone?" },
-        { say: "sunny", text: "\"Only when it's true! I tell people the second I decide. And I tell them the second I stop. Saves time.\" Totally unembarrassed. \"You get used to it.\"" },
+        { say: "sunny", text: "\"Only when it's true! I tell people the second I decide. And I tell them the second I stop.\" Totally unembarrassed. \"You get used to it.\"" },
         { choice: [
           { text: "That's — efficient.", steps: [
             { say: "rowan", text: "That's — efficient." },
@@ -249,14 +250,15 @@ scene("chat_sunny", {
         { choice: [
           { text: "Doesn't it get dull?", steps: [
             { say: "rowan", text: "Doesn't it get dull?" },
-            { say: "sunny", text: "\"It gets *honest*.\" A bright, quick grin. \"I like that. I'm not great at being anything else.\"" }
+            { say: "sunny", text: "\"Dull's the good bit.\" A bright, quick grin. \"Nothing down there to look at but what you've actually got. I like that. I'm not great at pretending.\"" }
           ] },
           { text: "That sounds like the only quiet you get all day.", steps: [
             { say: "rowan", text: "That sounds like the only quiet you get all day." },
             { say: "sunny", text: "\"…Yeah. I'm a lot, the rest of the day. I know I am.\" She does not seem sorry about it; she seems to have measured it. \"So I get the quiet in early, where it can't bother anyone.\"" }
           ] }
         ] },
-        { say: "sunny", text: "You should come. Six o'clock, any morning, wherever they keep the water. Bring whatever it is you swim sideways in." },
+        { when: (s)=>!!s.flags["sunny_rowan_sideways"], say: "sunny", text: "You should come. Six o'clock, any morning, wherever they keep the water. Bring whatever it is you swim sideways in." },
+        { when: (s)=>!s.flags["sunny_rowan_sideways"], say: "sunny", text: "You should come. Six o'clock, any morning, wherever they keep the water. Bring a towel and no opinions." },
         { say: "rowan", text: "Six in the morning." },
         { say: "sunny", text: "It only hurts the first eleven times." },
         AFF("sunny", 2, "Asked about the early swim"),
@@ -609,7 +611,7 @@ scene("chat_marit", {
             { text: "It comes out in the ordinary voice, quick, before she can dress it." },
             { say: "marit", text: "\"And then it goes quiet. The quiet is the part I can't stand. I'd rather fill it with *anything*.\"" },
             { say: "rowan", text: "I'd have looked twice. The hair alone." },
-            { say: "marit", text: "\"…That's going in the notebook. With your name on it. I *credit*.\"" },
+            { say: "marit", text: "\"…That's going in my notebook. I keep the good lines. With your name on it: I *credit*.\"" },
             AFF("marit", 3, "Would have looked twice")
           ] }
         ] },
@@ -634,6 +636,7 @@ scene("chat_marit", {
             { say: "rowan", text: "I don't act. I can barely hold cards when people are looking." },
             { say: "marit", text: "Then you shall play a man who can barely hold his cards! That is not a problem, that is **CASTING!** The **BROODING STRANGER!** It is a *lead!*" },
             { say: "marit", text: "\"Everybody I have ever cast told me first that they don't act.\" Ordinary voice, and kind. \"Then I give them one line and a hat. It's mostly the hat.\"" },
+            { flag: "marit_knows_stagefright" },
             AFF("marit", 2, "Said no and got a hat")
           ] }
         ] },
@@ -672,14 +675,14 @@ scene("chat_marit", {
       ] },
       { text: "I'll let you get back to the gulls.", steps: [
         { say: "rowan", text: "I'll let you get back to the gulls." },
-        { say: "marit", text: "**EXIT**, stage left, pursued by a **PROTAGONIST!**" },
+        { say: "marit", text: "**EXIT** the **PROTAGONIST**, stage left, pursued by a *gull!*" },
         { end: true }
       ] }
     ] },
     { jump: "top" },
     { label: "done" },
     { flag: "chat_marit_done" },
-    { say: "marit", text: "**THAT** — ladies and gentlemen — was the *finest* intermission of the morning!" },
+    { say: "marit", text: "**THAT** — ladies and gentlemen — was the *finest* interval of the morning!" },
     { end: true }
   ]
 });
@@ -931,7 +934,7 @@ scene("chat_freddie", {
             AFF("freddie", 2, "Asked about the octopus")
           ] }
         ] },
-        { say: "freddie", text: "The notebook's waterproof, by the way. It has to be. So's the pencil. I've lost three to the sea and one to a brother." },
+        { say: "freddie", text: "The notebook's waterproof, by the way. It has to be. So's the pencil. I've lost three to the sea and one to a brother. There are five of those, so that's not bad going." },
         { flag: "freddie_said_brothers" },
         { flag: "chat_freddie_2" },
         NOTE("freddie", "Loves octopuses: three hearts, open jars, never stay in the tank. Keeps a waterproof notebook."),
@@ -975,7 +978,7 @@ scene("chat_freddie", {
           ] },
           { text: "And who held your hand?", steps: [
             { say: "rowan", text: "And who held your hand?" },
-            { text: "She thinks about it honestly, upside down, with her chin on the rail." },
+            { text: "She thinks about it honestly, folded over the rail again, with her hair hanging down towards the wake." },
             { say: "freddie", text: "\"Nobody had to. I was the one who could swim.\" Then, quickly, the right way up again: \"That's not a sad thing! They had each other and I had the whole sea. I got the better half.\"" },
             AFF("freddie", 3, "Asked who looked after her")
           ] }
@@ -1003,7 +1006,7 @@ scene("chat_freddie", {
             { say: "freddie", text: "She looks *very* fast. Shoulders like a wardrobe. I'm not fast. I just don't stop, and people find that upsetting round about the second kilometre." }
           ] }
         ] },
-        { say: "freddie", text: "I'm going to let her think so for a *bit*." },
+        { say: "freddie", text: "I'm going to let her think she's winning for a *bit*." },
         { say: "freddie", text: "\"She keeps looking over here, have you noticed? Like I'm about to do something.\" Innocently, with her eyes on the drop below the rail. \"I can't think what.\"" },
         AFF("freddie", 1, "Mentioned Sunny"),
         { flag: "chat_freddie_4" },
@@ -1292,7 +1295,7 @@ scene("chat_rafa", {
             AFF("rafa", 2, "Guessed where his head is")
           ] }
         ] },
-        { say: "rafa", text: "My room-mate is already on this deck, by the way. Boy with a microphone clipped to his collar. He said his own name into it, and it's the name in my letter: Rare Hall, one-oh-three." },
+        { say: "rafa", text: "My roommate is already on this deck, by the way. Boy with a microphone clipped to his lapel. He said his own name into it, and it's the name in my letter: Rare Hall, one-oh-three." },
         { say: "rafa", text: "\"He described my ladling. To nobody. 'And he goes in low with the spoon.'\" A pause. \"I have started pouring a little nicer. I am not proud of it.\"" },
         { when: (s)=>!!s.flags["met_cas"], flag: "rel_rafa_cas" },
         { flag: "chat_rafa_3" },
@@ -1343,11 +1346,12 @@ scene("isle_sunny", {
       ] },
       { text: "Is this where six o'clock happens?", when: (s)=>!!s.flags["sunny_invited_swim"], steps: [
         { say: "rowan", text: "Is this where six o'clock happens?" },
-        { say: "sunny", text: "\"He *remembered!*\" She is unreasonably pleased. \"This is exactly where six o'clock happens. Sideways and all. You live thirty steps away, you've got no excuse left.\"" },
+        { say: "sunny", text: "\"He *remembered!*\" She is unreasonably pleased. \"This is exactly where six o'clock happens. You live thirty steps away, you've got no excuse left.\"" },
         AFF("sunny", 2, "Remembered six o'clock")
       ] }
     ] },
-    { text: "A few metres out, in water that barely covers her, a red-haired girl in diving goggles is floating face down, perfectly still. Sunny has not once looked fully away from her." },
+    { when: (s)=>!s.flags["met_freddie"], text: "A few metres out, in water that barely covers her, a red-haired girl in diving goggles is floating face down, perfectly still. Sunny has not once looked fully away from her." },
+    { when: (s)=>!!s.flags["met_freddie"], text: "A few metres out, in water that barely covers her, Freddie is floating face down in her diving goggles, perfectly still. Sunny has not once looked fully away from her." },
     { when: (s)=>!!s.flags["freddie_jumped"], say: "sunny", text: "Three hundred and ten seconds. I'm not on shift, I'm just counting. After this morning I'll be counting her in my sleep — you bad influence." },
     { when: (s)=>!s.flags["freddie_jumped"], say: "sunny", text: "Three hundred and ten seconds. I'm not on shift, I'm just counting. She comes up every six minutes or so, looking like she's found money." },
     { when: (s)=>!!s.flags["placement_won"], say: "sunny", text: "Heard you won in the Domes, by the way. Good. Now do it again tomorrow, that's the bit nobody likes." },
@@ -1414,8 +1418,12 @@ scene("isle_freddie", {
         { say: "freddie", text: "\"He moves into whatever's empty.\" At once; she has clearly been waiting. \"Something of yours leaves, he's in there by morning with his feet up. I don't know what that is in numbers. It's *true*, though.\"" },
         AFF("freddie", 1, "Asked what the crab does")
       ] },
-      { text: "Is the lifeguard on the beach bothering you?", steps: [
+      { text: "Is the lifeguard on the beach bothering you?", when: (s)=>!!s.flags["met_sunny"], steps: [
         { say: "rowan", text: "Is the lifeguard on the beach bothering you?" },
+        { say: "freddie", text: "She's counting. I can feel it on the back of my neck. I stay down a bit longer each time, to keep her interested." }
+      ] },
+      { text: "There's a girl on the beach with a towel who hasn't taken her eyes off you.", when: (s)=>!s.flags["met_sunny"], steps: [
+        { say: "rowan", text: "There's a girl on the beach with a towel who hasn't taken her eyes off you." },
         { say: "freddie", text: "She's counting. I can feel it on the back of my neck. I stay down a bit longer each time, to keep her interested." }
       ] }
     ] },
@@ -1462,16 +1470,17 @@ scene("isle_marit", {
         AFF("marit", 2, "Tried the echo")
       ] }
     ] },
-    { say: "marit", text: "My room-mate is one Eloise Lafayette. She had paint on the wall before she had sheets on the bed, and she has not, to my knowledge, eaten. I have cast her as the Tragic Artist and I am going to find her some soup." },
-    { text: "She steps down off the trunk and looks up at the sky over the gate, which is a hard, even blue from edge to edge." },
-    { say: "marit", text: "\"I asked a porter when it gets dark here. He said about seven, all year, like a shop.\" Quick and ordinary. \"All year. I don't know what I'm going to do with that much evening.\"" },
+    { say: "marit", text: "My roommate is one Eloise Lafayette. She had paint on the wall before she had sheets on the bed, and she has not, to my knowledge, eaten. I have cast her as the Tragic Artist and I am going to find her some soup." },
+    { text: "She steps down off the trunk." },
     { when: (s)=>!!s.flags["marit_knows_stagefright"] && !s.flags["placement_done"], say: "marit", text: "\"The Domes. I asked if I could come in and stand next to you. They said no, in three languages.\" She takes your sleeve. \"So narrate it. In your head. 'And he draws.' You can't shake and tell a story at the same time; there aren't enough hands.\"" },
     { when: (s)=>!!s.flags["marit_knows_stagefright"] && !!s.flags["placement_won"], say: "marit", text: "And you **WON** in the Domes! With those hands! I want it told to me in full, at supper speed, with pauses." },
     { when: (s)=>!!s.flags["marit_knows_stagefright"] && !!s.flags["placement_lost"], say: "marit", text: "\"I heard about the Domes.\" No capitals at all. \"You sat down and played it, with people looking. That was the frightening part, and it's done. The rest is only cards.\"" },
+    { text: "She looks up at the sky over the gate, which is a hard, even blue from edge to edge." },
+    { say: "marit", text: "\"I asked a porter when it gets dark here. He said about seven, all year, like a shop.\" Quick and ordinary. \"All year. I don't know what I'm going to do with that much evening.\"" },
     { choice: [
       { text: "Fill it with a show. Seven o'clock, every night.", steps: [
         { say: "rowan", text: "Fill it with a show. Seven o'clock, every night." },
-        { say: "marit", text: "\"…Every night.\" She has gone quite still. Then the grin, slowly, like house lights. \"Rowan Vance, that is a **SEASON!** That line is going in the notebook with your name on it!\"" },
+        { say: "marit", text: "\"…Every night.\" She has gone quite still. Then the grin, slowly, like house lights. \"Rowan Vance, that is a **SEASON!** That line is going in my notebook, with your name on it!\"" },
         AFF("marit", 2, "Gave her a season")
       ] },
       { text: "Carry the other end of the trunk up the steps.", steps: [
@@ -1497,7 +1506,7 @@ scene("isle_marit", {
 scene("isle_rafa", {
   steps: [
     { when: (s)=>!!s.flags["isle_rafa_done"], jump: "later" },
-    { text: "Bungalow one is hot, loud with a radio, and smells of something that has been frying since before you were born. At the range a broad woman in a flowered apron has her back to the room. At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana with a red jacket on a hook behind him, under a borrowed apron." },
+    { text: "Bungalow one is hot, loud with a radio, and smells of something that has been frying since before you were born. At the range a broad woman in a flowered apron has her back to the room. At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana and a borrowed apron, his red jacket, blue collar, on a hook behind him." },
     { when: (s)=>!s.flags["met_rafa"], jump: "first" },
     { say: "rafa", text: "\"Rowan.\" The knife does not stop. \"Sit. I didn't ask if you were hungry, I asked you to sit.\"" },
     { when: (s)=>!!s.flags["rafa_knows_table"] && !!s.flags["placement_won"], say: "rafa", text: "And? The table. …That face is a clean plate. Good. Told you it was a cupboard." },
@@ -1557,326 +1566,3 @@ scene("isle_rafa", {
 
 
 /* arrival_stern: unchanged from 19-19-ferry-arrival.js except Freddie's jacket (gold, grey collar) */
-scene("arrival_stern", {
-  steps: [
-    { clear: true },
-    { enter: "jessica" },
-    { enter: "ashton" },
-    { enter: "sunny" },
-    { enter: "freddie" },
-    { enter: "marit" },
-    {
-      text: "The stern is where the ship has put its grand gestures. The wake is long and white, the awning snaps in the breeze, and the stern rail is crowded with people who have each decided to be in a different film."
-    },
-    { when: (s)=>!(!!s.flags["met_marit"]), jump: "next_2" },
-    {
-      say: "marit",
-      text: "**FRIENDS!** *ROMANS!* **COUNTRYMEN!** Lend me your ears — and your jackets, I'm not wearing mine, I have a *scarf* —",
-      shake: true
-    },
-    {
-      say: "marit",
-      text: "**ACT ONE, SCENE LAST!** The *voyage ends!* The *island rises!* The *hero* — that is **YOU**, Rowan Vance — **steps ashore!**",
-      shake: true
-    },
-    { say: "rowan", text: "Marit, please sit down. You're on a bollard." },
-    { say: "marit", text: "A bollard is a **PLINTH!**", shake: true },
-    { when: (s)=>!(((s.vars["aff_marit"]||0)>=13)), jump: "next_4" },
-    { text: "She drops, abruptly, out of the big voice, into the quick wry one." },
-    {
-      say: "marit",
-      text: "I'm really glad you came to find me. I wasn't going to say that, there's a whole speech. It's got a pause in it. But you're here, and — it'd be silly not to say it."
-    },
-    {
-      add: { aff_marit: 2 }
-    },
-    {
-      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "marit", n: 2, why: "Dropped the act for him" }); }
-    },
-    { label: "next_4" },
-    { label: "end_3" },
-    { jump: "end_1" },
-    { label: "next_2" },
-    {
-      text: "A girl with two tall tufts of flame-orange hair, each tied up with an orange bow, is standing on a mooring bollard with her arms flung out, reciting at the island."
-    },
-    {
-      say: "marit",
-      alias: "Girl on a bollard",
-      text: "**ACT ONE, SCENE LAST!** The voyage ends! The island RISES! And there — look! — a **STRANGER** on the stern deck, in a rain jacket, who has no idea what comes *next!*",
-      shake: true
-    },
-    {
-      say: "marit",
-      alias: "Girl on a bollard",
-      text: "Marit Solberg! Theatre kid **EXTRAORDINAIRE!** We have not met, and I already love you, I have *decided* you are the lead!",
-      shake: true
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["marit"]) s.names["marit"] = "Marit Solberg"; if (io && io.popup && !s.flags["met_marit"]) io.popup({ type: 'met', id: "marit", name: "Marit Solberg" }); }
-    },
-    { flag: "met_marit" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["marit"] = s.notes["marit"] || []); if (a.indexOf("Treats everything as a stage. Narrates, loudly.") < 0) a.push("Treats everything as a stage. Narrates, loudly."); }
-    },
-    { say: "rowan", text: "Rowan. I'm not sure I'd know what to do with a lead." },
-    { say: "marit", text: "Nobody does! That's what *rehearsals* are for!", shake: true },
-    { label: "end_1" },
-    { when: (s)=>!(!!s.flags["met_sunny"]), jump: "next_7" },
-    { say: "sunny", text: "\"Wildcard! Come and look at THIS, I'm going to have a heart attack.\"" },
-    {
-      text: "She has her feet up on the lowest rail bar and is pointing at the shallows, which are the colour of a swimming-pool advert."
-    },
-    {
-      say: "sunny",
-      text: "\"I can see the sand. From here. I can see the individual SHELLS. Do you know how long it's been since I was in water over a metre deep? Two days.\""
-    },
-    { say: "rowan", text: "Two days isn't that long." },
-    { say: "sunny", text: "It's an *eternity.*" },
-    { jump: "end_6" },
-    { label: "next_7" },
-    {
-      text: "A tall girl is sitting on the lowest bar of the rail with her bare feet dangling, a towel round her neck, grinning at the shallows as if they were an old friend."
-    },
-    {
-      say: "sunny",
-      alias: "Girl on the rail",
-      text: "Hey, Wildcard! Hey! You see this? I can see the SAND from here. I can see individual SHELLS!"
-    },
-    { say: "rowan", text: "Rowan. Hello." },
-    {
-      say: "sunny",
-      alias: "Girl on the rail",
-      text: "Sunny Aldane. Lifeguard. Sports scholarship. I've been looking forward to a swim for two *days*, which I understand is not long, but it is to *me!*"
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["sunny"]) s.names["sunny"] = "Sunny Aldane"; if (io && io.popup && !s.flags["met_sunny"]) io.popup({ type: 'met', id: "sunny", name: "Sunny Aldane" }); }
-    },
-    { flag: "met_sunny" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["sunny"] = s.notes["sunny"] || []); if (a.indexOf("Lifeguard on a sports scholarship. Says exactly what she thinks.") < 0) a.push("Lifeguard on a sports scholarship. Says exactly what she thinks."); }
-    },
-    { label: "end_6" },
-    {
-      text: "A girl with wet red hair and diving goggles pushed up on her forehead, a gold jacket with a plain grey collar worn open over a swimsuit, is climbing the stern rail."
-    },
-    { when: (s)=>!(!!s.flags["met_freddie"]), jump: "next_10" },
-    { say: "freddie", text: "\"Rowan! Jacketless! Hold this!\"" },
-    { text: "She hands you the jacket without looking round, which is, you realise, an instruction." },
-    {
-      say: "freddie",
-      text: "\"I've been timing it! Four hundred metres to the pier, a bit of a current, I can do it in eight minutes, easily. Eight and a half if the shark's about.\""
-    },
-    { say: "sunny", text: "Freddie. FREDDIE. Get down." },
-    { say: "freddie", text: "I've done the maths!" },
-    { say: "sunny", text: "It's a *regulation*." },
-    { say: "freddie", text: "It's a very *short* regulation!" },
-    { jump: "end_9" },
-    { label: "next_10" },
-    { say: "freddie", alias: "Girl with goggles on her head", text: "\"Hey! Jacketless! Hold this!\"" },
-    { text: "She hands you the jacket without looking round, which is, you realise, an instruction." },
-    {
-      say: "freddie",
-      alias: "Girl with goggles on her head",
-      text: "\"I've been timing it! Four hundred metres to the pier, a bit of a current, eight minutes, easily. Eight and a half if the shark's about. Winifred Camara. Freddie. Hello!\""
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["freddie"]) s.names["freddie"] = "Winifred Camara"; if (io && io.popup && !s.flags["met_freddie"]) io.popup({ type: 'met', id: "freddie", name: "Winifred Camara" }); }
-    },
-    { flag: "met_freddie" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["freddie"] = s.notes["freddie"] || []); if (a.indexOf("Swimmer and diver. Wants to jump off the ship.") < 0) a.push("Swimmer and diver. Wants to jump off the ship."); }
-    },
-    { say: "sunny", alias: "Girl on the rail", text: "FREDDIE. Get *down*." },
-    { say: "freddie", alias: "Girl with goggles on her head", text: "It's a very short regulation!" },
-    { label: "end_9" },
-    {
-      text: "The jacket is warm from the sun. The girl in it is already halfway over the rail with one foot on the outer bar, and the sea is a long way down."
-    },
-    {
-      prompt: "What do you do?",
-      choice: [
-        { text: "Freddie, the captain will have your head. Come back over.", goto: "opt_13" },
-        { text: "Go on, then. I'll hold the jacket.", goto: "opt_14" },
-        { text: "Say nothing and hold out your hand for the mask.", goto: "opt_15" }
-      ]
-    },
-    { jump: "choiceend_12" },
-    { label: "opt_13" },
-    { say: "rowan", text: "Freddie, the captain will have your head. Come back over." },
-    { say: "freddie", text: "Oh, *you're* no fun. Neither of you is any fun. I've got *five brothers.*" },
-    {
-      text: "She comes back over the rail like a cat from a garden wall and lands on her feet beside Sunny, who is gripping the back of her swimsuit strap with an expression of pure loving violence."
-    },
-    { say: "sunny", text: "Thank you. I'd have caught her. I just didn't want to have to." },
-    {
-      add: { aff_sunny: 2 }
-    },
-    {
-      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "sunny", n: 2, why: "Helped her stop Freddie" }); }
-    },
-    {
-      add: { aff_freddie: 1 }
-    },
-    {
-      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 1, why: "Talked her down, kindly" }); }
-    },
-    { flag: "freddie_talked_down" },
-    { jump: "choiceend_12" },
-    { label: "opt_14" },
-    { say: "rowan", text: "Go on, then. I'll hold the jacket." },
-    { say: "freddie", text: "YES! A *friend!*" },
-    {
-      text: "She is gone before the word has finished. A long, clean, glittering arc over the stern rail and a very small white splash a long way down."
-    },
-    {
-      text: "From somewhere over the bridge wing comes the captain's voice, not on the loudspeaker this time, just a man at the end of his patience: \"THAT'S THIRTY-SEVEN. THAT'S THIRTY-SEVEN, AND NOT THIRTY-EIGHT, AND I WILL HAVE A WORD.\""
-    },
-    { say: "sunny", text: "\"I'm going in after her. Hold my towel.\"" },
-    { text: "She is already on the rail." },
-    { say: "sunny", text: "\"You — you're a *terrible* influence!\"" },
-    { say: "rowan", text: "I'm very sorry." },
-    { say: "sunny", text: "\"Don't be! It's the *best* thing anyone's done all day!\"" },
-    {
-      text: "A whoop, a splash, and then two figures in the white water, one cheering, one swearing, both laughing."
-    },
-    {
-      add: { aff_freddie: 4 }
-    },
-    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 4, why: "Held the jacket" }); } },
-    {
-      add: { aff_sunny: 1 }
-    },
-    {
-      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "sunny", n: 1, why: "Was a bad influence, in the best way" }); }
-    },
-    { flag: "freddie_jumped" },
-    { exit: "freddie" },
-    { exit: "sunny" },
-    { jump: "choiceend_12" },
-    { label: "opt_15" },
-    { say: "freddie", text: "\"…Wait.\"" },
-    { text: "She looks down at your outstretched hand, and then at you." },
-    { say: "freddie", text: "\"That's not — you're taking my *mask*?\"" },
-    { say: "rowan", text: "I'm holding it. So that it doesn't fall in." },
-    { say: "freddie", text: "\"…That's actually the most responsible thing anyone's ever said to me.\"" },
-    { text: "She comes back over the rail slowly, as if stepping out of a hot bath." },
-    { say: "freddie", text: "\"I'm leaving you with a very strong opinion of me.\"" },
-    {
-      add: { aff_freddie: 2 }
-    },
-    {
-      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 2, why: "Held the mask, not the argument" }); }
-    },
-    { flag: "freddie_talked_down" },
-    { jump: "choiceend_12" },
-    { label: "choiceend_12" },
-    { when: (s)=>!(!!s.flags["met_jessica"]), jump: "next_17" },
-    { say: "jessica", text: "\"Rowan.\"" },
-    {
-      text: "She is the only person on the stern who is not in motion. She stands a little apart, with one ringed hand on the smallest of her caskets, and the gold chain at her throat catching the morning light."
-    },
-    { say: "jessica", text: "\"I wished to say, before we land, that it was a pleasure to have been crossed to.\"" },
-    { say: "rowan", text: "The pleasure was mine, Jessica." },
-    { say: "jessica", text: "\"I shall hold you to that.\" A small, genuine smile. \"In writing, if necessary.\"" },
-    {
-      add: { aff_jessica: 1 }
-    },
-    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "jessica", n: 1, why: "Answered in kind" }); } },
-    { jump: "end_16" },
-    { label: "next_17" },
-    {
-      text: "A girl with a gold chain at her throat is standing a little apart from the commotion with one ringed hand on a small leather casket. A small swallow charm hangs from the chain and a look of patient serenity, like a lamp that has not yet been told it is the only light in the room."
-    },
-    {
-      say: "jessica",
-      alias: "Girl with the caskets",
-      text: "\"You are watching the water. So am I. It is a pleasant thing to share.\""
-    },
-    { text: "She does not turn her head." },
-    {
-      say: "jessica",
-      alias: "Girl with the caskets",
-      text: "\"Jessica Montclair. I should offer my hand, but it is busy, and the casket does not like to be left.\""
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["jessica"]) s.names["jessica"] = "Jessica Montclair"; if (io && io.popup && !s.flags["met_jessica"]) io.popup({ type: 'met', id: "jessica", name: "Jessica Montclair" }); }
-    },
-    { flag: "met_jessica" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["jessica"] = s.notes["jessica"] || []); if (a.indexOf("Formal, gracious. Travels with three caskets of jewellery.") < 0) a.push("Formal, gracious. Travels with three caskets of jewellery."); }
-    },
-    { label: "end_16" },
-    { when: (s)=>!(!!s.flags["met_ashton"]), jump: "next_20" },
-    { say: "ashton", text: "\"Vance! Rescue me.\"" },
-    {
-      text: "He is, as before, at the rail with a rose in one hand, and a look of tender intent aimed squarely at Jessica's profile."
-    },
-    {
-      say: "ashton",
-      text: "\"I have prepared a speech. It has four paragraphs and a joke about gulls. She has looked at the sea for fourteen minutes. I think I'm making progress.\""
-    },
-    { say: "rowan", text: "You're not." },
-    { say: "ashton", text: "I am, old thing! I'm ten per cent less ignored than I was at breakfast." },
-    { jump: "end_19" },
-    { label: "next_20" },
-    {
-      text: "A tall boy with violet hair swept into a smooth dome is standing at the rail with a single red rose, and the thorn of it pinched between finger and thumb of his other hand. His whole attention is directed at the girl with the gold chain."
-    },
-    {
-      say: "ashton",
-      alias: "Boy with a rose",
-      text: "\"Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does.\" He does not look round. \"I'm told you are the entrant in ink. I have prepared a speech for the lady. It has four paragraphs and a joke about gulls.\""
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["ashton"]) s.names["ashton"] = "Ashton Beaumont-Lyle"; if (io && io.popup && !s.flags["met_ashton"]) io.popup({ type: 'met', id: "ashton", name: "Ashton Beaumont-Lyle" }); }
-    },
-    { flag: "met_ashton" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["ashton"] = s.notes["ashton"] || []); if (a.indexOf("Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes.") < 0) a.push("Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes."); }
-    },
-    { label: "end_19" },
-    { when: (s)=>!(!!s.flags["met_victoria"]), jump: "next_23" },
-    { say: "victoria", text: "\"Rowan.\"" },
-    {
-      text: "She is sitting on the dry bench under the striped awning with her parasol open, in the full sun, which does not seem to trouble her."
-    },
-    {
-      say: "victoria",
-      text: "\"I have finished looking at the wake. It has become the sea. I should like to look at the island now.\""
-    },
-    { say: "rowan", text: "Would you like me to stand somewhere?" },
-    {
-      say: "victoria",
-      text: "\"No. Sit, if you wish.\" A pause. \"It is a very large island. I should like company in looking at it.\""
-    },
-    {
-      text: "You sit. Neither of you says anything for most of a minute, and it is, to your surprise, the best conversation you have had all morning."
-    },
-    {
-      add: { aff_victoria: 2 }
-    },
-    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "victoria", n: 2, why: "Sat with her" }); } },
-    { jump: "end_22" },
-    { label: "next_23" },
-    {
-      text: "On the dry bench under the awning a girl in a ruffled dress is sitting with a lace parasol open over her head, although she is already in the shade. Her wide sky-blue eyes are on the island, and her lips are moving very slightly, as if she were counting."
-    },
-    {
-      say: "victoria",
-      alias: "Girl with a parasol",
-      text: "\"Forty-one.\" She turns her head, slowly. \"I was counting the palm trees on the nearest slope. There are forty-one. I wished to know. Victoria Capulet.\""
-    },
-    {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["victoria"]) s.names["victoria"] = "Victoria Capulet"; if (io && io.popup && !s.flags["met_victoria"]) io.popup({ type: 'met', id: "victoria", name: "Victoria Capulet" }); }
-    },
-    { flag: "met_victoria" },
-    {
-      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["victoria"] = s.notes["victoria"] || []); if (a.indexOf("Speaks slowly and exactly. Sits under a parasol even in the shade.") < 0) a.push("Speaks slowly and exactly. Sits under a parasol even in the shade."); }
-    },
-    { say: "rowan", text: "Rowan. That's a good number." },
-    { say: "victoria", text: "Thank you. I think so as well." },
-    { label: "end_22" },
-    { time: 3 }
-  ]
-});

@@ -12,8 +12,8 @@ scene("ferry_jessica", {
     { text: "She has a very particular way of sitting: perfectly upright, perfectly still, her ankles crossed, as though a portrait were being painted and the artist had warned her not to blink." },
     { text: "She is not looking at you. She has, however, noticed you crossing the deck. Her face has the mild patience of someone who has been approached this morning by a great many people with a great many lines." },
     { choice: [
-      { text: "Hello. I'm Rowan. I wanted to say it properly, because nobody else seems to have crossed the deck.", hint: "Plain", steps: [
-        { say: "rowan", text: "Hello. I'm Rowan. I wanted to say it properly, because nobody else seems to have crossed the deck." },
+      { text: "Hello. I'm Rowan. I only came over to say that.", hint: "Plain", steps: [
+        { say: "rowan", text: "Hello. I'm Rowan. I only came over to say that." },
         { say: "jessica", alias: "Girl with the caskets", text: "Hello." },
         { text: "She looks up. A small, real smile, like a candle catching." },
         { say: "jessica", alias: "Girl with the caskets", text: "That is the first time this morning anyone has crossed the deck to say that and nothing else." },
@@ -203,7 +203,7 @@ scene("chat_jessica", {
         { choice: [
           { text: "Do you choose a different piece every day?", steps: [
             { say: "rowan", text: "Do you choose a different piece every day?" },
-            { say: "jessica", text: "Every day, yes." }
+            { say: "jessica", text: "You have guessed the rule from a single example. Yes." }
           ] },
           { text: "Come back where, though? Home, or here?", steps: [
             { say: "rowan", text: "Come back where, though? Home, or here?" },
@@ -263,11 +263,11 @@ scene("chat_jessica", {
           { text: "You'd rather talk about the games than win them?", steps: [
             { say: "rowan", text: "You'd rather talk about the games than win them?" },
             { say: "jessica", text: "Oh, I can count cards perfectly well. I simply find it more instructive to watch who explains the rules to me." },
-            { say: "jessica", text: "\"Three gentlemen have done so since the harbour.\" A beat. \"One of them incorrectly.\"" }
+            { say: "jessica", text: "\"Three gentlemen have done so since we sailed.\" A beat. \"One of them incorrectly.\"" }
           ] },
           { text: "And is it going well? The thing that wasn't on the list?", steps: [
             { say: "rowan", text: "And is it going well? The thing that wasn't on the list?" },
-            { say: "jessica", text: "\"I have not yet decided what it is.\" A pause. \"Ask me again in June.\"" }
+            { say: "jessica", text: "\"I have not yet decided what it is.\" A pause. \"You may ask again when I have.\"" }
           ] },
           { text: "Then you've got competition. There's a boy back there with a microphone doing it already.", hint: "From the stern", when: (s)=>!!s.flags["met_cas"] || !!s.flags["cas_heard"], steps: [
             { say: "rowan", text: "Then you've got competition. There's a boy back there with a microphone doing it already." },
@@ -517,6 +517,7 @@ scene("ferry_ashton", {
       { text: "Have you heard how it ended at the lounge table?", when: (s)=>!!s.flags["table_resolved"] && !s.flags["ashton_heard_news"], steps: [
         { say: "rowan", text: "Have you heard how it ended at the lounge table?" },
         { say: "ashton", text: "I have heard four versions and believe none of them. Go on." },
+        { text: "You give him the fifth, as plainly as you can." },
         { when: (s)=>!!s.flags["ferry_table_won"], say: "ashton", text: "\"Beaten! By YOU! Do you know what that is worth?\" He is delighted. \"I trust he carried it well. Said nothing, looked ill? Bravo.\"" },
         { when: (s)=>!s.flags["ferry_table_won"] && !!s.flags["ferry_inya_won"], say: "ashton", text: "Beaten by a child with bunnies! I wish I could have seen his face." },
         { when: (s)=>!s.flags["ferry_table_won"] && !s.flags["ferry_inya_won"] && !!s.flags["ferry_table_lost"], say: "ashton", text: "Oh, my dear boy. Four cases. Up that hill. I'd say bring a hat." },
@@ -633,7 +634,7 @@ scene("chat_ashton", {
         { text: "He does not seem to mind, for once." },
         { when: (s)=>!s.flags["ashton_says_ended"] && !s.flags["jessica_ex_known"], say: "ashton", text: "I ought to say that we are not strangers. Jessica Montclair. One London season, last spring. I ended it. There was a letter; these things want a letter." },
         { when: (s)=>!!s.flags["ashton_says_ended"], say: "ashton", text: "You know the history. One season, one letter, and I ended it." },
-        { when: (s)=>!s.flags["ashton_says_ended"] && !!s.flags["jessica_ex_known"], say: "ashton", text: "You know the history, I gather. I watched you sit with her, and she does like to be the source. One London season, one letter. And *I* ended it, whatever you may have been told." },
+        { when: (s)=>!s.flags["ashton_says_ended"] && !!s.flags["jessica_ex_known"], say: "ashton", text: "You know the history, I gather. I watched you cross to her, and she does like to be the source. One London season, one letter. And *I* ended it, whatever you may have been told." },
         { flag: "ashton_says_ended" },
         REL("ashton", "jessica"),
         { say: "ashton", text: "Everybody else says yes by the second sentence, you see. She said yes once, and then she *thought* about it. Nobody had ever thought about it before." },
@@ -694,7 +695,7 @@ scene("chat_ashton", {
       ] },
       { text: "I'll leave you to your campaign.", steps: [
         { say: "rowan", text: "I'll leave you to your campaign." },
-        { say: "ashton", text: "Do. Do. And wish me luck. Or don't. I shall pretend you did." },
+        { say: "ashton", text: "Back to the front, then. Wish me luck, Vance. I shall assume that you did." },
         { end: true }
       ] }
     ] },
@@ -1145,7 +1146,10 @@ scene("ferry_cas", {
     { text: "At the flagstaff, with his back to the wake and the whole after deck laid out in front of him like a pitch, a boy in a long striped scarf is talking to his own lapel." },
     { text: "Wavy dark hair, a black jacket with a blue collar, an easy mouth. Clipped to the lapel is a small microphone. Its lead runs down inside the scarf, comes out again at the bottom, and stops." },
     { say: "cas", alias: "Boy with a microphone", text: "…conditions remain good here on the stern deck, a following wind, the island somewhere off the bow, and at the rail the gentleman is selecting another rose. We have seen this approach before." },
-    { text: "He passes you the scene with an open hand, as though handing over to a colleague. You look. A violet-haired boy is squaring his shoulders at the rail, rose first. Thirty feet from him a girl sits beside a trolley of leather caskets and regards the sea." },
+    { when: (s)=>!s.flags["met_ashton"], text: "He passes you the scene with an open hand, as though handing over to a colleague. You look. A violet-haired boy is squaring his shoulders at the rail, rose first." },
+    { when: (s)=>!!s.flags["met_ashton"], text: "He passes you the scene with an open hand, as though handing over to a colleague. You look. Ashton is squaring his shoulders at the rail, rose first." },
+    { when: (s)=>!s.flags["met_jessica"], text: "Thirty feet from him a girl sits beside a trolley of leather caskets and regards the sea." },
+    { when: (s)=>!!s.flags["met_jessica"], text: "Thirty feet from him Jessica sits beside her trolley of caskets and regards the sea." },
     { flag: "cas_heard" },
     { say: "cas", alias: "Boy with a microphone", text: "And a newcomer on the deck. No jacket, no collar, walking straight up to the commentary position, which is not something we see every day. Let's see what he does." },
     { choice: [
@@ -1232,7 +1236,7 @@ scene("ferry_cas", {
         { say: "rowan", text: "What's the state of play?" },
         { when: (s)=>!!s.flags["ashton_advised"], say: "cas", text: "Curious passage at the rail. The gentleman has stopped delivering lines and appears to be composing something. He has got as far as her name twice and put the rose down once. We've not seen that before." },
         { when: (s)=>!s.flags["ashton_advised"], say: "cas", text: "No change at the rail. The rose is up, the lady has turned one page, and the gulls remain unimpressed. It's a patient game, this." },
-        { say: "cas", text: "And under the awning, the lady with the parasol has held the same position since the harbour. No commentary needed. Best seat on the deck, and she knows it." },
+        { say: "cas", text: "And under the awning, the lady with the parasol has held the same position since we cast off. No commentary needed. Best seat on the deck, and she knows it." },
         { time: 2 }
       ] },
       { text: "Leave him to the broadcast.", steps: [
@@ -1336,7 +1340,7 @@ scene("isle_jessica", {
   steps: [
     { when: (s)=>!!s.flags["isle_jessica_done"], jump: "again" },
     { text: "The lawn by the Trial Domes is full of white-and-gold collars standing about in the heat, pretending not to listen to the loudspeaker on the nearest dome. One person on it is sitting down. She has found the only folding chair on the island, and the smallest of three leather caskets is on her knee." },
-    { when: (s)=>!!s.flags["met_jessica"], say: "jessica", text: "Rowan. You have crossed a lawn. I did say that it was not a large island." },
+    { when: (s)=>!!s.flags["met_jessica"], say: "jessica", text: "Rowan. You have crossed a lawn. I had begun to wonder whether it was only decks." },
     { when: (s)=>!s.flags["met_jessica"], text: "Long golden curls under a small gold coronet, a swallow charm on a fine chain, rings on three fingers. She watches you cross the grass with the mild patience of somebody who has been approached a great deal." },
     { when: (s)=>!s.flags["met_jessica"], say: "jessica", alias: "Girl with the caskets", text: "Mr Vance. You were read out on the Quad, and one does listen. Jessica Montclair. Spectral Tower, Auxiliary track. I am watching the placements and disapproving of the loudspeaker." },
     MET("jessica", "Jessica Montclair"),
@@ -1363,7 +1367,8 @@ scene("isle_jessica", {
         { flag: "jessica_game_promised" }
       ] }
     ] },
-    { say: "jessica", text: "They have given me the second floor and the volcano, as threatened. It is very large. So is the room. I have not yet decided about either." },
+    { when: (s)=>!!s.flags["jessica_plain"] || !!s.flags["jessica_cheesy"] || !!s.flags["jessica_ex_known"], say: "jessica", text: "They have given me the second floor and the volcano, as threatened. It is very large. So is the room. I have not yet decided about either." },
+    { when: (s)=>!(!!s.flags["jessica_plain"] || !!s.flags["jessica_cheesy"] || !!s.flags["jessica_ex_known"]), say: "jessica", text: "They have given me the second floor of the Tower, with a view of the volcano. It is very large. So is the room. I have not yet decided about either." },
     { when: (s)=>!!s.flags["met_ashton"], text: "Twenty yards off, Ashton is pacing a short, elegant line on the grass with a rose in his lapel, waiting for his name. He is very carefully not looking this way." },
     { when: (s)=>!s.flags["met_ashton"], text: "Twenty yards off, a tall boy with violet hair and a rose in his lapel is pacing a short, elegant line on the grass, waiting for his name. He is very carefully not looking this way." },
     { when: (s)=>!!s.flags["jessica_ex_known"], say: "jessica", text: "He is nervous. He straightens his cuffs when he is nervous. Do not tell him that I know." },
@@ -1383,12 +1388,14 @@ scene("isle_jessica", {
 scene("isle_ashton", {
   steps: [
     { when: (s)=>!!s.flags["isle_ashton_done"], jump: "again" },
-    { text: "On the lawn by the Trial Domes the Spectral first-years are waiting to be called. A tall boy with violet hair swept into a smooth dome is walking a short line up and down the grass as if it were a drawing room, a rose in his lapel, squaring a deck in his hands, and squaring it again." },
-    { when: (s)=>!!s.flags["met_ashton"], say: "ashton", text: "Vance! Rescue me. A different rescue this time. They are calling the Tower in alphabetical order, and Beaumont comes distressingly early." },
+    { when: (s)=>!s.flags["met_ashton"], text: "On the lawn by the Trial Domes the Spectral first-years are waiting to be called. A tall boy with violet hair swept into a smooth dome is walking a short line up and down the grass as if it were a drawing room, a rose in his lapel, squaring a deck in his hands, and squaring it again." },
+    { when: (s)=>!!s.flags["met_ashton"], text: "On the lawn by the Trial Domes the Spectral first-years are waiting to be called. Ashton is walking a short line up and down the grass as if it were a drawing room, a rose in his lapel, squaring a deck in his hands, and squaring it again." },
+    { when: (s)=>!!s.flags["met_ashton"], say: "ashton", text: "Vance! Rescue me. They are calling the Tower in alphabetical order, and Beaumont comes distressingly early." },
     { when: (s)=>!s.flags["met_ashton"], say: "ashton", alias: "Boy with a rose", text: "Vance! The Wildcard. I was at the roll call, and I listen for the interesting names. Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does." },
     { when: (s)=>!s.flags["met_ashton"], say: "ashton", alias: "Boy with a rose", text: "I am waiting for my placement duel. They are calling the Tower in alphabetical order, and Beaumont comes distressingly early." },
     MET("ashton", "Ashton Beaumont-Lyle"),
-    { text: "His eyes go, for less than a second, to a folding chair twenty yards away, where a girl with golden curls sits with a leather casket on her knee and watches the domes." },
+    { when: (s)=>!s.flags["met_jessica"], text: "His eyes go, for less than a second, to a folding chair twenty yards away, where a girl with golden curls sits with a leather casket on her knee and watches the domes." },
+    { when: (s)=>!!s.flags["met_jessica"], text: "His eyes go, for less than a second, to a folding chair twenty yards away, where Jessica sits with a leather casket on her knee and watches the domes." },
     { say: "ashton", text: "I am about to be observed by two examiners, a loudspeaker, and an expert witness. I have played hundreds of people and never minded being looked at by one of them." },
     { choice: [
       { text: "You're nervous.", steps: [
@@ -1427,6 +1434,7 @@ scene("isle_ashton", {
 scene("isle_victoria", {
   steps: [
     { when: (s)=>!!s.flags["isle_victoria_done"], jump: "again" },
+    { when: (s)=>!!s.flags["met_victoria"], flag: "isle_victoria_knew" },
     { text: "At the edge of the Quad, where a tree puts a patch of shade over one bench, a girl in a ruffled dress is sitting very straight under a lace parasol. Pale-gold ringlets, ribbons, wide sky-blue eyes resting on the fountain. A small card lies in her lap, squared to her knee." },
     { when: (s)=>!!s.flags["met_victoria"], say: "victoria", text: "Rowan. I have a card now." },
     { when: (s)=>!s.flags["met_victoria"], say: "victoria", alias: "Girl with a parasol", text: "You are Rowan Vance. Your name was read out on the Quad. I am Victoria Capulet. Mine was read out as well, so we are even." },
@@ -1450,10 +1458,12 @@ scene("isle_victoria", {
         AFF("victoria", 1, "Asked the right worry"),
         NOTE("victoria", "Her room-mate writes her day on a card. The best line on it is the one that promises tomorrow's.")
       ] },
-      { text: "Is it as good as the bench on the ferry?", hint: "From the ferry", when: (s)=>!!s.flags["met_victoria"], steps: [
+      { text: "Is it as good as the bench on the ferry?", hint: "From the ferry", when: (s)=>!!s.flags["isle_victoria_knew"], steps: [
         { say: "rowan", text: "Is it as good as the bench on the ferry?" },
-        { say: "victoria", text: "It does not move, and there is no wake. But the fountain decides things as well, if one watches the very top of it." },
-        { say: "victoria", text: "\"I am content.\" She considers the word, and keeps it. \"The left side is free here too.\"" },
+        { when: (s)=>!!s.flags["chat_victoria_1"], say: "victoria", text: "It does not move, and there is no wake. But the fountain decides things as well, if one watches the very top of it." },
+        { when: (s)=>!s.flags["chat_victoria_1"], say: "victoria", text: "It does not move, and there is no wake. But the fountain goes up, and at the very top it changes its mind. I watch that part." },
+        { when: (s)=>!!s.flags["victoria_plain"] || !!s.flags["victoria_sat"], say: "victoria", text: "\"I am content.\" She considers the word, and keeps it. \"The left side is free here too.\"" },
+        { when: (s)=>!(!!s.flags["victoria_plain"] || !!s.flags["victoria_sat"]), say: "victoria", text: "\"I am content.\" She considers the word, and keeps it. \"There is room on it, if you wish.\"" },
         AFF("victoria", 1, "Remembered her bench")
       ] }
     ] },

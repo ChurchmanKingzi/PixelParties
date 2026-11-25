@@ -137,8 +137,8 @@ scene("ferry_magnus", {
         { say: "magnus", text: "\"That is fair.\" He sounds as though fairness has caught him off guard. \"Ask.\"" },
         { scene: "chat_magnus" }
       ] },
-      { text: "While you're watching replays: can I ask you something?", when: (s)=>!s.flags["chat_magnus_done"] && !!s.flags["flag_magnus_played"], steps: [
-        { say: "rowan", text: "While you're watching replays: can I ask you something?" },
+      { text: "Since you're going over it anyway: can I ask you something?", when: (s)=>!s.flags["chat_magnus_done"] && !!s.flags["flag_magnus_played"], steps: [
+        { say: "rowan", text: "Since you're going over it anyway: can I ask you something?" },
         { say: "magnus", text: "Ask. I can do two things at once. I have had practice." },
         { scene: "chat_magnus" }
       ] },
@@ -211,7 +211,7 @@ scene("chat_magnus", {
           { text: "Forget the numbers a second. Which card do you actually like?", steps: [
             { say: "rowan", text: "Forget the numbers a second. Which card do you actually like?" },
             { say: "magnus", text: "Like." },
-            { text: "For the first time since you sat down, his face is completely blank. It is not rudeness. He is searching, and the search is returning nothing." },
+            { text: "His face goes completely blank. It is not rudeness. He is searching, and the search is returning nothing." },
             { say: "magnus", text: "That isn't a field. I have never — nobody has asked for that." },
             { say: "magnus", text: "Ask me again at the end of term. I will have an answer. I will have a *ranked* answer." },
             AFF("magnus", 2, "Asked something new"),
@@ -229,7 +229,7 @@ scene("chat_magnus", {
           { text: "You called one deck for two years a superstition.", when: (s)=>!!s.flags["magnus_said_superstition"], steps: [
             { say: "rowan", text: "You called one deck for two years a superstition." },
             { say: "magnus", text: "This is not a superstition. It is a control variable." },
-            { text: "You say nothing. The engine hums. He lasts about four seconds." },
+            { text: "You say nothing. He lasts about four seconds." },
             { say: "magnus", text: "…It is a *small* superstition. It is in the file under 'other'." },
             AFF("magnus", 2, "Caught him out")
           ] },
@@ -238,7 +238,8 @@ scene("chat_magnus", {
             { say: "magnus", text: "They go back in the box. The box goes on the stack. I have brought eleven boxes." },
             { say: "rowan", text: "That's eleven losses you've packed for." },
             { say: "magnus", text: "\"That is eleven *events*.\" A pause. \"It is a pessimistic packing list. Yes.\"" },
-            AFF("magnus", 1, "Did his sums for him")
+            AFF("magnus", 1, "Did his sums for him"),
+            NOTE("magnus", "Packed eleven boxes of sneakers for the term.")
           ] },
           { text: "They're good shoes.", steps: [
             { say: "rowan", text: "They're good shoes." },
@@ -248,7 +249,7 @@ scene("chat_magnus", {
         ] },
         { say: "magnus", text: "The first pair was the first thing I bought with ladder winnings. Season one. Sixty-fourth place, one pair. I chose them myself. That mattered, at the time." },
         { flag: "chat_magnus_3" },
-        NOTE("magnus", "Wears a new pair of sneakers to every event: \"a pair with no losses in it.\" Brought eleven boxes."),
+        NOTE("magnus", "Wears a new pair of sneakers to every event: \"a pair with no losses in it.\""),
         { time: 3 }
       ] },
       { text: "Why me? There are four names above mine on that ladder.", when: (s)=>!s.flags["chat_magnus_x"], steps: [
@@ -350,8 +351,8 @@ scene("post_magnus", {
     { say: "rowan", text: "You hit me three times a turn. I had one turn to answer." },
     { say: "magnus", text: "\"And yet you did not hurry.\" He looks up. \"I would very much like to understand how you do that.\"" },
     { choice: [
-      { text: "Honestly? I don't know.", steps: [
-        { say: "rowan", text: "Honestly? I don't know." },
+      { text: "I don't know. If I did, I'd do it on purpose.", steps: [
+        { say: "rowan", text: "I don't know. If I did, I'd do it on purpose." },
         { say: "magnus", text: "Then I shall find out before you do, and tell you. You may consider that a threat." }
       ] },
       { text: "I did hurry. Online nobody's watching my hands. Here you were.", steps: [
@@ -485,7 +486,7 @@ scene("ferry_noor", {
         { say: "noor", text: "Gladly. No stake. I will announce every step; it is a habit." },
         { duel: "ferry_noor", opponent: "noor", opponentName: "Noor Al-Sayed", mustWin: false,
           onWin: [
-            { say: "noor", text: "To be precise, you did not win on time. You won on the board. That is better." },
+            { say: "noor", text: "For the record, you did not win on time. You won on the board. That is better." },
             AFF("noor", 3, "Fair loss")
           ],
           onLose: [
@@ -613,7 +614,7 @@ scene("chat_noor", {
         { say: "noor", text: "It is restful. It is also, I notice, half a metre." },
         { choice: [
           { text: "Sit down in the half-metre.", steps: [
-            { text: "You sit. The bench is warm from the window. She moves the Charter two centimetres to give you room that she did not need to give." },
+            { text: "You sit. The bench is warm from the window. She shifts the Charter on her knee to give you room that she did not need to give." },
             { say: "noor", text: "The notice has nothing against that." },
             { say: "noor", text: "My roommate, according to my letter, is a Sunniva Aldane. I am told she is the one who has been standing on the rail upstairs. I expect I shall be quoting notices at home as well." },
             AFF("noor", 3, "Sat in the half-metre")
@@ -644,7 +645,8 @@ scene("chat_noor", {
     { jump: "top" },
     { label: "done" },
     { flag: "chat_noor_done" },
-    { say: "noor", text: "That is a more thorough conversation than I expected to have before docking. Thank you. I shall mark it down as a pleasant irregularity." },
+    { when: (s)=>s.day===1 && s.minutes<645, say: "noor", text: "That is a more thorough conversation than I expected to have before docking. Thank you. I shall mark it down as a pleasant irregularity." },
+    { when: (s)=>!(s.day===1 && s.minutes<645), say: "noor", text: "That is a more thorough conversation than I expected to have on my first day. Thank you. I shall mark it down as a pleasant irregularity." },
     { end: true }
   ]
 });
@@ -653,13 +655,13 @@ scene("deck_noor", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_noor"], end: true },
     { say: "rowan", text: "Would you tell me what you play, Noor?" },
-    { text: "She closes the book on her pencil. It is, you are beginning to learn, what she does before anything she means." },
+    { text: "She closes the book on her pencil. It is, you suspect, what she does before anything she means." },
     { say: "noor", text: "\"Countdown. The Doom Clock. Twenty counters end the game for whoever places the last one.\" A pause. \"It is entirely transparent. It seems only fair to give notice.\"" },
     { text: "Your mouth has started moving half a second before your voice does." },
     { say: "rowan", text: "\"…Doom Prophecy fetches the Clock with three counters on it. Only she takes them off. Eagle Warrior, Jaguar Warrior — enter by removing one. Basketskull, a fistful off, turned into damage. Warrior of Teocuilatl spends them as shields. Archers shoot when one lands.\" A breath. \"Twentieth one falls on whoever she's picked. Right. Right.\"" },
     { say: "noor", text: "…You have said that in the correct order." },
     { say: "rowan", text: "Transparent, and nearly impossible to interrupt. It's the most honest threat in the format." },
-    { say: "noor", text: "\"Thank you.\" A very faint, very dry smile. \"I have been trying to say that for two years.\"" },
+    { say: "noor", text: "\"Thank you.\" The corner of her mouth moves, once. \"I have been trying to say that for two years.\"" },
     { choice: [
       { text: "Why tell them at all? You'd win more if you didn't.", steps: [
         { say: "rowan", text: "Why tell them at all? You'd win more if you didn't." },
@@ -761,7 +763,7 @@ scene("ferry_livvie", {
         { say: "livvie", text: "\"This one?\" She tilts the clipboard a careful inch towards you. \"Rolls.\"" }
       ] }
     ] },
-    { say: "livvie", text: "Thirty-one since the harbour. Three coins each, that's ninety-three, and that tray never cost her more than twelve." },
+    { say: "livvie", text: "Thirty-four since the harbour. Three coins each, that's a hundred and two, and that tray never cost her more than twelve." },
     { say: "livvie", text: "It's the best business on this boat. I'm not buying one. I'm *studying* one." },
     { text: "Her stomach growls. It is a small, distinct, entirely audible sound. She does not hear it. She very clearly does not hear it." },
     { say: "livvie", text: "I've eaten. I had a big breakfast." },
@@ -806,9 +808,13 @@ scene("ferry_livvie", {
       ] },
       { text: "So that's the rolls. What else on this boat have you priced?", hint: "Leave breakfast alone", steps: [
         { say: "rowan", text: "So that's the rolls. What else on this boat have you priced?" },
-        { say: "livvie", text: "\"Him with the bandana.\" The pencil points without her looking. \"Even money, on a yes-or-no where he gets to say what counts as yes.\"" },
-        { say: "livvie", text: "I'd not put a coin on his line. I'd put a coin on *him*." },
-        { say: "rowan", text: "And me? I'm the yes-or-no." },
+        { when: (s)=>!s.flags["table_resolved"], say: "livvie", text: "\"Him with the bandana.\" The pencil points without her looking. \"Even money, on a yes-or-no where he gets to say what counts as yes.\"" },
+        { when: (s)=>!s.flags["table_resolved"], say: "livvie", text: "I'd not put a coin on his line. I'd put a coin on *him*." },
+        { when: (s)=>!!s.flags["table_resolved"], say: "livvie", text: "\"Him with the bandana.\" The pencil points without her looking. \"Even money all morning, on a yes-or-no where he got to say what counted as yes.\"" },
+        { when: (s)=>!!s.flags["table_resolved"], say: "livvie", text: "I'd not have put a coin on his line. I'd put a coin on *him*." },
+        { when: (s)=>!s.flags["table_resolved"], say: "rowan", text: "And me? I'm the yes-or-no." },
+        { when: (s)=>!!s.flags["table_resolved"] && !!s.flags["rowan_singled_out"], say: "rowan", text: "And me? I was the yes-or-no." },
+        { when: (s)=>!!s.flags["table_resolved"] && !s.flags["rowan_singled_out"], say: "rowan", text: "And me?" },
         { say: "livvie", text: "You I've not priced. You keep changing. That's not a complaint. It's just awkward for the column." },
         AFF("livvie", 2, "Didn't push")
       ] },
@@ -884,7 +890,7 @@ scene("chat_livvie", {
             { say: "rowan", text: "Who'd play a card just so that it can die?" },
             { say: "livvie", text: "Anybody who's ever been one coin short." },
             { say: "rowan", text: "I've got mainland notes in my sock that are worth nothing past the arch. I'd play it." },
-            { say: "livvie", text: "\"…In your sock.\" She looks at you properly for the first time. Her eyes are grey, with shadows under them, and extremely clear. \"Right. You're who it's for, then.\"" },
+            { say: "livvie", text: "\"…In your sock.\" The pencil stops, and she looks up. Her eyes are grey, with shadows under them, and extremely clear. \"Right. You're who it's for, then.\"" },
             AFF("livvie", 3, "Knows about short")
           ] },
           { text: "Why's it in the margin, and not in the middle of the page?", steps: [
@@ -902,7 +908,8 @@ scene("chat_livvie", {
       { text: "You said you trade. Since when?", when: (s)=>!s.flags["chat_livvie_1"], steps: [
         { say: "rowan", text: "You said you trade. Since when?" },
         { say: "livvie", text: "Since I could count. There was a card shop in our town that paid you in a shelf of cards for working the till. So I worked the till." },
-        { say: "livvie", text: "\"I know what every card on this boat's worth.\" Eyes down. \"I've not seen most of them. I know what they're *worth*.\"" },
+        { when: (s)=>s.day===1 && s.minutes<645, say: "livvie", text: "\"I know what every card on this boat's worth.\" The pencil does not stop. \"I've not seen most of them. I know what they're *worth*.\"" },
+        { when: (s)=>!(s.day===1 && s.minutes<645), say: "livvie", text: "\"I know what every card on this row's worth.\" The pencil does not stop. \"I've not seen most of them. I know what they're *worth*.\"" },
         { choice: [
           { text: "That's impressive.", steps: [
             { say: "rowan", text: "That's impressive." },
@@ -911,7 +918,8 @@ scene("chat_livvie", {
           ] },
           { text: "What's my deck worth, then?", steps: [
             { say: "rowan", text: "What's my deck worth, then?" },
-            { say: "livvie", text: "Unsleeved, in a pocket you keep squeezing? Less every minute." },
+            { when: (s)=>s.day===1 && s.minutes<645, say: "livvie", text: "Unsleeved, in a pocket you keep squeezing? Less every minute." },
+            { when: (s)=>!(s.day===1 && s.minutes<645), say: "livvie", text: "Unsleeved, in a coat pocket, in this heat? Less every minute." },
             { say: "livvie", text: "I'd sleeve it for you. Two coins. That's cost and a bit, and I'll show you the bit." },
             AFF("livvie", 2, "Asked her price")
           ] },
@@ -926,18 +934,18 @@ scene("chat_livvie", {
         NOTE("livvie", "Has traded since she could count. Worked the till at a card shop that paid in cards."),
         { time: 3 }
       ] },
-      { text: "I've a hundred and forty Smug Coins and no idea what a week costs. You look like someone who's worked it out.", when: (s)=>!s.flags["chat_livvie_3"], steps: [
-        { say: "rowan", text: "I've a hundred and forty Smug Coins and no idea what a week costs. You look like someone who's worked it out." },
+      { text: "They gave me a hundred and forty Smug Coins and no idea what a week costs. You look like someone who's worked it out.", when: (s)=>!s.flags["chat_livvie_3"], steps: [
+        { say: "rowan", text: "They gave me a hundred and forty Smug Coins and no idea what a week costs. You look like someone who's worked it out." },
         { say: "livvie", text: "\"Ninety, if you eat the Commons breakfast. A hundred and ten if you don't. Plus sleeves.\" Fast, exact, almost relaxed. \"It's in the Handbook, page six. Nobody reads page six.\"" },
         { when: (s)=>(s.day===1 && s.minutes<645), say: "livvie", text: "I'm in the Commons myself. Bungalow three, with an Inya Bell and a Rana Marika, whoever they turn out to be." },
         { when: (s)=>!(s.day===1 && s.minutes<645), say: "livvie", text: "That's from before I knew the Commons meals were in the price, mind. Take twenty off. I'm still cross about the twenty, in a good way." },
-        { when: (s)=>!!s.flags["met_inya"] && (s.day===1 && s.minutes<645), say: "rowan", text: "Inya Bell's the one at the card table. Bunny clip." },
+        { when: (s)=>!!s.flags["met_inya"] && (s.day===1 && s.minutes<645), say: "rowan", text: "Inya Bell's the one from the card table. Bunny clip." },
         { when: (s)=>!!s.flags["met_inya"] && (s.day===1 && s.minutes<645), say: "livvie", text: "\"…The one who's been at the lad in gloves all morning.\" A pause, while a sum is done. \"Right. Earplugs. I'll price earplugs.\"" },
         { when: (s)=>!!s.flags["met_inya"] && (s.day===1 && s.minutes<645), flag: "rel_livvie_inya" },
         { choice: [
           { text: "Why do you know it to the coin?", steps: [
             { say: "rowan", text: "Why do you know it to the coin?" },
-            { say: "livvie", text: "Because I've one year paid for, and the second's on me. Scholarship. I'd sooner know on the boat than find out in March." },
+            { say: "livvie", text: "Because I've one year paid for, and the second's on me. Scholarship. I'd sooner know now than find out in March." },
             { say: "livvie", text: "Don't do a face. It's a sum, not a sad story." },
             AFF("livvie", 2, "Asked, no pity"),
             NOTE("livvie", "Here on a one-year scholarship. Next year's fees are hers to find.")
@@ -950,14 +958,15 @@ scene("chat_livvie", {
             { say: "livvie", text: "\"Transactions I can do.\" A very small, very real smile." },
             AFF("livvie", 3, "Paid for the advice")
           ] },
-          { text: "Then I've thirty spare a week.", steps: [
-            { say: "rowan", text: "Then I've thirty spare a week." },
-            { say: "livvie", text: "You've thirty spare a week *if nothing goes wrong*. Call it ten. Things go wrong at about twenty a week. I've averaged it." },
+          { text: "So a hundred and forty doesn't go far.", steps: [
+            { say: "rowan", text: "So a hundred and forty doesn't go far." },
+            { say: "livvie", text: "It goes far enough *if nothing goes wrong*. Things go wrong at about twenty a week. I've averaged it. You'll want something that pays before the fortnight's out." },
             AFF("livvie", 1, "Did the sum with her")
           ] }
         ] },
         { flag: "chat_livvie_3" },
-        NOTE("livvie", "A week costs about ninety Smug Coins with the Commons breakfast, a hundred and ten without. Lives in bungalow three."),
+        { when: (s)=>s.day===1 && s.minutes<645, ...NOTE("livvie", "A week costs about ninety Smug Coins with the Commons breakfast, a hundred and ten without. Lives in bungalow three.") },
+        { when: (s)=>!(s.day===1 && s.minutes<645), ...NOTE("livvie", "Has costed a week on the island to the coin, sleeves included. Lives in bungalow three.") },
         { time: 3 }
       ] },
       { text: "You could trade anywhere. Why come all this way to design?", when: (s)=>!s.flags["chat_livvie_x"] && !!s.flags["livvie_said_design"], steps: [
@@ -965,7 +974,7 @@ scene("chat_livvie", {
         { say: "livvie", text: "Because the best cards are designed by someone who's been hungry." },
         { say: "livvie", text: "You can tell. It's in the costs. A good cheap card, the kind that does exactly one thing well, was made by somebody who knew what one thing was worth." },
         { say: "rowan", text: "And a bad one?" },
-        { say: "livvie", text: "\"Somebody who's never had to count.\" A small, sideways look. \"That's why I'm good. I've always had to count.\"" },
+        { say: "livvie", text: "\"Somebody who's never had to count.\" The pencil taps the column, once. \"That's why I'm good. I've always had to count.\"" },
         { choice: [
           { text: "You said 'good'. Not 'might be'.", steps: [
             { say: "rowan", text: "You said 'good'. Not 'might be'." },
@@ -999,7 +1008,7 @@ scene("chat_livvie", {
     { jump: "top" },
     { label: "done" },
     { flag: "chat_livvie_done" },
-    { say: "livvie", text: "That's more than I usually give away for nothing. Don't go telling people. They'd all want some." },
+    { say: "livvie", text: "That's more than I usually give away for nothing. I'll have to put it down as advertising." },
     { end: true }
   ]
 });
@@ -1041,7 +1050,7 @@ scene("post_livvie", {
     { text: "Livvie takes your five Smug Coins and then, half a second later, hands three of them back without looking at you." },
     { say: "livvie", text: "The Crystal Well gave you a Crystal on turn one, and you used it to break my own spell level." },
     { say: "rowan", text: "That was the whole plan. Turn your own present against you." },
-    { say: "livvie", text: "\"Nobody does that.\" Eyes down. \"It was quite clever. Don't say I said so.\"" },
+    { say: "livvie", text: "\"Nobody does that.\" To the clipboard. \"It was quite clever.\" She writes that down as well." },
     { label: "after" },
     { choice: [
       { text: "Why build a deck that gives everything away?", steps: [
@@ -1072,7 +1081,7 @@ scene("ferry_junho", {
         { say: "rowan", text: "I've been called worse today. What are you doing to it?" },
         { say: "junho", alias: "Boy with a row of boxes", text: "Rewriting it. Nobody asked me to. That is usually when a thing most needs it." }
       ] },
-      { text: "Four ways? I only counted two.", steps: [
+      { text: "Four ways? I only counted two.", when: (s)=>!!s.flags["rowan_singled_out"], steps: [
         { say: "rowan", text: "Four ways? I only counted two." },
         { say: "junho", alias: "Boy with a row of boxes", text: "One: the winner keeps the seat. Two: the winner chooses the next opponent. Three: the winner may name a stake. Four: the winner may name a condition, such as a person on the stairs." },
         { say: "junho", alias: "Boy with a row of boxes", text: "Only the first is in the text. The other three got in through the gap. So I am closing the gap." },
@@ -1087,8 +1096,8 @@ scene("ferry_junho", {
     { text: "He turns the tablet round. It is a clean drawing of the plate: the same lettering, the same four screws, and more words." },
     { say: "junho", alias: "Boy with a row of boxes", text: "Version four. \"The winner keeps the seat. Whoever has waited longest plays next. Nothing is at stake unless both agree.\" Would you read it as the person it happened to?" },
     { choice: [
-      { text: "'Whoever has waited longest.' Who decides that? There's no queue over there. Just people standing two deep.", steps: [
-        { say: "rowan", text: "'Whoever has waited longest.' Who decides that? There's no queue over there. Just people standing two deep." },
+      { text: "'Whoever has waited longest.' Who decides that? Nobody queues at a card table. They stand round it two deep.", steps: [
+        { say: "rowan", text: "'Whoever has waited longest.' Who decides that? Nobody queues at a card table. They stand round it two deep." },
         { text: "The stylus comes out from behind his ear so fast that it must have been waiting." },
         { say: "junho", alias: "Boy with a row of boxes", text: "Yes. *Yes.* That is a real hole." },
         { say: "junho", alias: "Boy with a row of boxes", text: "\"'…in the order they arrived, which each says aloud.'\" He types it. \"Version five. Thank you. That was specific. People are so rarely specific.\"" },
@@ -1111,7 +1120,7 @@ scene("ferry_junho", {
     { say: "junho", alias: "Boy with a row of boxes", text: "Park Jun-ho. Game Design. Rare Hall, room one-oh-two." },
     MET("junho", "Park Jun-ho"),
     { say: "junho", text: "I should have opened with that. Patch one: name first, review second." },
-    { say: "rowan", text: "Rowan Vance. No hall yet. No jacket, as you can see." },
+    { say: "rowan", text: "Rowan Vance. The Commons. No jacket yet, as you can see." },
     { when: (s)=>!!s.flags["follow_nathan"], say: "nathan", text: "He's FIXING the TABLE! On a TABLET! Can you fix the STAIRS? They're too STEEP!" },
     { when: (s)=>!!s.flags["follow_nathan"] && !!s.flags["follow_baylee"], say: "baylee", text: "Just the sign, Nathan." },
     { add: { ferry_talked: 1 } },
@@ -1120,7 +1129,8 @@ scene("ferry_junho", {
     { choice: [
       { text: "Go on.", steps: [
         { say: "rowan", text: "Go on." },
-        { say: "junho", text: "When he pointed at you, you put your hand on your left pocket, and you have put it back there eleven times since. Everyone can see which pocket matters. I would move the deck, or move the hand." },
+        { when: (s)=>!!s.flags["rowan_singled_out"], say: "junho", text: "When he pointed at you, you put your hand on your left pocket, and you have put it back there eight times since. Everyone can see which pocket matters. I would move the deck, or move the hand." },
+        { when: (s)=>!s.flags["rowan_singled_out"], say: "junho", text: "You came down those stairs with your hand on your left pocket, and you have put it back there eight times since. Everyone can see which pocket matters. I would move the deck, or move the hand." },
         { text: "You take your hand off your pocket. You had not known it was there again." },
         { say: "junho", text: "That landed harder than I intended. I can't tell which part did it. Would you tell me?" },
         { choice: [
@@ -1130,16 +1140,16 @@ scene("ferry_junho", {
             { say: "junho", text: "That is a known problem with feedback. I have not fixed it." },
             AFF("junho", 2, "Took the note")
           ] },
-          { text: "The part where you counted. Eleven.", steps: [
-            { say: "rowan", text: "The part where you counted. Eleven." },
+          { text: "The part where you counted. Eight.", steps: [
+            { say: "rowan", text: "The part where you counted. Eight." },
             { say: "junho", text: "\"The number.\" He writes it down. \"I thought the number was the kind part. It shows I was paying attention.\"" },
             { say: "junho", text: "I see that it also shows I was paying attention. Thank you. That is the same fact from the other side; I had not walked round it." },
             AFF("junho", 2, "Told him which line")
           ] }
         ] }
       ] },
-      { text: "Not today. I've had a whole room's notes already.", steps: [
-        { say: "rowan", text: "Not today. I've had a whole room's notes already." },
+      { text: "Not today. I've had enough notes for one morning.", steps: [
+        { say: "rowan", text: "Not today. I've had enough notes for one morning." },
         { say: "junho", text: "\"Understood.\" He writes something short. \"I have logged that you were asked. It will keep.\"" },
         AFF("junho", 1, "Was told plainly")
       ] }
@@ -1216,7 +1226,8 @@ scene("chat_junho", {
           { text: "Then here's one back: say the good line first.", steps: [
             { say: "rowan", text: "Then here's one back: say the good line first." },
             { say: "junho", text: "\"Good line first.\" The stylus is already moving. \"That is implementable.\"" },
-            { say: "junho", text: "You came down those stairs into a room that was staring at you, and you didn't leave. I should have led with that." },
+            { when: (s)=>!!s.flags["rowan_singled_out"], say: "junho", text: "You came down those stairs into a room that was staring at you, and you didn't leave. I should have led with that." },
+            { when: (s)=>!s.flags["rowan_singled_out"], say: "junho", text: "A stranger asked you to read his plate, and you read it properly. I should have led with that." },
             AFF("junho", 3, "Gave him a note")
           ] },
           { text: "Most people will only hear the criticism.", steps: [
@@ -1291,7 +1302,7 @@ scene("ferry_eloise", {
   steps: [
     { when: (s)=>!!s.flags["met_eloise"], jump: "again" },
     { text: "One of the big windows has been propped open on its latch, and the cold comes in carrying a smell that is not the sea. Turpentine." },
-    { text: "Under it a girl in a wine-red beret is kneeling on the bench, because the sketchbook open in front of her is too big to share a bench with anyone sitting down. There is dried paint in her long honey-brown hair. She has a brush in one hand and, forgotten in the other, the lid of a jar." },
+    { text: "Under it a girl in a wine-red beret and a gold jacket is kneeling on the bench, because the sketchbook open in front of her is too big to share a bench with anyone sitting down. There is dried paint in her long honey-brown hair. She has a brush in one hand and, forgotten in the other, the lid of a jar." },
     { text: "She has her back to the island. She is painting the saloon: the green of the table, and round it the people, two deep, as stripes of red and gold and black." },
     { say: "eloise", alias: "Girl in a red beret", text: "Don't — no. Stay. Right there, where the window does that to your ear." },
     { choice: [
@@ -1323,7 +1334,7 @@ scene("ferry_eloise", {
         { say: "eloise", alias: "Girl in a red beret", text: "That's what I was going to tell you, I think. That, or something about your shoes." },
         AFF("eloise", 3, "Said what it felt like")
       ] },
-      { text: "You've made the boy in gloves the same white as the wall.", steps: [
+      { text: "You've made the boy in gloves the same white as the wall.", when: (s)=>!!s.flags["rowan_singled_out"] || !!s.flags["met_gideon"], steps: [
         { say: "rowan", text: "You've made the boy in gloves the same white as the wall." },
         { say: "eloise", alias: "Girl in a red beret", text: "He *is* the wall. Look, everybody's bouncing off him." },
         { say: "eloise", alias: "Girl in a red beret", text: "Oh, I like that you saw that. People mostly hunt for themselves and stop." },
@@ -1529,7 +1540,7 @@ scene("isle_magnus", {
     { choice: [
       { text: "While you're waiting: can I ask you something?", steps: [
         { say: "rowan", text: "While you're waiting: can I ask you something?" },
-        { say: "magnus", text: "Ask. It will keep my hands busy. Do not tell anyone I said that either." },
+        { say: "magnus", text: "Ask. It will keep my hands busy. Do not tell anyone I said that." },
         { scene: "chat_magnus" }
       ] },
       { text: "Leave him to the doors.", steps: [
@@ -1546,7 +1557,7 @@ scene("isle_magnus", {
       ] },
       { text: "Good luck in there.", steps: [
         { say: "rowan", text: "Good luck in there." },
-        { say: "magnus", text: "Luck is a rate. But thank you. I'll take the rate." }
+        { say: "magnus", text: "I do not log luck. But thank you. I'll log that you said it." }
       ] }
     ] },
     { time: 2 }
@@ -1556,7 +1567,7 @@ scene("isle_magnus", {
 scene("isle_noor", {
   steps: [
     { when: (s)=>!!s.flags["isle_noor_done"], jump: "again" },
-    { text: "The library closes the north end of the Quad like the last word of an argument: white steps, a deep arcade, and shade. Halfway up the steps, exactly in the middle, a girl in a blue hijab and a red jacket is reading a heavy blue book bristling with pencil tabs." },
+    { text: "The library closes the north end of the Quad like the last word of an argument: white steps, a deep arcade, and shade. Halfway up the steps, exactly in the middle, a girl in a red jacket and a blue hijab, pinned with a very small silver gavel, is reading a heavy blue book bristling with pencil tabs." },
     { text: "The lawn below her is all noise and blankets. Nobody has sat within two steps of her." },
     { when: (s)=>!!s.flags["met_noor"], jump: "known" },
     { say: "noor", alias: "Girl with a rulebook", text: "Mr Vance. The entrant in ink." },
@@ -1571,13 +1582,13 @@ scene("isle_noor", {
     { say: "noor", text: "Rowan. There is rather more than half a metre here, if you want it. Stone is cooler than it looks." },
     { when: (s)=>!!s.flags["ferry_table_settled"], say: "noor", text: "I have told my roommate about your table twice. A duffel bag and a rolled jacket. She asked whether it was regulation. I said that it was better than regulation; it was not forbidden." },
     { label: "beat" },
-    { say: "noor", text: "Did you notice what the Chancellor said? Every conflict on this island may be settled at a table. \"There are no exceptions.\"" },
+    { say: "noor", text: "Did you notice what the Chancellor said? Every conflict on this island may be settled at a table. \"The position is that there are no exceptions.\"" },
     { say: "noor", text: "Article seven has two. I have checked the text against her sentence three times since the Quad." },
     { choice: [
       { text: "So the Chancellor got her own Charter wrong?", steps: [
         { say: "rowan", text: "So the Chancellor got her own Charter wrong?" },
         { say: "noor", text: "I do not think that she gets things wrong. I think she said it to see who would go and look." },
-        { say: "noor", text: "\"I went and looked.\" A very faint, very dry smile. \"I am aware of what that makes me.\"" },
+        { say: "noor", text: "\"I went and looked.\" She turns a page that did not need turning. \"I am aware of what that makes me.\"" },
         AFF("noor", 1, "Followed the argument")
       ] },
       { text: "What are the two exceptions?", steps: [
@@ -1593,7 +1604,7 @@ scene("isle_noor", {
         { say: "noor", text: "If she asks. I have a feeling that she is a person who asks." }
       ] }
     ] },
-    { say: "noor", text: "Rare Hall, since you have not asked, has eleven house rules framed in the entrance. Two of them contradict each other. I have been on this island for three hours and I am already owed a letter." },
+    { say: "noor", text: "Rare Hall, since you have not asked, has twelve house rules framed in the entrance. Two of them contradict each other. I have been on this island for three hours and I already have a letter to write." },
     { say: "noor", text: "My roommate unpacks by throwing. We get on absurdly well. I cannot account for it, and I have stopped trying." },
     { flag: "isle_noor_done" },
     NOTE("noor", "Noticed that the Chancellor's \"no exceptions\" is contradicted by article seven, which has two."),
@@ -1657,7 +1668,7 @@ scene("isle_livvie", {
       { text: "Is the bungalow all right?", steps: [
         { say: "rowan", text: "Is the bungalow all right?" },
         { say: "livvie", text: "It's dry. It's got a door that shuts and a window that opens, and they both do what they say. I've had worse. I've *priced* worse." },
-        { say: "livvie", text: "Inya's got a radio and Rana's got a face on. I've the bunk by the window. I didn't ask for it; they'd left it, so I think that was them being nice. I've written it down as nice." },
+        { say: "livvie", text: "Inya's the one with the radio and Rana's the one with a face on. I've the bunk by the window. I didn't ask for it; they'd left it, so I think that was them being nice. I've written it down as nice." },
         AFF("livvie", 1, "Asked after her, not her prices"),
         { flag: "rel_livvie_inya" }
       ] }
@@ -1734,7 +1745,7 @@ scene("isle_junho", {
         AFF("junho", 1, "Saved the boxes")
       ] }
     ] },
-    { say: "junho", text: "I have met my roommate. I gave him the document for the room. He returned it within the hour, with eleven numbered comments." },
+    { say: "junho", text: "I have met my roommate, a Teobalt Fullington. I had drafted a document for our room, headings only. He returned it within the hour, with eleven numbered comments." },
     { text: "He straightens the boxes, which were straight." },
     { say: "junho", text: "I have never been so content. I did not know that it would feel like this. I've made a note to find out why." },
     { flag: "isle_junho_done" },
@@ -1753,7 +1764,7 @@ scene("isle_junho", {
 scene("isle_eloise", {
   steps: [
     { when: (s)=>!!s.flags["isle_eloise_done"], jump: "again" },
-    { text: "In the middle of the Quad, where everybody has to walk round her, a girl in a wine-red beret is kneeling on the grass over a sketchbook the size of a door. There is paint in her hair and a brush in her hand. The air near her smells of turpentine, even out here." },
+    { text: "In the middle of the Quad, where everybody has to walk round her, a girl in a wine-red beret and a gold jacket is kneeling on the grass over a sketchbook the size of a door. There is paint in her hair and a brush in her hand. The air near her smells of turpentine, even out here." },
     { text: "She is painting the clock tower. On the page its blue roof is enormous, and the people beneath it are small tilted dabs, every one of them leaning back." },
     { when: (s)=>!!s.flags["met_eloise"], jump: "known" },
     { say: "eloise", alias: "Girl in a red beret", text: "You, with no jacket. Stand in front of the tower. No — left. I need one thing out here it isn't looking at." },
@@ -1764,20 +1775,21 @@ scene("isle_eloise", {
     MET("eloise", "Eloise Lafayette"),
     { jump: "beat" },
     { label: "known" },
-    { say: "eloise", text: "Oh — the berry. Rowan. Stand in front of the tower a minute. Left. You're still the only one out here who didn't come out of a tube." },
-    { when: (s)=>!!s.flags["eloise_time_promise"], say: "eloise", text: "You said you'd tell me when the boat was nearly in. I don't know if you did. I got off it, so somebody must have." },
+    { say: "eloise", text: "Oh — the berry. Rowan. Stand in front of the tower a minute. Left. You're still the only one out here I'd have to mix." },
+    { when: (s)=>!!s.flags["eloise_time_promise"] && !s.flags["eloise_time_kept"], say: "eloise", text: "You said you'd tell me when the boat was nearly in. I don't know if you did. I got off it, so somebody must have." },
+    { when: (s)=>!!s.flags["eloise_time_kept"], say: "eloise", text: "You came and stood there, on the boat, so I'd turn round. I did turn round. I've not stopped looking since." },
     { label: "beat" },
     { say: "eloise", text: "It's counting. That's what it's doing. See how everybody under it has tipped back? They all look up to find out how late they are." },
     { say: "eloise", text: "I'm to be somewhere at three myself. It's on the other hand." },
     { text: "She shows you the other hand. In green paint, a little smeared: DOME 4 — 3." },
     { choice: [
-      { text: "Shall I come and find you when it's time?", when: (s)=>s.minutes < 890, steps: [
+      { text: "Shall I come and find you when it's time?", when: (s)=>s.minutes < 900, steps: [
         { say: "rowan", text: "Shall I come and find you when it's time?" },
         { say: "eloise", text: "Would you? Just come and stand in front of the tower again. I'll understand." },
         { say: "eloise", text: "People tell me the time as if I'd dropped it. You say it like it's only weather." },
         AFF("eloise", 2, "Kept the time kindly")
       ] },
-      { text: "Eloise. It's gone three.", when: (s)=>s.minutes >= 890, steps: [
+      { text: "Eloise. It's gone three.", when: (s)=>s.minutes >= 900, steps: [
         { say: "rowan", text: "Eloise. It's gone three." },
         { say: "eloise", text: "Has it?" },
         { text: "She looks up at the clock, then down at the clock on the page, as if one of them ought to settle it." },

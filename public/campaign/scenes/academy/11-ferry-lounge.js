@@ -207,8 +207,8 @@ scene("table_vouch", {
     { label: "next_2" },
     { label: "end_1" },
     { flag: "vouch_tried" },
-    { text: "You cross to the brass-rimmed table. Gideon does not look up." },
-    { say: "rowan", text: "Gideon. I'd like to speak for Inya Bell." },
+    { text: "You cross to the brass-rimmed table. The boy in the white gloves does not look up." },
+    { say: "rowan", text: "I'd like to speak for Inya Bell." },
     { say: "gideon", text: "How kind. And what, exactly, is your standing?" },
     {
       when: (s)=>!(((!!s.flags["beat_magnus"]||!!s.flags["beat_georgie"])||!!s.flags["beat_ashton"])),
@@ -485,7 +485,7 @@ scene("table_payout", {
     { jump: "end_1" },
     { label: "next_4" },
     { when: (s)=>!((!!s.flags["bet_gideon"]||!!s.flags["bet_inya"])), jump: "next_5" },
-    { text: "Tomi, passing, taps the lid of his binder, shrugs sympathetically, and does not stop walking." },
+    { text: "The bookmaker in the yellow bandana, passing, taps the lid of his binder, shrugs sympathetically, and does not stop walking." },
     { label: "next_5" },
     { label: "end_1" }
   ]

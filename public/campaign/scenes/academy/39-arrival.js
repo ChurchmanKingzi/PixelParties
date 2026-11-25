@@ -2,6 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
+const { AFF, MET, DECK, NOTE, REL } = helpers;
 scene("ferry_arrival", {
   background: "ferry_deck",
   steps: [
@@ -22,11 +23,19 @@ scene("ferry_arrival", {
     {
       text: "People abandon whatever they were doing. Bags are shouldered. Somebody calls \"Island!\" and somebody else, from the stern, calls \"We KNOW.\""
     },
+    { when: (s)=>!s.flags["met_maisie"], text: "Along the port walkway a girl in oil-stained overalls climbs down off an upturned bucket, counts the screws in her palm, and seems satisfied with the number." },
+    { when: (s)=>!!s.flags["met_maisie"], text: "Along the port walkway Maisie climbs down off her bucket, counts the screws in her palm, and seems satisfied with the number." },
+    { when: (s)=>!s.flags["met_hedda"], text: "On the starboard side a tiny girl under a crown of wildflowers is working her way down the line of people with a pen on a string, faster than before, like somebody getting the washing in ahead of rain." },
+    { when: (s)=>!!s.flags["met_hedda"], text: "On the starboard side Hedda is working her way down the line of people with the pen on its string, faster than before, like somebody getting the washing in ahead of rain." },
+    { when: (s)=>!s.flags["met_freya"], text: "On the bench bolted to the deckhouse behind her, a paperback lifts a quarter of an inch off a face. One pale eye considers the horn. The book comes down again." },
+    { when: (s)=>!!s.flags["met_freya"], text: "On the bench behind her, Freya's paperback lifts a quarter of an inch. One pale eye considers the horn. The book comes down again." },
     { text: "The captain's voice comes on the loudspeaker, unhurried and warm." },
     {
       name: "Loudspeaker",
       text: "Fifteen minutes, folks. Mind your luggage and your elbows. The ladies and gentlemen who are going to want a last look, the rail is wide enough for all of you. The gentleman with the lifebuoy knows who he is."
     },
+    { when: (s)=>!s.flags["met_viktor"], text: "Up in the point of the bow a man in a wide-brimmed hat does not look up at the loudspeaker. He looks at a brass compass, and then at the island, like somebody checking the captain's arithmetic." },
+    { when: (s)=>!!s.flags["met_viktor"], text: "Up in the point of the bow Viktor does not look up at the loudspeaker. He looks at the compass, and then at the island, like somebody checking the captain's arithmetic." },
     {
       text: "You are standing at the rail with your hands on the wet iron, and you are, for the first time since the harbour, entirely alone."
     },
@@ -37,6 +46,8 @@ scene("ferry_arrival", {
     { think: "That's it. That's where I live now." },
     { think: "Fifteen minutes. And then I won't be a person on a boat any more. I'll be a person on an island." },
     { text: "Behind you, the iron door of the saloon bangs open, and the whole ship starts to arrive." },
+    { when: (s)=>!s.flags["met_junho"], text: "The first one through it is a boy in a gold jacket carrying five identical deck boxes in a stack, with his chin on the top one, like a waiter with a difficult cake." },
+    { when: (s)=>!!s.flags["met_junho"], text: "The first one through it is Jun-ho, carrying all five deck boxes in a stack, with his chin on the top one, like a waiter with a difficult cake." },
     { scene: "arrival_hub" },
     { run: (s)=>{ if (s.minutes < 640) s.minutes = 640; } },
     { scene: "arrival_finale" },
@@ -56,12 +67,15 @@ scene("arrival_hub", {
     {
       text: "Four knots of people have formed along the rails: the bow, the saloon stairs, the stern, and the knot of small commotion in the middle of the deck. The ship is turning in towards the pier, slowly, like a very large animal making up its mind."
     },
+    { text: "Between the knots the stragglers are still choosing. A black parasol crosses the deck at the pace of a procession. A long striped scarf goes aft, talking. Somebody you very nearly fail to see reads the muster notice one more time, and then follows the parasol." },
+    { when: (s)=>!!s.flags["eloise_time_promise"]&&!s.flags["eloise_time_kept"]&&!s.flags["arr_stairs"]&&!!s.flags["lounge_seen"], think: "Nearly in. I told Eloise I'd come and say so. Not like a bell." },
     { jump: "end_3" },
     { label: "next_4" },
     { when: (s)=>!((s.vars["arrival_visits"]===1)), jump: "next_5" },
     {
       text: "The island has moved. It is no longer a place in the distance but a coast, with a surf line and a smell: wet earth and salt and something green, frying."
     },
+    { text: "The frying is real. So is the ginger, from somewhere aft, and under both of them a thread of turpentine that has no business on a ship." },
     { jump: "end_3" },
     { label: "next_5" },
     { text: "The pier is a clear line now, with a speck on it that is waving. You have about five minutes." },
@@ -77,7 +91,12 @@ scene("arrival_hub", {
             "nathan",
             "baylee",
             "ed",
-            "mikoto"
+            "mikoto",
+            "viktor",
+            "eberhart",
+            "sammy",
+            "tobias",
+            "dmitri"
           ]
         },
         {
@@ -89,7 +108,10 @@ scene("arrival_hub", {
             "inya",
             "tomi",
             "noor",
-            "livvie"
+            "livvie",
+            "anni",
+            "junho",
+            "eloise"
           ]
         },
         {
@@ -102,7 +124,9 @@ scene("arrival_hub", {
             "sunny",
             "freddie",
             "marit",
-            "victoria"
+            "victoria",
+            "cas",
+            "rafa"
           ]
         },
         {
@@ -114,7 +138,13 @@ scene("arrival_hub", {
             "pippa",
             "branden",
             "rana",
-            "teobalt"
+            "teobalt",
+            "maisie",
+            "fiona",
+            "leona",
+            "hedda",
+            "freya",
+            "trixie"
           ]
         },
         { text: "Stay where you are and watch the island come.", goto: "opt_12" }
@@ -240,6 +270,8 @@ scene("arrival_bow", {
     { label: "next_9" },
     { say: "baylee", text: "\"Morning, Rowan. Almost afternoon.\" A pause. \"Almost there.\"" },
     { label: "end_8" },
+    { when: (s)=>!s.flags["met_eberhart"], text: "Baylee is not the only fixed point on the fore deck. Against the forward bulkhead the first-years' trunks stand in a stack so square that it looks drawn, and beside it, at something like parade rest, stands a tall boy with cropped ash-blond hair and an old, straight scar across one cheek. He is facing the island as if it had been assigned to him." },
+    { when: (s)=>!!s.flags["met_eberhart"], text: "Baylee is not the only fixed point on the fore deck. Beside the trunks, which are still square, Eberhart stands at parade rest with his hands behind his back. He is facing the island as if it had been assigned to him." },
     { when: (s)=>!(!!s.flags["met_ed"]), jump: "next_12" },
     { say: "ed", text: "\"THERE'S A WATERFALL!\"" },
     {
@@ -293,6 +325,11 @@ scene("arrival_bow", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["ed"] = s.notes["ed"] || []); if (a.indexOf("Hangs off things. Asks whether everything is dangerous, hopefully.") < 0) a.push("Hangs off things. Asks whether everything is dangerous, hopefully."); }
     },
     { label: "end_11" },
+    { when: (s)=>!s.flags["met_viktor"], text: "Right in the point of the bow, where the deck narrows to nothing, a lean man in a wide-brimmed hat with a pale-blue feather in the band has not looked up at any of this. He holds a brass compass flat on his palm, sights along it at the cliff, and writes a small number on a creased map." },
+    { when: (s)=>!!s.flags["met_viktor"], text: "Right in the point of the bow, Viktor has not looked up at any of this. He holds the compass flat on his palm, sights along it at the cliff, and writes a small number on the map." },
+    { say: "viktor", alias: "Man with a compass", text: "A little east of the cone. High up. The printed map has trees there." },
+    { text: "He says it to the map. Ed hears it anyway, and looks round at him the way a dog looks at somebody who has just picked up a lead." },
+    { when: (s)=>!!s.flags["viktor_notch"], say: "viktor", alias: "Man with a compass", text: "Water comes down from somewhere, Rowan. I would start at your notch." },
     { when: (s)=>!(!!s.flags["met_mikoto"]), jump: "next_18" },
     {
       say: "mikoto",
@@ -335,9 +372,17 @@ scene("arrival_bow", {
       run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "mikoto", n: 2, why: "Said he was nervous too" }); }
     },
     { label: "end_17" },
+    { when: (s)=>!s.flags["met_sammy"], text: "Behind the crowd, alone at the rail beyond the last bench, a slight boy in a long black coat is brooding at the island: chin down, one eye lost under a black fringe. The coat is flying straight out behind him like a flag, and one corner of it is feeling its way towards a deck cleat." },
+    { when: (s)=>!!s.flags["met_sammy"], text: "Behind the crowd, alone at the rail beyond the last bench, Sammy is brooding at the island, chin down. The coat is flying straight out behind him like a flag, and one corner of it is feeling its way back towards the deck cleat." },
+    { when: (s)=>!s.flags["met_tobias"], text: "On the middle bench a broad boy with a broken nose, hands in his pockets, puts out one boot without turning his head and moves the hem aside. It is done so smoothly that the coat's owner never knows." },
+    { when: (s)=>!!s.flags["met_tobias"], text: "On the middle bench Tobias, hands still in his pockets, puts out one boot without turning his head and moves the hem aside. It is done so smoothly that the coat's owner never knows." },
+    { say: "sammy", alias: "Boy in a long black coat", text: "\"The island —\" Low, slow, ominous. A long pause. \"…is actually quite big, isn't it.\"" },
+    { say: "tobias", alias: "Boy with a broken nose", text: "\"Coat like that wants a minder.\" Quietly, to you and not to him. \"Don't tell him it's got one.\"" },
     {
       text: "A bell rings somewhere, thin and bright. The deck lurches an inch to starboard as the ship comes round."
     },
+    { when: (s)=>!s.flags["met_eberhart"], text: "The stack of trunks does not move. The boy with the scar looks at it once anyway, to make sure it has understood." },
+    { when: (s)=>!!s.flags["met_eberhart"], text: "The stack of trunks does not move. Eberhart looks at it once anyway, to make sure it has understood." },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_21" },
     { say: "nathan", text: "WE'RE TURNING! The island's TURNING! Baylee, the island is TURNING!", mood: "laughing" },
     { say: "baylee", text: "It's us." },
@@ -347,6 +392,10 @@ scene("arrival_bow", {
     { say: "nathan", text: "WE'RE TURNING! The island's TURNING!", mood: "laughing" },
     { say: "baylee", text: "It's us, Nathan." },
     { label: "end_20" },
+    { when: (s)=>!s.flags["met_dmitri"], text: "On the bench nearest the bow a long boy under a grey blanket, beanie down to his eyebrows, has not got up for any of it. He is lying with the island behind his head, looking at the sky over the stern, one hand resting on a dented steel thermos." },
+    { when: (s)=>!!s.flags["met_dmitri"], text: "On the bench nearest the bow, Dmitri has not got up for any of it. He is still facing the wrong way, with one hand on the thermos." },
+    { say: "dmitri", alias: "Boy under a blanket", text: "\"…They say it turns.\" To the sky, slowly. \"Somebody tell me when it has finished. I am going to look at it once, and I would like it to be standing still.\"" },
+    { say: "baylee", text: "Soon." },
     { time: 3 }
   ]
 });
@@ -362,6 +411,10 @@ scene("arrival_stairs", {
     {
       text: "The saloon stairs have turned into a gallery. The people from the table have come up with their drinks and their opinions, and have arranged themselves on the iron steps like an audience at the end of a play that nobody has quite agreed to applaud."
     },
+    { when: (s)=>!s.flags["met_eloise"], text: "Not everyone from the saloon has come up to look at the island. On the top step a girl in a wine-red beret is kneeling over a sketchbook too big for the stair, with dried paint in her hair and her back to the island. She is painting the stairs, and the people on them, as stripes." },
+    { when: (s)=>!!s.flags["met_eloise"], text: "Not everyone from the saloon has come up to look at the island. On the top step Eloise is kneeling over the sketchbook with her back to the island. She is painting the stairs, and the people on them, as stripes." },
+    { when: (s)=>!s.flags["met_junho"], text: "Two steps below her a boy in a gold jacket, a stylus behind his ear, has set five identical deck boxes along the tread and is squaring the row against the edge of the step. The step is not quite straight. He has noticed." },
+    { when: (s)=>!!s.flags["met_junho"], text: "Two steps below her Jun-ho has set the five deck boxes along the tread and is squaring the row against the edge of the step. The step is not quite straight. He has noticed." },
     { when: (s)=>!(!!s.flags["ferry_table_won"]), jump: "next_2" },
     {
       text: "Gideon is standing on the bottom step with a single duffel at his feet. It is the first time you have seen him without all four of his cases within arm's reach. He is looking at the island with the controlled attention of a man re-reading a contract."
@@ -545,6 +598,11 @@ scene("arrival_stairs", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["tomi"] = s.notes["tomi"] || []); if (a.indexOf("Runs the book on the ship. Everything has a friend price.") < 0) a.push("Runs the book on the ship. Everything has a friend price."); }
     },
     { label: "end_12" },
+    { when: (s)=>!s.flags["met_anni"], text: "On the step above him a girl is standing, heels together, although there is room to sit: a black jacket with a white-and-gold collar that looks ironed on, an auburn bun, large square glasses, a small grey booklet, and a red pen with its cap off." },
+    { when: (s)=>!!s.flags["met_anni"], text: "On the step above him Anni is standing, heels together, although there is room to sit. The booklet is open. The red pen has its cap off." },
+    { say: "anni", alias: "Girl with a red pen", text: "Organised wagering among students. Section nine, paragraph two. I am entering it a second time, because it is happening a second time." },
+    { text: "Tomi turns the binder a few degrees towards her, so that she can copy the odds down correctly." },
+    { when: (s)=>!!s.flags["met_anni"], say: "anni", alias: "Girl with a red pen", text: "\"Mr Vance.\" The grey eyes come up for exactly one second. \"Your hood is straight. I am not noting that, either.\"" },
     { when: (s)=>!(!!s.flags["met_noor"]), jump: "next_16" },
     { say: "noor", text: "\"Rowan.\"" },
     { text: "She does not look up from the Charter, which she is reading as the ship slides in." },
@@ -583,6 +641,7 @@ scene("arrival_stairs", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["noor"] = s.notes["noor"] || []); if (a.indexOf("Knows the Charter by heart. Wants to be a head judge.") < 0) a.push("Knows the Charter by heart. Wants to be a head judge."); }
     },
     { label: "end_15" },
+    { when: (s)=>!!s.flags["junho_v5"], say: "junho", alias: "Boy with a row of boxes", text: "Rowan. Version nine. Your queue is still in it. I have added the word 'please', and I am not sure it survives review." },
     { when: (s)=>!((!!s.flags["met_livvie"]&&!!s.flags["livvie_fed"])), jump: "next_19" },
     { say: "livvie", text: "\"Quick thing.\"" },
     {
@@ -641,10 +700,356 @@ scene("arrival_stairs", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["livvie"] = s.notes["livvie"] || []); if (a.indexOf("Trades, keeps lists, does not accept charity.") < 0) a.push("Trades, keeps lists, does not accept charity."); }
     },
     { label: "end_18" },
+    { when: (s)=>!s.flags["eloise_time_promise"], jump: "eloise_plain" },
+    { text: "You climb past the row of deck boxes and stand a step below Eloise, where the sun comes round the funnel, the way you stood for her at the window. You do not say it like a bell. You do not say anything." },
+    { text: "The brush stops. She looks at your ear, and then at your face, and then at where your face is pointing, which is over her shoulder." },
+    { say: "eloise", alias: "Girl in a red beret", text: "Oh. It's got *close*. It was only little when I looked. Nobody said. — No. You did. Just now. That was you saying it." },
+    { say: "eloise", alias: "Girl in a red beret", text: "Hold the corner of the book, would you? I'm going to turn round." },
+    { text: "You hold the corner. She turns round on her knees, sketchbook and all, and faces an island a good deal larger than any she has had to deal with so far. The lid of a jar goes down the stairs, one step at a time. Neither of you goes after it." },
+    AFF("eloise", 2, "Came and stood, as promised"),
+    { flag: "eloise_time_kept" },
+    { jump: "eloise_end" },
+    { label: "eloise_plain" },
+    { when: (s)=>!!s.flags["met_eloise"], say: "eloise", alias: "Girl in a red beret", text: "Oh — the berry. Stay there a second. You've got the whole sky round you." },
+    { label: "eloise_end" },
     { time: 3 }
   ]
 });
 
+scene("arrival_stern", {
+  steps: [
+    { clear: true },
+    { enter: "jessica" },
+    { enter: "ashton" },
+    { enter: "sunny" },
+    { enter: "freddie" },
+    { enter: "marit" },
+    {
+      text: "The stern is where the ship has put its grand gestures. The wake is long and white, the awning snaps in the breeze, and the stern rail is crowded with people who have each decided to be in a different film."
+    },
+    { when: (s)=>!s.flags["met_cas"], text: "At the flagstaff, with his back to the wake, a boy in a long striped scarf is talking steadily to a small microphone clipped to his lapel. Its lead comes out of the bottom of the scarf and stops." },
+    { when: (s)=>!!s.flags["met_cas"], text: "At the flagstaff Cas is still on air, with his back to the wake and the lead of his microphone still plugged into nothing." },
+    { say: "cas", alias: "Boy with a microphone", text: "…and we're into the closing minutes here on the stern deck. The wake is as straight as it has been all morning, the island is coming round onto the bow, and on the bollard the lady with the orange bows is about to address the nation." },
+    { when: (s)=>!(!!s.flags["met_marit"]), jump: "next_2" },
+    {
+      say: "marit",
+      text: "**FRIENDS!** *ROMANS!* **COUNTRYMEN!** Lend me your ears — and your jackets, I'm not wearing mine, I have a *scarf* —",
+      shake: true
+    },
+    {
+      say: "marit",
+      text: "**ACT ONE, SCENE LAST!** The *voyage ends!* The *island rises!* The *hero* — that is **YOU**, Rowan Vance — **steps ashore!**",
+      shake: true
+    },
+    { say: "rowan", text: "Marit, please sit down. You're on a bollard." },
+    { say: "marit", text: "A bollard is a **PLINTH!**", shake: true },
+    { when: (s)=>!(((s.vars["aff_marit"]||0)>=13)), jump: "next_4" },
+    { text: "She drops, abruptly, out of the big voice, into the quick wry one." },
+    {
+      say: "marit",
+      text: "I'm really glad you came to find me. I wasn't going to say that, there's a whole speech. It's got a pause in it. But you're here, and — it'd be silly not to say it."
+    },
+    {
+      add: { aff_marit: 2 }
+    },
+    {
+      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "marit", n: 2, why: "Dropped the act for him" }); }
+    },
+    { label: "next_4" },
+    { label: "end_3" },
+    { jump: "end_1" },
+    { label: "next_2" },
+    {
+      text: "A girl with two tall tufts of flame-orange hair, each tied up with an orange bow, is standing on a mooring bollard with her arms flung out, reciting at the island."
+    },
+    {
+      say: "marit",
+      alias: "Girl on a bollard",
+      text: "**ACT ONE, SCENE LAST!** The voyage ends! The island RISES! And there — look! — a **STRANGER** on the stern deck, in a rain jacket, who has no idea what comes *next!*",
+      shake: true
+    },
+    {
+      say: "marit",
+      alias: "Girl on a bollard",
+      text: "Marit Solberg! Theatre kid **EXTRAORDINAIRE!** We have not met, and I already love you, I have *decided* you are the lead!",
+      shake: true
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["marit"]) s.names["marit"] = "Marit Solberg"; if (io && io.popup && !s.flags["met_marit"]) io.popup({ type: 'met', id: "marit", name: "Marit Solberg" }); }
+    },
+    { flag: "met_marit" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["marit"] = s.notes["marit"] || []); if (a.indexOf("Treats everything as a stage. Narrates, loudly.") < 0) a.push("Treats everything as a stage. Narrates, loudly."); }
+    },
+    { say: "rowan", text: "Rowan. I'm not sure I'd know what to do with a lead." },
+    { say: "marit", text: "Nobody does! That's what *rehearsals* are for!", shake: true },
+    { label: "end_1" },
+    { when: (s)=>!(!!s.flags["met_sunny"]), jump: "next_7" },
+    { say: "sunny", text: "\"Wildcard! Come and look at THIS, I'm going to have a heart attack.\"" },
+    {
+      text: "She has her feet up on the lowest rail bar and is pointing at the shallows, which are the colour of a swimming-pool advert."
+    },
+    {
+      say: "sunny",
+      text: "\"I can see the sand. From here. I can see the individual SHELLS. Do you know how long it's been since I was in water over a metre deep? Two days.\""
+    },
+    { say: "rowan", text: "Two days isn't that long." },
+    { say: "sunny", text: "It's an *eternity.*" },
+    { jump: "end_6" },
+    { label: "next_7" },
+    {
+      text: "A tall girl is sitting on the lowest bar of the rail with her bare feet dangling, a towel round her neck, grinning at the shallows as if they were an old friend."
+    },
+    {
+      say: "sunny",
+      alias: "Girl on the rail",
+      text: "Hey, Wildcard! Hey! You see this? I can see the SAND from here. I can see individual SHELLS!"
+    },
+    { say: "rowan", text: "Rowan. Hello." },
+    {
+      say: "sunny",
+      alias: "Girl on the rail",
+      text: "Sunny Aldane. Lifeguard. Sports scholarship. I've been looking forward to a swim for two *days*, which I understand is not long, but it is to *me!*"
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["sunny"]) s.names["sunny"] = "Sunny Aldane"; if (io && io.popup && !s.flags["met_sunny"]) io.popup({ type: 'met', id: "sunny", name: "Sunny Aldane" }); }
+    },
+    { flag: "met_sunny" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["sunny"] = s.notes["sunny"] || []); if (a.indexOf("Lifeguard on a sports scholarship. Says exactly what she thinks.") < 0) a.push("Lifeguard on a sports scholarship. Says exactly what she thinks."); }
+    },
+    { label: "end_6" },
+    {
+      text: "A girl with wet red hair and diving goggles pushed up on her forehead, a gold jacket with a plain grey collar worn open over a swimsuit, is climbing the stern rail."
+    },
+    { when: (s)=>!(!!s.flags["met_freddie"]), jump: "next_10" },
+    { say: "freddie", text: "\"Rowan! Jacketless! Hold this!\"" },
+    { text: "She hands you the jacket without looking round, which is, you realise, an instruction." },
+    {
+      say: "freddie",
+      text: "\"I've been timing it! Four hundred metres to the pier, a bit of a current, I can do it in eight minutes, easily. Eight and a half if the shark's about.\""
+    },
+    { say: "sunny", text: "Freddie. FREDDIE. Get down." },
+    { say: "freddie", text: "I've done the maths!" },
+    { say: "sunny", text: "It's a *regulation*." },
+    { say: "freddie", text: "It's a very *short* regulation!" },
+    { jump: "end_9" },
+    { label: "next_10" },
+    { say: "freddie", alias: "Girl with goggles on her head", text: "\"Hey! Jacketless! Hold this!\"" },
+    { text: "She hands you the jacket without looking round, which is, you realise, an instruction." },
+    {
+      say: "freddie",
+      alias: "Girl with goggles on her head",
+      text: "\"I've been timing it! Four hundred metres to the pier, a bit of a current, eight minutes, easily. Eight and a half if the shark's about. Winifred Camara. Freddie. Hello!\""
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["freddie"]) s.names["freddie"] = "Winifred Camara"; if (io && io.popup && !s.flags["met_freddie"]) io.popup({ type: 'met', id: "freddie", name: "Winifred Camara" }); }
+    },
+    { flag: "met_freddie" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["freddie"] = s.notes["freddie"] || []); if (a.indexOf("Swimmer and diver. Wants to jump off the ship.") < 0) a.push("Swimmer and diver. Wants to jump off the ship."); }
+    },
+    { say: "sunny", alias: "Girl on the rail", text: "FREDDIE. Get *down*." },
+    { say: "freddie", alias: "Girl with goggles on her head", text: "It's a very short regulation!" },
+    { label: "end_9" },
+    {
+      text: "The jacket is warm from the sun. The girl in it is already halfway over the rail with one foot on the outer bar, and the sea is a long way down."
+    },
+    { say: "cas", alias: "Boy with a microphone", text: "A late entry at the stern rail. Goggles up, one foot outside the bar, four hundred metres of open water by her own figures. And the man in the rain jacket has been handed the jacket and, I'm afraid, the decision with it." },
+    {
+      prompt: "What do you do?",
+      choice: [
+        { text: "Freddie, the captain will have your head. Come back over.", goto: "opt_13" },
+        { text: "Go on, then. I'll hold the jacket.", goto: "opt_14" },
+        { text: "Say nothing and hold out your hand for the mask.", goto: "opt_15" }
+      ]
+    },
+    { jump: "choiceend_12" },
+    { label: "opt_13" },
+    { say: "rowan", text: "Freddie, the captain will have your head. Come back over." },
+    { say: "freddie", text: "Oh, *you're* no fun. Neither of you is any fun. I've got *five brothers.*" },
+    {
+      text: "She comes back over the rail like a cat from a garden wall and lands on her feet beside Sunny, who is gripping the back of her swimsuit strap with an expression of pure loving violence."
+    },
+    { say: "sunny", text: "Thank you. I'd have caught her. I just didn't want to have to." },
+    {
+      add: { aff_sunny: 2 }
+    },
+    {
+      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "sunny", n: 2, why: "Helped her stop Freddie" }); }
+    },
+    {
+      add: { aff_freddie: 1 }
+    },
+    {
+      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 1, why: "Talked her down, kindly" }); }
+    },
+    { flag: "freddie_talked_down" },
+    { jump: "choiceend_12" },
+    { label: "opt_14" },
+    { say: "rowan", text: "Go on, then. I'll hold the jacket." },
+    { say: "freddie", text: "YES! A *friend!*" },
+    {
+      text: "She is gone before the word has finished. A long, clean, glittering arc over the stern rail and a very small white splash a long way down."
+    },
+    {
+      text: "From somewhere over the bridge wing comes the captain's voice, not on the loudspeaker this time, just a man at the end of his patience: \"THAT'S THIRTY-SEVEN. THAT'S THIRTY-SEVEN, AND NOT THIRTY-EIGHT, AND I WILL HAVE A WORD.\""
+    },
+    { say: "sunny", text: "\"I'm going in after her. Hold my towel.\"" },
+    { text: "She is already on the rail." },
+    { say: "sunny", text: "\"You — you're a *terrible* influence!\"" },
+    { say: "rowan", text: "I'm very sorry." },
+    { say: "sunny", text: "\"Don't be! It's the *best* thing anyone's done all day!\"" },
+    {
+      text: "A whoop, a splash, and then two figures in the white water, one cheering, one swearing, both laughing."
+    },
+    { say: "cas", alias: "Boy with a microphone", text: "Two in the water! A clean entry from the first, an enthusiastic one from the second. The commentary box would like it on record that it advised nobody." },
+    {
+      add: { aff_freddie: 4 }
+    },
+    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 4, why: "Held the jacket" }); } },
+    {
+      add: { aff_sunny: 1 }
+    },
+    {
+      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "sunny", n: 1, why: "Was a bad influence, in the best way" }); }
+    },
+    { flag: "freddie_jumped" },
+    { exit: "freddie" },
+    { exit: "sunny" },
+    { jump: "choiceend_12" },
+    { label: "opt_15" },
+    { say: "freddie", text: "\"…Wait.\"" },
+    { text: "She looks down at your outstretched hand, and then at you." },
+    { say: "freddie", text: "\"That's not — you're taking my *mask*?\"" },
+    { say: "rowan", text: "I'm holding it. So that it doesn't fall in." },
+    { say: "freddie", text: "\"…That's actually the most responsible thing anyone's ever said to me.\"" },
+    { text: "She comes back over the rail slowly, as if stepping out of a hot bath." },
+    { say: "freddie", text: "\"I'm leaving you with a very strong opinion of me.\"" },
+    {
+      add: { aff_freddie: 2 }
+    },
+    {
+      run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "freddie", n: 2, why: "Held the mask, not the argument" }); }
+    },
+    { flag: "freddie_talked_down" },
+    { jump: "choiceend_12" },
+    { label: "choiceend_12" },
+    { when: (s)=>!(!!s.flags["met_jessica"]), jump: "next_17" },
+    { say: "jessica", text: "\"Rowan.\"" },
+    {
+      text: "She is the only person on the stern who is not in motion. She stands a little apart, with one ringed hand on the smallest of her caskets, and the gold chain at her throat catching the morning light."
+    },
+    { say: "jessica", text: "\"I wished to say, before we land, that it was a pleasure to have been crossed to.\"" },
+    { say: "rowan", text: "The pleasure was mine, Jessica." },
+    { say: "jessica", text: "\"I shall hold you to that.\" A small, genuine smile. \"In writing, if necessary.\"" },
+    {
+      add: { aff_jessica: 1 }
+    },
+    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "jessica", n: 1, why: "Answered in kind" }); } },
+    { jump: "end_16" },
+    { label: "next_17" },
+    {
+      text: "A girl with a gold chain at her throat is standing a little apart from the commotion with one ringed hand on a small leather casket. A small swallow charm hangs from the chain and a look of patient serenity, like a lamp that has not yet been told it is the only light in the room."
+    },
+    {
+      say: "jessica",
+      alias: "Girl with the caskets",
+      text: "\"You are watching the water. So am I. It is a pleasant thing to share.\""
+    },
+    { text: "She does not turn her head." },
+    {
+      say: "jessica",
+      alias: "Girl with the caskets",
+      text: "\"Jessica Montclair. I should offer my hand, but it is busy, and the casket does not like to be left.\""
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["jessica"]) s.names["jessica"] = "Jessica Montclair"; if (io && io.popup && !s.flags["met_jessica"]) io.popup({ type: 'met', id: "jessica", name: "Jessica Montclair" }); }
+    },
+    { flag: "met_jessica" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["jessica"] = s.notes["jessica"] || []); if (a.indexOf("Formal, gracious. Travels with three caskets of jewellery.") < 0) a.push("Formal, gracious. Travels with three caskets of jewellery."); }
+    },
+    { label: "end_16" },
+    { when: (s)=>!(!!s.flags["met_ashton"]), jump: "next_20" },
+    { say: "ashton", text: "\"Vance! Rescue me.\"" },
+    {
+      text: "He is, as before, at the rail with a rose in one hand, and a look of tender intent aimed squarely at Jessica's profile."
+    },
+    {
+      say: "ashton",
+      text: "\"I have prepared a speech. It has four paragraphs and a joke about gulls. She has looked at the sea for fourteen minutes. I think I'm making progress.\""
+    },
+    { say: "rowan", text: "You're not." },
+    { say: "ashton", text: "I am, old thing! I'm ten per cent less ignored than I was at breakfast." },
+    { jump: "end_19" },
+    { label: "next_20" },
+    {
+      text: "A tall boy with violet hair swept into a smooth dome is standing at the rail with a single red rose, and the thorn of it pinched between finger and thumb of his other hand. His whole attention is directed at the girl with the gold chain."
+    },
+    {
+      say: "ashton",
+      alias: "Boy with a rose",
+      text: "\"Ashton Beaumont-Lyle. You'll know the name. If you don't, nobody does.\" He does not look round. \"I'm told you are the entrant in ink. I have prepared a speech for the lady. It has four paragraphs and a joke about gulls.\""
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["ashton"]) s.names["ashton"] = "Ashton Beaumont-Lyle"; if (io && io.popup && !s.flags["met_ashton"]) io.popup({ type: 'met', id: "ashton", name: "Ashton Beaumont-Lyle" }); }
+    },
+    { flag: "met_ashton" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["ashton"] = s.notes["ashton"] || []); if (a.indexOf("Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes.") < 0) a.push("Hands out roses and talks like a novel. Says the lady has looked at the sea for fourteen minutes."); }
+    },
+    { label: "end_19" },
+    { when: (s)=>!s.flags["met_rafa"], text: "A round-faced, broad-shouldered boy in a chef's bandana, with a green stalk going from one corner of his mouth to the other, is working his way along the rail with an onion crate on his hip, taking tin mugs out of people's hands." },
+    { when: (s)=>!!s.flags["met_rafa"], text: "Rafa is working his way along the rail with an onion crate on his hip, taking tin mugs out of people's hands. The green stalk has changed sides again." },
+    { say: "rafa", alias: "Boy in a chef's bandana", text: "Mugs, please. Mugs. I promised the lady downstairs every one of them back, and I am two short and not looking at the sea." },
+    { text: "He takes one off the rail at Ashton's elbow, looks into it, and then at Ashton, with professional sorrow." },
+    { say: "rafa", alias: "Boy in a chef's bandana", text: "Half. A speech in four paragraphs, and the man stops at half a mug. This is why she is looking at the water." },
+    { when: (s)=>!!s.flags["rafa_fed_rowan"], say: "rafa", alias: "Boy in a chef's bandana", text: "\"Rowan.\" The same look goes over you, and comes back better pleased. \"One mug better than this morning. On land I find you something you have to chew.\"" },
+    { when: (s)=>!(!!s.flags["met_victoria"]), jump: "next_23" },
+    { say: "victoria", text: "\"Rowan.\"" },
+    {
+      text: "She is sitting on the dry bench under the striped awning with her parasol open, in the full sun, which does not seem to trouble her."
+    },
+    {
+      say: "victoria",
+      text: "\"I have finished looking at the wake. It has become the sea. I should like to look at the island now.\""
+    },
+    { say: "rowan", text: "Would you like me to stand somewhere?" },
+    {
+      say: "victoria",
+      text: "\"No. Sit, if you wish.\" A pause. \"It is a very large island. I should like company in looking at it.\""
+    },
+    {
+      text: "You sit. Neither of you says anything for most of a minute, and it is, to your surprise, the best conversation you have had all morning."
+    },
+    {
+      add: { aff_victoria: 2 }
+    },
+    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "victoria", n: 2, why: "Sat with her" }); } },
+    { jump: "end_22" },
+    { label: "next_23" },
+    {
+      text: "On the dry bench under the awning a girl in a ruffled dress is sitting with a lace parasol open over her head, although she is already in the shade. Her wide sky-blue eyes are on the island, and her lips are moving very slightly, as if she were counting."
+    },
+    {
+      say: "victoria",
+      alias: "Girl with a parasol",
+      text: "\"Forty-one.\" She turns her head, slowly. \"I was counting the palm trees on the nearest slope. There are forty-one. I wished to know. Victoria Capulet.\""
+    },
+    {
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["victoria"]) s.names["victoria"] = "Victoria Capulet"; if (io && io.popup && !s.flags["met_victoria"]) io.popup({ type: 'met', id: "victoria", name: "Victoria Capulet" }); }
+    },
+    { flag: "met_victoria" },
+    {
+      run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["victoria"] = s.notes["victoria"] || []); if (a.indexOf("Speaks slowly and exactly. Sits under a parasol even in the shade.") < 0) a.push("Speaks slowly and exactly. Sits under a parasol even in the shade."); }
+    },
+    { say: "rowan", text: "Rowan. That's a good number." },
+    { say: "victoria", text: "Thank you. I think so as well." },
+    { label: "end_22" },
+    { time: 3 }
+  ]
+});
 
 scene("arrival_mid", {
   steps: [
@@ -768,6 +1173,10 @@ scene("arrival_mid", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["branden"] = s.notes["branden"] || []); if (a.indexOf("Ten, loud, and a national champion. Pranks everyone.") < 0) a.push("Ten, loud, and a national champion. Pranks everyone."); }
     },
     { label: "end_7" },
+    { when: (s)=>!s.flags["met_maisie"], text: "A girl in oil-stained overalls, with a black jacket knotted round her waist and welding goggles holding back a great deal of copper-brown hair, has walked straight past him to the empty bracket on the rail, and is running a thumb along it." },
+    { when: (s)=>!!s.flags["met_maisie"], text: "Maisie has walked straight past him to the empty bracket on the rail, and is running a thumb along it." },
+    { say: "maisie", alias: "Girl in welding goggles", text: "No wonder it came away so easy. Spring's gone, look. That's not theft, love, that's gravity with a helper." },
+    { text: "She takes a screwdriver out of her hair and has the bracket tight again in four turns. The buoy will now have to be put back properly, which she seems to regard as the whole point." },
     { when: (s)=>!(!!s.flags["met_rana"]), jump: "next_14" },
     {
       text: "On the top step of the iron stair to the wheelhouse, a girl with two long blonde braids, each one tied off with a big red bow, is sitting, knees drawn up, with her back to the crowd and her eyes on the island."
@@ -856,6 +1265,9 @@ scene("arrival_mid", {
     { say: "rowan", text: "Rowan. How am I doing?" },
     { say: "teobalt", text: "You are in the middle. It is alphabetical. It is nothing personal." },
     { label: "end_19" },
+    { when: (s)=>!s.flags["met_leona"], text: "A yard from his elbow, in plain view, a girl with mousy-brown hair and a canvas satchel with a broken buckle is waiting to be counted. He counts the crate beside her." },
+    { when: (s)=>!!s.flags["met_leona"], text: "A yard from his elbow, in plain view, Leona is waiting to be counted. He counts the crate beside her." },
+    { say: "leona", alias: "Girl with a satchel", text: "He has counted me twice and missed me three times. I think it comes out even." },
     { when: (s)=>!(!!s.flags["met_pippa"]), jump: "next_26" },
     { text: "Pippa jumps off the crate with the camera held out in front of her like a lantern." },
     {
@@ -869,6 +1281,18 @@ scene("arrival_mid", {
     },
     { label: "next_28" },
     { label: "end_27" },
+    { when: (s)=>!s.flags["met_freya"], text: "The photograph has been gathering people the way a gutter gathers rain. In the back row a very long girl with an ice-blonde braid has arrived holding a paperback flat on top of her head, like a roof against the sun." },
+    { when: (s)=>!!s.flags["met_freya"], text: "The photograph has been gathering people the way a gutter gathers rain. In the back row Freya has arrived, holding the paperback flat on top of her head, like a roof against the sun." },
+    { when: (s)=>!s.flags["met_fiona"], text: "At the end of the line a girl in black lace comes to a halt under a black parasol, exactly where the shadow of the funnel stops." },
+    { when: (s)=>!!s.flags["met_fiona"], text: "At the end of the line Fiona comes to a halt under the black parasol, exactly where the shadow of the funnel stops." },
+    { say: "pippa", text: "Parasol! Could you smile? Only a bit. Only on one side." },
+    { say: "fiona", alias: "Girl in black lace", text: "No. I shall stand very still instead. It is the same service, and it lasts longer." },
+    { when: (s)=>!s.flags["met_trixie"], text: "The girl beside her is finding stillness a good deal harder. Yellow-striped socks, two bunches of honey-blonde hair, up on her toes and off them again — and one finger held out dead level, with something very small walking along it." },
+    { when: (s)=>!!s.flags["met_trixie"], text: "Beside her Trixie is finding stillness a good deal harder: up on her toes and off them again, with one finger held out dead level for Belinda." },
+    { when: (s)=>!s.flags["met_hedda"], text: "A megaphone comes up over the front row. Somewhere underneath it there is a crown of wildflowers." },
+    { when: (s)=>!!s.flags["met_hedda"], text: "A megaphone comes up over the front row. Somewhere underneath it there is Hedda." },
+    { when: (s)=>!s.flags["hedda_signed"], say: "hedda", alias: "Girl with a petition", text: "AFTER THE PHOTOGRAPH NOBODY LEAVES WITHOUT SIGNING! THE PEN IS ON A STRING! IT CAN'T GET AWAY EITHER!" },
+    { when: (s)=>!!s.flags["hedda_signed"], say: "hedda", alias: "Girl with a petition", text: "AFTER THE PHOTOGRAPH NOBODY LEAVES WITHOUT SIGNING! — Not you, Vance. You're on the page. Stand there and look signed." },
     { say: "pippa", text: "Everyone say — I don't know — 'island'!" },
     { text: "All of you, awkwardly, in a ragged line, say \"island.\"" },
     { text: "Click." },
@@ -948,6 +1372,14 @@ scene("arrival_finale", {
       text: "The bell rings again, three times, loud and clear. The engine note drops. All round you, the ship, which has been a collection of separate little worlds all morning, slowly becomes one."
     },
     { text: "Everyone has come to the rails." },
+    { text: "You look along them, bow to stern, because for once they are all in one place." },
+    { text: "In the point of the bow, a wide-brimmed hat and a brass compass. A boy with a scar, standing as if on parade beside luggage that has not shifted an inch. A long black coat, flying. A broken nose over a grey hood, hands in pockets. And on the nearest bench a grey blanket, which — you watch it happen — sits up." },
+    { say: "dmitri", alias: "Boy under a blanket", text: "…So. It is true. There is an island." },
+    { text: "Amidships: welding goggles pushed up into copper hair. A black parasol. A canvas satchel that you very nearly miss. A crown of wildflowers with a clipboard under it. Striped socks, on tiptoe. A paperback, lifted at last, shading a pair of pale eyes instead of covering them." },
+    { text: "At the saloon door, a red pen with its cap on. Five deck boxes in one stack, level. A wine-red beret, facing forwards. And aft, a striped scarf that has, for once, nothing to add, and a chef's bandana bent over a crate of tin mugs, counting them, and then looking up and counting heads instead." },
+    { when: (s)=>!!s.flags["eloise_time_promise"]&&!s.flags["eloise_time_kept"], think: "I told Eloise I'd say when we were nearly in. Somebody has turned her round. It wasn't me." },
+    { when: (s)=>!s.flags["freddie_jumped"], text: "Thirty-eight, counting you. Red, gold and black, and one rain jacket." },
+    { when: (s)=>!!s.flags["freddie_jumped"], text: "Thirty-eight came aboard, counting you. The rails are a little short of that, and the white water astern explains the difference. Red, gold and black, and one rain jacket." },
     { enter: "nathan" },
     { enter: "baylee" },
     {
@@ -1013,6 +1445,7 @@ scene("arrival_finale", {
     },
     { label: "next_14" },
     { label: "end_13" },
+    { say: "trixie", alias: "Girl in striped socks", text: "Wave slowly, though! Everybody, slowly! There's somebody very small on board who's never seen land before!" },
     { when: (s)=>!(!!s.flags["met_ed"]), jump: "next_16" },
     {
       say: "ed",
@@ -1031,6 +1464,7 @@ scene("arrival_finale", {
     },
     { label: "next_18" },
     { label: "end_17" },
+    { say: "freya", alias: "Girl under a book", text: "It is too warm, and it is not yet eleven. I intend to complain about this island for years." },
     { when: (s)=>!(!!s.flags["met_marit"]), jump: "next_20" },
     {
       say: "marit",
