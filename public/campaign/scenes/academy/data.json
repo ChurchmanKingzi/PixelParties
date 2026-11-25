@@ -1,0 +1,3960 @@
+{
+ "px": [
+  "ashton",
+  "baylee",
+  "branden",
+  "brant",
+  "freddie",
+  "georgie",
+  "hedda",
+  "jessica",
+  "lilia",
+  "livvie",
+  "marit",
+  "nathan",
+  "rana",
+  "tavita",
+  "teobalt",
+  "viktor",
+  "willas"
+ ],
+ "letter": {
+  "salutation": "Dear Mr.",
+  "paragraphs": [
+   "Pixel Academy, founded in the conviction that the game is the finest instrument of character yet devised, has the honour to confirm your admission to the incoming class, at the eleventh hour and not without astonishment on our part, as its Wildcard entrant: the last open seat of the year.",
+   "You will cross to Caldera Key by the Academy ferry, which ties up at the pier at twenty minutes to eleven on the morning of Monday, the first day of term. The island has never been impressed by anyone arriving early.",
+   "In view of the lateness of your admission you are placed in the Commons, Bungalow 7, on the south cove, which you will share with two fellow first-years. The dormitories of the Academy are ranked, as all things worth having are, and the Commons stands at the foot of the ladder. You are to begin there, as many who have since climbed it have done before you.",
+   "You are enrolled in the Competitive Play major, whose jacket is red. Your fellow students received theirs by post a month ago. Owing to the shortness of the notice, yours will be issued to you upon arrival, together with the plain grey collar of the Commons. Until then you will, we regret, be conspicuous.",
+   "Enclosed is the Academy's customary purse of one hundred and forty Smug Coins, the currency of the island and of no other place."
+  ],
+  "closing": "With every expectation,",
+  "signature": [
+   "Dr. Marguerite Vicar",
+   "Chancellor of Pixel Academy, Caldera Key"
+  ]
+ },
+ "alias": {
+  "nathan": "Spiky-haired boy",
+  "baylee": "Very tall boy in a straw hat",
+  "ed": "Boy in a battered hat",
+  "georgie": "Girl with the dark-blue feather",
+  "pippa": "Girl with a camera",
+  "mikoto": "Apologetic boy",
+  "gideon": "Boy in white gloves",
+  "inya": "Girl with the bunny clip",
+  "tomi": "Boy in a yellow bandana",
+  "magnus": "Boy with a tablet",
+  "noor": "Girl with a rulebook",
+  "livvie": "Girl with a clipboard",
+  "jessica": "Girl with the caskets",
+  "ashton": "Boy with a rose",
+  "victoria": "Girl with a parasol",
+  "sunny": "Girl on the rail",
+  "marit": "Girl on a bollard",
+  "abel": "The captain",
+  "rana": "Scowling girl",
+  "teobalt": "Boy with a clipboard",
+  "branden": "Flame-haired kid",
+  "freddie": "Girl with goggles on her head"
+ },
+ "people": {
+  "nathan": {
+   "name": "Nathan Whisper",
+   "first": "Nathan",
+   "romance": false,
+   "deck": {
+    "name": "War Room",
+    "heroes": [
+     "Tharx, the Never-Losing General",
+     "Layn, Defender of Deri",
+     "Silent Water Mizune"
+    ],
+    "key": [
+     [
+      "Censpartan War Counselor",
+      "Makes his other Counselors untargetable; if you have more creatures than he does, it destroys the surplus."
+     ],
+     [
+      "Cykyran War Counselor",
+      "With three different Counselors out, doubles his heroes' base Attack; each turn hits a target for one of his heroes' Attack."
+     ],
+     [
+      "Gorinthian War Counselor",
+      "With two Counselors out, stuns a target for two turns (it takes no damage while stunned)."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "rowan",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "baylee",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "tomi",
+     "label": "owes",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "rana",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "bex",
+     "label": "crush",
+     "pub": false,
+     "from": 3
+    },
+    {
+     "w": "sammy",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "mikoto",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "fiona",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "ed",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "dmitri",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "rafa",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    }
+   ]
+  },
+  "baylee": {
+   "name": "Baylee Halvorsen",
+   "first": "Baylee",
+   "romance": false,
+   "deck": {
+    "name": "Big Stomp!",
+    "heroes": [
+     "Güldefaber, the King of Dwarfs",
+     "Kit, the Shark Researcher",
+     "Alex, Trainer of Heroes"
+    ],
+    "key": [
+     [
+      "Gigantisaur Chimera",
+      "The boss: enormous health, summoned by discarding three different Gigantisaurs from hand (which ends his turn). Each turn it hits one target harder for every different Gigantisaur in his discard pile."
+     ],
+     [
+      "Gigantisaur King Trex",
+      "Enters by sacrificing another Gigantisaur; while it stands, every Gigantisaur in his hand can be summoned without levels."
+     ],
+     [
+      "Gigantisaur Stomp",
+      "Free extra hit from any hero that has a truly huge creature beside it; one per hero per turn."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "rowan",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "nathan",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "livvie",
+     "label": "crush",
+     "pub": false,
+     "from": 10
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "sunny",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "sammy",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "eberhart",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "maisie",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "hedda",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "trixie",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "rafa",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "keoni",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "shirin",
+     "label": "protégé",
+     "pub": true,
+     "from": 9
+    }
+   ]
+  },
+  "ed": {
+   "name": "Ed Venture",
+   "first": "Ed",
+   "romance": false,
+   "deck": {
+    "name": "Monkee Rodeo",
+    "heroes": [
+     "Logan, the Investment Monkee",
+     "Güldefaber, the King of Dwarfs",
+     "Rool, the Troll Guard"
+    ],
+    "key": [
+     [
+      "Logan, the Investment Monkee",
+      "Turns gold into Invest Counters. At the end of each turn he either collects gold equal to the counters or hits any target for five times their number. If Ed ever has no gold, all counters vanish."
+     ],
+     [
+      "Cheeky Monkee",
+      "Whenever Ed gains a little gold by an effect he may spend it at once on a solid hit; can also cash in Invest Counters for a hit."
+     ],
+     [
+      "Nimble Monkee",
+      "Jumps from hand for free on a gold gain; turns Invest Counters into cards."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "tomi",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "viktor",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "inya",
+     "label": "crush",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "nathan",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 21
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "sunny",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    }
+   ]
+  },
+  "pippa": {
+   "name": "Pippa Lund",
+   "first": "Pippa",
+   "romance": true,
+   "deck": {
+    "name": "Slimy Infestation",
+    "heroes": [
+     "Alice, the Puppeteer Girl",
+     "Stellan, the Calm Cat",
+     "Barker, the Monster Tamer"
+    ],
+    "key": [
+     [
+      "Alice, the Puppeteer Girl",
+      "Once per turn hits one of your targets, harder for every creature of hers that has been on the board since last turn."
+     ],
+     [
+      "Stellan, the Calm Cat",
+      "When he is hit or affected, up to three different small creatures jump from her hand onto the board."
+     ],
+     [
+      "Barker, the Monster Tamer",
+      "Starts the game with a small creature already in play."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "georgie",
+     "label": "best friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "gideon",
+     "label": "distrusts",
+     "pub": false,
+     "from": 20
+    },
+    {
+     "w": "marit",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "bex",
+     "label": "teammates",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "sunny",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "victoria",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "sammy",
+     "label": "friends",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "ophelia",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "fiona",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "ed",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "cas",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "lucas",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "thandi",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    }
+   ]
+  },
+  "georgie": {
+   "name": "Georgie Santa",
+   "first": "Georgie",
+   "romance": false,
+   "deck": {
+    "name": "Hatchery",
+    "heroes": [
+     "Rubin, the Dragoneer Champion",
+     "Kit, the Shark Researcher",
+     "Luna Pele, the Flame Dancer"
+    ],
+    "key": [
+     [
+      "Rubin, the Dragoneer Champion",
+      "Whenever she summons a creature by sacrificing another, Rubin may immediately cast a Destruction spell from hand for free. Hard to affect with anything but damage."
+     ],
+     [
+      "Icy Dragonegg",
+      "One-health egg, free to summon onto an empty board. If it breaks during her own turn, it freezes any target for a turn."
+     ],
+     [
+      "Flaming Dragonegg",
+      "Same egg; breaking on her turn it sets any target on fire for good."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "inya",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "lilia",
+     "label": "protégé",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "ashton",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "pippa",
+     "label": "best friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "gideon",
+     "label": "distrusts",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "hana",
+     "label": "protégé",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "victoria",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "magnus",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "mikoto",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "trixie",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "anni",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "thandi",
+     "label": "protégé",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "baraka",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    }
+   ]
+  },
+  "mikoto": {
+   "name": "Mikoto Yamaguchi",
+   "first": "Mikoto",
+   "romance": false,
+   "deck": {
+    "name": "Tiny Bone Friends",
+    "heroes": [
+     "Rha'Bi, the Living Skeleton",
+     "Vacarn, the Dark Goblin Necromancer",
+     "Styx, the Gate to the Spirit World"
+    ],
+    "key": [
+     [
+      "The Bonegrinder",
+      "Area, cheap once Skeletons are in the discard pile: deletes dying Skeletons for a card each."
+     ],
+     [
+      "Raise the Minions!",
+      "Returns three Skeletons from the discard pile at once."
+     ],
+     [
+      "Skeleton Priest",
+      "Casts a cheap Destruction spell out of the discard pile each turn."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "eberhart",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "magnus",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "trixie",
+     "label": "crush",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "noor",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "nathan",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": false,
+     "from": 9
+    },
+    {
+     "w": "isolde",
+     "label": "protégé",
+     "pub": true,
+     "from": 68
+    },
+    {
+     "w": "kenji",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "georgie",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    }
+   ]
+  },
+  "inya": {
+   "name": "Inya Bell",
+   "first": "Inya",
+   "romance": true,
+   "deck": {
+    "name": "Hop & Pop",
+    "heroes": [
+     "Bubbles, the Bouncy Bunny",
+     "Cute Annoyance Mini",
+     "Maya, the Nature Fairy"
+    ],
+    "key": [
+     [
+      "Bubbles, the Bouncy Bunny",
+      "A very tough hero who can take any damage aimed at Inya's creatures himself. If he goes down that way, Inya refills her hand."
+     ],
+     [
+      "Bunny Bombs",
+      "A tiny creature that collects a Bomb Counter at the end of every turn (both players'). When it dies it blasts every target on the board, harder for each counter. If that blast would end the game in a draw, its controller loses."
+     ],
+     [
+      "Haressassin",
+      "Fragile creature that strikes one target hard every turn, starting the turn after it arrives."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "livvie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "rana",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "chuck",
+     "label": "family",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "georgie",
+     "label": "rivals",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "gideon",
+     "label": "distrusts",
+     "pub": false,
+     "from": 14
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "wren",
+     "label": "friends",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "ed",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    }
+   ]
+  },
+  "gideon": {
+   "name": "Gideon Pryce",
+   "first": "Gideon",
+   "romance": false,
+   "deck": {
+    "name": "Guardians of the Treasure Cave",
+    "heroes": [
+     "Cooldin, King of Coolness",
+     "Mao, the Vengeful Guardian",
+     "Alice, the Puppeteer Girl"
+    ],
+    "key": [
+     [
+      "Guardian Beast Ma",
+      "Sends the top cards of BOTH decks to the discard piles each turn: fuel."
+     ],
+     [
+      "Guardian Beast Hou",
+      "Deletes cards from either discard pile to hit that many targets."
+     ],
+     [
+      "Guardian Beast Hu",
+      "Deletes five cards for an extra action with any of his heroes."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "inya",
+     "label": "rivals",
+     "pub": false,
+     "from": 14
+    },
+    {
+     "w": "ashton",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "georgie",
+     "label": "rivals",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "teobalt",
+     "label": "rivals",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "pippa",
+     "label": "distrusts",
+     "pub": false,
+     "from": 20
+    },
+    {
+     "w": "marrow",
+     "label": "owes",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "santangel",
+     "label": "distrusts",
+     "pub": false,
+     "from": 8
+    },
+    {
+     "w": "brant",
+     "label": "distrusts",
+     "pub": false,
+     "from": 15
+    },
+    {
+     "w": "magnus",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "fiona",
+     "label": "crush",
+     "pub": false,
+     "from": 10
+    },
+    {
+     "w": "tobias",
+     "label": "enemies",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "anni",
+     "label": "distrusts",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "tariq",
+     "label": "distrusts",
+     "pub": false,
+     "from": 20
+    }
+   ]
+  },
+  "tomi": {
+   "name": "Tomás \"Tomi\" Reyes",
+   "first": "Tomi",
+   "romance": false,
+   "deck": {
+    "name": "Free Port",
+    "heroes": [
+     "Gabby, the Boarding Broad",
+     "Key, the Cursed Thief",
+     "Monsieur Pete, the Booty Raider"
+    ],
+    "key": [
+     [
+      "Dirty Smuggler",
+      "Whenever you draw by an effect it steals gold from you; if you have none, he draws twice as many cards instead."
+     ],
+     [
+      "Smuggler's Pier",
+      "Area: either player may buy cards for gold on their own turn."
+     ],
+     [
+      "Thieving",
+      "Ability: steals gold from you every turn, more per level."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "viktor",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "livvie",
+     "label": "teammates",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "nathan",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "dex",
+     "label": "protégé",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "mika",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": false,
+     "from": 9
+    },
+    {
+     "w": "bex",
+     "label": "teammates",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "ed",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "leona",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "maisie",
+     "label": "teammates",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "tobias",
+     "label": "teammates",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "imara",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "cati",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "shirin",
+     "label": "enemies",
+     "pub": true,
+     "from": 10
+    }
+   ]
+  },
+  "magnus": {
+   "name": "Magnus Prospero",
+   "first": "Magnus",
+   "romance": false,
+   "deck": {
+    "name": "This Week: One-Two-Punch",
+    "heroes": [
+     "Bill, the Angry Auctioneer",
+     "Ghuanjun, the Undead Martial Artist",
+     "Elana, the Rocky Rebel"
+    ],
+    "key": [
+     [
+      "Ghuanjun, the Undead Martial Artist",
+      "May make up to three different attacks in a turn if nobody else acts; his targets cannot drop below one health that turn."
+     ],
+     [
+      "Bill, the Angry Auctioneer",
+      "Starts the game with two equipment cards already searched."
+     ],
+     [
+      "Elana, the Rocky Rebel",
+      "Reshuffles her hand for one more card each turn."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "ophelia",
+     "label": "crush",
+     "pub": true,
+     "from": 20
+    },
+    {
+     "w": "rowan",
+     "label": "rivals",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "rex",
+     "label": "rivals",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "kenji",
+     "label": "rivals",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "gideon",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "dom",
+     "label": "protégé",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "bex",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "ashton",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "georgie",
+     "label": "rivals",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "mikoto",
+     "label": "distrusts",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "sebastian",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    }
+   ]
+  },
+  "noor": {
+   "name": "Noor Al-Sayed",
+   "first": "Noor",
+   "romance": true,
+   "deck": {
+    "name": "Countdown",
+    "heroes": [
+     "Sabrina, the Psychic Witch",
+     "Silent Water Mizune",
+     "Baaliel, the Demon General"
+    ],
+    "key": [
+     [
+      "Doom Clock",
+      "Area. At the end of each turn the turn player adds a Doom Counter; whenever a player's targets are defeated, that player adds one (up to four times a turn). Whoever places the twentieth counter loses the game."
+     ],
+     [
+      "Doom Prophecy",
+      "Fetches the Doom Clock into play with three counters on it and ends her turn; at higher Decay Magic she can put it into YOUR Area zone."
+     ],
+     [
+      "Basketskull",
+      "Removes any number of counters from the Clock and hits one target for each removed."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "saoirse",
+     "label": "distrusts",
+     "pub": true,
+     "from": 14
+    },
+    {
+     "w": "teobalt",
+     "label": "friends",
+     "pub": false,
+     "from": 4
+    },
+    {
+     "w": "marit",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "hana",
+     "label": "protégé",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "mika",
+     "label": "teammates",
+     "pub": true,
+     "from": 13
+    },
+    {
+     "w": "sunny",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "eberhart",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "mikoto",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "anni",
+     "label": "rivals",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "lucas",
+     "label": "protégé",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "sebastian",
+     "label": "distrusts",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "imara",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "tavita",
+     "label": "friends",
+     "pub": true,
+     "from": 14
+    },
+    {
+     "w": "pilar",
+     "label": "colleagues",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "zeynep",
+     "label": "protégé",
+     "pub": true,
+     "from": 12
+    }
+   ]
+  },
+  "livvie": {
+   "name": "Olivia \"Livvie\" Thana",
+   "first": "Livvie",
+   "romance": true,
+   "deck": {
+    "name": "Crystal Gifts",
+    "heroes": [
+     "Cooldin, King of Coolness",
+     "Mary Crestmas",
+     "Arthor, the King of Blackport"
+    ],
+    "key": [
+     [
+      "Crystal Well",
+      "Area (Cooldin plays it from the deck on turn one): once per turn each player may hand the other a card they own and draw one."
+     ],
+     [
+      "Mary Crestmas",
+      "Draws a card for every card Livvie hands you; once per turn cancels damage to herself by making you discard one of Livvie's cards from your hand. Very low health."
+     ],
+     [
+      "Arthor, the King of Blackport",
+      "Whenever he casts a spell you discard a card."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "inya",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "rana",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": false,
+     "from": 10
+    },
+    {
+     "w": "tomi",
+     "label": "teammates",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "wren",
+     "label": "protégé",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "teobalt",
+     "label": "teammates",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "camille",
+     "label": "owes",
+     "pub": false,
+     "from": 23
+    },
+    {
+     "w": "odalys",
+     "label": "owes",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "tobias",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "eloise",
+     "label": "teammates",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "rafa",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "junho",
+     "label": "rivals",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "imara",
+     "label": "protégé",
+     "pub": true,
+     "from": 6
+    }
+   ]
+  },
+  "jessica": {
+   "name": "Jessica Montclair",
+   "first": "Jessica",
+   "romance": true,
+   "deck": {
+    "name": "Dowry",
+    "heroes": [
+     "Teocuilatl, the Embodiment of Gods",
+     "Boris, the Guardian of Blackport",
+     "Willy, the Valiant Leprechaun"
+    ],
+    "key": [
+     [
+      "Teocuilatl, the Embodiment of Gods",
+      "Tough hero who turns sacrifices into gold: an older creature for a little, or once per game one of her own heroes for a lot (which ends her turn)."
+     ],
+     [
+      "Willy, the Valiant Leprechaun",
+      "At the end of her first turn she takes either five cards or a pile of gold."
+     ],
+     [
+      "Boris, the Guardian of Blackport",
+      "Her weapon carrier: sturdy, a fighter, and nothing she owns can be stolen or taken over."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "ashton",
+     "label": "exes",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "georgie",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "octavia",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "vivienne",
+     "label": "protégé",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "marit",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "selene",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "odalys",
+     "label": "protégé",
+     "pub": false,
+     "from": 11
+    },
+    {
+     "w": "victoria",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "ophelia",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "tobias",
+     "label": "distrusts",
+     "pub": false,
+     "from": 14
+    },
+    {
+     "w": "cas",
+     "label": "rivals",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "pilar",
+     "label": "friends",
+     "pub": true,
+     "from": 14
+    }
+   ]
+  },
+  "ashton": {
+   "name": "Ashton Beaumont-Lyle",
+   "first": "Ashton",
+   "romance": false,
+   "deck": {
+    "name": "Spell Industrialization",
+    "heroes": [
+     "Cooldin, King of Coolness",
+     "Victorica, the Eternal Empress",
+     "Ingo, Investor of Evil"
+    ],
+    "key": [
+     [
+      "Pyroblast",
+      "Hits any number of targets he likes and drops one Pollution Token on his own side per target."
+     ],
+     [
+      "Pollution Spewer",
+      "An artifact that sits on the board as a creature; whenever a Pollution Token leaves his side it shoots a target."
+     ],
+     [
+      "Pollution Piranha",
+      "Free creature summoned by removing a Pollution Token; nips a target each turn. When it leaves the board he loses a card from hand."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "sunny",
+     "label": "exes",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "jessica",
+     "label": "exes",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "selene",
+     "label": "exes",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "bex",
+     "label": "exes",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "isolde",
+     "label": "exes",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "gideon",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "georgie",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "marit",
+     "label": "rivals",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "sammy",
+     "label": "mentor",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "magnus",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "freya",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "tobias",
+     "label": "distrusts",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "anni",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "sebastian",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    }
+   ]
+  },
+  "victoria": {
+   "name": "Victoria Capulet",
+   "first": "Victoria",
+   "romance": true,
+   "deck": {
+    "name": "Pretty Things",
+    "heroes": [
+     "Beato, the Butterfly Witch",
+     "Cute Princess Mary",
+     "Thalia, the Fun Fairy"
+    ],
+    "key": [
+     [
+      "Moonlight Butterfly",
+      "Tiny creature that can fly back to hand at the end of your turn and sting the hero opposite."
+     ],
+     [
+      "Golden Apple",
+      "Borrows one of your heroes for a turn; her only real threat."
+     ],
+     [
+      "Magic Ruby",
+      "Stuns one of your heroes for a turn."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "pippa",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "ophelia",
+     "label": "family",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "vivienne",
+     "label": "protégé",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "georgie",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "marit",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "chuck",
+     "label": "protégé",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "cas",
+     "label": "teammates",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "eberhart",
+     "label": "crush",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "eloise",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "lucas",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    }
+   ]
+  },
+  "sunny": {
+   "name": "Sunniva \"Sunny\" Aldane",
+   "first": "Sunny",
+   "romance": true,
+   "deck": {
+    "name": "Slip 'n Slide",
+    "heroes": [
+     "Cooldin, King of Coolness",
+     "Hel, the Bound Specter",
+     "Ingo, Investor of Evil"
+    ],
+    "key": [
+     [
+      "Slippery Spikeblock",
+      "One-health block. Every time it slides to a neighbouring hero it hits your hero in the same position."
+     ],
+     [
+      "Slippery Snowman",
+      "When it slides, it freezes your hero in the same position for a turn (if none of yours is frozen yet)."
+     ],
+     [
+      "Slippery Whoolmoth",
+      "Huge creature that is free once every one of her heroes has a creature; each slide hits your hero in that lane, or a creature beside it, hard."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "ashton",
+     "label": "exes",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "priya",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "noor",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "rox",
+     "label": "protégé",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "selene",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "ed",
+     "label": "crush",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "trixie",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "baraka",
+     "label": "protégé",
+     "pub": true,
+     "from": 3
+    }
+   ]
+  },
+  "marit": {
+   "name": "Marit Solberg",
+   "first": "Marit",
+   "romance": true,
+   "deck": {
+    "name": "Phoenix Encore",
+    "heroes": [
+     "Visionary Genius Heinz",
+     "Cute Annoyance Mini",
+     "Cool Rescuer Monia"
+    ],
+    "key": [
+     [
+      "Cute Phoenix",
+      "The win condition. Once per turn it hits one target, harder for every differently named creature in her discard pile. If you defeat it she discards two cards and it returns at full health. Only one at a time."
+     ],
+     [
+      "Cute Bird",
+      "When it dies she may discard two cards to bring a Cute Phoenix straight from the deck into its place."
+     ],
+     [
+      "Cute Cat",
+      "Goes to the discard pile the moment it is summoned and mills three more cards with it."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "ashton",
+     "label": "rivals",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "bex",
+     "label": "teammates",
+     "pub": true,
+     "from": 14
+    },
+    {
+     "w": "vivienne",
+     "label": "protégé",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "felix",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "noor",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "eloise",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "sammy",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "victoria",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "fiona",
+     "label": "rivals",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "cas",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "pilar",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    }
+   ]
+  },
+  "abel": {
+   "name": "Captain Stroud",
+   "first": "Abel",
+   "romance": false,
+   "deck": null,
+   "bonds": [
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "odalys",
+     "label": "crush",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "hedda",
+     "label": "distrusts",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "cas",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "cati",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "rana": {
+   "name": "Rana Marika",
+   "first": "Rana",
+   "romance": true,
+   "deck": {
+    "name": "Debug Mode",
+    "heroes": [
+     "Bakhm, the Desert Digger",
+     "Alleria, the Queen of Spiders",
+     "Silent Water Mizune"
+    ],
+    "key": [
+     [
+      "Cybug LOCUST",
+      "Face-down. When you equip or attach a card to one of your heroes, it is attached to Rana's hero instead. Paid for by deleting a Treasure Hunter's Backpack."
+     ],
+     [
+      "Cybug LADYBUG",
+      "Face-down. When you activate an Ability, it is cancelled and a copy of any Ability on the board is knocked off. Paid for with a Magic Amethyst."
+     ],
+     [
+      "Cybug ANTS",
+      "Face-down. When you damage its hero without killing it, the same damage is dealt to one of your targets. Paid for with a Future Tech Gun."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "inya",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "livvie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "kenji",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "priya",
+     "label": "rivals",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "nathan",
+     "label": "distrusts",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "santangel",
+     "label": "distrusts",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "ophelia",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "dmitri",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    }
+   ]
+  },
+  "teobalt": {
+   "name": "Teobalt Fullington",
+   "first": "Teobalt",
+   "romance": false,
+   "deck": {
+    "name": "Order of Tusca",
+    "heroes": [
+     "Hatusbal, the Leader of Tusca",
+     "Klaus, the Cult Leader",
+     "Natas, the Master of Hell"
+    ],
+    "key": [
+     [
+      "Hatusbal, the Leader of Tusca",
+      "While he is active you cannot shuffle cards back into your deck with effects at all; he draws whenever Teobalt shuffles two or more back."
+     ],
+     [
+      "Natas, the Master of Hell",
+      "May skip his normal draw to take a fresh copy of The Master's Plan instead, every turn."
+     ],
+     [
+      "Klaus, the Cult Leader",
+      "When he casts a Decay spell he puts a smaller creature from hand onto the board for free."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "gideon",
+     "label": "rivals",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "livvie",
+     "label": "teammates",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "octavia",
+     "label": "protégé",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "noor",
+     "label": "crush",
+     "pub": false,
+     "from": 4
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 13
+    },
+    {
+     "w": "felix",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "junho",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "eberhart",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "hedda",
+     "label": "teammates",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "anni",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "sebastian",
+     "label": "rivals",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "imara",
+     "label": "protégé",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "tavita",
+     "label": "protégé",
+     "pub": true,
+     "from": 13
+    },
+    {
+     "w": "pilar",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    }
+   ]
+  },
+  "cati": {
+   "name": "Catarina \"Cati\" Fagundes",
+   "first": "Cati",
+   "romance": true,
+   "deck": {
+    "name": "Signed For",
+    "heroes": [
+     "Bloom, the Maniacal Botanist",
+     "Pes'zet, the Plague Bringer",
+     "Klaus, the Cult Leader"
+    ],
+    "key": [
+     [
+      "Paraseed",
+      "A small creature. When one of your heroes or creatures defeats it, it moves into that hero's support zone instead of dying: that hero is poisoned for as long as it sits there, the poison cannot be healed, and it eats maximum health."
+     ],
+     [
+      "Bloom, the Maniacal Botanist",
+      "Poison on any hero that carries Paraseeds hurts far more, for each Paraseed on it."
+     ],
+     [
+      "Pes'zet, the Plague Bringer",
+      "Every time a creature lands in one of her heroes' support zones she adds a stack of poison to any target on the board."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "abel",
+     "label": "protégé",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "livvie",
+     "label": "colleagues",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "tomi",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "bex",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "dex",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "keoni",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "zeynep",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "shirin",
+     "label": "protégé",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "thandi",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "okonkwo",
+     "label": "distrusts",
+     "pub": false,
+     "from": 40
+    },
+    {
+     "w": "josie",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "freddie": {
+   "name": "Winifred \"Freddie\" Camara",
+   "first": "Freddie",
+   "romance": false,
+   "deck": {
+    "name": "Aquatic",
+    "heroes": [
+     "Silent Water Mizune",
+     "Kit, the Shark Researcher",
+     "Madaga, the Forsaken Seafarer"
+    ],
+    "key": [
+     [
+      "Silent Water Mizune",
+      "The main hero: once per turn she sends a Surprise from the board to the discard pile to draw a card."
+     ],
+     [
+      "Water Golem",
+      "A Surprise creature: it activates when one of Freddie's Surprises is sent away, which Mizune does on purpose."
+     ],
+     [
+      "Aquatic Arrows",
+      "A Destruction Magic Surprise. None of Freddie's heroes can cast it, which she regards as a detail."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "sunny",
+     "label": "swim buddies",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "okonkwo": {
+   "name": "Chancellor Vicar",
+   "first": "Marguerite",
+   "romance": false,
+   "deck": null,
+   "bonds": [
+    {
+     "w": "chuck",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "viktor",
+     "label": "distrusts",
+     "pub": false,
+     "from": 1
+    },
+    {
+     "w": "octavia",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "marrow",
+     "label": "distrusts",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "ashdown",
+     "label": "colleagues",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "silas",
+     "label": "colleagues",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "santangel",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "camille",
+     "label": "colleagues",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "hedda",
+     "label": "distrusts",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "helical",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "trixie",
+     "label": "mentor",
+     "pub": true,
+     "from": 12
+    }
+   ]
+  },
+  "octavia": {
+   "name": "Octavia Sterling",
+   "first": "Octavia",
+   "romance": true,
+   "deck": {
+    "name": "Nine Circles",
+    "heroes": [
+     "Dante, the Wanderer of Hell",
+     "Feral, the Fortress Breaker",
+     "Madame Guillotine, the Great Equalizer"
+    ],
+    "key": [
+     [
+      "Dante, the Wanderer of Hell",
+      "Once per turn deletes her current Area and brings one of her deleted Areas into play instead; or deletes a spell from hand to draw."
+     ],
+     [
+      "Feral, the Fortress Breaker",
+      "Hits a target every time any Area is played, and can clear all Areas once per turn."
+     ],
+     [
+      "Madame Guillotine, the Great Equalizer",
+      "During YOUR turn, each time you take an action or use a hero or Ability effect, she removes one Ability from one of your heroes until the end of the turn."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "lilia",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "dom",
+     "label": "exes",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "teobalt",
+     "label": "mentor",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "wren",
+     "label": "rivals",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "marrow",
+     "label": "colleagues",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "okonkwo",
+     "label": "protégé",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "hedda",
+     "label": "enemies",
+     "pub": true,
+     "from": 14
+    },
+    {
+     "w": "junho",
+     "label": "mentor",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "tariq",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "sebastian",
+     "label": "distrusts",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "imara",
+     "label": "colleagues",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "tavita",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "pilar",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "odalys": {
+   "name": "Mama Odalys",
+   "first": "Odalys",
+   "romance": false,
+   "deck": null,
+   "bonds": [
+    {
+     "w": "willas",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "jessica",
+     "label": "mentor",
+     "pub": false,
+     "from": 11
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "livvie",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "nathan",
+     "label": "friends",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "teobalt",
+     "label": "friends",
+     "pub": true,
+     "from": 13
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "abel",
+     "label": "crush",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "maisie",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "freya",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "hedda",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "tobias",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "trixie",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "dmitri",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "rafa",
+     "label": "mentor",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "tavita",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "keoni",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "cati",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "hedda": {
+   "name": "Hedda Njord",
+   "first": "Hedda",
+   "romance": true,
+   "deck": {
+    "name": "Elven Vanguard",
+    "heroes": [
+     "Barker, the Monster Tamer",
+     "Maya, the Nature Fairy",
+     "Tharx, the Never-Losing General"
+    ],
+    "key": [
+     [
+      "Elven Leader",
+      "Pings a target once for itself and once more for every other creature she controls."
+     ],
+     [
+      "Elven Druid",
+      "Summons an Elven creature straight from the deck each turn."
+     ],
+     [
+      "Elven Forager",
+      "Makes every Elven creature a level cheaper."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "freya",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "trixie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "rafa",
+     "label": "rivals",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "odalys",
+     "label": "rivals",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "teobalt",
+     "label": "teammates",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "octavia",
+     "label": "enemies",
+     "pub": true,
+     "from": 14
+    },
+    {
+     "w": "abel",
+     "label": "distrusts",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "okonkwo",
+     "label": "distrusts",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 30
+    },
+    {
+     "w": "wren",
+     "label": "protégé",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "sebastian",
+     "label": "enemies",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "pilar",
+     "label": "enemies",
+     "pub": true,
+     "from": 3
+    }
+   ]
+  },
+  "freya": {
+   "name": "Freya Nordlicht",
+   "first": "Freya",
+   "romance": true,
+   "deck": {
+    "name": "Glacier",
+    "heroes": [
+     "Fiedel, the Mercenary Mage",
+     "Klaus, the Cult Leader",
+     "Saya, the Plant Princess"
+    ],
+    "key": [
+     [
+      "Iceage",
+      "Freezes your whole side for a turn, two at a higher level."
+     ],
+     [
+      "Snowstorm Mischief",
+      "Freezes every creature for two turns."
+     ],
+     [
+      "Instant Cryo Stasis",
+      "Freezes a creature for the rest of the game."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "hedda",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "trixie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "tobias",
+     "label": "crush",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "dmitri",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "bex",
+     "label": "rivals",
+     "pub": true,
+     "from": 7
+    },
+    {
+     "w": "josie",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "camille",
+     "label": "owes",
+     "pub": false,
+     "from": 10
+    },
+    {
+     "w": "ashton",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    }
+   ]
+  },
+  "trixie": {
+   "name": "Beatrix \"Trixie\" Hollis",
+   "first": "Trixie",
+   "romance": true,
+   "deck": {
+    "name": "Bzzz-BOOM",
+    "heroes": [
+     "Kohta, the Silent Observer",
+     "Alice, the Puppeteer Girl",
+     "Kit, the Shark Researcher"
+    ],
+    "key": [
+     [
+      "Bomblebee",
+      "Once per turn, when one of YOUR targets is defeated, it hits another of your targets hard."
+     ],
+     [
+      "Carpet Bomblebee",
+      "When one of your targets is defeated, hits all your heroes."
+     ],
+     [
+      "Dive Bomblebee",
+      "When one of your targets is defeated, puts one of your non-hero cards on the bottom of your deck."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "freya",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "hedda",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "mikoto",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "baylee",
+     "label": "crush",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "okonkwo",
+     "label": "protégé",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "georgie",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "silas",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": true,
+     "from": 20
+    },
+    {
+     "w": "sunny",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    }
+   ]
+  },
+  "maisie": {
+   "name": "Maisie Voltage",
+   "first": "Maisie",
+   "romance": true,
+   "deck": {
+    "name": "Overdraft Mk. III",
+    "heroes": [
+     "Kent, the Indebted Apprentice",
+     "Visionary Genius Heinz",
+     "Legendary Explorer Dajan"
+    ],
+    "key": [
+     [
+      "Kent, the Indebted Apprentice",
+      "May overspend by a fixed amount, going into negative gold, at the price of her action that turn."
+     ],
+     [
+      "Debt-O-Tron Model Missing Parts",
+      "Machine playable only in debt: each turn hits a target for ten times her negative gold."
+     ],
+     [
+      "Debt-O-Tron Model Money Printer",
+      "Draws cards whenever she overspends."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "fiona",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "leona",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "helical",
+     "label": "protégé",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "wren",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "santangel",
+     "label": "distrusts",
+     "pub": false,
+     "from": 62
+    },
+    {
+     "w": "marrow",
+     "label": "owes",
+     "pub": false,
+     "from": 63
+    },
+    {
+     "w": "dex",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "tomi",
+     "label": "teammates",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "junho",
+     "label": "crush",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "gani",
+     "label": "protégé",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "keoni",
+     "label": "protégé",
+     "pub": true,
+     "from": 5
+    }
+   ]
+  },
+  "fiona": {
+   "name": "Fiona Blackwood",
+   "first": "Fiona",
+   "romance": true,
+   "deck": {
+    "name": "The Wheel",
+    "heroes": [
+     "Elana, the Rocky Rebel",
+     "Calamitusk, the Chaorc War Chief",
+     "Asriel, the Sapling Sacrificer"
+    ],
+    "key": [
+     [
+      "Serpentous Demon",
+      "When it dies a Hydrogen Demon takes its place from the deck. Arriving through the cycle it draws two."
+     ],
+     [
+      "Hydrogen Demon",
+      "When it dies a Herbithorn Demon replaces it. Arriving through the cycle it freezes one of your heroes."
+     ],
+     [
+      "Herbithorn Demon",
+      "When it dies a Bouldor Demon replaces it. Arriving through the cycle it takes a card from any discard pile."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "maisie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "leona",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "sammy",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "dmitri",
+     "label": "crush",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "tobias",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "gideon",
+     "label": "distrusts",
+     "pub": false,
+     "from": 10
+    },
+    {
+     "w": "marit",
+     "label": "rivals",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "oru",
+     "label": "friends",
+     "pub": true,
+     "from": 13
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 41
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "selene",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "nathan",
+     "label": "distrusts",
+     "pub": true,
+     "from": 1
+    }
+   ]
+  },
+  "leona": {
+   "name": "Leona Helical",
+   "first": "Leona",
+   "romance": true,
+   "deck": {
+    "name": "Borrowed Brilliance",
+    "heroes": [
+     "Enigma, the Seller of Secrets",
+     "Lilly, the Charming Infiltrator",
+     "Gabby, the Boarding Broad"
+    ],
+    "key": [
+     [
+      "Enigma, the Seller of Secrets",
+      "Each turn reveals the top five cards of your deck and takes one; you reorder the rest."
+     ],
+     [
+      "Lilly, the Charming Infiltrator",
+      "Draws a card whenever Leona takes a card from your deck or hand."
+     ],
+     [
+      "Infiltration",
+      "Ability: takes cards off the top of your deck, choosing among three at higher levels."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "maisie",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "fiona",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "helical",
+     "label": "family",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "tobias",
+     "label": "crush",
+     "pub": false,
+     "from": 12
+    },
+    {
+     "w": "wren",
+     "label": "friends",
+     "pub": true,
+     "from": 20
+    },
+    {
+     "w": "tomi",
+     "label": "owes",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "viktor",
+     "label": "friends",
+     "pub": false,
+     "from": 30
+    },
+    {
+     "w": "marrow",
+     "label": "distrusts",
+     "pub": false,
+     "from": 0
+    },
+    {
+     "w": "santangel",
+     "label": "distrusts",
+     "pub": false,
+     "from": 25
+    },
+    {
+     "w": "dex",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "tariq",
+     "label": "distrusts",
+     "pub": false,
+     "from": 12
+    }
+   ]
+  },
+  "sammy": {
+   "name": "Sammy Counts",
+   "first": "Sammy",
+   "romance": false,
+   "deck": {
+    "name": "Denied",
+    "heroes": [
+     "Natas, the Master of Hell",
+     "Fiedel, the Mercenary Mage",
+     "Sabrina, the Psychic Witch"
+    ],
+    "key": [
+     [
+      "Natas, the Master of Hell",
+      "May skip his draw to take a fresh copy of The Master's Plan instead, every turn."
+     ],
+     [
+      "The Master's Plan",
+      "Reaction: cancels any one card you play from hand, once per turn."
+     ],
+     [
+      "Rusty Touch",
+      "Cancels an artifact; you still pay for it."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "tobias",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "dmitri",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "fiona",
+     "label": "crush",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "ashton",
+     "label": "protégé",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "marit",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "bex",
+     "label": "friends",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "nathan",
+     "label": "distrusts",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "pippa",
+     "label": "friends",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "baylee",
+     "label": "friends",
+     "pub": true,
+     "from": 6
+    }
+   ]
+  },
+  "tobias": {
+   "name": "Tobias Crowe",
+   "first": "Tobias",
+   "romance": false,
+   "deck": {
+    "name": "Smash and Grab",
+    "heroes": [
+     "Andras, the Human Weapon",
+     "Sid, the King of Thieves",
+     "Alex, Trainer of Heroes"
+    ],
+    "key": [
+     [
+      "Andras, the Human Weapon",
+      "When his attack hits one target and his Fighting is higher than the attack's level, it hits a second target as well."
+     ],
+     [
+      "Sid, the King of Thieves",
+      "Before the game he looks through your deck, takes two different cards and may use them as if they cost no level at all."
+     ],
+     [
+      "Alex, Trainer of Heroes",
+      "Spreads Fighting to Andras."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "sammy",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "dmitri",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "leona",
+     "label": "friends",
+     "pub": false,
+     "from": 12
+    },
+    {
+     "w": "fiona",
+     "label": "crush",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "freya",
+     "label": "friends",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "ashton",
+     "label": "distrusts",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "jessica",
+     "label": "friends",
+     "pub": false,
+     "from": 14
+    },
+    {
+     "w": "brant",
+     "label": "enemies",
+     "pub": false,
+     "from": 9
+    },
+    {
+     "w": "tomi",
+     "label": "teammates",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "livvie",
+     "label": "friends",
+     "pub": true,
+     "from": 10
+    },
+    {
+     "w": "gideon",
+     "label": "enemies",
+     "pub": true,
+     "from": 6
+    },
+    {
+     "w": "silas",
+     "label": "distrusts",
+     "pub": false,
+     "from": 20
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    }
+   ]
+  },
+  "dmitri": {
+   "name": "Dmitri Volkov",
+   "first": "Dmitri",
+   "romance": false,
+   "deck": {
+    "name": "Sleepless",
+    "heroes": [
+     "Tsu'Ki, the Lunatic Princess",
+     "Shu'Chaku, the Blood Moon Projection",
+     "Fern, the Ship Slave"
+    ],
+    "key": [
+     [
+      "Lunatic Cycle - New Moon",
+      "First equipment of the chain: discards a card each turn to search the next Moon."
+     ],
+     [
+      "Lunatic Cycle - Crescent Moon",
+      "Needs a New Moon out. Its hero reshuffles cards whenever it acts."
+     ],
+     [
+      "Lunatic Cycle - Half Moon",
+      "Needs a Crescent. Its hero cannot lose more than half its health to one hit."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "sammy",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "tobias",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "fiona",
+     "label": "friends",
+     "pub": true,
+     "from": 9
+    },
+    {
+     "w": "freya",
+     "label": "crush",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "rana",
+     "label": "friends",
+     "pub": true,
+     "from": 8
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 30
+    },
+    {
+     "w": "nathan",
+     "label": "friends",
+     "pub": true,
+     "from": 2
+    },
+    {
+     "w": "selene",
+     "label": "friends",
+     "pub": true,
+     "from": 20
+    },
+    {
+     "w": "kenji",
+     "label": "friends",
+     "pub": true,
+     "from": 15
+    },
+    {
+     "w": "odalys",
+     "label": "friends",
+     "pub": true,
+     "from": 3
+    },
+    {
+     "w": "tavita",
+     "label": "friends",
+     "pub": true,
+     "from": 20
+    }
+   ]
+  },
+  "hana": {
+   "name": "Ms. Kirishima",
+   "first": "Hana",
+   "romance": true,
+   "deck": {
+    "name": "Rules Check",
+    "heroes": [
+     "Alleria, the Queen of Spiders",
+     "Fiedel, the Mercenary Mage",
+     "Sabrina, the Psychic Witch"
+    ],
+    "key": [
+     [
+      "Alleria, the Queen of Spiders",
+      "Sets a trap from the deck every turn, draws when her own trap fires, and once per turn pulls a single-target hit onto whichever of her heroes has a trap waiting."
+     ],
+     [
+      "Fiedel, the Mercenary Mage",
+      "Sturdy; uses reaction spells as if they were a level cheaper."
+     ],
+     [
+      "Sabrina, the Psychic Witch",
+      "Sacrifices a creature to fetch a trap from the deck and spring it at once."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "georgie",
+     "label": "mentor",
+     "pub": true,
+     "from": 5
+    },
+    {
+     "w": "noor",
+     "label": "mentor",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "santangel",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "vivienne",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "camille",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "blum",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "anni",
+     "label": "mentor",
+     "pub": true,
+     "from": 4
+    },
+    {
+     "w": "lucas",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "thandi",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "zeynep",
+     "label": "mentor",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  },
+  "zeynep": {
+   "name": "Zeynep Arslan",
+   "first": "Zeynep",
+   "romance": true,
+   "deck": {
+    "name": "Letter of the Law",
+    "heroes": [
+     "Idej Lord Daiyo",
+     "Idej Lord Nobunakin",
+     "Idej Lord Todugawin"
+    ],
+    "key": [
+     [
+      "Idej Projection",
+      "Attached to a lord: when he would take ANY damage she may discard it to cancel that hit and everything that comes with it. One Projection, one hit, however small. Six in the deck."
+     ],
+     [
+      "Idej Lord Daiyo",
+      "A hundred health. Starts the game with three Projections attached. His sword Kogarasu (free for him) lowers every spell he uses by his Fighting level, one spell a turn."
+     ],
+     [
+      "Idej Lord Nobunakin",
+      "A hundred health. Starts with two Projections and a blade. With his sword Muras (free for him) his first Attack each turn is an extra Action."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "lucas",
+     "label": "colleagues",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "hana",
+     "label": "protégé",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "noor",
+     "label": "mentor",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "anni",
+     "label": "mentor",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "sebastian",
+     "label": "distrusts",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "magnus",
+     "label": "rivals",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "tomi",
+     "label": "distrusts",
+     "pub": true,
+     "from": 12
+    },
+    {
+     "w": "mika",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "lilia",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "kenji",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "shirin",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "cati",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "gani",
+     "label": "friends",
+     "pub": true,
+     "from": 0
+    },
+    {
+     "w": "okonkwo",
+     "label": "distrusts",
+     "pub": false,
+     "from": 40
+    }
+   ]
+  },
+  "viktor": {
+   "name": "Viktor Hale",
+   "first": "Viktor",
+   "romance": false,
+   "deck": {
+    "name": "Shifting Sandlands",
+    "heroes": [
+     "Nomu, Wanderer of Worlds",
+     "Bakhm, the Desert Digger",
+     "Silent Water Mizune"
+    ],
+    "key": [
+     [
+      "Bakhm, the Desert Digger",
+      "Hides trap creatures in his support zones too, and whenever any trap is sprung he hits a target hard."
+     ],
+     [
+      "Nomu, Wanderer of Worlds",
+      "Draws extra cards on single draws and has no hand limit."
+     ],
+     [
+      "Silent Water Mizune",
+      "Can discard one of his own traps for cards."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "tomi",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "saoirse",
+     "label": "friends",
+     "pub": false,
+     "from": 15
+    },
+    {
+     "w": "ashdown",
+     "label": "distrusts",
+     "pub": false,
+     "from": 1
+    },
+    {
+     "w": "silas",
+     "label": "distrusts",
+     "pub": false,
+     "from": 3
+    },
+    {
+     "w": "josie",
+     "label": "friends",
+     "pub": false,
+     "from": 6
+    },
+    {
+     "w": "okonkwo",
+     "label": "distrusts",
+     "pub": false,
+     "from": 1
+    },
+    {
+     "w": "ed",
+     "label": "roommates",
+     "pub": true,
+     "from": 1
+    },
+    {
+     "w": "leona",
+     "label": "friends",
+     "pub": false,
+     "from": 30
+    }
+   ]
+  },
+  "branden": {
+   "name": "Branden Sunflower",
+   "first": "Branden",
+   "romance": false,
+   "deck": {
+    "name": "Hot Stuff",
+    "heroes": [
+     "Luna Pele, the Flame Dancer",
+     "Tazune, the Angry Hot-Blood",
+     "Luna, the Flame Fairy"
+    ],
+    "key": [
+     [
+      "Luna Pele, the Flame Dancer",
+      "The main hero: whenever anything is Poisoned it is Burned for the rest of the game, and every time a target is Burned (up to four times a turn) Branden draws a card."
+     ],
+     [
+      "Fireball",
+      "Two targets, 150 damage each: the simple, loud answer to everything."
+     ],
+     [
+      "Heat Wave",
+      "Burns every target on the board except the caster for the rest of the game."
+     ]
+    ]
+   },
+   "bonds": [
+    {
+     "w": "georgie",
+     "label": "rival",
+     "pub": true,
+     "from": 0
+    }
+   ]
+  }
+ },
+ "rowan": {
+  "name": "Gather That Storm!",
+  "heroes": [
+   {
+    "name": "Nicolas, the Hidden Alchemist",
+    "abilities": [
+     "Alchemy",
+     "Alchemy"
+    ],
+    "type": "Hero",
+    "effect": "When you play this Hero, your deck may contain Potion cards. The combined number of Potions in your deck and Potion Deck cannot exceed 15 and the number of copies of any given Potion between your deck and Potion Deck cannot exceed 2. After you have played your second Potion during a turn, you cannot play Potions for the rest of that turn (even if this Hero gets defeated before then)."
+   },
+   {
+    "name": "Tarleinn the Traveler",
+    "abilities": [
+     "Destruction Magic",
+     "Support Magic"
+    ],
+    "type": "Hero",
+    "effect": "Once per turn, when a Hero you control with two or more different Spell Schools attached to it uses a Spell, you may choose a target you control and heal its HP by 40/80/150, depending on the Spell's level."
+   },
+   {
+    "name": "Treasure Huntress Semi",
+    "abilities": [
+     "Adventurousness",
+     "Adventurousness"
+    ],
+    "type": "Hero",
+    "effect": "You gain 6 additional Gold during your Resource Phase."
+   }
+  ],
+  "main": [
+   {
+    "n": 2,
+    "name": "Acid Vial",
+    "type": "Potion",
+    "effect": "Choose a target and deal 150 damage to it. This damage cannot be reduced, redirected or negated. You can only play 1 \"Acid Vial\" per turn."
+   },
+   {
+    "n": 1,
+    "name": "Cataclysm",
+    "type": "Spell (Destruction Magic)",
+    "effect": "While there is an Area in play, this Spell's level becomes 0. Deal 100 damage to all targets on the board and send all Areas on the board to the discard pile."
+   },
+   {
+    "n": 2,
+    "name": "Chain Lightning",
+    "type": "Spell (Destruction Magic)",
+    "effect": "Your opponent has to choose 3 targets they control consecutively (or as many targets as possible). \nThe first chosen target takes 200 damage, the second 150 and the third 100. Your opponent always has to choose their undefeated Heroes first."
+   },
+   {
+    "n": 2,
+    "name": "Cloud in a Bottle",
+    "type": "Potion (Reaction)",
+    "effect": "Play this card immediately when a target you control takes any damage. Halve any damage that target would take for the rest of the turn (including that damage) (rounded up)."
+   },
+   {
+    "n": 2,
+    "name": "Dark Gear",
+    "type": "Artifact",
+    "effect": "You can only play this card while you control no Creatures originally owned by your opponent. Choose a Creature your opponent controls and take permanent control of it. Place it into a free Support Zone of any Hero you control. That Creature's effects are negated for the rest of the turn. This Artifact's Cost is multiplied by the Creature's original level."
+   },
+   {
+    "n": 9,
+    "name": "Destruction Magic",
+    "type": "Ability",
+    "effect": "1) Allows the use of Destruction Spells up to Level 1.\n2) Allows the use of Destruction Spells up to Level 2.\n3) Allows the use of Destruction Spells up to Level 3."
+   },
+   {
+    "n": 1,
+    "name": "Divine Gift of Fire",
+    "type": "Spell (Destruction Magic)",
+    "effect": "You can only activate 1 \"Divine Gift\" card per game.\nChoose a player. All targets that player controls are Burned for the rest of the game. This counts as an additional Action."
+   },
+   {
+    "n": 1,
+    "name": "Elixir of Immortality",
+    "type": "Potion",
+    "effect": "Place this card openly in front of you. \nThe next time a target you control is defeated, delete this card and revive and heal that target's HP for half their maximum instead (rounded up). \nYou can only play 1 \"Elixir of Immortality\" per game."
+   },
+   {
+    "n": 2,
+    "name": "Fire Bomb",
+    "type": "Potion",
+    "effect": "Choose any number of Artifacts on the board equipped to any Heroes and destroy them OR choose an Ability attached to a Hero and send it to the discard pile."
+   },
+   {
+    "n": 2,
+    "name": "Firewall",
+    "type": "Spell (Destruction Magic, Surprise)",
+    "effect": "Activate this Surprise when the user is hit by an Attack, Spell or Creature effect. Deal 100 damage to the attacker and Burn it for the rest of the game."
+   },
+   {
+    "n": 2,
+    "name": "Flame Avalanche",
+    "type": "Spell (Destruction Magic)",
+    "effect": "Deal 150 damage to all targets your opponent controls. You cannot deal any other damage to targets your opponent controls the turn you activate this card."
+   },
+   {
+    "n": 2,
+    "name": "Flashbang",
+    "type": "Potion",
+    "effect": "Your opponent's next turn immediately ends after they perform their first Action."
+   },
+   {
+    "n": 4,
+    "name": "Gathering Storm",
+    "type": "Spell (Destruction Magic, Attachment)",
+    "effect": "Attach this Spell to the Hero that uses it. As long as a Hero you control has this card attached to it, your opponent must choose 3 targets (or as many targets as possible) they control at the start of each of their turns. Deal 70 damage to those targets. This damage is doubled if the corresponding Hero is also equipped with \"The White Eye\"."
+   },
+   {
+    "n": 2,
+    "name": "Homerun!",
+    "type": "Artifact (Reaction)",
+    "effect": "Play this card immediately when a Hero you control would take damage equal to or greater than its max HP or be defeated by an effect. Negate that damage or effect and any effects associated with it to that Hero."
+   },
+   {
+    "n": 8,
+    "name": "Leadership",
+    "type": "Ability",
+    "effect": "1) You may once per turn shuffle 1 card from your hand back into your deck and draw 1 card.\n2) You may once per turn shuffle up to 3 cards from your hand into your deck and draw the same number of cards.\n3) You may once per turn shuffle up to 5 cards from your hand into your deck and draw the same number of cards +1."
+   },
+   {
+    "n": 1,
+    "name": "Lifeforce Howitzer",
+    "type": "Artifact (Equipment)",
+    "effect": "Equip this card to a Hero you control. Once per turn, when that Hero's HP are healed, you may choose a target your opponent controls and deal damage equal to the number of HP healed to it. This damage cannot exceed 200. A Hero can only be equipped with 1 \"Lifeforce Howitzer\"."
+   },
+   {
+    "n": 4,
+    "name": "Magnetic Glove",
+    "type": "Artifact",
+    "effect": "Choose a card from your deck, reveal it and add it to your hand. You can only play 1 \"Magnetic Glove\" per turn."
+   },
+   {
+    "n": 1,
+    "name": "Resuscitation Potion",
+    "type": "Potion",
+    "effect": "Choose one of your defeated Heroes and revive it with 50 HP. That Hero's max HP become 50 and cannot be increased in any way. \nYou can only play 1 \"Resuscitation Potion\" per game."
+   },
+   {
+    "n": 2,
+    "name": "Snow Cannon",
+    "type": "Artifact",
+    "effect": "Choose a target your opponent controls and Freeze it for 1 turn."
+   },
+   {
+    "n": 1,
+    "name": "Tarleinn's Floating Island",
+    "type": "Area (Support Magic)",
+    "effect": "If the user is \"Tarleinn the Traveler\", using this Spell counts as an additional Action. Once per turn, when a target a player controls has its HP healed, that player may draw 1 card."
+   },
+   {
+    "n": 3,
+    "name": "Tea",
+    "type": "Artifact",
+    "effect": "Choose a target you control and heal it from any number of negative status effects. If you do, choose a different target and inflict those status effects to it."
+   },
+   {
+    "n": 1,
+    "name": "The White Eye",
+    "type": "Artifact (Equipment)",
+    "effect": "Equip this card to a Hero you control. Whenever the equipped Hero hits exactly 1 target with a Spell, you may have that target's controller discard 1 random card from their hand. When this card is sent to your discard pile, except because you discarded it from your hand, add it to your hand immediately."
+   },
+   {
+    "n": 4,
+    "name": "The Yeeting",
+    "type": "Artifact",
+    "effect": "Choose a Hero you control and deal 150 damage to it. Choose any card on the board that is not a Hero and send it to the discard pile. You can only play 1 \"The Yeeting\" per turn."
+   },
+   {
+    "n": 1,
+    "name": "Treasure Hunter's Backpack",
+    "type": "Artifact",
+    "effect": "Choose an equippable Artifact with a Cost of 50 or less from your deck and play it immediately without paying its Cost. The Hero you equip the Artifact to cannot perform an Action this turn."
+   }
+  ],
+  "potions": [
+   {
+    "n": 2,
+    "name": "Elixir of Quickness",
+    "type": "Potion",
+    "effect": "Draw 3 cards."
+   },
+   {
+    "n": 1,
+    "name": "Magic Lamp",
+    "type": "Potion",
+    "effect": "Choose 3 different cards from your deck and reveal them. Your opponent chooses 1 of them. Add that card to your opponent's hand and the other 2 to your hand."
+   },
+   {
+    "n": 2,
+    "name": "Magnetic Potion",
+    "type": "Potion",
+    "effect": "Choose a card from your deck, reveal it and add it to your hand. You can only play 1 \"Magnetic Potion\" per turn."
+   }
+  ]
+ },
+ "followers": {
+  "nathan": "ferry_nathan",
+  "baylee": "ferry_baylee"
+ },
+ "stages": {
+  "friend": [
+   {
+    "name": "Stranger",
+    "cap": 25
+   },
+   {
+    "name": "Friendly",
+    "cap": 50
+   },
+   {
+    "name": "Friend",
+    "cap": 75
+   },
+   {
+    "name": "Trusted",
+    "cap": 100
+   }
+  ],
+  "romance": [
+   {
+    "name": "Stranger",
+    "cap": 20
+   },
+   {
+    "name": "Friend",
+    "cap": 40
+   },
+   {
+    "name": "Close",
+    "cap": 60
+   },
+   {
+    "name": "Dating",
+    "cap": 80
+   },
+   {
+    "name": "Lovers",
+    "cap": 95
+   },
+   {
+    "name": "Partner",
+    "cap": 100
+   }
+  ]
+ },
+ "startAff": {
+  "default": 8,
+  "nathan": 14,
+  "baylee": 12,
+  "odalys": 12,
+  "gideon": 3,
+  "brant": 3,
+  "ashton": 6,
+  "lilia": 8,
+  "chuck": 10,
+  "cati": 10,
+  "keoni": 10
+ }
+}
