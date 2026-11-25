@@ -196,7 +196,7 @@ class ProjShow(CaptionMixin):
         yy = np.arange(h)[:, None]
         xx = np.arange(w)[None, :]
         lines = (((yy // U) % 4 == 0) & (((xx // U) + (yy // U)) % 2 == 0)) & a
-        ov[lines] = (4, 34, 20, 255)
+        ov[lines] = (14, 70, 44, 255)
         # Flackerbänder: ab und zu ein heller Streifen (Störung der Projektion)
         ph = (t * 0.6) % 1.0
         if ph < 0.12 or any(0 <= t - a_ < 0.4 for a_ in self.ABS):
@@ -418,6 +418,33 @@ class ProjShow(CaptionMixin):
         self._draw_stage(canvas, d, t)
         self._draw_hud(canvas, ImageDraw.Draw(canvas), t)
         self._draw_caption(canvas, ImageDraw.Draw(canvas), t)
+
+    def draw_mid(self, canvas, f):
+        """Hinter Daiyo (vor der Karte): dunkler Halo in Form des Sprites, damit er sich vom Kartenbild abhebt."""
+        from PIL import ImageFilter
+        t = f / float(self.fps)
+        idx = int(t * 1000.0 / 90) % 48
+        k = ('halo', idx)
+        im, pad = self.actor_fn('daiyo', idx)
+        if k not in self._cache:
+            U = self.U
+            al = im.getchannel('A').point(lambda v: 255 if v > 0 else 0)
+            inner = al.filter(ImageFilter.MaxFilter(4 * U + 1))
+            outer = al.filter(ImageFilter.MaxFilter(8 * U + 1))
+            ii, oo = np.asarray(inner) > 0, np.asarray(outer) > 0
+            h, w = ii.shape
+            yy, xx = np.mgrid[0:h, 0:w]
+            thr = np.array(gamefx.BAY8)[((yy // U) % 8), ((xx // U) % 8)] / 64.0
+            out = np.zeros((h, w, 4), np.uint8)
+            body = np.asarray(al) > 0
+            ring = oo & ~ii & (thr < 0.5)
+            out[ring] = (4, 30, 18, 255)
+            out[ii & ~body] = (3, 22, 14, 255)                                          # fester dunkler Rand um die Figur
+            out[body & (thr < 0.42)] = (3, 22, 14, 255)                                # unter der Figur: Karte nur zum Teil abgedunkelt (Projektion bleibt durchsichtig)
+            self._cache[k] = Image.fromarray(out, 'RGBA')
+        sx, sy = self.sprite_origin
+        h_ = self._cache[k]
+        canvas.paste(h_, (int(sx + self.sprite_dx(f) - pad), int(sy - pad)), h_)
 
     # ───────── Interface ─────────
     def draw_logo(self, canvas, f):
