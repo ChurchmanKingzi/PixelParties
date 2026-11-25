@@ -1081,7 +1081,11 @@
     "sakura",
     14
    ]
-  ]
+  ],
+  "px": 12,
+  "projshow": true,
+  "opener": "wind",
+  "showLoops": 6
  },
  "Silent Water Mizune": {
   "name": "Mizune",
