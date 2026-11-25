@@ -53,13 +53,13 @@ scene("ferry_prologue", {
     { text: "A loudspeaker crackles above the wheelhouse." },
     {
       name: "Loudspeaker",
-      text: "Morning, all. Captain Stroud speaking. Thirty-eight new heads aboard, I counted twice. Reef's in the way, so we go round the long side: tie-up at ten-forty. There is coffee in the lounge. Hold on to your hats."
+      text: "\"Morning, all. Captain Stroud speaking. Thirty-eight new heads aboard, I counted twice. Reef's in the way, so we go round the long side: tie-up at ten-forty. There is coffee in the lounge. Hold on to your hats.\""
     },
     { enter: "nathan", x: 30, y: 98, h: 64 },
     {
       say: "nathan",
       alias: "Spiky-haired boy",
-      text: "**DUDE.** Is that it? That's *IT*, right? That's the island! Hey — **HEY**, big guy, look, that's the island!",
+      text: "\"**DUDE.** Is that it? That's *IT*, right? That's the island! Hey — **HEY**, big guy, look, that's the island!\"",
       mood: "laughing",
       shake: true
     },
@@ -70,11 +70,11 @@ scene("ferry_prologue", {
     {
       text: "The \"big guy\" is not hard to find. He is the tallest person on the deck by a head and a half, in a straw hat as wide as a cartwheel, sunburnt, built like a barn door, his jacket slung over one shoulder, and he stands with his shoulders pulled in so that people can get past him."
     },
-    { say: "baylee", alias: "Very tall boy in a straw hat", text: "…I see it.", mood: "shy" },
+    { say: "baylee", alias: "Very tall boy in a straw hat", text: "\"…I see it.\"", mood: "shy" },
     {
       say: "nathan",
       alias: "Spiky-haired boy",
-      text: "Nathan Whisper! War Counselors, best deck in the format, don't let anyone tell you different. You look wrecked. You a first-year too? What dorm? I'm the Commons, grey collar, I figure grey's the best colour, it goes with everything.",
+      text: "\"Nathan Whisper! War Counselors, best deck in the format, don't let anyone tell you different. You look wrecked. You a first-year too? What dorm? I'm the Commons, grey collar, I figure grey's the best colour, it goes with everything.\"",
       mood: "happy"
     },
     {
@@ -89,7 +89,7 @@ scene("ferry_prologue", {
     {
       say: "baylee",
       alias: "Very tall boy in a straw hat",
-      text: "Baylee. Commons too. …He has been like this since the harbour."
+      text: "\"Baylee. Commons too. …He has been like this since the harbour.\""
     },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["baylee"]) s.names["baylee"] = "Baylee"; if (io && io.popup && !s.flags["met_baylee"]) io.popup({ type: 'met', id: "baylee", name: "Baylee" }); }
@@ -123,7 +123,7 @@ scene("ferry_prologue", {
     { label: "opt_2" },
     {
       say: "rowan",
-      text: "Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means."
+      text: "\"Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means.\""
     },
     {
       add: { aff_nathan: 1 }
@@ -134,11 +134,11 @@ scene("ferry_prologue", {
     { flag: "follow_nathan" },
     { flag: "follow_baylee" },
     { text: "You take the hand. It shakes yours the way a pump handle would, if the pump were delighted." },
-    { say: "nathan", text: "SEVEN! That's — hold on. Hold on. Vance? Vance, R.?", mood: "happy" },
+    { say: "nathan", text: "\"SEVEN! That's — hold on. Hold on. Vance? Vance, R.?\"", mood: "happy" },
     { text: "He lets go of your hand and stares at you with the kind of expression normally reserved for a UFO." },
     {
       say: "nathan",
-      text: "There's a name on the passenger list. By the wheelhouse door. In INK, like somebody added it with a fountain pen at the last minute. 'Vance, R. — Wildcard.' Nobody knows who it is! There's a whole betting pool going on the lounge benches about who it is! That's YOU?",
+      text: "\"There's a name on the passenger list. By the wheelhouse door. In INK, like somebody added it with a fountain pen at the last minute. 'Vance, R. — Wildcard.' Nobody knows who it is! There's a whole betting pool going on the lounge benches about who it is! That's YOU?\"",
       mood: "laughing"
     },
     {
@@ -162,52 +162,52 @@ scene("ferry_prologue", {
     { label: "opt_6" },
     {
       say: "rowan",
-      text: "Yes, that's me. I won the Wildcard Qualifier two weeks ago, the last open seat of the year. I still feel a bit strange saying it out loud."
+      text: "\"Yes, that's me. I won the Wildcard Qualifier two weeks ago, the last open seat of the year. I still feel a bit strange saying it out loud.\""
     },
     {
       say: "nathan",
-      text: "THE LAST OPEN SEAT! Baylee, he got the last seat! That's like winning the lottery but with cards!",
+      text: "\"THE LAST OPEN SEAT! Baylee, he got the last seat! That's like winning the lottery but with cards!\"",
       mood: "happy"
     },
-    { say: "baylee", text: "Congratulations." },
+    { say: "baylee", text: "\"Congratulations.\"" },
     {
       say: "nathan",
-      text: "That's — Rowan. Rowan! You're famous! You're the whole boat's mystery! I've got to tell everyone!",
+      text: "\"That's — Rowan. Rowan! You're famous! You're the whole boat's mystery! I've got to tell everyone!\"",
       mood: "grin"
     },
-    { say: "rowan", text: "Please don't tell everyone. I only just got here." },
-    { say: "nathan", text: "I'm already telling everyone!", mood: "laughing" },
+    { say: "rowan", text: "\"Please don't tell everyone. I only just got here.\"" },
+    { say: "nathan", text: "\"I'm already telling everyone!\"", mood: "laughing" },
     { flag: "told_wildcard" },
     { flag: "ship_knows_wildcard" },
     { jump: "choiceend_5" },
     { label: "opt_7" },
     {
       say: "rowan",
-      text: "Yes. But I would honestly rather the whole boat didn't hear about it before I've even found the lounge."
+      text: "\"Yes. But I would honestly rather the whole boat didn't hear about it before I've even found the lounge.\""
     },
     {
       say: "nathan",
-      text: "Oh. OH. You're shy! That's fine! I get it! I'll only tell, like, half the boat!",
+      text: "\"Oh. OH. You're shy! That's fine! I get it! I'll only tell, like, half the boat!\"",
       mood: "happy"
     },
-    { say: "baylee", text: "Nathan." },
-    { say: "nathan", text: "A quarter! A QUARTER of the boat.", mood: "grin" },
-    { say: "baylee", text: "He will tell all of it." },
-    { say: "nathan", text: "I will tell all of it.", mood: "laughing" },
+    { say: "baylee", text: "\"Nathan.\"" },
+    { say: "nathan", text: "\"A quarter! A QUARTER of the boat.\"", mood: "grin" },
+    { say: "baylee", text: "\"He will tell all of it.\"" },
+    { say: "nathan", text: "\"I will tell all of it.\"", mood: "laughing" },
     { flag: "told_wildcard" },
     { flag: "ship_knows_wildcard" },
     { jump: "choiceend_5" },
     { label: "opt_8" },
-    { say: "rowan", text: "That's me. Does the betting pool pay out to the winner of the mystery? I'd like a cut." },
+    { say: "rowan", text: "\"That's me. Does the betting pool pay out to the winner of the mystery? I'd like a cut.\"" },
     {
       say: "nathan",
-      text: "A CUT! Baylee, he wants a CUT! Tomi is holding the pool, Tomi is going to cry!",
+      text: "\"A CUT! Baylee, he wants a CUT! Tomi is holding the pool, Tomi is going to cry!\"",
       mood: "laughing"
     },
-    { say: "baylee", text: "Tomi will not cry. Tomi will invoice." },
+    { say: "baylee", text: "\"Tomi will not cry. Tomi will invoice.\"" },
     {
       say: "nathan",
-      text: "Rowan, you're my favourite! I've known you for ninety seconds and you're my favourite!",
+      text: "\"Rowan, you're my favourite! I've known you for ninety seconds and you're my favourite!\"",
       mood: "grin"
     },
     { flag: "told_wildcard" },
@@ -218,15 +218,15 @@ scene("ferry_prologue", {
     { label: "opt_3" },
     {
       say: "rowan",
-      text: "Rowan. Just Rowan for now. I'm in the Commons too, apparently. Have you had a look round the ship yet? Anything worth finding?"
+      text: "\"Rowan. Just Rowan for now. I'm in the Commons too, apparently. Have you had a look round the ship yet? Anything worth finding?\""
     },
     { flag: "follow_nathan" },
     { flag: "follow_baylee" },
-    { say: "nathan", text: "ROWAN! Just Rowan! Like a wizard!", mood: "laughing" },
-    { say: "baylee", text: "Like a bartender." },
+    { say: "nathan", text: "\"ROWAN! Just Rowan! Like a wizard!\"", mood: "laughing" },
+    { say: "baylee", text: "\"Like a bartender.\"" },
     {
       say: "nathan",
-      text: "Like a WIZARD bartender. Okay. I like you. You asked ME a question. Nobody asked me a question since the harbour, they all just ran away!",
+      text: "\"Like a WIZARD bartender. Okay. I like you. You asked ME a question. Nobody asked me a question since the harbour, they all just ran away!\"",
       mood: "grin"
     },
     {
@@ -242,30 +242,30 @@ scene("ferry_prologue", {
     { flag: "follow_baylee" },
     {
       say: "rowan",
-      text: "Rowan. Tired, and new. I'm going to listen for a bit, if that's all right. I think I came here with too many questions."
+      text: "\"Rowan. Tired, and new. I'm going to listen for a bit, if that's all right. I think I came here with too many questions.\""
     },
     {
       say: "nathan",
-      text: "Rowan! A listener! Okay, okay, I can talk for TWO people. That's my second-best skill!",
+      text: "\"Rowan! A listener! Okay, okay, I can talk for TWO people. That's my second-best skill!\"",
       mood: "happy"
     },
-    { say: "baylee", text: "What's the first?" },
-    { say: "nathan", text: "Talking for three!", mood: "grin" },
+    { say: "baylee", text: "\"What's the first?\"" },
+    { say: "nathan", text: "\"Talking for three!\"", mood: "grin" },
     { jump: "choiceend_1" },
     { label: "choiceend_1" },
     {
       say: "nathan",
-      text: "Okay, listen. Down those steps there's a lounge with an actual card table, green felt and everything. A guy in white gloves has sat at it since before dawn. Gideon something. Won three in a row.",
+      text: "\"Okay, listen. Down those steps there's a lounge with an actual card table, green felt and everything. A guy in white gloves has sat at it since before dawn. Gideon something. Won three in a row.\"",
       mood: "laughing"
     },
     {
       say: "nathan",
-      text: "And there's this tiny girl with green hair, Inya, she's been waiting twenty minutes to play him and he won't. He just sits there. And a kid called Tomi is taking bets on it. Bets! On a boat!",
+      text: "\"And there's this tiny girl with green hair, Inya, she's been waiting twenty minutes to play him and he won't. He just sits there. And a kid called Tomi is taking bets on it. Bets! On a boat!\"",
       mood: "grin"
     },
     {
       say: "nathan",
-      text: "Also, at the back there's a girl with three treasure chests. Real ones. I counted. And the captain lets you look at the steering wheel if you ask nice.",
+      text: "\"Also, at the back there's a girl with three treasure chests. Real ones. I counted. And the captain lets you look at the steering wheel if you ask nice.\"",
       mood: "happy"
     },
     {
@@ -284,16 +284,16 @@ scene("ferry_prologue", {
     },
     { jump: "choiceend_9" },
     { label: "opt_10" },
-    { say: "rowan", text: "Show me this card table. I want to see how he plays." },
-    { say: "nathan", text: "THAT'S what I'm talking about. Baylee, he's a table guy!", mood: "happy" },
-    { say: "baylee", text: "Seems so." },
+    { say: "rowan", text: "\"Show me this card table. I want to see how he plays.\"" },
+    { say: "nathan", text: "\"THAT'S what I'm talking about. Baylee, he's a table guy!\"", mood: "happy" },
+    { say: "baylee", text: "\"Seems so.\"" },
     { time: 3 },
     { jump: "toward_lounge" },
     { jump: "choiceend_9" },
     { label: "opt_11" },
-    { say: "rowan", text: "I'd like to have a look at the whole ship first. Come with me, if you want." },
-    { say: "nathan", text: "Tour! Yes! I'm basically a tour guide! Baylee, we're a tour!", mood: "grin" },
-    { say: "baylee", text: "We're a tour." },
+    { say: "rowan", text: "\"I'd like to have a look at the whole ship first. Come with me, if you want.\"" },
+    { say: "nathan", text: "\"Tour! Yes! I'm basically a tour guide! Baylee, we're a tour!\"", mood: "grin" },
+    { say: "baylee", text: "\"We're a tour.\"" },
     { time: 5 },
     { jump: "stay" },
     { jump: "choiceend_9" },
@@ -301,8 +301,8 @@ scene("ferry_prologue", {
     {
       text: "Nathan's mouth opens, thinks better of it, and closes. It is perhaps the longest he has been silent since the harbour."
     },
-    { say: "baylee", text: "Let him look, Nathan." },
-    { say: "nathan", text: "I'll be around! I'm always around! I'm on the whole ship!" },
+    { say: "baylee", text: "\"Let him look, Nathan.\"" },
+    { say: "nathan", text: "\"I'll be around! I'm always around! I'm on the whole ship!\"" },
     {
       text: "The two of them peel away along the rail. The island does not look any nearer, but it does look more real."
     },
@@ -364,11 +364,11 @@ scene("deck_rail", {
     { label: "next_6" },
     {
       say: "nathan",
-      text: "Look at it! It's got a MOUNTAIN! Baylee, we're going to live on a MOUNTAIN!",
+      text: "\"Look at it! It's got a MOUNTAIN! Baylee, we're going to live on a MOUNTAIN!\"",
       mood: "happy"
     },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_9" },
-    { say: "baylee", text: "It has smoke on it." },
+    { say: "baylee", text: "\"It has smoke on it.\"" },
     { label: "next_9" },
     { label: "end_8" },
     { label: "end_5" },
@@ -399,10 +399,10 @@ scene("deck_collars", {
     { text: "Rank, printed on every shoulder. You wonder how long it takes for people to stop reading it." },
     { flag: "counted_collars" },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
-    { say: "nathan", text: "Grey is the BEST colour, I decided. It goes with EVERYTHING.", mood: "happy" },
+    { say: "nathan", text: "\"Grey is the BEST colour, I decided. It goes with EVERYTHING.\"", mood: "happy" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "baylee", text: "The white-and-gold ones have a tower." },
-    { say: "nathan", text: "I HEARD about the tower! I heard it has a fountain!", mood: "grin" },
+    { say: "baylee", text: "\"The white-and-gold ones have a tower.\"" },
+    { say: "nathan", text: "\"I HEARD about the tower! I heard it has a fountain!\"", mood: "grin" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },
@@ -421,9 +421,9 @@ scene("deck_lighthouse", {
     },
     { flag: "saw_commons_roofs" },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
-    { say: "baylee", text: "That is a long way up." },
+    { say: "baylee", text: "\"That is a long way up.\"" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "nathan", text: "Can we climb it? Are there stairs? Rowan, I am going to climb it.", mood: "happy" },
+    { say: "nathan", text: "\"Can we climb it? Are there stairs? Rowan, I am going to climb it.\"", mood: "happy" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },
@@ -440,10 +440,10 @@ scene("deck_seasick", {
     },
     { think: "Not even the birds are fooled." },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
-    { say: "nathan", text: "Are you actually seasick? Baylee, he's seasick, get a bucket!", mood: "happy" },
+    { say: "nathan", text: "\"Are you actually seasick? Baylee, he's seasick, get a bucket!\"", mood: "happy" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "baylee", text: "He is not." },
-    { say: "nathan", text: "He's doing a very GOOD seasick!", mood: "laughing" },
+    { say: "baylee", text: "\"He is not.\"" },
+    { say: "nathan", text: "\"He's doing a very GOOD seasick!\"", mood: "laughing" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },

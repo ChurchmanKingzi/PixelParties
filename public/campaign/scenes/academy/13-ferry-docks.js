@@ -18,7 +18,7 @@ scene("ferry_docks", {
     { enter: "abel" },
     {
       say: "abel",
-      text: "ONE AT A TIME! One at a time, folks, I want every one of you off this ship in the same number as you came on! Thirty-eight! I will count you out and I will count you in!"
+      text: "\"ONE AT A TIME! One at a time, folks, I want every one of you off this ship in the same number as you came on! Thirty-eight! I will count you out and I will count you in!\""
     },
     { text: "Click. Click. He says \"Welcome\" to each head as it passes, as if signing it for." },
     { when: (s)=>!(!!s.flags["freddie_jumped"]), jump: "next_2" },
@@ -35,19 +35,19 @@ scene("ferry_docks", {
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_4" },
     {
       say: "nathan",
-      text: "ROWAN! Stay close! Don't lose us! I've got Baylee's bag and my bag and a hat that isn't mine!",
+      text: "\"ROWAN! Stay close! Don't lose us! I've got Baylee's bag and my bag and a hat that isn't mine!\"",
       mood: "laughing"
     },
-    { say: "baylee", text: "That's my hat." },
-    { say: "nathan", text: "That's what I SAID!", mood: "grin" },
+    { say: "baylee", text: "\"That's my hat.\"" },
+    { say: "nathan", text: "\"That's what I SAID!\"", mood: "grin" },
     { jump: "end_3" },
     { label: "next_4" },
     {
       say: "nathan",
-      text: "ROWAN! Over here! We're going down together! I've decided! It's a rule!",
+      text: "\"ROWAN! Over here! We're going down together! I've decided! It's a rule!\"",
       mood: "laughing"
     },
-    { say: "baylee", text: "He decided at the funnel." },
+    { say: "baylee", text: "\"He decided at the funnel.\"" },
     { label: "end_3" },
     { when: (s)=>!(!!s.flags["has_snapper"]), jump: "next_7" },
     { say: "abel", text: "\"A word, young man.\"" },
@@ -55,14 +55,14 @@ scene("ferry_docks", {
       text: "He has not taken his eyes off the stream of students, but one enormous hand has found your elbow and steered you, very gently, a half-step out of the line."
     },
     { say: "abel", text: "\"The crate from under the tarp. You have it?\"" },
-    { say: "rowan", text: "Yes, Captain." },
+    { say: "rowan", text: "\"Yes, Captain.\"" },
     { say: "abel", text: "\"Good.\"" },
     { text: "A very long pause. His beard works." },
     { say: "abel", text: "\"Mind the step.\"" },
-    { say: "rowan", text: "I will." },
+    { say: "rowan", text: "\"I will.\"" },
     {
       say: "abel",
-      text: "…No. Not the gangway step. *The* step. At the top of the bungalow row. It's got a loose board. She'll tell you she's fixed it. She hasn't."
+      text: "\"…No. Not the gangway step. *The* step. At the top of the bungalow row. It's got a loose board. She'll tell you she's fixed it. She hasn't.\""
     },
     {
       add: { aff_abel: 2 }
@@ -77,7 +77,7 @@ scene("ferry_docks", {
     },
     {
       say: "georgie",
-      text: "…Is it all right if I go first? Ember wanted to see it. She's — it's the first time she's been somewhere that's not a hotel."
+      text: "\"…Is it all right if I go first? Ember wanted to see it. She's — it's the first time she's been somewhere that's not a hotel.\""
     },
     {
       say: "abel",
@@ -96,7 +96,7 @@ scene("ferry_docks", {
       text: "She passes, with two ship's porters behind her wheeling three leather caskets on a trolley, and a graciousness so complete that nobody dares to hurry her."
     },
     { say: "jessica", text: "\"I shall see you on the island. It is not a large one.\"" },
-    { say: "rowan", text: "I'll look out for you." },
+    { say: "rowan", text: "\"I'll look out for you.\"" },
     { say: "jessica", text: "\"Do.\" A small smile. \"Cross the lawn.\"" },
     { exit: "jessica" },
     { label: "next_11" },
@@ -107,7 +107,7 @@ scene("ferry_docks", {
     { text: "She is already at the head of the gangway, scarf flapping, hand pressed to her brow." },
     { say: "marit", text: "\"*Thou hast carried us well!* **Thou art free to go!**\"", shake: true },
     { name: "Captain Stroud", text: "It is a FERRY, Miss Solberg." },
-    { say: "marit", text: "**IT IS A VESSEL OF DESTINY!**", shake: true },
+    { say: "marit", text: "\"**IT IS A VESSEL OF DESTINY!**\"", shake: true },
     { exit: "marit" },
     { label: "next_13" },
     { label: "end_12" },
@@ -141,7 +141,7 @@ scene("ferry_docks", {
     { exit: "inya" },
     { label: "next_17" },
     { label: "end_16" },
-    { say: "abel", text: "…Thirty. Thirty-one. Thirty-two. Mind your heads. Mind your elbows." },
+    { say: "abel", text: "\"…Thirty. Thirty-one. Thirty-two. Mind your heads. Mind your elbows.\"" },
     { text: "And then it is your turn." },
     {
       text: "The gangway is steeper than it looked. The planks ring, one after another, under your feet, and the rail is warm from the sun. Halfway down you stop, for no reason, and look back at the ship."
@@ -151,7 +151,7 @@ scene("ferry_docks", {
     },
     {
       say: "abel",
-      text: "Don't dawdle, son! The island waits for no man! It does, in fact, but it likes to pretend otherwise!"
+      text: "\"Don't dawdle, son! The island waits for no man! It does, in fact, but it likes to pretend otherwise!\""
     },
     { exit: "abel" },
     { fx: "fadeout", ms: 400 },
@@ -169,11 +169,11 @@ scene("ferry_docks", {
     {
       text: "Under the arch, a line of older students in red, gold and black jackets stand beside luggage carts, calling out dorm names like market traders."
     },
-    { name: "Older student", text: "Spectral! Spectral first-years, this way, mind the step!" },
-    { name: "Older student", text: "Rare! Rare Hall over here, blue collars!" },
+    { name: "Older student", text: "\"Spectral! Spectral first-years, this way, mind the step!\"" },
+    { name: "Older student", text: "\"Rare! Rare Hall over here, blue collars!\"" },
     {
       name: "Older student",
-      text: "Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!"
+      text: "\"Commons — Commons — grey collars, please, bungalows on the beach, follow the sign!\""
     },
     {
       text: "The water under the planks is so clear you can see crabs arguing on the bottom. The air smells of tar, kelp and wet rope."
@@ -182,12 +182,12 @@ scene("ferry_docks", {
     {
       text: "At the mooring bollard an old man with a face like driftwood is checking the lines with the minute, unhurried care of someone who has done it every day for forty years. A girl with a mail sack, bright-eyed, hair in a braid, is catching the bow rope as it sails across from the deck above."
     },
-    { say: "cati", alias: "???", text: "Got it! Got it, Captain! You've got the aim of a retired postman!" },
-    { name: "Captain Stroud", text: "I AM a retired postman!" },
+    { say: "cati", alias: "???", text: "\"Got it! Got it, Captain! You've got the aim of a retired postman!\"" },
+    { name: "Captain Stroud", text: "\"I AM a retired postman!\"" },
     {
       say: "cati",
       alias: "???",
-      text: "I'm Cati! Campus post! If you've got a letter for home, you give it to me, and if you don't, I'll find you one!"
+      text: "\"I'm Cati! Campus post! If you've got a letter for home, you give it to me, and if you don't, I'll find you one!\""
     },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["cati"]) s.names["cati"] = "Cati"; if (io && io.popup && !s.flags["met_cati"]) io.popup({ type: 'met', id: "cati", name: "Cati" }); }
@@ -203,8 +203,8 @@ scene("ferry_docks", {
     {
       text: "At the far side of the pier a dripping figure with red hair, a stripe of green algae and a pair of diving goggles shoved up on her forehead is hauling herself up a ladder, grinning, with a towel-wrapped lifeguard hauling after her and shouting something about \"a *week* of nothing but breaststroke.\""
     },
-    { say: "freddie", text: "ROWAN! JACKETLESS! IT WAS EIGHT AND A HALF MINUTES! I TOLD YOU!" },
-    { say: "sunny", text: "Seven and a half, you absolute liar." },
+    { say: "freddie", text: "\"ROWAN! JACKETLESS! IT WAS EIGHT AND A HALF MINUTES! I TOLD YOU!\"" },
+    { say: "sunny", text: "\"Seven and a half, you absolute liar.\"" },
     { exit: "freddie" },
     { exit: "sunny" },
     { label: "next_23" },
@@ -212,7 +212,7 @@ scene("ferry_docks", {
     {
       text: "Halfway down the pier a pale boy in white gloves holds out a thick fold of mainland notes to a deckhand who has offered to take a case. The deckhand looks at the money the way a person looks at a leaf."
     },
-    { name: "Deckhand", text: "Smug Coins only, sir. Mainland paper's no good past the arch." },
+    { name: "Deckhand", text: "\"Smug Coins only, sir. Mainland paper's no good past the arch.\"" },
     {
       text: "The pale boy looks at the notes. For a moment the most self-possessed person on the ship has nothing at all to say."
     },
@@ -282,7 +282,7 @@ scene("dock_cases_lost", {
   steps: [
     {
       say: "gideon",
-      text: "Four cases, Vance. To the Spectral Tower, which is at the top of the hill. I will lead the way."
+      text: "\"Four cases, Vance. To the Spectral Tower, which is at the top of the hill. I will lead the way.\""
     },
     {
       text: "He does not carry anything. He does not need to. He has just turned the dock into a stage, and the whole jetty is the audience."
@@ -318,12 +318,12 @@ scene("dock_cases_lost", {
     { say: "nathan", text: "\"I'll take two! Give me two! Gimme gimme gimme!\"" },
     { text: "He has already grabbed a case in each hand, shouting to the jetty at large:" },
     { say: "nathan", text: "\"HE LOST! HE LOST FAIR AND SQUARE! He's paying! I'm helping!\"" },
-    { say: "gideon", text: "I do not recall asking for a second carrier." },
-    { say: "nathan", text: "It wasn't in the terms!" },
+    { say: "gideon", text: "\"I do not recall asking for a second carrier.\"" },
+    { say: "nathan", text: "\"It wasn't in the terms!\"" },
     {
       text: "Gideon looks at Nathan. Nathan looks at Gideon. It is, for a moment, a contest of two different species of confidence, and the loser, you suspect, is whoever has to sit next to either of them at lunch."
     },
-    { say: "gideon", text: "…Very well. The terms did not forbid it." },
+    { say: "gideon", text: "\"…Very well. The terms did not forbid it.\"" },
     {
       add: { aff_nathan: 3 }
     },
@@ -334,11 +334,11 @@ scene("dock_cases_lost", {
     {
       text: "Baylee has not said a word. He has simply picked up the heaviest case in one hand, as if it were a loaf of bread, and is waiting, politely, for you to say it is all right."
     },
-    { say: "baylee", text: "…Okay?" },
-    { say: "gideon", text: "I do not recall asking for a second carrier." },
+    { say: "baylee", text: "\"…Okay?\"" },
+    { say: "gideon", text: "\"I do not recall asking for a second carrier.\"" },
     { text: "Baylee looks at him for a long moment, from a considerable height." },
-    { say: "baylee", text: "Wasn't in the rules. Was it." },
-    { say: "gideon", text: "…No." },
+    { say: "baylee", text: "\"Wasn't in the rules. Was it.\"" },
+    { say: "gideon", text: "\"…No.\"" },
     {
       add: { aff_baylee: 3 }
     },
@@ -349,7 +349,7 @@ scene("dock_cases_lost", {
     {
       text: "The Spectral Tower stands on the hill above the Quad, a white spire with gold at the lip of its balconies and a doorman who has plainly seen better luggage. Gideon gives the concierge your name so that you are let in. The atrium floor is marble, the staircase is lined with portraits of previous year-captains, and you set four cases down in a neat row beside a very large, very silent potted palm."
     },
-    { say: "gideon", text: "Thank you, Vance. That will be all." },
+    { say: "gideon", text: "\"Thank you, Vance. That will be all.\"" },
     { text: "He says it quite courteously. He does not gloat. He does not need to." },
     { when: (s)=>!(!!!s.flags["carried_all_four"]), jump: "next_7" },
     { when: (s)=>!((!!!s.flags["nathan_carried"]&&!!!s.flags["baylee_carried"])), jump: "next_9" },
@@ -357,8 +357,8 @@ scene("dock_cases_lost", {
       text: "Beside you, a small girl with mint-green hair has been walking all the way up the avenue as well, a few steps behind, with her hands in her hoodie pockets. She stops at the tower door."
     },
     { say: "inya", text: "\"I'd have been carrying those.\" Quietly. \"If you hadn't asked.\"" },
-    { say: "rowan", text: "I know." },
-    { say: "inya", text: "Rude. Accurate. Thank you." },
+    { say: "rowan", text: "\"I know.\"" },
+    { say: "inya", text: "\"Rude. Accurate. Thank you.\"" },
     {
       add: { aff_inya: 3 }
     },
@@ -410,30 +410,30 @@ scene("quad_address", {
     {
       text: "In front of the tower, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds."
     },
-    { say: "okonkwo", text: "Good morning." },
+    { say: "okonkwo", text: "\"Good morning.\"" },
     { text: "A hundred new heartbeats, all in tempo." },
     {
       say: "okonkwo",
-      text: "I am Dr Marguerite Vicar. I am Chancellor of Pixel Academy, and I have been for a very long time."
+      text: "\"I am Dr Marguerite Vicar. I am Chancellor of Pixel Academy, and I have been for a very long time.\""
     },
     {
       say: "okonkwo",
-      text: "You have been admitted to this school out of two thousand, one hundred and fourteen applicants. That is not a boast. It is a statistic, and I distrust everything else I might say about it."
+      text: "\"You have been admitted to this school out of two thousand, one hundred and fourteen applicants. That is not a boast. It is a statistic, and I distrust everything else I might say about it.\""
     },
     {
       say: "okonkwo",
-      text: "Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well."
+      text: "\"Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well.\""
     },
     { text: "A ripple of nervous laughter, instantly suppressed." },
     {
       say: "okonkwo",
-      text: "There is one law on this island above all the others. Every conflict here may be settled at a table. Every one. You will be given the Charter tomorrow. Read it. The position is that there are no exceptions."
+      text: "\"There is one law on this island above all the others. Every conflict here may be settled at a table. Every one. You will be given the Charter tomorrow. Read it. The position is that there are no exceptions.\""
     },
     {
       say: "okonkwo",
-      text: "For today, you will be assigned a dormitory. The lists will be read in rank order. Do not take your assignment as a verdict. It is merely an arrangement. Verdicts, on this island, are earned at the table."
+      text: "\"For today, you will be assigned a dormitory. The lists will be read in rank order. Do not take your assignment as a verdict. It is merely an arrangement. Verdicts, on this island, are earned at the table.\""
     },
-    { say: "okonkwo", text: "Miss Sterling." },
+    { say: "okonkwo", text: "\"Miss Sterling.\"" },
     {
       text: "She steps aside. The woman who takes her place is taller, silver-blonde in a flawless chignon, with a dark council sash worn over a gold jacket like a rank. She opens a leather folio with the air of someone opening a ledger."
     },
@@ -462,7 +462,7 @@ scene("quad_address", {
     },
     {
       say: "octavia",
-      text: "Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Fullington, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria."
+      text: "\"Rare Hall. Von Düsterwald, Eberhart. Yamaguchi, Mikoto. Park, Jun-ho. Fullington, Teobalt. Abernathy, Caspian. Okonjo, Rafael. Lafayette, Eloise. Solberg, Marit. Al-Sayed, Noor. Aldane, Sunniva. Lund, Pippa. Capulet, Victoria.\""
     },
     { when: (s)=>!(!!s.flags["met_sunny"]), jump: "next_9" },
     { run: (s)=>{ s.names = s.names || {}; s.names["sunny"] = "Sunniva \"Sunny\" Aldane"; } },
@@ -475,16 +475,16 @@ scene("quad_address", {
     {
       text: "The Spectral cluster is gone. The Rare cluster is gone. The lawn has a hole in it where thirty-eight people used to be, and the remainder are all clutching their bags a little tighter."
     },
-    { say: "octavia", text: "The Commons." },
+    { say: "octavia", text: "\"The Commons.\"" },
     { text: "The word lands with a small, flat, administrative thud." },
     {
       say: "octavia",
-      text: "Bungalows one through eight. Bungalow two: Nordlicht, Freya. Njord, Hedda. Hollis, Beatrix."
+      text: "\"Bungalows one through eight. Bungalow two: Nordlicht, Freya. Njord, Hedda. Hollis, Beatrix.\""
     },
-    { say: "octavia", text: "Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana." },
-    { say: "octavia", text: "Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred." },
-    { say: "octavia", text: "Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor." },
-    { say: "octavia", text: "Bungalow six: Counts, Samuel. Crowe, Tobias. Volkov, Dmitri." },
+    { say: "octavia", text: "\"Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana.\"" },
+    { say: "octavia", text: "\"Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred.\"" },
+    { say: "octavia", text: "\"Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor.\"" },
+    { say: "octavia", text: "\"Bungalow six: Counts, Samuel. Crowe, Tobias. Volkov, Dmitri.\"" },
     {
       text: "Out at the edge of the lawn, a boy in a long black coat flinches at \"Samuel\" as if it were a draught."
     },
@@ -504,10 +504,10 @@ scene("quad_address", {
     { label: "next_15" },
     { label: "end_14" },
     { text: "A pause. She turns a page." },
-    { say: "octavia", text: "Bungalow seven. Halvorsen, Baylee. Whisper, Nathan." },
+    { say: "octavia", text: "\"Bungalow seven. Halvorsen, Baylee. Whisper, Nathan.\"" },
     { flag: "rel_nathan_baylee" },
     { text: "Another pause, a precise one." },
-    { say: "octavia", text: "Vance, Rowan. Late admission. The Wildcard entrant." },
+    { say: "octavia", text: "\"Vance, Rowan. Late admission. The Wildcard entrant.\"" },
     {
       text: "Somebody, near the back, says \"oh,\" in the way people say it when they have just worked something out. A girl in a ruffled dress turns her head. A boy with a clipboard looks at his clipboard."
     },
@@ -543,9 +543,9 @@ scene("quad_jacket", {
       text: "The jacket is red, stiff and smells of new fabric. It has a plain grey collar. The sleeves are exactly the right length, which feels like a small personal insult."
     },
     { text: "A shadow falls across the crate." },
-    { say: "okonkwo", text: "Mr Vance." },
+    { say: "okonkwo", text: "\"Mr Vance.\"" },
     { text: "She does not offer a hand. Her glasses swing on their silver chain." },
-    { say: "okonkwo", text: "The Wildcard entrant. You arrived by the back door. See that you leave by the front." },
+    { say: "okonkwo", text: "\"The Wildcard entrant. You arrived by the back door. See that you leave by the front.\"" },
     {
       choice: [
         { text: "\"Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.\"", goto: "opt_2" },
@@ -559,7 +559,7 @@ scene("quad_jacket", {
     },
     { jump: "choiceend_1" },
     { label: "opt_2" },
-    { say: "rowan", text: "Yes, ma'am. I'll try to leave by the front, and I'll try not to be late." },
+    { say: "rowan", text: "\"Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.\"" },
     { say: "okonkwo", text: "\"Good.\"" },
     { text: "A single, dry inclination of the head." },
     {
@@ -572,7 +572,7 @@ scene("quad_jacket", {
     { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "okonkwo", n: 2, why: "Respectful" }); } },
     { jump: "choiceend_1" },
     { label: "opt_3" },
-    { say: "rowan", text: "I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have." },
+    { say: "rowan", text: "\"I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have.\"" },
     { say: "okonkwo", text: "\"You will do better than that, or you will do something else.\"" },
     { text: "She does not smile. Something in the line of her mouth, however, has moved a millimetre." },
     { say: "okonkwo", text: "\"We shall see.\"" },
@@ -582,7 +582,7 @@ scene("quad_jacket", {
     { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "okonkwo", n: 1, why: "Honest" }); } },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "okonkwo", text: "Quite." },
+    { say: "okonkwo", text: "\"Quite.\"" },
     { jump: "choiceend_1" },
     { label: "choiceend_1" },
     { text: "She moves on. The crate has gone quiet." },
@@ -603,7 +603,7 @@ scene("commons_march", {
     {
       say: "odalys",
       alias: "???",
-      text: "COMMONS! Commons, over here! Nineteen of you, I counted, don't make me count again! Every one of you has a stomach, and I have a stove!"
+      text: "\"COMMONS! Commons, over here! Nineteen of you, I counted, don't make me count again! Every one of you has a stomach, and I have a stove!\""
     },
     {
       text: "There is a wooden spoon in her apron string like a sidearm. She raises it. Nineteen new first-years drift towards her as if drawn by gravity."
@@ -611,11 +611,11 @@ scene("commons_march", {
     {
       say: "odalys",
       alias: "???",
-      text: "I am Mama Odalys! Mrs Fuentes to the staff, Mama to everyone with sense! I run the kitchen, I run the row, and I run you! Rules!"
+      text: "\"I am Mama Odalys! Mrs Fuentes to the staff, Mama to everyone with sense! I run the kitchen, I run the row, and I run you! Rules!\""
     },
     {
       say: "odalys",
-      text: "One! Nobody eats alone! Two! Nobody skips breakfast! Three! Lights out means quiet! Four! If you are sad, tell somebody! If you cannot tell somebody, tell me! If you cannot tell me, tell the spoon! Come!"
+      text: "\"One! Nobody eats alone! Two! Nobody skips breakfast! Three! Lights out means quiet! Four! If you are sad, tell somebody! If you cannot tell somebody, tell me! If you cannot tell me, tell the spoon! Come!\""
     },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["odalys"]) s.names["odalys"] = "Mama Odalys"; if (io && io.popup && !s.flags["met_odalys"]) io.popup({ type: 'met', id: "odalys", name: "Mama Odalys" }); }
@@ -641,10 +641,10 @@ scene("commons_march", {
     { label: "opt_4" },
     {
       say: "rowan",
-      text: "Mrs Fuentes? Captain Stroud asked me to bring you this. He said you would know what it is."
+      text: "\"Mrs Fuentes? Captain Stroud asked me to bring you this. He said you would know what it is.\""
     },
     { text: "She stops walking so abruptly that three people walk into her." },
-    { say: "odalys", text: "Captain — Abel? He sent—" },
+    { say: "odalys", text: "\"Captain — Abel? He sent—\"" },
     {
       text: "She looks into the crate. For a long moment she does not say anything at all. The wooden spoon, for once, hangs entirely still."
     },
@@ -652,7 +652,7 @@ scene("commons_march", {
       say: "odalys",
       text: "\"…He always sends the good lot.\" Very quietly, to the fish. \"Twenty-two years, and he's never once said a thing. Not one word.\""
     },
-    { say: "odalys", text: "Thank you, mijo. You have a face like a good man. Come eat." },
+    { say: "odalys", text: "\"Thank you, mijo. You have a face like a good man. Come eat.\"" },
     {
       add: { aff_odalys: 5 }
     },
@@ -695,14 +695,14 @@ scene("commons_arrival", {
       text: "From the path behind you comes the measured crunch of a man who is not hurrying. Gideon Pryce, gloves on, a single duffel in his hand, passes through the crowd of grey collars like a dagger through silk, to the step of bungalow 7. He sets the duffel down on the boards beside it."
     },
     { text: "The whole row watches a white collar do it." },
-    { say: "gideon", text: "Vance. A small courtesy, paid in full. I congratulate you on a well-played game." },
+    { say: "gideon", text: "\"Vance. A small courtesy, paid in full. I congratulate you on a well-played game.\"" },
     { text: "He pauses. A quarter-inch smile." },
-    { say: "gideon", text: "I should dislike it very much if it were an accident." },
+    { say: "gideon", text: "\"I should dislike it very much if it were an accident.\"" },
     {
       text: "He turns and goes back up the path without hurrying, having looked, you notice, at absolutely everything on the way."
     },
-    { say: "nathan", text: "He CARRIED it. The glove guy CARRIED IT. Baylee, did you see that, he —" },
-    { say: "baylee", text: "I saw it." },
+    { say: "nathan", text: "\"He CARRIED it. The glove guy CARRIED IT. Baylee, did you see that, he —\"" },
+    { say: "baylee", text: "\"I saw it.\"" },
     {
       add: { aff_nathan: 2 }
     },
@@ -734,7 +734,7 @@ scene("bungalow_seven_first", {
     { text: "Nobody's things are in it yet. Not a sock." },
     {
       say: "nathan",
-      text: "OKAY! Three beds! Three of us! Nobody's touched anything! This is the fairest moment in the history of the room!",
+      text: "\"OKAY! Three beds! Three of us! Nobody's touched anything! This is the fairest moment in the history of the room!\"",
       mood: "happy"
     },
     { text: "He turns on the spot with his arms wide, like a man who has just been handed a country." },
@@ -743,10 +743,10 @@ scene("bungalow_seven_first", {
     { say: "baylee", text: "\"If somebody else wants the corners.\"" },
     {
       say: "nathan",
-      text: "The corners are the BEST. The left one has the sea in its window, I can see it from here, I can *smell* it. The right one has the desk. The desk has a window too, but it looks at the neighbours' wall.",
+      text: "\"The corners are the BEST. The left one has the sea in its window, I can see it from here, I can *smell* it. The right one has the desk. The desk has a window too, but it looks at the neighbours' wall.\"",
       mood: "grin"
     },
-    { say: "nathan", text: "DIBS ON THE SEA! Left window! Dibs!", mood: "laughing" },
+    { say: "nathan", text: "\"DIBS ON THE SEA! Left window! Dibs!\"", mood: "laughing" },
     {
       prompt: "The sea bed, or the desk?",
       choice: [
@@ -760,12 +760,12 @@ scene("bungalow_seven_first", {
     },
     { jump: "choiceend_1" },
     { label: "opt_2" },
-    { say: "rowan", text: "Take the sea, Nathan. I'd rather have the desk, I need a table to lay out my deck." },
-    { say: "nathan", text: "REALLY? You're giving me the SEA? Baylee, he's giving me the sea!", mood: "happy" },
-    { say: "baylee", text: "I heard." },
+    { say: "rowan", text: "\"Take the sea, Nathan. I'd rather have the desk, I need a table to lay out my deck.\"" },
+    { say: "nathan", text: "\"REALLY? You're giving me the SEA? Baylee, he's giving me the sea!\"", mood: "happy" },
+    { say: "baylee", text: "\"I heard.\"" },
     {
       say: "nathan",
-      text: "Best roommate in the history of the room! The room has no history! You're the FIRST best roommate!",
+      text: "\"Best roommate in the history of the room! The room has no history! You're the FIRST best roommate!\"",
       mood: "laughing"
     },
     {
@@ -781,14 +781,14 @@ scene("bungalow_seven_first", {
     { label: "opt_3" },
     {
       say: "rowan",
-      text: "I'd like the sea too. Let's duel for it: the winner gets the left bed, the loser gets the desk."
+      text: "\"I'd like the sea too. Let's duel for it: the winner gets the left bed, the loser gets the desk.\""
     },
     {
       say: "nathan",
-      text: "A DUEL FOR A BED! Baylee! Baylee, we're doing a duel for a BED! That's the best thing that's ever happened to me!",
+      text: "\"A DUEL FOR A BED! Baylee! Baylee, we're doing a duel for a BED! That's the best thing that's ever happened to me!\"",
       mood: "happy"
     },
-    { say: "baylee", text: "Be quick. I'd like my dinner." },
+    { say: "baylee", text: "\"Be quick. I'd like my dinner.\"" },
     {
       text: "You sit on the teal blanket with the duffel for a table. Nathan drops cross-legged on the rug opposite, with his deck box in both hands, and the room goes very quiet in the way rooms go quiet round two people who care about the answer."
     },
@@ -805,7 +805,7 @@ scene("bungalow_seven_first", {
         },
         {
           say: "nathan",
-          text: "I'll take the desk! I'll be the *scholar* of the family! I'll be very scholarly at it!",
+          text: "\"I'll take the desk! I'll be the *scholar* of the family! I'll be very scholarly at it!\"",
           mood: "happy"
         },
         {
@@ -837,9 +837,9 @@ scene("bungalow_seven_first", {
     },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "rowan", text: "I don't mind. I'll take whatever is left." },
-    { say: "nathan", text: "THE SEA! Baylee, I got the sea!", mood: "happy" },
-    { say: "baylee", text: "You did." },
+    { say: "rowan", text: "\"I don't mind. I'll take whatever is left.\"" },
+    { say: "nathan", text: "\"THE SEA! Baylee, I got the sea!\"", mood: "happy" },
+    { say: "baylee", text: "\"You did.\"" },
     {
       set: { bed_rowan: "right" }
     },
@@ -855,9 +855,9 @@ scene("bungalow_seven_first", {
       text: "You drop your duffel on the teal blanket. The mattress gives a small, sullen creak. The desk is a few steps away, with the window over it, which does indeed look at the neighbours' wall."
     },
     { label: "end_5" },
-    { say: "nathan", text: "Also I snore! So you know!" },
-    { say: "baylee", text: "He does." },
-    { say: "nathan", text: "I DO! My mom says it's like living next to a chainsaw. A friendly chainsaw!" },
+    { say: "nathan", text: "\"Also I snore! So you know!\"" },
+    { say: "baylee", text: "\"He does.\"" },
+    { say: "nathan", text: "\"I DO! My mom says it's like living next to a chainsaw. A friendly chainsaw!\"" },
     {
       text: "There is a footlocker at the head of your bed. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet."
     },
@@ -880,13 +880,13 @@ scene("bungalow_nathan", {
     },
     {
       say: "nathan",
-      text: "Rowan! I'm making a BASE! Everything has a place! The socks go over there! The… other socks go over there!",
+      text: "\"Rowan! I'm making a BASE! Everything has a place! The socks go over there! The… other socks go over there!\"",
       mood: "happy"
     },
     { flag: "nathan_room_talked" },
     { jump: "end_1" },
     { label: "next_2" },
-    { say: "nathan", text: "Hey! Come to admire the base?", mood: "grin" },
+    { say: "nathan", text: "\"Hey! Come to admire the base?\"", mood: "grin" },
     { label: "end_1" },
     {
       choice: [
@@ -902,25 +902,25 @@ scene("bungalow_nathan", {
     },
     { jump: "choiceend_4" },
     { label: "opt_5" },
-    { say: "rowan", text: "Can I ask you something, Nathan?" },
+    { say: "rowan", text: "\"Can I ask you something, Nathan?\"" },
     { scene: "chat_nathan" },
     { jump: "choiceend_4" },
     { label: "opt_6" },
-    { say: "rowan", text: "Talk me through your deck, if you've got a minute." },
+    { say: "rowan", text: "\"Talk me through your deck, if you've got a minute.\"" },
     { scene: "shop_nathan" },
     { jump: "choiceend_4" },
     { label: "opt_7" },
-    { say: "rowan", text: "How are you finding it so far?" },
+    { say: "rowan", text: "\"How are you finding it so far?\"" },
     {
       say: "nathan",
-      text: "Loud! It's LOUD! The sea's loud, the geckos are loud, Baylee's *breathing* is loud, and I'm — I'm the loudest. It's like coming home, except nobody's yelled at me yet.",
+      text: "\"Loud! It's LOUD! The sea's loud, the geckos are loud, Baylee's *breathing* is loud, and I'm — I'm the loudest. It's like coming home, except nobody's yelled at me yet.\"",
       mood: "happy"
     },
-    { say: "nathan", text: "Don't tell Baylee about the breathing.", mood: "grin" },
+    { say: "nathan", text: "\"Don't tell Baylee about the breathing.\"", mood: "grin" },
     { flag: "nathan_room_feel" },
     { jump: "choiceend_4" },
     { label: "opt_8" },
-    { say: "rowan", text: "Carry on. I'll leave you to the base." },
+    { say: "rowan", text: "\"Carry on. I'll leave you to the base.\"" },
     { jump: "choiceend_4" },
     { label: "choiceend_4" },
     { time: 4 }
@@ -937,7 +937,7 @@ scene("bungalow_baylee", {
     { flag: "baylee_room_talked" },
     { jump: "end_1" },
     { label: "next_2" },
-    { say: "baylee", text: "Mm." },
+    { say: "baylee", text: "\"Mm.\"" },
     { label: "end_1" },
     {
       choice: [
@@ -953,22 +953,22 @@ scene("bungalow_baylee", {
     },
     { jump: "choiceend_4" },
     { label: "opt_5" },
-    { say: "rowan", text: "Can I ask you a few things, Baylee?" },
+    { say: "rowan", text: "\"Can I ask you a few things, Baylee?\"" },
     { scene: "chat_baylee" },
     { jump: "choiceend_4" },
     { label: "opt_6" },
-    { say: "rowan", text: "Do you want to talk about your deck?" },
+    { say: "rowan", text: "\"Do you want to talk about your deck?\"" },
     { scene: "deck_baylee" },
     { jump: "choiceend_4" },
     { label: "opt_7" },
-    { say: "rowan", text: "Is it all right, sharing with Nathan? He's a lot." },
+    { say: "rowan", text: "\"Is it all right, sharing with Nathan? He's a lot.\"" },
     { say: "baylee", text: "\"He talks. I listen. It evens out.\"" },
     { text: "A very long pause, with a gull in it." },
     { say: "baylee", text: "\"He's a good one. He just doesn't know where the volume knob is.\"" },
     { flag: "baylee_room_feel" },
     { jump: "choiceend_4" },
     { label: "opt_8" },
-    { say: "rowan", text: "Carry on. I'll leave you in peace." },
+    { say: "rowan", text: "\"Carry on. I'll leave you in peace.\"" },
     { jump: "choiceend_4" },
     { label: "choiceend_4" },
     { time: 4 }

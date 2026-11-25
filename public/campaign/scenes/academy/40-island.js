@@ -44,7 +44,7 @@ scene("isle_odalys", {
     { end: true },
     { label: "busy" },
     { text: "Mama Odalys is tasting something off the end of the wooden spoon with her eyes shut. She points the spoon at you without opening them." },
-    { say: "odalys", text: "Six o'clock, mijo. Not before. If you are hungry now there is bread under the cloth, and if you are only lonely, sit down and peel." },
+    { say: "odalys", text: "\"Six o'clock, mijo. Not before. If you are hungry now there is bread under the cloth, and if you are only lonely, sit down and peel.\"" },
     { choice: [
       { text: "Sit down and peel.", steps: [
         { text: "You peel. She hums along with the radio, a half-beat behind it, and once, without comment, moves the bowl two inches nearer your hand." },
@@ -53,8 +53,8 @@ scene("isle_odalys", {
         { time: 15 }
       ] },
       { text: "\"Six o'clock. I'll be there.\"", steps: [
-        { say: "rowan", text: "Six o'clock. I'll be there." },
-        { say: "odalys", text: "I know you will. I have counted you." },
+        { say: "rowan", text: "\"Six o'clock. I'll be there.\"" },
+        { say: "odalys", text: "\"I know you will. I have counted you.\"" },
         { time: 2 }
       ] }
     ] }

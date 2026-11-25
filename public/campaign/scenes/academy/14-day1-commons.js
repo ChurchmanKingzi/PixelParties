@@ -70,21 +70,21 @@ scene("row_lunch", {
     {
       text: "Mama Odalys is at the range with her sleeves rolled to the elbow, singing. She sees you in the doorway and the song stops mid-line."
     },
-    { say: "odalys", text: "You! Ven acá. You have not eaten." },
-    { say: "rowan", text: "I'm not — " },
-    { say: "odalys", text: "That was not a question. Sit." },
+    { say: "odalys", text: "\"You! Ven acá. You have not eaten.\"" },
+    { say: "rowan", text: "\"I'm not — \"" },
+    { say: "odalys", text: "\"That was not a question. Sit.\"" },
     {
       text: "A bowl appears on the bench in front of you, as if conjured: black beans, rice, fried plantain. It is the best thing you have eaten in a fortnight. It might be the best thing you have eaten in your life."
     },
     {
       say: "odalys",
-      text: "My rules. One, nobody eats alone. Two, nobody skips breakfast. Three, lights out means quiet. Four, if you are sad — "
+      text: "\"My rules. One, nobody eats alone. Two, nobody skips breakfast. Three, lights out means quiet. Four, if you are sad — \""
     },
-    { say: "rowan", text: "You said. On the quad." },
-    { say: "odalys", text: "Good. You were listening. That is already more than your roommate." },
+    { say: "rowan", text: "\"You said. On the quad.\"" },
+    { say: "odalys", text: "\"Good. You were listening. That is already more than your roommate.\"" },
     {
       say: "odalys",
-      text: "And do not make that face about the Commons. Everybody starts somewhere. I have been feeding this somewhere for twelve years."
+      text: "\"And do not make that face about the Commons. Everybody starts somewhere. I have been feeding this somewhere for twelve years.\""
     },
     { flag: "had_lunch" },
     {
@@ -107,7 +107,7 @@ scene("row_mama", {
     },
     { jump: "choiceend_1" },
     { label: "opt_2" },
-    { say: "rowan", text: "How long have you been running this kitchen, Mrs Fuentes?" },
+    { say: "rowan", text: "\"How long have you been running this kitchen, Mrs Fuentes?\"" },
     { say: "odalys", text: "\"Twelve years with this stove. The left burner and I are not on speaking terms.\"" },
     { text: "She says it with great affection." },
     {
@@ -120,10 +120,10 @@ scene("row_mama", {
     { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "odalys", n: 2, why: "Asked about her" }); } },
     { jump: "choiceend_1" },
     { label: "opt_3" },
-    { say: "rowan", text: "Can I help? I'm no cook, but I can wash anything you hand me." },
+    { say: "rowan", text: "\"Can I help? I'm no cook, but I can wash anything you hand me.\"" },
     {
       say: "odalys",
-      text: "Wash these. And then peel those. And then I will tell you what I think of the way you hold a knife."
+      text: "\"Wash these. And then peel those. And then I will tell you what I think of the way you hold a knife.\""
     },
     {
       text: "You wash, and peel, and are told, within two minutes, that you hold the knife like you are angry at the onion. She shows you how. It is a better way."
@@ -137,7 +137,7 @@ scene("row_mama", {
     { time: 20 },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "rowan", text: "Who is on the row? I'd like to know whose bungalow is whose." },
+    { say: "rowan", text: "\"Who is on the row? I'd like to know whose bungalow is whose.\"" },
     {
       say: "odalys",
       text: "\"Nineteen. Six bungalows' worth. Every one of them mine.\" A heavy, fond pause. \"Do not let the loud one tell you he is the most trouble. He is the most noise. It is different.\""
@@ -221,9 +221,9 @@ scene("placement_call", {
     { text: "A boy in a yellow bandana is hammering up the boardwalk at a dead run." },
     {
       say: "tomi",
-      text: "WILDCARD! Placement! Placement duels! They're calling the Commons, it's half one, you're drawn for Dome two, they're doing it in alphabetical order, you're V!"
+      text: "\"WILDCARD! Placement! Placement duels! They're calling the Commons, it's half one, you're drawn for Dome two, they're doing it in alphabetical order, you're V!\""
     },
-    { say: "tomi", text: "Come ON. I've got ten Smug Coins on you not throwing up." },
+    { say: "tomi", text: "\"Come ON. I've got ten Smug Coins on you not throwing up.\"" },
     { think: "I haven't thought about it all day. Not once. Which is exactly why it's here." },
     { goto: "trial_dome", travel: 12 },
     { scene: "placement_duel" }
@@ -247,13 +247,13 @@ scene("placement_duel", {
     },
     {
       say: "hana",
-      text: "Mr Vance. I am Ms Kirishima, Rules and Judging. This is a placement duel. It is not an examination. It is a measurement. Please be precise with your terminology and do not narrate your emotions."
+      text: "\"Mr Vance. I am Ms Kirishima, Rules and Judging. This is a placement duel. It is not an examination. It is a measurement. Please be precise with your terminology and do not narrate your emotions.\""
     },
-    { say: "hana", text: "Your opponent." },
+    { say: "hana", text: "\"Your opponent.\"" },
     {
       text: "A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Blonde hair in two long hanging braids, each tied off with a large red bow. Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention."
     },
-    { say: "hana", text: "Rana Marika. Repeating year. Please be seated." },
+    { say: "hana", text: "\"Rana Marika. Repeating year. Please be seated.\"" },
     { when: (s)=>!(!!s.flags["met_rana"]), jump: "next_2" },
     {
       text: "She glances at you. A very flat flicker of recognition goes across her face, followed by an even flatter one of dread."
@@ -261,7 +261,7 @@ scene("placement_duel", {
     { say: "rana", text: "\"…You.\" Under her breath. \"Of course it's you.\"" },
     { jump: "end_1" },
     { label: "next_2" },
-    { say: "rana", alias: "Scowling girl", text: "Whatever." },
+    { say: "rana", alias: "Scowling girl", text: "\"Whatever.\"" },
     { label: "end_1" },
     {
       text: "A tall man in a black turtleneck has appeared in the doorway, hands in his pockets. Silver temples, a sharp goatee, a world-finalist's ring on his right hand that he is turning slowly with his thumb. He does not enter. He does not speak. He is, you understand, watching you."
@@ -288,11 +288,11 @@ scene("placement_duel", {
     {
       text: "You lock your fingers in your lap and breathe in for four counts, out for four. It does not work. It does, however, mean nobody can see it."
     },
-    { say: "hana", text: "Mr Vance, hands where the table may see them. It is a rule." },
+    { say: "hana", text: "\"Mr Vance, hands where the table may see them. It is a rule.\"" },
     { flag: "nerve_hid" },
     { jump: "choiceend_4" },
     { label: "opt_6" },
-    { say: "rowan", text: "My hands shake. It will pass once the first card goes down." },
+    { say: "rowan", text: "\"My hands shake. It will pass once the first card goes down.\"" },
     { say: "hana", text: "\"Noted.\"" },
     { text: "Not unkindly. She looks at you for a moment longer than the rule requires." },
     { say: "hana", text: "\"Stating a problem aloud is the first step in resolving it. Please proceed.\"" },
@@ -314,7 +314,7 @@ scene("placement_duel", {
     { flag: "nerve_cards" },
     { jump: "choiceend_4" },
     { label: "choiceend_4" },
-    { say: "hana", text: "Begin." },
+    { say: "hana", text: "\"Begin.\"" },
     {
       duel: "placement_rana",
       opponent: "rana",
@@ -329,7 +329,7 @@ scene("placement_duel", {
         {
           text: "She stands. She does not shake your hand. She does not look at you. At the door she turns, very quickly, and says to nobody:"
         },
-        { say: "rana", text: "It was good. Don't say anything." },
+        { say: "rana", text: "\"It was good. Don't say anything.\"" },
         {
           set: { ladder: 124 }
         },
@@ -363,9 +363,9 @@ scene("placement_duel", {
     {
       text: "The tall man in the doorway gives you one slow, level look. He turns, once, the ring flashing on his thumb, and walks out. Four minutes, by the score clock. Nobody has said a word."
     },
-    { say: "hana", text: "Result recorded. Ranking is a measurement, not a verdict, Mr Vance. Zeynep." },
+    { say: "hana", text: "\"Result recorded. Ranking is a measurement, not a verdict, Mr Vance. Zeynep.\"" },
     { text: "The girl with the stamp stamps something with a brisk, authoritative thud, and hands you a card." },
-    { say: "zeynep", alias: "???", text: "Ladder placement. Season one. Congratulations, you exist." },
+    { say: "zeynep", alias: "???", text: "\"Ladder placement. Season one. Congratulations, you exist.\"" },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["zeynep"]) s.names["zeynep"] = "Zeynep"; if (io && io.popup && !s.flags["met_zeynep"]) io.popup({ type: 'met', id: "zeynep", name: "Zeynep" }); }
     },
@@ -404,7 +404,7 @@ scene("supper_call", {
     {
       text: "Then a bell rings, once, with the particular, brassy authority of a woman who has been ringing it for twelve years. The whole boardwalk answers in a murmur of doors."
     },
-    { say: "odalys", text: "SUPPER!" },
+    { say: "odalys", text: "\"SUPPER!\"" },
     { goto: "commons_kitchen", travel: 2 },
     { scene: "welcome_supper" }
   ]
@@ -425,48 +425,48 @@ scene("welcome_supper", {
     {
       text: "Mama Odalys is carrying a pot that ought to need two people. She sets it down in the centre of the table, in a cloud of steam, with a clang like the end of a bell."
     },
-    { say: "odalys", text: "Sit! Sit! Nineteen of you, one bench each, no corners!" },
+    { say: "odalys", text: "\"Sit! Sit! Nineteen of you, one bench each, no corners!\"" },
     { text: "Everyone sits. It takes four minutes, three arguments and one mild fire at the end of the table." },
     {
       say: "odalys",
-      text: "Names! I want every one of you to say your bungalow, your name and one true thing. Left of me. Go!"
+      text: "\"Names! I want every one of you to say your bungalow, your name and one true thing. Left of me. Go!\""
     },
     {
       say: "freya",
-      text: "Freya Nordlicht. Two. Where I come from the sun goes away for three months. You learn to make your own entertainment."
+      text: "\"Freya Nordlicht. Two. Where I come from the sun goes away for three months. You learn to make your own entertainment.\""
     },
     {
       say: "hedda",
-      text: "Hedda Njord, bungalow two. Nothing in this stew was killed for it. I checked. The answer is 'mostly'."
+      text: "\"Hedda Njord, bungalow two. Nothing in this stew was killed for it. I checked. The answer is 'mostly'.\""
     },
-    { say: "trixie", text: "Beatrix! Trixie! Hollis! Two! Bees don't fib!" },
+    { say: "trixie", text: "\"Beatrix! Trixie! Hollis! Two! Bees don't fib!\"" },
     {
       say: "inya",
-      text: "Inya Bell. Three. A rabbit can turn ninety degrees at full speed. Name one of your storm clouds that can do that."
+      text: "\"Inya Bell. Three. A rabbit can turn ninety degrees at full speed. Name one of your storm clouds that can do that.\""
     },
     {
       say: "livvie",
       text: "\"Olivia Thana. Livvie. Three. I've eaten. I had a big breakfast.\" Everyone looks at her. \"Yesterday counts.\""
     },
     { say: "rana", text: "\"Rana. Three.\" Silence. \"That's all you get.\"" },
-    { say: "maisie", text: "Maisie Voltage! Four! It's meant to hum like that, I swear." },
+    { say: "maisie", text: "\"Maisie Voltage! Four! It's meant to hum like that, I swear.\"" },
     {
       say: "freddie",
-      text: "Winifred Camara. Freddie. Four. Five brothers. Ask me anything. I have seen everything and I am unembarrassed by all of it."
+      text: "\"Winifred Camara. Freddie. Four. Five brothers. Ask me anything. I have seen everything and I am unembarrassed by all of it.\""
     },
     { say: "fiona", text: "\"Fiona Blackwood. Four.\"" },
     { text: "Low, slow, a candle placed on every syllable." },
     { say: "fiona", text: "\"Things that are thrown away come back.\"" },
-    { say: "leona", text: "Leona Helical. Four. I got in the same way everyone did. There was a form." },
-    { say: "ed", text: "ED VENTURE! Five! Lazy V Ranch, high plains! Is any of this dangerous?" },
-    { say: "tomi", text: "Tomás Reyes. Tomi. Five. Friend price. Everybody's a friend, the price is the price." },
+    { say: "leona", text: "\"Leona Helical. Four. I got in the same way everyone did. There was a form.\"" },
+    { say: "ed", text: "\"ED VENTURE! Five! Lazy V Ranch, high plains! Is any of this dangerous?\"" },
+    { say: "tomi", text: "\"Tomás Reyes. Tomi. Five. Friend price. Everybody's a friend, the price is the price.\"" },
     {
       say: "sammy",
       text: "\"Sammy Counts. Six.\" Low, slow, ominous. \"Nobody really knows me. That's — I mean, that's deliberate.\" A beat. \"Did that sound deliberate?\""
     },
     { say: "tobias", text: "\"Tobias Crowe. Six. Saltgate.\" And that, evidently, is all." },
-    { say: "dmitri", text: "Dmitri Volkov. Six. Morning is a rumour. I have never seen evidence." },
-    { say: "nathan", text: "NATHAN WHISPER! SEVEN! WAR COUNSELORS! I SNORE!" },
+    { say: "dmitri", text: "\"Dmitri Volkov. Six. Morning is a rumour. I have never seen evidence.\"" },
+    { say: "nathan", text: "\"NATHAN WHISPER! SEVEN! WAR COUNSELORS! I SNORE!\"" },
     { say: "baylee", text: "\"Baylee Halvorsen. Seven.\" A long pause. \"…Yup.\"" },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["freya"]) s.names["freya"] = "Freya Nordlicht"; if (io && io.popup && !s.flags["met_freya"]) io.popup({ type: 'met', id: "freya", name: "Freya Nordlicht" }); }
@@ -556,7 +556,7 @@ scene("welcome_supper", {
     { flag: "rel_leona_freddie" },
     {
       say: "odalys",
-      text: "And last, as in the list, the Wildcard. Stand up, mijo. Everybody is looking at you anyway."
+      text: "\"And last, as in the list, the Wildcard. Stand up, mijo. Everybody is looking at you anyway.\""
     },
     {
       choice: [
@@ -567,7 +567,7 @@ scene("welcome_supper", {
     },
     { jump: "choiceend_1" },
     { label: "opt_2" },
-    { say: "rowan", text: "Rowan Vance. Seven. I'm — happy to be here." },
+    { say: "rowan", text: "\"Rowan Vance. Seven. I'm — happy to be here.\"" },
     { text: "A polite, warm murmur. Nathan, loudly: \"HE'S HAPPY! He said so! Write it down!\"" },
     {
       add: { aff_nathan: 1 }
@@ -577,9 +577,9 @@ scene("welcome_supper", {
     },
     { jump: "choiceend_1" },
     { label: "opt_3" },
-    { say: "rowan", text: "Rowan. I fold sheets. Aunt Dee's laundromat." },
+    { say: "rowan", text: "\"Rowan. I fold sheets. Aunt Dee's laundromat.\"" },
     { text: "A ripple of laughter, entirely kind. Mama Odalys's spoon bangs the pan once in approval." },
-    { say: "odalys", text: "A man who folds sheets knows how to look after a household. Good." },
+    { say: "odalys", text: "\"A man who folds sheets knows how to look after a household. Good.\"" },
     {
       add: { aff_odalys: 2 }
     },
@@ -587,7 +587,7 @@ scene("welcome_supper", {
     { flag: "told_row_laundromat" },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "rowan", text: "Best_Tarleinn." },
+    { say: "rowan", text: "\"Best_Tarleinn.\"" },
     { text: "For a moment, nothing. And then a whole row of faces tilts." },
     { say: "tomi", text: "\"Wait. Wait. Hold on.\"" },
     { text: "A pencil appears from behind his ear, as if from nowhere." },
@@ -595,7 +595,7 @@ scene("welcome_supper", {
     { say: "rana", text: "\"…The Storm deck.\"" },
     { text: "Flat. Sharp. Something in her face has shifted very slightly." },
     { say: "rana", text: "\"That was you.\"" },
-    { say: "nathan", text: "WHAT. WHAT. WHAT!" },
+    { say: "nathan", text: "\"WHAT. WHAT. WHAT!\"" },
     { say: "inya", text: "\"Ranked. Five. I've watched your replays.\"" },
     { text: "A very slight, very suspicious narrowing." },
     { say: "inya", text: "\"You better not be a fraud.\"" },
@@ -630,9 +630,9 @@ scene("welcome_supper", {
     { jump: "choiceend_5" },
     { label: "opt_6" },
     { text: "You take the gap between your roommates. Nathan has already made it, with an elbow." },
-    { say: "nathan", text: "ROWAN! Sit, sit! You're on my right! Baylee's on my left! We're a unit!" },
-    { say: "baylee", text: "…Pass the rice." },
-    { say: "nathan", text: "I'm passing the rice! I'm passing it LOUDLY!" },
+    { say: "nathan", text: "\"ROWAN! Sit, sit! You're on my right! Baylee's on my left! We're a unit!\"" },
+    { say: "baylee", text: "\"…Pass the rice.\"" },
+    { say: "nathan", text: "\"I'm passing the rice! I'm passing it LOUDLY!\"" },
     {
       add: { aff_nathan: 2 }
     },
@@ -647,13 +647,13 @@ scene("welcome_supper", {
     {
       text: "A small girl with long mint-green hair in two tails is sitting cross-legged on a bench, an oversized hoodie round her like a tent. She sees you coming. Her eyes narrow."
     },
-    { say: "inya", text: "Don't sit here to be nice." },
-    { say: "rowan", text: "I'm sitting here because there's a seat." },
+    { say: "inya", text: "\"Don't sit here to be nice.\"" },
+    { say: "rowan", text: "\"I'm sitting here because there's a seat.\"" },
     { say: "inya", text: "\"…Fine.\" A beat. \"That's better.\"" },
     {
       text: "Next to her, a pale girl with a violet-black bob is eating very fast and very neatly, as if each forkful is a transaction. She looks at your plate, looks at hers, and with a very slight movement pushes the last piece of plantain towards you."
     },
-    { say: "livvie", text: "Quick thing. You can have that. I've had enough." },
+    { say: "livvie", text: "\"Quick thing. You can have that. I've had enough.\"" },
     { text: "She has not had enough. Nobody has ever, in the history of the world, had enough on that face." },
     {
       add: { aff_inya: 2 }
@@ -669,14 +669,14 @@ scene("welcome_supper", {
     {
       text: "Rana is at the far end of the long table with her back to the wall and a gap on either side of her that nobody has quite dared fill. She does not look up as you sit down."
     },
-    { say: "rana", text: "…Why." },
-    { say: "rowan", text: "There's a seat." },
-    { say: "rana", text: "There's a hundred seats." },
-    { say: "rowan", text: "Nineteen. I counted." },
+    { say: "rana", text: "\"…Why.\"" },
+    { say: "rowan", text: "\"There's a seat.\"" },
+    { say: "rana", text: "\"There's a hundred seats.\"" },
+    { say: "rowan", text: "\"Nineteen. I counted.\"" },
     {
       text: "A very long pause. And then, very slightly, something moves in the corner of her mouth. It is not a smile. It is its cousin."
     },
-    { say: "rana", text: "…Pass the salt." },
+    { say: "rana", text: "\"…Pass the salt.\"" },
     {
       add: { aff_rana: 3 }
     },
@@ -687,8 +687,8 @@ scene("welcome_supper", {
     {
       text: "The far corner of the bench is occupied by the three boys from bungalow 6. Sammy, in his coat, is sitting very upright. Tobias, in his hoodie, is eating like someone who counts meals. Dmitri is wrapped in a blanket and entirely, perfectly awake."
     },
-    { say: "dmitri", text: "The only man at supper with the sun in his eyes. Hello." },
-    { say: "tobias", text: "Shove up, Sam." },
+    { say: "dmitri", text: "\"The only man at supper with the sun in his eyes. Hello.\"" },
+    { say: "tobias", text: "\"Shove up, Sam.\"" },
     { say: "sammy", text: "\"Counts. It's — fine. Sorry.\"" },
     { text: "He shuffles, and the coat catches the stew, and nobody says anything about it." },
     {
@@ -729,11 +729,11 @@ scene("welcome_supper", {
       say: "odalys",
       text: "\"Nobody eats alone! Nobody skips breakfast! Lights out means quiet! And if you are sad, you tell somebody!\""
     },
-    { say: "odalys", text: "If you cannot tell somebody, tell me! If you cannot tell me — " },
+    { say: "odalys", text: "\"If you cannot tell somebody, tell me! If you cannot tell me — \"" },
     {
       text: "The whole table, in ragged unison, from the people who have apparently been told this already: \"TELL THE SPOON.\""
     },
-    { say: "odalys", text: "Good! Eat!" },
+    { say: "odalys", text: "\"Good! Eat!\"" },
     { when: (s)=>!(!!!s.flags["met_viktor"]), jump: "next_11" },
     { text: "The door bangs open." },
     {
@@ -744,7 +744,7 @@ scene("welcome_supper", {
       alias: "???",
       text: "\"Sorry. I was — there's a path past the waterfall. I was exploring. It isn't on the map.\" A long pause. \"Mm.\""
     },
-    { say: "odalys", text: "SIT. Wash your hands. You smell of mountain." },
+    { say: "odalys", text: "\"SIT. Wash your hands. You smell of mountain.\"" },
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["viktor"]) s.names["viktor"] = "Viktor Hale"; if (io && io.popup && !s.flags["met_viktor"]) io.popup({ type: 'met', id: "viktor", name: "Viktor Hale" }); }
     },
@@ -760,9 +760,9 @@ scene("welcome_supper", {
       say: "nathan",
       text: "\"I'm telling you all now. So you know. My mom says it's like living next to a chainsaw, but a friendly chainsaw.\""
     },
-    { say: "baylee", text: "He does." },
-    { say: "rowan", text: "Noted." },
-    { say: "nathan", text: "HA! 'Noted'! You hear that? He said 'noted'! Very formal! I like him!" },
+    { say: "baylee", text: "\"He does.\"" },
+    { say: "rowan", text: "\"Noted.\"" },
+    { say: "nathan", text: "\"HA! 'Noted'! You hear that? He said 'noted'! Very formal! I like him!\"" },
     {
       text: "A very long, very loud, very good evening follows, in which nothing remotely important happens. Hedda finishes the stew, glares at the empty bowl and says, quietly, \"Fine. FINE. The rice is good.\" Freya laughs for the first time since you sat down, a low warm sound, and says \"To the ferry captain's hat.\" Nobody quite knows why. Everyone drinks. Livvie eats three helpings and does not look at anyone. Mama Odalys, noticing, slides a fourth in front of her without comment."
     },
@@ -787,14 +787,14 @@ scene("first_night", {
       text: "Back in bungalow 7, the ceiling fan ticks on every fourth turn. Three beds. Three footlockers. One bare bulb that is, at last, switched off."
     },
     { text: "In the dark, a voice from the bed at the other end of the room says, quite quietly for him:" },
-    { say: "nathan", text: "Rowan. You awake?" },
-    { say: "rowan", text: "…Yeah." },
-    { say: "nathan", text: "Can I ask you something?" },
-    { say: "rowan", text: "Sure." },
+    { say: "nathan", text: "\"Rowan. You awake?\"" },
+    { say: "rowan", text: "\"…Yeah.\"" },
+    { say: "nathan", text: "\"Can I ask you something?\"" },
+    { say: "rowan", text: "\"Sure.\"" },
     { text: "A long, comfortable pause, full of surf." },
     {
       say: "nathan",
-      text: "Were you scared? Today? When the little domes thing happened. I was in the back. I couldn't tell."
+      text: "\"Were you scared? Today? When the little domes thing happened. I was in the back. I couldn't tell.\""
     },
     {
       text: "You look at the ceiling. The fan ticks. From the middle bed, the very large, very gentle shape of Baylee has gone entirely still, which means, you have already learned, that he is listening."
@@ -808,10 +808,10 @@ scene("first_night", {
     },
     { jump: "choiceend_1" },
     { label: "opt_2" },
-    { say: "rowan", text: "They did, honestly. My hands shook the whole time." },
+    { say: "rowan", text: "\"They did, honestly. My hands shook the whole time.\"" },
     { say: "nathan", text: "\"…Huh.\" A pause. \"I would've said they didn't. I was watching. Honest.\"" },
-    { say: "baylee", text: "Yup. Didn't see it." },
-    { say: "nathan", text: "The thing is, I'm scared all the time. Of everything. I just do it louder." },
+    { say: "baylee", text: "\"Yup. Didn't see it.\"" },
+    { say: "nathan", text: "\"The thing is, I'm scared all the time. Of everything. I just do it louder.\"" },
     { think: "I did not expect that. I did not expect a lot of things today." },
     {
       add: { aff_nathan: 3 }
@@ -828,10 +828,10 @@ scene("first_night", {
     { flag: "told_roommates_nerves" },
     { jump: "choiceend_1" },
     { label: "opt_3" },
-    { say: "rowan", text: "It was fine, really. I've done harder things." },
-    { say: "nathan", text: "Cool! Yeah! Cool! I'd have thrown up." },
-    { say: "baylee", text: "He would." },
-    { say: "nathan", text: "I WOULD." },
+    { say: "rowan", text: "\"It was fine, really. I've done harder things.\"" },
+    { say: "nathan", text: "\"Cool! Yeah! Cool! I'd have thrown up.\"" },
+    { say: "baylee", text: "\"He would.\"" },
+    { say: "nathan", text: "\"I WOULD.\"" },
     {
       add: { aff_nathan: 1 }
     },
@@ -840,14 +840,14 @@ scene("first_night", {
     },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "rowan", text: "Were you, Nathan? Scared, I mean?" },
+    { say: "rowan", text: "\"Were you, Nathan? Scared, I mean?\"" },
     {
       say: "nathan",
       text: "\"Me? NO.\" A pause. \"…A bit. Nobody here's from anywhere near where I'm from. Everyone's got like, a whole deck of people. I've got my mom and a hamster.\""
     },
-    { say: "baylee", text: "I've got a lot of cows." },
-    { say: "nathan", text: "BAYLEE'S GOT COWS!" },
-    { say: "baylee", text: "I've got cows." },
+    { say: "baylee", text: "\"I've got a lot of cows.\"" },
+    { say: "nathan", text: "\"BAYLEE'S GOT COWS!\"" },
+    { say: "baylee", text: "\"I've got cows.\"" },
     {
       add: { aff_nathan: 2 }
     },
@@ -861,9 +861,9 @@ scene("first_night", {
     {
       text: "A very long, very comfortable silence follows. The surf hushes. Somewhere on the boardwalk, a gecko chirps twice, as if checking the room."
     },
-    { say: "nathan", text: "'Night, Wildcard." },
-    { say: "baylee", text: "Night." },
-    { say: "rowan", text: "…Night." },
+    { say: "nathan", text: "\"'Night, Wildcard.\"" },
+    { say: "baylee", text: "\"Night.\"" },
+    { say: "rowan", text: "\"…Night.\"" },
     { text: "Within three minutes, the bed at the other end of the room begins to snore." },
     {
       text: "It is a tremendous snore. It is the snore of a chainsaw, a friendly chainsaw, at a very great distance, in a room designed for the purpose. You lie awake and listen to it for a very long time, and discover, somewhere around the fortieth minute, that you are smiling at the ceiling."

@@ -16,11 +16,11 @@ scene("lounge_plate", {
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
     {
       say: "nathan",
-      text: "WINNER STAYS. That's the best rule I've ever read! Why don't we have that rule everywhere?",
+      text: "\"WINNER STAYS. That's the best rule I've ever read! Why don't we have that rule everywhere?\"",
       mood: "happy"
     },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "baylee", text: "Because you would never leave the table." },
+    { say: "baylee", text: "\"Because you would never leave the table.\"" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },
@@ -63,7 +63,7 @@ scene("lounge_watch", {
     {
       text: "Gideon looks up, finds you across the felt, and for a half-second something very quiet and very attentive lives behind his grey eyes."
     },
-    { say: "gideon", alias: "Boy in white gloves", text: "Did you find that instructive?" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"Did you find that instructive?\"" },
     { flag: "saw_beasts" },
     {
       choice: [
@@ -73,19 +73,19 @@ scene("lounge_watch", {
     },
     { jump: "choiceend_5" },
     { label: "opt_6" },
-    { say: "rowan", text: "Very. You build well." },
-    { say: "gideon", alias: "Boy in white gloves", text: "How resourceful of you to notice." },
+    { say: "rowan", text: "\"Very. You build well.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"How resourceful of you to notice.\"" },
     { jump: "choiceend_5" },
     { label: "opt_7" },
-    { say: "rowan", text: "Not especially. Nothing happened." },
-    { say: "gideon", alias: "Boy in white gloves", text: "A pity. It is the whole of the art." },
+    { say: "rowan", text: "\"Not especially. Nothing happened.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"A pity. It is the whole of the art.\"" },
     { jump: "choiceend_5" },
     { label: "choiceend_5" },
     { flag: "saw_counter" },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_9" },
-    { say: "nathan", text: "GO ON, DECKHAND! GO ON!", mood: "happy" },
+    { say: "nathan", text: "\"GO ON, DECKHAND! GO ON!\"", mood: "happy" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_11" },
-    { say: "baylee", text: "He's drinking tea, Nathan. He lost." },
+    { say: "baylee", text: "\"He's drinking tea, Nathan. He lost.\"" },
     { label: "next_11" },
     { label: "end_10" },
     { label: "next_9" },
@@ -126,9 +126,9 @@ scene("lounge_galley", {
     { jump: "choiceend_1" },
     { label: "choiceend_1" },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_6" },
-    { say: "nathan", text: "A ROLL! Rowan, do you have three coins? I have… a button.", mood: "happy" },
+    { say: "nathan", text: "\"A ROLL! Rowan, do you have three coins? I have… a button.\"", mood: "happy" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_8" },
-    { say: "baylee", text: "No." },
+    { say: "baylee", text: "\"No.\"" },
     { label: "next_8" },
     { label: "end_7" },
     { label: "next_6" },
@@ -149,9 +149,9 @@ scene("lounge_benches", {
     { item: "Teobalt's stapler" },
     { flag: "found_stapler" },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
-    { say: "nathan", text: "What are you looking for? Is it a sock? I lost a sock!", mood: "grin" },
+    { say: "nathan", text: "\"What are you looking for? Is it a sock? I lost a sock!\"", mood: "grin" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "baylee", text: "You lost four." },
+    { say: "baylee", text: "\"You lost four.\"" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },
@@ -176,11 +176,11 @@ scene("lounge_binder", {
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
     {
       say: "nathan",
-      text: "Is that Tomi's binder? You can't touch it, it's CURSED, it takes your coins!",
+      text: "\"Is that Tomi's binder? You can't touch it, it's CURSED, it takes your coins!\"",
       mood: "happy"
     },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_4" },
-    { say: "baylee", text: "That is a rumour." },
+    { say: "baylee", text: "\"That is a rumour.\"" },
     { label: "next_4" },
     { label: "end_3" },
     { label: "next_2" },
@@ -208,8 +208,8 @@ scene("table_vouch", {
     { label: "end_1" },
     { flag: "vouch_tried" },
     { text: "You cross to the brass-rimmed table. The boy in the white gloves does not look up." },
-    { say: "rowan", text: "I'd like to speak for Inya Bell." },
-    { say: "gideon", text: "How kind. And what, exactly, is your standing?" },
+    { say: "rowan", text: "\"I'd like to speak for Inya Bell.\"" },
+    { say: "gideon", text: "\"How kind. And what, exactly, is your standing?\"" },
     {
       when: (s)=>!(((!!s.flags["beat_magnus"]||!!s.flags["beat_georgie"])||!!s.flags["beat_ashton"])),
       jump: "next_4"
@@ -230,7 +230,7 @@ scene("table_vouch", {
     { label: "opt_6" },
     {
       say: "rowan",
-      text: "I've beaten people of standing aboard this ship this morning, and I'd say she plays at least as well. Take my word for it, or ask them."
+      text: "\"I've beaten people of standing aboard this ship this morning, and I'd say she plays at least as well. Take my word for it, or ask them.\""
     },
     { text: "A pause. The grey eyes narrow, thoughtfully." },
     { say: "gideon", text: "\"I did hear that Prospero's tablet recorded something unusual.\"" },
@@ -255,7 +255,7 @@ scene("table_vouch", {
     { label: "opt_7" },
     {
       say: "rowan",
-      text: "Never mind my standing. She's waited twenty minutes and she's beaten three people. That should be enough for anyone."
+      text: "\"Never mind my standing. She's waited twenty minutes and she's beaten three people. That should be enough for anyone.\""
     },
     {
       say: "gideon",
@@ -288,12 +288,12 @@ scene("table_vouch", {
     { label: "opt_10" },
     {
       say: "rowan",
-      text: "I haven't played anybody yet, if I'm honest. But I'd put my word behind her anyway. She seems to me very good."
+      text: "\"I haven't played anybody yet, if I'm honest. But I'd put my word behind her anyway. She seems to me very good.\""
     },
-    { say: "gideon", text: "An honest man. How rare. And how entirely without effect." },
+    { say: "gideon", text: "\"An honest man. How rare. And how entirely without effect.\"" },
     {
       say: "gideon",
-      text: "A voucher is only as good as his wins. Beat somebody of standing aboard this ship, Vance, and I shall listen to you with great attention."
+      text: "\"A voucher is only as good as his wins. Beat somebody of standing aboard this ship, Vance, and I shall listen to you with great attention.\""
     },
     {
       add: { aff_gideon: 1 }
@@ -307,9 +307,9 @@ scene("table_vouch", {
     { label: "opt_11" },
     {
       say: "rowan",
-      text: "She's earned a game by standing there. Isn't that enough for a table that says winner stays?"
+      text: "\"She's earned a game by standing there. Isn't that enough for a table that says winner stays?\""
     },
-    { say: "gideon", text: "It says who stays. I have always found it a very fair plate." },
+    { say: "gideon", text: "\"It says who stays. I have always found it a very fair plate.\"" },
     {
       add: { aff_gideon: 0 }
     },
@@ -333,9 +333,9 @@ scene("table_settle", {
     { label: "next_4" },
     { label: "end_3" },
     { text: "You cross the saloon to the bench where Noor is reading. She looks up at once." },
-    { say: "rowan", text: "If a second table isn't forbidden — " },
-    { say: "noor", text: "It is not." },
-    { say: "rowan", text: "Then I'd like to build one." },
+    { say: "rowan", text: "\"If a second table isn't forbidden — \"" },
+    { say: "noor", text: "\"It is not.\"" },
+    { say: "rowan", text: "\"Then I'd like to build one.\"" },
     { say: "noor", text: "\"To be precise,\"" },
     { text: "and there is, for the first time, something almost like delight under the dry courtesy," },
     { say: "noor", text: "\"you may use the hatch side. The benches are bolted in. You will need a bag.\"" },
@@ -351,18 +351,18 @@ scene("table_settle", {
       text: "A silence. He looks at the new table. At Noor, standing beside it with her rulebook open to a marked page. At the crowd, who are starting, slowly, to look at the new table too."
     },
     { text: "The room has two centres. His is no longer the only one." },
-    { say: "noor", text: "To be precise, a winner who declines every challenger has not defended the seat." },
-    { say: "gideon", text: "No luggage." },
-    { say: "rowan", text: "No stake. Nobody carries anything." },
-    { say: "gideon", text: "I do not play for nothing." },
+    { say: "noor", text: "\"To be precise, a winner who declines every challenger has not defended the seat.\"" },
+    { say: "gideon", text: "\"No luggage.\"" },
+    { say: "rowan", text: "\"No stake. Nobody carries anything.\"" },
+    { say: "gideon", text: "\"I do not play for nothing.\"" },
     {
       say: "rowan",
-      text: "Then play for the room. Everyone's going to watch, whatever you do. You may as well win in front of them."
+      text: "\"Then play for the room. Everyone's going to watch, whatever you do. You may as well win in front of them.\""
     },
     {
       text: "He considers that for a long moment. And then, slowly, a thin smile appears on his face, the first real one all morning."
     },
-    { say: "gideon", text: "How resourceful." },
+    { say: "gideon", text: "\"How resourceful.\"" },
     { text: "He crosses the saloon, takes off his gloves, and sits at the worst table on the ship." },
     {
       text: "The game takes twenty minutes, and it is, by all accounts, quite good. Inya waits him out for six turns, and he finally attacks first, and she loses by the width of a single rabbit. She shakes his hand afterwards and says \"Rematch\" and he says \"I should be delighted.\""
@@ -399,19 +399,19 @@ scene("inya_rematch", {
     { label: "next_2" },
     { label: "end_1" },
     { when: (s)=>!(!!s.flags["flag_inya_played"]), jump: "next_4" },
-    { say: "inya", text: "We did that. I remember. I'm still thinking about it." },
+    { say: "inya", text: "\"We did that. I remember. I'm still thinking about it.\"" },
     { end: true },
     { label: "next_4" },
     { label: "end_3" },
     { text: "A bench near the galley. Two decks. The cards held down with a coffee cup." },
     {
       say: "inya",
-      text: "Don't let me win. Loser pays for the rolls. Two cinnamon rolls, six Smug Coins, no arguments."
+      text: "\"Don't let me win. Loser pays for the rolls. Two cinnamon rolls, six Smug Coins, no arguments.\""
     },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_6" },
-    { say: "nathan", text: "I'll hold the bets! Nobody's betting! I'll hold the NOT-bets!", mood: "happy" },
+    { say: "nathan", text: "\"I'll hold the bets! Nobody's betting! I'll hold the NOT-bets!\"", mood: "happy" },
     { when: (s)=>!(!!s.flags["follow_baylee"]), jump: "next_8" },
-    { say: "baylee", text: "He means he'll watch." },
+    { say: "baylee", text: "\"He means he'll watch.\"" },
     { label: "next_8" },
     { label: "end_7" },
     { label: "next_6" },
@@ -425,7 +425,7 @@ scene("inya_rematch", {
         { say: "inya", text: "\"Rude.\"" },
         { text: "Instantly. Four seconds of furious sulking pass across her face. Then, very fast:" },
         { say: "inya", text: "\"Rematch. Not now. Later. On a real table. You owe me a real table.\"" },
-        { say: "inya", text: "And I owe you rolls. I know. I pay what I owe." },
+        { say: "inya", text: "\"And I owe you rolls. I know. I pay what I owe.\"" },
         {
           add: { aff_inya: 3 }
         },
@@ -436,7 +436,7 @@ scene("inya_rematch", {
         { say: "inya", text: "\"HA.\"" },
         { text: "She slaps the table. Then, remembering herself:" },
         { say: "inya", text: "\"Good game. Accurate. Your storm was wrong for my bunnies and I told you so.\"" },
-        { say: "inya", text: "I'll take the rolls. Six Smug Coins. You said." },
+        { say: "inya", text: "\"I'll take the rolls. Six Smug Coins. You said.\"" },
         {
           add: { aff_inya: 4 }
         },
