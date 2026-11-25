@@ -22,11 +22,11 @@ scene("ferry_docks", {
     },
     { text: "Click. Click. He says \"Welcome\" to each head as it passes, as if signing it for." },
     { when: (s)=>!(!!s.flags["freddie_jumped"]), jump: "next_2" },
-    { say: "abel", text: "\"Thirty-seven, and one in the harbour.\"" },
+    { say: "abel", text: "\"Thirty-six, and two in the harbour.\"" },
     { text: "He taps the clicker once against his chest." },
     {
       say: "abel",
-      text: "\"She's a good swimmer. She's also on my list. I will have a word with the young lady about regulation four-oh-one.\""
+      text: "\"They're both good swimmers. They're also both on my list. I will have a word with the young ladies about regulation four-oh-one.\""
     },
     { label: "next_2" },
     { label: "end_1" },

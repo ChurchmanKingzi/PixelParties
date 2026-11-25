@@ -36,6 +36,12 @@ const FERRY = [
   ["ferry_stern", "cas", { spot: ["ferry", 16, 6] }], ["ferry_stern", "rafa", { spot: ["ferry", 21, 11] }],
 ];
 for (const [lid, id, extra] of FERRY) add(lid, id, "ferry_" + id, extra, ferryOpen);
+// Inya verlässt die Lounge, wenn ihr der Tisch verwehrt blieb oder sie gegen Gideon verlor (der Text lässt sie aufs Vordeck gehen).
+const inyaOut = (s) => !!s.flags["ferry_inya_lost"] || !!(s.eventsDone && s.eventsDone["table_default"]);
+for (const o of L.ferry_lounge.objects || []) if (o.sprite === "inya") { const w = o.when; o.when = (s) => (w ? w(s) : true) && !inyaOut(s); }
+for (const o of (L.ferry_lounge.objects || []).filter(o => o.sprite === "inya").map(o => Object.assign({}, o))) {
+  const w = o.when; L.ferry_deck.objects.push(Object.assign(o, { id: o.id + "_deck", spot: ["ferry", 13, 30], free: true, alert: undefined, when: (s) => { const lounge = Object.assign({}, s, { eventsDone: {}, flags: Object.assign({}, s.flags, { ferry_inya_lost: false }) }); return w(lounge) && inyaOut(s); } }));
+}
 // Die schon gesetzten Figuren der Decks bekommen feste Plätze (bisher drängten sie sich alle um die Tür zur Lounge).
 const STAND = { ed: ["ferry", 19, 36], georgie: ["ferry", 19, 35], branden: ["ferry", 14, 33], pippa: ["ferry", 20, 30], mikoto: ["ferry", 10, 31],
   jessica: ["ferry", 12, 9], ashton: ["ferry", 20, 9], victoria: ["ferry", 20, 6], sunny: ["ferry", 17, 5], freddie: ["ferry", 14, 5], marit: ["ferry", 11, 6] };

@@ -14,7 +14,7 @@ scene("ferry_abel", {
       { text: "Good morning, Captain.", steps: [
         { say: "rowan", text: "Good morning, Captain." },
         { say: "abel", alias: "The captain", text: "Good MORNING, he says! Do you hear that, ship? All morning I've had them aboard, and one of them has said good morning." },
-        { say: "abel", alias: "The captain", text: "\"It'll be fair, then lumpy, then fair, since you ask. Same as everyone's morning.\" A big, rolling laugh, entirely at his own joke. \"That's one of six.\"" },
+        { say: "abel", alias: "The captain", text: "\"And since you mention it: fair, then lumpy, then fair. Same as everyone's morning.\" A big, rolling laugh, entirely at his own joke. \"That's one of six.\"" },
         { flag: "abel_said_six" },
         AFF("abel", 2, "Said good morning")
       ] },
@@ -56,7 +56,7 @@ scene("ferry_abel", {
     { when: (s)=>!!s.flags["follow_baylee"] && !!s.flags["follow_nathan"], say: "nathan", text: "They did a HAT THING! Rowan! They did a hat thing!" },
     { add: { ferry_talked: 1 } },
     NOTE("abel", "The ferry captain. Counts every student on and off."),
-    { say: "abel", text: "If you are going to be sick, do it leeward. That's the side that isn't me." },
+    { say: "abel", text: "\"You're swaying.\" Still without turning. \"If you are going to be sick, do it leeward. That's the side that isn't me.\"" },
     { say: "rowan", text: "I'm not sick. I'm just — looking." },
     { say: "abel", text: "That's the best thing to do on a bridge. Most of them come up here to complain." },
     { say: "abel", text: "So what do you see? Go on. I've looked out of that window for twenty-two years. I like a fresh report." },
@@ -64,7 +64,7 @@ scene("ferry_abel", {
       { text: "A volcano with smoke coming out of it. Is that normal?", steps: [
         { say: "rowan", text: "A volcano with smoke coming out of it. Is that normal?" },
         { say: "abel", text: "She's smoked like a kettle every morning I've known her. I set my pipe by it, when I had a pipe." },
-        { say: "abel", text: "She's a view, lad, not a weather report. Next." },
+        { say: "abel", text: "She's a view, not a weather report. Next." },
         AFF("abel", 1, "Gave a fresh report")
       ] },
       { text: "A pier I've got to walk down in front of thirty-seven people.", steps: [
@@ -120,7 +120,7 @@ scene("ferry_abel", {
           ] },
           { text: "And the nerve? Is there a time on the chart for that?", steps: [
             { say: "rowan", text: "And the nerve? Is there a time on the chart for that?" },
-            { say: "abel", text: "Ten-thirty-nine. It always turns up at ten-thirty-nine, lad, when it's too late to do anything else." },
+            { say: "abel", text: "Ten-thirty-nine. It always turns up at ten-thirty-nine, when it's too late to do anything else." },
             { say: "abel", text: "Till then you've no use for it. You're on a boat. Nobody is asking you for anything. That's what a crossing is for. I go slow on purpose." },
             { say: "rowan", text: "You go slow on purpose." },
             { say: "abel", text: "Don't tell the Academy. They think it's the engine." },
@@ -153,7 +153,7 @@ scene("ferry_abel", {
         { choice: [
           { text: "Why play a deck that loses?", steps: [
             { say: "rowan", text: "Why play a deck that loses?" },
-            { say: "abel", text: "Because it's got boats in it, lad. I'd look a proper fool with dragons." },
+            { say: "abel", text: "Because it's got boats in it. I'd look a proper fool with dragons." },
             { say: "abel", text: "And if a man only sits down once a year, he may as well lose with something he's fond of." }
           ] },
           { text: "May. I'll hold you to it.", steps: [
@@ -168,7 +168,7 @@ scene("ferry_abel", {
             { say: "rowan", text: "On a screen, yes. I've never played across a real table. My hands shake." },
             { say: "abel", text: "Do they." },
             { text: "He lifts one hand off the wheel and holds it out flat, level with the island. It is a broad brown hand, and it is not perfectly still." },
-            { say: "abel", text: "Mine too. Every time I bring her alongside. Twenty-two years, and nobody has ever noticed, because the ship doesn't shake." },
+            { say: "abel", text: "Mine too. Every time I bring her alongside. All these years, and nobody has ever noticed, because the ship doesn't shake." },
             { say: "abel", text: "Put your hands on something heavier than they are, lad. A table will do." },
             AFF("abel", 3, "Trusted him with it"),
             { flag: "abel_knows_hands" }
@@ -295,7 +295,7 @@ scene("abel_jokes", {
         { say: "rowan", text: "Which one is the worst?" },
         { say: "abel", text: "Six. Six is about a compass. Nobody has ever laughed at six. Not once." },
         { say: "rowan", text: "Then why keep it?" },
-        { say: "abel", text: "Because then there'd only be five, lad, and I've said six to too many people." },
+        { say: "abel", text: "Because then there'd only be five, and I've said six to too many people." },
         { say: "abel", text: "\"Also I think it's funny.\" With dignity. \"I am waiting for the world to catch up.\"" },
         AFF("abel", 1, "Asked about number six")
       ] }
@@ -822,6 +822,7 @@ scene("teobalt_list", {
     { when: (s)=>!s.flags["stapler_returned"] && !s.flags["chat_teobalt_1"], say: "teobalt", text: "One: the unloading order, which I have taken the liberty of estimating. Two: who has my stapler, which is not relevant yet. Three is confidential until I have solved one and two." },
     { when: (s)=>!s.flags["stapler_returned"] && !!s.flags["chat_teobalt_1"], say: "teobalt", text: "One: the unloading order, which I have taken the liberty of estimating. Two: who has my stapler, which is not relevant yet. Three was confidential, until I told you about it by accident." },
     { when: (s)=>!!s.flags["stapler_returned"], say: "teobalt", text: "One: the unloading order, which I have taken the liberty of estimating. Two: who had my stapler, which you have since settled; it is now in violet. Three you know already, and I am trusting you with it." },
+    { flag: "teobalt_list_told" },
     { text: "He tears out a clean copy and hands it over. It is colour-coded." },
     { say: "teobalt", text: "I used teal for the items I am worried about." },
     { choice: [
@@ -830,7 +831,10 @@ scene("teobalt_list", {
         { say: "teobalt", text: "\"I am a worrying person.\" A very small, very pleased pause. \"It is a gift.\"" },
         { flag: "teobalt_teal_noticed" }
       ] },
-      { text: "Who would take a stapler?", when: (s)=>!s.flags["stapler_returned"], steps: [
+      { text: "About item two. Hold out the stapler you found in the lounge.", when: (s)=>!!s.flags["found_stapler"] && !s.flags["stapler_returned"], hint: "You have it", steps: [
+        { scene: "teobalt_stapler" }
+      ] },
+      { text: "Who would take a stapler?", when: (s)=>!s.flags["stapler_returned"] && !s.flags["found_stapler"], steps: [
         { say: "rowan", text: "Who would take a stapler?" },
         { say: "teobalt", text: "\"That is the question I have underlined.\" He shows you. It is underlined twice. \"It is stencilled with my name. It cannot be mistaken for anybody else's. I am therefore obliged to consider *intent*.\"" },
         { say: "rowan", text: "Or it fell out of a bag." },
@@ -839,8 +843,8 @@ scene("teobalt_list", {
     ] },
     { item: "Teobalt's unloading list" },
     { flag: "has_unloading_list" },
-    { flag: "teobalt_list_told" },
-    NOTE("teobalt", "Has lost his stapler. Item three on his list is confidential."),
+    { when: (s)=>!s.flags["stapler_returned"] && !s.flags["chat_teobalt_1"] && !s.flags["teobalt_tuba_quest"], ...NOTE("teobalt", "Has lost his stapler. Item three on his list is confidential.") },
+    { when: (s)=>!s.flags["stapler_returned"] && (!!s.flags["chat_teobalt_1"] || !!s.flags["teobalt_tuba_quest"]), ...NOTE("teobalt", "Has lost a stapler with his name stencilled on it.") },
     AFF("teobalt", 3, "Wanted the list")
   ]
 });
@@ -976,7 +980,8 @@ scene("chat_teobalt", {
         { say: "rowan", text: "Your pages are ruled in four colours. Is that a system, or do you just own four pens?" },
         { say: "teobalt", text: "\"Ah.\"" },
         { text: "A slight brightening, as of a lamp being turned up one notch." },
-        { say: "teobalt", text: "Teal is for things I am worried about. Orange is for things that are ordinary. Violet is for things I have solved. Grey is for things I have not decided how to feel about." },
+        { when: (s)=>!s.flags["has_unloading_list"], say: "teobalt", text: "Teal is for things I am worried about. Orange is for things that are ordinary. Violet is for things I have solved. Grey is for things I have not decided how to feel about." },
+        { when: (s)=>!!s.flags["has_unloading_list"], say: "teobalt", text: "Teal you have met already: worries. Orange is for things that are ordinary. Violet is for things I have solved. Grey is for things I have not decided how to feel about." },
         { say: "rowan", text: "Is there a lot of grey?" },
         { say: "teobalt", text: "\"There is currently a *great* deal of grey. It is the whole of the island.\" He glances, with great gravity, at the horizon. \"I do not know how to list it.\"" },
         { choice: [
@@ -1426,7 +1431,7 @@ scene("chat_freya_ferry", {
           { text: "You signed a petition from under a book?", steps: [
             { say: "rowan", text: "You signed a petition from under a book?" },
             { say: "freya", text: "I read it first. One eye, under the edge. It asks what is in the pot. A fair question; where I am from you always ask, because sometimes it is seal." },
-            { say: "freya", text: "Also, she is going to win. I like to be early on the winning side. It is the only kind of bet I make." }
+            { say: "freya", text: "Also, she is going to win. I prefer to be early on the winning side. It is the only kind of bet I make." }
           ] },
           { text: "And what did you make of me, from under there?", steps: [
             { say: "rowan", text: "And what did you make of me, from under there?" },
@@ -1508,7 +1513,7 @@ scene("ferry_trixie", {
     MET("trixie", "Trixie Hollis"),
     { flag: "trixie_ferry_belinda" },
     { say: "rowan", text: "Rowan." },
-    { say: "trixie", text: "— Rowan, who's got no jacket and ever such nice manners." },
+    { say: "trixie", text: "— Rowan, who's got no jacket and lovely manners." },
     { say: "trixie", text: "She's not from here. She came aboard at the harbour on a girl's hair. Tiny girl, green hair, flowers all in it. I don't think the girl knows she was a ferry." },
     { say: "trixie", text: "And now it's all water, you see. A bee'll go three miles for a good clover, but not over this. She can't get home." },
     { choice: [
@@ -1677,7 +1682,7 @@ scene("chat_trixie_ferry", {
 
 scene("row_b2", {
   steps: [
-    { when: (s)=>!s.flags["row_b2_seen"] && !s.flags["supper_done"], jump: "first" },
+    { when: (s)=>!s.flags["row_b2_seen"], jump: "first" },
     { text: "The porch of bungalow 2 is still a small war zone, and nobody minds you coming back." },
     { scene: "chat_row_b2" },
     { time: 10 },
@@ -1695,22 +1700,27 @@ scene("row_b2", {
     { when: (s)=>!s.flags["b2_knew_trixie"], text: "And a honey-blonde girl in yellow-striped socks is talking to a bee on the end of her finger." },
     { when: (s)=>!!s.flags["b2_knew_trixie"], text: "And Trixie, striped socks going like pistons, is still deep in conversation with the bee on her finger." },
     { when: (s)=>!!s.flags["b2_knew_hedda"] && !!s.flags["b2_knew_freya"] && !!s.flags["b2_knew_trixie"], think: "The petition, the book and the bee. A whole side deck, moved onto one porch." },
-    { when: (s)=>!s.flags["b2_knew_hedda"], say: "hedda", alias: "???", text: "You! Are you for the sausage or against the sausage?" },
+    { when: (s)=>!s.flags["b2_knew_hedda"], say: "hedda", alias: "Girl with a paintbrush", text: "You! Are you for the sausage or against the sausage?" },
     { when: (s)=>!!s.flags["b2_knew_hedda"] && !!s.flags["hedda_signed"], say: "hedda", text: "Vance! Line twenty-seven! Good, you're already on record as somebody who asks. So: are you for the sausage or against the sausage?" },
     { when: (s)=>!!s.flags["b2_knew_hedda"] && !s.flags["hedda_signed"], say: "hedda", text: "Vance! The one who wouldn't sign on a boat! Here's an easier one: are you for the sausage or against the sausage?" },
     { say: "rowan", text: "I — what sausage?" },
-    { say: "hedda", alias: "???", text: "THE sausage. The one in the stew they're going to serve tonight. Do you know what is in a sausage? Do you? I've brought a leaflet." },
+    { when: (s)=>!s.flags["supper_done"], say: "hedda", alias: "Girl with a paintbrush", text: "THE sausage. The one in the stew they're going to serve tonight. Do you know what is in a sausage? Do you? I've brought a leaflet." },
+    { when: (s)=>!!s.flags["supper_done"], say: "hedda", text: "THE sausage. The one in the stew you've just eaten. I said 'mostly', and mostly is not an answer. Do you know what is in a sausage? Do you? I've brought a leaflet." },
     { text: "She has indeed brought a leaflet. It is four pages long." },
-    { when: (s)=>!s.flags["b2_knew_freya"], say: "freya", alias: "???", text: "\"Hedda.\" The book does not move. \"Let the boy sit down first.\"" },
+    { when: (s)=>!s.flags["b2_knew_freya"], say: "freya", alias: "Girl under a book", text: "\"Hedda.\" The book does not move. \"Let the boy sit down first.\"" },
     { when: (s)=>!!s.flags["b2_knew_freya"], say: "freya", text: "\"Hedda.\" The book does not move. \"That is Rowan. He was civil to my bench. Let him sit down first.\"" },
     MET("hedda", "Hedda"),
-    { when: (s)=>!s.flags["b2_knew_freya"], say: "freya", alias: "???", text: "\"Freya Nordlicht.\"" },
+    { when: (s)=>!s.flags["b2_knew_freya"] && !s.flags["supper_done"], say: "freya", alias: "Girl under a book", text: "\"Freya Nordlicht,\" the book adds, as if that settled the order of business." },
+    { when: (s)=>!s.flags["b2_knew_freya"] && !s.flags["supper_done"], ...MET("freya", "Freya Nordlicht") },
     { text: "The book lifts a quarter of an inch. A pale blue eye regards you." },
-    { when: (s)=>!s.flags["b2_knew_freya"], say: "freya", alias: "???", text: "\"Good. A face. I like it. We'll talk tonight — I'm wicked by ten.\"" },
-    { when: (s)=>!!s.flags["b2_knew_freya"], say: "freya", text: "\"So they have put you on the row as well. Good. It is nearly my hour, Rowan. Tonight.\"" },
+    { when: (s)=>!s.flags["b2_knew_freya"] && !s.flags["supper_done"], say: "freya", text: "\"Good. A face. I like it. We'll talk tonight — I'm wicked by ten.\"" },
+    { when: (s)=>!s.flags["b2_knew_freya"] && !!s.flags["supper_done"], say: "freya", text: "\"Seven, from the end of the bench. Good. A face. I like it. Stay up — I'm wicked by ten.\"" },
+    { when: (s)=>!!s.flags["b2_knew_freya"] && !s.flags["supper_done"], say: "freya", text: "\"So they have put you on the row as well. Good. It is not my hour yet, Rowan. Tonight.\"" },
+    { when: (s)=>!!s.flags["b2_knew_freya"] && !!s.flags["supper_done"], say: "freya", text: "\"You survived the stew. Good. It is getting towards my hour, Rowan.\"" },
     MET("freya", "Freya Nordlicht"),
     { flag: "freya_said_wicked" },
-    { when: (s)=>!s.flags["b2_knew_trixie"], say: "trixie", alias: "???", text: "\"Hello! Sorry, I'm Trixie. This is Belinda. She's on my finger. Don't swat.\" A gap-toothed grin. \"Hold still, there's a lady on your collar. There! Off she goes.\"" },
+    { when: (s)=>!s.flags["b2_knew_trixie"] && !!s.flags["supper_done"], say: "trixie", text: "\"Hello! It's Seven! Bungalow seven! This is Belinda. She's on my finger. Don't swat.\" A gap-toothed grin. \"Hold still, there's a lady on your collar. There! Off she goes.\"" },
+    { when: (s)=>!s.flags["b2_knew_trixie"] && !s.flags["supper_done"], say: "trixie", alias: "Girl in striped socks", text: "\"Hello! Sorry, I'm Trixie. This is Belinda. She's on my finger. Don't swat.\" A gap-toothed grin. \"Hold still, there's a lady on your collar. There! Off she goes.\"" },
     { when: (s)=>!!s.flags["b2_knew_trixie"], say: "trixie", text: "\"Rowan! Belinda, LOOK, it's Rowan off the boat!\" A gap-toothed grin. \"Hold still, there's a lady on your collar. There! Off she goes.\"" },
     { when: (s)=>!!s.flags["trixie_held_belinda"], say: "trixie", text: "Belinda remembers your finger, by the way. She says it was a very good twig." },
     MET("trixie", "Trixie"),
@@ -1729,15 +1739,19 @@ scene("row_b2", {
         AFF("hedda", 4, "Read the leaflet"),
         { flag: "hedda_leaflet_read" }
       ] },
-      { text: "Maybe after dinner. I'd like to read it properly, and I don't want to rush it.", steps: [
+      { text: "Maybe after dinner. I'd like to read it properly, and I don't want to rush it.", when: (s)=>!s.flags["supper_done"], steps: [
         { say: "rowan", text: "Maybe after dinner. I'd like to read it properly, and I don't want to rush it." },
         { say: "hedda", text: "After dinner. Fine. I'll hold my fire." }
+      ] },
+      { text: "Tomorrow, in daylight. I'd like to read it properly, and I don't want to rush it.", when: (s)=>!!s.flags["supper_done"], steps: [
+        { say: "rowan", text: "Tomorrow, in daylight. I'd like to read it properly, and I don't want to rush it." },
+        { say: "hedda", text: "Tomorrow. Fine. I'll hold my fire till breakfast." }
       ] },
       { text: "Is the sausage a witness, or a defendant?", hint: "Risky", steps: [
         { say: "rowan", text: "Is the sausage a witness, or a defendant?" },
         { text: "The megaphone comes up. You are very glad it is not switched on." },
         { say: "hedda", text: "Jokes about veganism! The OLDEST evasion in the book!" },
-        { say: "freya", text: "Hedda. He is nineteen and he is new." },
+        { say: "freya", text: "Hedda. He is new. Give him a day." },
         AFF("hedda", -2, "Joked about veganism")
       ] }
     ] },
@@ -1756,7 +1770,8 @@ scene("chat_row_b2", {
         { choice: [
           { text: "What's the banner for, Hedda?", when: (s)=>!s.flags["chat_hedda_1"], steps: [
             { say: "rowan", text: "What's the banner for, Hedda?" },
-            { say: "hedda", text: "\"Tonight's stew! It's a protest and a service announcement! 'Ask what's in the pot!'\" She jabs the brush at the red letters." },
+            { when: (s)=>!s.flags["supper_done"], say: "hedda", text: "\"Tonight's stew! It's a protest and a service announcement! 'Ask what's in the pot!'\" She jabs the brush at the red letters." },
+            { when: (s)=>!!s.flags["supper_done"], say: "hedda", text: "\"Tomorrow's breakfast! Tonight's stew got past me. It's a protest and a service announcement! 'Ask what's in the pot!'\" She jabs the brush at the red letters." },
             { say: "hedda", text: "\"People think a petition is a shout. A petition is a *list*. A list is what wins.\"" },
             { say: "rowan", text: "How many names have you got?" },
             { say: "hedda", text: "\"Eighty-one, since the harbour. I'd have ninety, but half of Rare Hall wouldn't sign without a lawyer.\" Fierce and quick, entirely delighted. \"I counted them twice. I always count twice.\"" },
@@ -1802,14 +1817,14 @@ scene("chat_row_b2", {
         { choice: [
           { text: "Do you always lie on two chairs with a book on your face?", when: (s)=>!s.flags["chat_freya_1"] && !s.flags["b2_knew_freya"], steps: [
             { say: "rowan", text: "Do you always lie on two chairs with a book on your face?" },
-            { say: "freya", text: "\"Only before ten.\" The book lifts. \"It's how I save my face for the evening. The rest of the day it's a rumour.\"" },
+            { say: "freya", text: "\"Only before ten.\" The book lifts. \"It is how I save my face for the evening. The rest of the day it is a rumour.\"" },
             { say: "rowan", text: "What are you reading?" },
             { say: "freya", text: "Nothing. I have been looking at the same sentence since lunch. It is a very good sentence." },
             AFF("freya", 2, "Played along"),
             { flag: "chat_freya_1" }
           ] },
-          { text: "A bench this morning, two chairs this afternoon. Has the book moved at all?", when: (s)=>!s.flags["chat_freya_1"] && !!s.flags["b2_knew_freya"], steps: [
-            { say: "rowan", text: "A bench this morning, two chairs this afternoon. Has the book moved at all?" },
+          { text: "A bench this morning, two chairs now. Has the book moved at all?", when: (s)=>!s.flags["chat_freya_1"] && !!s.flags["b2_knew_freya"], steps: [
+            { say: "rowan", text: "A bench this morning, two chairs now. Has the book moved at all?" },
             { say: "freya", text: "\"One page.\" The book lifts. \"It is how I save my face for the evening. Until ten it is a rumour.\"" },
             { when: (s)=>!!s.flags["freya_book_told"], say: "rowan", text: "And the murder?" },
             { when: (s)=>!!s.flags["freya_book_told"], say: "freya", text: "Still the one I said. I have been looking at the same sentence since lunch. It is a very good sentence; he lies in it." },
@@ -1831,7 +1846,7 @@ scene("chat_row_b2", {
                 { say: "freya", text: "You have until ten. It is a long run-up. I am not unreasonable." }
               ] }
             ] },
-            { say: "freya", text: "You'll want a water. Ask anyone. Everybody wants a water, eventually." },
+            { say: "freya", text: "You will want a glass of water by then. Everybody does, eventually." },
             AFF("freya", 1, "Asked straight"),
             { flag: "chat_freya_2" }
           ] },
@@ -1841,27 +1856,27 @@ scene("chat_row_b2", {
       ] },
       { text: "Hold still for Trixie and Belinda.", when: (s)=>!s.flags["chat_trixie_done"], steps: [
         { choice: [
-          { text: "Who's Belinda?", when: (s)=>!s.flags["chat_trixie_1"] && !s.flags["trixie_ferry_belinda"], steps: [
-            { say: "rowan", text: "Who's Belinda?" },
+          { text: "What sort of bee is Belinda?", when: (s)=>!s.flags["chat_trixie_1"] && !s.flags["trixie_ferry_belinda"], steps: [
+            { say: "rowan", text: "What sort of bee is Belinda?" },
             { say: "trixie", text: "\"Honeybee! Very decent. Very busy. She's been on my finger since breakfast, and I have *not* been asked for a single piece of paperwork.\" A bright, gap-toothed grin. \"She's a good listener. Ask her anything. She'll wait till the end.\"" },
-            { say: "rowan", text: "Good afternoon, Belinda." },
-            { say: "trixie", text: "\"She says good afternoon!\" Wholly serious. \"She also says you've got a flower on your collar, which is nice, because that was me. I put it there when you weren't looking.\"" },
+            { say: "rowan", text: "Hello, Belinda." },
+            { say: "trixie", text: "\"She says hello back!\" Wholly serious. \"She also says you've got a flower on your collar, which is nice, because that was me. I put it there when you weren't looking.\"" },
             AFF("trixie", 2, "Greeted the bee"),
             { flag: "chat_trixie_1" }
           ] },
           { text: "How is Belinda taking to dry land?", when: (s)=>!s.flags["chat_trixie_1"] && !!s.flags["trixie_ferry_belinda"], steps: [
             { say: "rowan", text: "How is Belinda taking to dry land?" },
             { say: "trixie", text: "\"Ever so well! She's been on my finger since breakfast, and she walked right down the gangway on it, and I have *not* been asked for a single piece of paperwork.\" A bright, gap-toothed grin. \"She's had a go at the lavender already. She says it'll do.\"" },
-            { say: "rowan", text: "Good afternoon, Belinda." },
-            { say: "trixie", text: "\"She says good afternoon!\" Wholly serious. \"She also says you've got a flower on your collar, which is nice, because that was me. I put it there when you weren't looking.\"" },
+            { say: "rowan", text: "Hello, Belinda." },
+            { say: "trixie", text: "\"She says hello back!\" Wholly serious. \"She also says you've got a flower on your collar, which is nice, because that was me. I put it there when you weren't looking.\"" },
             AFF("trixie", 2, "Asked after the bee"),
             { flag: "chat_trixie_1" }
           ] },
           { text: "Do you keep bees at home?", when: (s)=>!s.flags["chat_trixie_2"], steps: [
             { say: "rowan", text: "Do you keep bees at home?" },
-            { say: "trixie", text: "\"My dad does! The orchard coast! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home.\" She rattles it off without drawing breath." },
+            { say: "trixie", text: "\"My dad does! Edge of Dartmoor! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home.\" She rattles it off without drawing breath." },
             { say: "trixie", text: "\"I say good morning to the bees and they say it back. Mostly. In their own way.\"" },
-            { say: "trixie", text: "It's sad here without them. I'm going to put a hotel under the bungalow roof. If you've got a spare plank, I'll love you forever." },
+            { say: "trixie", text: "It's too quiet here without a hive. I'm going to put a hotel under the bungalow roof. If you've got a spare plank, I'll love you forever." },
             { choice: [
               { text: "I'll keep an eye out for a plank.", steps: [
                 { say: "rowan", text: "I'll keep an eye out for a plank." },
@@ -1890,7 +1905,7 @@ scene("chat_row_b2", {
     { jump: "top" },
     { label: "done" },
     { flag: "chat_row_b2_done" },
-    { say: "freya", text: "\"That's the whole porch. You've done the rounds.\" The book comes down for a moment, and the pale blue eye is almost warm." },
+    { say: "freya", text: "\"That is the whole porch. You have done the rounds.\" The book comes down for a moment, and the pale blue eye is almost warm." },
     { say: "freya", text: "\"Come by tonight. We start at ten. The sausage will still be wrong.\"" },
     { end: true }
   ]
@@ -1926,7 +1941,7 @@ scene("isle_rana", {
         { say: "rana", text: "Tide covers the low ones by six. This one stays dry." },
         { say: "rowan", text: "You've been on this island a couple of hours." },
         { say: "rana", text: "There's a line on the rock where the weed stops. Use your eyes." },
-        { text: "There is a line. You would have had to climb all the way out here to find it, and there are forty rocks nearer the row." }
+        { text: "There is a line, now that you look: dark weed below it, dry black rock above. It is also, you notice, the furthest rock from the row there is. You suspect that was the real requirement." }
       ] },
       { text: "Sit down on the next rock along, and say nothing.", hint: "Quiet", steps: [
         { text: "You pick the next flat rock and sit. It is warm from the sun and smells of weed. The row is a long way behind you both, and very small." },
@@ -2016,8 +2031,8 @@ scene("isle_teobalt", {
     { say: "rowan", text: "Seven." },
     { say: "teobalt", text: "Does the roof leak?" },
     { choice: [
-      { text: "I've been inside it for twenty minutes. Ask me after it rains.", steps: [
-        { say: "rowan", text: "I've been inside it for twenty minutes. Ask me after it rains." },
+      { text: "I've hardly been inside it. Ask me after it rains.", steps: [
+        { say: "rowan", text: "I've hardly been inside it. Ask me after it rains." },
         { say: "teobalt", text: "I shall. Nobody has listed the bungalows. I looked. There is a list for the Tower's chandeliers and none for your roofs." }
       ] },
       { text: "Why would Rare Hall want to know about a Commons roof?", steps: [
@@ -2028,7 +2043,7 @@ scene("isle_teobalt", {
     ] },
     { when: (s)=>!!s.flags["teobalt_thursday"], say: "teobalt", text: "Thursday stands, by the way. It has its own line now." },
     { flag: "isle_teobalt_done" },
-    NOTE("teobalt", "Shares Rare Hall 102 with Park Jun-ho, who sent his room rules back with eleven numbered comments."),
+    NOTE("teobalt", "Shares a room in Rare Hall with Park Jun-ho, who sent his room rules back with eleven numbered comments."),
     { time: 5 },
     { end: true },
     { label: "later" },

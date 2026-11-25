@@ -1767,7 +1767,7 @@ scene("isle_eloise", {
     { text: "In the middle of the Quad, where everybody has to walk round her, a girl in a wine-red beret and a gold jacket is kneeling on the grass over a sketchbook the size of a door. There is paint in her hair and a brush in her hand. The air near her smells of turpentine, even out here." },
     { text: "She is painting the clock tower. On the page its blue roof is enormous, and the people beneath it are small tilted dabs, every one of them leaning back." },
     { when: (s)=>!!s.flags["met_eloise"], jump: "known" },
-    { say: "eloise", alias: "Girl in a red beret", text: "You, with no jacket. Stand in front of the tower. No — left. I need one thing out here it isn't looking at." },
+    { say: "eloise", alias: "Girl in a red beret", text: "You, in the new red. Stand in front of the tower. No — left. I need one thing out here it isn't looking at." },
     { text: "You stand in front of the tower. It seems simpler than asking." },
     { say: "eloise", alias: "Girl in a red beret", text: "There. I'm Eloise. Lafayette. It's on my hand, with the room. And you're the one they read out last. I kept that it was last. I lost the name." },
     { say: "rowan", text: "Rowan." },
