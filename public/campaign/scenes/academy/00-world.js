@@ -381,7 +381,7 @@ world({
           x: 76,
           y: 100,
           h: 46,
-          label: "Girl with the dark-blue feather",
+          label: "Girl with the dark-purple feather",
           scene: "ferry_georgie",
           when: (s)=>(((s.day===1)&&(s.minutes<640))&&!!!s.flags["met_georgie"])
         },

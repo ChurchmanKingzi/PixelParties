@@ -999,34 +999,34 @@ scene("post_ed", {
 scene("ferry_georgie", {
   steps: [
     { when: (s)=>!!s.flags["met_georgie"], jump: "again" },
-    { text: "She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A dark-blue feather is pinned in her wild black hair. A green plush dragon hangs from her backpack by one wing." },
+    { text: "She is sitting on a coil of rope with a deck box held in both hands, in a jacket at least one size too big, its cuffs turned back twice. A dark-purple feather is pinned in her wild black hair. A green plush dragon hangs from her backpack by one wing." },
     { text: "A girl with a camera is orbiting her with great concentration." },
     { say: "pippa", alias: "Girl with a camera", text: "Chin up. No — down. No — up again. Look at the volcano like it owes you money." },
     { text: "The girl on the rope looks at the volcano. It does not owe her money. Her face says so." },
     { text: "There is something curiously still about her. It is not calm. It is more the stillness of a small animal that has learned that moving is what gets you noticed." },
     { text: "She notices you looking, and goes the colour of a tomato." },
-    { say: "georgie", alias: "Girl with the dark-blue feather", text: "Sorry. Was I — is this your rope?" },
+    { say: "georgie", alias: "Girl with the dark-purple feather", text: "Sorry. Was I — is this your rope?" },
     { choice: [
       { text: "\"It's the ship's rope. I think that makes it anybody's. I'm Rowan.\"", steps: [
         { say: "rowan", text: "It's the ship's rope. I think that makes it anybody's. I'm Rowan." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "Oh. Okay." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "I did ask a sailor. He said it's been lying there longer than he has. So I thought it would probably be all right." },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "Oh. Okay." },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "I did ask a sailor. He said it's been lying there longer than he has. So I thought it would probably be all right." },
         { text: "She hesitates, plainly deciding whether you are a trick." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "\"Georgie.\" A pause. \"Santa. Georgie Santa.\"" }
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Georgie.\" A pause. \"Santa. Georgie Santa.\"" }
       ] },
       { text: "\"I wasn't looking at the rope. You're holding that deck box as if it were full of eggs. I'm Rowan.\"", steps: [
         { say: "rowan", text: "I wasn't looking at the rope. You're holding that deck box as if it were full of eggs. I'm Rowan." },
         { text: "She goes perfectly still. Stiller than before, which you would not have thought possible." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "…How did you know?" },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "…How did you know?" },
         { say: "rowan", text: "Know what?" },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "\"Nothing. It's fine.\" She loosens her grip on the box by about one finger. \"Georgie. Georgie Santa.\"" },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Nothing. It's fine.\" She loosens her grip on the box by about one finger. \"Georgie. Georgie Santa.\"" },
         { flag: "georgie_egg_slip" }
       ] },
       { text: "\"Sit wherever you like. I spent the night on a bench, I don't own anything on this ship. I'm Rowan.\"", steps: [
         { say: "rowan", text: "Sit wherever you like. I spent the night on a bench, I don't own anything on this ship. I'm Rowan." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "\"The bench under the lifeboat?\" Very small. \"I saw. I walked quietly.\"" },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"The bench under the lifeboat?\" Very small. \"I saw. I walked quietly.\"" },
         { say: "rowan", text: "Then thank you. It worked." },
-        { say: "georgie", alias: "Girl with the dark-blue feather", text: "\"Georgie.\" She says it to the deck box. \"Santa. Georgie Santa.\"" },
+        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Georgie.\" She says it to the deck box. \"Santa. Georgie Santa.\"" },
         AFF("georgie", 1, "Said thank you")
       ] }
     ] },
@@ -1220,7 +1220,7 @@ scene("chat_georgie", {
         { say: "georgie", text: "He said it suited me better. He hasn't got much hair." },
         AFF("georgie", 2, "Asked about the feather"),
         { flag: "chat_georgie_1" },
-        NOTE("georgie", "The dark-blue feather came from the steps outside the hall of her first big final, when she was eleven."),
+        NOTE("georgie", "The dark-purple feather came from the steps outside the hall of her first big final, when she was eleven."),
         { time: 3 }
       ] },
       { text: "\"Can I ask you about playing in front of people? I've never done it.\"", when: (s)=>!s.flags["chat_georgie_2"], steps: [
@@ -1620,7 +1620,7 @@ scene("chat_viktor", {
         { say: "rowan", text: "The feather in your hatband. Is that from somewhere too?" },
         { say: "viktor", text: "The quay, last night. Heron, I think. It was lying by a bollard and everyone was stepping over it." },
         { say: "viktor", text: "It seemed a waste of a feather." },
-        { when: (s)=>!!s.flags["chat_georgie_1"], say: "rowan", text: "You're the second person today who's told me that. There's a girl on a coil of rope back there with a dark-blue one. Same reason." },
+        { when: (s)=>!!s.flags["chat_georgie_1"], say: "rowan", text: "You're the second person today who's told me that. There's a girl on a coil of rope back there with a dark-purple one. Same reason." },
         { when: (s)=>!!s.flags["chat_georgie_1"], say: "viktor", text: "\"Then she has good eyes.\" He glances down the deck, once, to see for himself. \"Most people only pick up what they came for.\"" },
         { when: (s)=>!s.flags["chat_georgie_1"], say: "rowan", text: "So you pick things up." },
         { when: (s)=>!s.flags["chat_georgie_1"], say: "viktor", text: "Things that are where they shouldn't be. It's usually worth asking how they got there." },
@@ -1802,11 +1802,11 @@ scene("isle_viktor", {
 scene("isle_georgie", {
   steps: [
     { when: (s)=>!!s.flags["isle_georgie_done"], jump: "later" },
-    { text: "The lawn by the Trial Domes is dotted with white-and-gold collars, standing about in twos and threes and pretending not to watch the doors. At the very edge of the grass, where the shade of a dome begins, a small girl in a jacket one size too big is sitting cross-legged with a deck box in both hands. A dark-blue feather is pinned in her hair, and a green plush dragon sits in her lap, facing the domes." },
+    { text: "The lawn by the Trial Domes is dotted with white-and-gold collars, standing about in twos and threes and pretending not to watch the doors. At the very edge of the grass, where the shade of a dome begins, a small girl in a jacket one size too big is sitting cross-legged with a deck box in both hands. A dark-purple feather is pinned in her hair, and a green plush dragon sits in her lap, facing the domes." },
     { when: (s)=>!!s.flags["met_georgie"], say: "georgie", text: "Hi, Rowan." },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["flag_georgie_played"], say: "georgie", text: "The tables in there light up. It isn't like our bit of deck. I looked through the door." },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["georgie_game_later"]&&!s.flags["flag_georgie_played"], say: "georgie", text: "It still isn't later. It's fine. There's a whole year." },
-    { when: (s)=>!s.flags["met_georgie"], say: "georgie", alias: "Girl with the dark-blue feather", text: "\"You're Rowan Vance. They read it out on the Quad.\" She goes pink. \"Is it all right that I know that already? I'm Georgie. Santa. Georgie Santa.\"" },
+    { when: (s)=>!s.flags["met_georgie"], say: "georgie", alias: "Girl with the dark-purple feather", text: "\"You're Rowan Vance. They read it out on the Quad.\" She goes pink. \"Is it all right that I know that already? I'm Georgie. Santa. Georgie Santa.\"" },
     MET("georgie", "Georgie Santa"),
     { say: "georgie", text: "They gave me a suite in the tower. It has five doors. One of them is a cupboard, but I counted it." },
     { say: "georgie", text: "\"We get called one at a time, by the alphabet. I'm an S.\" Her fingers are white on the box. \"I don't mind the duel. I mind the walking in.\"" },

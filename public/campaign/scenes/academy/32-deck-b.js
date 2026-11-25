@@ -215,7 +215,7 @@ scene("chat_pippa", {
       { text: "\"Did you know anybody aboard before this morning?\"", when: (s)=>!s.flags["chat_pippa_2"] && !s.flags["met_georgie"], steps: [
         { say: "rowan", text: "Did you know anybody aboard before this morning?" },
         { say: "pippa", text: "Not one. Three trains and a night bus down from Aarhus, and nobody on any of them was going where I was going." },
-        { say: "pippa", text: "There's a girl up by the rope coil, though. Dark-blue feather in her hair. Georgie. She's fourteen, and she asked me whether she was *allowed* to sit down." },
+        { say: "pippa", text: "There's a girl up by the rope coil, though. Dark-purple feather in her hair. Georgie. She's fourteen, and she asked me whether she was *allowed* to sit down." },
         { say: "pippa", text: "So I've decided I'm her older sister. She hasn't been told yet." },
         { choice: [
           { text: "\"You adopt people quickly.\"", steps: [
@@ -965,8 +965,8 @@ scene("chat_branden", {
         NOTE("branden", "Wants to find out whether you can toast a marshmallow on the volcano. At home nobody wanted to explore with him."),
         { time: 2 }
       ] },
-      { text: "\"Have you met Georgie? The girl with the dark-blue feather?\"", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
-        { say: "rowan", text: "Have you met Georgie? The girl with the dark-blue feather?" },
+      { text: "\"Have you met Georgie? The girl with the dark-purple feather?\"", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
+        { say: "rowan", text: "Have you met Georgie? The girl with the dark-purple feather?" },
         { say: "branden", text: "\"The *old* one?\" A snort. \"She's fourteen. She won the under-sixteens. Technically that's the *old people's* league.\"" },
         { say: "rowan", text: "She seemed a bit nervous." },
         { say: "branden", text: "That's because she's seen the competition." },
