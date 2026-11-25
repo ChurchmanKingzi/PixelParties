@@ -3,6 +3,13 @@
 //  BoardCard, BoardZone, animations, effects,
 //  prompts, and the main GameBoard component
 // ═══════════════════════════════════════════
+
+// Attribut-/HTML-Escaping für Bild-URLs, die per innerHTML in Animations-Elemente gesetzt werden.
+// Hülle/Sleeve-Werte kommen vom Gegner (Profil) — ein `"` darin würde sonst aus dem src-Attribut
+// ausbrechen (Stored XSS, Sicherheitsaudit 25.11.). Der Server prüft die Werte ebenfalls.
+function ppAttrEsc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"'`]/g, c => '&#' + c.charCodeAt(0) + ';');
+}
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
 const { api, emitSocket, socket, AppContext, CardMini, CardFoil, FoilBrettContext,
         cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB,
@@ -45885,8 +45892,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const imgUrl = !faceDown && cardName ? cardImageUrl(cardName) : null;
       const cardback = ownerIsMe ? (me.cardback || '/cardback.png') : (opp.cardback || '/cardback.png');
       fly.innerHTML = imgUrl
-        ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
-        : `<img src="${cardback}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
+        ? `<img src="${ppAttrEsc(imgUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
+        : `<img src="${ppAttrEsc(cardback)}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
       const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
       const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
       // ★ v1258 — Weltverankerung: liegt ein Ende im Feld, startet der
@@ -45927,7 +45934,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const back = ownerIsMe ? (me.cardback || '/cardback.png') : (opp.cardback || '/cardback.png');
       const el = document.createElement('div');
       el.className = 'hand-present-fly';
-      el.innerHTML = `<img src="${ownerIsMe ? face : back}" draggable="false" /><span class="hand-present-eye">👁</span>`;
+      el.innerHTML = `<img src="${ppAttrEsc(ownerIsMe ? face : back)}" draggable="false" /><span class="hand-present-eye">👁</span>`;
       el.style.cssText = `left:${sx}px;top:${sy}px;width:${w}px;height:${h}px;`;
       document.body.appendChild(el);
       const img = el.querySelector('img');
@@ -46009,7 +46016,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       fly.className = 'board-card hand-to-board-fly';
       const imgUrl = cardName ? cardImageUrl(cardName) : null;
       fly.innerHTML = imgUrl
-        ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
+        ? `<img src="${ppAttrEsc(imgUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
         : `<img src="/cardback.png" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
       const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
       const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
@@ -46236,7 +46243,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                    transform 780ms cubic-bezier(.25,.7,.35,1), opacity 220ms linear;
       `;
       el.innerHTML = bild
-        ? `<img src="${bild}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`
+        ? `<img src="${ppAttrEsc(bild)}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`
         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text1);font-size:13px;text-align:center;padding:6px">${karte.name}</div>`;
       document.body.appendChild(el);
       if (window.playSFX) window.playSFX('reveal', { category: 'effect', dedupe: 150 });
@@ -52389,7 +52396,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           + `margin:${-ch / 2}px 0 0 ${-cw / 2}px;z-index:10095;pointer-events:none;will-change:transform;`;
         const bild = window.cardImageUrl ? window.cardImageUrl(d.cardName) : null;
         el.innerHTML = (bild
-          ? `<img src="${bild}" draggable="false" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block" />`
+          ? `<img src="${ppAttrEsc(bild)}" draggable="false" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block" />`
           : `<div style="width:100%;height:100%;border-radius:6px;background:#3a2412"></div>`)
           + '<span class="chaorc-wurf-russ"></span>';
         (wA.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(el);

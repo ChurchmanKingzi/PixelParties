@@ -131,7 +131,15 @@ const PORT = process.env.PORT || 3000;
 //  Verhalten (alle Schnittstellen), damit Tests im LAN weiter gehen.
 // ───────────────────────────────────────────────────────────────
 const HOST = process.env.HOST || '0.0.0.0';
-const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025!';
+// PROFILE_SECRET (Sicherheitsaudit 25.11.): Der frühere Rückfallwert stand im Quelltext und damit im
+// öffentlichen Repo — wer ihn kannte, baute sich ein gültiges Backup (Elo, Siege, Decks) und importierte es.
+// In Produktion gibt es deshalb KEINEN Rückfall mehr: ohne eigenen Wert (mind. 16 Zeichen, `openssl rand -hex 32`)
+// sind Profil-Export und -Import abgeschaltet (503) — der Server startet trotzdem. Nur außerhalb von Produktion
+// (lokale Entwicklung, Tests) bleibt ein fester Entwicklungswert.
+const PROFILE_SECRET_ENV = String(process.env.PROFILE_SECRET || '').trim();
+const PROFILE_BACKUP_AKTIV = PROFILE_SECRET_ENV.length >= 16 || process.env.NODE_ENV !== 'production';
+const PROFILE_SECRET = PROFILE_SECRET_ENV.length >= 16 ? PROFILE_SECRET_ENV : 'pxlParties_dev_only_not_a_secret';
+if (!PROFILE_BACKUP_AKTIV) console.warn('[profil] PROFILE_SECRET fehlt oder ist kürzer als 16 Zeichen — Profil-Export/-Import sind ABGESCHALTET. Setzen: openssl rand -hex 32');
 const PUZZLE_SECRET = process.env.PUZZLE_SECRET || 'pxlParties_puzzl3_k3y_2025!';
 const profileImportUsed = new Set();
 
@@ -631,6 +639,12 @@ function zeigtAufKarteneffekte(reqPath) {
   let rel;
   try { rel = decodeURIComponent(reqPath.slice('/cards/'.length)); }
   catch { return true; } // kaputte Prozentkodierung — im Zweifel sperren
+  // Fuehrende Schraegstriche (`/cards//effects/…`, `/cards/%2feffects/…`) abschneiden:
+  // `path.resolve` haelt `/effects/…` sonst fuer einen ABSOLUTEN Pfad und landet ausserhalb
+  // von cards/ — der Riegel griff nicht, express.static und die gzip-Schicht
+  // normalisieren den Doppel-Slash aber und lieferten den Quelltext aus (Audit 25.11.).
+  // Auch Rueckwaertsstriche als Trenner behandeln (Windows-Entwicklung).
+  rel = rel.replace(/\\/g, '/').replace(/^\/+/, '');
   const abs = path.resolve(CARDS_DIR, rel).toLowerCase();
   const eff = CARD_EFFECTS_DIR.toLowerCase();
   // Segmentgrenze beachten: ein kuenftiges cards/effectsfoo/ waere frei.
@@ -640,6 +654,47 @@ function zeigtAufKarteneffekte(reqPath) {
 app.use((req, res, next) => {
   if (!zeigtAufKarteneffekte(req.path)) return next();
   // 404 statt 403 — die Existenz muss nicht bestaetigt werden.
+  res.status(404).type('text/plain').send('Not Found');
+});
+
+// ───────────────────────────────────────────────────────────────
+//  ALLOWLIST fuer /data (25.11., Sicherheitsaudit)
+//
+//  `/data` war als ganzer Ordner statisch eingehaengt. Darin liegen aber
+//  auch `pixel-parties.db` (E-Mails, Passwort-Hashes, Sitzungs- und
+//  Remember-Token im Klartext!), `demo-games/` (Mitschnitte mit den
+//  Haenden BEIDER Spieler), CPU-Lernprofile, Puzzle-Loesungen und
+//  Entwuerfe. Ausgeliefert wird jetzt nur, was der Browser wirklich
+//  laedt — alles andere gibt 404. Ein neuer oeffentlicher Eintrag
+//  gehoert HIER in die Liste (Name der obersten Ebene, klein geschrieben).
+//
+//  Geprueft wird der AUFGELOESTE erste Pfadabschnitt (Prozentkodierung,
+//  Doppel-Slash, `..`, Rueckwaertsstriche), nicht das Praefix: die
+//  gzip-Schicht und express.static normalisieren selbst, ein reiner
+//  startsWith-Test waere umgehbar (vgl. Quelltext-Riegel oben).
+//  Ordner mit `entwuerfe`/`proposals` im Namen (unveroeffentlichte
+//  Shop-Entwuerfe) bleiben auf jeder Ebene gesperrt.
+// ───────────────────────────────────────────────────────────────
+const DATA_OEFFENTLICH = new Set([
+  'pixel intv.otf',
+  'animated_screen', 'card-art', 'creature-animations', 'hero-animations', 'i18n', 'shop',
+  'cards.json', 'card-render.json', 'skins.json', 'titles.json', 'battle-tracks.json',
+  'palette.json', 'palette-fest.json', 'palette-retro.json',
+  'sc.png', 'logo.png', 'logo-licht-mask.png', 'logo-tint-mask.png', 'logo-umriss-mask.png',
+]);
+function dataPfadErlaubt(reqPath) {
+  let rel;
+  try { rel = decodeURIComponent(reqPath.slice('/data'.length)); }
+  catch { return false; }                       // kaputte Prozentkodierung — im Zweifel sperren
+  if (rel.includes('\0')) return false;
+  const teile = path.posix.normalize('/' + rel.replace(/\\/g, '/')).split('/').filter(Boolean);
+  if (!teile.length) return true;               // `/data/` selbst: kein Verzeichnislisting, faellt auf den SPA-Rueckfall
+  if (!DATA_OEFFENTLICH.has(teile[0].toLowerCase())) return false;
+  return !teile.some(t => /entwuerfe|proposals/i.test(t));
+}
+app.use((req, res, next) => {
+  if (req.path !== '/data' && !req.path.startsWith('/data/')) return next();
+  if (dataPfadErlaubt(req.path)) return next();
   res.status(404).type('text/plain').send('Not Found');
 });
 
@@ -2203,6 +2258,22 @@ function liveShopRef(url, subdir) {
   return shopIds(subdir).has(id) ? url : null;
 }
 
+/** Profil-Bildwert (Avatar, Sleeve, Board) vor dem Speichern prüfen (Sicherheitsaudit 25.11.).
+ *  Erlaubt: leer; Rasterbild als data-URL (png/jpeg/gif/webp, NIE svg/html — wird später unter der
+ *  Spiel-Origin über /api/img ausgeliefert und per innerHTML beim Gegner eingesetzt); ein
+ *  same-origin-Pfad ohne Anführungszeichen/Klammern/Whitespace/`..`; eine schlichte Kennung (Board-ID).
+ *  Alles andere wird abgelehnt. Gibt `true` zurück, wenn der Wert unbedenklich ist. */
+const PROFIL_BILD_MAX = 3 * 1024 * 1024;
+const PROFIL_BILD_DATAURL_RE = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i;
+function profilBildOk(v) {
+  if (v == null || v === '') return true;
+  if (typeof v !== 'string' || v.length > PROFIL_BILD_MAX) return false;
+  if (v.startsWith('data:')) return PROFIL_BILD_DATAURL_RE.test(v);
+  if (v.length > 300) return false;
+  if (v.startsWith('/')) return /^\/(?!\/)[A-Za-z0-9_\-./%+()~,@ ]*$/.test(v) && !v.includes('..');
+  return /^[A-Za-z0-9_\- ]{1,80}$/.test(v);
+}
+
 function parseHeroSkins(raw) {
   try {
     const o = JSON.parse(raw || '{}');
@@ -2273,6 +2344,14 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   // Battle-Track: nur wählbar, was freigeschaltet ist (battle-tracks.js).
   if (b.battleTrack !== undefined && !(await battleTracks.isSelectable(req.user.userId, b.battleTrack))) {
     return res.status(403).json({ error: 'This battle track is not unlocked yet.' });
+  }
+  // Bildwerte: nur prüfen, wenn sie sich ändern (ein Altwert in der DB soll beim Speichern anderer Felder nicht blockieren).
+  {
+    const cur = await db.get('SELECT avatar, cardback, board FROM users WHERE id = ?', [req.user.userId]) || {};
+    for (const [key, label] of [['avatar', 'Avatar'], ['cardback', 'Sleeve'], ['board', 'Board']]) {
+      if (b[key] === undefined || b[key] === (cur[key] ?? null)) continue;
+      if (!profilBildOk(b[key])) return res.status(400).json({ error: `${label}: invalid image value.` });
+    }
   }
   // Gegner-Sleeves (cpu-sleeves.js): erst nach fünf Siegen gegen diese CPU.
   if (b.cardback) {
@@ -2406,7 +2485,7 @@ function bildRef(v) {
   let h = _bildHash.get(v);
   if (!h) {
     const m = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(v);
-    if (!m) return v;
+    if (!m || !/^image\/(png|jpe?g|gif|webp)$/i.test(m[1])) return v;   // svg/html u. Ä. nie unter /api/img ausliefern
     let buf;
     try { buf = m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3])); }
     catch { return v; }
@@ -2426,6 +2505,8 @@ app.get('/api/img/:h', (req, res) => {
   const d = _bildDaten.get(String(req.params.h || ''));
   if (!d) return res.status(404).end();
   res.set('Content-Type', d.mime);
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
   res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.send(d.buf);
 });
@@ -2433,7 +2514,7 @@ app.get('/api/img/:h', (req, res) => {
 // Avatar upload — accepts base64 data URL in JSON body
 app.post('/api/profile/avatar', authMiddleware, async (req, res) => {
   const { avatar } = req.body;
-  if (!avatar || !avatar.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
+  if (!avatar || typeof avatar !== 'string' || !profilBildOk(avatar) || !avatar.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
   // Limit ~2MB base64
   if (avatar.length > 3 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 2MB)' });
   await db.run('UPDATE users SET avatar = ? WHERE id = ?', [avatar, req.user.userId]);
@@ -2443,7 +2524,7 @@ app.post('/api/profile/avatar', authMiddleware, async (req, res) => {
 // Cardback upload — accepts base64 data URL, stores in DB
 app.post('/api/profile/cardback', authMiddleware, async (req, res) => {
   const { cardback } = req.body;
-  if (!cardback || !cardback.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
+  if (!cardback || typeof cardback !== 'string' || !profilBildOk(cardback) || !cardback.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
   if (cardback.length > 3 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 2MB)' });
   const id = uuidv4();
   const filename = req.user.userId + '_' + Date.now() + '.png';
@@ -2484,6 +2565,7 @@ function decryptProfile(blob) {
 }
 
 app.get('/api/profile/export', authMiddleware, async (req, res) => {
+  if (!PROFILE_BACKUP_AKTIV) return res.status(503).json({ error: 'Profile backup is currently unavailable.' });
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -2526,6 +2608,7 @@ app.get('/api/profile/export', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }), async (req, res) => {
+  if (!PROFILE_BACKUP_AKTIV) return res.status(503).json({ error: 'Profile backup is currently unavailable.' });
   if (profileImportUsed.has(req.user.userId)) {
     return res.status(403).json({ error: 'You cannot import your profile again until the next update!' });
   }
@@ -15811,22 +15894,20 @@ async function setupGameState(room) {
 }
 
 /**
- * Ist die Demo-Aufnahme aktiv? **Standard: JA.**
+ * Ist die Demo-Aufnahme aktiv? **Standard: NEIN** (seit dem Sicherheitsaudit 25.11.).
  *
- * Seit dem Live-Betrieb (Render) sollen ALLE Partien aufgezeichnet
- * werden, damit auch fremde Spieler Daten liefern. Abschalten geht
- * ausdrücklich über `PP_DEMO_RECORD=0` (auch `false`/`off`/`no`).
- *
- * Die frühere Logik war umgekehrt (nur AN bei gesetzter Variable) und
- * akzeptierte die Variable zusätzlich als Prozessargument, weil sie
- * einmal per npm-Argument statt als Env gesetzt worden war — beides
- * bleibt kompatibel.
+ * Die Mitschnitte enthalten die Haende BEIDER Spieler im Klartext und wurden
+ * ueber den statischen `/data`-Mount ausgeliefert — ein Echtzeit-Cheat. `/data`
+ * ist inzwischen per Allowlist gesperrt (siehe DATA_OEFFENTLICH), die Aufnahme
+ * bleibt trotzdem aus, bis sie ausdruecklich gebraucht wird: `PP_DEMO_RECORD=1`
+ * (auch `true`/`on`/`yes`/`ja`). Die Variable wird weiterhin auch als
+ * Prozessargument akzeptiert (einmal per npm-Argument statt als Env gesetzt).
  */
 function demoRecordingEnabled() {
   const raw = process.env.PP_DEMO_RECORD
     ?? (process.argv.find(a => /^PP_DEMO_RECORD=/.test(a)) || '').split('=')[1];
-  if (raw == null || raw === '') return true;          // Standard: an
-  return !/^(0|false|off|no|nein)$/i.test(String(raw).trim());
+  if (raw == null || raw === '') return false;         // Standard: aus
+  return /^(1|true|on|yes|ja)$/i.test(String(raw).trim());
 }
 
 // HINWEIS (1.8.): Diese Funktion stand zunächst weiter unten — mitten im
@@ -17491,6 +17572,14 @@ io.on('connection', (socket) => {
     },
   }));
 
+  // Gehört der Nutzer zu diesem Raum (Spieler, Mitspieler im Spielzustand oder Zuschauer)? Sicherheitsaudit 25.11.:
+  // `request_chat_history` und `chat_private` prüften das nicht — jeder Angemeldete las die privaten Nachrichten fremder Räume.
+  const nutzerImRaum = (room, userId) => !!room && (
+    (room.players || []).some(p => p.userId === userId)
+    || (room.gameState?.players || []).some(ps => ps.userId === userId)
+    || (room.spectators || []).some(sp => sp.userId === userId));
+  const CHAT_MAX_HAUPT = 300, CHAT_MAX_PRIVAT = 200, CHAT_MAX_PAARE = 50;
+
   socket.on('chat_message', ({ roomId, text }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -17515,6 +17604,7 @@ io.on('connection', (socket) => {
     };
     if (!room.chatHistory) room.chatHistory = [];
     room.chatHistory.push(entry);
+    if (room.chatHistory.length > CHAT_MAX_HAUPT) room.chatHistory.splice(0, room.chatHistory.length - CHAT_MAX_HAUPT);   // unbegrenzt wachsende Historie (Audit)
     // Broadcast to all in room
     const allSids = [];
     for (const p of room.players) { if (p.socketId) allSids.push(p.socketId); }
@@ -17543,11 +17633,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('chat_private', ({ roomId, targetUsername, text }) => {
+  socket.on('chat_private', ({ roomId, targetUsername, text } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
-    if (!room) return;
-    const msg = (text || '').slice(0, 500).trim();
+    if (!room || !nutzerImRaum(room, currentUser.userId)) return;
+    if (typeof targetUsername !== 'string' || typeof text !== 'string') return;
+    const msg = text.slice(0, 500).trim();
     if (!msg) return;
     const entry = {
       id: Date.now() + Math.random(),
@@ -17561,8 +17652,12 @@ io.on('connection', (socket) => {
     };
     if (!room.privateChatHistory) room.privateChatHistory = {};
     const pairKey = [currentUser.username, targetUsername].sort().join('::');
-    if (!room.privateChatHistory[pairKey]) room.privateChatHistory[pairKey] = [];
+    if (!room.privateChatHistory[pairKey]) {
+      if (Object.keys(room.privateChatHistory).length >= CHAT_MAX_PAARE) return;   // Obergrenze je Raum (Audit: Speicher)
+      room.privateChatHistory[pairKey] = [];
+    }
     room.privateChatHistory[pairKey].push(entry);
+    if (room.privateChatHistory[pairKey].length > CHAT_MAX_PRIVAT) room.privateChatHistory[pairKey].splice(0, room.privateChatHistory[pairKey].length - CHAT_MAX_PRIVAT);
     // Send to both participants
     socket.emit('chat_private', entry);
     // Find target socket
@@ -17577,13 +17672,18 @@ io.on('connection', (socket) => {
     if (targetSid) io.to(targetSid).emit('chat_private', entry);
   });
 
-  socket.on('request_chat_history', ({ roomId }) => {
+  socket.on('request_chat_history', ({ roomId } = {}) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
-    if (!room) return;
+    if (!room || !nutzerImRaum(room, currentUser.userId)) return;
+    // Private Unterhaltungen nur, wenn der Anfragende selbst daran beteiligt ist (Absender oder Empfänger).
+    const eigene = {};
+    for (const [paar, liste] of Object.entries(room.privateChatHistory || {})) {
+      if (liste.some(e => e.from === currentUser.username || e.to === currentUser.username)) eigene[paar] = liste;
+    }
     socket.emit('chat_history', {
       main: room.chatHistory || [],
-      private: room.privateChatHistory || {},
+      private: eigene,
     });
   });
 
@@ -23995,12 +24095,11 @@ initDatabase().then(async () => {
     // still, weil die Variable als npm-Argument statt Env gesetzt war.
     if (demoRecordingEnabled()) {
       console.log('╔══════════════════════════════════════════════════════╗');
-      console.log('║  DEMO-AUFNAHME AKTIV (Standard) — Singleplayer-      ║');
-      console.log('║  Partien werden nach data/demo-games/ aufgezeichnet  ║');
-      console.log('║  Abschalten: PP_DEMO_RECORD=0                        ║');
+      console.log('║  DEMO-AUFNAHME AKTIV (PP_DEMO_RECORD=1) — Partien    ║');
+      console.log('║  werden nach data/demo-games/ aufgezeichnet          ║');
       console.log('╚══════════════════════════════════════════════════════╝');
     } else {
-      console.log('[demo-recorder] deaktiviert (PP_DEMO_RECORD=0)');
+      console.log('[demo-recorder] aus (Standard; einschalten: PP_DEMO_RECORD=1)');
     }
     console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
     // Skill Test: passives Lernen der Bots im Hintergrund (nur mit PP_ST_TRAIN_BG; siehe skilltest/learn/background.js).
