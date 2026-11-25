@@ -870,8 +870,8 @@ scene("arrival_stern", {
     {
       prompt: "What do you do?",
       choice: [
-        { text: "Freddie, the captain will have your head. Come back over.", goto: "opt_13" },
-        { text: "Go on, then. I'll hold the jacket.", goto: "opt_14" },
+        { text: "\"Freddie, the captain will have your head. Come back over.\"", goto: "opt_13" },
+        { text: "\"Go on, then. I'll hold the jacket.\"", goto: "opt_14" },
         { text: "Say nothing and hold out your hand for the goggles.", goto: "opt_15" }
       ]
     },
@@ -1309,7 +1309,7 @@ scene("arrival_mid", {
     { text: "Click." },
     {
       choice: [
-        { text: "Wait. Give me the camera. You should be in one.", goto: "opt_30" },
+        { text: "\"Wait. Give me the camera. You should be in one.\"", goto: "opt_30" },
         { text: "Smile for the picture and say nothing else.", goto: "opt_31" }
       ]
     },

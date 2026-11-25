@@ -548,9 +548,9 @@ scene("quad_jacket", {
     { say: "okonkwo", text: "The Wildcard entrant. You arrived by the back door. See that you leave by the front." },
     {
       choice: [
-        { text: "Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.", goto: "opt_2" },
+        { text: "\"Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.\"", goto: "opt_2" },
         {
-          text: "I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have.",
+          text: "\"I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have.\"",
           goto: "opt_3",
           hint: "Honest"
         },
@@ -631,7 +631,7 @@ scene("commons_march", {
     {
       choice: [
         {
-          text: "Mrs Fuentes? Captain Stroud asked me to bring you this. He said you would know what it is.",
+          text: "\"Mrs Fuentes? Captain Stroud asked me to bring you this. He said you would know what it is.\"",
           goto: "opt_4"
         },
         { text: "Keep quiet about it and carry on.", goto: "opt_5", hint: "Awkward" }
@@ -750,12 +750,12 @@ scene("bungalow_seven_first", {
     {
       prompt: "The sea bed, or the desk?",
       choice: [
-        { text: "Take the sea, Nathan. I'd rather have the desk, I need a table to lay out my deck.", goto: "opt_2" },
+        { text: "\"Take the sea, Nathan. I'd rather have the desk, I need a table to lay out my deck.\"", goto: "opt_2" },
         {
-          text: "I'd like the sea too. Let's duel for it: the winner gets the left bed, the loser gets the desk.",
+          text: "\"I'd like the sea too. Let's duel for it: the winner gets the left bed, the loser gets the desk.\"",
           goto: "opt_3"
         },
-        { text: "I don't mind. I'll take whatever is left.", goto: "opt_4" }
+        { text: "\"I don't mind. I'll take whatever is left.\"", goto: "opt_4" }
       ]
     },
     { jump: "choiceend_1" },
@@ -890,14 +890,14 @@ scene("bungalow_nathan", {
     { label: "end_1" },
     {
       choice: [
-        { text: "Can I ask you something, Nathan?", goto: "opt_5", when: (s)=>!!!s.flags["chat_nathan_done"] },
+        { text: "\"Can I ask you something, Nathan?\"", goto: "opt_5", when: (s)=>!!!s.flags["chat_nathan_done"] },
         {
-          text: "Talk me through your deck, if you've got a minute.",
+          text: "\"Talk me through your deck, if you've got a minute.\"",
           goto: "opt_6",
           when: (s)=>!!!s.flags["shop_nathan_done"]
         },
-        { text: "How are you finding it so far?", goto: "opt_7", when: (s)=>!!!s.flags["nathan_room_feel"] },
-        { text: "Carry on. I'll leave you to the base.", goto: "opt_8" }
+        { text: "\"How are you finding it so far?\"", goto: "opt_7", when: (s)=>!!!s.flags["nathan_room_feel"] },
+        { text: "\"Carry on. I'll leave you to the base.\"", goto: "opt_8" }
       ]
     },
     { jump: "choiceend_4" },
@@ -941,14 +941,14 @@ scene("bungalow_baylee", {
     { label: "end_1" },
     {
       choice: [
-        { text: "Can I ask you a few things, Baylee?", goto: "opt_5", when: (s)=>!!!s.flags["chat_baylee_done"] },
-        { text: "Do you want to talk about your deck?", goto: "opt_6", when: (s)=>!!!s.flags["deck_known_baylee"] },
+        { text: "\"Can I ask you a few things, Baylee?\"", goto: "opt_5", when: (s)=>!!!s.flags["chat_baylee_done"] },
+        { text: "\"Do you want to talk about your deck?\"", goto: "opt_6", when: (s)=>!!!s.flags["deck_known_baylee"] },
         {
-          text: "Is it all right, sharing with Nathan? He's a lot.",
+          text: "\"Is it all right, sharing with Nathan? He's a lot.\"",
           goto: "opt_7",
           when: (s)=>!!!s.flags["baylee_room_feel"]
         },
-        { text: "Carry on. I'll leave you in peace.", goto: "opt_8" }
+        { text: "\"Carry on. I'll leave you in peace.\"", goto: "opt_8" }
       ]
     },
     { jump: "choiceend_4" },

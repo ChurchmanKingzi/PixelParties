@@ -52,7 +52,7 @@ scene("isle_odalys", {
         { flag: "isle_odalys_peeled" },
         { time: 15 }
       ] },
-      { text: "Six o'clock. I'll be there.", steps: [
+      { text: "\"Six o'clock. I'll be there.\"", steps: [
         { say: "rowan", text: "Six o'clock. I'll be there." },
         { say: "odalys", text: "I know you will. I have counted you." },
         { time: 2 }

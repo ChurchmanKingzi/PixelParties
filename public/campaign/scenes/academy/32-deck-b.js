@@ -11,12 +11,12 @@ scene("ferry_pippa", {
     { text: "The camera clicks. She waits, as if for the light to answer. It does not. Then, without getting up, she swings the lens round to you." },
     { say: "pippa", alias: "Girl with a camera", text: "Hang on — don't move — okay. Sorry. You were looking at the island with your hand flat on your pocket, like you were checking it was still there. That's the shot. I got it." },
     { choice: [
-      { text: "What shot? Nobody told me I was being photographed.", steps: [
+      { text: "\"What shot? Nobody told me I was being photographed.\"", steps: [
         { say: "rowan", text: "What shot? Nobody told me I was being photographed." },
         { say: "pippa", alias: "Girl with a camera", text: "Nobody ever is told. That's when it's any good." },
         { say: "pippa", alias: "Girl with a camera", text: "Light behind you, island in front. You were backlit, and you'd forgotten you had a face. Good, actually. Really good." }
       ] },
-      { text: "Do I get to see it, at least?", steps: [
+      { text: "\"Do I get to see it, at least?\"", steps: [
         { say: "rowan", text: "Do I get to see it, at least?" },
         { say: "pippa", alias: "Girl with a camera", text: "Later! It's film. I'll develop it in a week. You'll hate it. It'll be perfect." },
         { say: "rowan", text: "Those can both be true?" },
@@ -40,7 +40,7 @@ scene("ferry_pippa", {
     { text: "She takes a pencil stub from behind her ear and writes on a strip of tape along the camera's back." },
     { say: "pippa", text: "\"Frame seven. Rowan. Rail, pocket.\" She blows on the pencil, which cannot need it. \"I'm doing everybody before we dock. Thirty-eight faces, before anyone's learned which face to make here.\"" },
     { choice: [
-      { text: "And the frame before me? There was nothing there.", steps: [
+      { text: "\"And the frame before me? There was nothing there.\"", steps: [
         { say: "rowan", text: "And the frame before me? There was nothing there." },
         { say: "pippa", text: "There was! Look. No — lower." },
         { text: "You look. The shadow of the rail lies across the wet planks in five straight lines, like music paper, and tilts a little each time the ship rolls." },
@@ -48,12 +48,12 @@ scene("ferry_pippa", {
         AFF("pippa", 1, "Looked where she pointed"),
         { flag: "pippa_showed_shadow" }
       ] },
-      { text: "Thirty-eight people, on film. You can't even check what you've got.", steps: [
+      { text: "\"Thirty-eight people, on film. You can't even check what you've got.\"", steps: [
         { say: "rowan", text: "Thirty-eight people, on film. You can't even check what you've got." },
         { say: "pippa", text: "No! Isn't it awful? I'll find out in a week whether today happened." },
         { say: "pippa", text: "But that's why. Film's the only honest thing left. It doesn't let you have another go at the same second." }
       ] },
-      { text: "Do you always shoot strangers without asking?", steps: [
+      { text: "\"Do you always shoot strangers without asking?\"", steps: [
         { say: "rowan", text: "Do you always shoot strangers without asking?" },
         { say: "pippa", text: "Only the ones who hold still. Which — you did, actually. Quite well. I think it's the no-jacket. It makes you look like you're waiting for a verdict." },
         { say: "rowan", text: "I'm waiting for a jacket." },
@@ -66,18 +66,18 @@ scene("ferry_pippa", {
     { flag: "pippa_film" },
     { say: "pippa", text: "Your go. What were you looking at? Not the island — everybody's looking at the island. You were looking at it as if it had asked you something." },
     { choice: [
-      { text: "Whether I'm any good when somebody's watching.", steps: [
+      { text: "\"Whether I'm any good when somebody's watching.\"", steps: [
         { say: "rowan", text: "Whether I'm any good when somebody's watching." },
         { text: "It is out before you have checked it. She does not pounce on it. She only tips her head, as though the light had changed." },
         { say: "pippa", text: "Well. I was watching. You were fine." },
         AFF("pippa", 2, "Gave a true answer")
       ] },
-      { text: "Mostly at how far it is from a bed.", steps: [
+      { text: "\"Mostly at how far it is from a bed.\"", steps: [
         { say: "rowan", text: "Mostly at how far it is from a bed." },
         { say: "pippa", text: "Ha! Okay. Tired. Don't worry, I've got that as well, it's all in the shoulders. Yours are up round your ears." },
         { text: "You lower your shoulders. She nods, as at a correction made in the darkroom." }
       ] },
-      { text: "You tell me. You're the one with the picture.", steps: [
+      { text: "\"You tell me. You're the one with the picture.\"", steps: [
         { say: "rowan", text: "You tell me. You're the one with the picture." },
         { say: "pippa", text: "Oh, that's good. That's cheating, but it's good." },
         { say: "pippa", text: "I'd say: somebody doing sums, and not liking the answer yet. The film will say for certain. It's slow, but it doesn't lie to be nice." },
@@ -89,7 +89,7 @@ scene("ferry_pippa", {
     { when: (s)=>!!s.flags["ship_knows_wildcard"], say: "pippa", text: "Probably. Hope not. Might be sort of nice, though. Nobody on this boat is guessing about *me*." },
     { when: (s)=>!s.flags["ship_knows_wildcard"], say: "pippa", text: "Rowan what, though? For the caption." },
     { when: (s)=>!s.flags["ship_knows_wildcard"], choice: [
-      { text: "Vance. Rowan Vance.", steps: [
+      { text: "\"Vance. Rowan Vance.\"", steps: [
         { say: "rowan", text: "Vance. Rowan Vance." },
         { say: "pippa", text: "\"Vance. Rowan Vance.\" She says it like a caption, and then stops with the pencil in the air." },
         { say: "pippa", text: "There's a passenger list on the wheelhouse door; I've been reading it for names. One of them is added in ink. 'Vance, R. — Wildcard.' I think I've just found him." },
@@ -98,7 +98,7 @@ scene("ferry_pippa", {
         { flag: "told_wildcard" },
         AFF("pippa", 1, "Offered his name")
       ] },
-      { text: "Just Rowan will do for a caption.", steps: [
+      { text: "\"Just Rowan will do for a caption.\"", steps: [
         { say: "rowan", text: "Just Rowan will do for a caption." },
         { say: "pippa", text: "Mysterious. Fine. 'Rowan, no jacket, no surname.' That's a better caption anyway." }
       ] }
@@ -133,7 +133,7 @@ scene("ferry_pippa", {
     { when: (s)=>!!s.flags["pippa_just_met"], jump: "first_hub" },
     { when: (s)=>!!s.flags["chat_pippa_done"], text: "She is already squinting past you at something only she can see. You leave her to it.", end: true },
     { choice: [
-      { text: "Have you got a minute, between frames?", steps: [
+      { text: "\"Have you got a minute, between frames?\"", steps: [
         { say: "rowan", text: "Have you got a minute, between frames?" },
         { say: "pippa", text: "I've got a whole roll. Go on." },
         { scene: "chat_pippa" }
@@ -153,7 +153,7 @@ scene("chat_pippa", {
     { label: "top" },
     { when: (s)=>!!s.flags["chat_pippa_1"] && !!s.flags["chat_pippa_2"] && !!s.flags["chat_pippa_3"] && !!s.flags["chat_pippa_x"] && (!!s.flags["deck_known_pippa"] || !!s.flags["deck_skipped_pippa"]) && !s.flags["chat_pippa_done"], jump: "done" },
     { choice: [
-      { text: "Thirty-eight faces. What are you hoping is on the roll?", when: (s)=>!s.flags["chat_pippa_1"], steps: [
+      { text: "\"Thirty-eight faces. What are you hoping is on the roll?\"", when: (s)=>!s.flags["chat_pippa_1"], steps: [
         { say: "rowan", text: "Thirty-eight faces. What are you hoping is on the roll?" },
         { say: "pippa", text: "Mostly rubbish! Thirty-eight people being brave at a camera." },
         { say: "pippa", text: "\"But somewhere in there, one where somebody looks like themselves.\" She lifts the camera and does not click. \"Not nice, not clever. Just like themselves. That's the whole job, really. Everything else is practice.\"" },
@@ -161,19 +161,19 @@ scene("chat_pippa", {
         { say: "pippa", text: "Twice, I think. Not today. Possibly you at the rail; we'll see when it's developed." },
         { say: "pippa", text: "And it's the quickest way I know to find the ones I'm going to like. You find people through a lens. It's cheating. It works." },
         { choice: [
-          { text: "Who have you found so far?", steps: [
+          { text: "\"Who have you found so far?\"", steps: [
             { say: "rowan", text: "Who have you found so far?" },
             { say: "pippa", text: "An enormous boy in a straw hat who moved a whole bench, by himself, so that somebody else's bag was in the shade. He didn't tell anyone. I've got it, though." },
             { say: "pippa", text: "\"And — well. Frame seven was all right.\" She is suddenly very busy with the strap. \"Don't put that in a caption.\"" },
             AFF("pippa", 1, "Asked who she liked")
           ] },
-          { text: "It's also a good way never to be on the other side of one.", steps: [
+          { text: "\"It's also a good way never to be on the other side of one.\"", steps: [
             { say: "rowan", text: "It's also a good way never to be on the other side of one." },
             { say: "pippa", text: "Ouch. Accurate, but ouch." },
             { say: "pippa", text: "\"I'm not hiding behind the camera. I'm just… better from back here.\" A grin, a little late. \"Ask me again in a month. I'll have thought of something funnier.\"" },
             AFF("pippa", 2, "Saw how it works")
           ] },
-          { text: "And the ones you don't like?", steps: [
+          { text: "\"And the ones you don't like?\"", steps: [
             { say: "rowan", text: "And the ones you don't like?" },
             { say: "pippa", text: "They get photographed as well. Very sharply. Putting somebody perfectly in focus is the meanest thing I know how to do." },
             { say: "rowan", text: "Was I in focus?" },
@@ -185,16 +185,16 @@ scene("chat_pippa", {
         NOTE("pippa", "Is photographing all the first-years before the ship docks. Wants one photograph where somebody looks like themselves."),
         { time: 2 }
       ] },
-      { text: "Georgie, on the rope coil — you were circling her with the camera. Do you two know each other?", when: (s)=>!s.flags["chat_pippa_2"] && !!s.flags["met_georgie"], steps: [
+      { text: "\"Georgie, on the rope coil — you were circling her with the camera. Do you two know each other?\"", when: (s)=>!s.flags["chat_pippa_2"] && !!s.flags["met_georgie"], steps: [
         { say: "rowan", text: "Georgie, on the rope coil — you were circling her with the camera. Do you two know each other?" },
         { say: "pippa", text: "Georgie! Since about ten minutes before you did. She's fourteen. Fourteen! National under-sixteens champion, and she asked me whether she was *allowed* to sit on a rope." },
         { say: "pippa", text: "So I've decided I'm her older sister. It's not up for discussion. She hasn't been told yet." },
         { choice: [
-          { text: "Ten minutes is quick, for a sister.", steps: [
+          { text: "\"Ten minutes is quick, for a sister.\"", steps: [
             { say: "rowan", text: "Ten minutes is quick, for a sister." },
             { say: "pippa", text: "I've had practice. Three little brothers, at home in Aarhus. You learn to spot the one who hasn't eaten and isn't going to say." }
           ] },
-          { text: "Does she get a vote?", steps: [
+          { text: "\"Does she get a vote?\"", steps: [
             { say: "rowan", text: "Does she get a vote?" },
             { say: "pippa", text: "No! That's the entire point of an older sister. Ask my brothers. There are three of them, in Aarhus, and not one has ever had a vote." }
           ] }
@@ -212,17 +212,17 @@ scene("chat_pippa", {
         NOTE("pippa", "Has three younger brothers at home in Aarhus."),
         { time: 2 }
       ] },
-      { text: "Did you know anybody aboard before this morning?", when: (s)=>!s.flags["chat_pippa_2"] && !s.flags["met_georgie"], steps: [
+      { text: "\"Did you know anybody aboard before this morning?\"", when: (s)=>!s.flags["chat_pippa_2"] && !s.flags["met_georgie"], steps: [
         { say: "rowan", text: "Did you know anybody aboard before this morning?" },
         { say: "pippa", text: "Not one. Three trains and a night bus down from Aarhus, and nobody on any of them was going where I was going." },
         { say: "pippa", text: "There's a girl up by the rope coil, though. Dark-blue feather in her hair. Georgie. She's fourteen, and she asked me whether she was *allowed* to sit down." },
         { say: "pippa", text: "So I've decided I'm her older sister. She hasn't been told yet." },
         { choice: [
-          { text: "You adopt people quickly.", steps: [
+          { text: "\"You adopt people quickly.\"", steps: [
             { say: "rowan", text: "You adopt people quickly." },
             { say: "pippa", text: "I've had practice. Three little brothers at home. You learn to spot the one who hasn't eaten and isn't going to say." }
           ] },
-          { text: "What did she say, when you told her she could sit?", steps: [
+          { text: "\"What did she say, when you told her she could sit?\"", steps: [
             { say: "rowan", text: "What did she say, when you told her she could sit?" },
             { say: "pippa", text: "'Sorry.' She said sorry. That's how I knew. I've got three little brothers at home and not one of them has ever said sorry for sitting down." }
           ] }
@@ -241,7 +241,7 @@ scene("chat_pippa", {
         NOTE("pippa", "Has three younger brothers at home in Aarhus."),
         { time: 2 }
       ] },
-      { text: "You're doing everybody before we dock. Who takes yours?", when: (s)=>!s.flags["chat_pippa_3"], steps: [
+      { text: "\"You're doing everybody before we dock. Who takes yours?\"", when: (s)=>!s.flags["chat_pippa_3"], steps: [
         { say: "rowan", text: "You're doing everybody before we dock. Who takes yours?" },
         { say: "pippa", text: "\"Hm?\" The camera comes down an inch. \"Oh — thirty-seven, then. Thirty-seven and a photographer. Somebody has to be behind it. It's a rule. There's always one person behind it.\"" },
         { text: "A very small pause. It is quick, and she covers it with a grin, but it was there." },
@@ -249,19 +249,19 @@ scene("chat_pippa", {
         { text: "She has the strap half over her head before she stops." },
         { say: "pippa", text: "…No. Wait. That's the good roll, and you'd cut my head off. On the island. When I've got one loaded that doesn't matter." },
         { choice: [
-          { text: "On the island, then. I'm holding you to it.", steps: [
+          { text: "\"On the island, then. I'm holding you to it.\"", steps: [
             { say: "rowan", text: "On the island, then. I'm holding you to it." },
             { say: "pippa", text: "\"People say that.\" Lightly. \"Fine. Hold me to it. I'm the one behind the camera, I'm easy to find.\"" },
             AFF("pippa", 2, "Meant to come back"),
             { flag: "pippa_owes_portrait" }
           ] },
-          { text: "You stopped, just then.", steps: [
+          { text: "\"You stopped, just then.\"", steps: [
             { say: "rowan", text: "You stopped, just then." },
             { say: "pippa", text: "Did I? Bad light." },
             { say: "pippa", text: "\"…You're quite annoying to stand next to, did you know?\" She does not move away. \"You'd make a decent photographer.\"" },
             AFF("pippa", 2, "Noticed the pause")
           ] },
-          { text: "A roll that doesn't matter. For the one picture of you.", steps: [
+          { text: "\"A roll that doesn't matter. For the one picture of you.\"", steps: [
             { say: "rowan", text: "A roll that doesn't matter. For the one picture of you." },
             { say: "pippa", text: "\"…Okay. That sounded worse out loud than it did in my head.\" She laughs, properly, at herself. \"Don't caption that.\"" },
             AFF("pippa", 1, "Caught what she said")
@@ -272,18 +272,18 @@ scene("chat_pippa", {
         NOTE("pippa", "Is in none of her own photographs: 'somebody has to be behind the camera.'"),
         { time: 2 }
       ] },
-      { text: "You can't delete a frame. Is there one you're glad you couldn't?", when: (s)=>!s.flags["chat_pippa_x"], steps: [
+      { text: "\"You can't delete a frame. Is there one you're glad you couldn't?\"", when: (s)=>!s.flags["chat_pippa_x"], steps: [
         { say: "rowan", text: "You can't delete a frame. Is there one you're glad you couldn't?" },
         { say: "pippa", text: "Oh — easy. A man asleep on a night bus. Holding a goldfish in a bag. A real one. Alive. Swimming." },
         { say: "pippa", text: "He had his coat buttoned over it so that it'd stay warm, and he'd fallen asleep with his hand over the top, like a very small hat. I took it from the stairs." },
         { say: "rowan", text: "Is it any good?" },
         { say: "pippa", text: "It's the best thing I've ever done. I've never printed it. It was too private. He didn't know he was being that nice." },
         { choice: [
-          { text: "Then why keep it?", steps: [
+          { text: "\"Then why keep it?\"", steps: [
             { say: "rowan", text: "Then why keep it?" },
             { say: "pippa", text: "Because it's the one where I thought, there's somebody who's looking after something. And that's what I want to take, all the time. Somebody looking after something." }
           ] },
-          { text: "You took mine without asking, too. What's the difference?", steps: [
+          { text: "\"You took mine without asking, too. What's the difference?\"", steps: [
             { say: "rowan", text: "You took mine without asking, too. What's the difference?" },
             { say: "pippa", text: "You were looking at an island. He was looking after a fish." },
             { say: "pippa", text: "…All right, there's less difference than I'd like. Yours I'll show you before anybody else sees it. That's the rule I made after him. He's why there's a rule." },
@@ -302,7 +302,7 @@ scene("chat_pippa", {
       { text: "Steer the talk to cards.", when: (s)=>!s.flags["deck_known_pippa"], steps: [
         { scene: "deck_pippa" }
       ] },
-      { text: "I'll let you get back to it. Thanks, Pippa.", steps: [
+      { text: "\"I'll let you get back to it. Thanks, Pippa.\"", steps: [
         { say: "rowan", text: "I'll let you get back to it. Thanks, Pippa." },
         { when: (s)=>!!s.flags["pippa_showed_shadow"], say: "pippa", text: "Go on, then. Mind the shadow by the rail. It's on the roll now, it's got rights." },
         { when: (s)=>!s.flags["pippa_showed_shadow"], say: "pippa", text: "Go on, then. If you see something nobody else is looking at, come and tell me." },
@@ -321,7 +321,7 @@ scene("deck_pippa", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_pippa"], end: true },
     { choice: [
-      { text: "I've been wondering what a photographer plays. What's yours?", steps: [
+      { text: "\"I've been wondering what a photographer plays. What's yours?\"", steps: [
         { say: "rowan", text: "I've been wondering what a photographer plays. What's yours?" },
         { say: "pippa", text: "Slimes! They split when you hit them. More of them the worse it gets. Oof, I relate." },
         { say: "pippa", text: "Alice, Stellan the cat, Barker. And a ridiculous amount of Cute Cheese." },
@@ -338,12 +338,12 @@ scene("deck_pippa", {
     { say: "rowan", text: "Every time." },
     { say: "pippa", text: "I'm putting it in the book." },
     { choice: [
-      { text: "There'll be a Cute Camera in there somewhere. For the deck, or for you?", steps: [
+      { text: "\"There'll be a Cute Camera in there somewhere. For the deck, or for you?\"", steps: [
         { say: "rowan", text: "There'll be a Cute Camera in there somewhere. For the deck, or for you?" },
         { say: "pippa", text: "Two. And it's both! It was the first card I ever pulled. I built everything else round it, and then pretended I'd had a plan." },
         { say: "pippa", text: "Don't tell the slimes. They think they were first." }
       ] },
-      { text: "Why slimes, though?", steps: [
+      { text: "\"Why slimes, though?\"", steps: [
         { say: "rowan", text: "Why slimes, though?" },
         { say: "pippa", text: "Because nobody takes them seriously. They look at one and go 'aww', and they hit it, and then there are more." },
         { say: "pippa", text: "It's very relaxing to be underestimated by somebody who's about to count the board again." }
@@ -365,20 +365,20 @@ scene("ferry_mikoto", {
     { text: "He notices you and laughs, a high, helpless giggle that stops as quickly as it started." },
     { say: "mikoto", alias: "Apologetic boy", text: "Sorry! I'm Mikoto. I laugh when I'm frightened. It isn't funny. I know it isn't funny." },
     { choice: [
-      { text: "It's a little bit funny. I'm Rowan. And the gull won that one fair and square.", steps: [
+      { text: "\"It's a little bit funny. I'm Rowan. And the gull won that one fair and square.\"", steps: [
         { say: "rowan", text: "It's a little bit funny. I'm Rowan. And the gull won that one fair and square." },
         { say: "mikoto", alias: "Apologetic boy", text: "She did. She really did." },
         { text: "A breathless little laugh, and then, mercifully, a genuine smile." },
         { say: "mikoto", alias: "Apologetic boy", text: "She took it out of my actual hand. I'd only had the one corner." },
         AFF("mikoto", 1, "Laughed with him")
       ] },
-      { text: "Don't apologise to the gull. I'm Rowan. Are you all right?", steps: [
+      { text: "\"Don't apologise to the gull. I'm Rowan. Are you all right?\"", steps: [
         { say: "rowan", text: "Don't apologise to the gull. I'm Rowan. Are you all right?" },
         { say: "mikoto", alias: "Apologetic boy", text: "Oh — yes. No. A bit. I'm — thank you for asking, nobody asks." },
         { say: "mikoto", alias: "Apologetic boy", text: "It's a very big boat. And a very big sea. And she came at me from the side, which I hadn't planned for." },
         AFF("mikoto", 1, "Asked if he was all right")
       ] },
-      { text: "I'm Rowan. What was in it?", steps: [
+      { text: "\"I'm Rowan. What was in it?\"", steps: [
         { say: "rowan", text: "I'm Rowan. What was in it?" },
         { say: "mikoto", alias: "Apologetic boy", text: "Egg. Egg and a bit of cress. I made it at four this morning, in case the boat had nothing." },
         { text: "The gull lifts the top slice, considers, and eats the cress as well." },
@@ -396,15 +396,15 @@ scene("ferry_mikoto", {
     { add: { ferry_talked: 1 } },
     NOTE("mikoto", "Laughs when he is frightened. Keeps a numbered list of everything that might go wrong today."),
     { choice: [
-      { text: "How many of them have happened so far?", steps: [
+      { text: "\"How many of them have happened so far?\"", steps: [
         { say: "rowan", text: "How many of them have happened so far?" }
       ] },
-      { text: "Number fourteen. How long is this list?", steps: [
+      { text: "\"Number fourteen. How long is this list?\"", steps: [
         { say: "rowan", text: "Number fourteen. How long is this list?" },
         { say: "mikoto", text: "Forty-one. Forty-two; I added 'it is the wrong boat' on the gangway. It's the right boat. I asked three people." },
         { say: "rowan", text: "And how many have come true?" }
       ] },
-      { text: "Am I on it?", steps: [
+      { text: "\"Am I on it?\"", steps: [
         { say: "rowan", text: "Am I on it?" },
         { say: "mikoto", text: "No! No. Well. Number three is 'somebody talks to me and I laugh at them'. That's sort of you. It's got one tick already. But you stayed, so I don't know whether I'm allowed another." },
         { say: "rowan", text: "Tick it. It went wrong and nothing happened." },
@@ -427,7 +427,7 @@ scene("ferry_mikoto", {
     { when: (s)=>!s.flags["ship_knows_wildcard"], say: "mikoto", text: "Rowan. That's a nice name. It sounds like a bird. Would it be all right — would you mind if I called you Row-Row? I won't. I'll ask first. May I?" },
     { when: (s)=>!s.flags["ship_knows_wildcard"], think: "It is a tree. You let it be a bird." },
     { choice: [
-      { text: "Sure. Row-Row is fine.", steps: [
+      { text: "\"Sure. Row-Row is fine.\"", steps: [
         { say: "rowan", text: "Sure. Row-Row is fine." },
         { say: "mikoto", text: "Row-Row!" },
         { text: "A brilliant smile breaks over his whole face, and he claps a hand to his mouth as though it might get out." },
@@ -435,7 +435,7 @@ scene("ferry_mikoto", {
         AFF("mikoto", 3, "Allowed the nickname"),
         { flag: "mikoto_rowrow" }
       ] },
-      { text: "What happens if I say no?", steps: [
+      { text: "\"What happens if I say no?\"", steps: [
         { say: "rowan", text: "What happens if I say no?" },
         { say: "mikoto", text: "Then I write 'Rowan' and underline it. And I think the other one very quietly, where it doesn't bother anybody." },
         { say: "rowan", text: "Think it out loud. It's fine." },
@@ -444,7 +444,7 @@ scene("ferry_mikoto", {
         { flag: "mikoto_rowrow" },
         { flag: "mikoto_asked_no" }
       ] },
-      { text: "I'd rather keep it as Rowan, for now. Try me again once we know each other.", steps: [
+      { text: "\"I'd rather keep it as Rowan, for now. Try me again once we know each other.\"", steps: [
         { say: "rowan", text: "I'd rather keep it as Rowan, for now. Try me again once we know each other." },
         { say: "mikoto", text: "Rowan. Of course. Rowan." },
         { text: "A tiny nod. He turns to a clean page and writes something, very carefully." },
@@ -465,7 +465,7 @@ scene("ferry_mikoto", {
         AFF("mikoto", 3, "Bought him lunch"),
         { flag: "mikoto_sandwich" }
       ] },
-      { text: "They'll feed us on the island. You'll last.", steps: [
+      { text: "\"They'll feed us on the island. You'll last.\"", steps: [
         { say: "rowan", text: "They'll feed us on the island. You'll last." },
         { say: "mikoto", text: "Yes. Yes, they will. It's in the letter: 'lunch at one'. I underlined it." }
       ] }
@@ -483,7 +483,7 @@ scene("ferry_mikoto", {
     { when: (s)=>!s.flags["flag_mikoto_game"], say: "mikoto", text: "Would you — would you like a game? You don't have to. I'll understand. I'll apologise all the way through, I should say that now." },
     { when: (s)=>!!s.flags["flag_mikoto_game"] && !!s.flags["chat_mikoto_done"], end: true },
     { choice: [
-      { text: "Sure, let's play. I'd like that.", when: (s)=>!s.flags["flag_mikoto_game"], steps: [
+      { text: "\"Sure, let's play. I'd like that.\"", when: (s)=>!s.flags["flag_mikoto_game"], steps: [
         { say: "rowan", text: "Sure, let's play. I'd like that." },
         { say: "mikoto", text: "Oh! Oh good. Oh no. I mean — good! I'll — sorry!" },
         { duel: "ferry_mikoto", opponent: "mikoto", opponentName: "Mikoto Yamaguchi", mustWin: false,
@@ -499,12 +499,12 @@ scene("ferry_mikoto", {
         { flag: "flag_mikoto_game" },
         { time: 25 }
       ] },
-      { text: "Can I stand here a while? You're easier to talk to than most of this ship.", when: (s)=>!s.flags["chat_mikoto_done"], steps: [
+      { text: "\"Can I stand here a while? You're easier to talk to than most of this ship.\"", when: (s)=>!s.flags["chat_mikoto_done"], steps: [
         { say: "rowan", text: "Can I stand here a while? You're easier to talk to than most of this ship." },
         { say: "mikoto", text: "Am I? Oh. Yes. Please. There's room on this side of the chain." },
         { scene: "chat_mikoto" }
       ] },
-      { text: "Not just now. Maybe a game on the island, once I've got my bearings.", when: (s)=>!s.flags["flag_mikoto_game"], steps: [
+      { text: "\"Not just now. Maybe a game on the island, once I've got my bearings.\"", when: (s)=>!s.flags["flag_mikoto_game"], steps: [
         { say: "rowan", text: "Not just now. Maybe a game on the island, once I've got my bearings." },
         { say: "mikoto", text: "Of course. Of course. On the island. I'll write it down, then it's real." }
       ] },
@@ -518,7 +518,7 @@ scene("chat_mikoto", {
     { label: "top" },
     { when: (s)=>!!s.flags["chat_mikoto_1"] && !!s.flags["chat_mikoto_2"] && !!s.flags["chat_mikoto_3"] && !!s.flags["chat_mikoto_x"] && !!s.flags["chat_mikoto_r"] && (!!s.flags["deck_known_mikoto"] || !!s.flags["deck_skipped_mikoto"]) && !s.flags["chat_mikoto_done"], jump: "done" },
     { choice: [
-      { text: "The tall one who walked off with your trunk. Did you ever get to thank him?", when: (s)=>!s.flags["chat_mikoto_r"], steps: [
+      { text: "\"The tall one who walked off with your trunk. Did you ever get to thank him?\"", when: (s)=>!s.flags["chat_mikoto_r"], steps: [
         { say: "rowan", text: "The tall one who walked off with your trunk. Did you ever get to thank him?" },
         { say: "mikoto", text: "It's worse than that. I read my letter again, to calm down. Rare Hall, room 101, sharing with Eberhart von Düsterwald." },
         { say: "mikoto", text: "And then I looked at the trunk he'd put next to mine. His own one. It's got 'E. v. Düsterwald' painted on the lid, in white." },
@@ -528,20 +528,20 @@ scene("chat_mikoto", {
         { say: "mikoto", text: "I went straight over. I'd practised it. And it came out as 'thank you, Ebi'. At home that means prawn. I didn't decide it! It just arrived!" },
         { say: "mikoto", text: "He looked at me for four seconds. I counted. Then he said 'No.' Then he did a very small bow and went back to the luggage." },
         { choice: [
-          { text: "I've met him. I don't think that was anger. I think that's how he's built.", when: (s)=>!!s.flags["met_eberhart"], hint: "You met Eberhart", steps: [
+          { text: "\"I've met him. I don't think that was anger. I think that's how he's built.\"", when: (s)=>!!s.flags["met_eberhart"], hint: "You met Eberhart", steps: [
             { say: "rowan", text: "I've met him. I don't think that was anger. I think that's how he's built." },
             { say: "mikoto", text: "Do you think so? Really?" },
             { say: "mikoto", text: "…He did put my trunk straight. You wouldn't put a trunk straight for somebody you were cross with. You'd leave it crooked. I would." },
             AFF("mikoto", 2, "Said Ebi wasn't angry")
           ] },
-          { text: "'No' to the thank-you, or 'no' to the name?", steps: [
+          { text: "\"'No' to the thank-you, or 'no' to the name?\"", steps: [
             { say: "rowan", text: "'No' to the thank-you, or 'no' to the name?" },
             { say: "mikoto", text: "That's what I don't *know*. I've written down both." },
             { say: "rowan", text: "He bowed. You don't bow to somebody you've finished with." },
             { say: "mikoto", text: "…Oh. That's good. I'm putting that underneath." },
             AFF("mikoto", 1, "Worked it out with him")
           ] },
-          { text: "Why 'Ebi'?", steps: [
+          { text: "\"Why 'Ebi'?\"", steps: [
             { say: "rowan", text: "Why 'Ebi'?" },
             { say: "mikoto", text: "Eberhart is very long, and I was frightened. It was the first short thing in my head." },
             { say: "mikoto", text: "He is the least prawn-like person I have ever seen. I can't take it back now. It's stuck to him." }
@@ -559,21 +559,21 @@ scene("chat_mikoto", {
         NOTE("mikoto", "Shares Rare Hall 101 with Eberhart von Düsterwald, the tall boy who carried his trunk. Has already called him 'Ebi' by accident."),
         { time: 2 }
       ] },
-      { text: "You checked where we're allowed to stand. Do you check everything?", when: (s)=>!s.flags["chat_mikoto_1"], steps: [
+      { text: "\"You checked where we're allowed to stand. Do you check everything?\"", when: (s)=>!s.flags["chat_mikoto_1"], steps: [
         { say: "rowan", text: "You checked where we're allowed to stand. Do you check everything?" },
         { say: "mikoto", text: "Everything. Sorry. It's — if I know where the edge is, I can stand quite near it. If I don't, I stand in the middle and get in everybody's way." },
         { say: "mikoto", text: "\"That's why here, really. My mother looked the Academy up. She said: he's very good at lists, a place with a lot of rules will suit him.\" A quick, high laugh, stopped at once. \"The handbook came with the letter. It's eleven pages. I'd hoped for more.\"" },
         { choice: [
-          { text: "Eleven pages leaves a lot of room.", steps: [
+          { text: "\"Eleven pages leaves a lot of room.\"", steps: [
             { say: "rowan", text: "Eleven pages leaves a lot of room." },
             { say: "mikoto", text: "That's exactly what's wrong with it! Room for what? It doesn't say!" }
           ] },
-          { text: "You like them that much? Rules.", steps: [
+          { text: "\"You like them that much? Rules.\"", steps: [
             { say: "rowan", text: "You like them that much? Rules." },
             { say: "mikoto", text: "Yes. Rules are very kind. They tell you where the edge is before you get there. People mostly tell you afterwards." },
             AFF("mikoto", 1, "Took it seriously")
           ] },
-          { text: "What would you add, if they let you?", steps: [
+          { text: "\"What would you add, if they let you?\"", steps: [
             { say: "rowan", text: "What would you add, if they let you?" },
             { say: "mikoto", text: "One line. 'Tell Mikoto when the plan changes.' I'd put it on page one. I wouldn't mind what the plan was." },
             AFF("mikoto", 1, "Asked what he'd want")
@@ -588,15 +588,15 @@ scene("chat_mikoto", {
         NOTE("mikoto", "His mother thought a place full of rules would suit him. The handbook turned out to be eleven pages."),
         { time: 2 }
       ] },
-      { text: "Does everybody get a nickname, or only me and the gull?", when: (s)=>!s.flags["chat_mikoto_2"], steps: [
+      { text: "\"Does everybody get a nickname, or only me and the gull?\"", when: (s)=>!s.flags["chat_mikoto_2"], steps: [
         { say: "rowan", text: "Does everybody get a nickname, or only me and the gull?" },
         { say: "mikoto", text: "Everybody! Sorry. I can't help it. The captain's Bowler; he's got a blue one, a real one. I haven't decided about the volcano yet. I'm waiting for it to do something." },
         { choice: [
-          { text: "Where do they come from?", steps: [
+          { text: "\"Where do they come from?\"", steps: [
             { say: "rowan", text: "Where do they come from?" },
             { say: "mikoto", text: "They just arrive. Before I've decided anything. It's like sneezing, except that it lasts for ever." }
           ] },
-          { text: "And when somebody says no?", steps: [
+          { text: "\"And when somebody says no?\"", steps: [
             { say: "rowan", text: "And when somebody says no?" },
             { when: (s)=>!s.flags["mikoto_asked_no"], say: "mikoto", text: "Then I say the real one out loud. And the other one inside. I can't not. I've tried." },
             { when: (s)=>!!s.flags["mikoto_asked_no"], say: "mikoto", text: "You know that one. The real one out loud and the other one inside — unless somebody tells me to think it out loud. Then I'm hopeless." }
@@ -606,14 +606,14 @@ scene("chat_mikoto", {
         { text: "He looks at his shoes." },
         { say: "mikoto", text: "Nobody's ever given me one back. That's all right. I'm not — I wasn't hinting." },
         { choice: [
-          { text: "I'll think of one. A good one takes me a while.", steps: [
+          { text: "\"I'll think of one. A good one takes me a while.\"", steps: [
             { say: "rowan", text: "I'll think of one. A good one takes me a while." },
             { say: "mikoto", text: "Does it? Mine take no time at all. That's probably what's wrong with them." },
             { say: "mikoto", text: "\"I'll wait. I'm good at waiting.\" He opens the notebook. \"I've got a page for it.\"" },
             AFF("mikoto", 2, "Promised him a nickname"),
             { flag: "mikoto_owed_nickname" }
           ] },
-          { text: "Mikoto suits you as it is.", steps: [
+          { text: "\"Mikoto suits you as it is.\"", steps: [
             { say: "rowan", text: "Mikoto suits you as it is." },
             { say: "mikoto", text: "Oh. Does it?" },
             { say: "mikoto", text: "…Nobody's said that either." },
@@ -625,26 +625,26 @@ scene("chat_mikoto", {
         NOTE("mikoto", "Nicknames everybody: the captain is Bowler, the gull is Mrs Pemberton. A name he made himself is one he cannot get wrong."),
         { time: 2 }
       ] },
-      { text: "The gull's ticked off. What's at the top of the list now?", when: (s)=>!s.flags["chat_mikoto_3"], steps: [
+      { text: "\"The gull's ticked off. What's at the top of the list now?\"", when: (s)=>!s.flags["chat_mikoto_3"], steps: [
         { say: "rowan", text: "The gull's ticked off. What's at the top of the list now?" },
         { say: "mikoto", text: "Oh — it isn't in order of the day. It's in order of likelihood." },
         { say: "mikoto", text: "One: my first duel on a real table, with people round it. Two: the person I'm sharing a room with. Three: that I laugh at the wrong moment and somebody thinks it's about them." },
         { choice: [
-          { text: "Number one's on mine as well. I've never played on a real table.", steps: [
+          { text: "\"Number one's on mine as well. I've never played on a real table.\"", steps: [
             { say: "rowan", text: "Number one's on mine as well. I've never played on a real table." },
             { say: "mikoto", text: "\"Is it?\" A quick, startled look, magnified by the glasses. \"You?\"" },
             { say: "rowan", text: "My hands shake when people watch." },
             { say: "mikoto", text: "Oh. Oh, that's — thank you. It's much better with two. I'll write you next to it. In pencil, so that you can come off again." },
             AFF("mikoto", 3, "Admitted he was nervous too")
           ] },
-          { text: "Has number three happened before?", steps: [
+          { text: "\"Has number three happened before?\"", steps: [
             { say: "rowan", text: "Has number three happened before?" },
             { say: "mikoto", text: "Every time. Somebody falls over, or cries, or tells me something sad, and out it comes. And then they go and sit somewhere else. It's a very reliable list." },
             { say: "rowan", text: "I'm still standing here." },
             { say: "mikoto", text: "You are. I'd noticed. I didn't like to say, in case it stopped." },
             AFF("mikoto", 2, "Still standing there")
           ] },
-          { text: "And what's at the very bottom?", steps: [
+          { text: "\"And what's at the very bottom?\"", steps: [
             { say: "rowan", text: "And what's at the very bottom?" },
             { say: "mikoto", text: "'Volcano.' The letter says it's asleep. So I've put it last." },
             { say: "mikoto", text: "In pen, though." }
@@ -655,19 +655,19 @@ scene("chat_mikoto", {
         NOTE("mikoto", "The list is in order of likelihood. His first duel on a real table is at the top."),
         { time: 2 }
       ] },
-      { text: "All those lines are for what goes wrong. Do you keep a list of anything else?", when: (s)=>!!s.flags["chat_mikoto_3"] && !s.flags["chat_mikoto_x"], steps: [
+      { text: "\"All those lines are for what goes wrong. Do you keep a list of anything else?\"", when: (s)=>!!s.flags["chat_mikoto_3"] && !s.flags["chat_mikoto_x"], steps: [
         { say: "rowan", text: "All those lines are for what goes wrong. Do you keep a list of anything else?" },
         { say: "mikoto", text: "Oh — no. No, I — sorry. That's a very good question." },
         { text: "He looks briefly stricken, as if he had been caught with a second notebook. Then he turns the first one over and opens it from the back." },
         { say: "mikoto", text: "I keep two. The other one is nice things. It's much shorter." },
         { say: "mikoto", text: "It's got 'hot milk tea', and 'the sound the sea makes when an engine stops', and 'when someone says \"sure\" and means it'." },
         { choice: [
-          { text: "What was the last thing you put on it?", steps: [
+          { text: "\"What was the last thing you put on it?\"", steps: [
             { say: "rowan", text: "What was the last thing you put on it?" },
             { say: "mikoto", text: "'The trunk was straight.' I don't know why that's a nice thing. It just was. Somebody bothered." },
             { when: (s)=>!!s.flags["mikoto_sandwich"], say: "mikoto", text: "And then 'cheese roll'. That's under it. You're on the nice list twice, if you count the paper bag." }
           ] },
-          { text: "That's a good list.", steps: [
+          { text: "\"That's a good list.\"", steps: [
             { say: "rowan", text: "That's a good list." },
             { say: "mikoto", text: "It's only three pages. The other one's got nineteen." },
             { say: "rowan", text: "Three pages you'd want to read twice." }
@@ -685,7 +685,7 @@ scene("chat_mikoto", {
       { text: "Steer the talk to cards.", when: (s)=>!s.flags["deck_known_mikoto"], steps: [
         { scene: "deck_mikoto" }
       ] },
-      { text: "I'll go and see more of the ship. Good talking to you, Mikoto.", steps: [
+      { text: "\"I'll go and see more of the ship. Good talking to you, Mikoto.\"", steps: [
         { say: "rowan", text: "I'll go and see more of the ship. Good talking to you, Mikoto." },
         { say: "mikoto", text: "Oh — you too! Sorry! Not sorry. Good. You too." },
         { end: true }
@@ -703,7 +703,7 @@ scene("deck_mikoto", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_mikoto"], end: true },
     { choice: [
-      { text: "Would you mind telling me what you play, Mikoto? I'll understand if you'd rather not.", steps: [
+      { text: "\"Would you mind telling me what you play, Mikoto? I'll understand if you'd rather not.\"", steps: [
         { say: "rowan", text: "Would you mind telling me what you play, Mikoto? I'll understand if you'd rather not." },
         { say: "mikoto", text: "Skeletons. Healers and mages, mostly. Sorry. They heal each other, and when one dies, The Bonegrinder turns it into a card. Is that all right? That's all right." },
         AFF("mikoto", 2, "Asked gently")
@@ -719,12 +719,12 @@ scene("deck_mikoto", {
     { say: "rowan", text: "The Death Knight's the dull one. The Healers are the deck." },
     { say: "mikoto", text: "\"Oh.\" A small, wet laugh, stopped at once. \"Oh, that's — thank you. Sorry. That's lovely.\"" },
     { choice: [
-      { text: "Why skeletons? You don't seem the type.", steps: [
+      { text: "\"Why skeletons? You don't seem the type.\"", steps: [
         { say: "rowan", text: "Why skeletons? You don't seem the type." },
         { say: "mikoto", text: "Everybody thinks they're the frightening ones. But look at what they do. They're the only people on the table who look after each other." },
         { say: "mikoto", text: "And I'm frightened of nearly everything else. It seemed fair to have one thing the other way round." }
       ] },
-      { text: "You said 'all right' twice. Who told you it wasn't?", steps: [
+      { text: "\"You said 'all right' twice. Who told you it wasn't?\"", steps: [
         { say: "rowan", text: "You said 'all right' twice. Who told you it wasn't?" },
         { say: "mikoto", text: "Nobody *told* me. People look at the box and then at me and then they laugh, and that's meant to be my job." },
         { say: "mikoto", text: "You didn't. You counted the Healers. I noticed that." }
@@ -744,12 +744,12 @@ scene("post_mikoto", {
     { say: "rowan", text: "I should have left them alone. Every time I killed one I was drawing for you." },
     { say: "mikoto", text: "\"Nothing's ever properly finished.\" Quietly, for him. \"That's — I've been trying to say that for years.\"" },
     { choice: [
-      { text: "You didn't laugh once while you were playing. Did you notice?", steps: [
+      { text: "\"You didn't laugh once while you were playing. Did you notice?\"", steps: [
         { say: "rowan", text: "You didn't laugh once while you were playing. Did you notice?" },
         { say: "mikoto", text: "Didn't I? No. I didn't." },
         { say: "mikoto", text: "I know where all the edges are, on a table. It's the only place I do." }
       ] },
-      { text: "Say it again, and leave the 'sorry' out this time.", steps: [
+      { text: "\"Say it again, and leave the 'sorry' out this time.\"", steps: [
         { say: "rowan", text: "Say it again, and leave the 'sorry' out this time." },
         { say: "mikoto", text: "\"I won.\" He tries it like a hot drink. \"I won. Oh, that's — it's much shorter that way.\"" }
       ] }
@@ -761,11 +761,11 @@ scene("post_mikoto", {
     { say: "rowan", text: "I went after the Necromancer first. If he'd survived, Raise the Minions would have brought three back." },
     { say: "mikoto", text: "\"It would have! It would have, wouldn't it? I had it in my hand!\" A giggle, then quick embarrassment. \"Sorry. It was a very good plan.\"" },
     { choice: [
-      { text: "It was. You were one turn away from it.", steps: [
+      { text: "\"It was. You were one turn away from it.\"", steps: [
         { say: "rowan", text: "It was. You were one turn away from it." },
         { say: "mikoto", text: "One turn. I'll write that down. Not on the bad list." }
       ] },
-      { text: "You don't have to be sorry about a good plan.", steps: [
+      { text: "\"You don't have to be sorry about a good plan.\"", steps: [
         { say: "rowan", text: "You don't have to be sorry about a good plan." },
         { say: "mikoto", text: "No. No, I suppose I — it was good, wasn't it? I'm keeping it. I'll do it to somebody else." }
       ] }
@@ -781,7 +781,7 @@ scene("ferry_branden", {
     { text: "Somebody has taken the lifebuoy off the rail and is rolling it down the deck like a hoop. The somebody is perhaps ten years old. The first thing you notice is the hair, a flame-orange mop that stands up in spikes as if it is in the middle of a shout. The second is the jacket, three sizes too big, its sleeves flapping past his hands like flags. The third is the grin, which has already decided to regret nothing." },
     { say: "branden", alias: "Flame-haired kid", text: "You! Jacketless! Be my timekeeper! If I get this thing to the funnel before a crewman catches me, you owe me one Smug Coin. If I get caught, you don't, but I'll still say it was a *very* good attempt." },
     { choice: [
-      { text: "That's the ship's lifebuoy. Somebody might need it. I'm Rowan, by the way.", steps: [
+      { text: "\"That's the ship's lifebuoy. Somebody might need it. I'm Rowan, by the way.\"", steps: [
         { say: "rowan", text: "That's the ship's lifebuoy. Somebody might need it. I'm Rowan, by the way." },
         { say: "branden", alias: "Flame-haired kid", text: "Nobody's drowning. Technically. I checked the whole deck." },
         { say: "branden", alias: "Flame-haired kid", text: "Branden Sunflower. National champion. Under tens. Two years running. And you're the boring one who's about to tell on me." },
@@ -790,7 +790,7 @@ scene("ferry_branden", {
         { flag: "branden_scolded" },
         { flag: "branden_said_champion" }
       ] },
-      { text: "All right. Rowan, timekeeper. I'll time you. Go.", steps: [
+      { text: "\"All right. Rowan, timekeeper. I'll time you. Go.\"", steps: [
         { say: "rowan", text: "All right. Rowan, timekeeper. I'll time you. Go." },
         { say: "branden", alias: "Flame-haired kid", text: "A SPORT! Okay! On three! One! Two — " },
         { text: "He is off along the deck with the buoy bowling ahead of him. Half a dozen heads turn. From somewhere above the lounge stairs a voice that can only belong to a captain shouts \"WHO HAS MY LIFEBUOY?\" and the sprinter takes a corner so fast that he skids." },
@@ -800,7 +800,7 @@ scene("ferry_branden", {
         AFF("branden", 3, "Timed his run"),
         { flag: "branden_prank_buddy" }
       ] },
-      { text: "How old are you, exactly? I'm Rowan, and I'm trying to work out who's in charge here.", steps: [
+      { text: "\"How old are you, exactly? I'm Rowan, and I'm trying to work out who's in charge here.\"", steps: [
         { say: "rowan", text: "How old are you, exactly? I'm Rowan, and I'm trying to work out who's in charge here." },
         { say: "branden", alias: "Flame-haired kid", text: "TEN. Ten and three quarters. Technically eleven in spirit." },
         { say: "branden", alias: "Flame-haired kid", text: "Branden Sunflower. National champion. Under tens. Two years running. You can write it down, but I won't wait." },
@@ -814,19 +814,19 @@ scene("ferry_branden", {
     { add: { ferry_talked: 1 } },
     { say: "branden", text: "Everyone else on this boat is *old*. You're old. You're, what, seventeen? That's *ancient*. I'm the youngest here, so I've got the best seat in the house, and I'm not giving it up." },
     { choice: [
-      { text: "Nineteen.", steps: [
+      { text: "\"Nineteen.\"", steps: [
         { say: "rowan", text: "Nineteen." },
         { say: "branden", text: "NINETEEN! That's nearly twenty! That's nearly *finished*!" },
         { say: "branden", text: "\"It's fine. You're holding up *very* well.\" He pats your elbow, which is as high as he can comfortably reach. \"I've seen worse. There's one with a parasol.\"" },
         AFF("branden", 1, "Owned up to nineteen")
       ] },
-      { text: "The best seat for what?", steps: [
+      { text: "\"The best seat for what?\"", steps: [
         { say: "rowan", text: "The best seat for what?" },
         { say: "branden", text: "For *everything*! Nobody's watching the small one! By the time they look down, it's already happened!" },
         { say: "rowan", text: "I looked down." },
         { say: "branden", text: "You're *jacketless*. You've got nothing else to look at. That doesn't count." }
       ] },
-      { text: "How does somebody your age get onto this boat at all?", steps: [
+      { text: "\"How does somebody your age get onto this boat at all?\"", steps: [
         { say: "rowan", text: "How does somebody your age get onto this boat at all?" },
         { say: "branden", text: "They had a *meeting* about me. A whole meeting. With a table." },
         { say: "branden", text: "I wasn't allowed in. I listened at the door. That's attending." }
@@ -842,7 +842,7 @@ scene("ferry_branden", {
     { say: "branden", text: "Don't look at the bucket. There's no bucket." },
     { flag: "branden_bucket_seen" },
     { choice: [
-      { text: "Do you want a game, Branden?", when: (s)=>!s.flags["flag_branden_game"] && !s.flags["branden_scolded"], steps: [
+      { text: "\"Do you want a game, Branden?\"", when: (s)=>!s.flags["flag_branden_game"] && !s.flags["branden_scolded"], steps: [
         { say: "rowan", text: "Do you want a game, Branden?" },
         { say: "branden", text: "A GAME! Finally somebody brave!" },
         { text: "He abandons the bucket without a backward glance." },
@@ -863,12 +863,12 @@ scene("ferry_branden", {
         { flag: "flag_branden_game" },
         { time: 25 }
       ] },
-      { text: "Never mind the bucket. Have you got a minute?", when: (s)=>!s.flags["chat_branden_done"], steps: [
+      { text: "\"Never mind the bucket. Have you got a minute?\"", when: (s)=>!s.flags["chat_branden_done"], steps: [
         { say: "rowan", text: "Never mind the bucket. Have you got a minute?" },
         { say: "branden", text: "I've got *several*. I'm ten. I've got more minutes than anyone on this boat." },
         { scene: "chat_branden" }
       ] },
-      { text: "Is that a bucket, Branden?", steps: [
+      { text: "\"Is that a bucket, Branden?\"", steps: [
         { say: "rowan", text: "Is that a bucket, Branden?" },
         { say: "branden", text: "NO." },
         { say: "rowan", text: "It's a bucket on a lifeboat cover. Above the door to the lounge." },
@@ -887,19 +887,19 @@ scene("chat_branden", {
     { label: "top" },
     { when: (s)=>(!!s.flags["chat_branden_1"] || !s.flags["branden_said_champion"]) && !!s.flags["chat_branden_2"] && !!s.flags["chat_branden_3"] && (!!s.flags["chat_branden_4"] || !s.flags["met_georgie"]) && (!!s.flags["deck_known_branden"] || !!s.flags["deck_skipped_branden"]) && !s.flags["chat_branden_done"], jump: "done" },
     { choice: [
-      { text: "National champion, you said. Tell me about that.", when: (s)=>!s.flags["chat_branden_1"] && !!s.flags["branden_said_champion"], steps: [
+      { text: "\"National champion, you said. Tell me about that.\"", when: (s)=>!s.flags["chat_branden_1"] && !!s.flags["branden_said_champion"], steps: [
         { say: "rowan", text: "National champion, you said. Tell me about that." },
         { say: "branden", text: "Two years running. Under tens. The final was in a *school gym*, the other kid cried, I did a lap of honour, they let me keep the trophy for a week." },
         { say: "branden", text: "I do not *give* the trophy back. They keep sending letters. I have a drawer for the letters." },
         { say: "rowan", text: "Do you read them?" },
         { say: "branden", text: "\"I *file* them.\" Dignified. \"Technically that's a different thing.\"" },
         { choice: [
-          { text: "What happens when the drawer's full?", steps: [
+          { text: "\"What happens when the drawer's full?\"", steps: [
             { say: "rowan", text: "What happens when the drawer's full?" },
             { say: "branden", text: "Then I win it again and it's *mine* anyway and they have to send a letter saying sorry. I've planned the whole thing." },
             { say: "branden", text: "…Except I'm not under ten any more. So somebody else has got to win it now. I hope they're *rubbish*." }
           ] },
-          { text: "Did the other kid really cry?", steps: [
+          { text: "\"Did the other kid really cry?\"", steps: [
             { say: "rowan", text: "Did the other kid really cry?" },
             { say: "branden", text: "LOADS. Buckets. …A bit." },
             { say: "branden", text: "\"I gave him my juice.\" Very fast. \"Don't write that down. That's not part of the story.\"" },
@@ -911,18 +911,18 @@ scene("chat_branden", {
         NOTE("branden", "National champion, under tens, two years running. Files the trophy letters in a drawer."),
         { time: 2 }
       ] },
-      { text: "Is the lifebuoy the best you've got, or have there been better ones?", when: (s)=>!s.flags["chat_branden_2"], steps: [
+      { text: "\"Is the lifebuoy the best you've got, or have there been better ones?\"", when: (s)=>!s.flags["chat_branden_2"], steps: [
         { say: "rowan", text: "Is the lifebuoy the best you've got, or have there been better ones?" },
         { say: "branden", text: "Oh, *wow*, do you have an hour? There was the bucket. And the other bucket. And the time I put every single shoe in the school gym on the roof." },
         { say: "rowan", text: "How did you get them up there?" },
         { say: "branden", text: "\"A *ladder*, Rowan.\" Very patient. \"I'm not a *magician*. Technically I'm *better*.\"" },
         { choice: [
-          { text: "Why shoes?", steps: [
+          { text: "\"Why shoes?\"", steps: [
             { say: "rowan", text: "Why shoes?" },
             { say: "branden", text: "Because then *everybody* had to go home in socks! The whole school! Together! The big ones as well!" },
             { say: "branden", text: "It was the best day. Everyone was talking to everyone. Nobody said I was annoying for a whole afternoon." }
           ] },
-          { text: "Did they ever find out it was you?", steps: [
+          { text: "\"Did they ever find out it was you?\"", steps: [
             { say: "rowan", text: "Did they ever find out it was you?" },
             { say: "branden", text: "They found out *straight away*. I was the only one with shoes on." },
             { say: "branden", text: "That's the flaw. I've fixed the flaw. I'm not telling you how." }
@@ -934,7 +934,7 @@ scene("chat_branden", {
         NOTE("branden", "Pranks: the bucket, the other bucket, and every shoe in the school gym on the roof."),
         { time: 2 }
       ] },
-      { text: "A whole island of ancient people. What's in it for you?", when: (s)=>!s.flags["chat_branden_3"], steps: [
+      { text: "\"A whole island of ancient people. What's in it for you?\"", when: (s)=>!s.flags["chat_branden_3"], steps: [
         { say: "rowan", text: "A whole island of ancient people. What's in it for you?" },
         { say: "branden", text: "A volcano. They have a *volcano*. I'm going to find out if you can toast a marshmallow on it, and then I'm going to find out if you can toast a *person* on it, and then I'm going to be told no." },
         { say: "rowan", text: "Probably in that order." },
@@ -942,7 +942,7 @@ scene("chat_branden", {
         { text: "A very small, very brief flash of something different." },
         { say: "branden", text: "…At home nobody wanted to find things out with me. They said I was too much. This is the first place that's got a *volcano*." },
         { choice: [
-          { text: "I'd like to know about the marshmallow myself.", steps: [
+          { text: "\"I'd like to know about the marshmallow myself.\"", steps: [
             { say: "rowan", text: "I'd like to know about the marshmallow myself." },
             { say: "branden", text: "\"You'd come?\" He looks at you sideways, checking for the trick. \"You'd have to carry the marshmallows. I'm carrying the stick. The stick's the important job.\"" },
             { say: "rowan", text: "I'll carry the marshmallows." },
@@ -950,7 +950,7 @@ scene("chat_branden", {
             AFF("branden", 2, "Wants to find out too"),
             { flag: "branden_marshmallow_pact" }
           ] },
-          { text: "Too much for whom?", steps: [
+          { text: "\"Too much for whom?\"", steps: [
             { say: "rowan", text: "Too much for whom?" },
             { say: "branden", text: "\"For — I don't know. For indoors.\" He kicks the rail, not hard. \"A volcano's *outdoors*. You can't be too much for a volcano. It's bigger.\"" },
             AFF("branden", 1, "Took his side")
@@ -965,7 +965,7 @@ scene("chat_branden", {
         NOTE("branden", "Wants to find out whether you can toast a marshmallow on the volcano. At home nobody wanted to explore with him."),
         { time: 2 }
       ] },
-      { text: "Have you met Georgie? The girl with the dark-blue feather?", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
+      { text: "\"Have you met Georgie? The girl with the dark-blue feather?\"", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
         { say: "rowan", text: "Have you met Georgie? The girl with the dark-blue feather?" },
         { say: "branden", text: "\"The *old* one?\" A snort. \"She's fourteen. She won the under-sixteens. Technically that's the *old people's* league.\"" },
         { say: "rowan", text: "She seemed a bit nervous." },
@@ -974,11 +974,11 @@ scene("chat_branden", {
         { say: "branden", text: "…She asked if she could sit on the rope. Nobody asks that. I was going to say yes if she'd asked me. I was going to charge her a Smug Coin." },
         { say: "branden", text: "…It's *annoying*. She used to be the youngest. Now it's me. And everyone's still looking at her *first*." },
         { choice: [
-          { text: "You were going to say yes, though.", steps: [
+          { text: "\"You were going to say yes, though.\"", steps: [
             { say: "rowan", text: "You were going to say yes, though." },
             { say: "branden", text: "\"For a *coin*!\" Outraged. \"…Half a coin. She looked like she'd only got half.\"" }
           ] },
-          { text: "They looked at you first when you had the lifebuoy.", steps: [
+          { text: "\"They looked at you first when you had the lifebuoy.\"", steps: [
             { say: "rowan", text: "They looked at you first when you had the lifebuoy." },
             { say: "branden", text: "\"…They did, didn't they.\" He thinks about this with his whole face. \"So I just need a lifebuoy *all the time*. That's fine. I can do that.\"" }
           ] }
@@ -991,12 +991,12 @@ scene("chat_branden", {
       { text: "Steer the talk to cards.", when: (s)=>!s.flags["deck_known_branden"], steps: [
         { scene: "deck_branden" }
       ] },
-      { text: "I'll leave you to your bucket.", when: (s)=>!!s.flags["branden_bucket_seen"], steps: [
+      { text: "\"I'll leave you to your bucket.\"", when: (s)=>!!s.flags["branden_bucket_seen"], steps: [
         { say: "rowan", text: "I'll leave you to your bucket." },
         { say: "branden", text: "There's no bucket!" },
         { end: true }
       ] },
-      { text: "I'll leave you to your lifebuoy.", when: (s)=>!s.flags["branden_bucket_seen"], steps: [
+      { text: "\"I'll leave you to your lifebuoy.\"", when: (s)=>!s.flags["branden_bucket_seen"], steps: [
         { say: "rowan", text: "I'll leave you to your lifebuoy." },
         { say: "branden", text: "It's not MINE. I'm *minding* it." },
         { end: true }
@@ -1014,7 +1014,7 @@ scene("deck_branden", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_branden"], end: true },
     { choice: [
-      { text: "What do you play, Branden?", steps: [
+      { text: "\"What do you play, Branden?\"", steps: [
         { say: "rowan", text: "What do you play, Branden?" },
         { say: "branden", text: "BURN! Luna Pele! The Flame Dancer! She turns every burning thing into a card! Fireball! Fireball! Heat Wave! You're welcome!" },
         { say: "branden", text: "National champion! Under tens! Technically *burning* is the best way to win a championship. Nobody else has a plan for the other side of the table." },
@@ -1034,11 +1034,11 @@ scene("deck_branden", {
     { say: "rowan", text: "There's an egg." },
     { say: "branden", text: "…It's a *very* good egg." },
     { choice: [
-      { text: "I believe you about the egg.", steps: [
+      { text: "\"I believe you about the egg.\"", steps: [
         { say: "rowan", text: "I believe you about the egg." },
         { say: "branden", text: "\"…You do?\" Deeply suspicious. \"Good. You should. Don't ask to see it. It's shy.\"" }
       ] },
-      { text: "And when the fire really does run out?", steps: [
+      { text: "\"And when the fire really does run out?\"", steps: [
         { say: "rowan", text: "And when the fire really does run out?" },
         { say: "branden", text: "Then I lose *really fast*. That's also a record." },
         { say: "branden", text: "It doesn't run out, though. Not if you do it properly. Nobody ever stays long enough to check." }
@@ -1059,11 +1059,11 @@ scene("post_branden", {
     { text: "He climbs down, suddenly almost shy." },
     { say: "branden", text: "…You were the first person today who didn't say it was luck." },
     { choice: [
-      { text: "It wasn't luck. Luck doesn't hit two heroes.", steps: [
+      { text: "\"It wasn't luck. Luck doesn't hit two heroes.\"", steps: [
         { say: "rowan", text: "It wasn't luck. Luck doesn't hit two heroes." },
         { say: "branden", text: "\"That's what I SAID! To the last three!\" He is back on the bench. \"Say it louder! Say it to the one with the parasol!\"" }
       ] },
-      { text: "Who said it was luck?", steps: [
+      { text: "\"Who said it was luck?\"", steps: [
         { say: "rowan", text: "Who said it was luck?" },
         { say: "branden", text: "Everybody. They lose to a ten-year-old and it's always *luck*. Nobody ever lost to a ten-year-old because he was *good*." },
         { say: "branden", text: "You did, though. So that's one." }
@@ -1078,11 +1078,11 @@ scene("post_branden", {
     { text: "He looks at you for a long, searching moment." },
     { say: "branden", text: "That's *rude*. And clever. Do it again tomorrow. When I'm ready." },
     { choice: [
-      { text: "Tomorrow. Bring everything you've got.", steps: [
+      { text: "\"Tomorrow. Bring everything you've got.\"", steps: [
         { say: "rowan", text: "Tomorrow. Bring everything you've got." },
         { say: "branden", text: "I'm bringing MORE than I've got. I'm bringing things I haven't even *thought* of yet." }
       ] },
-      { text: "You nearly had me on the turn before.", steps: [
+      { text: "\"You nearly had me on the turn before.\"", steps: [
         { say: "rowan", text: "You nearly had me on the turn before." },
         { say: "branden", text: "\"I KNOW I did.\" The chin comes down a little. \"…Did I really?\"" },
         { say: "rowan", text: "Really." },
@@ -1110,13 +1110,13 @@ scene("ferry_eberhart", {
         { say: "eberhart", alias: "Boy with a scar", text: "Good. Down." },
         AFF("eberhart", 2, "Caught the case")
       ] },
-      { text: "That one at the top is about to go.", steps: [
+      { text: "\"That one at the top is about to go.\"", steps: [
         { say: "rowan", text: "That one at the top is about to go." },
         { text: "He looks, takes one step and stops it with the flat of his hand." },
         { say: "eberhart", alias: "Boy with a scar", text: "Yes. Thank you." },
         AFF("eberhart", 1, "Gave a useful warning")
       ] },
-      { text: "Are you crew? You don't look like crew.", steps: [
+      { text: "\"Are you crew? You don't look like crew.\"", steps: [
         { say: "rowan", text: "Are you crew? You don't look like crew." },
         { text: "He stops the case with one hand, without looking at it." },
         { say: "eberhart", alias: "Boy with a scar", text: "No." },
@@ -1140,19 +1140,19 @@ scene("ferry_eberhart", {
     { when: (s)=>!!s.flags["ship_knows_wildcard"], say: "eberhart", text: "Also you have no jacket." },
     { when: (s)=>!s.flags["ship_knows_wildcard"], say: "eberhart", text: "You have no jacket." },
     { choice: [
-      { text: "It comes later, they tell me. I've been cold since half past six.", steps: [
+      { text: "\"It comes later, they tell me. I've been cold since half past six.\"", steps: [
         { say: "rowan", text: "It comes later, they tell me. I've been cold since half past six." },
         { say: "eberhart", text: "And you did not go inside." },
         { say: "rowan", text: "The lounge is full of people." },
         { say: "eberhart", text: "\"Yes.\" It is the first thing he has said that sounds like agreement." },
         AFF("eberhart", 1, "Also avoids the lounge")
       ] },
-      { text: "People keep telling me that.", steps: [
+      { text: "\"People keep telling me that.\"", steps: [
         { say: "rowan", text: "People keep telling me that." },
         { say: "eberhart", text: "Then I will not say it again." },
         { say: "eberhart", text: "It is a fact about today only. Tomorrow you will have one, and they must find something else." }
       ] },
-      { text: "What's the 'v' for, on your trunk?", steps: [
+      { text: "\"What's the 'v' for, on your trunk?\"", steps: [
         { say: "rowan", text: "What's the 'v' for, on your trunk?" },
         { say: "eberhart", text: "For forms." },
         { text: "The subject closes like a lid. Nothing in his face has moved; it is simply no longer open." },
@@ -1166,7 +1166,7 @@ scene("ferry_eberhart", {
     { say: "rowan", text: "At what?" },
     { say: "eberhart", text: "At anything." },
     { choice: [
-      { text: "Cards. Every night, for years. On a screen; never once on a table.", steps: [
+      { text: "\"Cards. Every night, for years. On a screen; never once on a table.\"", steps: [
         { say: "rowan", text: "Cards. Every night, for years. On a screen; never once on a table." },
         { say: "eberhart", text: "How many hours?" },
         { say: "rowan", text: "Four. Five, when I couldn't sleep." },
@@ -1174,12 +1174,12 @@ scene("ferry_eberhart", {
         AFF("eberhart", 2, "Trains every night"),
         { flag: "eberhart_knows_screen" }
       ] },
-      { text: "Does staying awake count?", steps: [
+      { text: "\"Does staying awake count?\"", steps: [
         { say: "rowan", text: "Does staying awake count?" },
         { say: "eberhart", text: "No." },
         { say: "eberhart", text: "\"It is the opposite of training.\" He looks at you a moment longer. \"You should sleep. This is advice, not a criticism.\"" }
       ] },
-      { text: "Not the way you do, by the look of you.", steps: [
+      { text: "\"Not the way you do, by the look of you.\"", steps: [
         { say: "rowan", text: "Not the way you do, by the look of you." },
         { say: "eberhart", text: "There is only one way. Every day. What one does it at matters less than people think." }
       ] }
@@ -1197,7 +1197,7 @@ scene("ferry_eberhart", {
     { time: 3 },
     { when: (s)=>!!s.flags["chat_eberhart_1"] && !!s.flags["chat_eberhart_2"] && (!s.flags["chat_mikoto_offered"] || !!s.flags["chat_eberhart_3"]), jump: "nothing_left" },
     { choice: [
-      { text: "I have a question. You said to ask.", steps: [
+      { text: "\"I have a question. You said to ask.\"", steps: [
         { say: "rowan", text: "I have a question. You said to ask." },
         { say: "eberhart", text: "I did." },
         { scene: "chat_eberhart" }
@@ -1217,21 +1217,21 @@ scene("chat_eberhart", {
     { label: "top" },
     { when: (s)=>!!s.flags["chat_eberhart_1"] && !!s.flags["chat_eberhart_2"] && (!s.flags["chat_mikoto_offered"] || !!s.flags["chat_eberhart_3"]), jump: "done" },
     { choice: [
-      { text: "The scar. Is it rude to ask?", when: (s)=>!s.flags["chat_eberhart_1"], steps: [
+      { text: "\"The scar. Is it rude to ask?\"", when: (s)=>!s.flags["chat_eberhart_1"], steps: [
         { say: "rowan", text: "The scar. Is it rude to ask?" },
         { say: "eberhart", text: "No. It is rude to look for a long time and then not ask. You asked." },
         { say: "eberhart", text: "Academic fencing. One stands at a measured distance. One does not step back, and one does not move the head. The other man has a sharp blade, and so have you." },
         { choice: [
-          { text: "Did it hurt?", steps: [
+          { text: "\"Did it hurt?\"", steps: [
             { say: "rowan", text: "Did it hurt?" },
             { say: "eberhart", text: "Yes." },
             { say: "eberhart", text: "That is not the important part of it." }
           ] },
-          { text: "Did you win?", steps: [
+          { text: "\"Did you win?\"", steps: [
             { say: "rowan", text: "Did you win?" },
             { say: "eberhart", text: "Nobody wins. One stands, or one does not stand. I stood." }
           ] },
-          { text: "That sounds insane.", steps: [
+          { text: "\"That sounds insane.\"", steps: [
             { say: "rowan", text: "That sounds insane." },
             { say: "eberhart", text: "\"Yes. Many say so.\" He is entirely untroubled. \"Mostly they have not tried to stand still at anything.\"" }
           ] }
@@ -1246,7 +1246,7 @@ scene("chat_eberhart", {
         NOTE("eberhart", "The scar is from academic fencing. He calls it the mark of having stood still."),
         { time: 2 }
       ] },
-      { text: "Forty-one paces at five in the morning. What does that look like?", when: (s)=>!s.flags["chat_eberhart_2"], steps: [
+      { text: "\"Forty-one paces at five in the morning. What does that look like?\"", when: (s)=>!s.flags["chat_eberhart_2"], steps: [
         { say: "rowan", text: "Forty-one paces at five in the morning. What does that look like?" },
         { say: "eberhart", text: "Running. Then strength. Then forty minutes with the deck: shuffle, cut, deal, and again. The hands must do it without me." },
         { say: "rowan", text: "Forty minutes of shuffling." },
@@ -1266,12 +1266,12 @@ scene("chat_eberhart", {
             { flag: "eberhart_saw_shuffle" },
             NOTE("eberhart", "Saw your hands shake on the shuffle and called it a thing to train, not a fault.")
           ] },
-          { text: "Not with somebody watching.", steps: [
+          { text: "\"Not with somebody watching.\"", steps: [
             { say: "rowan", text: "Not with somebody watching." },
             { say: "eberhart", text: "Then the first time somebody watches will be the time it counts. That is also a choice." },
             { say: "eberhart", text: "I do not press." }
           ] },
-          { text: "You first.", steps: [
+          { text: "\"You first.\"", steps: [
             { say: "rowan", text: "You first." },
             { text: "He takes a deck from his inside pocket. The shuffle is like a drill movement: square, exact, entirely joyless and without a single fault. It lasts eight seconds." },
             { say: "eberhart", text: "So. Now you." },
@@ -1289,7 +1289,7 @@ scene("chat_eberhart", {
         NOTE("eberhart", "Trains at five every morning: running, strength, then forty minutes of shuffling. To him it is not a game."),
         { time: 2 }
       ] },
-      { text: "Mikoto, the boy with the gull. He says you carried his trunk up the gangway.", when: (s)=>!!s.flags["chat_mikoto_offered"] && !s.flags["chat_eberhart_3"], steps: [
+      { text: "\"Mikoto, the boy with the gull. He says you carried his trunk up the gangway.\"", when: (s)=>!!s.flags["chat_mikoto_offered"] && !s.flags["chat_eberhart_3"], steps: [
         { say: "rowan", text: "Mikoto, the boy with the gull. He says you carried his trunk up the gangway." },
         { say: "eberhart", text: "It stood in the way. He was speaking with the ticket man and laughing. Somebody would have fallen." },
         { say: "eberhart", text: "Afterwards I read the label. Yamaguchi, Rare 101. So it is my roommate's trunk. This was not planned." },
@@ -1302,17 +1302,17 @@ scene("chat_eberhart", {
         { text: "The scar shifts very slightly. It is possible that the cheek under it has clenched." },
         { say: "eberhart", text: "I have asked him not to. I expect that he will continue." },
         { choice: [
-          { text: "He doesn't mean anything by it. Or by the laughing.", steps: [
+          { text: "\"He doesn't mean anything by it. Or by the laughing.\"", steps: [
             { say: "rowan", text: "He doesn't mean anything by it. Or by the laughing." },
             { say: "eberhart", text: "I know. He laughed at a gull also, and at a stair. It is not at anybody. It is like a cough." },
             AFF("eberhart", 2, "Spoke up for Yamaguchi")
           ] },
-          { text: "Will you ask for a different room?", steps: [
+          { text: "\"Will you ask for a different room?\"", steps: [
             { say: "rowan", text: "Will you ask for a different room?" },
             { say: "eberhart", text: "No. The letter says 101 and it says Yamaguchi. One does not change the draw because the opponent talks." },
             { say: "eberhart", text: "He is not an opponent. It was a comparison." }
           ] },
-          { text: "It rather suits you.", when: (s)=>!!s.flags["mikoto_said_ebi"], steps: [
+          { text: "\"It rather suits you.\"", when: (s)=>!!s.flags["mikoto_said_ebi"], steps: [
             { say: "rowan", text: "It rather suits you." },
             { say: "eberhart", text: "No." },
             { text: "He looks at you. You find that you are counting. Four seconds; Mikoto had it exactly right." },
@@ -1327,7 +1327,7 @@ scene("chat_eberhart", {
         NOTE("eberhart", "Shares Rare Hall 101 with Mikoto, who has a nickname for him that he has asked not to hear. Would not let anyone mock Mikoto."),
         { time: 2 }
       ] },
-      { text: "That's all. Thank you.", steps: [
+      { text: "\"That's all. Thank you.\"", steps: [
         { say: "rowan", text: "That's all. Thank you." },
         { say: "eberhart", text: "Good." },
         { end: true }
@@ -1357,18 +1357,18 @@ scene("isle_pippa", {
     { say: "pippa", text: "They've given me a north window. North! Nobody's ever done anything that kind for me on purpose. And a roommate with a parasol, who has asked me, very politely, to stop telling her what the light is doing to her." },
     { say: "pippa", text: "But the thing I wanted was this morning. Everybody looked at the Chancellor. I looked at everybody looking. That's the roll." },
     { choice: [
-      { text: "What did we look like?", steps: [
+      { text: "\"What did we look like?\"", steps: [
         { say: "rowan", text: "What did we look like?" },
         { say: "pippa", text: "Like thirty-eight people being told they're exceptional, and each one wondering who the exception is." },
         { say: "pippa", text: "You looked at your shoes, by the way. I've got it. It's a good honest pair of shoes." },
         AFF("pippa", 1, "Asked what she saw")
       ] },
-      { text: "And who was looking at you?", steps: [
+      { text: "\"And who was looking at you?\"", steps: [
         { say: "rowan", text: "And who was looking at you?" },
         { say: "pippa", text: "\"The fountain. It's very attentive.\" She flicks water at it. \"…Don't do that. That's the question after the one I've got an answer for.\"" },
         AFF("pippa", 2, "Asked about her")
       ] },
-      { text: "Not one day here and you're already soaked.", steps: [
+      { text: "\"Not one day here and you're already soaked.\"", steps: [
         { say: "rowan", text: "Not one day here and you're already soaked." },
         { say: "pippa", text: "One sleeve! One sleeve is a working sleeve. Wait till I find the tide pools. I'll come back to supper in a bucket." }
       ] }
@@ -1403,19 +1403,19 @@ scene("isle_mikoto", {
     { say: "mikoto", text: "That's my roommate. Eberhart. Room 101. I've been up once. His half is already finished: bed made, a sheet of paper pinned to the wall with times on it, absolutely square. My half has got me in it." },
     { say: "mikoto", text: "He said one thing. 'I rise at five. You need not.' So I've decided there's a line down the middle of the room. He doesn't know about it. It's for his sake." },
     { choice: [
-      { text: "A line he doesn't know about isn't much of a rule.", steps: [
+      { text: "\"A line he doesn't know about isn't much of a rule.\"", steps: [
         { say: "rowan", text: "A line he doesn't know about isn't much of a rule." },
         { say: "mikoto", text: "It's the best kind! Nobody can tell me I've got it wrong." },
         { say: "mikoto", text: "…I could tell him. I could write it out and leave it on his side. No. On the line. Exactly on it." },
         AFF("mikoto", 1, "Thought it through with him")
       ] },
-      { text: "He carried your trunk before you could ask. I'd say the room's going to be all right.", steps: [
+      { text: "\"He carried your trunk before you could ask. I'd say the room's going to be all right.\"", steps: [
         { say: "rowan", text: "He carried your trunk before you could ask. I'd say the room's going to be all right." },
         { say: "mikoto", text: "He did, didn't he? And up the gangway this morning as well. That's twice. Once could have been a mistake." },
         { say: "mikoto", text: "\"I'm putting it on the other list.\" He turns the notebook over and opens it from the back. \"That's the nice one. It's short. It's getting longer.\"" },
         AFF("mikoto", 2, "Made the room sound safe")
       ] },
-      { text: "What did you say back to him?", when: (s)=>!!s.flags["mikoto_said_ebi"], steps: [
+      { text: "\"What did you say back to him?\"", when: (s)=>!!s.flags["mikoto_said_ebi"], steps: [
         { say: "rowan", text: "What did you say back to him?" },
         { say: "mikoto", text: "'Thank you, Ebi.' It got out again. He looked at me for the four seconds." },
         { say: "mikoto", text: "But he didn't say 'no' this time. He only breathed. I think that's progress. I've written 'breathed'." }
@@ -1460,14 +1460,14 @@ scene("isle_eberhart", {
         { say: "eberhart", text: "That was correctly carried. Ten left." },
         AFF("eberhart", 2, "Took the other handle")
       ] },
-      { text: "Whose cat is that?", steps: [
+      { text: "\"Whose cat is that?\"", steps: [
         { say: "rowan", text: "Whose cat is that?" },
         { say: "eberhart", text: "It belongs to the Hall. Not to me." },
         { say: "rowan", text: "You've walked round it six times." },
         { say: "eberhart", text: "It was there first. That is a different thing from its being mine." },
         AFF("eberhart", 1, "Noticed the cat")
       ] },
-      { text: "Nobody asked you to do this, did they?", steps: [
+      { text: "\"Nobody asked you to do this, did they?\"", steps: [
         { say: "rowan", text: "Nobody asked you to do this, did they?" },
         { say: "eberhart", text: "No." },
         { say: "eberhart", text: "If one waits to be asked, the trunk is still on the gravel and one has also waited. I do not see the gain." }
@@ -1482,7 +1482,7 @@ scene("isle_eberhart", {
     { time: 5 },
     { when: (s)=>!s.flags["eberhart_ferry_met"] || (!!s.flags["chat_eberhart_1"] && !!s.flags["chat_eberhart_2"] && (!s.flags["chat_mikoto_offered"] || !!s.flags["chat_eberhart_3"])), end: true },
     { choice: [
-      { text: "On the ship you said to ask, if I had a question. I still have one.", steps: [
+      { text: "\"On the ship you said to ask, if I had a question. I still have one.\"", steps: [
         { say: "rowan", text: "On the ship you said to ask, if I had a question. I still have one." },
         { say: "eberhart", text: "\"Then ask it.\" He puts the trunk down. This, you understand, is a courtesy." },
         { scene: "chat_eberhart" }
@@ -1517,18 +1517,18 @@ scene("isle_branden", {
     { text: "He picks a daisy out of the lawn, looks at it, and puts it in his top pocket, where it vanishes entirely." },
     { say: "branden", text: "…There isn't an under-tens here. Did you know? I asked. There's just *everybody*. All in one go." },
     { choice: [
-      { text: "Then you're not the under-tens champion today. You're just the one with the fire.", when: (s)=>!!s.flags["deck_known_branden"], steps: [
+      { text: "\"Then you're not the under-tens champion today. You're just the one with the fire.\"", when: (s)=>!!s.flags["deck_known_branden"], steps: [
         { say: "rowan", text: "Then you're not the under-tens champion today. You're just the one with the fire." },
         { say: "branden", text: "\"…Just the one with the fire.\" He tries it out, chin up. \"That's *better*. That's actually better. I'm having that. You can't have it back.\"" },
         AFF("branden", 2, "Gave him a better title")
       ] },
-      { text: "Are you nervous?", steps: [
+      { text: "\"Are you nervous?\"", steps: [
         { say: "rowan", text: "Are you nervous?" },
         { say: "branden", text: "NO. Champions don't get nervous." },
         { say: "branden", text: "\"…My tummy's a bit nervous. That's separate. It's not *me*.\" He looks at you sideways. \"Don't tell the ancient ones.\"" },
         AFF("branden", 2, "Asked, and kept it quiet")
       ] },
-      { text: "Everybody in one go. So if you win, you've beaten everybody.", steps: [
+      { text: "\"Everybody in one go. So if you win, you've beaten everybody.\"", steps: [
         { say: "rowan", text: "Everybody in one go. So if you win, you've beaten everybody." },
         { say: "branden", text: "I KNOW. That's what I said to the one with the white gloves. He didn't even look round. He's going to be *so* embarrassed." },
         AFF("branden", 1, "Saw it his way")

@@ -106,11 +106,11 @@ scene("ferry_prologue", {
       prompt: "How do you introduce yourself?",
       choice: [
         {
-          text: "Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means.",
+          text: "\"Rowan Vance. Yes, first-year, and I think I'm in the Commons as well, bungalow seven. I only got my housing two weeks ago, so I'm still catching up on what any of this means.\"",
           goto: "opt_2"
         },
         {
-          text: "Rowan. Just Rowan for now. I'm in the Commons too, apparently. Have you had a look round the ship yet? Anything worth finding?",
+          text: "\"Rowan. Just Rowan for now. I'm in the Commons too, apparently. Have you had a look round the ship yet? Anything worth finding?\"",
           goto: "opt_3"
         },
         {
@@ -148,14 +148,14 @@ scene("ferry_prologue", {
     {
       choice: [
         {
-          text: "Yes, that's me. I won the Wildcard Qualifier two weeks ago, the last open seat of the year. I still feel a bit strange saying it out loud.",
+          text: "\"Yes, that's me. I won the Wildcard Qualifier two weeks ago, the last open seat of the year. I still feel a bit strange saying it out loud.\"",
           goto: "opt_6"
         },
         {
-          text: "Yes. But I would honestly rather the whole boat didn't hear about it before I've even found the lounge.",
+          text: "\"Yes. But I would honestly rather the whole boat didn't hear about it before I've even found the lounge.\"",
           goto: "opt_7"
         },
-        { text: "That's me. Does the betting pool pay out to the winner of the mystery? I'd like a cut.", goto: "opt_8" }
+        { text: "\"That's me. Does the betting pool pay out to the winner of the mystery? I'd like a cut.\"", goto: "opt_8" }
       ]
     },
     { jump: "choiceend_5" },
@@ -277,8 +277,8 @@ scene("ferry_prologue", {
     {
       prompt: "What do you do?",
       choice: [
-        { text: "Show me this card table. I want to see how he plays.", goto: "opt_10" },
-        { text: "I'd like to have a look at the whole ship first. Come with me, if you want.", goto: "opt_11" },
+        { text: "\"Show me this card table. I want to see how he plays.\"", goto: "opt_10" },
+        { text: "\"I'd like to have a look at the whole ship first. Come with me, if you want.\"", goto: "opt_11" },
         { text: "Stay at the rail and watch the island come closer.", goto: "opt_12" }
       ]
     },

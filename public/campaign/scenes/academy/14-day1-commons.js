@@ -100,9 +100,9 @@ scene("row_mama", {
     { text: "Mama Odalys is stirring a pot that could comfortably contain a person." },
     {
       choice: [
-        { text: "How long have you been running this kitchen, Mrs Fuentes?", goto: "opt_2" },
-        { text: "Can I help? I'm no cook, but I can wash anything you hand me.", goto: "opt_3" },
-        { text: "Who is on the row? I'd like to know whose bungalow is whose.", goto: "opt_4" }
+        { text: "\"How long have you been running this kitchen, Mrs Fuentes?\"", goto: "opt_2" },
+        { text: "\"Can I help? I'm no cook, but I can wash anything you hand me.\"", goto: "opt_3" },
+        { text: "\"Who is on the row? I'd like to know whose bungalow is whose.\"", goto: "opt_4" }
       ]
     },
     { jump: "choiceend_1" },
@@ -279,7 +279,7 @@ scene("placement_duel", {
     {
       choice: [
         { text: "Hide them under the table and breathe.", goto: "opt_5", hint: "Hide it" },
-        { text: "My hands shake. It will pass once the first card goes down.", goto: "opt_6" },
+        { text: "\"My hands shake. It will pass once the first card goes down.\"", goto: "opt_6" },
         { text: "Look only at the cards.", goto: "opt_7" }
       ]
     },
@@ -560,9 +560,9 @@ scene("welcome_supper", {
     },
     {
       choice: [
-        { text: "Rowan Vance. Seven. I'm — happy to be here.", goto: "opt_2" },
-        { text: "Rowan. I fold sheets. Aunt Dee's laundromat.", goto: "opt_3" },
-        { text: "Best_Tarleinn.", goto: "opt_4" }
+        { text: "\"Rowan Vance. Seven. I'm — happy to be here.\"", goto: "opt_2" },
+        { text: "\"Rowan. I fold sheets. Aunt Dee's laundromat.\"", goto: "opt_3" },
+        { text: "\"Best_Tarleinn.\"", goto: "opt_4" }
       ]
     },
     { jump: "choiceend_1" },
@@ -801,9 +801,9 @@ scene("first_night", {
     },
     {
       choice: [
-        { text: "They did, honestly. My hands shook the whole time.", goto: "opt_2" },
-        { text: "It was fine, really. I've done harder things.", goto: "opt_3" },
-        { text: "Were you, Nathan? Scared, I mean?", goto: "opt_4" }
+        { text: "\"They did, honestly. My hands shook the whole time.\"", goto: "opt_2" },
+        { text: "\"It was fine, really. I've done harder things.\"", goto: "opt_3" },
+        { text: "\"Were you, Nathan? Scared, I mean?\"", goto: "opt_4" }
       ]
     },
     { jump: "choiceend_1" },

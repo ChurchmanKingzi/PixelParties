@@ -67,8 +67,8 @@ scene("lounge_watch", {
     { flag: "saw_beasts" },
     {
       choice: [
-        { text: "Very. You build well.", goto: "opt_6" },
-        { text: "Not especially. Nothing happened.", goto: "opt_7" }
+        { text: "\"Very. You build well.\"", goto: "opt_6" },
+        { text: "\"Not especially. Nothing happened.\"", goto: "opt_7" }
       ]
     },
     { jump: "choiceend_5" },
@@ -217,11 +217,11 @@ scene("table_vouch", {
     {
       choice: [
         {
-          text: "I've beaten people of standing aboard this ship this morning, and I'd say she plays at least as well. Take my word for it, or ask them.",
+          text: "\"I've beaten people of standing aboard this ship this morning, and I'd say she plays at least as well. Take my word for it, or ask them.\"",
           goto: "opt_6"
         },
         {
-          text: "Never mind my standing. She's waited twenty minutes and she's beaten three people. That should be enough for anyone.",
+          text: "\"Never mind my standing. She's waited twenty minutes and she's beaten three people. That should be enough for anyone.\"",
           goto: "opt_7"
         }
       ]
@@ -275,11 +275,11 @@ scene("table_vouch", {
     {
       choice: [
         {
-          text: "I haven't played anybody yet, if I'm honest. But I'd put my word behind her anyway. She seems to me very good.",
+          text: "\"I haven't played anybody yet, if I'm honest. But I'd put my word behind her anyway. She seems to me very good.\"",
           goto: "opt_10"
         },
         {
-          text: "She's earned a game by standing there. Isn't that enough for a table that says winner stays?",
+          text: "\"She's earned a game by standing there. Isn't that enough for a table that says winner stays?\"",
           goto: "opt_11"
         }
       ]
