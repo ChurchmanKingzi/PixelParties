@@ -1102,7 +1102,7 @@ scene("arrival_mid", {
     },
     {
       say: "georgie",
-      text: "\"Hi, Rowan.\" Barely audible. \"Ember's looking. She's never — she's never seen an island. It's — it's bigger than the pictures. Is that normal?\""
+      text: "\"Hi, Rowan.\" Barely audible. \"Ember's looking.\" The green plush dragon is held up to the rail. \"She's never — she's never seen an island. It's — it's bigger than the pictures. Is that normal?\""
     },
     { say: "rowan", text: "\"I think that's what an island's meant to be like.\"" },
     { say: "georgie", text: "\"…Oh. Good.\"" },

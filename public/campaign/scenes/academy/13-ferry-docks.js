@@ -77,7 +77,7 @@ scene("ferry_docks", {
     },
     {
       say: "georgie",
-      text: "\"…Is it all right if I go first? Ember wanted to see it. She's — it's the first time she's been somewhere that's not a hotel.\""
+      text: "\"…Is it all right if I go first? Ember wanted to see it.\" She lifts the green plush dragon an inch. \"She's — it's the first time she's been somewhere that's not a hotel.\""
     },
     {
       say: "abel",
