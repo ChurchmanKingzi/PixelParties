@@ -2,6 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
+const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
 scene("ferry_docks", {
   background: "ferry_deck",
   steps: [
@@ -21,6 +22,7 @@ scene("ferry_docks", {
       text: "\"ONE AT A TIME! One at a time, folks, I want every one of you off this ship in the same number as you came on! Thirty-eight! I will count you out and I will count you in!\""
     },
     { text: "Click. Click. He says \"Welcome\" to each head as it passes, as if signing it for." },
+    PHOTO("gangway_captain", "Captain Stroud at the head of the gangway, counting everyone off with his clicker", { who: ["abel"], off: true }),
     { when: (s)=>!(!!s.flags["freddie_jumped"]), jump: "next_2" },
     { say: "abel", text: "\"Thirty-six, and two in the harbour.\"" },
     { text: "He taps the clicker once against his chest." },
@@ -425,6 +427,8 @@ scene("quad_address", {
       text: "\"Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well.\""
     },
     { text: "A ripple of nervous laughter, instantly suppressed." },
+    PHOTO("quad_year_looking", "The whole year looking at the Chancellor (a roll of everybody looking)", { who: [], off: true }),
+    PHOTO("quad_rowan_shoes", "Rowan at the Chancellor's address, looking at his shoes", { who: ["rowan"], off: true }),
     {
       say: "okonkwo",
       text: "\"There is one law on this island above all the others. Every conflict here may be settled at a table. Every one. You will be given the Charter tomorrow. Read it. The position is that there are no exceptions.\""

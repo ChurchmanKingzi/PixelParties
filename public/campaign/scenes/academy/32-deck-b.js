@@ -2,7 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
 
 
 scene("deck_pippa", {
@@ -23,8 +23,9 @@ scene("deck_pippa", {
     { text: "You are looking at the camera, but not through it. Your voice comes out of the side of your mouth." },
     { say: "rowan", text: "\"…Slimy Infestation. Cloudy, Fiery, Shadowy, Splashy, Sparky, Shiny. Every slime does its job the moment it lands. Burn something forever. Freeze. Switch off. Slime Rancher doubles it. Shadowy brings them back. Alice hits for every creature that's sat a turn. Rain of Arrows hits the whole side.\" A pause. \"Wide board that lives a turn is the entire plan.\"" },
     { say: "pippa", text: "\"Stay — stay exactly like that —\" She clicks the shutter. \"That. That was your *face*. That was the face of somebody doing arithmetic. Does it do that every time?\"" },
+    PHOTO("rowan_arithmetic", "Rowan reciting his deck: the face of somebody doing arithmetic", { who: ["rowan"] }),
     { say: "rowan", text: "\"Every time.\"" },
-    { say: "pippa", text: "\"I'm putting it in the book.\"" },
+    { say: "pippa", text: "\"When it's developed, I'm putting it on the wall.\"" },
     { choice: [
       { text: "\"There'll be a Cute Camera in there somewhere. For the deck, or for you?\"", steps: [
         { say: "rowan", text: "\"There'll be a Cute Camera in there somewhere. For the deck, or for you?\"" },
@@ -1034,21 +1035,26 @@ scene("isle_pippa", {
   steps: [
     { when: (s)=>!!s.flags["isle_pippa_done"], jump: "later" },
     { text: "Somebody is lying flat on her stomach along the rim of the fountain, with a heavy old film camera held an inch above the water. Strawberry-orange hair, a yellow bow tie, a black jacket with a blue collar and pockets that bulge." },
-    { when: (s)=>!s.flags["met_pippa"], say: "pippa", alias: "Girl with a camera", text: "\"Don't walk round. You're in the reflection, and you're the best thing in it. …There. Got you. You're Vance; they read you out at the roll call and half the Quad turned to look. I photographed the half.\"" },
-    { when: (s)=>!s.flags["met_pippa"], say: "pippa", alias: "Girl with a camera", text: "\"Pippa Lund. I'm the photographer. Nobody asked me to be. It's film, so you'll see it in a week, and you'll hate it.\"" },
+    { when: (s)=>!s.flags["met_pippa"], say: "pippa", alias: "Girl with a camera", text: "\"Don't walk round. You're in the reflection, and you're the best thing in it. …There. Got you. You're Vance. They read you out after Rare had been marched off, and I hear half the Quad turned round to look. I missed it. I'm still cross.\"" },
+    { ...PHOTO("fountain_reflection", "Rowan in the fountain's reflection (roll three)", { who: ["rowan"] }), when: (s)=>!s.flags["met_pippa"] },
+        { when: (s)=>!s.flags["met_pippa"], say: "pippa", alias: "Girl with a camera", text: "\"Pippa Lund. I'm the photographer. Nobody asked me to be. It's film, so you'll see it in a week, and you'll hate it.\"" },
     { when: (s)=>!s.flags["met_pippa"], say: "rowan", text: "\"Rowan. Though apparently you knew.\"" },
     { when: (s)=>!!s.flags["met_pippa"], say: "pippa", text: "\"Rowan! Don't walk round. You're in the reflection, and it's better with you in it. …There. That's roll three, and we've not been here a day.\"" },
+    { ...PHOTO("fountain_reflection", "Rowan in the fountain's reflection (roll three)", { who: ["rowan"] }), when: (s)=>!!s.flags["met_pippa"] },
     { when: (s)=>!!s.flags["pippa_photographed"], say: "pippa", text: "\"Roll two's got me on it, somewhere near the end. Your one.\" She says it to the water. \"I've been very good and not thought about it for nearly an hour.\"" },
+    { ...PHOTO("pippa_by_rowan", "Pippa in front of the island, trying not to pose (taken by Rowan, with her camera)", { who: ["pippa"] }), when: (s)=>!!s.flags["pippa_photographed"] },
     { when: (s)=>!s.flags["pippa_photographed"] && !!s.flags["pippa_owes_portrait"], say: "pippa", text: "\"And before you say it: yes, on the island, I know what I said. This is still a roll that matters. I'm working up to a bad one.\"" },
     MET("pippa", "Pippa Lund"),
     { text: "She rolls over and sits up on the rim, wringing out one cuff that has gone into the fountain without her noticing." },
     { say: "pippa", text: "\"They've given me a north window. North! Nobody's ever done anything that kind for me on purpose. And a roommate with a parasol, who has asked me, very politely, to stop telling her what the light is doing to her.\"" },
     { say: "pippa", text: "\"But the thing I wanted was this morning. Everybody looked at the Chancellor. I looked at everybody looking. That's the roll.\"" },
+    PHOTO("quad_year_looking", "The whole year looking at the Chancellor (a roll of everybody looking)", { who: [], off: true }),
     { choice: [
       { text: "\"What did we look like?\"", steps: [
         { say: "rowan", text: "\"What did we look like?\"" },
         { say: "pippa", text: "\"Like thirty-eight people being told they're exceptional, and each one wondering who the exception is.\"" },
         { say: "pippa", text: "\"You looked at your shoes, by the way. I've got it. It's a good honest pair of shoes.\"" },
+        PHOTO("quad_rowan_shoes", "Rowan at the Chancellor's address, looking at his shoes", { who: ["rowan"], off: true }),
         AFF("pippa", 1, "Asked what she saw")
       ] },
       { text: "\"And who was looking at you?\"", steps: [
@@ -1070,8 +1076,10 @@ scene("isle_pippa", {
     { end: true },
     { label: "later" },
     { text: "Pippa is on her knees on the gravel now, photographing the fountain's shadow instead of the fountain." },
+    PHOTO("fountain_shadow", "The fountain's shadow on the gravel, a hand's width further on", { who: [] }),
     { say: "pippa", text: "\"It moves, you know. A whole hand's width since you were last here. I'm the only person on this island who's been keeping an eye on it.\"" },
     { say: "pippa", text: "\"Go on, you've got places to be. You walk like it. I'll get you from behind.\"" },
+    PHOTO("rowan_from_behind", "Rowan walking off across the Quad, from behind", { who: ["rowan"], off: true }),
     { time: 3 }
   ]
 });

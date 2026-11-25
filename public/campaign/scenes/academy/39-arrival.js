@@ -2,7 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
 scene("ferry_arrival", {
   background: "ferry_deck",
   steps: [
@@ -11,6 +11,11 @@ scene("ferry_arrival", {
       set: { arrival_visits: 0 }
     },
     { goto: "ferry_deck", travel: 0 },
+    // Pippa fotografiert die ganze Überfahrt, auch wo Rowan nicht hinsieht (Ids wie die gezeigten Fotos; doppelte entfallen).
+    PHOTO("georgie_gangway", "Georgie coming up the gangway at the harbour, hands shaking before the crossing", { who: ["georgie"], off: true }),
+    PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"], off: true }),
+    PHOTO("baylee_bench", "Baylee moving a whole bench by himself, so somebody else's bag is in the shade", { who: ["baylee"], off: true }),
+    PHOTO("island_bow", "Caldera Key from the bow, the volcano trailing its thread of smoke", { who: [], off: true }),
     { fx: "fadeout", ms: 400 },
     { wait: 300 },
     { fx: "fadein", ms: 400 },
@@ -1078,6 +1083,8 @@ scene("arrival_mid", {
       say: "pippa",
       text: "\"ROWAN! Perfect. You're in the right place. Hang on — don't move —\" Click. \"That's the arrival. That's the face. I've shot twelve people now with that face. Everybody's got the same face. It's lovely.\""
     },
+    PHOTO("rowan_arrival", "Rowan with the arrival face", { who: ["rowan"] }),
+    PHOTO("arrival_twelve", "Twelve people with the same face as the island arrives", { who: [], off: true }),
     { jump: "end_1" },
     { label: "next_2" },
     {
@@ -1088,6 +1095,8 @@ scene("arrival_mid", {
       alias: "Girl with a camera",
       text: "\"You! Stranger! Yes, you! Stand there. No, there. No — in front of the lifeboat. Perfect. Hold it —\" Click. \"Pippa Lund. I'm the photographer. Nobody asked me to be. I've shot twelve people now. Everyone's got the same face when the island arrives. It's lovely.\""
     },
+    PHOTO("rowan_arrival", "Rowan in front of the lifeboat as the island arrives", { who: ["rowan"] }),
+    PHOTO("arrival_twelve", "Twelve people with the same face as the island arrives", { who: [], off: true }),
     {
       run: (s,io)=>{ s.names = s.names || {}; if (!s.names["pippa"]) s.names["pippa"] = "Pippa Lund"; if (io && io.popup && !s.flags["met_pippa"]) io.popup({ type: 'met', id: "pippa", name: "Pippa Lund" }); }
     },
@@ -1307,6 +1316,7 @@ scene("arrival_mid", {
     { say: "pippa", text: "\"Everyone say — I don't know — 'island'!\"" },
     { text: "All of you, awkwardly, in a ragged line, say \"island.\"" },
     { text: "Click." },
+    PHOTO("arrival_group", "Group photo amidships as the island arrives: everyone says \"island\"", { who: ["rowan", "georgie", "branden", "rana", "teobalt", "freya", "fiona", "trixie", "hedda"] }),
     {
       choice: [
         { text: "\"Wait. Give me the camera. You should be in one.\"", goto: "opt_30" },
@@ -1323,6 +1333,7 @@ scene("arrival_mid", {
       say: "rowan",
       text: "\"You're in none of these. You've shot twelve people. I want one of you. In front of the island. Here.\""
     },
+    PHOTO("arrival_twelve", "Twelve people with the same face as the island arrives", { who: [], off: true }),
     { say: "pippa", text: "\"That's — nobody ever — it's a rule. There's always one person behind the —\"" },
     {
       text: "She stops. She looks at the camera, and at you, and at the lifeboat ladder behind her, where Georgie has stopped breathing."
@@ -1334,6 +1345,7 @@ scene("arrival_mid", {
     { say: "rowan", text: "\"Don't try. Just look at the island.\"" },
     { text: "She looks at it. Her face does something you cannot name, and you press the shutter." },
     { text: "Click." },
+    PHOTO("pippa_by_rowan", "Pippa in front of the island, trying not to pose (taken by Rowan, with her camera)", { who: ["pippa"] }),
     { say: "pippa", text: "\"…\" She is very quiet. \"Is that — how did it look?\"" },
     { say: "rowan", text: "\"Like you.\"" },
     {
@@ -1368,6 +1380,7 @@ scene("arrival_mid", {
       text: "\"Right! Everybody! Group photo! Georgie, you're at the front. Everyone say 'island'!\""
     },
     { text: "All of you, awkwardly, in a ragged line, say \"island.\" Click." },
+    PHOTO("arrival_group", "Group photo amidships as the island arrives: everyone says \"island\"", { who: ["rowan", "georgie"] }),
     { label: "end_25" },
     { time: 3 }
   ]
@@ -1387,6 +1400,7 @@ scene("arrival_finale", {
     { text: "In the point of the bow the wide-brimmed hat has at last looked up from its compass. Beside the trunks a boy with a scar stands as if on parade, and a long black coat streams past a broken nose that is pretending not to see it. And on the nearest bench a grey blanket, which — you watch it happen — sits up." },
     { say: "dmitri", alias: "Boy under a blanket", text: "\"…So. It is true. There is an island.\"" },
     { text: "Amidships the photograph has come apart into a ragged line along the rail, with a pair of striped socks bobbing up on tiptoe at the end of it. On the saloon stairs a red pen has, for once, got its cap on, and a wine-red beret has turned round to face the island. Aft, a chef's bandana is bent over a crate of tin mugs, counting them, and then looks up and counts heads instead." },
+    { ...PHOTO("arrival_group", "Group photo amidships as the island arrives: everyone says \"island\"", { who: ["georgie", "branden", "rana", "teobalt", "freya", "fiona", "trixie", "hedda"], off: true }), when: (s)=>!s.flags["arr_mid"] },
     { when: (s)=>!!s.flags["eloise_time_promise"]&&!s.flags["eloise_time_kept"], think: "I told Eloise I'd say when we were nearly in. Somebody has turned her round. It wasn't me." },
     { when: (s)=>!s.flags["freddie_jumped"], text: "Thirty-eight, counting you. Red, gold and black, and one rain jacket." },
     { when: (s)=>!!s.flags["freddie_jumped"], text: "Thirty-eight came aboard, counting you. The rails hold thirty-six; the other two are dark heads in the water off the quarter, racing the ship to the pier. Red, gold and black, and one rain jacket with a gold one over its arm." },

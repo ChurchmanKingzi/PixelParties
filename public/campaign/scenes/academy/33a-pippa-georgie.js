@@ -2,7 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
 scene("ferry_pippa_georgie", {
   steps: [
     // Gemeinsame erste Begegnung mit Pippa und Georgie (stehen nebeneinander auf dem Vordeck).
@@ -13,6 +13,7 @@ scene("ferry_pippa_georgie", {
     { text: "She is sitting on a coil of rope with a deck box held in both hands, in a red jacket at least one size too big, its cuffs turned back twice. A dark-purple feather is pinned in her wild black hair. A green plush dragon hangs from her backpack by one wing." },
     { text: "A girl with a heavy old film camera is orbiting her with great concentration: freckles, a yellow bow tie, strawberry-orange hair sticking up at the crown. There is a grey sock on the end of her lens, which she pulls off for each shot." },
     { say: "pippa", alias: "Girl with a camera", text: "\"Chin up. No — down. Feather to the light. Now look at the volcano like it owes you money.\"" },
+    PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"] }),
     { text: "The girl on the rope looks at the volcano. It does not owe her money. Her face says so. There is something curiously still about her: not calm, but the stillness of a small animal that has learned that moving is what gets you noticed." },
     { text: "She notices you looking, and goes the colour of a tomato." },
     { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Sorry. Was I — is this your rope?\"" },
@@ -50,8 +51,10 @@ scene("ferry_pippa_georgie", {
     { text: "A girl with a heavy old film camera is crouched on the planks at a very odd angle, like a heron deciding about a fish. Strawberry-orange hair sticks up at the crown; there is a yellow bow tie under her chin, freckles on every visible surface and a grey sock dangling from the end of her lens." },
     { text: "Her fish is a small girl on a coil of rope: a red jacket at least one size too big, cuffs turned back twice, a deck box held in both hands, a dark-purple feather in wild black hair. A green plush dragon hangs from her backpack by one wing." },
     { say: "pippa", alias: "Girl with a camera", text: "\"Feather to the light. Now look at the volcano like it owes you money. No — like it owes you *a lot* of money.\"" },
+    PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"] }),
     { text: "The girl on the rope tries. The volcano remains in credit. Then, without getting up, the photographer swings the lens round to you." },
     { say: "pippa", alias: "Girl with a camera", text: "\"Hang on — don't move —\" Click. \"Sorry. You were looking at the island with your hand flat on your pocket, like you were checking it was still there. That's the shot. I got it.\"" },
+    PHOTO("rowan_pocket", "Rowan looking at the island, hand flat on his pocket", { who: ["rowan"] }),
     { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"She says that to me.\" Very small, from the rope. \"'I got it.' And then she does ten more.\"" },
     { choice: [
       { text: "\"What shot? Nobody told me I was being photographed.\"", steps: [
@@ -113,6 +116,7 @@ scene("ferry_pippa_georgie", {
         { text: "You sit down on the far end of the coil. It is damp, and harder than it looks. The girl on the other end stares at you as if you had walked through a wall." },
         { say: "georgie", text: "\"…Oh. You can. It's — it's anybody's.\"" },
         { say: "pippa", text: "Click. She is already back behind the lens. \"*That's* the one. Two people on a rope, neither of them sure they're allowed.\"" },
+        PHOTO("rope_two", "Two people on a rope, neither of them sure they're allowed: Rowan and Georgie", { who: ["rowan", "georgie"] }),
         { flag: "pg_sat" },
         AFF("georgie", 2, "Sat down too")
       ] }
@@ -120,12 +124,14 @@ scene("ferry_pippa_georgie", {
     { when: (s)=>!!s.flags["follow_nathan"], say: "nathan", text: "\"Is that a DRAGON? On her BAG? Baylee, she's got a DRAGON on her bag!\"" },
     { when: (s)=>!!s.flags["follow_nathan"]&&!!s.flags["follow_baylee"], say: "baylee", text: "\"It's a plush. Bring it down a bit, Nathan.\"" },
     { when: (s)=>!!s.flags["follow_nathan"]&&!!s.flags["follow_baylee"], say: "pippa", text: "\"I've had you two already. On the stairs, ten minutes ago. One of you was pointing at a gull and one of you wasn't.\"" },
+    { ...PHOTO("stairs_nathan_baylee", "Nathan and Baylee on the stairs, one pointing at a gull and one not", { who: ["nathan", "baylee"], off: true }), when: (s)=>!!s.flags["follow_nathan"]&&!!s.flags["follow_baylee"] },
 
     // ---- Mischen: Georgie wird scharf ----
     { say: "pippa", text: "\"Right. Hands. Georgie, shuffle for me. Just the hands; I won't put your face in.\"" },
     { text: "Georgie looks at the deck box as if it had been asked to dance. Then she opens it, sets the plush dragon on the rope at her elbow, facing the cards, and the moment the deck is in her hands the hunch goes out of her shoulders." },
     { text: "The shuffle is small, quick and exact. The cards go through each other with a sound like a bird settling." },
     { say: "pippa", text: "\"Slower! It's all blur, I can't —\"" },
+    PHOTO("georgie_hands", "Georgie's hands shuffling, eight riffles, Ember at her elbow (no face)", { who: ["georgie"] }),
     { say: "georgie", text: "\"Slower clumps.\" Clipped, flat, nothing in it but fact. \"Eight riffles. Seven is for fifty-two cards; mine has more. Fewer and it isn't shuffled. It's a pattern you haven't found yet.\"" },
     { say: "georgie", text: "She squares the deck with one tap and looks up, straight at you, for the first time. \"You've got a deck in that pocket. You keep touching it. Do you do eight?\"" },
     { choice: [
@@ -148,6 +154,7 @@ scene("ferry_pippa_georgie", {
       { text: "\"Did you get that?\" Ask Pippa, not her.", steps: [
         { say: "rowan", text: "\"Did you get that?\"" },
         { say: "pippa", text: "\"Every frame.\" She says it quietly, for once. \"She's two people, did you know? The one on the rope, and the one with the cards. I've been trying to get the second one for half an hour.\"" },
+        PHOTO("georgie_hands", "Georgie's hands shuffling, eight riffles, Ember at her elbow (no face)", { who: ["georgie"] }),
         { say: "georgie", text: "\"I'm not two people.\"" },
         { say: "pippa", text: "\"You're two people, and one of them is terrifying.\"" },
         { say: "georgie", text: "\"…She means it nicely.\" To the dragon, not to you." },
@@ -158,7 +165,8 @@ scene("ferry_pippa_georgie", {
 
     // ---- Bildunterschrift ----
     { text: "The cards go back into the box, and the small animal is back on the rope. Somewhere in all that, the camera has clicked. Pippa takes a pencil stub from behind her ear and writes on a strip of tape along its back." },
-    { say: "pippa", text: "\"Frame eleven. Rowan, rope, pocket.\" She blows on the pencil, which cannot need it. \"I'm doing everybody before we dock. Thirty-eight faces, before anyone's learned which face to make here. On film, so one go at every second, and no deleting.\"" },
+    PHOTO("rowan_frame_eleven", "Frame thirty-four: Rowan, rope, pocket", { who: ["rowan"] }),
+    { say: "pippa", text: "\"Frame thirty-four. Rowan, rope, pocket.\" She blows on the pencil, which cannot need it. \"I'm doing everybody before we dock. Thirty-eight faces, before anyone's learned which face to make here. On film, so one go at every second, and no deleting.\"" },
     { say: "georgie", text: "\"If it's bad, you just have to be sorry about it afterwards.\" She says it like a quotation." },
     { say: "pippa", text: "\"She *listens*. Nobody warned me she listens.\"" },
     { flag: "pippa_film" },
@@ -196,6 +204,7 @@ scene("ferry_pippa_georgie", {
 
     // ---- Abschluss ----
     { say: "pippa", text: "A gull goes over low, and the camera goes after it, and so, for a step or two, does Pippa. \"Go on, you two. Talk cards. She goes all sharp; it's the best light she's got.\"" },
+    PHOTO("gull_low", "A gull going over the foredeck, low", { who: [] }),
     { choice: [
       { text: "\"Would you like a game, Georgie? Nothing riding on it, just for fun.\"", steps: [
         { say: "rowan", text: "\"Would you like a game, Georgie? Nothing riding on it, just for fun.\"" },
@@ -280,6 +289,7 @@ scene("ferry_georgie", {
     { end: true },
     { label: "again" },
     { text: "Georgie is on her coil of rope with the deck box in both hands. A yard away, Pippa is photographing a bollard with great seriousness. When Georgie sees you she lifts one hand off the box, about an inch. It is a wave." },
+    PHOTO("bollard", "A bollard, taken with great seriousness", { who: [] }),
     { say: "georgie", text: "\"Hi, Rowan.\"" },
     { when: (s)=>!!s.flags["georgie_game_later"]&&!s.flags["flag_georgie_played"], say: "georgie", text: "\"You said later. It's fine if it isn't later yet.\"" },
     { when: (s)=>!!s.flags["flag_georgie_played"]&&!s.flags["georgie_again_played"], text: "The plush dragon is back on her backpack. She has turned it so that it faces the patch of deck where you played." },
@@ -356,6 +366,7 @@ scene("chat_georgie", {
     { choice: [
       { text: "\"Pippa kept turning you so the feather caught the light. Is there a story to it?\"", when: (s)=>!s.flags["chat_georgie_1"], steps: [
         { say: "rowan", text: "\"Pippa kept turning you so the feather caught the light. Is there a story to it?\"" },
+        PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"] }),
         { text: "She touches it, as if to make sure it is still there." },
         { say: "georgie", text: "\"I found it on the steps outside the hall where I played my first big final. Nobody else wanted it, and I thought somebody should.\"" },
         { choice: [
@@ -395,6 +406,7 @@ scene("chat_georgie", {
             { say: "rowan", text: "\"Do yours still shake?\"" },
             { say: "georgie", text: "\"Before. Not during.\"" },
             { say: "pippa", text: "\"It's true. I've got the before. All the way up the gangway.\"" },
+            PHOTO("georgie_gangway", "Georgie coming up the gangway at the harbour, hands shaking before the crossing", { who: ["georgie"], off: true }),
             { say: "georgie", text: "\"You weren't supposed to be looking.\"" },
             { say: "pippa", text: "\"I'm always supposed to be looking.\"" },
             { text: "Georgie holds one hand out flat over the deck box. It is perfectly steady. She studies it as if it belonged to somebody she rather admired." },
@@ -571,8 +583,11 @@ scene("chat_pippa", {
           { text: "\"Who have you found so far?\"", steps: [
             { say: "rowan", text: "\"Who have you found so far?\"" },
             { say: "pippa", text: "\"An enormous boy in a straw hat who moved a whole bench, by himself, so that somebody else's bag was in the shade. He didn't tell anyone. I've got it, though.\"" },
-            { when: (s)=>!!s.flags["pg_two_people"], say: "pippa", text: "\"And the second Georgie, the one with the cards. And — well. Frame eleven was all right.\" She is suddenly very busy with the strap. \"Don't put that in a caption.\"" },
-            { when: (s)=>!s.flags["pg_two_people"], say: "pippa", text: "\"And Georgie shuffling, obviously. And — well. Frame eleven was all right.\" She is suddenly very busy with the strap. \"Don't put that in a caption.\"" },
+            PHOTO("baylee_bench", "Baylee moving a whole bench by himself, so somebody else's bag is in the shade", { who: ["baylee"], off: true }),
+            { when: (s)=>!!s.flags["pg_two_people"], say: "pippa", text: "\"And the second Georgie, the one with the cards. And — well. Frame thirty-four was all right.\" She is suddenly very busy with the strap. \"Don't put that in a caption.\"" },
+            { when: (s)=>!s.flags["pg_two_people"], say: "pippa", text: "\"And Georgie shuffling, obviously. And — well. Frame thirty-four was all right.\" She is suddenly very busy with the strap. \"Don't put that in a caption.\"" },
+            PHOTO("rowan_frame_eleven", "Frame thirty-four: Rowan, rope, pocket", { who: ["rowan"] }),
+            PHOTO("georgie_hands", "Georgie's hands shuffling, eight riffles, Ember at her elbow (no face)", { who: ["georgie"] }),
             AFF("pippa", 1, "Asked who she liked")
           ] },
           { text: "\"It's also a good way never to be on the other side of one.\"", steps: [
@@ -637,8 +652,8 @@ scene("chat_pippa", {
         NOTE("pippa", "Has three younger brothers at home in Aarhus."),
         { time: 2 }
       ] },
-      { text: "\"Eleven frames on that roll, and not one of them is you. Is there a picture of you anywhere?\"", when: (s)=>!s.flags["chat_pippa_3"], steps: [
-        { say: "rowan", text: "\"Eleven frames on that roll, and not one of them is you. Is there a picture of you anywhere?\"" },
+      { text: "\"Thirty-four frames on that roll, and not one of them is you. Is there a picture of you anywhere?\"", when: (s)=>!s.flags["chat_pippa_3"], steps: [
+        { say: "rowan", text: "\"Thirty-four frames on that roll, and not one of them is you. Is there a picture of you anywhere?\"" },
         { say: "pippa", text: "\"Hm?\" The camera comes down an inch. \"Oh — no. Thirty-seven, and a photographer. Somebody has to be behind it. It's a rule. There's always one person behind it.\"" },
         { text: "A very small pause. It is quick, and she covers it with a grin, but it was there." },
         { say: "georgie", text: "\"I offered.\" From the rope. \"She said I'd hold it like a deck box.\"" },
@@ -683,6 +698,7 @@ scene("chat_pippa", {
           ] },
           { text: "\"You took mine without asking, too. What's the difference?\"", steps: [
             { say: "rowan", text: "\"You took mine without asking, too. What's the difference?\"" },
+            PHOTO("rowan_frame_eleven", "Frame thirty-four: Rowan, rope, pocket", { who: ["rowan"] }),
             { say: "pippa", text: "\"You were looking at an island. He was looking after a fish.\"" },
             { say: "pippa", text: "\"…All right, there's less difference than I'd like. Yours I'll show you before anybody else sees it. That's the rule I made after him. He's why there's a rule.\"" },
             AFF("pippa", 1, "Asked the fair question")

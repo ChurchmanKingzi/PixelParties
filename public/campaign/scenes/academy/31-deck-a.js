@@ -2,7 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
 scene("ferry_nathan", {
   steps: [
     { when: (s)=>!s.flags["ship_knows_wildcard"]&&!s.flags["nathan_inked"]&&!s.flags["nathan_list_beat"], jump: "list" },
