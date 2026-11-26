@@ -76,7 +76,7 @@ world({
     noor: { name: "Noor", portrait: "noor", sprite: "noor", color: "#7ee081" },
     octavia: { name: "Octavia", portrait: "octavia", sprite: "octavia", color: "#b08b3a" },
     odalys: { name: "Mama Odalys", portrait: "odalys", sprite: "odalys", color: "#8fe3d6" },
-    okonkwo: { name: "Chancellor Vicar", portrait: "okonkwo", sprite: "okonkwo", color: "#6cc0ff" },
+    vicar: { name: "Chancellor Vicar", portrait: "vicar", sprite: "vicar", color: "#6cc0ff" },
     ophelia: { name: "Ophelia", portrait: "ophelia", sprite: "ophelia", color: "#8fe3d6" },
     oru: { name: "Madame Oru", portrait: "oru", sprite: "oru", color: "#a9b4ff" },
     pilar: { name: "Pilar", portrait: "pilar", sprite: "pilar", color: "#7ee081" },

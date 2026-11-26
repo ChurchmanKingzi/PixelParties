@@ -2151,7 +2151,7 @@
      "from": 0
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "distrusts",
      "pub": false,
      "from": 40
@@ -2199,7 +2199,7 @@
     }
    ]
   },
-  "okonkwo": {
+  "vicar": {
    "name": "Chancellor Vicar",
    "first": "Marguerite",
    "romance": false,
@@ -2337,7 +2337,7 @@
      "from": 0
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "protégé",
      "pub": true,
      "from": 0
@@ -2578,7 +2578,7 @@
      "from": 12
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "distrusts",
      "pub": true,
      "from": 9
@@ -2756,7 +2756,7 @@
      "from": 4
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "protégé",
      "pub": true,
      "from": 12
@@ -3576,7 +3576,7 @@
      "from": 0
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "distrusts",
      "pub": false,
      "from": 40
@@ -3641,7 +3641,7 @@
      "from": 6
     },
     {
-     "w": "okonkwo",
+     "w": "vicar",
      "label": "distrusts",
      "pub": false,
      "from": 1

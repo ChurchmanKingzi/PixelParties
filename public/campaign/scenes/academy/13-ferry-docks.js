@@ -404,32 +404,32 @@ scene("quad_address", {
     {
       text: "In front of the tower, a tall woman in a navy suit stands completely still. Grey-streaked braids coiled high, reading glasses on a silver chain. She waits for silence, and gets it in about four seconds."
     },
-    { say: "okonkwo", text: "\"Good morning.\"" },
+    { say: "vicar", text: "\"Good morning.\"" },
     { text: "A hundred new heartbeats, all in tempo." },
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"I am Dr Marguerite Vicar. I am Chancellor of Pixel Academy, and I have been for a very long time.\""
     },
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"You have been admitted to this school out of two thousand, one hundred and fourteen applicants. That is not a boast. It is a statistic, and I distrust everything else I might say about it.\""
     },
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"Over the next two hundred and ten days you will be taught the game, the rules of the game, and the history of the game. You will learn what a good loss looks like. Most of you will lose a great deal. I recommend you do it well.\""
     },
     { text: "A ripple of nervous laughter, instantly suppressed." },
     PHOTO("quad_year_looking", "The whole year looking at the Chancellor (a roll of everybody looking)", { who: [], off: true }),
     PHOTO("quad_rowan_shoes", "Rowan at the Chancellor's address, looking at his shoes", { who: ["rowan"], off: true }),
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"There is one law on this island above all the others. Every conflict here may be settled at a table. Every one. You will be given the Charter tomorrow. Read it. The position is that there are no exceptions.\""
     },
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"For today, you will be assigned a dormitory. The lists will be read in rank order. Do not take your assignment as a verdict. It is merely an arrangement. Verdicts, on this island, are earned at the table.\""
     },
-    { say: "okonkwo", text: "\"Miss Sterling.\"" },
+    { say: "vicar", text: "\"Miss Sterling.\"" },
     {
       text: "She steps aside. The woman who takes her place is taller, silver-blonde in a flawless chignon, with a dark council sash worn over a gold jacket like a rank. She opens a leather folio with the air of someone opening a ledger."
     },
@@ -539,9 +539,9 @@ scene("quad_jacket", {
     },
     { flag: "jacket_issued" },
     { text: "A shadow falls across the crate." },
-    { say: "okonkwo", text: "\"Mr Vance.\"" },
+    { say: "vicar", text: "\"Mr Vance.\"" },
     { text: "She does not offer a hand. Her glasses swing on their silver chain." },
-    { say: "okonkwo", text: "\"The Wildcard entrant. You arrived by the back door. See that you leave by the front.\"" },
+    { say: "vicar", text: "\"The Wildcard entrant. You arrived by the back door. See that you leave by the front.\"" },
     {
       choice: [
         { text: "\"Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.\"", goto: "opt_2" },
@@ -556,37 +556,37 @@ scene("quad_jacket", {
     { jump: "choiceend_1" },
     { label: "opt_2" },
     { say: "rowan", text: "\"Yes, ma'am. I'll try to leave by the front, and I'll try not to be late.\"" },
-    { say: "okonkwo", text: "\"Good.\"" },
+    { say: "vicar", text: "\"Good.\"" },
     { text: "A single, dry inclination of the head." },
     {
-      say: "okonkwo",
+      say: "vicar",
       text: "\"I find that you may be the only person today who has said that without being asked.\""
     },
     {
-      add: { aff_okonkwo: 2 }
+      add: { aff_vicar: 2 }
     },
-    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "okonkwo", n: 2, why: "Respectful" }); } },
+    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "vicar", n: 2, why: "Respectful" }); } },
     { jump: "choiceend_1" },
     { label: "opt_3" },
     { say: "rowan", text: "\"I'll do my best, Chancellor. I'm not sure it will be enough, but it is what I have.\"" },
-    { say: "okonkwo", text: "\"You will do better than that, or you will do something else.\"" },
+    { say: "vicar", text: "\"You will do better than that, or you will do something else.\"" },
     { text: "She does not smile. Something in the line of her mouth, however, has moved a millimetre." },
-    { say: "okonkwo", text: "\"We shall see.\"" },
+    { say: "vicar", text: "\"We shall see.\"" },
     {
-      add: { aff_okonkwo: 1 }
+      add: { aff_vicar: 1 }
     },
-    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "okonkwo", n: 1, why: "Honest" }); } },
+    { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "vicar", n: 1, why: "Honest" }); } },
     { jump: "choiceend_1" },
     { label: "opt_4" },
-    { say: "okonkwo", text: "\"Quite.\"" },
+    { say: "vicar", text: "\"Quite.\"" },
     { jump: "choiceend_1" },
     { label: "choiceend_1" },
     { text: "She moves on. The crate has gone quiet." },
     { think: "I'm wearing the jacket. I'm actually wearing the jacket. I'm one of them now." },
     {
-      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["okonkwo"]) s.names["okonkwo"] = "Chancellor Vicar"; if (io && io.popup && !s.flags["met_okonkwo"]) io.popup({ type: 'met', id: "okonkwo", name: "Chancellor Vicar" }); }
+      run: (s,io)=>{ s.names = s.names || {}; if (!s.names["vicar"]) s.names["vicar"] = "Chancellor Vicar"; if (io && io.popup && !s.flags["met_vicar"]) io.popup({ type: 'met', id: "vicar", name: "Chancellor Vicar" }); }
     },
-    { flag: "met_okonkwo" },
+    { flag: "met_vicar" },
     { scene: "commons_march" }
   ]
 });
