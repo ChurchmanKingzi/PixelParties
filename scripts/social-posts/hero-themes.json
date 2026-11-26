@@ -980,7 +980,11 @@
     "gold",
     8
    ]
-  ]
+  ],
+  "px": 12,
+  "polshow": true,
+  "opener": "wind",
+  "showLoops": 6
  },
  "Xiong, the Bamboo Guardian": {
   "particles": [
