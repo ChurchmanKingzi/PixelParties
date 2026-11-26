@@ -2,7 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 /* ===================================================================== JESSICA */
 scene("ferry_jessica", {
   steps: [
@@ -797,6 +798,22 @@ scene("post_ashton", {
       { text: "\"Two targets on turn two, and I think you'd have had me.\"", steps: [
         { say: "rowan", text: "\"Two targets on turn two, and I think you'd have had me.\"" },
         { say: "ashton", text: "\"Two.\" He looks at the board as if it had been rude to him. \"Restraint. What a perfectly horrid idea. I shall try it once and report back.\"" }
+      ] }
+    ] },
+    // Nach Rowans Sieg: Ashton gibt Trinkgeld (er gibt immer zu viel).
+    { text: "He draws a small, heavy purse from an inside pocket, counts Smug Coins onto the bench in a neat column without looking at them, and slides the column across to you with one finger." },
+    { say: "ashton", text: "\"Twenty. For the entertainment. One always tips the band, and you were rather a good band.\"" },
+    { choice: [
+      { text: "\"Thank you. It's going on sleeves.\"", steps: [
+        { say: "rowan", text: "\"Thank you. It's going on sleeves.\"" },
+        { say: "ashton", text: "\"Sleeves. How grimly sensible. Buy the good ones, Vance; I shall be checking.\"" },
+        { coins: 20, flag: "ashton_gave_coins" }
+      ] },
+      { text: "\"Keep it. You lost a game, not a bet.\"", steps: [
+        { say: "rowan", text: "\"Keep it. You lost a game, not a bet.\"" },
+        { text: "He looks at the column of coins as if it had passed a remark." },
+        { say: "ashton", text: "\"…So I did. Nobody has ever handed one of those back to me.\" He sweeps them into the purse. \"I find I don't mind it. How very peculiar.\"" },
+        { flag: "ashton_tip_refused" }
       ] }
     ] },
     { label: "out" },

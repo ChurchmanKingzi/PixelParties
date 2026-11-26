@@ -2,7 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 scene("ferry_nathan", {
   steps: [
     { when: (s)=>!s.flags["ship_knows_wildcard"]&&!s.flags["nathan_inked"]&&!s.flags["nathan_list_beat"], jump: "list" },
@@ -659,6 +660,22 @@ scene("post_baylee", {
         { text: "He holds one up. It is true that it is hard to look at anything else." }
       ] }
     ] },
+    // Geschenk nach Rowans Sieg: eine Chimera aus Baylees Ersatzstapel.
+    { when: (s)=>s.duels["ferry_baylee"]==="won", text: "He stops with one card still out of the box. A Gigantisaur Chimera, its corners gone soft from handling." },
+    { when: (s)=>s.duels["ferry_baylee"]==="won", say: "baylee", text: "\"Got five. Deck takes four.\"" },
+    { when: (s)=>s.duels["ferry_baylee"]==="won", say: "baylee", text: "\"You kept him in the barn.\" He holds it out across the bench. \"Ought to have one.\"" },
+    { when: (s)=>s.duels["ferry_baylee"]==="won", choice: [
+      { text: "\"Thanks, Baylee. I'll let this one out.\"", steps: [
+        { say: "rowan", text: "\"Thanks, Baylee. I'll let this one out.\"" },
+        { say: "baylee", text: "\"Good.\" A slow nod, as if a gate had been shut properly." },
+        { card: "Gigantisaur Chimera", rarity: "uncommon", flag: "baylee_gave_chimera" }
+      ] },
+      { text: "\"Keep it. It's the best animal you've got.\"", steps: [
+        { say: "rowan", text: "\"Keep it. It's the best animal you've got.\"" },
+        { say: "baylee", text: "\"Best five.\" He thinks about that, and puts it back in the box, the right way up. \"All right.\"" },
+        { flag: "baylee_gift_refused" }
+      ] }
+    ] },
     AFF("baylee", 1, "Talked it through")
   ]
 });
@@ -992,6 +1009,22 @@ scene("post_ed", {
     { say: "ed", text: "\"Again some time? On the island? Somewhere with a view?\"" },
     { say: "rowan", text: "\"Somewhere with a floor.\"" },
     { say: "ed", text: "\"A floor AND a view! You drive a hard bargain!\"" },
+    // Geschenk nach Rowans Sieg: Eds Glückskarte aus dem Hutband.
+    { when: (s)=>s.duels["ferry_ed"]==="won", text: "He takes off the hat, feels round inside the band, and comes out with a card that has been folded once across the middle and flattened again, more or less." },
+    { when: (s)=>s.duels["ferry_ed"]==="won", say: "ed", text: "\"Here. Smug Coin. The card, not the money. When your hero's about to go down, it drops to one instead. Once.\" He grins. \"It's lucky. It's been in the hat since I left home.\"" },
+    { when: (s)=>s.duels["ferry_ed"]==="won", say: "ed", text: "\"You robbed the whole bank. You should get something out of the bank.\"" },
+    { when: (s)=>s.duels["ferry_ed"]==="won", choice: [
+      { text: "\"Thanks, Ed. I'll keep it somewhere safer than a hat.\"", steps: [
+        { say: "rowan", text: "\"Thanks, Ed. I'll keep it somewhere safer than a hat.\"" },
+        { say: "ed", text: "\"There's nowhere safer than a hat!\" He jams it back on his head, slightly crooked, to prove it." },
+        { card: "Smug Coin", rarity: "rare", flag: "ed_gave_smug_coin" }
+      ] },
+      { text: "\"Keep it in the hat. I think you're going to need it more than I am.\"", steps: [
+        { say: "rowan", text: "\"Keep it in the hat. I think you're going to need it more than I am.\"" },
+        { say: "ed", text: "\"…Yeah, probably.\" Cheerfully, as a matter of record. He slides it back into the band and pats it twice." },
+        { flag: "ed_gift_refused" }
+      ] }
+    ] },
     AFF("ed", 1, "Talked it through")
   ]
 });
@@ -1054,6 +1087,21 @@ scene("post_georgie", {
     { say: "georgie", text: "\"You're still talking to me.\"" },
     { say: "rowan", text: "\"Why wouldn't I be?\"" },
     { say: "georgie", text: "\"I don't know. I've not lost very often. I didn't know what happens next.\" A breath. \"This is all right.\"" },
+    // Geschenk nach Rowans Sieg: ihr Lieblings-Ei, prismatisch (die seltene Ausnahme).
+    { text: "She sets the dragon down beside her, opens her deck box and goes through it with the speed of somebody who knows where every card lives. She stops at an egg, holds it a moment, and then holds it out. It is not printed like your cards: when it tilts, the whole face of it runs through every colour there is." },
+    { say: "georgie", text: "\"Shimmering Dragonegg. You can have it. If you want.\" Very quickly: \"It's my favourite one, so it's a proper present, not a spare. Eggs are for when you don't know what happens next.\"" },
+    { choice: [
+      { text: "\"Georgie, that's a prismatic. You can't just give that away.\"", steps: [
+        { say: "rowan", text: "\"Georgie, that's a prismatic. You can't just give that away.\"" },
+        { say: "georgie", text: "\"I can. It's mine.\" Quiet, and surprisingly firm. \"I've never given anybody a card before. I wanted to know what it's like.\"" },
+        { card: "Shimmering Dragonegg", rarity: "prismatic", flag: "georgie_gave_egg" }
+      ] },
+      { text: "\"Thank you. I'll look after it.\"", steps: [
+        { say: "rowan", text: "\"Thank you. I'll look after it.\"" },
+        { say: "georgie", text: "\"You don't have to look after it. That's the good thing about eggs.\" The tiny smile again. \"You just keep it until you find out.\"" },
+        { card: "Shimmering Dragonegg", rarity: "prismatic", flag: "georgie_gave_egg" }
+      ] }
+    ] },
     { jump: "after" },
     { label: "lost" },
     { text: "Georgie has already stacked her cards into a tidy pile and is holding the green plush dragon on her knee." },

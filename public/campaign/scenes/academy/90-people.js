@@ -2,6 +2,7 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
 const STORY = helpers.story, DATA = helpers.data;
 // Wer wo steht. Diese Datei läuft als letzte Szenen-Datei: Figuren werden nur gesetzt, wenn es ihre Szene gibt.
 //   Fähre: die sechzehn First-Years, die bisher erst auf der Insel auftauchten (alle 38 sind an Bord).

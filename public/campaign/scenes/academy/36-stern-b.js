@@ -2,7 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 /* ───────────────────────── SUNNY ───────────────────────── */
 scene("ferry_sunny", {
   steps: [
@@ -364,6 +365,22 @@ scene("post_sunny", {
       { text: "\"Rematch on dry land?\"", steps: [
         { say: "rowan", text: "\"Rematch on dry land?\"" },
         { say: "sunny", text: "\"Obviously. Twenty push-ups. I've seen what you do now.\"" }
+      ] }
+    ] },
+    // Geschenk nach Rowans Sieg: eine Trophäe, die rutscht.
+    { text: "She riffles her deck one-handed, without looking, the way she caught it on the rail, and stops on one card: a small, round, extremely pleased-looking penguin." },
+    { say: "sunny", text: "\"Here. Your storm doesn't slide, so have something that does. Slippery Pengu. My favourite. Put him anywhere and he's moved by your next turn.\"" },
+    { say: "sunny", text: "\"Not a consolation prize. A trophy. You won, you get a trophy. That's sport.\"" },
+    { choice: [
+      { text: "\"Thanks. He's going to hate my deck.\"", steps: [
+        { say: "rowan", text: "\"Thanks. He's going to hate my deck.\"" },
+        { say: "sunny", text: "\"He'll slide straight out of it. Keep him in your pocket, then. That's where trophies go.\"" },
+        { card: "Slippery Pengu", rarity: "uncommon", flag: "sunny_gave_pengu" }
+      ] },
+      { text: "\"Keep him. He's your favourite.\"", steps: [
+        { say: "rowan", text: "\"Keep him. He's your favourite.\"" },
+        { say: "sunny", text: "\"Fair. I'd miss him.\" No fuss at all; the penguin goes back into the deck. \"It was a real offer, though. I don't do the other kind.\"" },
+        { flag: "sunny_gift_refused" }
       ] }
     ] },
     { jump: "out" },
@@ -738,6 +755,22 @@ scene("post_marit", {
     { say: "marit", text: "\"*Thank* you. I stay up at night thinking nobody understands it.\"" },
     { text: "She looks, for a second, entirely sincere." },
     { say: "marit", text: "\"You do.\"" },
+    // Nach Rowans Sieg: Marit lässt für den Sieger sammeln.
+    { text: "Then, as if she has remembered that there is a house, she is up on the bollard again. She unwinds the ember scarf from her throat, holds it out like a collection bag, and goes along the line of watchers with it." },
+    { say: "marit", text: "\"The **HAT** goes **ROUND!** There *is* no hat! The *SCARF* goes round! Pay the victor, you savages, he has been *magnificent!*\"" },
+    { text: "The dozen laugh, and pay. She comes back and tips the scarf out on the bollard beside you: fourteen Smug Coins and one button, which she pockets." },
+    { choice: [
+      { text: "\"Thank you. I've never been paid by an audience before.\"", steps: [
+        { say: "rowan", text: "\"Thank you. I've never been paid by an audience before.\"" },
+        { say: "marit", text: "\"Then *remember* the feeling.\" Ordinary voice, very quick: \"They wanted to have paid for something good. You let them. That's half the job.\"" },
+        { coins: 14, flag: "marit_gave_coins" }
+      ] },
+      { text: "\"Give it back to them. Nobody bought a ticket.\"", steps: [
+        { say: "rowan", text: "\"Give it back to them. Nobody bought a ticket.\"" },
+        { say: "marit", text: "\"A *PRINCIPLED* artist!\" She goes back down the line, returning each coin with a small bow. It takes twice as long as the collection and gets a bigger laugh." },
+        { flag: "marit_collection_returned" }
+      ] }
+    ] },
     { jump: "out" },
     { label: "lost" },
     { text: "The cheering thins out. Marit comes up from her bow and drops, mid-flourish, into her ordinary voice, the quick, wry one." },
@@ -1123,6 +1156,21 @@ scene("post_freddie", {
       { text: "\"Mine are built to win. Yours are built to be looked at. Both work.\"", steps: [
         { say: "rowan", text: "\"Mine are built to win. Yours are built to be looked at. Both work.\"" },
         { say: "freddie", text: "\"One of them works.\" Sunnily. \"But I know which one I'd take swimming.\"" }
+      ] }
+    ] },
+    // Geschenk nach Rowans Sieg: eine Karte zum Ansehen, mit Fisch.
+    { when: (s)=>s.duels["ferry_freddie"] === "won", text: "She fishes a card out of the front of her deck box and lays it face up on the Storm in your hand. It has waves on it. In one corner, very small, there is a fish." },
+    { when: (s)=>s.duels["ferry_freddie"] === "won", say: "freddie", text: "\"Aquatic Arrows. I can't cast it anyway, so it isn't a sacrifice, it's a *rescue*. You won. Now you've got one card worth looking at.\"" },
+    { when: (s)=>s.duels["ferry_freddie"] === "won", choice: [
+      { text: "\"You know my heroes can cast that one.\"", steps: [
+        { say: "rowan", text: "\"You know my heroes can cast that one.\"" },
+        { say: "freddie", text: "\"…Oh *no*.\" A long look at the card, and then at you. \"Then don't. Promise me you'll mostly just look at it.\"" },
+        { card: "Aquatic Arrows", rarity: "rare", flag: "freddie_gave_arrows" }
+      ] },
+      { text: "\"Keep your fish. Your deck needs all the looking at it can get.\"", steps: [
+        { say: "rowan", text: "\"Keep your fish. Your deck needs all the looking at it can get.\"" },
+        { say: "freddie", text: "\"It *does*, doesn't it?\" She takes it back and kisses it once, absent-mindedly, the way people kiss a pebble for luck." },
+        { flag: "freddie_gift_refused" }
       ] }
     ] },
     { flag: "rowan_commons_seen" },

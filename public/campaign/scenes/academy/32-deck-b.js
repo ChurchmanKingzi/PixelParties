@@ -2,7 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 
 
 scene("deck_pippa", {
@@ -459,6 +460,21 @@ scene("post_mikoto", {
         { say: "mikoto", text: "\"No. No, I suppose I — it was good, wasn't it? I'm keeping it. I'll do it to somebody else.\"" }
       ] }
     ] },
+    // Geschenk nach Rowans Sieg: der Knochenhund, der die anderen zurückholt.
+    { text: "He gathers up his discard pile and stops halfway, with one card still face up in his fingers: a small skeleton dog, all ribs and tail." },
+    { say: "mikoto", text: "\"Loyal Bone Dog. Would you — he's for you. If you'd like. Sorry. When one of the others goes down, he gives himself up and brings it straight back.\" A small, crooked smile. \"I thought you ought to have something from my side that gets up again.\"" },
+    { choice: [
+      { text: "\"I'd like him. Thank you, Mikoto.\"", steps: [
+        { say: "rowan", text: "\"I'd like him. Thank you, Mikoto.\"" },
+        { say: "mikoto", text: "\"Oh! Good. Good. He's very loyal. It's in the name, so that's — yes.\" He laughs, and for once does not apologise for it." },
+        { card: "Loyal Bone Dog", rarity: "uncommon", flag: "mikoto_gave_dog" }
+      ] },
+      { text: "\"Keep him. Your skeletons need him more than my storm does.\"", steps: [
+        { say: "rowan", text: "\"Keep him. Your skeletons need him more than my storm does.\"" },
+        { say: "mikoto", text: "\"They do, don't they? They'd fall to bits.\" He slides the dog back into the deck very gently, as if it might mind. \"Thank you for — sorry. Thank you.\"" },
+        { flag: "mikoto_gift_refused" }
+      ] }
+    ] },
     { label: "after" },
     AFF("mikoto", 1, "Talked it through")
   ]
@@ -776,6 +792,21 @@ scene("post_branden", {
         { say: "branden", text: "\"I KNOW I did.\" The chin comes down a little. \"…Did I really?\"" },
         { say: "rowan", text: "\"Really.\"" },
         { say: "branden", text: "\"Then technically it was a draw. I'm writing it down as a draw.\"" }
+      ] }
+    ] },
+    // Geschenk nach Rowans Sieg: ein Booster aus dem Ärmel (Turnierpreis der Unter-Zehn).
+    { text: "Then he plunges one arm up the enormous sleeve of his jacket, nearly to the shoulder, and comes out with a booster pack. It is sealed, slightly warm, and has clearly been up there a while." },
+    { say: "branden", text: "\"Here. Under-tens prize. They give you a whole box when you win, and I always win, so I've got *loads*.\" He shoves it at you. \"The champion gives the other person something. That's a rule. It's *my* rule.\"" },
+    { choice: [
+      { text: "\"Thanks, Branden. I'll open it on the island.\"", steps: [
+        { say: "rowan", text: "\"Thanks, Branden. I'll open it on the island.\"" },
+        { say: "branden", text: "\"Tell me if there's a fire one in it.\" A pause. \"If there's a fire one I want it back.\"" },
+        { item: "Booster Pack", flag: "branden_gave_booster" }
+      ] },
+      { text: "\"Keep it, champion. You won it.\"", steps: [
+        { say: "rowan", text: "\"Keep it, champion. You won it.\"" },
+        { say: "branden", text: "\"I *did* win it.\" He jams it back up the sleeve with enormous dignity, and looks, for one second, secretly relieved." },
+        { flag: "branden_gift_refused" }
       ] }
     ] },
     { label: "after" },

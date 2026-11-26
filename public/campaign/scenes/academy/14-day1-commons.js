@@ -2,6 +2,9 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const STORY = helpers.story, DATA = helpers.data;
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 scene("row_boardwalk", {
   steps: [
     {
@@ -173,10 +176,10 @@ scene("room_unpack", {
 scene("room_goldfish", {
   steps: [
     {
-      text: "You lay Gather That Storm! out on the bed, card by card, in the old pattern: heroes at the top, abilities down the left, the Storm itself centred and facing you."
+      text: (s) => { const d = DECKCOUNT(s), m = (s.deck && s.deck.main) || null; const storm = !m || (m["Gathering Storm"] || 0) > 0; return "You lay " + (d.name || "your deck") + " out on the bed, card by card, in the old pattern: heroes at the top, abilities down the left, " + (storm ? "the Storm itself centred and facing you." : "the gap where the Storm used to go centred and facing you."); }
     },
     {
-      text: "\"Goldfishing,\" the forums call it: playing a deck against nobody, to see if it works. You shuffle sixty cards, deal a seven, and play the hand out against an invisible opponent, turn by turn, all by yourself."
+      text: (s) => "\"Goldfishing,\" the forums call it: playing a deck against nobody, to see if it works. You shuffle " + WORDS(DECKCOUNT(s).main) + " cards, deal a seven, and play the hand out against an invisible opponent, turn by turn, all by yourself."
     },
     { text: "It is a comfort. It is the only table in the world where your hands do not shake." },
     {
@@ -316,7 +319,28 @@ scene("placement_duel", {
     { label: "choiceend_4" },
     { say: "hana", text: "\"Deck check, both players.\" She holds out a hand, palm up, without looking at it." },
     { text: "Rana's deck goes across the felt in one flat, contemptuous slide. Yours goes across less elegantly. Ms Kirishima fans it in a single movement and reads it the way other people read a clock." },
-    { say: "hana", text: "\"Three Heroes, six starting Abilities, sixty in the main deck, five in the Potion Deck. Registered as 'Gather That Storm!', Wildcard Qualifier, prize print.\" She squares it with one tap. \"Common throughout. New stock. The edges are unmarked.\"" },
+    // Deckprüfung: zählt Rowans AKTUELLES Deck (er kann es umbauen); Abweichungen vom registrierten Preis-Deck benennt sie trocken.
+    { say: "hana", text: (s) => {
+      const d = DECKCOUNT(s), up = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+      let t = "\"" + up(WORDS(d.heroes)) + (d.heroes === 1 ? " Hero, " : " Heroes, ") + WORDS(d.abilities) + (d.abilities === 1 ? " starting Ability, " : " starting Abilities, ") + WORDS(d.main) + " in the main deck" + (d.potions ? ", " + WORDS(d.potions) + " in the Potion Deck." : ", and no Potion Deck.") + "\"";
+      const mirror = ((s.deck && s.deck.main) || {})["The Sacred Mirror"] || 0;
+      if (d.main !== 60 && mirror >= 4 && d.main > 60 && d.main <= 80) t += " A pause. \"Four Sacred Mirrors. Then " + WORDS(d.main) + " is permitted. I have checked that it is permitted.\"";
+      else if (d.main !== 60) t += " A pause, during which she counts again. \"A sanctioned main deck is sixty cards, Mr Vance. This is a measurement, not a tournament, so I will allow it. I will also write it down.\"";
+      if (d.heroes !== 3) t += " \"The customary number of Heroes is three. I assume you know that. I assume you have a reason. Neither assumption is my business.\"";
+      return t;
+    } },
+    { say: "hana", text: (s) => {
+      const d = DECKCOUNT(s), R = (typeof DATA !== "undefined" && DATA.rowan) || {}, k = s.deck;
+      const list = (a) => { const o = {}; for (const c of a || []) o[c.name] = (o[c.name] || 0) + c.n; return o; };
+      const same = (a, b) => { a = a || {}; b = b || {}; const ks = Object.keys(Object.assign({}, a, b)); return ks.every(n => (a[n] || 0) === (b[n] || 0)); };
+      const changed = !!k && (!same(k.main, list(R.main)) || !same(k.potions, list(R.potions)) || (k.heroes && k.heroes.map(h => (h && h.name) || h).join("|") !== (R.heroes || []).map(h => h.name).join("|")));
+      const renamed = !!k && !!k.name && R.name && k.name !== R.name;
+      let t = "\"Registered as '" + (R.name || "Gather That Storm!") + "', Wildcard Qualifier, prize print.";
+      if (renamed) t += " The box now says '" + k.name + "'. The register has not been told, and will be.";
+      if (!changed) return t + "\" She squares it with one tap. \"Common throughout. New stock. The edges are unmarked.\"";
+      t += " It is not the list that was registered. It is a relative of it.\" She squares it with one tap.";
+      return t + (d.allCommon ? " \"Common throughout, still. The edges are, for the most part, unmarked.\"" : " \"Common, with exceptions. I will not ask where the exceptions came from. I will note that they came from somewhere.\"");
+    } },
     { say: "hana", text: "\"Unsleeved, they will not stay unmarked, and a marked card is a matter for this office. Sleeves by Friday, Mr Vance. That is not a penalty. It is a forecast.\"" },
     { when: (s)=>!!s.flags["rowan_commons_seen"], think: "Everybody has had something to say about these cards today. She's the first one who can write it down." },
     { when: (s)=>!s.flags["rowan_commons_seen"], think: "Prize print. It sounds more official when she says it. It also sounds a lot like 'cheap'." },

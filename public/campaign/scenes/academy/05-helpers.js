@@ -2,6 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const STORY = helpers.story, DATA = helpers.data;
 // Kurzformen für Schritte, die in fast jeder Szene vorkommen. Jede liefert EINEN Schritt (ein Objekt für die steps-Liste).
 // AFF(id, n, why)     Zuneigung ändern + Popup          MET(id, fullName)  kennengelernt: Name merken, Popup, Flag met_<id>
 // DECK(id)            Deck gelernt: Popup + Flag        NOTE(id, text)     Notiz im People-Fenster ("What you know")
@@ -13,9 +15,24 @@
 //                      ZUKUNFT (Plan des Autors, noch nicht umgesetzt): Pippa wird einer der ersten Romance-Charaktere;
 //                      ideal dafür ist eine Szene, in der Rowan und sie gemeinsam ihre Filme entwickeln — aus dieser Liste.
 //                      Sie fotografiert analog: niemand sieht ein Bild, bevor es entwickelt ist (laut ihr „in a week“).
+// DECKCOUNT(s)         Rowans AKTUELLES Deck gezählt (er kann es umbauen): { heroes, abilities, main, potions, total, allCommon }.
+//                      Für Texte, die Karten zählen: { text: (s) => "…" + WORDS(DECKCOUNT(s).main) + "…" } (Texte dürfen Funktionen sein).
+// WORDS(n)             Zahl als englisches Wort ("sixty"), ab 100 als Ziffern.
+// Belohnungen: { card: "Kartenname", rarity: "rare" } (eine Kopie in dieser Seltenheit, Standard common),
+//              { item: "Booster Pack" } (im Cards-Fenster zu öffnen), { coins: 10 } (Smug Coins).
 helpers.AFF = (id, n, why) => ({ add: { ['aff_' + id]: n }, run: (s, io) => { if (io && io.popup) io.popup({ type: 'aff', id, n, why }); }, _h: ['aff', id, n, why] });
 helpers.MET = (id, full) => ({ run: (s, io) => { s.names = s.names || {}; if (full && !s.names[id]) s.names[id] = full; if (io && io.popup && !s.flags['met_' + id]) io.popup({ type: 'met', id, name: full }); s.flags['met_' + id] = true; }, _h: ['met', id, full] });
 helpers.DECK = (id) => ({ run: (s, io) => { if (io && io.popup && !s.flags['deck_known_' + id]) io.popup({ type: 'deck', id }); s.flags['deck_known_' + id] = true; }, _h: ['deck', id] });
 helpers.NOTE = (id, text) => ({ run: (s) => { s.notes = s.notes || {}; const a = (s.notes[id] = s.notes[id] || []); if (a.indexOf(text) < 0) a.push(text); }, _h: ['note', id, text] });
 helpers.REL = (a, b) => ({ flag: 'rel_' + a + '_' + b, _h: ['rel', a, b] });
+helpers.DECKCOUNT = (s) => {
+  const d = s.deck || {}, R = (typeof DATA !== 'undefined' && DATA.rowan) || {}, sum = (o) => Object.values(o || {}).reduce((a, n) => a + n, 0);
+  const heroes = d.heroes ? d.heroes.length : (R.heroes || []).length;
+  const abilities = d.heroes ? d.heroes.length * 2 : (R.heroes || []).reduce((a, h) => a + (h.abilities || []).length, 0);
+  const main = d.main ? sum(d.main) : (R.main || []).reduce((a, c) => a + c.n, 0), potions = d.potions ? sum(d.potions) : (R.potions || []).reduce((a, c) => a + c.n, 0);
+  const own = s.owned || {}; let allCommon = true;
+  for (const n of Object.keys(Object.assign({}, d.main, d.potions))) { const r = own[n] || {}; if (Object.keys(r).some(k => k !== 'common' && r[k] > 0) && !(r.common >= ((d.main || {})[n] || 0) + ((d.potions || {})[n] || 0))) allCommon = false; }
+  return { heroes, abilities, main, potions, total: heroes + abilities + main + potions, allCommon, name: d.name || R.name || '' };
+};
+helpers.WORDS = (n) => { const a = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'], t = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']; if (n < 20) return a[n]; if (n < 100) return t[Math.floor(n / 10)] + (n % 10 ? '-' + a[n % 10] : ''); return String(n); };
 helpers.PHOTO = (id, subject, o) => ({ run: (s) => { o = o || {}; s.photos = s.photos || []; if (s.photos.some(p => p.id === id)) return; s.photos.push({ id, subject, who: o.who || [], off: !!o.off, day: s.day, minutes: s.minutes, place: s.location, developed: false }); }, _h: ['photo', id, subject, (o && o.off) ? 'off' : 'seen'] });

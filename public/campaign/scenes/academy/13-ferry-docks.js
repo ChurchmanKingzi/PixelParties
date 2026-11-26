@@ -2,7 +2,8 @@
 // Stand aus dem Artefakt „Academy Playtest“. Dieser Unterordner wird vom Spiel noch NICHT geladen (der Server listet nur die Dateien direkt in scenes/).
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
-const { AFF, MET, DECK, NOTE, REL, PHOTO } = helpers;
+// Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 scene("ferry_docks", {
   background: "ferry_deck",
   steps: [
@@ -818,7 +819,22 @@ scene("bungalow_seven_first", {
         {
           add: { aff_nathan: 2 }
         },
-        { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "nathan", n: 2, why: "Beat him fairly" }); } }
+        { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "nathan", n: 2, why: "Beat him fairly" }); } },
+        // Nach Rowans Sieg: ein Booster aus Moms „Freunde-finden“-Vorrat.
+        { text: "Then he plunges both arms into his duffel, rummages with the sound of a small landslide, and comes up holding a booster pack, still in its wrapper, at arm's length, like a summons." },
+        { say: "nathan", text: "\"My MOM put three of these in my bag! She said they're for MAKING FRIENDS!\" He waggles it at you. \"You beat me for my own window on day ONE! I think that's the most friends two people can be!\"", mood: "happy" },
+        { choice: [
+          { text: "\"Thanks, Nathan. Tell her it worked.\"", steps: [
+            { say: "rowan", text: "\"Thanks, Nathan. Tell her it worked.\"" },
+            { say: "nathan", text: "\"I'm TELLING her! I'm texting her RIGHT NOW!\" He is: with both thumbs, at enormous speed, reading it out loud as he goes.", mood: "laughing" },
+            { item: "Booster Pack", flag: "nathan_gave_booster" }
+          ] },
+          { text: "\"Keep it. You've already lost a window to me today.\"", steps: [
+            { say: "rowan", text: "\"Keep it. You've already lost a window to me today.\"" },
+            { say: "nathan", text: "\"That's very FAIR of you and I HATE it.\" The pack goes back into the duffel. It does not, you notice, go very far in." },
+            { flag: "nathan_gift_refused" }
+          ] }
+        ] }
       ],
       onLose: [
         { say: "nathan", text: "\"THE SEA IS MINE! I'm going to say that again! THE SEA IS MINE!\"", mood: "laughing" },
