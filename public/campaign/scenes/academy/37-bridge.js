@@ -1323,7 +1323,7 @@ scene("ferry_freya", {
       ] },
       { text: "\"Neither. I was wondering what the book is.\"", steps: [
         { say: "rowan", text: "\"Neither. I was wondering what the book is.\"" },
-        { say: "freya", alias: "Girl under a book", text: "\"A murder, in Norwegian. I know who did it. I knew on page nine.\"" },
+        { say: "freya", alias: "Girl under a book", text: "\"A murder, in the language I grew up with. I know who did it. I knew on page nine.\"" },
         { say: "freya", alias: "Girl under a book", text: "\"It is not for reading. It is a roof.\"" },
         { flag: "freya_book_told" }
       ] }
@@ -1831,7 +1831,7 @@ scene("chat_row_b2", {
             { when: (s)=>!!s.flags["freya_book_told"], say: "rowan", text: "\"And the murder?\"" },
             { when: (s)=>!!s.flags["freya_book_told"], say: "freya", text: "\"Still the one I said. I have been looking at the same sentence since lunch. It is a very good sentence; he lies in it.\"" },
             { when: (s)=>!s.flags["freya_book_told"], say: "rowan", text: "\"What is it, anyway?\"" },
-            { when: (s)=>!s.flags["freya_book_told"], say: "freya", text: "\"A murder, in Norwegian. I have been looking at the same sentence since lunch. It is a very good sentence; somebody lies in it.\"" },
+            { when: (s)=>!s.flags["freya_book_told"], say: "freya", text: "\"A murder, in the language I grew up with. I have been looking at the same sentence since lunch. It is a very good sentence; somebody lies in it.\"" },
             AFF("freya", 2, "Played along"),
             { flag: "chat_freya_1" }
           ] },

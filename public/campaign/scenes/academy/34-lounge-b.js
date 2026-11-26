@@ -599,13 +599,13 @@ scene("chat_noor", {
       ] },
       { text: "\"You read that book as if you already know it. When did you learn it?\"", when: (s)=>!s.flags["chat_noor_3"], steps: [
         { say: "rowan", text: "\"You read that book as if you already know it. When did you learn it?\"" },
-        { say: "noor", text: "\"When I was eleven. We had moved countries. I had a new language to learn, and English, and at the club on the corner they played this game.\"" },
+        { say: "noor", text: "\"When I was eleven. We had moved countries. I had two new languages to learn, and at the club on the corner they played this game.\"" },
         { say: "noor", text: "\"I learned all three in the same two years. The rules were the only one of the three that had been written down in full.\"" },
         { say: "noor", text: "\"My grandmother used to say that a promise is only as good as the person who can say what it meant. I decided to be that person. I was eleven; it seemed manageable.\"" },
         { choice: [
           { text: "\"Which of the three was hardest?\"", steps: [
             { say: "rowan", text: "\"Which of the three was hardest?\"" },
-            { say: "noor", text: "\"Dutch. It has rules and declines to follow them. I hold it against the language to this day.\"" },
+            { say: "noor", text: "\"The first of the two. It has rules and declines to follow them. I hold it against the language to this day.\"" },
             AFF("noor", 1, "Made her joke")
           ] },
           { text: "\"Is that why you finish every sentence?\"", steps: [
@@ -622,7 +622,7 @@ scene("chat_noor", {
           ] }
         ] },
         { flag: "chat_noor_3" },
-        NOTE("noor", "Moved countries at eleven. Learned a new language, English and the rules in the same two years."),
+        NOTE("noor", "Moved countries at eleven. Learned two languages and the rules in the same two years."),
         { time: 3 }
       ] },
       { text: "\"Every bench in here is three deep in bags. Why is there half a metre free on either side of you?\"", when: (s)=>!s.flags["chat_noor_x"] && (s.day===1 && s.minutes<645), steps: [

@@ -31,8 +31,8 @@ function add(lid, id, scene, extra, open) {
 const FERRY = [
   ["ferry_deck", "viktor", { spot: ["ferry", 16, 37] }], ["ferry_deck", "eberhart", { spot: ["ferry", 11, 32] }],
   ["ferry_deck", "sammy", { spot: ["ferry", 19, 33] }], ["ferry_deck", "tobias", { spot: ["ferry", 21, 32] }], ["ferry_deck", "dmitri", { spot: ["ferry", 14, 35] }],
-  ["ferry_deck", "fiona", { spot: "ferry_port_a", free: true }], ["ferry_deck", "maisie", { spot: "ferry_port_b", free: true }], ["ferry_deck", "leona", { spot: "ferry_port_c", free: true }],
-  ["ferry_stern", "hedda", { spot: "ferry_star_c", free: true }], ["ferry_stern", "freya", { spot: "ferry_star_b", free: true }], ["ferry_stern", "trixie", { spot: "ferry_star_a", free: true }],
+  ["ferry_deck", "fiona", { spot: ["ferry", 10, 31], free: true }], ["ferry_deck", "maisie", { spot: ["ferry", 10, 33], free: true }], ["ferry_deck", "leona", { spot: ["ferry", 9, 28], free: true }],
+  ["ferry_stern", "hedda", { spot: ["ferry", 23, 27], free: true }], ["ferry_stern", "freya", { spot: ["ferry", 21, 30], free: true }], ["ferry_stern", "trixie", { spot: ["ferry", 22, 32], free: true }],
   ["ferry_lounge", "anni", {}], ["ferry_lounge", "junho", {}], ["ferry_lounge", "eloise", {}],
   ["ferry_stern", "cas", { spot: ["ferry", 16, 6] }], ["ferry_stern", "rafa", { spot: ["ferry", 21, 11] }],
 ];
@@ -44,9 +44,9 @@ for (const o of (L.ferry_lounge.objects || []).filter(o => o.sprite === "inya").
   const w = o.when; L.ferry_deck.objects.push(Object.assign(o, { id: o.id + "_deck", spot: ["ferry", 13, 30], free: true, alert: undefined, when: (s) => { const lounge = Object.assign({}, s, { eventsDone: {}, flags: Object.assign({}, s.flags, { ferry_inya_lost: false }) }); return w(lounge) && inyaOut(s); } }));
 }
 // Die schon gesetzten Figuren der Decks bekommen feste Plätze (bisher drängten sie sich alle um die Tür zur Lounge).
-const STAND = { ed: ["ferry", 19, 36], georgie: ["ferry", 18, 35], branden: ["ferry", 14, 33], pippa: ["ferry", 20, 35], mikoto: ["ferry", 10, 31],
+const STAND = { abel: ["ferry", 21, 27], teobalt: ["ferry", 19, 27], rana: ["ferry", 11, 27], ed: ["ferry", 19, 36], georgie: ["ferry", 18, 35], branden: ["ferry", 14, 33], pippa: ["ferry", 20, 35], mikoto: ["ferry", 10, 31],
   jessica: ["ferry", 12, 9], ashton: ["ferry", 20, 9], victoria: ["ferry", 20, 6], sunny: ["ferry", 17, 5], freddie: ["ferry", 14, 5], marit: ["ferry", 11, 6] };
-for (const lid of ["ferry_deck", "ferry_stern"]) for (const o of L[lid].objects || []) if (STAND[o.sprite] && !o.spot) o.spot = STAND[o.sprite];
+for (const lid of ["ferry_deck", "ferry_stern", "ferry_bridge"]) for (const o of L[lid].objects || []) if (STAND[o.sprite] && !o.spot) o.spot = STAND[o.sprite];
 
 // ── Insel, Tag 1 ──
 const ROW = "commons_beach";

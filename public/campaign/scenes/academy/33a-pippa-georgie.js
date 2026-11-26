@@ -462,7 +462,7 @@ scene("chat_georgie", {
       { text: "Ask about the workbook she was half sitting on.", when: (s)=>!s.flags["chat_georgie_3"], steps: [
         { say: "rowan", text: "\"You were sitting on a book. Is it in trouble?\"" },
         { text: "She pulls it out from under her knee. It is a school workbook with a cheerful cartoon croissant on the cover. Somebody has given the croissant a dragon's tail in biro." },
-        { say: "georgie", text: "\"French. I do ordinary school by post, in the evenings. I'm three units behind. The verbs are horrible.\"" },
+        { say: "georgie", text: "\"Languages. I do ordinary school by post, in the evenings. I'm three units behind. The verbs are horrible.\"" },
         { choice: [
           { text: "\"Mine was worse. I took it for one term.\"", steps: [
             { say: "rowan", text: "\"Mine was worse. I took it for one term.\"" },
@@ -483,7 +483,7 @@ scene("chat_georgie", {
           ] }
         ] },
         { flag: "chat_georgie_3" },
-        NOTE("georgie", "Does ordinary school by post, in the evenings, and is behind in French."),
+        NOTE("georgie", "Does ordinary school by post, in the evenings, and is behind in languages."),
         { time: 3 }
       ] },
       { text: "\"You've done all this before. Halls, finals. What's the best part of a tournament?\"", when: (s)=>!s.flags["chat_georgie_x"]&&(!!s.flags["georgie_said_titles"]||!!s.flags["chat_georgie_1"]), steps: [
