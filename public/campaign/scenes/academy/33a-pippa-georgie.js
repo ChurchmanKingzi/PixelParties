@@ -77,7 +77,7 @@ scene("ferry_pippa_georgie", {
         AFF("pippa", 1, "Held still for her")
       ] }
     ] },
-    { say: "pippa", alias: "Girl with a camera", text: "\"She stands, lets the camera drop on its strap and looks at you without a lens in the way, one eye still half shut out of habit. 'Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.'\"" },
+    { say: "pippa", alias: "Girl with a camera", text: "She stands, lets the camera drop on its strap and looks at you without a lens in the way, one eye still half shut out of habit. \"Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.\"" },
     MET("pippa", "Pippa Lund"),
     { say: "rowan", text: "\"Rowan.\"" },
     { say: "pippa", text: "\"And that's Georgie Santa. She's fourteen.\" Quite gently. \"She's allowed to sit on the rope. I've told her. She doesn't believe me.\"" },
@@ -134,7 +134,7 @@ scene("ferry_pippa_georgie", {
     { say: "pippa", text: "\"Slower! It's all blur, I can't —\"" },
     PHOTO("georgie_hands", "Georgie's hands shuffling, eight riffles, Ember at her elbow (no face)", { who: ["georgie"] }),
     { say: "georgie", text: "\"Slower clumps.\" Clipped, flat, nothing in it but fact. \"Eight riffles. Seven is for fifty-two cards; mine has more. Fewer and it isn't shuffled. It's a pattern you haven't found yet.\"" },
-    { say: "georgie", text: "\"She squares the deck with one tap and looks up, straight at you, for the first time. 'You've got a deck in that pocket. You keep touching it. Do you do eight?'\"" },
+    { say: "georgie", text: "She squares the deck with one tap and looks up, straight at you, for the first time. \"You've got a deck in that pocket. You keep touching it. Do you do eight?\"" },
     { choice: [
       { text: "\"I've never shuffled for a real game in my life. Online, the computer does it.\"", steps: [
         { say: "rowan", text: "\"I've never shuffled for a real game in my life. Online, the computer does it.\"" },

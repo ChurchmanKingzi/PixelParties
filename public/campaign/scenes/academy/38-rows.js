@@ -152,7 +152,7 @@ scene("chat_maisie_ferry", {
         { text: "Her hands stop moving. It is the first time you have seen them do that." },
         { say: "maisie", text: "\"Oh, now. You've seen a holo-table going? On a screen, even?\"" },
         { say: "rowan", text: "\"On streams.\"" },
-        { say: "maisie", text: "\"Right. So the monster comes up, and the monster's flat. It flickers. Walk round the side and there's nowt there. Every hologram I've ever seen is a lantern slide with ambitions.\"" },
+        { say: "maisie", text: "\"Right. So the Hero comes up, and the Hero's flat. It flickers. Walk round the side and there's nowt there. Every hologram I've ever seen is a lantern slide with ambitions.\"" },
         { say: "maisie", text: "\"I want one you can shake hands with.\" Slowly, as if the words might spill." },
         { choice: [
           { text: "\"Solid light? Is that even possible?\"", steps: [

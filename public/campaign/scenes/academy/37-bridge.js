@@ -668,14 +668,14 @@ scene("answer_rana", {
     { choice: [
       { text: "Say what you know about the deck, quietly.", hint: "You know these cards", steps: [
         { text: "You say nothing for a moment. Then, so low that she may not be meant to hear:" },
-        { say: "rowan", text: "\"…Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill. Bee, Centipede, Rhinoceros, Scarab. Each one waits for exactly one thing. Bakhm hits for every trap that fires. Paid for by deleting the matching artifact.\" A breath. \"Troop Annihilation refills them. Nobody plays it like that.\"" },
+        { say: "rowan", text: "\"…Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill. Bee, Centipede, Rhinoceros, Scarab. Each one waits for exactly one thing. Bakhm hits for every Surprise that fires. Paid for by deleting the matching artifact.\" A breath. \"Troop Annihilation refills them. Nobody plays it like that.\"" },
         { say: "rana", text: "\"…You read the names.\" Under her breath. \"Nobody reads the names.\"" },
         AFF("rana", 2, "Read the names")
       ] },
       { text: "\"It sounds interesting to me. Which one do people walk into most?\"", steps: [
         { say: "rowan", text: "\"It sounds interesting to me. Which one do people walk into most?\"" },
         { say: "rana", text: "\"ANTS.\" No pause at all. \"It punishes damage that doesn't kill, and nobody can stand not attacking. Then LADYBUG, because it cancels an Ability and everybody thinks theirs is special.\"" },
-        { say: "rowan", text: "\"And Cybug LOCUST copies whatever you attach to my hero. Bakhm hits for every trap that fires. Troop Annihilation refills them.\" A breath. \"Nobody plays it like that.\"" },
+        { say: "rowan", text: "\"And Cybug LOCUST copies whatever you attach to my hero. Bakhm hits for every Surprise that fires. Troop Annihilation refills them.\" A breath. \"Nobody plays it like that.\"" },
         { say: "rana", text: "\"…You read the names.\" Under her breath. \"Nobody reads the names.\"" },
         AFF("rana", 1, "Asked the right question")
       ] }

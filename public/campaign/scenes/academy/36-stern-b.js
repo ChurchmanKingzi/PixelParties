@@ -728,8 +728,8 @@ scene("deck_marit", {
     { say: "rowan", text: "\"…Cute Bird in front. It dies, she discards two, a Phoenix comes off the deck. Cats mill three. Dog comes back out of the pile. Skull Necklace pays on the way down. Glass of Marbles. Gravedigger Slap for every differently named creature in the pile.\" A breath. \"Right. *Right.*\"" },
     { say: "marit", text: "\"Is he — is he doing a *monologue?* He's doing a **monologue!** About *my deck!*\"" },
     { choice: [
-      { text: "\"Sorry. Sorry. The pile's the engine, not the graveyard. That's all.\"", steps: [
-        { say: "rowan", text: "\"Sorry. Sorry. The pile's the engine, not the graveyard. That's all.\"" },
+      { text: "\"Sorry. Sorry. The discard pile's the engine, not the bin. That's all.\"", steps: [
+        { say: "rowan", text: "\"Sorry. Sorry. The discard pile's the engine, not the bin. That's all.\"" },
         { say: "marit", text: "\"It is the **SECOND ACT!** *Thank* you!\"" }
       ] },
       { text: "\"It takes the whole game to arrive. Don't you ever want something faster?\"", steps: [

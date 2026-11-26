@@ -1061,7 +1061,7 @@ scene("deck_georgie", {
       ] }
     ] },
     { text: "Rowan has gone very still. When he speaks it is to the middle distance, soft and fast." },
-    { say: "rowan", text: "\"…Icy, Flaming, Shimmering eggs. Free, one health. Worthless unless they break on your own turn. Sacrifice them into Green Dragoneer. Every sacrifice-summon, Rubin fires a Destruction spell on top. Black-Thorn Dragon, and neither can be touched by spells. Luna turns burns into cards.\" A breath. \"Tight. Never wastes a trigger.\"" },
+    { say: "rowan", text: "\"…Icy, Flaming, Shimmering eggs. Free, 1 HP. Worthless unless they break on your own turn. Sacrifice them into Green Dragoneer. Every sacrifice-summon, Rubin fires a Destruction spell on top. Black-Thorn Dragon, and neither can be touched by spells. Luna turns burns into cards.\" A breath. \"Tight. Never wastes a trigger.\"" },
     { say: "georgie", text: "\"You — you know the *order*.\"" },
     { text: "She has gone pink to the ears." },
     { say: "georgie", text: "\"Nobody knows the order.\"" },
@@ -1272,7 +1272,7 @@ scene("chat_viktor", {
         { when: (s)=>!!s.flags["viktor_said_deck"], say: "rowan", text: "\"That deck under the rope. What's in it?\"" },
         { say: "viktor", text: "\"Sand.\"" },
         { text: "He lets the word sit there for a while, as if it covered everything." },
-        { say: "viktor", text: "\"Mummies. Traps. A camel. Things that were buried, mostly. I didn't build it. I collected it. I can tell you where I got every card.\"" },
+        { say: "viktor", text: "\"Mummies. Curses. A camel. Things that were buried, mostly. I didn't build it. I collected it. I can tell you where I got every card.\"" },
         { choice: [
           { text: "\"Where did you get the camel?\"", steps: [
             { say: "rowan", text: "\"Where did you get the camel?\"" },
