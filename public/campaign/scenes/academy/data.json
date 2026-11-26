@@ -2612,7 +2612,7 @@
   "freya": {
    "name": "Freya Nordlicht",
    "first": "Freya",
-   "romance": true,
+   "romance": false,
    "deck": {
     "name": "Glacier",
     "heroes": [
