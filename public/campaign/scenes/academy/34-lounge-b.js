@@ -17,12 +17,12 @@ scene("ferry_magnus", {
         { say: "rowan", text: "\"You've looked at me twice now. Do we know each other? I'm Rowan.\"" },
         { say: "magnus", alias: "Boy with a tablet", text: "\"Six.\" He does not look up. \"You're five. Were five. The ladder froze on the day of the Qualifier.\"" },
         { say: "rowan", text: "\"…I'm sorry — what?\"" },
-        { text: "He turns the tablet round. Half the screen is this morning's games in a hand-ruled grid. The other half is the online ladder, top ten. The fifth row has been marked in red. Fifth: Best_Tarleinn_NA. Sixth: Prospero_GG." },
+        { text: "He turns the tablet round. Half the screen is this morning's games in a hand-ruled grid. The other half is the online ladder, top ten. The fifth row has been marked in red. Fifth: Best_Tarleinn. Sixth: Prospero_GG." },
         { think: "That's my handle. That's me, in red." }
       ] },
       { text: "Look at what is on the tablet.", steps: [
         { text: "You tilt your head. Half the screen is this morning's games in a hand-ruled grid. The other half is the online ladder, top ten, and the fifth row has been marked in red." },
-        { think: "Best_Tarleinn_NA. That's — that's me." },
+        { think: "Best_Tarleinn. That's — that's me." },
         { say: "rowan", text: "\"That's my handle. The red one.\"" },
         { text: "His head comes up so fast that the stylus drops out of his mouth. He catches it without looking, which he has clearly done before." },
         { say: "magnus", alias: "Boy with a tablet", text: "\"*Finally.*\"" },
@@ -34,7 +34,7 @@ scene("ferry_magnus", {
         { say: "rowan", text: "\"Who's winning over there? You seem to be the only one keeping score.\"" },
         { say: "magnus", alias: "Boy with a tablet", text: "\"The gloves. Three games, three wins, eleven point three turns a game.\" The thumb stops. \"You'd know that if you kept a log. You don't keep a log. You never have.\"" },
         { say: "rowan", text: "\"Have we met?\"" },
-        { say: "magnus", alias: "Boy with a tablet", text: "\"Forty-one times.\" He turns the tablet round. Beside the morning's games is the online ladder, top ten, the fifth row marked in red. Fifth: Best_Tarleinn_NA. Sixth: Prospero_GG." },
+        { say: "magnus", alias: "Boy with a tablet", text: "\"Forty-one times.\" He turns the tablet round. Beside the morning's games is the online ladder, top ten, the fifth row marked in red. Fifth: Best_Tarleinn. Sixth: Prospero_GG." },
         { think: "That's my handle. That's me, in red." }
       ] },
       { text: "Leave him to his tablet.", steps: [
@@ -599,7 +599,7 @@ scene("chat_noor", {
       ] },
       { text: "\"You read that book as if you already know it. When did you learn it?\"", when: (s)=>!s.flags["chat_noor_3"], steps: [
         { say: "rowan", text: "\"You read that book as if you already know it. When did you learn it?\"" },
-        { say: "noor", text: "\"In Rotterdam, when I was eleven. We had moved from Alexandria. I had Dutch to learn, and English, and at the club on the corner they played this game.\"" },
+        { say: "noor", text: "\"When I was eleven. We had moved countries. I had a new language to learn, and English, and at the club on the corner they played this game.\"" },
         { say: "noor", text: "\"I learned all three in the same two years. The rules were the only one of the three that had been written down in full.\"" },
         { say: "noor", text: "\"My grandmother used to say that a promise is only as good as the person who can say what it meant. I decided to be that person. I was eleven; it seemed manageable.\"" },
         { choice: [
@@ -622,7 +622,7 @@ scene("chat_noor", {
           ] }
         ] },
         { flag: "chat_noor_3" },
-        NOTE("noor", "From Alexandria by way of Rotterdam. Learned Dutch, English and the rules in the same two years."),
+        NOTE("noor", "Moved countries at eleven. Learned a new language, English and the rules in the same two years."),
         { time: 3 }
       ] },
       { text: "\"Every bench in here is three deep in bags. Why is there half a metre free on either side of you?\"", when: (s)=>!s.flags["chat_noor_x"] && (s.day===1 && s.minutes<645), steps: [
@@ -1252,7 +1252,7 @@ scene("chat_junho", {
         { say: "rowan", text: "\"Do you hand a note to everyone you've just met?\"" },
         { say: "junho", text: "\"Yes.\"" },
         { say: "junho", text: "\"It is the kindest thing I know how to do. It means somebody has looked at you closely enough to find the one thing that is off. Nobody does that for a stranger. So I do.\"" },
-        { say: "junho", text: "\"My mother runs a cram school in Seoul. Report cards were read aloud at dinner. All of them, the good lines as well. People leave that part out when they retell it.\"" },
+        { say: "junho", text: "\"My mother runs a cram school, back home. Report cards were read aloud at dinner. All of them, the good lines as well. People leave that part out when they retell it.\"" },
         { choice: [
           { text: "\"And did it feel kind? At dinner?\"", steps: [
             { say: "rowan", text: "\"And did it feel kind? At dinner?\"" },
@@ -1277,7 +1277,7 @@ scene("chat_junho", {
           ] }
         ] },
         { flag: "chat_junho_2" },
-        NOTE("junho", "Believes a specific note is the kindest thing one person can give another. His mother runs a cram school in Seoul."),
+        NOTE("junho", "Believes a specific note is the kindest thing one person can give another. His mother runs a cram school back home."),
         { time: 3 }
       ] },
       { text: "\"Room one-oh-two. Do you know who you're sharing with?\"", when: (s)=>!s.flags["chat_junho_3"], steps: [
@@ -1459,7 +1459,7 @@ scene("chat_eloise", {
       { text: "\"That sketchbook doesn't fit the bench. Don't they make smaller ones?\"", when: (s)=>!s.flags["chat_eloise_2"], steps: [
         { say: "rowan", text: "\"That sketchbook doesn't fit the bench. Don't they make smaller ones?\"" },
         { say: "eloise", text: "\"They do. I can't see anything in them.\"" },
-        { say: "eloise", text: "\"My grandmother painted shop signs, and my mama paints carnival floats. New Orleans. I learned on things you're meant to read from across the street with a crowd in the way.\"" },
+        { say: "eloise", text: "\"My grandmother painted shop signs, and my mama paints carnival floats. Back home the whole city is a carnival twice a year. I learned on things you're meant to read from across the street with a crowd in the way.\"" },
         { say: "eloise", text: "\"Small is hard. Small is what I came for.\"" },
         { choice: [
           { text: "\"You came here for small?\"", steps: [
@@ -1482,7 +1482,7 @@ scene("chat_eloise", {
           ] }
         ] },
         { flag: "chat_eloise_2" },
-        NOTE("eloise", "From New Orleans: her mother paints carnival floats, her grandmother painted shop signs. Came to learn to paint small."),
+        NOTE("eloise", "From a carnival city: her mother paints carnival floats, her grandmother painted shop signs. Came to learn to paint small."),
         { time: 3 }
       ] },
       { text: "\"Your room's written on your hand. Is that so it can't get lost?\"", when: (s)=>!s.flags["chat_eloise_3"], steps: [

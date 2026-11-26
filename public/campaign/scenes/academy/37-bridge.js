@@ -1403,7 +1403,7 @@ scene("chat_freya_ferry", {
         { say: "freya", text: "\"It is nineteen degrees, and the morning is not half done. Somebody should be told.\"" },
         { say: "rowan", text: "\"Nineteen's mild.\"" },
         { say: "freya", text: "\"Where I am from, nineteen is a headline.\"" },
-        { say: "freya", text: "\"Longyearbyen. Svalbard. There is a rifle by every door, for the bears. Here I am told that the most dangerous animal is a gull.\"" },
+        { say: "freya", text: "\"An island further north than you are thinking. There is a rifle by every door, for the bears. Here I am told that the most dangerous animal is a gull.\"" },
         { choice: [
           { text: "\"Then why come somewhere this warm?\"", steps: [
             { say: "rowan", text: "\"Then why come somewhere this warm?\"" },
@@ -1420,7 +1420,7 @@ scene("chat_freya_ferry", {
         ] },
         AFF("freya", 2, "Asked about the north"),
         { flag: "chat_freya_ferry_1" },
-        NOTE("freya", "From Longyearbyen, on Svalbard: a rifle by every door, for the bears. Finds nineteen degrees far too warm."),
+        NOTE("freya", "From an island in the far north: a rifle by every door, for the bears. Finds nineteen degrees far too warm."),
         { time: 3 }
       ] },
       { text: "\"You've been under that book a good while. Missed anything?\"", when: (s)=>!s.flags["chat_freya_ferry_2"], steps: [
@@ -1876,7 +1876,7 @@ scene("chat_row_b2", {
           ] },
           { text: "\"Do you keep bees at home?\"", when: (s)=>!s.flags["chat_trixie_2"], steps: [
             { say: "rowan", text: "\"Do you keep bees at home?\"" },
-            { say: "trixie", text: "\"My dad does! Edge of Dartmoor! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home.\" She rattles it off without drawing breath." },
+            { say: "trixie", text: "\"My dad does! Edge of the moor! Forty hives on a hillside, and a bee hotel under the eaves, which is for the ones with no home.\" She rattles it off without drawing breath." },
             { say: "trixie", text: "\"I say good morning to the bees and they say it back. Mostly. In their own way.\"" },
             { say: "trixie", text: "\"It's too quiet here without a hive. I'm going to put a hotel under the bungalow roof. If you've got a spare plank, I'll love you forever.\"" },
             { choice: [

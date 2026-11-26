@@ -88,12 +88,12 @@ scene("ferry_jessica", {
         AFF("jessica", 2, "Let the silence sit")
       ] }
     ] },
-    { when: (s)=>!s.flags["met_ashton"], say: "jessica", text: "\"That is Ashton Beaumont-Lyle. You will hear this by luncheon from somebody less accurate, so I prefer to be the source: we were one London season, last spring. I ended it by letter.\"" },
-    { when: (s)=>!!s.flags["met_ashton"], say: "jessica", text: "\"You have met Mr Beaumont-Lyle; I saw you at the rail. You will hear this by luncheon from somebody less accurate, so I prefer to be the source: we were one London season, last spring. I ended it by letter.\"" },
+    { when: (s)=>!s.flags["met_ashton"], say: "jessica", text: "\"That is Ashton Beaumont-Lyle. You will hear this by luncheon from somebody less accurate, so I prefer to be the source: we were one season in the city, last spring. I ended it by letter.\"" },
+    { when: (s)=>!!s.flags["met_ashton"], say: "jessica", text: "\"You have met Mr Beaumont-Lyle; I saw you at the rail. You will hear this by luncheon from somebody less accurate, so I prefer to be the source: we were one season in the city, last spring. I ended it by letter.\"" },
     { say: "jessica", text: "\"It was a very good letter.\" A pause. \"He is not a bad man. He is a rehearsed one. I should like to know what he says when the script runs out, and I am no longer the person to find out.\"" },
     { flag: "jessica_ex_known" },
     REL("ashton", "jessica"),
-    NOTE("jessica", "She and Ashton Beaumont-Lyle were together for one London season. She says she ended it by letter."),
+    NOTE("jessica", "She and Ashton Beaumont-Lyle were together for one season in the city. She says she ended it by letter."),
     { choice: [
       { text: "\"And now you're both on the same boat.\"", steps: [
         { say: "rowan", text: "\"And now you're both on the same boat.\"" },
@@ -465,8 +465,8 @@ scene("ferry_ashton", {
         { say: "ashton", text: "\"Two ladies have, this morning, and with admirable aim. You're quite right. By that measure I am positively encouraged.\"" },
         AFF("ashton", 1, "Made him laugh")
       ] },
-      { text: "\"She told me about the London season. And the letter.\"", hint: "From Jessica", when: (s)=>!!s.flags["jessica_ex_known"], steps: [
-        { say: "rowan", text: "\"She told me about the London season. And the letter.\"" },
+      { text: "\"She told me about the season in the city. And the letter.\"", hint: "From Jessica", when: (s)=>!!s.flags["jessica_ex_known"], steps: [
+        { say: "rowan", text: "\"She told me about the season in the city. And the letter.\"" },
         { text: "The rose stops turning." },
         { say: "ashton", text: "\"Did she.\" A beat, and then the drawl is back in place. \"Then you have the abridged edition. In the full text, *I* ended it. The letter was a formality. One of us had to put it in writing, and she has the better hand.\"" },
         { text: "His free hand goes, briefly, to his inside pocket, and comes away again." },
@@ -649,9 +649,9 @@ scene("chat_ashton", {
         { say: "rowan", text: "\"Why her? She's barely looked at you.\"" },
         { say: "ashton", text: "\"No.\"" },
         { text: "He does not seem to mind, for once." },
-        { when: (s)=>!s.flags["ashton_says_ended"] && !s.flags["jessica_ex_known"], say: "ashton", text: "\"I ought to say that we are not strangers. Jessica Montclair. One London season, last spring. I ended it. There was a letter; these things want a letter.\"" },
+        { when: (s)=>!s.flags["ashton_says_ended"] && !s.flags["jessica_ex_known"], say: "ashton", text: "\"I ought to say that we are not strangers. Jessica Montclair. One season in the city, last spring. I ended it. There was a letter; these things want a letter.\"" },
         { when: (s)=>!!s.flags["ashton_says_ended"], say: "ashton", text: "\"You know the history. One season, one letter, and I ended it.\"" },
-        { when: (s)=>!s.flags["ashton_says_ended"] && !!s.flags["jessica_ex_known"], say: "ashton", text: "\"You know the history, I gather. I watched you cross to her, and she does like to be the source. One London season, one letter. And *I* ended it, whatever you may have been told.\"" },
+        { when: (s)=>!s.flags["ashton_says_ended"] && !!s.flags["jessica_ex_known"], say: "ashton", text: "\"You know the history, I gather. I watched you cross to her, and she does like to be the source. One season in the city, one letter. And *I* ended it, whatever you may have been told.\"" },
         { flag: "ashton_says_ended" },
         REL("ashton", "jessica"),
         { say: "ashton", text: "\"Everybody else says yes by the second sentence, you see. She said yes once, and then she *thought* about it. Nobody had ever thought about it before.\"" },
@@ -681,7 +681,7 @@ scene("chat_ashton", {
         { say: "rowan", text: "\"The joke about gulls. From the speech. Let's hear it.\"" },
         { say: "ashton", text: "\"Ah. You *were* listening.\"" },
         { text: "He clears his throat with enormous ceremony." },
-        { say: "ashton", text: "\"Why did the gull cross the Atlantic?\"" },
+        { say: "ashton", text: "\"Why did the gull cross the ocean?\"" },
         { say: "rowan", text: "\"I don't know. Why?\"" },
         { say: "ashton", text: "\"To get to the other tide.\"" },
         { text: "A long, appalled silence. Overhead, a gull says something short." },
@@ -1211,8 +1211,8 @@ scene("ferry_cas", {
     { say: "cas", text: "\"Then she said his first name. Nobody had told it to her. Unforced error from Abernathy: these two have history, and he has been calling it as a cold open.\"" },
     { flag: "cas_said_history" },
     { choice: [
-      { text: "\"One London season, last spring. It ended by letter.\"", hint: "From the players", when: (s)=>!!s.flags["jessica_ex_known"] || !!s.flags["ashton_says_ended"], steps: [
-        { say: "rowan", text: "\"One London season, last spring. It ended by letter.\"" },
+      { text: "\"One season in the city, last spring. It ended by letter.\"", hint: "From the players", when: (s)=>!!s.flags["jessica_ex_known"] || !!s.flags["ashton_says_ended"], steps: [
+        { say: "rowan", text: "\"One season in the city, last spring. It ended by letter.\"" },
         { text: "The open hand stops in mid-air." },
         { say: "cas", text: "\"…And the newcomer has *sources*. A full season and a letter, and the commentary box had it down as two strangers and a florist.\"" },
         { say: "cas", text: "\"I shan't put it out on air. That's theirs. But thank you; I'd rather be corrected than fluent.\"" },
@@ -1312,7 +1312,7 @@ scene("chat_cas", {
       ] },
       { text: "\"A following wind, conditions good. Do you know boats, or was that just colour?\"", when: (s)=>!s.flags["chat_cas_2"], steps: [
         { say: "rowan", text: "\"A following wind, conditions good. Do you know boats, or was that just colour?\"" },
-        { say: "cas", text: "\"That was not colour, I'll have you know. I grew up at a lock on the Thames. My father keeps it. Everything that goes up or down that river goes through our front garden at walking pace.\"" },
+        { say: "cas", text: "\"That was not colour, I'll have you know. I grew up at a lock on a big river. My father keeps it. Everything that goes up or down that river goes through our front garden at walking pace.\"" },
         { say: "cas", text: "\"I started calling them when I was six. Sat on the gate. 'And here's the *Margaret Rose*, coming in a little wide—'\"" },
         { choice: [
           { text: "\"Who was listening?\"", steps: [
@@ -1329,7 +1329,7 @@ scene("chat_cas", {
         ] },
         { say: "cas", text: "\"My deck's boats as well. A regatta. Nobody dies. Somebody wins a little cup. I think there should be more of that.\"" },
         { flag: "chat_cas_2" },
-        NOTE("cas", "Grew up at a lock on the Thames and has called the boats through since he was six. Plays a boat-race deck."),
+        NOTE("cas", "Grew up at a lock on a big river and has called the boats through since he was six. Plays a boat-race deck."),
         { time: 3 }
       ] },
       { text: "\"Room 103, you said. Who are you sharing with?\"", when: (s)=>!s.flags["chat_cas_3"], steps: [

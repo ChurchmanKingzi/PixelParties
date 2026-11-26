@@ -1334,12 +1334,12 @@ scene("chat_rafa", {
             { say: "rafa", text: "\"Missing home. Nothing grows for that.\" Easily, as a fact about gardening. \"For that you cook what your aunt cooked, and you eat it standing up.\"" }
           ] }
         ] },
-        { say: "rafa", text: "\"Aunty's place is in Houston. I grew up over it — born in Lagos, raised on the smell coming up through the floor. You learn what time it is by what's frying.\"" },
+        { say: "rafa", text: "\"Aunty's place is in a port city a long way from here. I grew up over it — born somewhere else again, raised on the smell coming up through the floor. You learn what time it is by what's frying.\"" },
         { say: "rowan", text: "\"What time is it now?\"" },
         { say: "rafa", text: "\"On this boat?\" He sniffs. \"Diesel and yesterday's cinnamon rolls. That is no time at all. That's why I had to do something.\"" },
         AFF("rafa", 2, "Asked what he was chewing"),
         { flag: "chat_rafa_2" },
-        NOTE("rafa", "Born in Lagos, raised over his aunt's restaurant in Houston. Always chewing something, and knows what it is good for."),
+        NOTE("rafa", "Born far from here, raised over his aunt's restaurant in a big port city. Always chewing something, and knows what it is good for."),
         { time: 3 }
       ] },
       { text: "\"Red jacket. Competitive Play. And you spent the crossing in a galley.\"", when: (s)=>!s.flags["chat_rafa_3"], steps: [

@@ -627,11 +627,11 @@ scene("chat_pippa", {
         { choice: [
           { text: "\"Since this morning is quick, for a sister.\"", steps: [
             { say: "rowan", text: "\"Since this morning is quick, for a sister.\"" },
-            { say: "pippa", text: "\"I've had practice. Three little brothers, at home in Aarhus. You learn to spot the one who hasn't eaten and isn't going to say.\"" }
+            { say: "pippa", text: "\"I've had practice. Three little brothers, at home. You learn to spot the one who hasn't eaten and isn't going to say.\"" }
           ] },
           { text: "\"Does she get a vote?\"", steps: [
             { say: "rowan", text: "\"Does she get a vote?\"" },
-            { say: "pippa", text: "\"No! That's the entire point of an older sister. Ask my brothers. There are three of them, in Aarhus, and not one has ever had a vote.\"" }
+            { say: "pippa", text: "\"No! That's the entire point of an older sister. Ask my brothers. There are three of them, at home, and not one has ever had a vote.\"" }
           ] }
         ] },
         { text: "She winds the film on a notch with her thumb, which she does not need to do." },
@@ -656,7 +656,7 @@ scene("chat_pippa", {
         { flag: "pippa_said_brothers" },
         REL("pippa", "georgie"),
         NOTE("pippa", "Has appointed herself Georgie's older sister, and keeps bread rolls in her pockets for her."),
-        NOTE("pippa", "Has three younger brothers at home in Aarhus."),
+        NOTE("pippa", "Has three younger brothers at home."),
         { time: 2 }
       ] },
       { text: "\"Thirty-four frames on that roll, and not one of them is you. Is there a picture of you anywhere?\"", when: (s)=>!s.flags["chat_pippa_3"], steps: [

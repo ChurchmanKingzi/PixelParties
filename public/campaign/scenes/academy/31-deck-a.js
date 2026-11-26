@@ -1245,7 +1245,7 @@ scene("chat_viktor", {
     { choice: [
       { text: "\"The rope, the compass, the boots. You didn't learn any of that at a card table.\"", when: (s)=>!s.flags["chat_viktor_1"], steps: [
         { say: "rowan", text: "\"The rope, the compass, the boots. You didn't learn any of that at a card table.\"" },
-        { say: "viktor", text: "\"Greenland. Then Jordan. Survey crews.\"" },
+        { say: "viktor", text: "\"Ice, one year. Then desert. Survey crews.\"" },
         { say: "viktor", text: "\"You carry poles for people with degrees. You learn where not to put your feet.\"" },
         { choice: [
           { text: "\"Ice, and then desert. That's an odd pair.\"", steps: [
@@ -1264,7 +1264,7 @@ scene("chat_viktor", {
           ] }
         ] },
         { flag: "chat_viktor_1" },
-        NOTE("viktor", "Worked on survey crews in Greenland and Jordan before he came to the Academy."),
+        NOTE("viktor", "Worked on survey crews in ice and in desert before he came to the Academy."),
         { time: 3 }
       ] },
       { text: "\"And the cards? You must have a deck somewhere.\"", when: (s)=>!s.flags["chat_viktor_2"], steps: [

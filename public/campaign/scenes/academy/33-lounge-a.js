@@ -1385,7 +1385,7 @@ scene("chat_anni", {
       { text: "\"Why write it all down? Who is going to read it?\"", when: (s)=>!s.flags["chat_anni_1"], steps: [
         { say: "rowan", text: "\"Why write it all down? Who is going to read it?\"" },
         { say: "anni", text: "\"Because otherwise the only account of a room is the one given by whoever was most at ease in it.\"" },
-        { say: "anni", text: "\"My father is a customs officer. In Lübeck. I grew up at a table where the conversation was who had tried to bring what past him that day, and how pleasant they had been about it.\"" },
+        { say: "anni", text: "\"My father is a customs officer. At a port. I grew up at a table where the conversation was who had tried to bring what past him that day, and how pleasant they had been about it.\"" },
         { say: "anni", text: "\"The pleasant ones were always the worst. That was the entire lesson. Rules are how people who are not charming are protected from people who are.\"" },
         { choice: [
           { text: "\"What was the best thing anybody tried to get past him?\"", steps: [
@@ -1410,7 +1410,7 @@ scene("chat_anni", {
           ] }
         ] },
         { flag: "chat_anni_1" },
-        NOTE("anni", "Her father is a customs officer in Lübeck. She believes rules protect plain people from charming ones."),
+        NOTE("anni", "Her father is a customs officer at a port. She believes rules protect plain people from charming ones."),
         { time: 2 },
       ] },
       { text: "\"What is that booklet, exactly? You've hardly looked up from it.\"", when: (s)=>!s.flags["chat_anni_2"], steps: [
@@ -2370,7 +2370,7 @@ scene("inya_rolls", {
     { text: "Flat, brisk, the tone other people keep for tax law." },
     {
       say: "inya",
-      text: "\"Holland Lop: ears hang, face is a brick. Mini Rex: ears stand, coat's like velvet. Flemish Giant: it isn't the ears at all, it's that you can't lift it. I've had rabbits since I was five.\""
+      text: "\"Mini Lop: ears hang, face is a brick. Mini Rex: ears stand, coat's like velvet. Flemish Giant: it isn't the ears at all, it's that you can't lift it. I've had rabbits since I was five.\""
     },
     { say: "rowan", text: "\"I thought you said no rabbits during icing.\"" },
     { say: "inya", text: "\"That was a rule for *you*.\"" },

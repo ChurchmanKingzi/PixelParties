@@ -128,7 +128,7 @@ scene("chat_maisie_ferry", {
             { say: "maisie", text: "\"Off a hook in a shed, when nobody's looking. Then you get told off, and then you get given 'em, because it's cheaper than a new pair of eyes.\"" }
           ] }
         ] },
-        { say: "maisie", text: "\"Me dad's got a scrapyard. Sheffield. Dead tellies up to the roof, it was the best place in the world to be small in.\"" },
+        { say: "maisie", text: "\"Me dad's got a scrapyard. Up north, where it rains sideways. Dead tellies up to the roof, it was the best place in the world to be small in.\"" },
         { say: "maisie", text: "\"First thing I ever built was a projector. Car headlamp, biscuit tin, a lens out of some old feller's glasses. Threw a picture of our dog on the side of a van, big as a house.\"" },
         { choice: [
           { text: "\"Did it work?\"", steps: [
@@ -143,7 +143,7 @@ scene("chat_maisie_ferry", {
           ] }
         ] },
         AFF("maisie", 2, "Asked about the goggles"),
-        NOTE("maisie", "Grew up in her father's scrapyard in Sheffield and built her first projector from a car headlamp at eleven."),
+        NOTE("maisie", "Grew up in her father's scrapyard and built her first projector from a car headlamp at eleven."),
         { flag: "chat_maisie_ferry_1" },
         { time: 3 }
       ] },
@@ -351,7 +351,7 @@ scene("chat_fiona_ferry", {
         { choice: [
           { text: "\"So the lace isn't a costume. It's the uniform.\"", steps: [
             { say: "rowan", text: "\"So the lace isn't a costume. It's the uniform.\"" },
-            { say: "fiona", text: "\"The lace is entirely a costume. My mother wears grey wool and sensible shoes, and has the kindest telephone voice in Whitby.\"" },
+            { say: "fiona", text: "\"The lace is entirely a costume. My mother wears grey wool and sensible shoes, and has the kindest telephone voice in our whole town.\"" },
             { say: "fiona", text: "\"Death is not black lace. Death is a casserole on the doorstep and a great many forms. I simply prefer the lace.\"" },
             AFF("fiona", 2, "Asked about the lace")
           ] },
@@ -1210,7 +1210,7 @@ scene("chat_dmitri_ferry", {
         { say: "dmitri", text: "\"It is not a hardship. I am awake then in any case.\"" },
         { say: "rowan", text: "\"Every night?\"" },
         { say: "dmitri", text: "\"Where I am from, in summer the sun does not set, and in winter it does not rise. After a time the body stops asking which it is.\"" },
-        { say: "dmitri", text: "\"Murmansk. You may look it up. It is at the top.\"" },
+        { say: "dmitri", text: "\"A port at the top of the map. Above it there is only ice. You would not have heard of it.\"" },
         { choice: [
           { text: "\"That sounds lonely.\"", steps: [
             { say: "rowan", text: "\"That sounds lonely.\"" },
@@ -1225,7 +1225,7 @@ scene("chat_dmitri_ferry", {
             AFF("dmitri", 2, "Understood at once")
           ] }
         ] },
-        NOTE("dmitri", "From Murmansk. Awake all night, every night; sat on the quay from the night train until the ferry."),
+        NOTE("dmitri", "From a port at the top of the map. Awake all night, every night; sat on the quay from the night train until the ferry."),
         { flag: "chat_dmitri_ferry_2" },
         { time: 3 }
       ] },
