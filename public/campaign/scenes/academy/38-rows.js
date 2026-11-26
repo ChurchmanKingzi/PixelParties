@@ -7,7 +7,8 @@ const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 scene("ferry_maisie", {
   steps: [
     { when: (s)=>!!s.flags["met_maisie"], jump: "again" },
-    { text: "The port side is a narrow walkway under the lifeboats, out of the worst of the wind. Halfway along it a girl in oil-stained overalls is standing on an upturned bucket with her arm up to the elbow in a bulkhead lamp. The lamp's wire cage hangs open. A black jacket is knotted round her waist by the sleeves, and a pair of welding goggles is holding back a great deal of copper-brown hair." },
+    { text: "The port side is a narrow walkway under the lifeboats, out of the worst of the wind. Halfway along it a girl in oil-stained overalls is standing on an upturned bucket with her arm up to the elbow in a bulkhead lamp." },
+    { text: "The lamp's wire cage hangs open. A black jacket is knotted round her waist by the sleeves, and a pair of welding goggles is holding back a great deal of copper-brown hair." },
     { text: "The lamp is on, in broad daylight. It is also ticking." },
     { say: "maisie", alias: "Girl in welding goggles", text: "\"Flickering since the harbour, this. Broad daylight, sun out, and it's sat there going tick, tick, tick like it wants a word with somebody.\"" },
     { say: "maisie", alias: "Girl in welding goggles", text: "\"You're in me light, love.\" She has not looked round. \"No, don't move. I'm lying. You're not.\"" },
@@ -228,7 +229,8 @@ scene("chat_maisie_ferry", {
 scene("ferry_fiona", {
   steps: [
     { when: (s)=>!!s.flags["met_fiona"], jump: "again" },
-    { text: "At the stern end of the port walkway, in the deepest shade a lifeboat can throw, a girl in black lace is sitting very straight on a life-jacket locker under a black parasol. Black lipstick. Black hair, dead straight to the waist. A red jacket whose grey collar is pinned with a small silver coffin. A leather-bound book lies shut in her lap." },
+    { text: "At the stern end of the port walkway, in the deepest shade a lifeboat can throw, a girl in black lace is sitting very straight on a life-jacket locker under a black parasol." },
+    { text: "Black lipstick. Black hair, dead straight to the waist. A red jacket whose grey collar is pinned with a small silver coffin. A leather-bound book lies shut in her lap." },
     { text: "On the locker beside her stands a little storm lantern with its door open. She strikes a match. The wind takes it. She lays it down next to six others, in a row." },
     { say: "fiona", alias: "Girl in black lace", text: "\"Seven.\" Low, slow, each syllable set down with care. \"The sea does not care for atmosphere.\"" },
     { choice: [
@@ -427,7 +429,8 @@ scene("chat_fiona_ferry", {
         { when: (s)=>!s.flags["met_maisie"], text: "Up the walkway something small and metal hits the deck, and a cheerful voice calls a lamp a name it has probably earned." },
         { when: (s)=>!!s.flags["met_maisie"], text: "Up the walkway something small and metal hits the deck, and Maisie's voice, cheerfully, calls it a name it has probably earned." },
         { say: "fiona", text: "\"If that one is mine, I shall need more lace.\"" },
-        { when: (s)=>!!s.flags["leona_told_b4"], think: "Bungalow four. According to Leona, the girl with the lamp is in four as well. I think I'll let the door tell her." },
+        { when: (s)=>!!s.flags["leona_told_b4"] && !s.flags["met_maisie"], think: "Bungalow four. According to Leona, the girl with the lamp is in four as well. I think I'll let the door tell her." },
+        { when: (s)=>!!s.flags["leona_told_b4"] && !!s.flags["met_maisie"], think: "Bungalow four. According to Leona, Maisie is in four as well. I think I'll let the door tell her." },
         { say: "fiona", text: "\"And you? Where have they put you?\"" },
         { say: "rowan", text: "\"Seven.\"" },
         { say: "fiona", text: "\"Three doors along. Near enough to borrow a candle; far enough not to hear it.\"" },
@@ -623,9 +626,17 @@ scene("chat_leona_ferry", {
         { flag: "chat_leona_ferry_2" },
         { time: 3 }
       ] },
-      { text: "\"The girl in the overalls, with the lamp. Do you know her?\"", when: (s)=>!!s.flags["chat_leona_ferry_2"] && !s.flags["chat_leona_ferry_3"], hint: "From what she said", steps: [
+      ...((st)=>[
+      { text: "\"The girl in the overalls, with the lamp. Do you know her?\"", when: (s)=>!!s.flags["chat_leona_ferry_2"] && !s.flags["chat_leona_ferry_3"] && !s.flags["met_maisie"], hint: "From what she said", steps: [
         { say: "rowan", text: "\"The girl in the overalls, with the lamp. Do you know her?\"" },
         { say: "leona", text: "\"No. But she has her acceptance letter in her back pocket, folded with the room line outwards. Commons, bungalow four.\"" },
+        ...st ] },
+      { text: "\"The girl with the lamp is Maisie, by the way. Do you know her?\"", when: (s)=>!!s.flags["chat_leona_ferry_2"] && !s.flags["chat_leona_ferry_3"] && !!s.flags["met_maisie"], hint: "From what she said", steps: [
+        { say: "rowan", text: "\"The girl with the lamp is Maisie, by the way. Do you know her?\"" },
+        { say: "leona", text: "\"Maisie. Thank you. No, I do not know her.\"" },
+        { say: "leona", text: "\"But she has her acceptance letter in her back pocket, folded with the room line outwards. Commons, bungalow four.\"" },
+        ...st ] }
+      ])([
         { say: "leona", text: "\"So does mine. Say bungalow four, I mean. I keep it in the satchel.\"" },
         { choice: [
           { text: "\"You haven't told her?\"", steps: [
@@ -651,7 +662,7 @@ scene("chat_leona_ferry", {
         NOTE("leona", "Is in bungalow 4, and worked out on the ferry that the girl in overalls who mended the lamp is too."),
         { flag: "chat_leona_ferry_3" },
         { time: 3 }
-      ] },
+      ]),
       { text: "\"I'll let you get back to the notice.\"", steps: [
         { say: "rowan", text: "\"I'll let you get back to the notice.\"" },
         { say: "leona", text: "\"I have finished the notice. But thank you, Rowan.\"" },

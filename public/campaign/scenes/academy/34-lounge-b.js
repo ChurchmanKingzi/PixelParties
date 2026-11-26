@@ -322,7 +322,8 @@ scene("deck_magnus", {
     { say: "rowan", text: "\"What are you on this week?\"" },
     { say: "magnus", text: "\"Whatever the data says.\" A glance at the tablet. \"One-Two-Punch. Ghuanjun, Bill, Elana. Win rate fifty-nine point four.\"" },
     { text: "Your eyes go to the stylus in his hand, and stay there, and your voice comes out low and fast." },
-    { say: "rowan", text: "\"…Ferocious Tiger Kick, Blow of the Venom Snake, Whirlwind Strike. Three attacks a turn, the second and third with a bonus. Stun. Discard. Poison. First turn can't kill. Stranglehold and the Sun Sword next turn. Jump in the River keeps the one attacker alive.\" A breath. \"One hero deep. Every attack announced.\"" },
+    { say: "rowan", text: "\"…Ferocious Tiger Kick, Blow of the Venom Snake, Whirlwind Strike. Three attacks a turn, the second and third with a bonus. Stun. Discard. Poison.\"" },
+    { say: "rowan", text: "\"First turn can't kill. Stranglehold and the Sun Sword next turn. Jump in the River keeps the one attacker alive.\" A breath. \"One hero deep. Every attack announced.\"" },
     { say: "magnus", text: "\"You have looked at the same lists I have.\"" },
     { say: "rowan", text: "\"Everyone has. It's the best list on the ladder this week.\"" },
     { say: "magnus", text: "\"…It is.\" He does not say anything else for a moment. Then, carefully: \"It is a clean list. It is not a deck I *love*.\"" },
@@ -388,7 +389,7 @@ scene("ferry_noor", {
   steps: [
     { when: (s)=>!!s.flags["met_noor"], jump: "again" },
     { text: "A calm girl in a blue hijab sits on a window bench with a heavy book open on her knee. Its margins bristle with pencil tabs. Her jacket is red; the brooch that pins the hijab is a very small silver gavel." },
-    { text: "The window behind her is huge and spotless, and full of sea. She is not looking at the sea. She is reading, with the complete stillness of someone who finishes the sentence before reacting." },
+    { text: "The window above her is spotless, and full of sea. She is not looking at the sea. She is reading, with the complete stillness of someone who finishes the sentence before reacting." },
     { text: "Around her the saloon is a fairground of duffel bags and raised voices. Her bench has a clear half-metre on either side, as if the whole crowd had agreed on it without being told." },
     { text: "You stand there for a moment. Then, unexpectedly, the pencil stops." },
     { say: "noor", alias: "Girl with a rulebook", text: "\"May I help you?\"" },
@@ -676,7 +677,8 @@ scene("deck_noor", {
     { text: "She closes the book on her pencil. It is, you suspect, what she does before anything she means." },
     { say: "noor", text: "\"Countdown. The Doom Clock. Twenty counters end the game for whoever places the last one.\" A pause. \"It is entirely transparent. It seems only fair to give notice.\"" },
     { text: "Your mouth has started moving half a second before your voice does." },
-    { say: "rowan", text: "\"…Doom Prophecy fetches the Clock with three counters on it. Only she takes them off. Eagle Warrior, Jaguar Warrior — enter by removing one. Basketskull, a fistful off, turned into damage. Warrior of Teocuilatl spends them as shields. Archers shoot when one lands.\" A breath. \"Twentieth one falls on whoever she's picked. Right. Right.\"" },
+    { say: "rowan", text: "\"…Doom Prophecy fetches the Clock with three counters on it. Only she takes them off. Eagle Warrior, Jaguar Warrior — enter by removing one. Basketskull, a fistful off, turned into damage.\"" },
+    { say: "rowan", text: "\"Warrior of Teocuilatl spends them as shields. Archers shoot when one lands.\" A breath. \"Twentieth one falls on whoever she's picked. Right. Right.\"" },
     { say: "noor", text: "\"…You have said that in the correct order.\"" },
     { say: "rowan", text: "\"Transparent, and nearly impossible to interrupt. It's the most honest threat in the format.\"" },
     { say: "noor", text: "\"Thank you.\" The corner of her mouth moves, once. \"I have been trying to say that for two years.\"" },
@@ -1066,7 +1068,8 @@ scene("mutter_livvie", {
   steps: [
     { when: (s)=>!!s.flags["deck_known_livvie"], end: true },
     { text: "You have stopped looking at her. Your voice is flat and very fast." },
-    { say: "rowan", text: "\"…Crystal Well. A gift a turn. Crystals break spell levels, shuffling, hero effects, until you pay to get rid of them. Letter of Misinformations takes the best two cards. Mary draws for every gift. Slow, Magic Amber, Spreading Rumor strip the rest of the hand. Laser Volley asks for what's left.\" A breath. \"No board. Heroes like glass.\"" },
+    { say: "rowan", text: "\"…Crystal Well. A gift a turn. Crystals break spell levels, shuffling, hero effects, until you pay to get rid of them. Letter of Misinformations takes the best two cards.\"" },
+    { say: "rowan", text: "\"Mary draws for every gift. Slow, Magic Amber, Spreading Rumor strip the rest of the hand. Laser Volley asks for what's left.\" A breath. \"No board. Heroes like glass.\"" },
     { say: "livvie", text: "\"…That's all of it.\" Her voice has gone quite small. \"Nobody has ever said all of it.\"" },
     { say: "rowan", text: "\"It's a gift economy. With teeth.\"" },
     { say: "livvie", text: "\"…That's what I call it.\" A tiny, tired smile. \"Don't tell anyone I do.\"" },
@@ -1339,8 +1342,9 @@ scene("chat_junho", {
 scene("ferry_eloise", {
   steps: [
     { when: (s)=>!!s.flags["met_eloise"], jump: "again" },
-    { text: "One of the big windows has been propped open on its latch, and the cold comes in carrying a smell that is not the sea. Turpentine." },
-    { text: "Under it a girl in a wine-red beret and a gold jacket is kneeling on the bench, because the sketchbook open in front of her is too big to share a bench with anyone sitting down. There is dried paint in her long honey-brown hair. She has a brush in one hand and, forgotten in the other, the lid of a jar." },
+    { text: "One of the windows on the far wall has been propped open on its latch, and the cold comes in carrying a smell that is not the sea. Turpentine." },
+    { text: "Under it a girl in a wine-red beret and a gold jacket is kneeling on the bench, because the sketchbook open in front of her is too big to share a bench with anyone sitting down." },
+    { text: "There is dried paint in her long honey-brown hair. She has a brush in one hand and, forgotten in the other, the lid of a jar." },
     { text: "She has her back to the island. She is painting the saloon: the green of the table, and round it the people, two deep, as stripes of red and gold and black." },
     { say: "eloise", alias: "Girl in a red beret", text: "\"Don't — no. Stay. Right there, where the window does that to your ear.\"" },
     { choice: [
@@ -1534,7 +1538,8 @@ scene("chat_eloise", {
 scene("isle_magnus", {
   steps: [
     { when: (s)=>!!s.flags["isle_magnus_done"], jump: "again" },
-    { text: "Four small white domes stand in a row at the end of the lawn. The white-and-gold collars are waiting for their names in the one strip of shade, in a clump. One of them is not in the shade. He is standing in full sun, where he can see all four doors at once, with a tablet in the crook of his arm." },
+    { text: "Two small white domes stand side by side at the end of the lawn. The white-and-gold collars are waiting for their names in the one strip of shade, in a clump." },
+    { text: "One of them is not in the shade. He is standing in full sun, where he can see both doors at once, with a tablet in the crook of his arm." },
     { text: "A door opens. Somebody comes out. His thumb comes down. His sneakers are very white, and the grass has not got to them yet." },
     { when: (s)=>!!s.flags["met_magnus"], jump: "known" },
     { say: "magnus", alias: "Boy with a tablet", text: "\"Vance.\" He does not look up. \"Fifth. I'm sixth. Prospero_GG.\"" },
@@ -1605,7 +1610,8 @@ scene("isle_magnus", {
 scene("isle_noor", {
   steps: [
     { when: (s)=>!!s.flags["isle_noor_done"], jump: "again" },
-    { text: "The library closes the north end of the Quad like the last word of an argument: white steps, a deep arcade, and shade. Halfway up the steps, exactly in the middle, a girl in a red jacket and a blue hijab, pinned with a very small silver gavel, is reading a heavy blue book bristling with pencil tabs." },
+    { text: "The library closes the north end of the Quad like the last word of an argument: white steps, a deep arcade, and shade." },
+    { text: "Halfway up the steps, exactly in the middle, a girl in a red jacket and a blue hijab, pinned with a very small silver gavel, is reading a heavy blue book bristling with pencil tabs." },
     { text: "The lawn below her is all noise and blankets. Nobody has sat within two steps of her." },
     { when: (s)=>!!s.flags["met_noor"], jump: "known" },
     { say: "noor", alias: "Girl with a rulebook", text: "\"Mr Vance. The entrant in ink.\"" },
@@ -1677,7 +1683,8 @@ scene("isle_noor", {
 scene("isle_livvie", {
   steps: [
     { when: (s)=>!!s.flags["isle_livvie_done"], jump: "again" },
-    { text: "Bungalow three has a number painted on its doorpost, a step, and on the step a very pale girl with a violet-black bob and two cyan hair clips, doing sums on a clipboard. Her gold jacket is folded beside her with the mended elbows turned inwards. Through the open window behind her a radio is playing to nobody." },
+    { text: "Bungalow three has a number painted on its doorpost, a step, and on the step a very pale girl with a violet-black bob and two cyan hair clips, doing sums on a clipboard." },
+    { text: "Her gold jacket is folded beside her with the mended elbows turned inwards. Through the open window behind her a radio is playing to nobody." },
     { when: (s)=>!!s.flags["met_livvie"], jump: "known" },
     { say: "livvie", alias: "Girl with a clipboard", text: "\"You're Vance. Bungalow seven.\" Eyes down. \"Don't be alarmed. I've got everyone down. It's not personal, it's a column.\"" },
     { say: "rowan", text: "\"Rowan. What's the column for?\"" },
@@ -1747,7 +1754,8 @@ scene("isle_livvie", {
 scene("isle_junho", {
   steps: [
     { when: (s)=>!!s.flags["isle_junho_done"], jump: "again" },
-    { text: "The fountain on the Quad is a bronze figure flinging a spray of bronze cards, with the water jumping from card to card. On its rim sits a boy in a gold jacket with the blue collar pressed flat, a stylus behind his ear, a tablet on his knee, and beside him, in a perfectly straight row, five identical deck boxes." },
+    { text: "The fountain on the Quad is a bronze figure flinging a spray of bronze cards, with the water jumping from card to card." },
+    { text: "On its rim sits a boy in a gold jacket with the blue collar pressed flat, a stylus behind his ear, a tablet on his knee, and beside him, in a perfectly straight row, five identical deck boxes." },
     { text: "He is not looking at the fountain. He is looking the length of the lawn at the ladder board under the clock tower, and frowning at it the way you frown at a sum." },
     { when: (s)=>!!s.flags["met_junho"], jump: "known" },
     { say: "junho", alias: "Boy with a row of boxes", text: "\"Excuse me. Vance, from the roll call. If your name were on that board, how long would it take you to find it?\"" },
@@ -1802,7 +1810,7 @@ scene("isle_junho", {
 scene("isle_eloise", {
   steps: [
     { when: (s)=>!!s.flags["isle_eloise_done"], jump: "again" },
-    { text: "In the middle of the Quad, where everybody has to walk round her, a girl in a wine-red beret and a gold jacket is kneeling on the grass over a sketchbook the size of a door. There is paint in her hair and a brush in her hand. The air near her smells of turpentine, even out here." },
+    { text: "In the middle of the Quad, where everybody has to walk round her, a girl in a wine-red beret and a gold jacket is kneeling on the paving over a sketchbook the size of a door. There is paint in her hair and a brush in her hand. The air near her smells of turpentine, even out here." },
     { text: "She is painting the clock tower. On the page its blue roof is enormous, and the people beneath it are small tilted dabs, every one of them leaning back." },
     { when: (s)=>!!s.flags["met_eloise"], jump: "known" },
     { say: "eloise", alias: "Girl in a red beret", text: "\"You, in the new red. Stand in front of the tower. No — left. I need one thing out here it isn't looking at.\"" },

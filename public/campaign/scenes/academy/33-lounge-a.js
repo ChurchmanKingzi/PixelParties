@@ -392,7 +392,8 @@ scene("deck_gideon", {
       ] }
     ] },
     { text: "Your eyes have gone to the deck under his hand, and your voice runs on under your breath." },
-    { say: "rowan", text: "\"…Beasts only come down while your own pile's empty. Every one of them deletes cards when it lands. Yours. Mine. First Circle of Hell wipes an odd pile. Zhu skips a turn, eventually. Never attacks first, because every card he plays is a card he can't afford to lose.\" A breath. \"Lets Ma fill both piles. Right.\"" },
+    { say: "rowan", text: "\"…Beasts only come down while your own pile's empty. Every one of them deletes cards when it lands. Yours. Mine. First Circle of Hell wipes an odd pile.\"" },
+    { say: "rowan", text: "\"Zhu skips a turn, eventually. Never attacks first, because every card he plays is a card he can't afford to lose.\" A breath. \"Lets Ma fill both piles. Right.\"" },
     { say: "gideon", text: "\"How resourceful.\"" },
     { say: "rowan", text: "\"It only breaks if something lands in your pile and nothing is there to delete it.\"" },
     { say: "gideon", text: "\"…\"" },
@@ -846,7 +847,8 @@ scene("deck_inya", {
       ] }
     ] },
     { text: "Your eyes have unfocused. Your voice runs on under your breath." },
-    { say: "rowan", text: "\"…Bubbles soaks the hits. Cute Bunny, Cheering Rabbit, Town Guard, wide and cheap. Haressassins shoot from the turn after they land. Bunny Bombs ticking in the back, and she picks when it goes. Deepsea Idol and Thicket for cover.\" A pause. \"Fast. Thin. Bubbles falls, everything falls.\"" },
+    { say: "rowan", text: "\"…Bubbles soaks the hits. Cute Bunny, Cheering Rabbit, Town Guard, wide and cheap. Haressassins shoot from the turn after they land.\"" },
+    { say: "rowan", text: "\"Bunny Bombs ticking in the back, and she picks when it goes. Deepsea Idol and Thicket for cover.\" A pause. \"Fast. Thin. Bubbles falls, everything falls.\"" },
     { say: "inya", text: "\"…\"" },
     { text: "She looks at you for a long moment." },
     { say: "inya", text: "\"Who told you about Bubbles.\"" },
@@ -1054,7 +1056,8 @@ scene("ferry_tomi", {
             { say: "tomi", text: "\"Commons. All of them. And so new they squeak.\" He closes the lid. \"That's the Qualifier print, that is. They do the winning list in Commons so nobody can flip the prize for rent.\"" },
             { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"Everyone's going to tell me that, aren't they.\"" },
             { when: (s)=>!!s.flags["rowan_commons_seen"], say: "tomi", text: "\"Everyone who can count. Then they'll all go quiet the first time it hits them.\"" },
-            { say: "tomi", text: "\"Where would it go? Back pages. Coin a card on a friendly day, and nobody's ever bought a Tea from me in their life.\" He slides the box back across. \"In a binder it's worth nothing. On a table it's worth a seat at this school. I don't sell those. I'd not know where to start the price.\"" },
+            { say: "tomi", text: "\"Where would it go? Back pages. Coin a card on a friendly day, and nobody's ever bought a Tea from me in their life.\" He slides the box back across." },
+            { say: "tomi", text: "\"In a binder it's worth nothing. On a table it's worth a seat at this school. I don't sell those. I'd not know where to start the price.\"" },
             { choice: [
               { text: "\"Then I'll keep it out of your binder.\"", steps: [
                 { say: "rowan", text: "\"Then I'll keep it out of your binder.\"" },
@@ -1270,9 +1273,12 @@ scene("ferry_anni", {
     { say: "anni", alias: "Girl with a red pen", text: "\"Brandt. Anneliese.\" A very small, very correct nod. \"Auxiliary, judging track. Anni, if it must be short. People generally find that it must.\"" },
     MET("anni", "Anneliese Brandt"),
     { text: "The open page is ruled by hand, in red, into three columns. The left one is full." },
-    { say: "anni", text: "\"Since the harbour: eleven. Feet on upholstery, four counts. A bench used as a luggage rack. One betting pool: that is Mr Reyes, in the yellow bandana, organised wagering among students, section nine, paragraph two. And the stake card at the table, which I have entered as *irregular*, because I cannot find what else it is.\"" },
-    { when: (s)=>!s.flags["table_resolved"], say: "anni", text: "\"What I cannot enter is the thing itself.\" The pen points, briefly, at the pale boy and at the small girl he is not playing. \"He declines a challenger on the colour of her collar, and it is written nowhere that he may not. I have read the section twice. I find that I am annoyed with the booklet.\"" },
-    { when: (s)=>!!s.flags["table_resolved"], say: "anni", text: "\"What I could not enter was the thing itself.\" The pen points, briefly, at the card table. \"He declined a challenger on the colour of her collar for most of a morning, and it is written nowhere that he may not. However it ended, that part stands. I find that I am annoyed with the booklet.\"" },
+    { say: "anni", text: "\"Since the harbour: eleven. Feet on upholstery, four counts. A bench used as a luggage rack. One betting pool: that is Mr Reyes, in the yellow bandana, organised wagering among students, section nine, paragraph two.\"" },
+    { say: "anni", text: "\"And the stake card at the table, which I have entered as *irregular*, because I cannot find what else it is.\"" },
+    { when: (s)=>!s.flags["table_resolved"], say: "anni", text: "\"What I cannot enter is the thing itself.\" The pen points, briefly, at the pale boy and at the small girl he is not playing." },
+    { when: (s)=>!s.flags["table_resolved"], say: "anni", text: "\"He declines a challenger on the colour of her collar, and it is written nowhere that he may not. I have read the section twice. I find that I am annoyed with the booklet.\"" },
+    { when: (s)=>!!s.flags["table_resolved"], say: "anni", text: "\"What I could not enter was the thing itself.\" The pen points, briefly, at the card table." },
+    { when: (s)=>!!s.flags["table_resolved"], say: "anni", text: "\"He declined a challenger on the colour of her collar for most of a morning, and it is written nowhere that he may not. However it ended, that part stands. I find that I am annoyed with the booklet.\"" },
     { choice: [
       { text: "\"Can't you make him play her?\"", when: (s)=>!s.flags["table_resolved"], steps: [
         { say: "rowan", text: "\"Can't you make him play her?\"" },
@@ -1840,15 +1846,14 @@ scene("lounge_first", {
   background: "ferry_lounge",
   steps: [
     { when: (s)=>!!s.flags["table_resolved"], flag: "lounge_seen" },
-    { when: (s)=>!!s.flags["table_resolved"], text: "The saloon is long and full of sun. At the far end, by the galley hatch, stands a green card table with a brass rim, and the benches round it are emptying. Whatever happened in this room this morning has finished happening without you." },
+    { when: (s)=>!!s.flags["table_resolved"], text: "The saloon is long and full of sun. In the middle, on its square of green carpet, stands a card table with a brass rim, and the benches round it are emptying. Whatever happened in this room this morning has finished happening without you." },
     { when: (s)=>!!s.flags["table_resolved"], end: true },
     {
-      text: "The iron steps give onto a long saloon so full of sun that you stop on the bottom stair. The windows are huge and rounded and spotless, a row of clean panes with nothing in them but sea. Padded blue benches run along the wall beneath them, and duffel bags are piled on every seat."
+      text: "The iron steps give onto a long saloon so full of sun that you stop on the bottom stair. Along the far wall runs a row of spotless windows with nothing in them but sea. Rows of padded blue benches fill the room, and duffel bags are piled on every seat."
     },
     { text: "It smells of coffee and warm wool. The engine is a hum you feel in the soles of your feet." },
-    {
-      text: "At the far end a steel urn steams on the counter of a galley hatch, with a hand-lettered sign for coffee and cinnamon rolls. Beside it, under a round porthole that frames the island like a postcard, stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to the edge, a ring of blue stools. People are standing round it two deep."
-    },
+    { text: "At the far end a steel urn steams on the counter of a galley hatch, with a hand-lettered sign for coffee and cinnamon rolls." },
+    { text: "In the middle of the saloon, on a square of green carpet, stands the only real card table on the ship: green felt, a raised brass rim to keep the cards from sliding, a brass plate screwed to the edge, a ring of blue stools. People are standing round it two deep." },
     {
       text: "At the table sits a pale boy with a starched white-and-gold collar, squaring his deck against the felt. He does it twice, as if it might have changed. A pair of white cotton gloves lies folded beside it. He has not looked up since you came in."
     },
@@ -1902,11 +1907,8 @@ scene("lounge_first", {
     { label: "end_3" },
     { label: "next_2" },
     { label: "end_1" },
-    {
-      say: "gideon",
-      alias: "Boy in white gloves",
-      text: "\"Beat him, in front of this table, and I will concede that you are worth my time. Then we shall play, for the usual stake: the loser carries the winner's luggage up the hill. Mine is those four cases, Vance. Yours, I gather, is one duffel. I shall try to be a gentle winner. Until then, the table is closed.\""
-    },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"Beat him, in front of this table, and I will concede that you are worth my time. Then we shall play, for the usual stake: the loser carries the winner's luggage up the hill.\"" },
+    { say: "gideon", alias: "Boy in white gloves", text: "\"Mine is those four cases, Vance. Yours, I gather, is one duffel. I shall try to be a gentle winner. Until then, the table is closed.\"" },
     {
       text: "On the nearest bench a boy in a yellow bandana turns the lid of his binder towards the room and takes the pencil from behind his ear."
     },
@@ -2185,14 +2187,10 @@ scene("lounge_first", {
 
 scene("inya_finds_rowan", {
   steps: [
-    {
-      when: (s)=>s.location==="ferry_lounge",
-      text: "A small figure with two mint-green tails and a bunny-shaped clip leaves the end of the card table, marches the length of the saloon and plants herself directly in front of you. Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas."
-    },
-    {
-      when: (s)=>s.location!=="ferry_lounge",
-      text: "A small figure with two mint-green tails and a bunny-shaped clip marches the length of the deck and plants herself directly in front of you. Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas."
-    },
+    { when: (s)=>s.location==="ferry_lounge", text: "A small figure with two mint-green tails and a bunny-shaped clip leaves the end of the card table, marches the length of the saloon and plants herself directly in front of you." },
+    { when: (s)=>s.location==="ferry_lounge", text: "Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas." },
+    { when: (s)=>s.location!=="ferry_lounge", text: "A small figure with two mint-green tails and a bunny-shaped clip marches the length of the deck and plants herself directly in front of you." },
+    { when: (s)=>s.location!=="ferry_lounge", text: "Her deck box, a bunny charm swinging from its clasp, is clamped to her chest in both hands. She has the look of a person who has run out of better ideas." },
     { when: (s)=>!(!!!s.flags["met_inya"]), jump: "next_2" },
     { say: "inya", alias: "Girl with the bunny clip", text: "\"You. The one without the jacket. Inya Bell.\"" },
     {
@@ -2425,7 +2423,8 @@ scene("inya_rolls", {
 scene("isle_gideon", {
   steps: [
     { when: (s)=>!!s.flags["isle_gideon_done"], jump: "later" },
-    { text: "Four small white domes stand in a row on the lawn, and the Spectral first-years stand in front of them in a loose knot of white-and-gold collars, pretending not to watch the doors. One of them stands a little apart, at the edge, where he can see everybody's hands. The white gloves are on." },
+    { text: "Two small white domes stand side by side on the lawn, and the Spectral first-years stand in front of them in a loose knot of white-and-gold collars, pretending not to watch the doors." },
+    { text: "One of them stands a little apart, at the edge, where he can see everybody's hands. The white gloves are on." },
     { when: (s)=>!s.flags["met_gideon"], say: "gideon", alias: "Boy in white gloves", text: "\"Vance. They read you out last on the Quad, and in a different voice. I noticed. I expect you did.\"" },
     { when: (s)=>!s.flags["met_gideon"], say: "gideon", alias: "Boy in white gloves", text: "\"Gideon Pryce. Spectral Tower. I should offer to shake hands, but I am waiting for a game, and I never do before one.\"" },
     { when: (s)=>!!s.flags["met_gideon"], say: "gideon", text: "\"Vance.\"" },
@@ -2523,7 +2522,8 @@ scene("isle_anni", {
 scene("isle_inya", {
   steps: [
     { when: (s)=>!!s.flags["isle_inya_done"], jump: "later" },
-    { text: "Bungalow 3 has bunny bunting over the door and three beds inside it. One is hidden behind a sheet hung from the rafters like a wall. One is made with hospital corners under a wardrobe door that has a spreadsheet pinned inside it. On the third, by the door, a small girl with mint-green tails is sitting cross-legged in the middle of everything she owns." },
+    { text: "Bungalow 3 has bunny bunting over the door and three beds inside it. One is hidden behind a sheet hung from the rafters like a wall." },
+    { text: "One is made with hospital corners under a wardrobe door that has a spreadsheet pinned inside it. On the third, by the door, a small girl with mint-green tails is sitting cross-legged in the middle of everything she owns." },
     { when: (s)=>!s.flags["met_inya"], say: "inya", alias: "Girl with the bunny clip", text: "\"You're letting the flies in. In or out. …You're the Wildcard. They read you out last.\"" },
     { when: (s)=>!s.flags["met_inya"], say: "inya", alias: "Girl with the bunny clip", text: "\"Inya Bell. Bed by the door. Don't sit on the hoodies, they're in an order.\"" },
     { when: (s)=>!s.flags["met_inya"], say: "rowan", text: "\"Rowan.\"" },
@@ -2588,7 +2588,8 @@ scene("isle_inya", {
 scene("isle_tomi", {
   steps: [
     { when: (s)=>!!s.flags["isle_tomi_done"], jump: "later" },
-    { text: "Bungalow 5 has a hand-painted sign propped on its step: TRADES — ASK TOMI. Behind the sign, on the step itself, sits a small quick boy in a yellow bandana with a binder open on each knee and a pencil behind each ear. A map of the island is taped to the railing above him, every forbidden place circled in red." },
+    { text: "Bungalow 5 has a hand-painted sign propped on its step: TRADES — ASK TOMI. Behind the sign, on the step itself, sits a small quick boy in a yellow bandana with a binder open on each knee and a pencil behind each ear." },
+    { text: "A map of the island is taped to the railing above him, every forbidden place circled in red." },
     { when: (s)=>!s.flags["met_tomi"], say: "tomi", alias: "Boy in a yellow bandana", text: "\"Wildcard! Last name on the roll and the only one anybody clapped for. I had a line on that. Don't ask which way.\"" },
     { when: (s)=>!s.flags["met_tomi"], say: "tomi", alias: "Boy in a yellow bandana", text: "\"Tomás Reyes. Tomi. The sign's me. Binders, odds, and whatever I've heard since breakfast. Friend price. Everybody's a friend, the price is the price.\"" },
     { when: (s)=>!!s.flags["met_tomi"], say: "tomi", text: "\"Wildcard! Welcome to head office. Mind the step, the step is the counter.\"" },

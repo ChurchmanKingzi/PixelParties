@@ -49,7 +49,8 @@ scene("ferry_pippa_georgie", {
 
     // ---- Rowan geht auf das Mädchen mit der Kamera zu ----
     { label: "from_pippa" },
-    { text: "A girl with a heavy old film camera is crouched on the planks at a very odd angle, like a heron deciding about a fish. Strawberry-orange hair sticks up at the crown; there is a yellow bow tie under her chin, freckles on every visible surface and a grey sock dangling from the end of her lens." },
+    { text: "A girl with a heavy old film camera is crouched on the planks at a very odd angle, like a heron deciding about a fish." },
+    { text: "Strawberry-orange hair sticks up at the crown; there is a yellow bow tie under her chin, freckles on every visible surface and a grey sock dangling from the end of her lens." },
     { text: "Her fish is a small girl on a coil of rope: a red jacket at least one size too big, cuffs turned back twice, a deck box held in both hands, a dark-purple feather in wild black hair. A green plush dragon hangs from her backpack by one wing." },
     { say: "pippa", alias: "Girl with a camera", text: "\"Feather to the light. Now look at the volcano like it owes you money. No — like it owes you *a lot* of money.\"" },
     PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"] }),

@@ -182,9 +182,8 @@ scene("ferry_docks", {
       text: "The water under the planks is so clear you can see crabs arguing on the bottom. The air smells of tar, kelp and wet rope."
     },
     { enter: "cati" },
-    {
-      text: "At the mooring bollard an old man with a face like driftwood is checking the lines with the minute, unhurried care of someone who has done it every day for forty years. A girl with a mail sack, bright-eyed, hair in a braid, is catching the bow rope as it sails across from the deck above."
-    },
+    { text: "At the mooring bollard an old man with a face like driftwood is checking the lines with the minute, unhurried care of someone who has done it every day for forty years." },
+    { text: "A girl with a mail sack, bright-eyed, hair in a braid, is catching the bow rope as it sails across from the deck above." },
     { say: "cati", alias: "???", text: "\"Got it! Got it, Captain! You've got the aim of a retired postman!\"" },
     { name: "Captain Stroud", text: "\"I AM a retired postman!\"" },
     {
@@ -203,9 +202,8 @@ scene("ferry_docks", {
     { when: (s)=>!(!!s.flags["freddie_jumped"]), jump: "next_23" },
     { enter: "freddie" },
     { enter: "sunny" },
-    {
-      text: "At the far side of the pier a dripping figure with red hair, a stripe of green algae and a pair of diving goggles shoved up on her forehead is hauling herself up a ladder, grinning, with a towel-wrapped lifeguard hauling after her and shouting something about \"a *week* of nothing but breaststroke.\""
-    },
+    { text: "At the far side of the pier a dripping figure with red hair, green algae and diving goggles on her forehead is hauling herself up a ladder, grinning." },
+    { text: "A towel-wrapped lifeguard is hauling after her and shouting something about \"a *week* of nothing but breaststroke.\"" },
     { say: "freddie", text: "\"ROWAN! JACKETLESS! IT WAS EIGHT AND A HALF MINUTES! I TOLD YOU!\"" },
     { say: "sunny", text: "\"Seven and a half, you absolute liar.\"" },
     { exit: "freddie" },
@@ -241,15 +239,13 @@ scene("dock_consequences", {
     { jump: "end_1" },
     { label: "next_2" },
     { when: (s)=>!(!!s.flags["ferry_inya_won"]), jump: "next_3" },
-    {
-      text: "Down the jetty a pale boy in white gloves is walking behind a small girl with mint-green hair and a single rucksack, which he is carrying. She is eating a cinnamon roll. He has the look of a man who has lost a bet and intends never to mention it. Tomi, passing, pays somebody out of a pocket binder."
-    },
+    { text: "Down the jetty a pale boy in white gloves is walking behind a small girl with mint-green hair and a single rucksack, which he is carrying." },
+    { text: "She is eating a cinnamon roll. He has the look of a man who has lost a bet and intends never to mention it. Tomi, passing, pays somebody out of a pocket binder." },
     { jump: "end_1" },
     { label: "next_3" },
     { when: (s)=>!(!!s.flags["ferry_table_won"]), jump: "next_4" },
-    {
-      text: "Gideon, ahead of you on the jetty, is looking at his four cases with the grave disinterest of a man who has been told he owes somebody a duffel and is deciding when to start. Three of his things are being rolled on a cart by an upper-year in a gold jacket. The fourth, you notice, is not."
-    },
+    { text: "Gideon, ahead of you on the jetty, is looking at his four cases with the grave disinterest of a man who has been told he owes somebody a duffel and is deciding when to start." },
+    { text: "Three of his things are being rolled on a cart by an upper-year in a gold jacket. The fourth, you notice, is not." },
     { jump: "end_1" },
     { label: "next_4" },
     { when: (s)=>!(!!s.flags["ferry_table_settled"]), jump: "next_5" },
@@ -259,18 +255,16 @@ scene("dock_consequences", {
     { jump: "end_1" },
     { label: "next_5" },
     { when: (s)=>!(!!s.flags["ferry_table_denied"]), jump: "next_6" },
-    {
-      text: "Down the jetty a small girl with mint-green hair is walking alone, deck box clamped to her chest, looking at nobody. A little way ahead, a pale boy in white gloves strides up the planks with his hands entirely free and four matched cases being rolled behind him on a cart by an upper-year. Nobody carries anything. It is, somehow, worse."
-    },
+    { text: "Down the jetty a small girl with mint-green hair is walking alone, deck box clamped to her chest, looking at nobody." },
+    { text: "A little way ahead, a pale boy in white gloves strides up the planks with his hands entirely free and four matched cases being rolled behind him on a cart by an upper-year. Nobody carries anything. It is, somehow, worse." },
     { when: (s)=>!(!!s.flags["lounge_seen"]), jump: "next_8" },
     { text: "She sees you watching. Her chin comes up. She does not say anything, and neither do you." },
     { label: "next_8" },
     { label: "end_7" },
     { jump: "end_1" },
     { label: "next_6" },
-    {
-      text: "Down the jetty a small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks. She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her."
-    },
+    { text: "Down the jetty a small girl with mint-green hair is staggering under two matched cases, with two more waiting behind her on the planks." },
+    { text: "She lets nobody take one. A pale boy in white gloves walks ahead of her with his hands entirely free. Tomi, paying out his book, does not look at her." },
     { when: (s)=>!(!!s.flags["lounge_seen"]), jump: "next_11" },
     { text: "She sees you watching. Her chin comes up. She does not say anything, and neither do you." },
     { think: "I could have said something. I know I could." },
@@ -309,9 +303,8 @@ scene("dock_cases_lost", {
     { flag: "carried_two_trips" },
     { jump: "choiceend_1" },
     { label: "opt_3" },
-    {
-      text: "You do not make it to the foot of the jetty. The third case slips. The fourth, which was balanced precariously on the top, falls into your arms in a way that is technically carrying. Behind you somebody gasps. Somebody else, Nathan, says very loudly: \"He's doing it! He's CARRYING them ALL!\""
-    },
+    { text: "You do not make it to the foot of the jetty. The third case slips. The fourth, which was balanced precariously on the top, falls into your arms in a way that is technically carrying." },
+    { text: "Behind you somebody gasps. Somebody else, Nathan, says very loudly: \"He's doing it! He's CARRYING them ALL!\"" },
     {
       text: "You do not drop a case. You do, however, discover muscles you did not know you had, and they are all in agony."
     },
@@ -349,9 +342,8 @@ scene("dock_cases_lost", {
     { flag: "baylee_carried" },
     { jump: "choiceend_1" },
     { label: "choiceend_1" },
-    {
-      text: "The Spectral Tower stands on the hill above the Quad, a white spire with gold at the lip of its balconies and a doorman who has plainly seen better luggage. Gideon gives the concierge your name so that you are let in. The atrium floor is marble, the staircase is lined with portraits of previous year-captains, and you set four cases down in a neat row beside a very large, very silent potted palm."
-    },
+    { text: "The Spectral Tower stands on the hill above the Quad, a white spire with gold at the lip of its balconies and a doorman who has plainly seen better luggage. Gideon gives the concierge your name so that you are let in." },
+    { text: "The atrium floor is marble, the staircase is lined with portraits of previous year-captains, and you set four cases down in a neat row beside a very large, very silent potted palm." },
     { say: "gideon", text: "\"Thank you, Vance. That will be all.\"" },
     { text: "He says it quite courteously. He does not gloat. He does not need to." },
     { when: (s)=>!(!!!s.flags["carried_all_four"]), jump: "next_7" },
@@ -379,9 +371,8 @@ scene("dock_cases_lost", {
 scene("dock_to_quad", {
   steps: [
     { goto: "main_gate", travel: 8 },
-    {
-      text: "The road climbs from the pier between tall palms. At its top the main gate stands open: two pillars of dark brick with lamps on top, a brass plaque set into the left-hand one, and an iron arch fanned out above the gates like a hand of cards, each card holding a coloured gem. Beyond it a sandy path runs between more palms to a white building with a red roof."
-    },
+    { text: "The road climbs from the pier between tall palms. At its top the main gate stands open: two pillars of dark brick with lamps on top, a brass plaque set into the left-hand one, and an iron arch fanned out above the gates like a hand of cards, each card holding a coloured gem." },
+    { text: "Beyond it a sandy path runs between more palms to a white building with a red roof." },
     {
       text: "People flow through it in knots. Nobody speaks very loudly. It is the kind of silence that comes over a crowd entering a church or an exam hall, only here it is not reverence but plain, shared, delighted terror."
     },
@@ -540,9 +531,8 @@ scene("quad_address", {
 
 scene("quad_jacket", {
   steps: [
-    {
-      text: "The crowd breaks up. A young woman with a clipboard of her own, black-haired and brisk, points you towards a large wooden crate set at the foot of the tower, from which a jacket is being issued with grim ceremony to each of the Commons. A senior in a gold jacket is reading names off a list and pulling out jackets by size."
-    },
+    { text: "The crowd breaks up. A young woman with a clipboard of her own, black-haired and brisk, points you towards a large wooden crate set at the foot of the tower, from which a jacket is being issued with grim ceremony to each of the Commons." },
+    { text: "A senior in a gold jacket is reading names off a list and pulling out jackets by size." },
     { name: "Upper-year", text: "Vance. Medium. Hold your arms out." },
     {
       text: "The jacket is red, stiff and smells of new fabric. It has a plain grey collar. The sleeves are exactly the right length, which feels like a small personal insult."
@@ -684,9 +674,8 @@ scene("commons_arrival", {
   background: "commons_beach",
   steps: [
     { text: "The path drops through a stand of wind-bent palms and ends, abruptly, on sand." },
-    {
-      text: "A crooked row of weathered bungalows stands on stilts along the curve of a cove, shingle roofs dark with age, walls in salmon-pink, mint and sun-bleached blue, joined by a path of mismatched paving stones, pink, teal and brown, some replaced, some missing. Laundry flaps on lines strung between the palms. A hand-painted sign on two posts says THE COMMONS — EVERYBODY STARTS SOMEWHERE."
-    },
+    { text: "A crooked row of weathered bungalows stands on stilts along the curve of a cove, shingle roofs dark with age, walls in salmon-pink, mint and sun-bleached blue, joined by a path of mismatched paving stones, pink, teal and brown, some replaced, some missing." },
+    { text: "Laundry flaps on lines strung between the palms. A hand-painted sign on two posts says THE COMMONS — EVERYBODY STARTS SOMEWHERE." },
     {
       text: "A red hammock, surfboards leaning on the porch rails, a small blue folding table with a duel mat taped across it. Geckos on the eaves. The surf breathing, in and out. It is the most beautiful place you have ever seen, and it has a washing line."
     },
@@ -733,9 +722,9 @@ scene("bungalow_seven_first", {
     {
       text: "Bungalow 7 is the last one on the row, a narrow box of weathered boards on stilts, with a single step and a teal door that squeaks. You push it open."
     },
-    {
-      text: "A long plank room that smells of paint and old salt. Three iron beds stand in a row against the back wall, each with a footlocker at its head: one under a blue blanket, one under a red, one under a teal. There is a curtained window at the left end of the wall, and another above a wobbly desk and chair in the right-hand corner, and between them a faded tournament poster with a golden cup on it. A plant by the door. A low bookshelf. A teal rug. A ceiling fan that ticks on every fourth turn."
-    },
+    { text: "A long plank room that smells of paint and old salt. Three iron beds stand in a row against the back wall, each with a footlocker at its head: one under a blue blanket, one under a red, one under a teal." },
+    { text: "There is a curtained window at the left end of the wall, and another above a wobbly desk and chair in the right-hand corner, and between them a faded tournament poster with a golden cup on it." },
+    { text: "A plant by the door. A low bookshelf. A teal rug. A ceiling fan that ticks on every fourth turn." },
     { text: "Nobody's things are in it yet. Not a sock." },
     {
       say: "nathan",
@@ -882,9 +871,8 @@ scene("bungalow_seven_first", {
       text: "There is a footlocker at the head of your bed. You open it. Inside is a folded letter in Aunt Dee's handwriting. You do not open it yet."
     },
     { think: "I live here now. This is where I live." },
-    {
-      text: "Nathan turns to his corner and tips an entire duffel out onto his blanket. Baylee unpacks exactly four things, a folded blanket, a framed photograph, a tin of liniment and a coiled lasso, and sets each of them on his footlocker like a very small altar. Neither of them is going anywhere. Neither of them, you notice, is in a hurry to follow you either."
-    },
+    { text: "Nathan turns to his corner and tips an entire duffel out onto his blanket. Baylee unpacks exactly four things, a folded blanket, a framed photograph, a tin of liniment and a coiled lasso, and sets each of them on his footlocker like a very small altar." },
+    { text: "Neither of them is going anywhere. Neither of them, you notice, is in a hurry to follow you either." },
     { flag: "unpacked_started" },
     { unflag: "follow_nathan" },
     { unflag: "follow_baylee" },

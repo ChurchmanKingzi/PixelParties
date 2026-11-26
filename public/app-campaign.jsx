@@ -1114,7 +1114,8 @@ function cmpMakeRunner(io) {
     // ── Ausgabe ──
     if (step.text || step.say || step.think) {
       await io.say({
-        speaker: step.say, text: step.text || step.think || '',
+        // Text darf eine Funktion des Zustands sein (z. B. Karten zählen, Namen erst nach dem Kennenlernen).
+        speaker: step.say, text: (typeof step.text === 'function' ? step.text(io.state()) : step.text) || step.think || '',
         think: !!step.think, side: step.side, speed: step.speed,
         portrait: step.portrait, color: step.color, name: step.name,
       });

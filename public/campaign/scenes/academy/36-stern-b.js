@@ -8,7 +8,8 @@ const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
 scene("ferry_sunny", {
   steps: [
     { when: (s)=>!!s.flags["met_sunny"], jump: "again" },
-    { text: "A tall girl is sitting on the lower bar of the rail with her bare feet dangling over the wake. A red jacket with a blue collar hangs open over a swimsuit, a towel is slung round her neck like a scarf, and there are pale rings round her eyes where goggles usually live. Her ponytail is wet, although it has not rained." },
+    { text: "A tall girl is sitting on the lower bar of the rail with her bare feet dangling over the wake." },
+    { text: "A red jacket with a blue collar hangs open over a swimsuit, a towel is slung round her neck like a scarf, and there are pale rings round her eyes where goggles usually live. Her ponytail is wet, although it has not rained." },
     { text: "She is, at the exact moment you notice her, doing something with a deck of cards that involves flipping half of it into the air and catching it behind her back." },
     { text: "She catches it. Every card. She does not look at them." },
     { text: "She sees you looking and grins with her whole face." },
@@ -331,7 +332,8 @@ scene("deck_sunny", {
       ] }
     ] },
     { text: "Rowan's mouth moves before his voice does, low and quick." },
-    { say: "rowan", text: "\"…Pengu, Polar, Snobbit, Snowman. Skates for an extra slide. Spikeblock. Whoolmoth once every hero has a creature. Every Slippery slides into the neighbouring hero each turn, and every slide does something. Ingo gets paid per slide.\" A beat. \"Middle hero falls, outer ones aren't neighbours. Right.\"" },
+    { say: "rowan", text: "\"…Pengu, Polar, Snobbit, Snowman. Skates for an extra slide. Spikeblock. Whoolmoth once every hero has a creature.\"" },
+    { say: "rowan", text: "\"Every Slippery slides into the neighbouring hero each turn, and every slide does something. Ingo gets paid per slide.\" A beat. \"Middle hero falls, outer ones aren't neighbours. Right.\"" },
     { say: "sunny", text: "\"…Oh, he's *good*.\"" },
     { text: "She says it to the gulls." },
     { say: "sunny", text: "\"That's the whole weakness and he said it in one go. Rude.\"" },
@@ -408,7 +410,8 @@ scene("post_sunny", {
 scene("ferry_marit", {
   steps: [
     { when: (s)=>!!s.flags["met_marit"], jump: "again" },
-    { text: "A girl is standing on a mooring bollard, reciting to the gulls. Her flame-orange hair flares up into two tall tufts, one on each side of her head, each tied with an orange bow; a scarf the colour of embers is wound twice round her throat, and the blue collar of her black jacket is turned up as far as it will go." },
+    { text: "A girl is standing on a mooring bollard, reciting to the gulls." },
+    { text: "Her flame-orange hair flares up into two tall tufts, one on each side of her head, each tied with an orange bow; a scarf the colour of embers is wound twice round her throat, and the blue collar of her black jacket is turned up as far as it will go." },
     { text: "\"…and in that hour, when the sea went grey as a forgotten promise —\" She is holding an invisible sword aloft. The gulls are paying attention in the way gulls do, which is to say, as a business matter." },
     { text: "She sees you. The recital stops. The sword, you notice, stays up." },
     { say: "marit", alias: "Girl on a bollard", text: "\"A **HUMAN!** An *AUDIENCE!* The gods are *generous* this morning!\"" },
@@ -799,7 +802,8 @@ scene("post_marit", {
 scene("ferry_freddie", {
   steps: [
     { when: (s)=>!!s.flags["met_freddie"], jump: "again" },
-    { text: "At the stern rail a girl with a mop of wet red hair is hanging over the wake by her waist, bare feet hooked round the lowest bar, peering at the water. Diving goggles are pushed up on her forehead. A gold jacket with a plain grey collar hangs open over a swimsuit; below it she is wearing the bottom half of a wetsuit, with its empty arms knotted round her middle. A towel is tied to the rail beside her so that the wind cannot have it." },
+    { text: "At the stern rail a girl with a mop of wet red hair is hanging over the wake by her waist, bare feet hooked round the lowest bar, peering at the water. Diving goggles are pushed up on her forehead." },
+    { text: "A gold jacket with a plain grey collar hangs open over a swimsuit; below it she is wearing the bottom half of a wetsuit, with its empty arms knotted round her middle. A towel is tied to the rail beside her so that the wind cannot have it." },
     { text: "A frond of green algae is plastered in her hair. She is, with great concentration, talking to the sea." },
     { say: "freddie", alias: "Girl with goggles on her head", text: "\"Come on — come ON — I saw you, you big brown — that's a ray. That's a *ray*. Hey! Jacketless! Is that a ray?\"" },
     { choice: [
@@ -1086,7 +1090,8 @@ scene("deck_freddie", {
       ] }
     ] },
     { text: "Rowan has stopped listening to her and started on the sea." },
-    { say: "rowan", text: "\"…Mizune sends a Surprise to the discard, draws a card. Water Golem for the Surprise. Frolake draws two. Land Sharks, Narwhal, Diver Helmet. Aquatic Shield. Aquatic Arrows. Aquatic Spear.\" He stops. \"Aquatic Arrows is Destruction Magic. Mizune hasn't got Destruction Magic. None of your heroes have.\"" },
+    { say: "rowan", text: "\"…Mizune sends a Surprise to the discard, draws a card. Water Golem for the Surprise. Frolake draws two. Land Sharks, Narwhal, Diver Helmet. Aquatic Shield.\"" },
+    { say: "rowan", text: "\"Aquatic Arrows. Aquatic Spear.\" He stops. \"Aquatic Arrows is Destruction Magic. Mizune hasn't got Destruction Magic. None of your heroes have.\"" },
     { say: "freddie", text: "\"…\"" },
     { text: "A very long, very serene pause." },
     { say: "freddie", text: "\"They're *aquatic*. Casting them is not the *point*.\"" },
@@ -1183,7 +1188,9 @@ scene("ferry_rafa", {
   steps: [
     { when: (s)=>!!s.flags["met_rafa"], jump: "again" },
     { text: "You smell him before you see him. On a deck that has smelled of salt and diesel since last night, something is suddenly giving off ginger, lemon, and a sharp edge of pepper." },
-    { text: "Beside the luggage cage a steel door marked GALLEY — CREW ONLY is wedged open with a crate of onions, and steam is coming up the steps behind it. In front of it a round-faced, broad-shouldered boy has set the ship's biggest kettle on a second crate and is ladling from it into a row of tin mugs. His red jacket, blue collar, has its sleeves shoved up past the elbow; a chef's bandana is knotted over short, neat twists; a stalk of something green is going steadily from one corner of his mouth to the other." },
+    { text: "Beside the luggage cage a steel door marked GALLEY — CREW ONLY is wedged open with a crate of onions, and steam is coming up the steps behind it." },
+    { text: "In front of it a round-faced, broad-shouldered boy has set the ship's biggest kettle on a second crate and is ladling from it into a row of tin mugs." },
+    { text: "His red jacket, blue collar, has its sleeves shoved up past the elbow; a chef's bandana is knotted over short, neat twists; a stalk of something green is going steadily from one corner of his mouth to the other." },
     { text: "He is not giving the mugs to everybody. A boy strolls past whistling and gets a nod. Then the cook's eyes land on you, and he looks at you for a moment the way a cook looks into a pot." },
     { say: "rafa", alias: "Boy in a chef's bandana", text: "\"You eaten?\"" },
     { choice: [
@@ -1447,7 +1454,8 @@ scene("isle_sunny", {
 scene("isle_freddie", {
   steps: [
     { when: (s)=>!!s.flags["isle_freddie_done"], jump: "later" },
-    { text: "In the shallows behind the bungalow row somebody is floating face down in a swimsuit and diving goggles, a mop of red hair spread out on the water like weed. A gold jacket with a grey collar hangs from a bungalow stilt, well above the tide line. As you reach the edge she comes up all at once, streaming, with both hands cupped round something." },
+    { text: "In the shallows behind the bungalow row somebody is floating face down in a swimsuit and diving goggles, a mop of red hair spread out on the water like weed." },
+    { text: "A gold jacket with a grey collar hangs from a bungalow stilt, well above the tide line. As you reach the edge she comes up all at once, streaming, with both hands cupped round something." },
     { when: (s)=>!s.flags["met_freddie"], jump: "first" },
     { when: (s)=>!!s.flags["freddie_held_jacket"], say: "freddie", text: "\"Jacket man! Perfect. Hold out your hand.\"" },
     { when: (s)=>!s.flags["freddie_held_jacket"], say: "freddie", text: "\"Rowan! Perfect. Hold out your hand.\"" },
@@ -1508,7 +1516,7 @@ scene("isle_freddie", {
 scene("isle_marit", {
   steps: [
     { when: (s)=>!!s.flags["isle_marit_done"], jump: "later" },
-    { text: "In front of Rare Hall, just inside the main gate, a trunk has been stood on its end in the middle of the path. A girl with two flame-shaped tufts of orange hair, an orange bow on each, is standing on it with her arms spread, addressing the façade." },
+    { text: "In the forecourt of Rare Hall, a trunk has been stood on its end in the middle of the path. A girl with two flame-shaped tufts of orange hair, an orange bow on each, is standing on it with her arms spread, addressing the façade." },
     { text: "\"…and LO, the doors of the hall stood open —\" The façade gives her back every word, half a second late. She listens to it with her head on one side, like a cook tasting." },
     { when: (s)=>!s.flags["met_marit"], jump: "first" },
     { when: (s)=>!!s.flags["marit_cast_rowan"], say: "marit", text: "\"The **BROODING STRANGER!** On time for a rehearsal nobody told him about! *That* is instinct!\"" },
@@ -1572,7 +1580,8 @@ scene("isle_marit", {
 scene("isle_rafa", {
   steps: [
     { when: (s)=>!!s.flags["isle_rafa_done"], jump: "later" },
-    { text: "Bungalow one is hot, loud with a radio, and smells of something that has been frying since before you were born. At the range a broad woman in a flowered apron has her back to the room. At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana and a borrowed apron, his red jacket, blue collar, on a hook behind him." },
+    { text: "Bungalow one is hot, loud with a radio, and smells of something that has been frying since before you were born. At the range a broad woman in a flowered apron has her back to the room." },
+    { text: "At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana and a borrowed apron, his red jacket, blue collar, on a hook behind him." },
     { when: (s)=>!s.flags["met_rafa"], jump: "first" },
     { say: "rafa", text: "\"Rowan.\" The knife does not stop. \"Sit. I didn't ask if you were hungry, I asked you to sit.\"" },
     { when: (s)=>!!s.flags["rafa_knows_table"] && !!s.flags["placement_won"], say: "rafa", text: "\"And? The table. …That face is a clean plate. Good. Told you it was a cupboard.\"" },

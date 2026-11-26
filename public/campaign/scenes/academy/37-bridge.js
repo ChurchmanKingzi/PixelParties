@@ -8,7 +8,8 @@ scene("ferry_abel", {
   steps: [
     { when: (s)=>!!s.flags["met_abel"], jump: "again" },
     { text: "The man at the wheel is barrel-chested, with a full white beard and a blue bowler hat gone soft with age. His face is the colour and texture of a good saddle." },
-    { text: "Through the open door the wheelhouse is warm and bright with brass. He has both hands on the wheel, with his feet planted apart, as if the whole ship were a very large, very slow horse that needed to be reminded who was riding it. Just inside the door, under a tarpaulin, sits a small crate that smells of ice and harbour." },
+    { text: "Through the open door the wheelhouse is warm and bright with brass. He has both hands on the wheel, with his feet planted apart, as if the whole ship were a very large, very slow horse that needed to be reminded who was riding it." },
+    { text: "Just inside the door, under a tarpaulin, sits a small crate that smells of ice and harbour." },
     { say: "abel", alias: "The captain", text: "\"Thirty-seven and — hold on. Thirty-eight! There you are. I counted thirty-seven.\"" },
     { text: "He does not turn round." },
     { choice: [
@@ -288,7 +289,8 @@ scene("abel_jokes", {
         { text: "The pause of a man who has been waiting all morning for it." },
         { say: "abel", text: "\"And I say — only the ONCE!\"" },
         { text: "The laugh rolls round the brass and out of the door. You laugh too. You had not planned to. It is the timing." },
-        { when: (s)=>!!s.flags["rana_knew_joke"], think: "The girl on the stair had that ending out before he did. Word for word." },
+        { when: (s)=>!!s.flags["rana_knew_joke"] && !s.flags["met_rana"], think: "The girl on the stair had that ending out before he did. Word for word." },
+        { when: (s)=>!!s.flags["rana_knew_joke"] && !!s.flags["met_rana"], think: "Rana had that ending out before he did. Word for word." },
         { say: "abel", text: "\"Four's the good one. Everybody finds four in the end.\"" },
         AFF("abel", 2, "Asked for number four")
       ] },
@@ -668,7 +670,8 @@ scene("answer_rana", {
     { choice: [
       { text: "Say what you know about the deck, quietly.", hint: "You know these cards", steps: [
         { text: "You say nothing for a moment. Then, so low that she may not be meant to hear:" },
-        { say: "rowan", text: "\"…Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill. Bee, Centipede, Rhinoceros, Scarab. Each one waits for exactly one thing. Bakhm hits for every Surprise that fires. Paid for by deleting the matching artifact.\" A breath. \"Troop Annihilation refills them. Nobody plays it like that.\"" },
+        { say: "rowan", text: "\"…Cybug LOCUST copies whatever you attach to my hero. LADYBUG cancels an Ability. ANTS punishes damage that doesn't kill. Bee, Centipede, Rhinoceros, Scarab. Each one waits for exactly one thing.\"" },
+        { say: "rowan", text: "\"Bakhm hits for every Surprise that fires. Paid for by deleting the matching artifact.\" A breath. \"Troop Annihilation refills them. Nobody plays it like that.\"" },
         { say: "rana", text: "\"…You read the names.\" Under her breath. \"Nobody reads the names.\"" },
         AFF("rana", 2, "Read the names")
       ] },
@@ -1061,7 +1064,8 @@ scene("deck_teobalt", {
       ] }
     ] },
     { text: "You have taken a half-step back without meaning to. Your voice comes out low and exact, as if you were reading from a sheet." },
-    { say: "rowan", text: "\"…Aristocrat, Artist, Mystic, Prisoner. Each one a clause. No Potions. No multi-card draws. No extra gold. Natas makes a Master's Plan every turn and cancels the one card that mattered. Slow. Icy Grave. Forbidden Zone. Mr. Jiggles and a Haressassin grind for the damage.\" A breath. \"Plain mid-sized bodies. One Master's Plan a turn, no more.\"" },
+    { say: "rowan", text: "\"…Aristocrat, Artist, Mystic, Prisoner. Each one a clause. No Potions. No multi-card draws. No extra gold. Natas makes a Master's Plan every turn and cancels the one card that mattered.\"" },
+    { say: "rowan", text: "\"Slow. Icy Grave. Forbidden Zone. Mr. Jiggles and a Haressassin grind for the damage.\" A breath. \"Plain mid-sized bodies. One Master's Plan a turn, no more.\"" },
     { say: "teobalt", text: "\"…You are describing my deck.\" A very quiet, very serious voice. \"That is the most accurate description I have ever heard of my deck, including my own.\"" },
     { say: "teobalt", text: "\"May I ask where you learned it? It is not a list one meets by accident.\"" },
     { choice: [
@@ -1083,7 +1087,8 @@ scene("ferry_hedda", {
   steps: [
     { when: (s)=>!!s.flags["met_hedda"], jump: "again" },
     { text: "The starboard side deck is the narrow way between bow and stern, and somebody has turned it into a checkpoint." },
-    { text: "She is tiny: a wild mane of moss-green hair under a crown of fresh wildflowers, a gold jacket with a plain grey collar hanging open over a gardening apron, and a megaphone slung across her back on a strap of bicycle inner tube. In the crook of one arm she is sheltering a small pot of lavender from the wind. In the other hand is a board with a pen on a string, and she is holding it across the deck like a barrier." },
+    { text: "She is tiny: a wild mane of moss-green hair under a crown of fresh wildflowers, a gold jacket with a plain grey collar hanging open over a gardening apron, and a megaphone slung across her back on a strap of bicycle inner tube." },
+    { text: "In the crook of one arm she is sheltering a small pot of lavender from the wind. In the other hand is a board with a pen on a string, and she is holding it across the deck like a barrier." },
     { say: "hedda", alias: "Girl with a petition", text: "\"You! Jacketless! You haven't signed. I'd remember; I've got every face on this boat against a line.\"" },
     { choice: [
       { text: "\"What would I be signing?\"", steps: [
@@ -1305,7 +1310,9 @@ scene("chat_hedda_ferry", {
 scene("ferry_freya", {
   steps: [
     { when: (s)=>!!s.flags["met_freya"], jump: "again" },
-    { text: "A bench is bolted to the deckhouse wall on the starboard side, in the only strip of shade, and one girl has taken all of it. She is long enough to need it: boots crossed over one armrest, an ice-blonde braid hanging off the other end nearly to the planks, a red jacket with a grey collar buttoned over a shirt and a narrow black tie. A paperback lies open, face down, across her face. A steel flask stands on the deck within reach of her hand." },
+    { text: "A bench is bolted to the deckhouse wall on the starboard side, in the only strip of shade, and one girl has taken all of it." },
+    { text: "She is long enough to need it: boots crossed over one armrest, an ice-blonde braid hanging off the other end nearly to the planks, a red jacket with a grey collar buttoned over a shirt and a narrow black tie." },
+    { text: "A paperback lies open, face down, across her face. A steel flask stands on the deck within reach of her hand." },
     { text: "You slow down, to step round the braid." },
     { say: "freya", alias: "Girl under a book", text: "\"You have stopped.\" The book does not move. \"People who stop want the bench, or they want to know if I am dead. Which?\"" },
     { choice: [
@@ -1488,7 +1495,8 @@ scene("chat_freya_ferry", {
 scene("ferry_trixie", {
   steps: [
     { when: (s)=>!!s.flags["met_trixie"], jump: "again" },
-    { text: "Halfway along the starboard deck a girl is standing at the rail on tiptoe, and then not on tiptoe, and then on tiptoe again. Honey-blonde hair in two bunches that bounce half a beat behind the rest of her. A red jacket, a grey collar with an enamel bee pinned to it, and yellow-striped socks pulled up to the knee. She is talking, earnestly and without a break, to the top of the rail." },
+    { text: "Halfway along the starboard deck a girl is standing at the rail on tiptoe, and then not on tiptoe, and then on tiptoe again. Honey-blonde hair in two bunches that bounce half a beat behind the rest of her." },
+    { text: "A red jacket, a grey collar with an enamel bee pinned to it, and yellow-striped socks pulled up to the knee. She is talking, earnestly and without a break, to the top of the rail." },
     { text: "You are about to put a hand on that rail, to get past her." },
     { say: "trixie", alias: "Girl in striped socks", text: "\"Stop! Sorry! Stop. Right by your hand. Don't swat.\"" },
     { choice: [

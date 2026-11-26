@@ -46,9 +46,8 @@ scene("ferry_arrival", {
       text: "You are standing at the rail with your hands on the wet iron, and you are, for the first time since the harbour, entirely alone."
     },
     { text: "The island has stopped being a picture. It has trees on it now." },
-    {
-      text: "A grey cone of volcano, a thread of smoke leaning off its top. Jungle pouring down the flanks to a ribbon of pale sand, and, on the sand, tiny and perfect, a long wooden pier with a blue arch at its end. A little red cable car crawls along a wire over the canopy like a bead on a string. The sea around it is so clear that you can see, where the ship's shadow falls, a line where the green turns to blue."
-    },
+    { text: "A grey cone of volcano, a thread of smoke leaning off its top. Jungle pouring down the flanks to a ribbon of pale sand, and, on the sand, tiny and perfect, a long wooden pier with a blue arch at its end." },
+    { text: "A little red cable car crawls along a wire over the canopy like a bead on a string. The sea around it is so clear that you can see, where the ship's shadow falls, a line where the green turns to blue." },
     { think: "That's it. That's where I live now." },
     { think: "Fifteen minutes. And then I won't be a person on a boat any more. I'll be a person on an island." },
     { text: "Behind you, the iron door of the saloon bangs open, and the whole ship starts to arrive." },
@@ -276,7 +275,9 @@ scene("arrival_bow", {
     { label: "next_9" },
     { say: "baylee", text: "\"Morning, Rowan. Nearly eleven.\" A pause. \"Nearly there.\"" },
     { label: "end_8" },
-    { when: (s)=>!s.flags["met_eberhart"], text: "Baylee is not the only fixed point on the fore deck. Against the forward bulkhead the first-years' trunks stand in a stack so square that it looks drawn, and beside it, at something like parade rest, stands a tall boy with cropped ash-blond hair and an old, straight scar across one cheek. He is facing the island as if it had been assigned to him." },
+    { when: (s)=>!s.flags["met_eberhart"], text: "Baylee is not the only fixed point on the fore deck." },
+    { when: (s)=>!s.flags["met_eberhart"], text: "Against the forward bulkhead the first-years' trunks stand in a stack so square that it looks drawn, and beside it, at something like parade rest, stands a tall boy with cropped ash-blond hair and an old, straight scar across one cheek." },
+    { when: (s)=>!s.flags["met_eberhart"], text: "He is facing the island as if it had been assigned to him." },
     { when: (s)=>!!s.flags["met_eberhart"], text: "Baylee is not the only fixed point on the fore deck. Beside the trunks, which are still square, Eberhart stands at parade rest with his hands behind his back. He is facing the island as if it had been assigned to him." },
     { when: (s)=>!(!!s.flags["met_ed"]), jump: "next_12" },
     { say: "ed", text: "\"THERE'S A WATERFALL!\"" },
@@ -331,7 +332,8 @@ scene("arrival_bow", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["ed"] = s.notes["ed"] || []); if (a.indexOf("Hangs off things. Asks whether everything is dangerous, hopefully.") < 0) a.push("Hangs off things. Asks whether everything is dangerous, hopefully."); }
     },
     { label: "end_11" },
-    { when: (s)=>!s.flags["met_viktor"], text: "Right in the point of the bow, where the deck narrows to nothing, a lean man in a wide-brimmed hat with a pale-blue feather in the band has not looked up at any of this. He holds a brass compass flat on his palm, sights along it at the cliff, and writes a small number on a creased map." },
+    { when: (s)=>!s.flags["met_viktor"], text: "Right in the point of the bow, where the deck narrows to nothing, a lean man in a wide-brimmed hat with a pale-blue feather in the band has not looked up at any of this." },
+    { when: (s)=>!s.flags["met_viktor"], text: "He holds a brass compass flat on his palm, sights along it at the cliff, and writes a small number on a creased map." },
     { when: (s)=>!!s.flags["met_viktor"], text: "Right in the point of the bow, Viktor has not looked up at any of this. He holds the compass flat on his palm, sights along it at the cliff, and writes a small number on the map." },
     { say: "viktor", alias: "Man with a compass", text: "\"A little east of the cone. High up. The printed map has trees there.\"" },
     { text: "He says it to the map. Ed hears it anyway, and looks round at him the way a dog looks at somebody who has just picked up a lead." },
@@ -378,7 +380,8 @@ scene("arrival_bow", {
       run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "mikoto", n: 2, why: "Said he was nervous too" }); }
     },
     { label: "end_17" },
-    { when: (s)=>!s.flags["met_sammy"], text: "Behind the crowd, alone at the rail beyond the last bench, a slight boy in a long black coat is brooding at the island: chin down, one eye lost under a black fringe. The coat is flying straight out behind him like a flag, and one corner of it is feeling its way towards a deck cleat." },
+    { when: (s)=>!s.flags["met_sammy"], text: "Behind the crowd, alone at the rail beyond the last bench, a slight boy in a long black coat is brooding at the island: chin down, one eye lost under a black fringe." },
+    { when: (s)=>!s.flags["met_sammy"], text: "The coat is flying straight out behind him like a flag, and one corner of it is feeling its way towards a deck cleat." },
     { when: (s)=>!!s.flags["met_sammy"], text: "Behind the crowd, alone at the rail beyond the last bench, Sammy is brooding at the island, chin down. The coat is flying straight out behind him like a flag, and one corner of it is feeling its way back towards the deck cleat." },
     { when: (s)=>!s.flags["met_tobias"], text: "On the middle bench a broad boy with a broken nose, hands in his pockets, puts out one boot without turning his head and moves the hem aside. It is done so smoothly that the coat's owner never knows." },
     { when: (s)=>!!s.flags["met_tobias"], text: "On the middle bench Tobias, hands still in his pockets, puts out one boot without turning his head and moves the hem aside. It is done so smoothly that the coat's owner never knows." },
@@ -966,9 +969,8 @@ scene("arrival_stern", {
     { run: (s,io)=>{ if (io && io.popup) io.popup({ type: 'aff', id: "jessica", n: 1, why: "Answered in kind" }); } },
     { jump: "end_16" },
     { label: "next_17" },
-    {
-      text: "A girl with a gold chain at her throat is standing a little apart from the commotion with one ringed hand on a small leather casket. A small swallow charm hangs from the chain. Her face wears a look of patient serenity, like a lamp that has not yet been told it is the only light in the room."
-    },
+    { text: "A girl with a gold chain at her throat is standing a little apart from the commotion with one ringed hand on a small leather casket." },
+    { text: "A small swallow charm hangs from the chain. Her face wears a look of patient serenity, like a lamp that has not yet been told it is the only light in the room." },
     {
       say: "jessica",
       alias: "Girl with the caskets",
@@ -1107,9 +1109,8 @@ scene("arrival_mid", {
     },
     { label: "end_1" },
     { when: (s)=>!(!!s.flags["met_georgie"]), jump: "next_5" },
-    {
-      text: "Georgie is standing on the lowest rung of the lifeboat ladder, with a deck box in one hand and the green dragon plush in the other, and her eyes are enormous. She has not said anything, but she is smiling, a small, astonished, private smile, the way you smile when you are alone with a thing you love."
-    },
+    { text: "Georgie is standing on the lowest rung of the lifeboat ladder, with a deck box in one hand and the green dragon plush in the other, and her eyes are enormous." },
+    { text: "She has not said anything, but she is smiling, a small, astonished, private smile, the way you smile when you are alone with a thing you love." },
     {
       say: "georgie",
       text: "\"Hi, Rowan.\" Barely audible. \"Ember's looking.\" The green plush dragon is held up to the rail. \"She's never — she's never seen an island. It's — it's bigger than the pictures. Is that normal?\""
@@ -1398,9 +1399,11 @@ scene("arrival_finale", {
     },
     { text: "Everyone on board has come to the rails." },
     { text: "You look along them, bow to stern, because for once they are all in one place." },
-    { text: "In the point of the bow the wide-brimmed hat has at last looked up from its compass. Beside the trunks a boy with a scar stands as if on parade, and a long black coat streams past a broken nose that is pretending not to see it. And on the nearest bench a grey blanket, which — you watch it happen — sits up." },
+    { text: "In the point of the bow the wide-brimmed hat has at last looked up from its compass." },
+    { text: "Beside the trunks a boy with a scar stands as if on parade, and a long black coat streams past a broken nose that is pretending not to see it. And on the nearest bench a grey blanket, which — you watch it happen — sits up." },
     { say: "dmitri", alias: "Boy under a blanket", text: "\"…So. It is true. There is an island.\"" },
-    { text: "Amidships the photograph has come apart into a ragged line along the rail, with a pair of striped socks bobbing up on tiptoe at the end of it. On the saloon stairs a red pen has, for once, got its cap on, and a wine-red beret has turned round to face the island. Aft, a chef's bandana is bent over a crate of tin mugs, counting them, and then looks up and counts heads instead." },
+    { text: "Amidships the photograph has come apart into a ragged line along the rail, with a pair of striped socks bobbing up on tiptoe at the end of it." },
+    { text: "On the saloon stairs a red pen has, for once, got its cap on, and a wine-red beret has turned round to face the island. Aft, a chef's bandana is bent over a crate of tin mugs, counting them, and then looks up and counts heads instead." },
     { ...PHOTO("arrival_group", "Group photo amidships as the island arrives: everyone says \"island\"", { who: ["georgie", "branden", "rana", "teobalt", "freya", "fiona", "trixie", "hedda"], off: true }), when: (s)=>!s.flags["arr_mid"] },
     { when: (s)=>!!s.flags["eloise_time_promise"]&&!s.flags["eloise_time_kept"], think: "I told Eloise I'd say when we were nearly in. Somebody has turned her round. It wasn't me." },
     { when: (s)=>!s.flags["freddie_jumped"], text: "Thirty-eight, counting you. Red, gold and black, and one rain jacket." },

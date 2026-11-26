@@ -269,7 +269,8 @@ scene("shop_nathan", {
   steps: [
     { say: "nathan", text: "\"SIX different dudes! Censpartan, Cykyran, Gorinthian, Harpthenean, Minocrete, Thebinxan, I can say them ALL, I practised in the shower! You play one a turn and every dude is better for every OTHER dude on the table. It's basically Thanksgiving!\"" },
     { text: "Rowan's eyes have drifted out of focus. His lips are moving a half-second ahead of his voice." },
-    { say: "rowan", text: "\"…One of each at a time. Each one stronger per Counselor out. War Chest pays for the Gathering Place, so the new one acts the turn it lands. Three or four out and the board does everything. Stuns. Doubled shots. Gold cannon.\" A breath. \"Over-commits every game. One sweep and the whole table goes at once. Right. *Right.*\"" },
+    { say: "rowan", text: "\"…One of each at a time. Each one stronger per Counselor out. War Chest pays for the Gathering Place, so the new one acts the turn it lands.\"" },
+    { say: "rowan", text: "\"Three or four out and the board does everything. Stuns. Doubled shots. Gold cannon.\" A breath. \"Over-commits every game. One sweep and the whole table goes at once. Right. *Right.*\"" },
     { say: "nathan", text: "\"…Did you just say *sweep*?\"" },
     { say: "baylee", text: "\"He's right.\"" },
     { say: "nathan", text: "\"He's — okay, he's right! But nobody sweeps! It's rude!\"" },
@@ -713,7 +714,8 @@ scene("ferry_ed", {
         AFF("ed", 1, "Argued about fences")
       ] }
     ] },
-    { text: "He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning as if the sun had just come up for him personally. There is a fresh bandage round his left hand, and both knees of his trousers have been through something." },
+    { text: "He swings a leg up, hooks it over the rail with the grace of a boy who has done this on fences, and lands in a crouch on the planks, grinning as if the sun had just come up for him personally." },
+    { text: "There is a fresh bandage round his left hand, and both knees of his trousers have been through something." },
     { say: "ed", alias: "Boy in a battered hat", text: "\"Ed Venture. Lazy V Ranch, up on the high plains. Bungalow five, supposedly. They put the Commons on a beach. A BEACH. Who're you?\"" },
     MET("ed", "Ed Venture"),
     { choice: [
@@ -980,7 +982,8 @@ scene("deck_ed", {
       ] }
     ] },
     { text: "Rowan has stopped listening to the joke. His eyes are on the sea and his voice drops to a rapid undertone." },
-    { say: "rowan", text: "\"…Gold in, Monkee out. Cheeky hits, Nimble free, Resilient free. Non-Fungible pays when it comes and when it goes. Wealth. Treasure Chest. Golden Bananas. Real money goes onto Logan as Invest Counters, rolls over, deletes a hero at end of turn. Smug Coin. Bamboo Shield.\" He frowns. \"Logan's the smallest hero on the table. Freeze him and the bank stops. Right.\"" },
+    { say: "rowan", text: "\"…Gold in, Monkee out. Cheeky hits, Nimble free, Resilient free. Non-Fungible pays when it comes and when it goes. Wealth. Treasure Chest. Golden Bananas.\"" },
+    { say: "rowan", text: "\"Real money goes onto Logan as Invest Counters, rolls over, deletes a hero at end of turn. Smug Coin. Bamboo Shield.\" He frowns. \"Logan's the smallest hero on the table. Freeze him and the bank stops. Right.\"" },
     { say: "ed", text: "\"Did he just say freeze my banker?\" He waves a hand in front of your face, with interest. \"Rowan? Can people DO that? He's not blinking.\"" },
     { say: "rowan", text: "\"Only if someone's watching the gold.\"" },
     { say: "ed", text: "\"Nobody watches the gold! They watch the Monkees! …You're going to watch the gold, aren't you.\"" },
@@ -1061,7 +1064,8 @@ scene("deck_georgie", {
       ] }
     ] },
     { text: "Rowan has gone very still. When he speaks it is to the middle distance, soft and fast." },
-    { say: "rowan", text: "\"…Icy, Flaming, Shimmering eggs. Free, 1 HP. Worthless unless they break on your own turn. Sacrifice them into Green Dragoneer. Every sacrifice-summon, Rubin fires a Destruction spell on top. Black-Thorn Dragon, and neither can be touched by spells. Luna turns burns into cards.\" A breath. \"Tight. Never wastes a trigger.\"" },
+    { say: "rowan", text: "\"…Icy, Flaming, Shimmering eggs. Free, 1 HP. Worthless unless they break on your own turn. Sacrifice them into Green Dragoneer. Every sacrifice-summon, Rubin fires a Destruction spell on top.\"" },
+    { say: "rowan", text: "\"Black-Thorn Dragon, and neither can be touched by spells. Luna turns burns into cards.\" A breath. \"Tight. Never wastes a trigger.\"" },
     { say: "georgie", text: "\"You — you know the *order*.\"" },
     { text: "She has gone pink to the ears." },
     { say: "georgie", text: "\"Nobody knows the order.\"" },
@@ -1088,7 +1092,8 @@ scene("post_georgie", {
     { say: "rowan", text: "\"Why wouldn't I be?\"" },
     { say: "georgie", text: "\"I don't know. I've not lost very often. I didn't know what happens next.\" A breath. \"This is all right.\"" },
     // Geschenk nach Rowans Sieg: ihr Lieblings-Ei, prismatisch (die seltene Ausnahme).
-    { text: "She sets the dragon down beside her, opens her deck box and goes through it with the speed of somebody who knows where every card lives. She stops at an egg, holds it a moment, and then holds it out. It is not printed like your cards: when it tilts, the whole face of it runs through every colour there is." },
+    { text: "She sets the dragon down beside her, opens her deck box and goes through it with the speed of somebody who knows where every card lives." },
+    { text: "She stops at an egg, holds it a moment, and then holds it out. It is not printed like your cards: when it tilts, the whole face of it runs through every colour there is." },
     { say: "georgie", text: "\"Shimmering Dragonegg. You can have it. If you want.\" Very quickly: \"It's my favourite one, so it's a proper present, not a spare. Eggs are for when you don't know what happens next.\"" },
     { choice: [
       { text: "\"Georgie, that's a prismatic. You can't just give that away.\"", steps: [
@@ -1154,7 +1159,8 @@ scene("ferry_viktor", {
     { say: "rowan", text: "\"I'm Rowan.\"" },
     { say: "viktor", alias: "Man with a compass", text: "\"Viktor Hale. Commons. Bungalow five.\"" },
     MET("viktor", "Viktor Hale"),
-    { text: "He turns the map so that you can see it. It is a printed map of the island, creased into eighths. Pencil lines fan out from a dot in the sea: one to the cone, one to the left shoulder of the land, one to a notch below the smoke that you had not noticed until the line pointed at it." },
+    { text: "He turns the map so that you can see it. It is a printed map of the island, creased into eighths." },
+    { text: "Pencil lines fan out from a dot in the sea: one to the cone, one to the left shoulder of the land, one to a notch below the smoke that you had not noticed until the line pointed at it." },
     { say: "viktor", text: "\"Three bearings, and you know where you are. Six, and you know whether the map does.\"" },
     { choice: [
       { text: "\"And does it?\"", steps: [
@@ -1348,7 +1354,8 @@ scene("chat_viktor", {
 scene("isle_ed", {
   steps: [
     { when: (s)=>!!s.flags["isle_ed_done"], jump: "later" },
-    { text: "Behind the bungalow row the sand runs down to the cove in one long white slope. A pair of boots is standing at the foot of a palm tree, side by side, as if waiting for a bus. Their owner is three-quarters of the way up the trunk, gripping it with knees and elbows, in a battered cowboy hat." },
+    { text: "Behind the bungalow row the sand runs down to the cove in one long white slope. A pair of boots is standing at the foot of a palm tree, side by side, as if waiting for a bus." },
+    { text: "Their owner is three-quarters of the way up the trunk, gripping it with knees and elbows, in a battered cowboy hat." },
     { when: (s)=>!!s.flags["met_ed"], say: "ed", text: "\"Rowan! Don't look up, there's sand coming down! No, do look up! You can see EVERYTHING from here!\"" },
     { when: (s)=>!s.flags["met_ed"], say: "ed", alias: "Boy in a battered hat", text: "\"Hey! You're Rowan! The Wildcard, they read you out! Don't look up, there's sand coming down! No, do look up!\"" },
     { when: (s)=>!s.flags["met_ed"], say: "ed", alias: "Boy in a battered hat", text: "\"Ed Venture! Lazy V Ranch! Bungalow five! I'd shake, but I need both hands for another minute.\"" },
@@ -1410,7 +1417,8 @@ scene("isle_ed", {
 scene("isle_viktor", {
   steps: [
     { when: (s)=>!!s.flags["isle_viktor_done"], jump: "later" },
-    { text: "At the west end of the cove, where the bungalows give out and the sand turns to black rock, a man in a wide-brimmed hat stands exactly on the tide line with a map in one hand and a brass compass in the other. Each wave runs over his boots. He has his back to the sea. He is looking inland, up over the roofs and the trees, at the volcano." },
+    { text: "At the west end of the cove, where the bungalows give out and the sand turns to black rock, a man in a wide-brimmed hat stands exactly on the tide line with a map in one hand and a brass compass in the other." },
+    { text: "Each wave runs over his boots. He has his back to the sea. He is looking inland, up over the roofs and the trees, at the volcano." },
     { when: (s)=>!!s.flags["met_viktor"], say: "viktor", text: "\"Rowan.\"" },
     { when: (s)=>!!s.flags["met_viktor"]&&!!s.flags["viktor_notch_done"], say: "viktor", text: "\"You can see the notch from here.\" The pencil points, once. \"The green goes into it. So, a valley.\"" },
     { when: (s)=>!!s.flags["met_viktor"]&&!!s.flags["viktor_notch"]&&!s.flags["viktor_notch_done"], say: "viktor", text: "\"You didn't ask me at ten.\" The pencil points up at the mountain, once. \"It was a valley. The green goes into it.\"" },
@@ -1482,7 +1490,8 @@ scene("isle_viktor", {
 scene("isle_georgie", {
   steps: [
     { when: (s)=>!!s.flags["isle_georgie_done"], jump: "later" },
-    { text: "The lawn by the Trial Domes is dotted with white-and-gold collars, standing about in twos and threes and pretending not to watch the doors. At the very edge of the grass, where the shade of a dome begins, a small girl in a jacket one size too big is sitting cross-legged with a deck box in both hands. A dark-purple feather is pinned in her hair, and a green plush dragon sits in her lap, facing the domes." },
+    { text: "The lawn by the Trial Domes is dotted with white-and-gold collars, standing about in twos and threes and pretending not to watch the doors." },
+    { text: "At the very edge of the grass, where the shade of a dome begins, a small girl in a jacket one size too big is sitting cross-legged with a deck box in both hands. A dark-purple feather is pinned in her hair, and a green plush dragon sits in her lap, facing the domes." },
     { when: (s)=>!!s.flags["met_georgie"], say: "georgie", text: "\"Hi, Rowan.\"" },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["flag_georgie_played"], say: "georgie", text: "\"The tables in there light up. It isn't like our bit of deck. I looked through the door.\"" },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["georgie_game_later"]&&!s.flags["flag_georgie_played"], say: "georgie", text: "\"It still isn't later. It's fine. There's a whole year.\"" },

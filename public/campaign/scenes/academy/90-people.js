@@ -29,12 +29,16 @@ function add(lid, id, scene, extra, open) {
 }
 // ── Fähre ── (free: das Gespräch findet statt, wo Rowan gerade ist; kein Ortswechsel)
 const FERRY = [
-  ["ferry_deck", "viktor", { spot: ["ferry", 16, 37] }], ["ferry_deck", "eberhart", { spot: ["ferry", 11, 32] }],
-  ["ferry_deck", "sammy", { spot: ["ferry", 19, 33] }], ["ferry_deck", "tobias", { spot: ["ferry", 21, 32] }], ["ferry_deck", "dmitri", { spot: ["ferry", 14, 35] }],
-  ["ferry_deck", "fiona", { spot: ["ferry", 10, 31], free: true }], ["ferry_deck", "maisie", { spot: ["ferry", 10, 33], free: true }], ["ferry_deck", "leona", { spot: ["ferry", 9, 28], free: true }],
-  ["ferry_stern", "hedda", { spot: ["ferry", 23, 27], free: true }], ["ferry_stern", "freya", { spot: ["ferry", 21, 30], free: true }], ["ferry_stern", "trixie", { spot: ["ferry", 22, 32], free: true }],
+  // Bug: Viktor in der Spitze hinter der Ankerwinde, Eberhart bei den Koffern, die drei vom Bankende
+  ["ferry_deck", "viktor", { spot: ["ferry", 16, 37] }], ["ferry_deck", "eberhart", { spot: ["ferry", 21, 31] }],
+  ["ferry_deck", "sammy", { spot: ["ferry", 22, 33] }], ["ferry_deck", "tobias", { spot: ["ferry", 17, 34] }], ["ferry_deck", "dmitri", { spot: ["ferry", 13, 35] }],
+  // Backbord-Gang: Leona am Bug-Ende vor dem Musteraushang, Maisie in der Mitte auf dem Eimer an der Lampe, Fiona am Heck-Ende im Schatten des Rettungsboots
+  ["ferry_deck", "leona", { spot: ["ferry", 9, 24], free: true }], ["ferry_deck", "maisie", { spot: ["ferry", 9, 18], free: true }], ["ferry_deck", "fiona", { spot: ["ferry", 10, 13], free: true }],
+  // Steuerbord-Gang: Freya auf der Bank an der Deckhauswand, Hedda mit ihrem Brett in der Mitte, Trixie an der Reling
+  ["ferry_stern", "freya", { spot: ["ferry", 22, 14], free: true }], ["ferry_stern", "hedda", { spot: ["ferry", 23, 18], free: true }], ["ferry_stern", "trixie", { spot: ["ferry", 23, 22], free: true }],
   ["ferry_lounge", "anni", {}], ["ferry_lounge", "junho", {}], ["ferry_lounge", "eloise", {}],
-  ["ferry_stern", "cas", { spot: ["ferry", 16, 6] }], ["ferry_stern", "rafa", { spot: ["ferry", 21, 11] }],
+  // Heck: Cas am Flaggenstock, Rafa an der Kombüsentür neben dem Gepäckkäfig
+  ["ferry_stern", "cas", { spot: ["ferry", 17, 6] }], ["ferry_stern", "rafa", { spot: ["ferry", 9, 10] }],
 ];
 for (const [lid, id, extra] of FERRY) add(lid, id, "ferry_" + id, extra, ferryOpen);
 // Inya verlässt die Lounge, wenn ihr der Tisch verwehrt blieb oder sie gegen Gideon verlor (der Text lässt sie aufs Vordeck gehen).
@@ -44,9 +48,15 @@ for (const o of (L.ferry_lounge.objects || []).filter(o => o.sprite === "inya").
   const w = o.when; L.ferry_deck.objects.push(Object.assign(o, { id: o.id + "_deck", spot: ["ferry", 13, 30], free: true, alert: undefined, when: (s) => { const lounge = Object.assign({}, s, { eventsDone: {}, flags: Object.assign({}, s.flags, { ferry_inya_lost: false }) }); return w(lounge) && inyaOut(s); } }));
 }
 // Die schon gesetzten Figuren der Decks bekommen feste Plätze (bisher drängten sie sich alle um die Tür zur Lounge).
-const STAND = { abel: ["ferry", 21, 27], teobalt: ["ferry", 19, 27], rana: ["ferry", 11, 27], ed: ["ferry", 19, 36], georgie: ["ferry", 18, 35], branden: ["ferry", 14, 33], pippa: ["ferry", 20, 35], mikoto: ["ferry", 10, 31],
-  jessica: ["ferry", 12, 9], ashton: ["ferry", 20, 9], victoria: ["ferry", 20, 6], sunny: ["ferry", 17, 5], freddie: ["ferry", 14, 5], marit: ["ferry", 11, 6] };
-for (const lid of ["ferry_deck", "ferry_stern", "ferry_bridge"]) for (const o of L[lid].objects || []) if (STAND[o.sprite] && !o.spot) o.spot = STAND[o.sprite];
+const STAND = { abel: ["ferry", 12, 27], rana: ["ferry", 14, 27], teobalt: ["ferry", 18, 27],
+  ed: ["ferry", 19, 36], georgie: ["ferry", 18, 35], pippa: ["ferry", 20, 35], branden: ["ferry", 14, 33], mikoto: ["ferry", 10, 31],
+  freddie: ["ferry", 14, 5], sunny: ["ferry", 19, 5], marit: ["ferry", 11, 5], jessica: ["ferry", 14, 8], ashton: ["ferry", 23, 8], victoria: ["ferry", 21, 10] };
+// Lounge (Raum ferry__0, Tür unten, Fensterwand oben): Spieltisch in der Mitte auf dem grünen Teppich, Galley-Theke oben links.
+//   Gideon und Inya einander gegenüber am Tisch, Tomi auf der Banklehne daneben, Anni am Bankende neben dem Tisch,
+//   Magnus zwei Bänke dahinter, Jun-ho mitten an der Fensterwand, Eloise unter dem linken Fenster, Noor allein unter dem rechten, Livvie am Galley-Ende.
+Object.assign(STAND, { gideon: ["ferry__0", 10, 7], inya: ["ferry__0", 11, 9], tomi: ["ferry__0", 12, 7], anni: ["ferry__0", 8, 9],
+  magnus: ["ferry__0", 12, 11], junho: ["ferry__0", 10, 4], eloise: ["ferry__0", 6, 4], noor: ["ferry__0", 18, 4], livvie: ["ferry__0", 2, 4] });
+for (const lid of ["ferry_deck", "ferry_stern", "ferry_bridge", "ferry_lounge"]) for (const o of L[lid].objects || []) if (STAND[o.sprite] && !o.spot && (lid === "ferry_lounge") === (STAND[o.sprite][0] === "ferry__0")) o.spot = STAND[o.sprite];
 
 // ── Insel, Tag 1 ──
 const ROW = "commons_beach";
@@ -56,21 +66,21 @@ const ISLE = [
   [ROW, "maisie", "row_b4", { spot: ["commons", 28, 25] }], [ROW, "fiona", "row_b4", { spot: ["commons", 30, 25] }], [ROW, "leona", "row_b4", { spot: ["commons", 31, 24] }],
   [ROW, "sammy", "row_b6", { spot: ["commons", 40, 24] }], [ROW, "tobias", "row_b6", { spot: ["commons", 42, 24] }], [ROW, "dmitri", "row_b6", { spot: ["commons", 43, 23] }],
   // Bungalow 3 und 5, der Strand
-  [ROW, "inya", "isle_inya", { room: "commons__2" }], [ROW, "livvie", "isle_livvie", { spot: ["commons", 22, 22] }], [ROW, "rana", "isle_rana", { spot: ["commons", 8, 33] }],
-  [ROW, "tomi", "isle_tomi", { spot: ["commons", 35, 22] }], [ROW, "ed", "isle_ed", { spot: ["commons", 38, 31] }], [ROW, "viktor", "isle_viktor", { spot: ["commons", 20, 38] }],
-  [ROW, "freddie", "isle_freddie", { spot: ["commons", 30, 41] }], [ROW, "sunny", "isle_sunny", { spot: ["commons", 34, 41] }],
+  [ROW, "inya", "isle_inya", { room: "commons__2" }], [ROW, "livvie", "isle_livvie", { spot: ["commons", 22, 22] }], [ROW, "rana", "isle_rana", { spot: ["commons", 6, 43] }],
+  [ROW, "tomi", "isle_tomi", { spot: ["commons", 35, 22] }], [ROW, "ed", "isle_ed", { spot: ["commons", 37, 30] }], [ROW, "viktor", "isle_viktor", { spot: ["commons", 11, 43] }],
+  [ROW, "freddie", "isle_freddie", { spot: ["commons", 31, 42] }], [ROW, "sunny", "isle_sunny", { spot: ["commons", 34, 41] }],
   // die Küche
   ["commons_kitchen", "odalys", "isle_odalys", { room: "commons__0" }], ["commons_kitchen", "rafa", "isle_rafa", { room: "commons__0" }],
   // der Quad
-  ["quad", "pippa", "isle_pippa", { spot: ["campus_core", 37, 32] }], ["quad", "teobalt", "isle_teobalt", { spot: ["campus_core", 33, 28] }], ["quad", "noor", "isle_noor", { spot: ["campus_core", 35, 14] }],
-  ["quad", "junho", "isle_junho", { spot: ["campus_core", 31, 31] }], ["quad", "eloise", "isle_eloise", { spot: ["campus_core", 26, 27] }], ["quad", "cas", "isle_cas", { spot: ["campus_core", 39, 29] }],
+  ["quad", "pippa", "isle_pippa", { spot: ["campus_core", 36, 30] }], ["quad", "teobalt", "isle_teobalt", { spot: ["campus_core", 33, 22] }], ["quad", "noor", "isle_noor", { spot: ["campus_core", 35, 13] }],
+  ["quad", "junho", "isle_junho", { spot: ["campus_core", 32, 28] }], ["quad", "eloise", "isle_eloise", { spot: ["campus_core", 28, 25] }], ["quad", "cas", "isle_cas", { spot: ["campus_core", 38, 28] }],
   ["quad", "victoria", "isle_victoria", { spot: ["campus_core", 41, 33] }],
   // vor Rare Hall, am Tor
-  ["main_gate", "eberhart", "isle_eberhart", { spot: ["gate", 19, 19] }], ["main_gate", "mikoto", "isle_mikoto", { spot: ["gate", 21, 20] }], ["main_gate", "marit", "isle_marit", { spot: ["gate", 16, 20] }],
+  ["main_gate", "eberhart", "isle_eberhart", { spot: ["gate", 20, 19] }], ["main_gate", "mikoto", "isle_mikoto", { spot: ["gate", 19, 17] }], ["main_gate", "marit", "isle_marit", { spot: ["gate", 24, 18] }],
   // bei den Trial Domes: Spectral wartet auf seine Einstufung
-  ["trial_dome", "gideon", "isle_gideon", { spot: ["campus_west", 10, 48] }], ["trial_dome", "magnus", "isle_magnus", { spot: ["campus_west", 12, 47] }], ["trial_dome", "ashton", "isle_ashton", { spot: ["campus_west", 9, 50] }],
-  ["trial_dome", "jessica", "isle_jessica", { spot: ["campus_west", 14, 49] }], ["trial_dome", "georgie", "isle_georgie", { spot: ["campus_west", 7, 49] }], ["trial_dome", "anni", "isle_anni", { spot: ["campus_west", 5, 48] }],
-  ["trial_dome", "branden", "isle_branden", { spot: ["campus_west", 16, 47] }],
+  ["trial_dome", "gideon", "isle_gideon", { spot: ["campus_west", 16, 50] }], ["trial_dome", "magnus", "isle_magnus", { spot: ["campus_west", 13, 47] }], ["trial_dome", "ashton", "isle_ashton", { spot: ["campus_west", 20, 44] }],
+  ["trial_dome", "jessica", "isle_jessica", { spot: ["campus_west", 26, 46] }], ["trial_dome", "georgie", "isle_georgie", { spot: ["campus_west", 18, 46] }], ["trial_dome", "anni", "isle_anni", { spot: ["campus_west", 7, 48] }],
+  ["trial_dome", "branden", "isle_branden", { spot: ["campus_west", 23, 48] }],
 ];
 for (const [lid, id, scene, extra] of ISLE) add(lid, id, scene, extra, isleOpen);
 // Was die Figuren auf den Veranden ersetzen: die Knöpfe „Knock on bungalow 2“ usw.

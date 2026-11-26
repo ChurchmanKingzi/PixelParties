@@ -22,7 +22,8 @@ scene("deck_pippa", {
       ] }
     ] },
     { text: "You are looking at the camera, but not through it. Your voice comes out of the side of your mouth." },
-    { say: "rowan", text: "\"…Slimy Infestation. Cloudy, Fiery, Shadowy, Splashy, Sparky, Shiny. Every slime does its job the moment it lands. Burn something forever. Freeze. Switch off. Slime Rancher doubles it. Shadowy brings them back. Alice hits for every creature that's sat a turn. Rain of Arrows hits the whole side.\" A pause. \"Wide board that lives a turn is the entire plan.\"" },
+    { say: "rowan", text: "\"…Slimy Infestation. Cloudy, Fiery, Shadowy, Splashy, Sparky, Shiny. Every slime does its job the moment it lands. Burn something forever. Freeze. Switch off. Slime Rancher doubles it.\"" },
+    { say: "rowan", text: "\"Shadowy brings them back. Alice hits for every creature that's sat a turn. Rain of Arrows hits the whole side.\" A pause. \"Wide board that lives a turn is the entire plan.\"" },
     { say: "pippa", text: "\"Stay — stay exactly like that —\" She clicks the shutter. \"That. That was your *face*. That was the face of somebody doing arithmetic. Does it do that every time?\"" },
     PHOTO("rowan_arithmetic", "Rowan reciting his deck: the face of somebody doing arithmetic", { who: ["rowan"] }),
     { say: "rowan", text: "\"Every time.\"" },
@@ -404,7 +405,8 @@ scene("deck_mikoto", {
       ] }
     ] },
     { text: "Your lips are moving. You are not looking at Mikoto any longer. You are looking at a board nobody else can see." },
-    { say: "rowan", text: "\"…Tiny Bone Friends. Healer, Priest, Mage, Wizard. Necromancer brings one back. Treasure Skeleton draws. Bonegrinder turns every dead one into a card. Raise the Minions after a sweep, three at once. Vacarn is the weak point, he's always the weak point.\" A breath. \"Grinds. Doesn't rush. Patient.\"" },
+    { say: "rowan", text: "\"…Tiny Bone Friends. Healer, Priest, Mage, Wizard. Necromancer brings one back. Treasure Skeleton draws. Bonegrinder turns every dead one into a card.\"" },
+    { say: "rowan", text: "\"Raise the Minions after a sweep, three at once. Vacarn is the weak point, he's always the weak point.\" A breath. \"Grinds. Doesn't rush. Patient.\"" },
     { say: "mikoto", text: "\"You — you know all of them? Sorry. Sorry, I — nobody — they only ever know the Death Knight.\"" },
     { say: "rowan", text: "\"The Death Knight's the dull one. The Healers are the deck.\"" },
     { say: "mikoto", text: "\"Oh.\" A small, wet laugh, stopped at once. \"Oh, that's — thank you. Sorry. That's lovely.\"" },
@@ -483,7 +485,8 @@ scene("post_mikoto", {
 scene("ferry_branden", {
   steps: [
     { when: (s)=>!!s.flags["met_branden"], jump: "again" },
-    { text: "Somebody has taken the lifebuoy off the rail and is rolling it down the deck like a hoop. The somebody is perhaps ten years old. The first thing you notice is the hair, a flame-orange mop that stands up in spikes as if it is in the middle of a shout. The second is the jacket, three sizes too big, its sleeves flapping past his hands like flags. The third is the grin, which has already decided to regret nothing." },
+    { text: "Somebody has taken the lifebuoy off the rail and is rolling it down the deck like a hoop. The somebody is perhaps ten years old. The first thing you notice is the hair, a flame-orange mop that stands up in spikes as if it is in the middle of a shout." },
+    { text: "The second is the jacket, three sizes too big, its sleeves flapping past his hands like flags. The third is the grin, which has already decided to regret nothing." },
     { say: "branden", alias: "Flame-haired kid", text: "\"You! Jacketless! Be my timekeeper! If I get this thing to the funnel before a crewman catches me, you owe me one Smug Coin. If I get caught, you don't, but I'll still say it was a *very* good attempt.\"" },
     { choice: [
       { text: "\"That's the ship's lifebuoy. Somebody might need it. I'm Rowan, by the way.\"", steps: [
@@ -732,7 +735,8 @@ scene("deck_branden", {
       ] }
     ] },
     { text: "You have put your head on one side. Your voice comes out low and quick." },
-    { say: "rowan", text: "\"…Luna Pele. Poison burns for the rest of the game. Every burn, a card, up to four a turn. Tazune to shrug off the first two hits of his own fire every turn. Fire Bolts. Fireball on two. Heat Wave lights the whole board, then Heart of the Mountain draws one per burning target. Flame Avalanche to finish.\" A pause. \"All spells. No board. When the burn runs out there's nothing.\"" },
+    { say: "rowan", text: "\"…Luna Pele. Poison burns for the rest of the game. Every burn, a card, up to four a turn. Tazune to shrug off the first two hits of his own fire every turn. Fire Bolts. Fireball on two.\"" },
+    { say: "rowan", text: "\"Heat Wave lights the whole board, then Heart of the Mountain draws one per burning target. Flame Avalanche to finish.\" A pause. \"All spells. No board. When the burn runs out there's nothing.\"" },
     { say: "branden", text: "\"There's *always* something!\"" },
     { text: "Offended, but a little too quick." },
     { say: "branden", text: "\"There's — Fiery Slime! There's an egg!\"" },
@@ -819,7 +823,8 @@ scene("ferry_eberhart", {
   steps: [
     { when: (s)=>!!s.flags["met_eberhart"], jump: "again" },
     { text: "The first-years' trunks are lashed in a stack against the forward bulkhead, under a tarpaulin that has come loose at one corner. Somebody is putting this right." },
-    { text: "He is tall and heavy in the shoulder, with cropped ash-blond hair and his red jacket buttoned to the throat, the blue collar squared. An old, straight scar runs across his left cheek. He has a steamer trunk in both arms, a trunk with somebody else's initials on it, and he is waiting for the ship to finish rolling before he sets it down." },
+    { text: "He is tall and heavy in the shoulder, with cropped ash-blond hair and his red jacket buttoned to the throat, the blue collar squared. An old, straight scar runs across his left cheek." },
+    { text: "He has a steamer trunk in both arms, a trunk with somebody else's initials on it, and he is waiting for the ship to finish rolling before he sets it down." },
     { text: "The ship finishes. The trunk goes down without a sound. He moves it a finger's width with the side of his shoe, until its edge agrees with the one beneath." },
     { text: "At the top of the stack, a small leather case begins, slowly, to slide." },
     { choice: [
@@ -1118,7 +1123,8 @@ scene("isle_pippa", {
 scene("isle_mikoto", {
   steps: [
     { when: (s)=>!!s.flags["isle_mikoto_done"], jump: "later" },
-    { text: "On the steps of Rare Hall a thin boy in round glasses is standing beside the space where, evidently, a trunk used to be. He has a notebook open and a pencil on a string, and he is looking at the gap. A few steps off, a tall boy with a scar on his cheek is going in through the door with a trunk on his shoulder." },
+    { text: "On the steps of Rare Hall a thin boy in round glasses is standing beside the space where, evidently, a trunk used to be." },
+    { text: "He has a notebook open and a pencil on a string, and he is looking at the gap. A few steps off, a tall boy with a scar on his cheek is going in through the door with a trunk on his shoulder." },
     { when: (s)=>!s.flags["met_mikoto"], say: "mikoto", alias: "Apologetic boy", text: "\"Sorry — was that yours? No. No, it was mine. He's taken mine. Sorry. You're Rowan Vance, they read it out, I wrote it down.\"" },
     { when: (s)=>!s.flags["met_mikoto"], text: "He laughs, high and helpless, and stops as though somebody had put a hand over it." },
     { when: (s)=>!s.flags["met_mikoto"], say: "mikoto", alias: "Apologetic boy", text: "\"Mikoto Yamaguchi. I laugh when I'm frightened. It isn't funny. I've got a list of what could go wrong today, and 'tall person carries my trunk away' is on it. It's got two ticks now.\"" },
@@ -1169,7 +1175,8 @@ scene("isle_mikoto", {
 scene("isle_eberhart", {
   steps: [
     { when: (s)=>!!s.flags["isle_eberhart_done"], jump: "later" },
-    { text: "The trunks of Rare Hall stand in a row on the gravel before the door, and the row is getting shorter. A tall boy with cropped ash-blond hair, a scar across his left cheek and his red jacket buttoned to the throat comes down the steps empty-handed, takes the next one by both handles and lifts it as though it had asked him to." },
+    { text: "The trunks of Rare Hall stand in a row on the gravel before the door, and the row is getting shorter." },
+    { text: "A tall boy with cropped ash-blond hair, a scar across his left cheek and his red jacket buttoned to the throat comes down the steps empty-handed, takes the next one by both handles and lifts it as though it had asked him to." },
     { text: "A grey cat is asleep on the third step. He goes round it, each time, by exactly the same margin." },
     { when: (s)=>!s.flags["met_eberhart"], say: "eberhart", alias: "Boy with a scar", text: "\"Vance. You were read out on the Quad. The Wildcard.\"" },
     { when: (s)=>!s.flags["met_eberhart"], text: "He sets the trunk down, straightens, and gives a short, exact bow of the head." },
@@ -1228,7 +1235,8 @@ scene("isle_eberhart", {
 scene("isle_branden", {
   steps: [
     { when: (s)=>!!s.flags["isle_branden_done"], jump: "later" },
-    { text: "On the lawn before the Trial Domes the first-years with the white-and-gold collars are waiting to be called, and are doing it quietly, a careful distance apart. All but one. A boy of perhaps ten, with flame-orange hair standing up in spikes and a jacket three sizes too big, is walking along the top of the low wall with his arms out, counting." },
+    { text: "On the lawn before the Trial Domes the first-years with the white-and-gold collars are waiting to be called, and are doing it quietly, a careful distance apart. All but one." },
+    { text: "A boy of perhaps ten, with flame-orange hair standing up in spikes and a jacket three sizes too big, is walking along the stone kerb of the path with his arms out, counting." },
     { when: (s)=>!s.flags["met_branden"], say: "branden", alias: "Flame-haired kid", text: "\"Forty-one, forty-two — YOU! You're the Wildcard! They read you out! Your jacket *fits*! Mine's *enormous*, do you want to swap? No. Technically I need it.\"" },
     { when: (s)=>!s.flags["met_branden"], say: "branden", alias: "Flame-haired kid", text: "\"Branden Sunflower. National champion. Under tens. Two years running. I'm ten and three quarters and I'm the youngest one here, so everybody else is ancient. You're ancient.\"" },
     { when: (s)=>!s.flags["met_branden"], say: "rowan", text: "\"Rowan. Nineteen.\"" },
@@ -1236,7 +1244,7 @@ scene("isle_branden", {
     { when: (s)=>!!s.flags["met_branden"] && !!s.flags["branden_prank_buddy"], say: "branden", text: "\"Forty-one, forty-two — TIMEKEEPER! You've got a *jacket*! Time me! No, don't, there's nothing to time, that's the whole *problem*.\"" },
     { when: (s)=>!!s.flags["met_branden"] && !s.flags["branden_prank_buddy"], say: "branden", text: "\"Forty-one, forty-two — Jacketless! You're not jacketless! They *fixed* you. That's the only interesting thing that's happened for an *hour*.\"" },
     MET("branden", "Branden Sunflower"),
-    { text: "He jumps down off the wall and lands with both feet together, to nobody's applause." },
+    { text: "He hops off the kerb and lands with both feet together, to nobody's applause." },
     { say: "branden", text: "\"They're calling us in *alphabet order*. I'm an S. S is practically last. I've been here since for ever and I'm not allowed a lifebuoy and nobody will play me first for practice because they're all *concentrating*.\"" },
     { when: (s)=>!!s.flags["met_georgie"], say: "branden", text: "\"Georgie's an S *as well*, and she's still before me. Sa, Su. She gets *everything* first. She's over there holding her box in both hands like it's going to fly off.\"" },
     { when: (s)=>!!s.flags["branden_marshmallow_pact"], say: "branden", text: "\"And LOOK.\" He points over the domes at the mountain. \"It's *right there*. You can see the top. Have you got the marshmallows? You said. No take-backs.\"" },
@@ -1263,13 +1271,13 @@ scene("isle_branden", {
     ] },
     { when: (s)=>!!s.flags["placement_won"], say: "branden", text: "\"You won yours, I heard. Don't make a face about it. I'm going to win mine *louder*.\"" },
     { when: (s)=>!!s.flags["placement_lost"], say: "branden", text: "\"You lost yours, I heard. That's fine. You're old, you were probably tired. I'll win one for both of us.\"" },
-    { say: "branden", text: "\"Forty-two steps along the wall. I'm going to do it backwards now. Watch. No — don't watch, it's better if you just *happen* to see.\"" },
+    { say: "branden", text: "\"Forty-two steps along the kerb. I'm going to do it backwards now. Watch. No — don't watch, it's better if you just *happen* to see.\"" },
     NOTE("branden", "Waiting for his placement duel by the Trial Domes. Has found out there is no under-tens league here, only everybody."),
     { flag: "isle_branden_done" },
     { time: 5 },
     { end: true },
     { label: "later" },
-    { text: "Branden is walking along the wall backwards, very slowly, with his tongue between his teeth." },
+    { text: "Branden is walking along the kerb backwards, very slowly, with his tongue between his teeth." },
     { say: "branden", text: "\"Don't TALK to me, I'm on thirty-something. …Have they said S yet? They haven't said S. I'd have *heard* S.\"" },
     { say: "branden", text: "\"Go away. Nicely. Come back when I've won.\"" },
     { time: 3 }

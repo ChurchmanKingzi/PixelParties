@@ -363,7 +363,8 @@ scene("deck_jessica", {
       ] }
     ] },
     { text: "Your eyes settle on the nearest casket and stop seeing it. You hear your own voice from a little way off." },
-    { say: "rowan", text: "\"…Wealth. Treasure Chest. Mimic. A gold pile nobody else has. Sun Sword, Warhorse, the Vampiric Sword when it comes. All on Boris. Heavy Hit stuns, Quick Attack swings again, heals off the damage. Golden Apple borrows a hero of mine.\" A pause. \"Everything she paid for sits on one hero. Freeze him, stun him — the whole dowry sits.\"" },
+    { say: "rowan", text: "\"…Wealth. Treasure Chest. Mimic. A gold pile nobody else has. Sun Sword, Warhorse, the Vampiric Sword when it comes. All on Boris. Heavy Hit stuns, Quick Attack swings again, heals off the damage.\"" },
+    { say: "rowan", text: "\"Golden Apple borrows a hero of mine.\" A pause. \"Everything she paid for sits on one hero. Freeze him, stun him — the whole dowry sits.\"" },
     { text: "You come back. You have just said all of that aloud, to a lady, about her own deck." },
     { say: "jessica", text: "\"You read the hero card.\" She says it quietly. \"Most people read the jewellery.\"" },
     { choice: [
@@ -745,7 +746,8 @@ scene("deck_ashton", {
       ] }
     ] },
     { text: "Your eyes go to the middle distance and stay there. You hear yourself start talking, without moving your head." },
-    { say: "rowan", text: "\"…Pyroblast, as many targets as he likes. One Pollution Token on his own side for each. Every token shrinks the hand. Victorica lifts one a turn. Piranha is summoned by removing one. Spewer fires when one leaves. Rain of Arrows across my whole side.\" A breath. \"Eraser Beam, once a game. Slow start. Zones clog. Power on credit.\"" },
+    { say: "rowan", text: "\"…Pyroblast, as many targets as he likes. One Pollution Token on his own side for each. Every token shrinks the hand. Victorica lifts one a turn. Piranha is summoned by removing one.\"" },
+    { say: "rowan", text: "\"Spewer fires when one leaves. Rain of Arrows across my whole side.\" A breath. \"Eraser Beam, once a game. Slow start. Zones clog. Power on credit.\"" },
     { say: "ashton", text: "\"On *credit!*\"" },
     { text: "He is, for a moment, entirely sincere." },
     { say: "ashton", text: "\"Somebody understands the economics.\"" },
@@ -1372,7 +1374,8 @@ scene("chat_cas", {
 scene("isle_jessica", {
   steps: [
     { when: (s)=>!!s.flags["isle_jessica_done"], jump: "again" },
-    { text: "The lawn by the Trial Domes is full of white-and-gold collars standing about in the heat, pretending not to listen to the loudspeaker on the nearest dome. One person on it is sitting down. She has found the only folding chair on the island, and the smallest of three leather caskets is on her knee." },
+    { text: "The lawn by the Trial Domes is full of white-and-gold collars standing about in the heat, pretending not to listen to the loudspeaker on the nearest dome." },
+    { text: "One person on it is sitting down. She has found the only folding chair on the island, and the smallest of three leather caskets is on her knee." },
     { when: (s)=>!!s.flags["met_jessica"], say: "jessica", text: "\"Rowan. You have crossed a lawn. I had begun to wonder whether it was only decks.\"" },
     { when: (s)=>!s.flags["met_jessica"], text: "Long golden curls under a small gold coronet, a swallow charm on a fine chain, rings on three fingers. She watches you cross the grass with the mild patience of somebody who has been approached a great deal." },
     { when: (s)=>!s.flags["met_jessica"], say: "jessica", alias: "Girl with the caskets", text: "\"Mr Vance. You were read out on the Quad, and one does listen. Jessica Montclair. Spectral Tower, Auxiliary track. I am watching the placements and disapproving of the loudspeaker.\"" },
@@ -1520,7 +1523,8 @@ scene("isle_victoria", {
 scene("isle_cas", {
   steps: [
     { when: (s)=>!!s.flags["isle_cas_done"], jump: "again" },
-    { text: "On the rim of the fountain in the middle of the Quad sits a boy in a long striped scarf, black jacket, blue collar, with a small microphone clipped to his lapel and one open hand offering the whole square to an invisible colleague. First-years cross and re-cross with boxes. He has a word for each of them." },
+    { text: "On the rim of the fountain in the middle of the Quad sits a boy in a long striped scarf, black jacket, blue collar, with a small microphone clipped to his lapel and one open hand offering the whole square to an invisible colleague." },
+    { text: "First-years cross and re-cross with boxes. He has a word for each of them." },
     { when: (s)=>!!s.flags["met_cas"], say: "cas", text: "\"And crossing the Quad now, a familiar face from the stern deck. The Wildcard, making good way.\"" },
     { when: (s)=>!s.flags["met_cas"], say: "cas", alias: "Boy with a microphone", text: "\"And crossing to the fountain now, Rowan Vance, the Wildcard, the name in ink at the roll call. He's coming straight for the commentary position, which we don't often see.\"" },
     { when: (s)=>!s.flags["met_cas"], say: "cas", alias: "Boy with a microphone", text: "\"Caspian Abernathy. Cas, off air. Auxiliary track, Rare Hall. The microphone isn't plugged into anything; I'll save you asking.\"" },

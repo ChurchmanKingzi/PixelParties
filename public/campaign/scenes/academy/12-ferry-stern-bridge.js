@@ -10,13 +10,11 @@ scene("stern_first", {
     {
       text: "You follow the side deck aft past the funnel, which breathes warmth over your shoulder like a large, sleeping animal. And then the noise falls away."
     },
-    {
-      text: "The open after deck: a long white wake running back to an empty horizon, gulls riding the air above the flagstaff, a wire luggage cage stacked to the top with trunks. One bench stands dry under a blue-and-white striped awning, a lifebuoy hung on the rail beside it. The rest of the planking shines with spray."
-    },
+    { text: "The open after deck: a long white wake running back to an empty horizon, gulls riding the air above the flagstaff, a wire luggage cage stacked to the top with trunks." },
+    { text: "One bench stands dry under a blue-and-white striped awning, a lifebuoy hung on the rail beside it. The rest of the planking shines with spray." },
     { text: "It is quieter here than forward. The mainland is gone." },
-    {
-      text: "Half a dozen people are scattered across the deck, each in their own small piece of calm, and none of them is quarrelling with anybody. A girl is reciting to the gulls. A boy is standing very nobly at the rail holding a rose. Beside the cage, a very still girl in a ruffled dress sits alone under a parasol."
-    },
+    { text: "Half a dozen people are scattered across the deck, each in their own small piece of calm, and none of them is quarrelling with anybody. A girl is reciting to the gulls." },
+    { text: "A boy is standing very nobly at the rail holding a rose. Beside the cage, a very still girl in a ruffled dress sits alone under a parasol." },
     { think: "So this is where people go who want to meet each other." },
     { time: 3 }
   ]
@@ -64,9 +62,8 @@ scene("stern_cage", {
     {
       text: "The luggage cage is a wire pen stacked to the top with trunks, duffels, and one inexplicable tuba. Every item has a paper label tied to it, handwritten."
     },
-    {
-      text: "You read some. HALVORSEN B. — FRAGILE (a very large hard case that you suspect holds nothing breakable at all). WHISPER N. — OPEN ME AND DIE (a battered duffel, with a smaller, tidier label beneath that says in another hand: *please don't*). CAPULET V. — HANDLE WITH GRACE. LUND P. — CAMERA, DON'T. THANA O. — one small bag, tied twice."
-    },
+    { text: "You read some. HALVORSEN B. — FRAGILE (a very large hard case that you suspect holds nothing breakable at all)." },
+    { text: "WHISPER N. — OPEN ME AND DIE (a battered duffel, with a smaller, tidier label beneath that says in another hand: *please don't*). CAPULET V. — HANDLE WITH GRACE. LUND P. — CAMERA, DON'T. THANA O. — one small bag, tied twice." },
     {
       text: "At the bottom of the pile, sagging, you find your own duffel. The label says, in Aunt Dee's handwriting: ROWAN — CALL HER WHEN YOU LAND."
     },
@@ -96,9 +93,8 @@ scene("bridge_first", {
     {
       text: "You take the iron stair two steps at a time. At the top is a narrow wing of dark deck outside the wheelhouse, with a rope rail, a brass bell on the wall, a lifebuoy, and a fire axe in a red frame beside a clipboard."
     },
-    {
-      text: "Through the open door you see a bright room of brass and polished wood: a big spoked wheel, a bank of dials, a red rug, a chart table, and through the front windows the island, dead ahead and larger now, its grey cone trailing a thread of smoke. A man in a navy suit and a blue bowler hat stands at the wheel with his feet apart, talking without turning round."
-    },
+    { text: "Through the open door you see a bright room of brass and polished wood: a big spoked wheel, a bank of dials, a red rug, a chart table, and through the front windows the island, dead ahead and larger now, its grey cone trailing a thread of smoke." },
+    { text: "A man in a navy suit and a blue bowler hat stands at the wheel with his feet apart, talking without turning round." },
     { text: "If you lean over the rail, the whole ship lies below you." },
     { time: 3 }
   ]
@@ -106,9 +102,8 @@ scene("bridge_first", {
 
 scene("bridge_overlook", {
   steps: [
-    {
-      text: "From the wing you can see who is where. A knot of people at the lounge stair. A girl on the stern rail with her feet over the wake. A small crowd round a bollard where somebody is waving an arm at the gulls. Nathan, a spiky dot, in motion on the fore deck, talking at a very tall dot."
-    },
+    { text: "From the wing you can see who is where. A knot of people at the lounge stair. A girl on the stern rail with her feet over the wake." },
+    { text: "A small crowd round a bollard where somebody is waving an arm at the gulls. Nathan, a spiky dot, in motion on the fore deck, talking at a very tall dot." },
     { when: (s)=>!(!!s.flags["table_resolved"]), jump: "next_2" },
     {
       text: "The lounge door lets out a ripple of noise, and then another. Whatever was going to happen at the table has happened."
@@ -144,9 +139,8 @@ scene("bridge_plate", {
 
 scene("bridge_chart", {
   steps: [
-    {
-      text: "The chart is pinned flat by a chipped mug that says WORLD'S OKAYEST CAPTAIN. It shows the island as a rough, blunt oval with a volcano at the centre, the pier on the south coast, a bay with the town on its western curve, and a dotted line round the north shore labelled, in a very old hand, DO NOT."
-    },
+    { text: "The chart is pinned flat by a chipped mug that says WORLD'S OKAYEST CAPTAIN." },
+    { text: "It shows the island as a rough, blunt oval with a volcano at the centre, the pier on the south coast, a bay with the town on its western curve, and a dotted line round the north shore labelled, in a very old hand, DO NOT." },
     { text: "Somebody has drawn a small boat on the south side, dead on the pier, and written: *tie up 10.40*." },
     { when: (s)=>!(!!s.flags["follow_nathan"]), jump: "next_2" },
     { say: "nathan", text: "\"That's US! That little dot is US!\"", mood: "happy" },

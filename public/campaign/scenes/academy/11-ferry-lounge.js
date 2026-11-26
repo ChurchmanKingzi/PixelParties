@@ -49,9 +49,8 @@ scene("lounge_watch", {
     },
     { text: "Gideon inclines his head a quarter of an inch. \"How kind.\"" },
     { text: "You find a spot at the rail of the crowd where you can see both hands." },
-    {
-      text: "The deckhand leads with everything he has: an attack on turn one, another on turn two, a Creature behind it. Gideon does nothing. He builds. A single Guardian Beast, two, then a third, set one beside the other like fence posts. The deckhand commits again on turn three and the board blinks."
-    },
+    { text: "The deckhand leads with everything he has: an attack on turn one, another on turn two, a Creature behind it. Gideon does nothing. He builds." },
+    { text: "A single Guardian Beast, two, then a third, set one beside the other like fence posts. The deckhand commits again on turn three and the board blinks." },
     {
       text: "Gideon has not attacked once. He has not needed to. Every blow the deckhand swung came back at him, and then some."
     },

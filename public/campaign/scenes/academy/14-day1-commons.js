@@ -157,9 +157,8 @@ scene("room_unpack", {
     {
       text: "A rain jacket, which you are wearing. A second pair of jeans. Three T-shirts, one of which says LAUNDRY KING in Aunt Dee's hand-painted iron-on letters."
     },
-    {
-      text: "One good shirt, folded in tissue. A wire-bound notebook in which you have, over four years, kept a handwritten record of every deck you have faced on the ladder. The cracked phone, face-down, wrapped in a sock. And, at the bottom, tied with a ribbon, a small plastic tub of cinnamon sweets from Aunt Dee, which she must have slipped in when you were not looking."
-    },
+    { text: "One good shirt, folded in tissue. A wire-bound notebook in which you have, over four years, kept a handwritten record of every deck you have faced on the ladder." },
+    { text: "The cracked phone, face-down, wrapped in a sock. And, at the bottom, tied with a ribbon, a small plastic tub of cinnamon sweets from Aunt Dee, which she must have slipped in when you were not looking." },
     {
       text: "At the bottom, in the seam, something stiff: a card in a sleeve that you did not pack. On the sleeve, in Aunt Dee's uphill handwriting: *for luck. Do not trade it. D.*"
     },
@@ -237,25 +236,22 @@ scene("placement_duel", {
   background: "trial_dome",
   steps: [
     {
-      text: "Four small white domes stand in a row like half-buried golf balls, each with a number over the door. You are Dome 2."
+      text: "Two small white domes stand side by side like half-buried golf balls, each with a number over the door. You are Dome 2."
     },
-    {
-      text: "Inside, the roof is a lattice of cream and sky-blue triangles, bright as the inside of an egg. A single holo-table sits on a round dais with a glowing cyan ring, under a ring of lights, and three holographic cards drift above it like paper lanterns. A scoreboard on a stand blinks in one corner. A high-backed judge's chair waits by the door. Wooden benches along the wall are filling with people. The acoustics are odd: a whisper at the table reaches the back wall."
-    },
+    { text: "Inside, the roof is a lattice of cream and sky-blue triangles, bright as the inside of an egg. A single holo-table sits on a round dais with a glowing cyan ring, under a ring of lights, and three holographic cards drift above it like paper lanterns." },
+    { text: "A scoreboard on a stand blinks in one corner. A high-backed judge's chair waits by the door. Wooden benches along the wall are filling with people. The acoustics are odd: a whisper at the table reaches the back wall." },
     {
       text: "The benches fill. Forty strangers. They are, in their way, the first people who have ever looked at your hands."
     },
-    {
-      text: "A young woman in a pencil skirt, with a sleek black bob, red-framed glasses and a slim black brace on her right wrist stands at the judge's chair. A small, neat girl with black braids stands behind a table at the side with a stamp the size of her fist and the expression of someone who has never once misfiled anything."
-    },
+    { text: "A young woman in a pencil skirt, with a sleek black bob, red-framed glasses and a slim black brace on her right wrist stands at the judge's chair." },
+    { text: "A small, neat girl with black braids stands behind a table at the side with a stamp the size of her fist and the expression of someone who has never once misfiled anything." },
     {
       say: "hana",
       text: "\"Mr Vance. I am Ms Kirishima, Rules and Judging. This is a placement duel. It is not an examination. It is a measurement. Please be precise with your terminology and do not narrate your emotions.\""
     },
     { say: "hana", text: "\"Your opponent.\"" },
-    {
-      text: "A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Blonde hair in two long hanging braids, each tied off with a large red bow. Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention."
-    },
+    { text: "A girl comes through the dome door and walks to the opposite side of the table without looking at anyone. Blonde hair in two long hanging braids, each tied off with a large red bow." },
+    { text: "Black polish, chipped. A plain grey collar studded with tiny silver studs, which she dares anyone to mention." },
     { say: "hana", text: "\"Rana Marika. Repeating year. Please be seated.\"" },
     { when: (s)=>!(!!s.flags["met_rana"]), jump: "next_2" },
     {
@@ -322,13 +318,14 @@ scene("placement_duel", {
     // Deckprüfung: zählt Rowans AKTUELLES Deck (er kann es umbauen); Abweichungen vom registrierten Preis-Deck benennt sie trocken.
     { say: "hana", text: (s) => {
       const d = DECKCOUNT(s), up = (w) => w.charAt(0).toUpperCase() + w.slice(1);
-      let t = "\"" + up(WORDS(d.heroes)) + (d.heroes === 1 ? " Hero, " : " Heroes, ") + WORDS(d.abilities) + (d.abilities === 1 ? " starting Ability, " : " starting Abilities, ") + WORDS(d.main) + " in the main deck" + (d.potions ? ", " + WORDS(d.potions) + " in the Potion Deck." : ", and no Potion Deck.") + "\"";
-      const mirror = ((s.deck && s.deck.main) || {})["The Sacred Mirror"] || 0;
-      if (d.main !== 60 && mirror >= 4 && d.main > 60 && d.main <= 80) t += " A pause. \"Four Sacred Mirrors. Then " + WORDS(d.main) + " is permitted. I have checked that it is permitted.\"";
-      else if (d.main !== 60) t += " A pause, during which she counts again. \"A sanctioned main deck is sixty cards, Mr Vance. This is a measurement, not a tournament, so I will allow it. I will also write it down.\"";
-      if (d.heroes !== 3) t += " \"The customary number of Heroes is three. I assume you know that. I assume you have a reason. Neither assumption is my business.\"";
-      return t;
+      return "\"" + up(WORDS(d.heroes)) + (d.heroes === 1 ? " Hero, " : " Heroes, ") + WORDS(d.abilities) + (d.abilities === 1 ? " starting Ability, " : " starting Abilities, ") + WORDS(d.main) + " in the main deck" + (d.potions ? ", " + WORDS(d.potions) + " in the Potion Deck." : ", and no Potion Deck.") + "\"";
     } },
+    { say: "hana", when: (s) => { const d = DECKCOUNT(s), m = ((s.deck && s.deck.main) || {})["The Sacred Mirror"] || 0; return d.main !== 60 && m >= 4 && d.main > 60 && d.main <= 80; },
+      text: (s) => "A pause. \"Four Sacred Mirrors. Then " + WORDS(DECKCOUNT(s).main) + " is permitted. I have checked that it is permitted.\"" },
+    { say: "hana", when: (s) => { const d = DECKCOUNT(s), m = ((s.deck && s.deck.main) || {})["The Sacred Mirror"] || 0; return d.main !== 60 && !(m >= 4 && d.main > 60 && d.main <= 80); },
+      text: "A pause, during which she counts again. \"A sanctioned main deck is sixty cards, Mr Vance. This is a measurement, not a tournament, so I will allow it. I will also write it down.\"" },
+    { say: "hana", when: (s) => DECKCOUNT(s).heroes !== 3,
+      text: "\"The customary number of Heroes is three. I assume you know that. I assume you have a reason. Neither assumption is my business.\"" },
     { say: "hana", text: (s) => {
       const d = DECKCOUNT(s), R = (typeof DATA !== "undefined" && DATA.rowan) || {}, k = s.deck;
       const list = (a) => { const o = {}; for (const c of a || []) o[c.name] = (o[c.name] || 0) + c.n; return o; };
@@ -452,9 +449,8 @@ scene("welcome_supper", {
     {
       text: "Bungalow one, which is Mama's kitchen, is one long table, one blackened range, and nineteen strangers arriving in clumps."
     },
-    {
-      text: "The table is a single slab of dark wood under a tin roof, worn smooth by twelve years of elbows. The benches on both sides have been squeezed together. Dented pans hang from the walls. Twelve years of group photographs look down from the rafters. A radio on the sill plays boleros through static."
-    },
+    { text: "The table is a single slab of dark wood under a tin roof, worn smooth by twelve years of elbows. The benches on both sides have been squeezed together." },
+    { text: "Dented pans hang from the walls. Twelve years of group photographs look down from the rafters. A radio on the sill plays boleros through static." },
     {
       text: "Mama Odalys is carrying a pot that ought to need two people. She sets it down in the centre of the table, in a cloud of steam, with a clang like the end of a bell."
     },
@@ -743,12 +739,10 @@ scene("welcome_supper", {
     {
       text: "At the head of the table, in an upright chair with a high back that is quite clearly hers and nobody else's, Mama Odalys is ladling stew with the grave dispatch of a quartermaster."
     },
-    {
-      text: "Down the left side: Freya, very upright, very cool, hair in a pale braid, saying nothing to anyone with great elegance. Next to her Hedda, who is inspecting the stew with a fork and the narrowed eyes of an investigator. Next to her Trixie, who has something alive in a matchbox and is whispering to it. \"Don't tell Mama,\" she tells you. \"It's only a beetle.\""
-    },
-    {
-      text: "Further down, from bungalow 4: Freddie, hair still wet, has taken two helpings and is explaining the anatomy of an octopus to an uninterested bench. Maisie is taking the pepper mill apart. Fiona, in black lace, is saying grace in a very deep voice. Leona, ordinary, pleasant, forgettable, has chosen the seat nearest the door."
-    },
+    { text: "Down the left side: Freya, very upright, very cool, hair in a pale braid, saying nothing to anyone with great elegance. Next to her Hedda, who is inspecting the stew with a fork and the narrowed eyes of an investigator." },
+    { text: "Next to her Trixie, who has something alive in a matchbox and is whispering to it. \"Don't tell Mama,\" she tells you. \"It's only a beetle.\"" },
+    { text: "Further down, from bungalow 4: Freddie, hair still wet, has taken two helpings and is explaining the anatomy of an octopus to an uninterested bench." },
+    { text: "Maisie is taking the pepper mill apart. Fiona, in black lace, is saying grace in a very deep voice. Leona, ordinary, pleasant, forgettable, has chosen the seat nearest the door." },
     {
       text: "From bungalow 5: Ed is leaning back on two legs of his chair asking Mama which part of the island is forbidden. Tomi is already trading something under the table, quietly, with a boy you do not recognise. Viktor Hale is not here."
     },
@@ -796,9 +790,8 @@ scene("welcome_supper", {
     { say: "baylee", text: "\"He does.\"" },
     { say: "rowan", text: "\"Noted.\"" },
     { say: "nathan", text: "\"HA! 'Noted'! You hear that? He said 'noted'! Very formal! I like him!\"" },
-    {
-      text: "A very long, very loud, very good evening follows, in which nothing remotely important happens. Hedda finishes the stew, glares at the empty bowl and says, quietly, \"Fine. FINE. The rice is good.\" Freya laughs for the first time since you sat down, a low warm sound, and says \"To the ferry captain's hat.\" Nobody quite knows why. Everyone drinks. Livvie eats three helpings and does not look at anyone. Mama Odalys, noticing, slides a fourth in front of her without comment."
-    },
+    { text: "A very long, very loud, very good evening follows, in which nothing remotely important happens. Hedda finishes the stew, glares at the empty bowl and says, quietly, \"Fine. FINE. The rice is good.\"" },
+    { text: "Freya laughs for the first time since you sat down, a low warm sound, and says \"To the ferry captain's hat.\" Nobody quite knows why. Everyone drinks. Livvie eats three helpings and does not look at anyone. Mama Odalys, noticing, slides a fourth in front of her without comment." },
     {
       text: "By the time the last plate is dry the stars have come out over the cove and the radio has gone to a slow song that Mama hums, quietly, over the sink."
     },

@@ -35,28 +35,24 @@ scene("ferry_prologue", {
     {
       text: "The box was the grand prize. A few days after the Qualifier a courier brought it to the laundromat: the list you won with, printed card for card, exactly as you registered it, down to the last Tea. Apart from those seventy-four, you own no cards at all."
     },
-    {
-      text: "Every one of them is a Common. The prize print always is: no foil, no shimmer, only the plain frame, and a Common plays exactly the same as the shiniest Storm Rare anyone ever pulled from a pack. The box still smells of new card stock. It has only ever been shuffled at the folding table after closing, with nobody watching but the dryers."
-    },
+    { text: "Every one of them is a Common. The prize print always is: no foil, no shimmer, only the plain frame, and a Common plays exactly the same as the shiniest Storm Rare anyone ever pulled from a pack." },
+    { text: "The box still smells of new card stock. It has only ever been shuffled at the folding table after closing, with nobody watching but the dryers." },
     {
       text: "The acceptance letter is still in your bag, folded so often it has gone soft. You know it by heart now, down to the line about Bungalow 7."
     },
-    {
-      text: "Folded inside the letter, a small canvas pouch: a hundred and forty Smug Coins, one starting purse for every student on the island, each stamped with a smirking little face. The Academy's own money. Good here, and nowhere else. The few folded notes in your sock, which are every scrap of mainland money you own, are worth exactly nothing past the arch."
-    },
+    { text: "Folded inside the letter, a small canvas pouch: a hundred and forty Smug Coins, one starting purse for every student on the island, each stamped with a smirking little face." },
+    { text: "The Academy's own money. Good here, and nowhere else. The few folded notes in your sock, which are every scrap of mainland money you own, are worth exactly nothing past the arch." },
     { text: "You do not know yet what that means." },
     {
       text: "Behind the pouch, a single stiff page: the uniform guide. It is the only part of the letter written like a rulebook, so you have learned it by heart as well."
     },
-    {
-      text: "The JACKET is your major. Red is Competitive Play, gold is Game Design, black is Auxiliary. The COLLAR is your rank, which means your dorm, and the Academy does not pretend otherwise: white with a gold edge for Spectral at the top, blue for Rare in the middle, plain grey for the Commons at the foot."
-    },
+    { text: "The JACKET is your major. Red is Competitive Play, gold is Game Design, black is Auxiliary." },
+    { text: "The COLLAR is your rank, which means your dorm, and the Academy does not pretend otherwise: white with a gold edge for Spectral at the top, blue for Rare in the middle, plain grey for the Commons at the foot." },
     { text: "At the bottom, in smaller print: \"Rank is where you start. It is not where you finish.\"" },
     { think: "Red jacket, grey collar. Competitive Play, and the bottom rung. Fine. I've started from lower." },
     { text: "Yours will be issued on arrival, the letter says. The others received theirs in the post a month ago." },
-    {
-      text: "The deck around you is filling up: duffel bags, deck boxes, thirty-odd people your age in stiff new jackets, mostly red, some gold, a few black, each with a collar of white-and-gold, blue or grey. Every one of them is a stranger. You are the only person on deck in a rain jacket, and the only one who looks like it."
-    },
+    { text: "The deck around you is filling up: duffel bags, deck boxes, thirty-odd people your age in stiff new jackets, mostly red, some gold, a few black, each with a collar of white-and-gold, blue or grey." },
+    { text: "Every one of them is a stranger. You are the only person on deck in a rain jacket, and the only one who looks like it." },
     { text: "A loudspeaker crackles above the wheelhouse." },
     {
       name: "Loudspeaker",
