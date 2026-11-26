@@ -45,18 +45,18 @@ class PollutionShow(CaptionMixin):
     SLOT_Y = 1752
     SLOT_X = [165 + 150 * i for i in range(6)]
     T_CH, T_BEAM, T_IMP = 0.8, 1.15, 1.45                                              # Eraser Beam
-    T_RAIN = 12.6
-    T_ALLY = 15.4
-    T_REV = 17.6
+    T_RAIN = 17.0
+    T_ALLY = 22.2
+    T_REV = 24.4
     # Token-Ereignisse: (Zeit, +1 = gelegt / -1 = verdunstet)
-    TOK = [(2.0, 1), (2.3, 1), (2.6, 1), (6.6, -1), (13.8, 1), (16.6, 1), (16.9, 1), (20.4, -1)]
+    TOK = [(2.0, 1), (2.3, 1), (2.6, 1), (9.0, -1), (18.2, 1), (23.4, 1), (23.7, 1), (28.5, -1), (30.5, -1), (32.5, -1)]
     CAPTIONS = [
-        (0.2, 3.0, '*Victorica*, the Eternal Empress.'),
-        (3.2, 7.6, 'Her spells break the rules of magic - and *drain the land of mana*.'),
-        (7.8, 12.4, 'Every spell leaves behind gray, lifeless *Pollution*.'),
-        (12.6, 17.4, 'She conquered with *Eraser Beam* and *Rain of Death*...'),
-        (17.6, 22.2, '...and saved her loved ones with *Reincarnation*.'),
-        (22.4, 25.7, 'Now the *Bretonnia Empire* must clean up...'),
+        (0.2, 4.8, '*Victorica*, the Eternal Empress.'),
+        (5.0, 10.9, 'Her spells break the rules of magic - and *drain the land of mana*.'),
+        (11.1, 16.4, 'Every spell leaves behind gray, lifeless *Pollution*.'),
+        (16.6, 21.9, 'She conquered with *Eraser Beam* and *Rain of Death*...'),
+        (22.1, 27.2, '...and saved her loved ones with *Reincarnation*.'),
+        (27.4, 32.0, 'Now, *Bretonnia* must clean up!'),
     ]
     SND = {
         'charge': [('elem_dark', -8)],
@@ -170,7 +170,7 @@ class PollutionShow(CaptionMixin):
         g = gamefx.R1(m)
         hx, hy = self._ci(self.HERO[0], self.HERO[1])
         # Mana wird aus der Umgebung gesogen: bunte Funken fliegen beim Zauber zu Victorica, dahinter bleibt grauer Staub
-        for (a, b) in [(0.4, 1.4), (12.0, 13.0), (16.0, 17.2)]:
+        for (a, b) in [(0.4, 1.4), (5.6, 6.8), (16.4, 17.4), (22.8, 23.8)]:
             if not (a <= t < b + 0.8):
                 continue
             for k in range(46):
@@ -554,6 +554,6 @@ class PollutionShow(CaptionMixin):
         for (te, dd, s) in self.slot_events:
             add(te, 'place' if dd > 0 else 'evap')
         add(self.T_RAIN, 'rain'); add(self.T_REV, 'revive')
-        for a in (0.4, 12.0, 16.0):
+        for a in (0.4, 5.6, 16.4, 22.8):
             add(a, 'drain')
         return sorted(ev)

@@ -1,5 +1,8 @@
 """Untertitel im Video (Schreibmaschine in einer Pixelbox, Schlüsselwörter *gold*) – gemeinsamer Baustein für die Shows.
-Die Show liefert `CAPTIONS` = [(von, bis, 'Text mit *Hervorhebung*')], `CPS`, `CAP_Y`, `draw_text`, `U` und `_cache`."""
+Die Show liefert `CAPTIONS` = [(von, bis, 'Text mit *Hervorhebung*')], `CPS`, `CAP_Y`, `draw_text`, `U` und `_cache`.
+
+REGEL (Vorgabe des Gestalters): Untertitel brauchen Zeit. Ein Fenster dauert mindestens Tippzeit (Zeichen / CPS) + CAP_READ (3,2 s) Lesezeit - lieber wird das Reel länger (mehr Schleifen, `showLoops`) als dass ein Text zu kurz steht.
+`check_captions(show)` meldet beim Bauen jedes zu kurze Fenster."""
 from PIL import Image
 
 GOLD = (255, 214, 64)
@@ -7,6 +10,7 @@ GOLD_HL = (255, 244, 170)
 
 
 class CaptionMixin:
+    CAP_READ = 3.2                                                                    # Lesezeit nach dem Tippen (s)
     CAP_SCALE = 4                                                                     # Schriftgröße der Untertitel (Pixel je Schriftpixel); einzelne Shows setzen mehr
     CPS = 25.0                                                                        # Standard: langsam tippen (Wort für Wort, mitlesbar) – Fenster müssen dazu passen: Länge / 25 s
     CAP_Y = 1150
@@ -94,3 +98,21 @@ class CaptionMixin:
                     break
                 self._put(canvas, p[:n - ci], sc, cx + x, ty + li * lh, GOLD_HL if g else (255, 255, 255))
             return
+
+
+def check_captions(show):
+    """Meldet Untertitel, die zu kurz stehen (Tippzeit + Lesezeit) oder über das Ende der Show hinausragen."""
+    cps = getattr(show, 'CPS', 25.0)
+    read = getattr(show, 'CAP_READ', 3.2)
+    ok = True
+    for i, (t0, t1, text) in enumerate(show.CAPTIONS):
+        need = len(text.replace('*', '')) / float(cps) + read
+        if t1 - t0 < need - 0.01:
+            print('WARNUNG Untertitel %d zu kurz: %.1f s statt %.1f s (%s)' % (i + 1, t1 - t0, need, text[:40]))
+            ok = False
+        if t1 > show.D + 0.01:
+            print('WARNUNG Untertitel %d endet nach der Show (%.1f s > %.1f s)' % (i + 1, t1, show.D))
+            ok = False
+    if ok:
+        print('Untertitel: alle Fenster lang genug (Tippen + %.1f s Lesezeit)' % read)
+    return ok

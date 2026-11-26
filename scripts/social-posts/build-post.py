@@ -1020,6 +1020,9 @@ def main():
                 wind = alicefx.AliceShow(W, H, U, float(fps), loop, ag, loop * WIND_LOOPS / float(fps))
         else:
             wind = windfx.WindFX(W, H, U, float(fps), loop, wgeom)
+    if wind_on and hasattr(wind, 'CAPTIONS'):
+        import capfx
+        capfx.check_captions(wind)                                           # Regel: Untertitel brauchen Tippzeit + Lesezeit
     SHOW_LOOPS = 9                                                           # Länge der Show in Schleifen der Sprite-Animation (9 × 2,24 s ≈ 20 s)
     if show_on:
         import minishow
