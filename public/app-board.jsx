@@ -3226,7 +3226,26 @@ const HeroIdleAnims = (() => {
   const TAKT_MS = 20;
   let pruefSchmutz = true, pruefZuletzt = -Infinity;
   let takt = 0;
-  function markiere() { pruefSchmutz = true; }
+  // ★ Sprite-Versatz nach Layoutwechseln (Befund: „beim Anhängen einer NEUEN Ability stehen die Hero-Idle-Sprites kurz an falschen Stellen"): Eine neue
+  // Ability-Zone verschiebt die Brettmitte (`--center-offset`, Messschleife `check()`) um einige Pixel; die Beobachter meldeten das nur als „schmutz",
+  // nachgeführt wurden die Figuren erst im nächsten 20-ms-Takt — also mindestens ein Bild NACH der Karte. Jetzt läuft der Abgleich sofort als
+  // Mikroaufgabe (vor dem nächsten Zeichnen, höchstens einmal je Aufgabe), sobald ein Beobachter, ein Hover-Ereignis oder ein Zustandswechsel „schmutz" meldet.
+  let sofortGeplant = false;
+  function sofortAbgleichen() {
+    sofortGeplant = false;
+    if (!schritte.size) return;
+    const now = performance.now();
+    pruefSchmutz = false; pruefZuletzt = now;
+    try { ebeneAbgleichen(); } catch {}
+    for (const s of schritte) { try { s(now, true); } catch {} }
+  }
+  // Höchstens ~60 Sofort-Abgleiche je Sekunde: die Messschleife des Bretts lässt `--center-offset`/`--board-scale` dauernd um Bruchteile eines Pixels
+  // pendeln (gemessen: ~20 echte Änderungen/s im Leerlauf); das darf nicht jedes Mal einen vollen Abgleich auslösen. Ein größerer Sprung nach einer Ruhepause
+  // (neue Ability-Zone, Hover, Fenstergröße) wird dagegen sofort nachgezogen, alles Übrige beim nächsten 20-ms-Takt wie bisher.
+  function markiere() {
+    pruefSchmutz = true;
+    if (!sofortGeplant && schritte.size && performance.now() - pruefZuletzt >= 16) { sofortGeplant = true; if (typeof queueMicrotask === 'function') queueMicrotask(sofortAbgleichen); else Promise.resolve().then(sofortAbgleichen); }
+  }
   function naechsterTakt() { if (!takt && schritte.size) takt = setTimeout(tick, TAKT_MS); }
   function tick() {
     takt = 0;
@@ -3295,6 +3314,19 @@ const HeroIdleAnims = (() => {
   // Meldet „schmutz", sobald sich Größe der Ebene/ihres Wrappers ändert
   // oder `class`/`style`/`data-pp-dragging` der Ebene oder eines Vorfahren
   // (inkl. <html>: `--board-scale`, `--center-offset`, Scroll-Modus).
+  // Gleicher Text bis auf Zahlen, und jede Zahl weicht nur minimal ab (Pixelwerte und große Zahlen < 0,8, Maßstäbe < 0,004).
+  function nurKleinesPendeln(a, b) {
+    if (a == null || b == null) return false;
+    const re = /(-?\d+(?:\.\d+)?)(px)?/g;
+    const za = [...String(a).matchAll(re)], zb = [...String(b).matchAll(re)];
+    if (za.length !== zb.length || String(a).replace(re, '#') !== String(b).replace(re, '#')) return false;
+    for (let i = 0; i < za.length; i++) {
+      const x = parseFloat(za[i][1]), y = parseFloat(zb[i][1]), d = Math.abs(x - y);
+      const px = !!za[i][2] || Math.max(Math.abs(x), Math.abs(y)) >= 10;
+      if (d > (px ? 0.8 : 0.004)) return false;
+    }
+    return true;
+  }
   function beobachteEbene(plane) {
     try {
       if (ebeneRO) ebeneRO.disconnect();
@@ -3302,14 +3334,42 @@ const HeroIdleAnims = (() => {
       ebeneRO = ebeneMO = null;
       if (!plane) return;
       if (typeof ResizeObserver !== 'undefined') {
-        ebeneRO = new ResizeObserver(markiere);
+        // Größenänderung unter ~1 px (die Messschleife lässt die Höhe um 1 px pendeln) zählt nur leise; alles andere zieht die Figuren sofort nach.
+        const letzteGroesse = new WeakMap();
+        ebeneRO = new ResizeObserver((eintraege) => {
+          let laut = false;
+          for (const e of eintraege) {
+            const r = e.contentRect, v = letzteGroesse.get(e.target);
+            letzteGroesse.set(e.target, [r.width, r.height]);
+            if (!v || Math.abs(v[0] - r.width) > 1.1 || Math.abs(v[1] - r.height) > 1.1) laut = true;
+          }
+          if (laut) markiere(); else pruefSchmutz = true;
+        });
         ebeneRO.observe(plane);
         if (plane.parentElement) ebeneRO.observe(plane.parentElement);
       }
       if (typeof MutationObserver !== 'undefined') {
-        ebeneMO = new MutationObserver(markiere);
+        // Nur ECHTE Änderungen melden: die Messschleife des Bretts (`check()`) schaltet `board-flat-measure`/`can-scroll` und schreibt `--center-offset`
+        // in jedem Render hin und her — am Ende oft mit demselben Wert wie vorher. Wer dann jedes Mal sofort nachmisst (`markiere`), liest ~4-mal so oft
+        // wie nötig; verglichen wird deshalb der Endwert mit dem Wert VOR der ersten Änderung dieser Aufgabe.
+        ebeneMO = new MutationObserver((eintraege) => {
+          const vorher = new Map();
+          for (const r of eintraege) {
+            let m = vorher.get(r.target);
+            if (!m) vorher.set(r.target, m = {});
+            if (!(r.attributeName in m)) m[r.attributeName] = r.oldValue;
+          }
+          let laut = false, leise = false;
+          for (const [el, m] of vorher) for (const a in m) {
+            const jetzt = el.getAttribute(a);
+            if (jetzt === m[a]) continue;
+            if (a === 'style' && nurKleinesPendeln(m[a], jetzt)) leise = true; else laut = true;
+          }
+          if (laut) markiere();          // echter Sprung (neue Zone, Zoom, Klassenwechsel): Figuren sofort nachführen
+          else if (leise) pruefSchmutz = true;          // Pendeln um Bruchteile eines Pixels: beim nächsten 20-ms-Takt wie bisher
+        });
         for (let e = plane; e; e = e.parentElement) {
-          ebeneMO.observe(e, { attributes: true, attributeFilter: ['class', 'style', 'data-pp-dragging'] });
+          ebeneMO.observe(e, { attributes: true, attributeOldValue: true, attributeFilter: ['class', 'style', 'data-pp-dragging'] });
         }
       }
     } catch {}
