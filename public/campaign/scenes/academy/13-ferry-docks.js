@@ -537,6 +537,7 @@ scene("quad_jacket", {
     {
       text: "The jacket is red, stiff and smells of new fabric. It has a plain grey collar. The sleeves are exactly the right length, which feels like a small personal insult."
     },
+    { flag: "jacket_issued" },
     { text: "A shadow falls across the crate." },
     { say: "okonkwo", text: "\"Mr Vance.\"" },
     { text: "She does not offer a hand. Her glasses swing on their silver chain." },
