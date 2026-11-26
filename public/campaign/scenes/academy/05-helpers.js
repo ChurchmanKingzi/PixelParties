@@ -18,19 +18,21 @@ const STORY = helpers.story, DATA = helpers.data;
 //
 // VORGEMERKTE SZENEN (Pläne des Autors, noch nicht ausgeschrieben; vor dem Schreiben mit dem Autor abstimmen):
 //   Freya — abends besuchbar (Bungalow 2, nach dem Abendessen). Sie ist dann ausgesprochen flirty: neckend, selbstsicher,
-//     spielt mit Rowans Verlegenheit; das Flirten steht im Vordergrund, kein Ero-Spiel. Nach zwei, drei Besuchen wird es
-//     körperlicher, höchstens bis zum Kuss: der Jahrgang ist minderjährig (Rowan „what, seventeen?“, Branden etwa zehn),
-//     darum nichts Sexuelles, auch nicht angedeutet oder abgeblendet. Casual, vorerst nicht romanceable (data: romance false).
+//     spielt mit Rowans Verlegenheit; das Flirten steht im Vordergrund, kein Ero-Spiel. Nach zwei, drei Besuchen kann es zu
+//     Sex kommen: einvernehmlich, beiläufig, nicht explizit (Andeutung, Abblende, der Morgen danach). Casual, ohne Folgen für
+//     eine Romanze; vorerst nicht romanceable (data: romance false). Freya und Rowan sind erwachsen (siehe ALTER unten).
 //   Fiona — organisiert „to uncover the darkest secrets of everyone on the island“ eine große Runde Truth or Dare. Teilnahme
 //     ganz freiwillig; Rowan kann jede teilnehmende Figur fragen (Truth) oder herausfordern (Dare), und wird selbst gefragt.
 //     Verschiedene Verläufe geben Zuneigung oder kosten sie (zu weit gebohrt, Geheimnis verraten, Mut bewiesen …).
-//     Dares und Fragen altersgerecht (peinlich, mutig, ehrlich — nichts Sexuelles).
+//     Georgie und Branden (minderjährig) sind dabei nur bei harmlosen Runden, und nichts Anzügliches betrifft sie.
 //   Sammy — läuft Fiona hinterher wie ein Fan und will von ihr lernen (Auftreten, Düsternis, Mantel). Über die Kampagne
 //     werden die beiden nach und nach sehr gute Freunde. (Die Beziehung sammy → fiona heißt in den Daten noch „crush“;
 //     beim Ausschreiben auf „admirer“ und später „friends“ umstellen.)
 //   Teobalt — verliebt sich im Lauf der Kampagne SICHTLICH in Freddie (er führt eine Liste, die er niemandem zeigt; er
 //     plant Zufälle; er ist in ihrer Nähe noch genauer als sonst). Optionale Szenen und Entscheidungen, in denen Rowan die
 //     beiden zusammenbringen kann (oder es lässt). Noch keine Beziehung teobalt ↔ freddie in den Daten.
+//   ALTER: Pixel Academy ist höhere Bildung; alle Studierenden sind volljährig (18+), außer Georgie und Branden (Branden etwa
+//     zehn). Flirt, Romanze und Sex nur zwischen Erwachsenen; Georgie und Branden bleiben davon ganz ausgenommen.
 // DECKCOUNT(s)         Rowans AKTUELLES Deck gezählt (er kann es umbauen): { heroes, abilities, main, potions, total, allCommon }.
 //                      Für Texte, die Karten zählen: { text: (s) => "…" + WORDS(DECKCOUNT(s).main) + "…" } (Texte dürfen Funktionen sein).
 // WORDS(n)             Zahl als englisches Wort ("sixty"), ab 100 als Ziffern.

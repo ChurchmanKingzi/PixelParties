@@ -520,7 +520,7 @@ scene("ferry_branden", {
     { when: (s)=>!!s.flags["follow_nathan"], say: "nathan", text: "\"He's a KID! He has a LIFEBUOY! I want to be him when I'm ten, and I'm already past ten, so I'd like to be him NOW.\"" },
     { when: (s)=>!!s.flags["follow_nathan"] && !!s.flags["follow_baylee"], say: "baylee", text: "\"No.\"" },
     { add: { ferry_talked: 1 } },
-    { say: "branden", text: "\"Everyone else on this boat is *old*. You're old. You're, what, seventeen? That's *ancient*. I'm the youngest here, so I've got the best seat in the house, and I'm not giving it up.\"" },
+    { say: "branden", text: "\"Everyone else on this boat is *old*. You're old. You're, what, nineteen? That's *ancient*. I'm the youngest here, so I've got the best seat in the house, and I'm not giving it up.\"" },
     { choice: [
       { text: "\"Nineteen.\"", steps: [
         { say: "rowan", text: "\"Nineteen.\"" },
