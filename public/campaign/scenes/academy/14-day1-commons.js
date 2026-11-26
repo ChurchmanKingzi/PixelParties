@@ -4,7 +4,7 @@
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
 // Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
 const STORY = helpers.story, DATA = helpers.data;
-const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS, ALPHA } = helpers;
 scene("row_boardwalk", {
   steps: [
     {
@@ -223,7 +223,8 @@ scene("placement_call", {
     { text: "A boy in a yellow bandana is hammering up the boardwalk at a dead run." },
     {
       say: "tomi",
-      text: "\"WILDCARD! Placement! Placement duels! They're calling the Commons, it's half one, you're drawn for Dome two, they're doing it in alphabetical order, you're V!\""
+      // alphabetisch nach Nachnamen: der Buchstabe folgt dem gewählten Nachnamen (ALPHA)
+      text: (s) => "\"WILDCARD! Placement! Placement duels! They're calling the Commons, it's half one, you're drawn for Dome two, they're doing it in alphabetical order, you're " + ALPHA(s).letter + "!\""
     },
     { say: "tomi", text: "\"Come ON. I've got ten Smug Coins on you not throwing up.\"" },
     { think: "I haven't thought about it all day. Not once. Which is exactly why it's here." },

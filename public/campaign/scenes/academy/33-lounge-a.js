@@ -3,7 +3,7 @@
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
 // Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
-const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS, ALPHA } = helpers;
 scene("ferry_gideon", {
   steps: [
     { when: (s)=>!!s.flags["lounge_seen"], jump: "seen" },
@@ -2555,7 +2555,10 @@ scene("isle_inya", {
     ] },
     { when: (s)=>!!s.flags["placement_won"], say: "inya", text: "\"You won your placement. It's all over the row.\" A narrow look. \"Good. Then you're still worth beating.\"" },
     { when: (s)=>!!s.flags["placement_lost"], say: "inya", text: "\"You lost your placement. It's all over the row.\" She holds out a pencil stub, not a notebook. \"One line. What you should have done. Your own paper.\"" },
-    { when: (s)=>!s.flags["placement_won"] && !s.flags["placement_lost"], say: "inya", text: "\"They call us at half one. I'm B, so I'm early, and you're V, so you get to watch everyone else first. I can't decide which is worse.\"" },
+    { when: (s)=>!s.flags["placement_won"] && !s.flags["placement_lost"], say: "inya", text: (s) => { const a = ALPHA(s), mine = "Bell".localeCompare((s.vars && s.vars.pl) || "Vance", "en", { sensitivity: "base" }) < 0;   // Inya Bell, B
+      return "\"They call us at half one. I'm B, so I'm early, and you're " + a.letter + (mine
+        ? (a.where === "end" || a.where === "last" ? ", so you get to watch everyone else first." : ", so you get to watch me go first.")
+        : ", so you're even earlier than me. At least it's over quickly.") + " I can't decide which is worse.\""; } },
     NOTE("inya", "Has the bed by the door in bungalow 3 and calls it the best room she has ever had."),
     { flag: "isle_inya_done" },
     { choice: [

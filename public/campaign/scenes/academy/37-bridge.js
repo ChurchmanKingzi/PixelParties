@@ -3,12 +3,12 @@
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
 // Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
-const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS, ALPHA } = helpers;
 scene("ferry_abel", {
   steps: [
     { when: (s)=>!!s.flags["met_abel"], jump: "again" },
     { text: "The man at the wheel is barrel-chested, with a full white beard and a blue bowler hat gone soft with age. His face is the colour and texture of a good saddle." },
-    { text: "Through the open door the wheelhouse is warm and bright with brass. He has both hands on the wheel, with his feet planted apart, as if the whole ship were a very large, very slow horse that needed to be reminded who was riding it." },
+    { text: "The wheelhouse is warm and bright with brass. He has both hands on the wheel, with his feet planted apart, as if the whole ship were a very large, very slow horse that needed to be reminded who was riding it." },
     { text: "Just inside the door, under a tarpaulin, sits a small crate that smells of ice and harbour." },
     { say: "abel", alias: "The captain", text: "\"Thirty-seven and — hold on. Thirty-eight! There you are. I counted thirty-seven.\"" },
     { text: "He does not turn round." },
@@ -23,7 +23,7 @@ scene("ferry_abel", {
       { text: "\"How did you count me? You haven't looked.\"", steps: [
         { say: "rowan", text: "\"How did you count me? You haven't looked.\"" },
         { say: "abel", alias: "The captain", text: "\"The stair. It's iron, it rings, and every one of you rings different. You've a tired foot. The left.\"" },
-        { text: "He nods at the brass housing of the compass in front of him. In its curve there is a very small, very bent wheelhouse door, and a very small, very bent you standing in it." },
+        { text: "He nods at the brass housing of the compass in front of him. In its curve there is a very small, very bent wheelhouse, and a very small, very bent you standing in it." },
         { say: "abel", alias: "The captain", text: "\"And I polish that myself.\"" },
         AFF("abel", 1, "Asked how he counts")
       ] },
@@ -312,7 +312,7 @@ scene("abel_jokes", {
 scene("ferry_rana", {
   steps: [
     { when: (s)=>!!s.flags["met_rana"], jump: "again" },
-    { text: "On the top step of the iron stair a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship." },
+    { text: "At the head of the iron stair, just off the top step, a girl is sitting with her arms round her knees and her back turned to the rail, as far from anybody as it is possible to be on a ship." },
     { text: "Blonde hair in two long braids that hang down in front of her shoulders, each one tied off with a large red bow. Black nail polish, chipped from biting. A plain grey collar set with tiny silver studs, in a row too even to have come out of a shop." },
     { text: "She is watching the planks." },
     { text: "She knows you are there. You can tell from the set of her shoulders, which have gone very slightly straighter, in the manner of an animal that has heard a twig." },

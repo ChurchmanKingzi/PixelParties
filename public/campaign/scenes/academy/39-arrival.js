@@ -3,11 +3,13 @@
 // Beim Übertragen: helpers.story (= { world, scenes }) und helpers.data (Personen, Bezeichnungen; siehe data.json) muss der Lader bereitstellen;
 // io.popup({ type: 'aff' | 'met' | 'deck', … }) ist optional (ohne es entfallen nur die Einblendungen).
 // Der Runner muss Texte als Funktion erlauben (text: (s) => …, ausgewertet mit dem Spielstand) und beim card-Schritt die Seltenheit (rarity) beachten; s.deck = Rowans aktuelles Deck, s.owned = Sammlung je Seltenheit.
-const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS } = helpers;
+const { AFF, MET, DECK, NOTE, REL, PHOTO, DECKCOUNT, WORDS, ALPHA } = helpers;
 scene("ferry_arrival", {
   background: "ferry_deck",
   steps: [
     { clear: true },
+    // Das Horn ertönt immer um 10:25, egal wie spät das Ereignis nach der letzten Szene zum Zug kommt (die Uhr springt dorthin).
+    { run: (s)=>{ s.minutes = 625; } },
     {
       set: { arrival_visits: 0 }
     },
@@ -54,7 +56,8 @@ scene("ferry_arrival", {
     { when: (s)=>!s.flags["met_junho"], text: "The first one through it is a boy in a gold jacket carrying five identical deck boxes in a stack, with his chin on the top one, like a waiter with a difficult cake." },
     { when: (s)=>!!s.flags["met_junho"], text: "The first one through it is Jun-ho, carrying all five deck boxes in a stack, with his chin on the top one, like a waiter with a difficult cake." },
     { scene: "arrival_hub" },
-    { run: (s)=>{ if (s.minutes < 640) s.minutes = 640; } },
+    // Angelegt wird immer um 10:40 (Karte im Steuerhaus: „tie up 10.40“), gleich wie lange der Rundgang gedauert hat.
+    { run: (s)=>{ s.minutes = 640; } },
     { scene: "arrival_finale" },
     { scene: "ferry_docks" }
   ]
@@ -162,7 +165,7 @@ scene("arrival_hub", {
     {
       add: { arrival_visits: 1 }
     },
-    { time: 4 },
+    { run: (s)=>{ s.minutes = 625 + 4 * (s.vars["arrival_visits"] || 0); } },
     { jump: "top" },
     { jump: "choiceend_7" },
     { label: "opt_9" },
@@ -171,7 +174,7 @@ scene("arrival_hub", {
     {
       add: { arrival_visits: 1 }
     },
-    { time: 4 },
+    { run: (s)=>{ s.minutes = 625 + 4 * (s.vars["arrival_visits"] || 0); } },
     { jump: "top" },
     { jump: "choiceend_7" },
     { label: "opt_10" },
@@ -180,7 +183,7 @@ scene("arrival_hub", {
     {
       add: { arrival_visits: 1 }
     },
-    { time: 4 },
+    { run: (s)=>{ s.minutes = 625 + 4 * (s.vars["arrival_visits"] || 0); } },
     { jump: "top" },
     { jump: "choiceend_7" },
     { label: "opt_11" },
@@ -189,7 +192,7 @@ scene("arrival_hub", {
     {
       add: { arrival_visits: 1 }
     },
-    { time: 4 },
+    { run: (s)=>{ s.minutes = 625 + 4 * (s.vars["arrival_visits"] || 0); } },
     { jump: "top" },
     { jump: "choiceend_7" },
     { label: "opt_12" },
@@ -1264,7 +1267,11 @@ scene("arrival_mid", {
     { label: "next_22" },
     {
       say: "teobalt",
-      text: "\"I have drawn up an unloading order. You are near the end. I am sorry. It is nothing personal. It is alphabetical.\""
+      text: (s) => ({ first: "\"I have drawn up an unloading order. You are first. It is alphabetical. Please do not let it go to your head; it is not a merit.\"",
+        front: "\"I have drawn up an unloading order. You are near the front. It is alphabetical. You may thank your surname; I had no part in it.\"",
+        middle: "\"I have drawn up an unloading order. You are in the middle. It is alphabetical. It is the most restful place on any list.\"",
+        end: "\"I have drawn up an unloading order. You are near the end. I am sorry. It is nothing personal. It is alphabetical.\"",
+        last: "\"I have drawn up an unloading order. You are last. I am sorry. It is nothing personal. It is alphabetical.\"" })[ALPHA(s).where]
     },
     { label: "end_21" },
     { jump: "end_19" },
@@ -1285,7 +1292,9 @@ scene("arrival_mid", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["teobalt"] = s.notes["teobalt"] || []); if (a.indexOf("Makes lists. Organises everything.") < 0) a.push("Makes lists. Organises everything."); }
     },
     { say: "rowan", text: "\"Rowan. How am I doing?\"" },
-    { say: "teobalt", text: "\"You are near the end. It is alphabetical. It is nothing personal.\"" },
+    { say: "teobalt", text: (s) => ({ first: "\"You are first. It is alphabetical. It is not a merit.\"", front: "\"You are near the front. It is alphabetical. It is not a merit.\"",
+      middle: "\"You are in the middle. It is alphabetical. It is the most restful place on a list.\"", end: "\"You are near the end. It is alphabetical. It is nothing personal.\"",
+      last: "\"You are last. It is alphabetical. It is nothing personal.\"" })[ALPHA(s).where] },
     { label: "end_19" },
     { when: (s)=>!s.flags["met_leona"], text: "A yard from his elbow, in plain view, a girl with mousy-brown hair and a canvas satchel with a broken buckle is waiting to be counted. He counts the crate beside her." },
     { when: (s)=>!!s.flags["met_leona"], text: "A yard from his elbow, in plain view, Leona is waiting to be counted. He counts the crate beside her." },

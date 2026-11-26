@@ -91,18 +91,19 @@ scene("bridge_first", {
   background: "ferry_bridge",
   steps: [
     {
-      text: "You take the iron stair two steps at a time. At the top is a narrow wing of dark deck outside the wheelhouse, with a rope rail, a brass bell on the wall, a lifebuoy, and a fire axe in a red frame beside a clipboard."
+      text: "You take the iron stair two steps at a time. The wing at the top has a rope rail, a brass bell, a lifebuoy, and a fire axe in a red frame beside a clipboard."
     },
-    { text: "Through the open door you see a bright room of brass and polished wood: a big spoked wheel, a bank of dials, a red rug, a chart table, and through the front windows the island, dead ahead and larger now, its grey cone trailing a thread of smoke." },
+    { text: "The wheelhouse door stands open on its hook. Inside is a bright room of brass and polished wood: a big spoked wheel on a red rug, two banks of dials, a chart table." },
+    { text: "Through the front windows lies the island, dead ahead and larger now, its grey cone trailing a thread of smoke." },
     { text: "A man in a navy suit and a blue bowler hat stands at the wheel with his feet apart, talking without turning round." },
-    { text: "If you lean over the rail, the whole ship lies below you." },
+    { text: "Out on the wing, if you lean over the rail, the whole ship lies below you." },
     { time: 3 }
   ]
 });
 
 scene("bridge_overlook", {
   steps: [
-    { text: "From the wing you can see who is where. A knot of people at the lounge stair. A girl on the stern rail with her feet over the wake." },
+    { text: "You step back out onto the wing. From up here you can see who is where. A knot of people at the lounge stair. A girl on the stern rail with her feet over the wake." },
     { text: "A small crowd round a bollard where somebody is waving an arm at the gulls. Nathan, a spiky dot, in motion on the fore deck, talking at a very tall dot." },
     { when: (s)=>!(!!s.flags["table_resolved"]), jump: "next_2" },
     {

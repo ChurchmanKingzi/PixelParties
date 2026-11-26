@@ -48,7 +48,10 @@ for (const o of (L.ferry_lounge.objects || []).filter(o => o.sprite === "inya").
   const w = o.when; L.ferry_deck.objects.push(Object.assign(o, { id: o.id + "_deck", spot: ["ferry", 13, 30], free: true, alert: undefined, when: (s) => { const lounge = Object.assign({}, s, { eventsDone: {}, flags: Object.assign({}, s.flags, { ferry_inya_lost: false }) }); return w(lounge) && inyaOut(s); } }));
 }
 // Die schon gesetzten Figuren der Decks bekommen feste Plätze (bisher drängten sie sich alle um die Tür zur Lounge).
-const STAND = { abel: ["ferry", 12, 27], rana: ["ferry", 14, 27], teobalt: ["ferry", 18, 27],
+// Brücke: Abel am Rad im Steuerhaus (Raum ferry__1 hinter der Tür auf dem Deckshaus), Rana oben an der Metalltreppe auf der Nock,
+//   Teobalt vor der Front des Steuerhauses neben der Tür (Blick über die Reling hinunter auf das Vordeck). Beide Plätze sind „fest“.
+if (L.ferry_bridge) L.ferry_bridge.name = "The Wheelhouse";
+const STAND = { abel: ["ferry__1", 6, 6], rana: ["ferry", 12, 23, "fest"], teobalt: ["ferry", 15, 23, "fest"],
   ed: ["ferry", 19, 36], georgie: ["ferry", 18, 35], pippa: ["ferry", 20, 35], branden: ["ferry", 14, 33], mikoto: ["ferry", 10, 31],
   freddie: ["ferry", 14, 5], sunny: ["ferry", 19, 5], marit: ["ferry", 11, 5], jessica: ["ferry", 14, 8], ashton: ["ferry", 23, 8], victoria: ["ferry", 21, 10] };
 // Lounge (Raum ferry__0, Tür unten, Fensterwand oben): Spieltisch in der Mitte auf dem grünen Teppich, Galley-Theke oben links.

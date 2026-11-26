@@ -18,6 +18,9 @@ const STORY = helpers.story, DATA = helpers.data;
 // DECKCOUNT(s)         Rowans AKTUELLES Deck gezählt (er kann es umbauen): { heroes, abilities, main, potions, total, allCommon }.
 //                      Für Texte, die Karten zählen: { text: (s) => "…" + WORDS(DECKCOUNT(s).main) + "…" } (Texte dürfen Funktionen sein).
 // WORDS(n)             Zahl als englisches Wort ("sixty"), ab 100 als Ziffern.
+// ALPHA(s)             Rowans Platz in der alphabetischen Liste der 38 First-Years nach Nachnamen. Der Nachname ist frei
+//                      wählbar (s.vars.pl, Standard Vance): { pos, of, letter, where: 'first'|'front'|'middle'|'end'|'last' }.
+//                      Für Teobalts Abfahrtsliste, die Reihenfolge der Placement-Duelle usw. — nie fest „near the end“ schreiben.
 // Belohnungen: { card: "Kartenname", rarity: "rare" } (eine Kopie in dieser Seltenheit, Standard common),
 //              { item: "Booster Pack" } (im Cards-Fenster zu öffnen), { coins: 10 } (Smug Coins).
 helpers.AFF = (id, n, why) => ({ add: { ['aff_' + id]: n }, run: (s, io) => { if (io && io.popup) io.popup({ type: 'aff', id, n, why }); }, _h: ['aff', id, n, why] });
@@ -33,6 +36,16 @@ helpers.DECKCOUNT = (s) => {
   const own = s.owned || {}; let allCommon = true;
   for (const n of Object.keys(Object.assign({}, d.main, d.potions))) { const r = own[n] || {}; if (Object.keys(r).some(k => k !== 'common' && r[k] > 0) && !(r.common >= ((d.main || {})[n] || 0) + ((d.potions || {})[n] || 0))) allCommon = false; }
   return { heroes, abilities, main, potions, total: heroes + abilities + main + potions, allCommon, name: d.name || R.name || '' };
+};
+helpers.ALPHA = (s) => {
+  // Nachnamen der übrigen 37 (Sortierschlüssel; „von Düsterwald“ unter D, „Park Jun-ho“ unter P)
+  const others = ['Whisper', 'Halvorsen', 'Venture', 'Santa', 'Hale', 'Lund', 'Yamaguchi', 'Sunflower', 'Düsterwald', 'Pryce', 'Bell', 'Reyes', 'Brandt',
+    'Prospero', 'Al-Sayed', 'Thana', 'Park', 'Lafayette', 'Montclair', 'Beaumont-Lyle', 'Capulet', 'Abernathy', 'Aldane', 'Solberg', 'Camara', 'Okonjo',
+    'Marika', 'Fullington', 'Njord', 'Nordlicht', 'Hollis', 'Voltage', 'Blackwood', 'Helical', 'Counts', 'Crowe', 'Volkov'];
+  const me = String((s && s.vars && s.vars.pl) || 'Vance').trim() || 'Vance';
+  const pos = 1 + others.filter(n => n.localeCompare(me, 'en', { sensitivity: 'base' }) < 0).length, of = others.length + 1;
+  const where = pos === 1 ? 'first' : pos === of ? 'last' : pos <= 10 ? 'front' : pos <= 28 ? 'middle' : 'end';
+  return { pos, of, letter: me.charAt(0).toUpperCase(), where };
 };
 helpers.WORDS = (n) => { const a = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'], t = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']; if (n < 20) return a[n]; if (n < 100) return t[Math.floor(n / 10)] + (n % 10 ? '-' + a[n % 10] : ''); return String(n); };
 helpers.PHOTO = (id, subject, o) => ({ run: (s) => { o = o || {}; s.photos = s.photos || []; if (s.photos.some(p => p.id === id)) return; s.photos.push({ id, subject, who: o.who || [], off: !!o.off, day: s.day, minutes: s.minutes, place: s.location, developed: false }); }, _h: ['photo', id, subject, (o && o.off) ? 'off' : 'seen'] });
