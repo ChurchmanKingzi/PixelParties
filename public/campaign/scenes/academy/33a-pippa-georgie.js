@@ -41,7 +41,7 @@ scene("ferry_pippa_georgie", {
       ] }
     ] },
     MET("georgie", "Georgie Santa"),
-    { say: "pippa", alias: "Girl with a camera", text: "The camera comes down, and its owner gives you a look of frank assessment, one eye half shut, as though weighing you for a composition. \"Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.\"" },
+    { say: "pippa", alias: "Girl with a camera", text: "\"The camera comes down, and its owner gives you a look of frank assessment, one eye half shut, as though weighing you for a composition. 'Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.'\"" },
     MET("pippa", "Pippa Lund"),
     { say: "pippa", text: "\"She's fourteen, you know.\" Quite gently. \"She's allowed to sit on the rope. I've told her. She doesn't believe me.\"" },
     { jump: "both" },
@@ -76,7 +76,7 @@ scene("ferry_pippa_georgie", {
         AFF("pippa", 1, "Held still for her")
       ] }
     ] },
-    { say: "pippa", alias: "Girl with a camera", text: "She stands, lets the camera drop on its strap and looks at you without a lens in the way, one eye still half shut out of habit. \"Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.\"" },
+    { say: "pippa", alias: "Girl with a camera", text: "\"She stands, lets the camera drop on its strap and looks at you without a lens in the way, one eye still half shut out of habit. 'Pippa Lund. I'm the photographer. Nobody asked me to be; I just got here first.'\"" },
     MET("pippa", "Pippa Lund"),
     { say: "rowan", text: "\"Rowan.\"" },
     { say: "pippa", text: "\"And that's Georgie Santa. She's fourteen.\" Quite gently. \"She's allowed to sit on the rope. I've told her. She doesn't believe me.\"" },
@@ -107,7 +107,7 @@ scene("ferry_pippa_georgie", {
         { say: "georgie", text: "\"I don't know. I only met her at the harbour. She asked if she could take my picture, and then she just — stayed.\"" },
         { say: "pippa", text: "\"I'm standing *right here*.\"" },
         { say: "georgie", text: "\"I know.\" A small pause. \"It's nice. I think it's nice. I don't know what you're supposed to do back.\"" },
-        { say: "pippa", text: "For once she has nothing ready. Then: \"You hold still. That's what you do back. You're very good at it.\"" },
+        { say: "pippa", text: "\"For once she has nothing ready. Then: 'You hold still. That's what you do back. You're very good at it.'\"" },
         { flag: "pg_harbour" },
         AFF("georgie", 1, "Asked me, not her"),
         AFF("pippa", 1, "Let her answer")
@@ -115,7 +115,7 @@ scene("ferry_pippa_georgie", {
       { text: "Sit down on the other end of the rope.", steps: [
         { text: "You sit down on the far end of the coil. It is damp, and harder than it looks. The girl on the other end stares at you as if you had walked through a wall." },
         { say: "georgie", text: "\"…Oh. You can. It's — it's anybody's.\"" },
-        { say: "pippa", text: "Click. She is already back behind the lens. \"*That's* the one. Two people on a rope, neither of them sure they're allowed.\"" },
+        { say: "pippa", text: "\"Click. She is already back behind the lens. '*That's* the one. Two people on a rope, neither of them sure they're allowed.'\"" },
         PHOTO("rope_two", "Two people on a rope, neither of them sure they're allowed: Rowan and Georgie", { who: ["rowan", "georgie"] }),
         { flag: "pg_sat" },
         AFF("georgie", 2, "Sat down too")
@@ -133,7 +133,7 @@ scene("ferry_pippa_georgie", {
     { say: "pippa", text: "\"Slower! It's all blur, I can't —\"" },
     PHOTO("georgie_hands", "Georgie's hands shuffling, eight riffles, Ember at her elbow (no face)", { who: ["georgie"] }),
     { say: "georgie", text: "\"Slower clumps.\" Clipped, flat, nothing in it but fact. \"Eight riffles. Seven is for fifty-two cards; mine has more. Fewer and it isn't shuffled. It's a pattern you haven't found yet.\"" },
-    { say: "georgie", text: "She squares the deck with one tap and looks up, straight at you, for the first time. \"You've got a deck in that pocket. You keep touching it. Do you do eight?\"" },
+    { say: "georgie", text: "\"She squares the deck with one tap and looks up, straight at you, for the first time. 'You've got a deck in that pocket. You keep touching it. Do you do eight?'\"" },
     { choice: [
       { text: "\"I've never shuffled for a real game in my life. Online, the computer does it.\"", steps: [
         { say: "rowan", text: "\"I've never shuffled for a real game in my life. Online, the computer does it.\"" },
@@ -203,7 +203,7 @@ scene("ferry_pippa_georgie", {
     { when: (s)=>!!s.flags["pg_wild"], say: "pippa", text: "\"That's her impressed face. It's very hard to photograph.\"" },
 
     // ---- Abschluss ----
-    { say: "pippa", text: "A gull goes over low, and the camera goes after it, and so, for a step or two, does Pippa. \"Go on, you two. Talk cards. She goes all sharp; it's the best light she's got.\"" },
+    { say: "pippa", text: "\"A gull goes over low, and the camera goes after it, and so, for a step or two, does Pippa. 'Go on, you two. Talk cards. She goes all sharp; it's the best light she's got.'\"" },
     PHOTO("gull_low", "A gull going over the foredeck, low", { who: [] }),
     { choice: [
       { text: "\"Would you like a game, Georgie? Nothing riding on it, just for fun.\"", steps: [
@@ -329,6 +329,12 @@ scene("georgie_game", {
       { text: "Play her.", steps: [
         { text: "The moment the first card is in her hand, the hunch goes out of her shoulders. She sets the plush dragon on the planks at her elbow, facing the board." },
         { say: "georgie", text: "\"Shuffle, please. Thoroughly. Then we begin.\"" },
+        { text: "You shuffle and lay out your three Heroes. The new cards stick and clump, and one tries to leave altogether. Georgie watches the deck and not your hands, which is somehow kinder." },
+        { say: "georgie", text: "\"Nicolas, Tarleinn, Semi. Gold, Potions, Spells.\" Clipped, certain, reading the deck behind the Heroes. \"It's a very sharp list. There's nothing in it that's only there to be pretty.\"" },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"Including the frames, I keep hearing.\"" },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "georgie", text: "\"…Oh. They're Commons.\" She had not noticed, and looks faintly surprised that anybody would. \"Frames don't count.\"" },
+        { when: (s)=>!s.flags["rowan_commons_seen"], say: "georgie", text: "\"They're all Commons, too.\" Not a judgement. A fact, set down on the table like a card. \"Frames don't count.\"" },
+        { flag: "rowan_commons_seen" },
         { duel: "ferry_georgie", opponent: "georgie", opponentName: "Georgie Santa", mustWin: false,
           onWin: [
             { text: "Georgie stares at the board for a long time, completely still." },

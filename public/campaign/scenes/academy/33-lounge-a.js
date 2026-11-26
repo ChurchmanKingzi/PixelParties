@@ -1047,6 +1047,28 @@ scene("ferry_tomi", {
             Object.assign(AFF("tomi", 2, "Asked the real price"), { when: (s)=>!s.flags["tomi_binder_aff"] }),
             { flag: "tomi_binder_aff" }
           ] },
+          { text: "\"Where would mine go in here?\" Take out your deck.", when: (s)=>!s.flags["tomi_saw_print"], steps: [
+            { say: "rowan", text: "\"Where would mine go in here?\"" },
+            { text: "You put the deck box on the open page. He flicks the lid up with the pencil, looks at the top card, riffles the edges once with his thumb, and listens to them like a man buying a melon." },
+            { say: "tomi", text: "\"Commons. All of them. And so new they squeak.\" He closes the lid. \"That's the Qualifier print, that is. They do the winning list in Commons so nobody can flip the prize for rent.\"" },
+            { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"Everyone's going to tell me that, aren't they.\"" },
+            { when: (s)=>!!s.flags["rowan_commons_seen"], say: "tomi", text: "\"Everyone who can count. Then they'll all go quiet the first time it hits them.\"" },
+            { say: "tomi", text: "\"Where would it go? Back pages. Coin a card on a friendly day, and nobody's ever bought a Tea from me in their life.\" He slides the box back across. \"In a binder it's worth nothing. On a table it's worth a seat at this school. I don't sell those. I'd not know where to start the price.\"" },
+            { choice: [
+              { text: "\"Then I'll keep it out of your binder.\"", steps: [
+                { say: "rowan", text: "\"Then I'll keep it out of your binder.\"" },
+                { say: "tomi", text: "\"Smart. That's also why I keep saying sleeves, by the way. Brand-new cardboard and a nervous shuffle, I've seen how that ends. It's not only patter. It's *mostly* patter.\"" }
+              ] },
+              { text: "\"You'd have bought the seat, though. If it was for sale.\"", steps: [
+                { say: "rowan", text: "\"You'd have bought the seat, though. If it was for sale.\"" },
+                { say: "tomi", text: "\"Wildcard, I'd have *sold* it. Three times. To three different people.\" The grin. Then, a shade less of it: \"No. I'd have bought it. Don't write that down.\"" },
+                AFF("tomi", 1, "Asked what he'd want")
+              ] }
+            ] },
+            NOTE("tomi", "Says your all-Commons prize print is worth nothing in a binder and a seat at the Academy on a table."),
+            { flag: "tomi_saw_print" },
+            { flag: "rowan_commons_seen" }
+          ] },
           { text: "Close it again. Only looking.", steps: [
             { say: "rowan", text: "\"Only looking.\"" },
             { say: "tomi", text: "\"Looking's free. It's the only thing on this bench that is.\"" }

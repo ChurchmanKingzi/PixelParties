@@ -117,6 +117,23 @@ scene("ferry_magnus", {
       { text: "\"All right. Let's play.\"", when: (s)=>!s.flags["flag_magnus_played"], steps: [
         { say: "rowan", text: "\"All right. Let's play.\"" },
         { text: "He has cleared the bench between you before you have finished the sentence. The tablet goes face up beside his deck, recording." },
+        { text: "You take out your deck and set the three Heroes face up on the vinyl. The cards are so new that they cling to one another; you have to thumb them apart." },
+        { say: "magnus", text: "\"Nicolas. Tarleinn. Semi.\" Not a question. \"Nine Destruction Magic, eight Leadership, four Gathering Storm, four Yeeting, one Cataclysm. The Qualifier list, as registered.\" He has not touched the tablet. He does not need it for this. \"You have not changed a card.\"" },
+        { choice: [
+          { text: "\"I couldn't. That's the prize: they print the winning list, card for card.\"", steps: [
+            { say: "rowan", text: "\"I couldn't. That's the prize: they print the winning list, card for card.\"" },
+            { say: "magnus", text: "\"I know what the prize is. I read the terms. I read all prize terms.\" His eyes go over the plain frames. \"Every one a Common.\"" }
+          ] },
+          { text: "\"You know my list better than I do.\"", steps: [
+            { say: "rowan", text: "\"You know my list better than I do.\"" },
+            { say: "magnus", text: "\"Nobody knows your list better than you. I know it second.\" His eyes go over the plain frames. \"And all in Commons. The prize print always is.\"" }
+          ] }
+        ] },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"You're not the first to notice.\"" },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "magnus", text: "\"I am the first who knew before he looked. Note the distinction.\"" },
+        { say: "magnus", text: "\"I approve, if it matters. Foil glares under lights, and a Common has nothing on it but the numbers.\" A glance down at his own white sneakers, which have a great deal on them. \"Cards are not shoes.\"" },
+        { flag: "rowan_commons_seen" },
+        { flag: "magnus_saw_print" },
         { duel: "ferry_magnus", opponent: "magnus", opponentName: "Magnus Prospero", mustWin: false,
           onWin: [
             { say: "magnus", text: "\"Congratulations. No, really. Enjoy it. I'll have the replay broken down by breakfast.\"" },
@@ -920,8 +937,29 @@ scene("chat_livvie", {
             { say: "rowan", text: "\"What's my deck worth, then?\"" },
             { when: (s)=>s.day===1 && s.minutes<645, say: "livvie", text: "\"Unsleeved, in a pocket you keep squeezing? Less every minute.\"" },
             { when: (s)=>!(s.day===1 && s.minutes<645), say: "livvie", text: "\"Unsleeved, in a coat pocket, in this heat? Less every minute.\"" },
-            { say: "livvie", text: "\"I'd sleeve it for you. Two coins. That's cost and a bit, and I'll show you the bit.\"" },
-            AFF("livvie", 2, "Asked her price")
+            { say: "livvie", text: "\"Can't say more than that without seeing inside. I don't price a box.\"" },
+            { choice: [
+              { text: "Open the box and tilt it towards her.", steps: [
+                { text: "She does not touch. She reads the edges and the face card the way she reads a column, and the pencil stops." },
+                { say: "livvie", text: "\"…They're commons.\" Then, fast: \"Sorry. That's not a price, that's just what they are. All of them, aren't they? Every one. And new. The edges haven't even gone soft.\"" },
+                { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"So I keep being told.\"" },
+                { when: (s)=>!!s.flags["rowan_commons_seen"], say: "livvie", text: "\"Then I'll skip that bit and charge you less for the rest.\"" },
+                { when: (s)=>!!(s.flags["told_wildcard"] || s.flags["ship_knows_wildcard"]), say: "rowan", text: "\"It's the Qualifier prize. They print the list you won with, card for card, all in Commons.\"" },
+                { when: (s)=>!(s.flags["told_wildcard"] || s.flags["ship_knows_wildcard"]), say: "rowan", text: "\"It was a prize. They printed the list I won with, card for card, all in Commons.\"" },
+                { say: "livvie", text: "\"So it won with nothing that cost anything.\" She looks at the box a moment longer than she needs to. \"That's the best kind there is. Don't let anybody with a gold edge on their collar tell you different.\"" },
+                { say: "livvie", text: "\"It's also why you want sleeves *today*. New stock's the worst: slick, it clumps, it nicks on the first proper riffle, and once a corner's gone the whole table knows which card it is.\"" },
+                { say: "livvie", text: "\"I'd sleeve it for you. Two coins. That's cost and a bit, and I'll show you the bit.\"" },
+                AFF("livvie", 2, "Showed her inside"),
+                NOTE("livvie", "Saw your prize print of commons and called it the best kind of deck: one that won with nothing that cost anything."),
+                { flag: "rowan_commons_seen" },
+                { flag: "livvie_saw_print" }
+              ] },
+              { text: "\"Whatever it's worth, it's not for sale.\"", steps: [
+                { say: "rowan", text: "\"Whatever it's worth, it's not for sale.\"" },
+                { say: "livvie", text: "\"Everything's —\" She stops herself. \"All right. Then it's worth what it does. I'd still sleeve it for you. Two coins. That's cost and a bit, and I'll show you the bit.\"" },
+                AFF("livvie", 2, "Asked her price")
+              ] }
+            ] }
           ] },
           { text: "\"Did you ever keep any? Or was it all stock?\"", steps: [
             { say: "rowan", text: "\"Did you ever keep any? Or was it all stock?\"" },

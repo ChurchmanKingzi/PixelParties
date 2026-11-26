@@ -29,7 +29,13 @@ scene("ferry_prologue", {
       text: "You have never once played this game on a real table. Never shuffled a real deck in front of a real person who was looking at your hands."
     },
     {
-      text: "Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Seventy-four cards, counting the three heroes and their six starting abilities, and you know every one of them by heart."
+      text: "Your deck box sits in the pocket of your old rain jacket. Gather That Storm. Seventy-four cards, counting the three heroes and their six starting abilities, and you know every one of them by heart. You have known them for years, as pixels. You have owned them for a fortnight."
+    },
+    {
+      text: "The box was the grand prize. A few days after the Qualifier a courier brought it to the laundromat: the list you won with, printed card for card, exactly as you registered it, down to the last Tea. Apart from those seventy-four, you own no cards at all."
+    },
+    {
+      text: "Every one of them is a Common. The prize print always is: no foil, no shimmer, only the plain frame, and a Common plays exactly the same as the shiniest Storm Rare anyone ever pulled from a pack. The box still smells of new card stock. It has only ever been shuffled at the folding table after closing, with nobody watching but the dryers."
     },
     {
       text: "The acceptance letter is still in your bag, folded so often it has gone soft. You know it by heart now, down to the line about Bungalow 7."

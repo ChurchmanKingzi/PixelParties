@@ -309,11 +309,20 @@ scene("placement_duel", {
     { jump: "choiceend_4" },
     { label: "opt_7" },
     {
-      text: "You look at the cards. Not the benches. Not the doorway. The cards are the same cards they have always been. You pick up the deck and your hands, very slowly, begin to do what you have asked them to do."
+      text: "You look at the cards. Not the benches. Not the doorway. The cards are the same cards they always were on the screen. You pick up the deck and your hands, very slowly, begin to do what you have asked them to do."
     },
     { flag: "nerve_cards" },
     { jump: "choiceend_4" },
     { label: "choiceend_4" },
+    { say: "hana", text: "\"Deck check, both players.\" She holds out a hand, palm up, without looking at it." },
+    { text: "Rana's deck goes across the felt in one flat, contemptuous slide. Yours goes across less elegantly. Ms Kirishima fans it in a single movement and reads it the way other people read a clock." },
+    { say: "hana", text: "\"Three Heroes, six starting Abilities, sixty in the main deck, five in the Potion Deck. Registered as 'Gather That Storm!', Wildcard Qualifier, prize print.\" She squares it with one tap. \"Common throughout. New stock. The edges are unmarked.\"" },
+    { say: "hana", text: "\"Unsleeved, they will not stay unmarked, and a marked card is a matter for this office. Sleeves by Friday, Mr Vance. That is not a penalty. It is a forecast.\"" },
+    { when: (s)=>!!s.flags["rowan_commons_seen"], think: "Everybody has had something to say about these cards today. She's the first one who can write it down." },
+    { when: (s)=>!s.flags["rowan_commons_seen"], think: "Prize print. It sounds more official when she says it. It also sounds a lot like 'cheap'." },
+    { when: (s)=>!!s.flags["met_rana"], say: "rana", text: "\"…The prize list.\" Under her breath, to her own deck. \"Lovely.\"" },
+    { flag: "rowan_commons_seen" },
+    { flag: "hana_checked_print" },
     { say: "hana", text: "\"Begin.\"" },
     {
       duel: "placement_rana",

@@ -1108,6 +1108,24 @@ scene("post_freddie", {
       ] }
     ] },
     { label: "out" },
+    { text: "She rolls onto her front, drags one of your Gathering Storms across the planks by its corner, and holds it up against the sky to look at it properly." },
+    { when: (s)=>s.duels["ferry_freddie"] === "won", say: "freddie", text: "\"It's *plain*.\" Delighted, and a little scandalised. \"No waves. Not even a little fish. It's a *Common*. You beat me with a Common!\"" },
+    { when: (s)=>s.duels["ferry_freddie"] !== "won", say: "freddie", text: "\"It's *plain*.\" Delighted, and a little scandalised. \"No waves. Not even a little fish. It's a *Common*. You nearly beat me with a Common!\"" },
+    { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"They're all Commons. Half the ship's told me so already.\"" },
+    { when: (s)=>!!s.flags["rowan_commons_seen"], say: "freddie", text: "\"Well, I'm telling you *louder*.\"" },
+    { when: (s)=>!s.flags["rowan_commons_seen"], say: "rowan", text: "\"They're all Commons. It was a prize: they printed the list I won with, card for card.\"" },
+    { say: "freddie", text: "\"Mine are the other way round. Gorgeous, and they don't do anything.\" She says it with enormous affection, and hands the Storm back." },
+    { choice: [
+      { text: "\"Yours are better to look at.\"", steps: [
+        { say: "rowan", text: "\"Yours are better to look at.\"" },
+        { say: "freddie", text: "\"Everybody's are better to look at than *yours*. That's not a criticism. It's a public service.\"" }
+      ] },
+      { text: "\"Mine are built to win. Yours are built to be looked at. Both work.\"", steps: [
+        { say: "rowan", text: "\"Mine are built to win. Yours are built to be looked at. Both work.\"" },
+        { say: "freddie", text: "\"One of them works.\" Sunnily. \"But I know which one I'd take swimming.\"" }
+      ] }
+    ] },
+    { flag: "rowan_commons_seen" },
     AFF("freddie", 1, "Talked it through")
   ]
 });

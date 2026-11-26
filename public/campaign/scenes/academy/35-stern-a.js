@@ -624,6 +624,22 @@ scene("chat_ashton", {
             AFF("ashton", 1, "Noticed the real interest")
           ] }
         ] },
+        { say: "ashton", text: "\"And the prize has arrived, I take it.\" A glance at your pocket: the first time he has looked anywhere but your face. \"The printed list.\"" },
+        { when: (s)=>!s.flags["rowan_commons_seen"], say: "ashton", text: "\"In Commons, every card. I looked it up, the way one looks up what a rival's horse eats. In my building that would count as a scandal.\"" },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "rowan", text: "\"Go on. Tell me they're all Commons. Everybody else has.\"" },
+        { when: (s)=>!!s.flags["rowan_commons_seen"], say: "ashton", text: "\"I was going to be *delicate* about it.\" Wounded. \"In my building, you understand, that would count as a scandal.\"" },
+        { choice: [
+          { text: "\"They play exactly the same.\"", steps: [
+            { say: "rowan", text: "\"They play exactly the same.\"" },
+            { say: "ashton", text: "\"They do. That is precisely what nobody in the tower can forgive.\" He straightens a cuff. \"Some of us have paid a great deal to find out that a Spectral plays no better than a Common. We have the receipts. I keep mine rather than look at them.\"" }
+          ] },
+          { text: "\"You'd have had it reprinted in something shinier by now.\"", steps: [
+            { say: "rowan", text: "\"You'd have had it reprinted in something shinier by now.\"" },
+            { say: "ashton", text: "\"Within the hour. It would have played no better, I would have known it, and I would have done it anyway.\" A small, unperformed pause. \"That is the difference between us, Vance, and I am not certain it is in my favour.\"" },
+            AFF("ashton", 1, "Called his bluff")
+          ] }
+        ] },
+        { flag: "rowan_commons_seen" },
         { flag: "chat_ashton_2" },
         NOTE("ashton", "Watches every replay of every player in the year, and is far sharper about cards than he lets on."),
         { time: 3 }
