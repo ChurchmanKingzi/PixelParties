@@ -1133,11 +1133,11 @@ scene("arrival_mid", {
     {
       text: "A small girl in a jacket too big for her is standing on the lowest rung of the lifeboat ladder with a deck box in one hand and a green dragon plush in the other, and her eyes are enormous. She has not said anything, but she is smiling, a small, astonished, private smile."
     },
-    { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"…Sorry. Is this your ladder?\"" },
+    { say: "georgie", alias: "Girl with the plush dragon", text: "\"…Sorry. Is this your ladder?\"" },
     { say: "rowan", text: "\"No, it's anybody's. I'm Rowan.\"" },
     {
       say: "georgie",
-      alias: "Girl with the dark-purple feather",
+      alias: "Girl with the plush dragon",
       text: "\"Georgie. Santa. Georgie Santa.\" She looks at the plush. \"This is Ember. She's — she hasn't seen the island.\""
     },
     {

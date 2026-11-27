@@ -673,8 +673,8 @@ scene("chat_branden", {
         NOTE("branden", "Wants to find out whether you can toast a marshmallow on the volcano. At home nobody wanted to explore with him."),
         { time: 2 }
       ] },
-      { text: "\"Have you met Georgie? The girl with the dark-purple feather?\"", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
-        { say: "rowan", text: "\"Have you met Georgie? The girl with the dark-purple feather?\"" },
+      { text: "\"Have you met Georgie? The girl with the green plush dragon?\"", when: (s)=>!!s.flags["met_georgie"] && !s.flags["chat_branden_4"], steps: [
+        { say: "rowan", text: "\"Have you met Georgie? The girl with the green plush dragon?\"" },
         { say: "branden", text: "\"The *old* one?\" A snort. \"She's fourteen. She won the under-sixteens. Technically that's the *old people's* league.\"" },
         { say: "rowan", text: "\"She seemed a bit nervous.\"" },
         { say: "branden", text: "\"That's because she's seen the competition.\"" },

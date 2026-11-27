@@ -17,27 +17,27 @@ scene("ferry_pippa_georgie", {
     PHOTO("georgie_rope", "Georgie on the rope coil, feather to the light, looking at the volcano", { who: ["georgie"] }),
     { text: "The girl on the rope looks at the volcano. It does not owe her money. Her face says so. There is something curiously still about her: not calm, but the stillness of a small animal that has learned that moving is what gets you noticed." },
     { text: "She notices you looking, and goes the colour of a tomato." },
-    { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Sorry. Was I — is this your rope?\"" },
+    { say: "georgie", alias: "Girl with the plush dragon", text: "\"Sorry. Was I — is this your rope?\"" },
     { choice: [
       { text: "\"It's the ship's rope. I think that makes it anybody's. I'm Rowan.\"", steps: [
         { say: "rowan", text: "\"It's the ship's rope. I think that makes it anybody's. I'm Rowan.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Oh. Okay.\" A pause. \"I did ask a sailor. He said it's been lying there longer than he has.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"Oh. Okay.\" A pause. \"I did ask a sailor. He said it's been lying there longer than he has.\"" },
         { say: "pippa", alias: "Girl with a camera", text: "\"She asked a *sailor*. For permission. To sit on a *rope*.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Georgie.\" She says it to you, quickly, as if to get it in before anybody else can. \"Santa. Georgie Santa.\"" }
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"Georgie.\" She says it to you, quickly, as if to get it in before anybody else can. \"Santa. Georgie Santa.\"" }
       ] },
       { text: "\"I wasn't looking at the rope. You're holding that deck box as if it were full of eggs. I'm Rowan.\"", steps: [
         { say: "rowan", text: "\"I wasn't looking at the rope. You're holding that deck box as if it were full of eggs. I'm Rowan.\"" },
         { text: "She goes perfectly still. Stiller than before, which you would not have thought possible." },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"…How did you know?\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"…How did you know?\"" },
         { say: "rowan", text: "\"Know what?\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Nothing. It's fine.\" She loosens her grip on the box by about one finger. \"Georgie. Georgie Santa.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"Nothing. It's fine.\" She loosens her grip on the box by about one finger. \"Georgie. Georgie Santa.\"" },
         { flag: "georgie_egg_slip" }
       ] },
       { text: "\"Sit wherever you like. I spent the night on a bench, I don't own anything on this ship. I'm Rowan.\"", steps: [
         { say: "rowan", text: "\"Sit wherever you like. I spent the night on a bench, I don't own anything on this ship. I'm Rowan.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"The bench under the lifeboat?\" Very small. \"I saw. I walked quietly.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"The bench under the lifeboat?\" Very small. \"I saw. I walked quietly.\"" },
         { say: "rowan", text: "\"Then thank you. It worked.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"Georgie.\" She says it to the deck box. \"Santa. Georgie Santa.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"Georgie.\" She says it to the deck box. \"Santa. Georgie Santa.\"" },
         AFF("georgie", 1, "Said thank you")
       ] }
     ] },
@@ -57,24 +57,24 @@ scene("ferry_pippa_georgie", {
     { text: "The girl on the rope tries. The volcano remains in credit. Then, without getting up, the photographer swings the lens round to you." },
     { say: "pippa", alias: "Girl with a camera", text: "\"Hang on — don't move —\" Click. \"Sorry. You were looking at the island with your hand flat on your pocket, like you were checking it was still there. That's the shot. I got it.\"" },
     PHOTO("rowan_pocket", "Rowan looking at the island, hand flat on his pocket", { who: ["rowan"] }),
-    { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"She says that to me.\" Very small, from the rope. \"'I got it.' And then she does ten more.\"" },
+    { say: "georgie", alias: "Girl with the plush dragon", text: "\"She says that to me.\" Very small, from the rope. \"'I got it.' And then she does ten more.\"" },
     { choice: [
       { text: "\"What shot? Nobody told me I was being photographed.\"", steps: [
         { say: "rowan", text: "\"What shot? Nobody told me I was being photographed.\"" },
         { say: "pippa", alias: "Girl with a camera", text: "\"Nobody ever is told. That's when it's any good.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"She told me.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"She told me.\"" },
         { say: "pippa", alias: "Girl with a camera", text: "\"And look how that's going. Half an hour of you being *brave* at me.\"" }
       ] },
       { text: "\"Do I get to see it, at least?\"", steps: [
         { say: "rowan", text: "\"Do I get to see it, at least?\"" },
         { say: "pippa", alias: "Girl with a camera", text: "\"Later! It's film. I'll develop it in a week. You'll hate it. It'll be perfect.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"She said that to me as well.\" To the deck box. \"I still don't know how it can be both.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"She said that to me as well.\" To the deck box. \"I still don't know how it can be both.\"" },
         { say: "pippa", alias: "Girl with a camera", text: "\"Because they're the same thing.\"" }
       ] },
       { text: "Hold the pose a moment longer, in case she needs another.", steps: [
         { text: "You stay as you are, hand on your pocket, feeling like a statue of a man who has lost his keys." },
         { say: "pippa", alias: "Girl with a camera", text: "\"…Oh, you're *kind*. No, it's gone, you can breathe. It never works twice. The second one always knows it's being looked at.\"" },
-        { say: "georgie", alias: "Girl with the dark-purple feather", text: "\"…That's why all mine are bad.\"" },
+        { say: "georgie", alias: "Girl with the plush dragon", text: "\"…That's why all mine are bad.\"" },
         AFF("pippa", 1, "Held still for her")
       ] }
     ] },

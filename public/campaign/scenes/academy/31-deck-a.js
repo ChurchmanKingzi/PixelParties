@@ -1495,7 +1495,7 @@ scene("isle_georgie", {
     { when: (s)=>!!s.flags["met_georgie"], say: "georgie", text: "\"Hi, Rowan.\"" },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["flag_georgie_played"], say: "georgie", text: "\"The tables in there light up. It isn't like our bit of deck. I looked through the door.\"" },
     { when: (s)=>!!s.flags["met_georgie"]&&!!s.flags["georgie_game_later"]&&!s.flags["flag_georgie_played"], say: "georgie", text: "\"It still isn't later. It's fine. There's a whole year.\"" },
-    { when: (s)=>!s.flags["met_georgie"], say: "georgie", alias: "Girl with the dark-purple feather", text: "\"You're Rowan Vance. They read it out on the Quad.\" She goes pink. \"Is it all right that I know that already? I'm Georgie. Santa. Georgie Santa.\"" },
+    { when: (s)=>!s.flags["met_georgie"], say: "georgie", alias: "Girl with the plush dragon", text: "\"You're Rowan Vance. They read it out on the Quad.\" She goes pink. \"Is it all right that I know that already? I'm Georgie. Santa. Georgie Santa.\"" },
     MET("georgie", "Georgie Santa"),
     { say: "georgie", text: "\"They gave me a suite in the tower. It has five doors. One of them is a cupboard, but I counted it.\"" },
     { say: "georgie", text: "\"We get called one at a time, by the alphabet. I'm an S.\" Her fingers are white on the box. \"I don't mind the duel. I mind the walking in.\"" },
