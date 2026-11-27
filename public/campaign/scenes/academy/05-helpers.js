@@ -21,16 +21,29 @@ const STORY = helpers.story, DATA = helpers.data;
 //     spielt mit Rowans Verlegenheit; das Flirten steht im Vordergrund, kein Ero-Spiel. Nach zwei, drei Besuchen kann es zu
 //     Sex kommen: einvernehmlich, beiläufig, nicht explizit (Andeutung, Abblende, der Morgen danach). Casual, ohne Folgen für
 //     eine Romanze; vorerst nicht romanceable (data: romance false). Freya und Rowan sind erwachsen (siehe ALTER unten).
+//     Danach sind weitere Nächte möglich, nichts Festes: Sie sagt ihm sinngemäß, dass ihr Bett für ihn immer offen ist. Je
+//     länger es geht, desto offener und forscher flirtet sie mit ihm (auch vor anderen), nicht weil sie mit ihm zusammen sein
+//     will, sondern weil es ihr Spaß macht und er so gut darauf reagiert. Entwurf im Playtest (41-freya-evenings.js), noch nicht im Repo.
 //   Fiona — organisiert „to uncover the darkest secrets of everyone on the island“ eine große Runde Truth or Dare. Teilnahme
 //     ganz freiwillig; Rowan kann jede teilnehmende Figur fragen (Truth) oder herausfordern (Dare), und wird selbst gefragt.
 //     Verschiedene Verläufe geben Zuneigung oder kosten sie (zu weit gebohrt, Geheimnis verraten, Mut bewiesen …).
-//     Georgie und Branden (minderjährig) sind dabei nur bei harmlosen Runden, und nichts Anzügliches betrifft sie.
+//     Fiona plant (oder erwartet zumindest), dass es explizit wird: Georgie und Branden (minderjährig) dürfen in-universe
+//     ausdrücklich NICHT mitmachen; Fiona schließt sie selbst aus, und jemand (Baylee) passt den Abend über aktiv auf Branden
+//     auf, damit er sich nicht hineinschleicht.
 //   Sammy — läuft Fiona hinterher wie ein Fan und will von ihr lernen (Auftreten, Düsternis, Mantel). Über die Kampagne
-//     werden die beiden nach und nach sehr gute Freunde. (Die Beziehung sammy → fiona heißt in den Daten noch „crush“;
-//     beim Ausschreiben auf „admirer“ und später „friends“ umstellen.)
+//     werden die beiden nach und nach sehr gute Freunde (Daten: sammy → fiona „admirer“, fiona → sammy „protégé“, ab sf_stage 3
+//     beide „friends“). Entwurf im Playtest (43-sammy-fiona.js), noch nicht im Repo. Fiona soll langfristig romanceable sein (für Rowan).
 //   Teobalt — verliebt sich im Lauf der Kampagne SICHTLICH in Freddie (er führt eine Liste, die er niemandem zeigt; er
 //     plant Zufälle; er ist in ihrer Nähe noch genauer als sonst). Optionale Szenen und Entscheidungen, in denen Rowan die
-//     beiden zusammenbringen kann (oder es lässt). Noch keine Beziehung teobalt ↔ freddie in den Daten.
+//     beiden zusammenbringen kann (oder es lässt). Daten: teobalt → freddie „crush“ (ersetzt den früheren stillen Schwarm für
+//     Noor, der gestrichen ist). Entwurf im Playtest (44-teobalt-freddie.js), noch nicht im Repo.
+//   CLUBS: Clubs gehören zur Academy. Die Club Fair ist an Tag 3 auf dem Quad (Stände um den Brunnen). Rowan wird Mitglied im
+//     Battle Team, das die Academy bei offiziellen Events vertritt; Leitung: Lilia Mann (4. Jahr, Spectral; Tryouts laut
+//     Kalender). Weitere Clubs dürfen frei erfunden und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
+//   GIDEON darf frei eingesetzt werden, solange er konsistent bleibt: sein verborgener Schwarm für Fiona zeigt sich nur darin,
+//     dass er sie nie ansieht und über ihre Bewunderer (Sammy) spottet.
+//   STRÄNGE werden konsequent fortgeführt: was eine Szene anstößt (z. B. Pippas „golden hour“ aus Truth or Dare, Pippa soll
+//     romanceable werden), bekommt später eine Fortsetzung.
 //   ALTER: Pixel Academy ist höhere Bildung; alle Studierenden sind volljährig (18+), außer Georgie und Branden (Branden etwa
 //     zehn). Flirt, Romanze und Sex nur zwischen Erwachsenen; Georgie und Branden bleiben davon ganz ausgenommen.
 // DECKCOUNT(s)         Rowans AKTUELLES Deck gezählt (er kann es umbauen): { heroes, abilities, main, potions, total, allCommon }.

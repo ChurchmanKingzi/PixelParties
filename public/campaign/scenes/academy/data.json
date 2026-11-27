@@ -1984,12 +1984,6 @@
      "from": 12
     },
     {
-     "w": "noor",
-     "label": "crush",
-     "pub": false,
-     "from": 4
-    },
-    {
      "w": "odalys",
      "label": "friends",
      "pub": true,
@@ -2048,6 +2042,12 @@
      "label": "friends",
      "pub": true,
      "from": 3
+    },
+    {
+     "w": "freddie",
+     "label": "crush",
+     "pub": true,
+     "from": 4
     }
    ]
   },
@@ -2941,9 +2941,16 @@
     },
     {
      "w": "sammy",
-     "label": "friends",
+     "label": "protégé",
      "pub": true,
-     "from": 5
+     "from": 5,
+     "stages": [
+      {
+       "v": "sf_stage",
+       "min": 3,
+       "label": "friends"
+      }
+     ]
     },
     {
      "w": "dmitri",
@@ -3137,9 +3144,16 @@
     },
     {
      "w": "fiona",
-     "label": "crush",
+     "label": "admirer",
      "pub": true,
-     "from": 5
+     "from": 5,
+     "stages": [
+      {
+       "v": "sf_stage",
+       "min": 3,
+       "label": "friends"
+      }
+     ]
     },
     {
      "w": "ashton",
