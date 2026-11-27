@@ -45,6 +45,9 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
 //   KARTENSTATUS: Ob eine Karte „forbidden“/gebannt ist, spielt in der Kampagne keine Rolle (das gilt erst für ein viel später
 //     erfundenes Custom-Format). Niemand bezieht sich darauf, weder im Text noch in Notizen.
+//   ROMANZEN: Die ersten romanceable Figuren sind Pippa, Fiona und Marit. Marit (Rare Hall, Kommentatorin, spricht für die letzte
+//     Reihe, die echte leise Stimme rutscht nur selten durch; Angst: Stille) ist auf ihre bombastische Art gern dabei und soll in
+//     Szenen mit vielen Leuten oft als Randfigur auftauchen.
 //   CLUBS: Clubs gehören zur Academy. Die Club Fair ist an Tag 3 auf dem Quad (Stände um den Brunnen). Rowan wird Mitglied im
 //     Battle Team, das die Academy bei offiziellen Events vertritt; Leitung: Lilia Mann (4. Jahr, Spectral; Tryouts laut
 //     Kalender). Weitere Clubs dürfen frei erfunden und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
