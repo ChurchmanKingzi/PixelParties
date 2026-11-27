@@ -75,8 +75,14 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Reihe, die echte leise Stimme rutscht nur selten durch; Angst: Stille) ist auf ihre bombastische Art gern dabei und soll in
 //     Szenen mit vielen Leuten oft als Randfigur auftauchen.
 //   CLUBS: Clubs gehören zur Academy. Die Club Fair ist an Tag 3 auf dem Quad (Stände um den Brunnen). Rowan wird Mitglied im
-//     Battle Team, das die Academy bei offiziellen Events vertritt; Leitung: Lilia Mann (4. Jahr, Spectral; Tryouts laut
-//     Kalender). Weitere Clubs dürfen frei erfunden und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
+//     Battle Team, das die Academy bei offiziellen Events vertritt; Kapitänin: Lilia Mann. Weitere Clubs dürfen frei erfunden
+//     und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
+//   LILIA MANN (4. Jahr, Spectral, CP): seit zwei vollen Jahren Nr. 1 der Ladder, Kapitänin des Battle Teams, eine RICHTIG große
+//     Nummer. Spielt an Wochenenden und in den Ferien schon in der echten Pro-Liga und macht das Studium nur noch pro forma
+//     fertig. Sie wird OFT erwähnt (Gesprächsstoff, Anzeigetafel, Stream, Gerüchte, Poster), tritt aber LANGE NICHT auf: keine
+//     Zufallsbegegnung, keine Nebenrolle, kein Gesicht in der Menge. Ihr erster Auftritt ist ein Ereignis — sie kommt selbst,
+//     um Rowan fürs Battle Team zu holen, sobald er sich einen Namen gemacht hat. Bis dahin höchstens von Weitem (eine Gestalt
+//     auf der Klippe, ein leerer Platz in der ersten Reihe, ihr Name auf der Tafel).
 //   GIDEON darf frei eingesetzt werden, solange er konsistent bleibt: sein verborgener Schwarm für Fiona zeigt sich nur darin,
 //     dass er sie nie ansieht und über ihre Bewunderer (Sammy) spottet.
 //   STRÄNGE werden konsequent fortgeführt: was eine Szene anstößt (z. B. Pippas „golden hour“ aus Truth or Dare, Pippa soll

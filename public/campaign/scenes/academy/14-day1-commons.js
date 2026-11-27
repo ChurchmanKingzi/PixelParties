@@ -407,6 +407,8 @@ scene("placement_duel", {
     { label: "next_9" },
     { text: "The card reads: RANK 132 OF 144." },
     { label: "end_8" },
+    { say: "zeynep", text: "\"Somebody always asks, so: number one is Lilia Mann. Two years running. Battle Team captain.\" The stamp goes back in its tin. \"Don't bother looking for her. She's playing the pros this weekend.\"" },
+    NOTE("lilia", "Number one on the Academy ladder for two years running, and captain of the Battle Team. Plays in the pro league at weekends."),
     { think: "A hundred and twenty-something. I was top ten on the ladder a month ago." },
     {
       think: "And I am, for the first time in my life, in a room where that number does not mean what I thought it meant."
