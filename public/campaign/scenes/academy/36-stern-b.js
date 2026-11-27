@@ -1349,9 +1349,9 @@ scene("chat_rafa", {
         NOTE("rafa", "Born far from here, raised over his aunt's restaurant in a big port city. Always chewing something, and knows what it is good for."),
         { time: 3 }
       ] },
-      { text: "\"Red jacket. Competitive Play. And you spent the crossing in a galley.\"", when: (s)=>!s.flags["chat_rafa_3"], steps: [
-        { say: "rowan", text: "\"Red jacket. Competitive Play. And you spent the crossing in a galley.\"" },
-        { say: "rafa", text: "\"The jacket says player. The hands say something else. I know.\" He turns them over: big, quick, freckled with small old burns. \"I play. I'm all right. My deck is all spices, if you can believe it.\"" },
+      { text: "\"Black jacket. Auxiliary. And you spent the crossing in a galley.\"", when: (s)=>!s.flags["chat_rafa_3"], steps: [
+        { say: "rowan", text: "\"Black jacket. Auxiliary. And you spent the crossing in a galley.\"" },
+        { say: "rafa", text: "\"Event staff. Catering, mostly. Somebody has to feed a tournament.\" He turns his hands over: big, quick, freckled with small old burns. \"I play too. I'm all right. My deck is all spices.\"" },
         { say: "rafa", text: "\"A good game and a good stew go wrong the same ways. Too much pepper and you can't taste the pot.\"" },
         { choice: [
           { text: "\"What are the other ways?\"", steps: [
@@ -1372,7 +1372,7 @@ scene("chat_rafa", {
         { say: "rafa", text: "\"He described my ladling. To nobody. 'And he goes in low with the spoon.'\" A pause. \"I have started pouring a little nicer. I am not proud of it.\"" },
         { when: (s)=>!!s.flags["met_cas"], flag: "rel_rafa_cas" },
         { flag: "chat_rafa_3" },
-        NOTE("rafa", "Wears the red jacket and plays a deck built on spices, but found the three campus kitchens on the map before the arena."),
+        NOTE("rafa", "Black jacket, Auxiliary event staff: he means to cater tournaments. Plays a deck built on spices and found the three campus kitchens on the map before the arena."),
         { time: 3 }
       ] },
       { text: "\"I'll let you get back to the kettle.\"", steps: [
@@ -1593,7 +1593,7 @@ scene("isle_rafa", {
     { say: "rowan", text: "\"Not since the boat.\"" },
     { say: "rafa", alias: "Boy in a chef's bandana", text: "\"Vance, from the roll call. The Wildcard. I thought so: you looked hungry from across a whole lawn.\" He pushes a stool out with his foot. \"Rafael Okonjo. Rafa. Sit.\"" },
     MET("rafa", "Rafa Okonjo"),
-    NOTE("rafa", "Rare Hall, red jacket, and working an unasked shift in the Commons kitchen on his first afternoon."),
+    NOTE("rafa", "Rare Hall, black jacket, and working an unasked shift in the Commons kitchen on his first afternoon."),
     { label: "common" },
     { text: "You sit. A heel of bread and a saucer of something red and oily arrive in front of you without his seeming to have moved." },
     { choice: [
@@ -1624,7 +1624,7 @@ scene("isle_rafa", {
       ] },
       { text: "\"You look happier than anyone I've seen today.\"", steps: [
         { say: "rowan", text: "\"You look happier than anyone I've seen today.\"" },
-        { say: "rafa", text: "\"Do I?\" He considers the onion in his hand as if it had said it. \"…Don't tell the jacket.\"" },
+        { say: "rafa", text: "\"Do I?\" He considers the onion in his hand as if it had said it. \"…It is a kitchen. Don't tell anyone it feels like a holiday.\"" },
         AFF("rafa", 1, "Saw that he was happy")
       ] }
     ] },
