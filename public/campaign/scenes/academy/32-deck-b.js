@@ -865,8 +865,8 @@ scene("ferry_eberhart", {
     { when: (s)=>!!s.flags["ship_knows_wildcard"], say: "eberhart", text: "\"Also you have no jacket.\"" },
     { when: (s)=>!s.flags["ship_knows_wildcard"], say: "eberhart", text: "\"You have no jacket.\"" },
     { choice: [
-      { text: "\"It comes later, they tell me. I've been cold since half past six.\"", steps: [
-        { say: "rowan", text: "\"It comes later, they tell me. I've been cold since half past six.\"" },
+      { text: "\"It comes later, they tell me. I've been cold since three this morning.\"", steps: [
+        { say: "rowan", text: "\"It comes later, they tell me. I've been cold since three this morning.\"" },
         { say: "eberhart", text: "\"And you did not go inside.\"" },
         { say: "rowan", text: "\"The lounge is full of people.\"" },
         { say: "eberhart", text: "\"Yes.\" It is the first thing he has said that sounds like agreement." },

@@ -378,7 +378,10 @@ scene("chat_fiona_ferry", {
         { time: 3 }
       ] },
       { text: "\"Somebody keeps walking past us.\"", when: (s)=>!s.flags["chat_fiona_ferry_2"], steps: [
-        { text: "A boy with a blue collar comes along the walkway, not for the first time, deeply interested in the lifeboats. He looks at the lace, then at the sea, then at his own shoes, and is gone round the corner." },
+        // Der Junge, der Fiona umkreist, ist Sammy (er bewundert sie; Sammys Fähren-Gespräch greift das auf: sammy_orbit_seen).
+        { when: (s)=>!s.flags["met_sammy"], text: "A slight boy in a long black coat comes along the walkway, not for the first time, deeply interested in the lifeboats. He looks at the lace, then at the sea, then at his own shoes, and is gone round the corner." },
+        { when: (s)=>!!s.flags["met_sammy"], text: "Sammy comes along the walkway in his long black coat, not for the first time, deeply interested in the lifeboats. He looks at the lace, then at the sea, then at his own shoes, and is gone round the corner." },
+        { flag: "sammy_orbit_seen" },
         { say: "rowan", text: "\"Somebody keeps walking past us.\"" },
         { say: "fiona", text: "\"That was his fourth. You missed one while you were arriving.\"" },
         { say: "fiona", text: "\"They do not speak. They orbit.\"" },
@@ -629,7 +632,7 @@ scene("chat_leona_ferry", {
       { text: "\"You've been standing here a while. What have you seen?\"", when: (s)=>!s.flags["chat_leona_ferry_2"], steps: [
         { say: "rowan", text: "\"You've been standing here a while. What have you seen?\"" },
         { text: "She turns her head and looks at you with something that, in a louder person, would be surprise." },
-        { say: "leona", text: "\"The girl in the overalls has mended a lamp that nobody asked her to mend. The girl in black has a great many matches and is patient with them. A boy with a blue collar has walked past her several times and has not managed a word.\"" },
+        { say: "leona", text: "\"The girl in the overalls has mended a lamp that nobody asked her to mend. The girl in black has a great many matches and is patient with them. A boy in a long black coat has walked past her several times and has not managed a word.\"" },
         { say: "leona", text: "\"People tell me things because they forget I am in the room. On a ship there is not even a room. They simply do it in front of me.\"" },
         { choice: [
           { text: "\"Anything about me?\"", hint: "Bold", steps: [
@@ -907,6 +910,33 @@ scene("chat_sammy_ferry", {
         AFF("sammy", 1, "Asked about the others"),
         NOTE("sammy", "Kept an eye on the sleeping boy on the bench all morning, from a polite distance."),
         { flag: "chat_sammy_ferry_3" },
+        { time: 3 }
+      ] },
+      { text: "\"You keep walking past the girl in black.\"", when: (s)=>!!s.flags["sammy_orbit_seen"] && !s.flags["chat_sammy_orbit"], steps: [
+        { say: "rowan", text: "\"You keep walking past the girl in black.\"" },
+        { say: "sammy", text: "\"I'm taking the air.\" Low, slow. Then, much faster: \"On a circuit. It's a circuit. People do circuits on ships, it's — nautical.\"" },
+        { text: "He looks at the horizon very hard, as if it might back him up." },
+        { say: "sammy", text: "\"She's the real thing. Do you see? I've got a coat. She's got a whole —\" A helpless gesture at the entire port side. \"She's got a whole *way*.\"" },
+        { choice: [
+          { text: "\"She counted, you know. You're on four.\"", when: (s)=>!!s.flags["chat_fiona_ferry_2"], steps: [
+            { say: "rowan", text: "\"She counted, you know. You're on four.\"" },
+            { say: "sammy", text: "\"She COUNTED?\" The ordinary voice, an octave up. Then the low one, with enormous effort: \"…That's very… ominous of her.\"" },
+            AFF("sammy", 1, "Told me she'd noticed")
+          ] },
+          { text: "\"Next time, try saying hello.\"", steps: [
+            { say: "rowan", text: "\"Next time, try saying hello.\"" },
+            { say: "sammy", text: "\"Hello.\" He tries it out, quietly, to the sea. \"Too bright. She'd see straight through hello.\" A pause. \"I'll work on it. I've got a notebook.\"" },
+            AFF("sammy", 1, "Didn't laugh at me")
+          ] },
+          { text: "\"Your secret's safe.\"", steps: [
+            { say: "rowan", text: "\"Your secret's safe.\"" },
+            { say: "sammy", text: "\"It's not a — \" He stops. \"Thanks.\" Ordinary voice. \"It's not a crush, by the way. I just want to know how she does it.\"" },
+            AFF("sammy", 2, "Kept it quiet")
+          ] }
+        ] },
+        NOTE("sammy", "Keeps walking circuits past Fiona Blackwood on the ferry without speaking to her. He admires her: he wants to know how she does it."),
+        REL("sammy", "fiona"),
+        { flag: "chat_sammy_orbit" },
         { time: 3 }
       ] },
       { text: "\"I'll leave you to the horizon.\"", steps: [

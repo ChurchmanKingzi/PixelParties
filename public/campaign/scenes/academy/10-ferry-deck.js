@@ -12,7 +12,7 @@ scene("ferry_prologue", {
       text: "Salt on your lips. An engine thrumming somewhere under your shoes. You must have dozed off against the railing again."
     },
     {
-      text: "The ferry left the mainland at nine last night. Nine and a half hours of black water, one bench under a lifeboat, a cocoa you paid for with the last of your real money, and a string of naps that never quite counted as sleep."
+      text: "The ferry left the mainland at half past ten last night. Nine and a half hours of black water, one bench under a lifeboat, a cocoa you paid for with the last of your real money, and a string of naps that never quite counted as sleep."
     },
     {
       text: "Now the sky over the bow has gone the colour of weak tea, and on the very edge of it, where the water stops, there is something that is not cloud."
@@ -275,7 +275,7 @@ scene("ferry_prologue", {
       text: "Under the wheelhouse a door stands open on a flight of steps. You can hear it from here: cards slapping on felt, a girl's voice, quick and sharp, and a second voice that stays low and does not hurry. A few people on the benches have turned their heads that way."
     },
     {
-      text: "A side deck runs aft past the funnel to the stern, where gulls hang over the wake. An iron stair climbs to the wheelhouse door. The island lies ahead, still small. The clock over the lounge door says half past six."
+      text: "A side deck runs aft past the funnel to the stern, where gulls hang over the wake. An iron stair climbs to the wheelhouse door. The island lies ahead, still small. The clock over the lounge door says eight o'clock."
     },
     {
       prompt: "What do you do?",

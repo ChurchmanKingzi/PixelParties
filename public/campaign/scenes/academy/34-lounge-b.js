@@ -397,7 +397,7 @@ scene("ferry_noor", {
     { choice: [
       { text: "\"Sorry, I'm in your light. I'm Rowan. I wondered what could be better than that view.\"", steps: [
         { say: "rowan", text: "\"Sorry, I'm in your light. I'm Rowan. I wondered what could be better than that view.\"" },
-        { say: "noor", alias: "Girl with a rulebook", text: "\"The view has not changed since half past six. I checked.\" She lifts the book half an inch, so that you can see the cover: a heavy, official, very worn blue. \"This has.\"" },
+        { say: "noor", alias: "Girl with a rulebook", text: "\"The view has not changed since seven. I checked.\" She lifts the book half an inch, so that you can see the cover: a heavy, official, very worn blue. \"This has.\"" },
         { say: "noor", alias: "Girl with a rulebook", text: "\"It is the Academy Charter. Nine articles, with the Handbook bound in.\"" }
       ] },
       { text: "\"Is that the rulebook for the whole Academy? I'm Rowan. All I got was a packing list.\"", steps: [

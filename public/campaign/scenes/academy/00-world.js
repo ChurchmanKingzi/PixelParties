@@ -18,7 +18,7 @@ world({
   },
   title: "Pixel Academy",
   assets: { spriteUnit: 10, avatarUnit: 10 },
-  start: { location: "ferry_deck", day: 1, time: "06:30", coins: 140, deck: "rowan" },
+  start: { location: "ferry_deck", day: 1, time: "08:00", coins: 140, deck: "rowan" },
   music: "menu",
   defaultTravel: 8,
   dayEnd: { at: "23:30", wake: "07:00", scene: "sleep", location: "commons_room" },
