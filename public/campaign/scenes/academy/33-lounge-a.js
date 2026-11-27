@@ -1243,6 +1243,8 @@ scene("ferry_anni", {
   steps: [
     { when: (s)=>!!s.flags["met_anni"], jump: "again" },
     { text: "At the end of the bench nearest the card table a girl is standing, although there is room to sit. Heels together. A black jacket so immaculate that its white-and-gold collar looks ironed onto her, a red tie, an auburn bun without one hair adrift, large square glasses." },
+    { text: "She is very thin. The immaculate jacket hangs from her shoulders as if from a hanger, and where the cuffs end her wrists look as if they would snap." },
+    NOTE("anni", "Extremely thin; her jacket hangs from her shoulders as if from a hanger."),
     { text: "She holds a small grey booklet open in her left hand and a red pen in her right, and she is looking from the card table to the booklet and back, as if one of the two had made a mistake." },
     { say: "anni", alias: "Girl with a red pen", text: "\"You are out of uniform.\"" },
     { text: "She says it to the booklet. The red pen is already uncapped." },

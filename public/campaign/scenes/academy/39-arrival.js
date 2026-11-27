@@ -624,7 +624,7 @@ scene("arrival_stairs", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["tomi"] = s.notes["tomi"] || []); if (a.indexOf("Runs the book on the ship.") < 0) a.push("Runs the book on the ship."); }
     },
     { label: "end_12" },
-    { when: (s)=>!s.flags["met_anni"], text: "On the step above him a girl is standing, heels together, although there is room to sit: a black jacket with a white-and-gold collar that looks ironed on, an auburn bun, large square glasses, a small grey booklet, and a red pen with its cap off." },
+    { when: (s)=>!s.flags["met_anni"], text: "On the step above him a very thin girl is standing, heels together, although there is room to sit: a black jacket that hangs from her shoulders, its white-and-gold collar ironed on, an auburn bun, large square glasses, a small grey booklet, and a red pen with its cap off." },
     { when: (s)=>!!s.flags["met_anni"], text: "On the step above him Anni is standing, heels together, although there is room to sit. The booklet is open. The red pen has its cap off." },
     { say: "anni", alias: "Girl with a red pen", text: "\"Organised wagering among students. Section nine, paragraph two. I am entering it a second time, because it is happening a second time.\"" },
     { text: "Tomi turns the binder a few degrees towards her, so that she can copy the odds down correctly." },

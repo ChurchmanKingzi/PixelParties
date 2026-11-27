@@ -45,6 +45,9 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
 //   KARTENSTATUS: Ob eine Karte „forbidden“/gebannt ist, spielt in der Kampagne keine Rolle (das gilt erst für ein viel später
 //     erfundenes Custom-Format). Niemand bezieht sich darauf, weder im Text noch in Notizen.
+//   ANNI: extrem dünn, isst fast nichts (Grund vorerst offen; nicht Eitelkeit, keine Diät). Höfliche Ausreden („I ate earlier“).
+//     Nie als Witz, nie als attraktiv, keine Zahlen; niemand „heilt“ es mit einer Rede. Wer es bemerkt und bleibt, ohne den Teller
+//     zu kommentieren, gewinnt ihr Vertrauen. Ernste Krise → Krankenstation/Erwachsene, nicht Rowans Privatheldentum.
 //   WOHNEN (First-Years, je Bungalow genau drei): B1 Mama Odalys' Küche · B2 Freya, Hedda, Trixie · B3 Inya, Livvie, Rana ·
 //     B4 Maisie, Fiona, Leona · B5 Viktor, Tomi, Ed · B6 Sammy, Tobias, Dmitri · B7 Rowan, Nathan, Baylee · B8 Wäscherei.
 //     Rare Hall (Zweibettzimmer): 101 Eberhart+Mikoto · 102 Teobalt+Jun-ho · 103 Cas+Rafa · 201 Marit+Eloise · 202 Noor+Sunny ·
