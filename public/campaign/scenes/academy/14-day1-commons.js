@@ -765,7 +765,7 @@ scene("welcome_supper", {
     { when: (s)=>!(!!!s.flags["met_viktor"]), jump: "next_11" },
     { text: "The door bangs open." },
     {
-      text: "A lean, tanned boy in a red jacket worn like something borrowed, in a wide-brimmed grey-brown hat with a pale-blue feather in the band, mud to both knees, has arrived late. He carries a coil of rope and a brass compass."
+      text: "A lean, tanned boy in a gold jacket worn like something borrowed, in a wide-brimmed grey-brown hat with a pale-blue feather in the band, mud to both knees, has arrived late. He carries a coil of rope and a brass compass."
     },
     {
       say: "viktor",

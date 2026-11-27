@@ -492,7 +492,7 @@ scene("ferry_leona", {
     { when: (s)=>!!s.flags["met_leona"], jump: "again" },
     { text: "There is a muster notice screwed to the bulkhead at the bow end of the port walkway: a plan of the ship, two lifeboats, a column of small print. You have walked past it twice this morning." },
     { text: "The third time there is a girl standing in front of it, and you have the uncomfortable feeling that she was there the other two times as well." },
-    { text: "Medium everything. Mousy-brown hair parted in the middle, grey-blue eyes, a red jacket with its grey collar buttoned exactly as issued, a canvas satchel with a broken buckle. A steel wristwatch a size too large slides down her arm as she lifts a finger to the plan." },
+    { text: "Medium everything. Mousy-brown hair parted in the middle, grey-blue eyes, a gold jacket with its grey collar buttoned exactly as issued, a canvas satchel with a broken buckle. A steel wristwatch a size too large slides down her arm as she lifts a finger to the plan." },
     { say: "leona", alias: "Girl with a satchel", text: "\"Two boats. Thirty persons each.\" An even, mild voice. \"That is enough. I wanted to be sure before I sat down.\"" },
     { choice: [
       { text: "\"Sorry. I didn't see you there.\"", steps: [

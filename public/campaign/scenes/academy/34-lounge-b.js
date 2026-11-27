@@ -388,7 +388,7 @@ scene("post_magnus", {
 scene("ferry_noor", {
   steps: [
     { when: (s)=>!!s.flags["met_noor"], jump: "again" },
-    { text: "A calm girl in a blue hijab sits on a window bench with a heavy book open on her knee. Its margins bristle with pencil tabs. Her jacket is red; the brooch that pins the hijab is a very small silver gavel." },
+    { text: "A calm girl in a blue hijab sits on a window bench with a heavy book open on her knee. Its margins bristle with pencil tabs. Her jacket is black; the brooch that pins the hijab is a very small silver gavel." },
     { text: "The window above her is spotless, and full of sea. She is not looking at the sea. She is reading, with the complete stillness of someone who finishes the sentence before reacting." },
     { text: "Around her the saloon is a fairground of duffel bags and raised voices. Her bench has a clear half-metre on either side, as if the whole crowd had agreed on it without being told." },
     { text: "You stand there for a moment. Then, unexpectedly, the pencil stops." },
@@ -534,10 +534,10 @@ scene("chat_noor", {
     { label: "top" },
     { when: (s)=>!!s.flags["chat_noor_1"] && !!s.flags["chat_noor_2"] && !!s.flags["chat_noor_3"] && (!!s.flags["chat_noor_x"] || !(s.day===1 && s.minutes<645)) && !s.flags["chat_noor_done"], jump: "done" },
     { choice: [
-      { text: "\"That brooch is a judge's gavel. On a Competitive Play jacket.\"", when: (s)=>!s.flags["chat_noor_1"], steps: [
-        { say: "rowan", text: "\"That brooch is a judge's gavel. On a Competitive Play jacket.\"" },
-        { say: "noor", text: "\"It is, and it is. You found the contradiction faster than my mother did.\"" },
-        { say: "noor", text: "\"I am in Competitive Play because one cannot judge a game one has never properly lost. I intend to be a head judge. Not a champion.\"" },
+      { text: "\"That brooch is a judge's gavel. So it's the judging track?\"", when: (s)=>!s.flags["chat_noor_1"], steps: [
+        { say: "rowan", text: "\"That brooch is a judge's gavel. So it's the judging track?\"" },
+        { say: "noor", text: "\"It is, and it is. Auxiliary, judging and refereeing. My mother asked why I would cross the sea to a card school and not play.\"" },
+        { say: "noor", text: "\"I shall play, a great deal. One cannot judge a game one has never properly lost. But I intend to be a head judge. Not a champion.\"" },
         { text: "She says it without apology, the way another girl might say she wants to be a pilot." },
         { choice: [
           { text: "\"I've never met anybody who wanted that.\"", steps: [
@@ -1611,7 +1611,7 @@ scene("isle_noor", {
   steps: [
     { when: (s)=>!!s.flags["isle_noor_done"], jump: "again" },
     { text: "The library closes the north end of the Quad like the last word of an argument: white steps, a deep arcade, and shade." },
-    { text: "Halfway up the steps, exactly in the middle, a girl in a red jacket and a blue hijab, pinned with a very small silver gavel, is reading a heavy blue book bristling with pencil tabs." },
+    { text: "Halfway up the steps, exactly in the middle, a girl in a black jacket and a blue hijab, pinned with a very small silver gavel, is reading a heavy blue book bristling with pencil tabs." },
     { text: "The lawn below her is all noise and blankets. Nobody has sat within two steps of her." },
     { when: (s)=>!!s.flags["met_noor"], jump: "known" },
     { say: "noor", alias: "Girl with a rulebook", text: "\"Mr Vance. The entrant in ink.\"" },

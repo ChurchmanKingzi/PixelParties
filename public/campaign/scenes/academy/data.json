@@ -3671,6 +3671,12 @@
      "label": "friends",
      "pub": false,
      "from": 30
+    },
+    {
+     "w": "eloise",
+     "label": "friends",
+     "pub": true,
+     "from": 4
     }
    ]
   },

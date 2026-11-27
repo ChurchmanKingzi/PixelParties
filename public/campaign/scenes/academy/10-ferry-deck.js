@@ -391,7 +391,7 @@ scene("deck_collars", {
   steps: [
     { text: "You lean against a bollard and count collars." },
     {
-      text: "Jackets first, because they are easy: red for Competitive Play, and red is most of the deck, perhaps twenty-five of them. A handful of gold for Game Design, who carry sketchbooks. A few black for Auxiliary, who carry clipboards and look as if they are already running something."
+      text: "Jackets first, because they are easy: red for Competitive Play, the biggest share, perhaps fifteen of them. Nearly as many gold for Game Design, who carry sketchbooks. As many black for Auxiliary, who carry clipboards and look as if they are already running something."
     },
     {
       text: "Then collars, which are the interesting part. The white-and-gold ones, Spectral, stand a little apart from the others without seeming to try. The blue ones, Rare, are scattered through the crowd. The grey ones, the Commons, hold their bags in both arms."

@@ -1496,7 +1496,7 @@ scene("ferry_trixie", {
   steps: [
     { when: (s)=>!!s.flags["met_trixie"], jump: "again" },
     { text: "Halfway along the starboard deck a girl is standing at the rail on tiptoe, and then not on tiptoe, and then on tiptoe again. Honey-blonde hair in two bunches that bounce half a beat behind the rest of her." },
-    { text: "A red jacket, a grey collar with an enamel bee pinned to it, and yellow-striped socks pulled up to the knee. She is talking, earnestly and without a break, to the top of the rail." },
+    { text: "A gold jacket, a grey collar with an enamel bee pinned to it, and yellow-striped socks pulled up to the knee. She is talking, earnestly and without a break, to the top of the rail." },
     { text: "You are about to put a hand on that rail, to get past her." },
     { say: "trixie", alias: "Girl in striped socks", text: "\"Stop! Sorry! Stop. Right by your hand. Don't swat.\"" },
     { choice: [

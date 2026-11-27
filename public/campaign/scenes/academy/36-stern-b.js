@@ -1190,7 +1190,7 @@ scene("ferry_rafa", {
     { text: "You smell him before you see him. On a deck that has smelled of salt and diesel since last night, something is suddenly giving off ginger, lemon, and a sharp edge of pepper." },
     { text: "Beside the luggage cage a steel door marked GALLEY — CREW ONLY is wedged open with a crate of onions, and steam is coming up the steps behind it." },
     { text: "In front of it a round-faced, broad-shouldered boy has set the ship's biggest kettle on a second crate and is ladling from it into a row of tin mugs." },
-    { text: "His red jacket, blue collar, has its sleeves shoved up past the elbow; a chef's bandana is knotted over short, neat twists; a stalk of something green is going steadily from one corner of his mouth to the other." },
+    { text: "His black jacket, blue collar, has its sleeves shoved up past the elbow; a chef's bandana is knotted over short, neat twists; a stalk of something green is going steadily from one corner of his mouth to the other." },
     { text: "He is not giving the mugs to everybody. A boy strolls past whistling and gets a nod. Then the cook's eyes land on you, and he looks at you for a moment the way a cook looks into a pot." },
     { say: "rafa", alias: "Boy in a chef's bandana", text: "\"You eaten?\"" },
     { choice: [
@@ -1581,7 +1581,7 @@ scene("isle_rafa", {
   steps: [
     { when: (s)=>!!s.flags["isle_rafa_done"], jump: "later" },
     { text: "Bungalow one is hot, loud with a radio, and smells of something that has been frying since before you were born. At the range a broad woman in a flowered apron has her back to the room." },
-    { text: "At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana and a borrowed apron, his red jacket, blue collar, on a hook behind him." },
+    { text: "At the near end of the long table, behind a hill of onions that is slowly becoming a hill of chopped onions, sits a boy in a chef's bandana and a borrowed apron, his black jacket, blue collar, on a hook behind him." },
     { when: (s)=>!s.flags["met_rafa"], jump: "first" },
     { say: "rafa", text: "\"Rowan.\" The knife does not stop. \"Sit. I didn't ask if you were hungry, I asked you to sit.\"" },
     { when: (s)=>!!s.flags["rafa_knows_table"] && !!s.flags["placement_won"], say: "rafa", text: "\"And? The table. …That face is a clean plate. Good. Told you it was a cupboard.\"" },

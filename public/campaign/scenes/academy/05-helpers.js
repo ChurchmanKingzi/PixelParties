@@ -45,6 +45,16 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
 //   KARTENSTATUS: Ob eine Karte „forbidden“/gebannt ist, spielt in der Kampagne keine Rolle (das gilt erst für ein viel später
 //     erfundenes Custom-Format). Niemand bezieht sich darauf, weder im Text noch in Notizen.
+//   STUDIENGÄNGE (Jacke = Studiengang, Kragen = Wohnheim), grob gleich groß, Competitive Play etwas größer. First-Years:
+//     rot (Competitive Play): Rowan, Nathan, Baylee, Ed, Inya, Rana, Freya, Fiona, Tobias, Eberhart, Sunny, Georgie, Gideon,
+//       Magnus, Ashton, Branden · gold (Game Design): Livvie, Hedda, Freddie, Jun-ho, Eloise, Teobalt (eigener langer roter
+//       Mantel über der goldenen Jacke), Leona, Dmitri, Trixie, Mikoto, Viktor · schwarz (Auxiliary): Maisie, Pippa, Victoria,
+//       Cas, Marit, Anni, Jessica, Noor (Schiedsrichter), Tomi, Sammy, Rafa (alle drei Event-Team).
+//     Trixie will viele neue Insekten-Archetypes erfinden. Viktor zeichnet (Karten, Illustration) und wird eng mit Eloise
+//     befreundet (Daten: viktor ↔ eloise „friends“). Sammy will epische, düstere Events gestalten.
+//   SAMMYS TURNIER (Woche 2 oder später, längerer Nebenstrang): Sammy plant ein großes Turnier mit Sonderregeln und besonderen
+//     Preisen. Rowan kann ihm auf verschiedene Weise helfen und Leute für ihn gewinnen: Teobalt für die Regeln, Tomi für die
+//     Preise, Rafa fürs Catering usw., dazu interessierte Spieler. Wen Rowan gewinnt und wie, prägt das Turnier.
 //   ROMANZEN: Die ersten romanceable Figuren sind Pippa, Fiona und Marit. Marit (Rare Hall, Kommentatorin, spricht für die letzte
 //     Reihe, die echte leise Stimme rutscht nur selten durch; Angst: Stille) ist auf ihre bombastische Art gern dabei und soll in
 //     Szenen mit vielen Leuten oft als Randfigur auftauchen.
