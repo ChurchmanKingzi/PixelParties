@@ -440,7 +440,7 @@ scene("chat_fiona_ferry", {
         { time: 3 }
       ] },
       // Fiona trägt den Namen eines Heroes: „Fiona, the Princess of Blackport“ und ihre aufgestiegene Fassung „Fiona, the Empty
-      // Vessel of a Forgotten Sorceress“ (beide im Format gebannt). Spätere Szenen (Truth or Dare) greifen fiona_blackport auf.
+      // Vessel of a Forgotten Sorceress“. Spätere Szenen (Truth or Dare) greifen fiona_blackport auf.
       { text: "\"Fiona. Like the Princess of Blackport?\"", when: (s)=>!!s.flags["met_fiona"] && !s.flags["chat_fiona_ferry_4"], steps: [
         { say: "rowan", text: "\"Fiona. Like the Princess of Blackport?\"" },
         { text: "For the first time she looks at you as if you might be worth a whole answer." },
@@ -449,10 +449,10 @@ scene("chat_fiona_ferry", {
         { say: "fiona", text: "\"Then the Ascended card came out. The Empty Vessel. A princess with a forbidden book, and somebody else's voice coming out of her.\"" },
         { say: "fiona", text: "\"If they were going to call me a princess, I would at least be the possessed one. The lace dates from that week.\"" },
         { choice: [
-          { text: "\"Both of them are banned now, you know.\"", hint: "You know the list", steps: [
-            { say: "rowan", text: "\"Both of them are banned now, you know.\"" },
-            { say: "fiona", text: "\"Both of me. Yes.\" The corner of her mouth goes, and is put firmly back. \"I have never been so flattered by a committee.\"" },
-            AFF("fiona", 2, "Knew the banlist")
+          { text: "\"The Vessel's a monster. Every Spell in the deck, three levels cheaper.\"", hint: "You know the card", steps: [
+            { say: "rowan", text: "\"The Vessel's a monster. Every Spell in the deck, three levels cheaper.\"" },
+            { say: "fiona", text: "\"So I am told.\" The corner of her mouth goes, and is put firmly back. \"People have always liked her better than the princess. I try not to take it personally.\"" },
+            AFF("fiona", 2, "Knew the card")
           ] },
           { text: "\"Does anybody still call you Princess?\"", steps: [
             { say: "rowan", text: "\"Does anybody still call you Princess?\"" },
@@ -469,7 +469,7 @@ scene("chat_fiona_ferry", {
             { flag: "fiona_blackport_vessel" }
           ] }
         ] },
-        NOTE("fiona", "Shares her name with the Hero Fiona, the Princess of Blackport. At fourteen her school called her Princess; she chose to be the possessed Ascended Fiona instead, and the lace dates from that week. Both cards are banned, which she takes as a compliment."),
+        NOTE("fiona", "Shares her name with the Hero Fiona, the Princess of Blackport. At fourteen her school called her Princess; she chose to be the possessed Ascended Fiona instead, and the lace dates from that week."),
         { flag: "fiona_blackport" },
         { flag: "chat_fiona_ferry_4" },
         { time: 3 }

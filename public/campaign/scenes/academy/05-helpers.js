@@ -41,8 +41,10 @@ const STORY = helpers.story, DATA = helpers.data;
 //     beiden zusammenbringen kann (oder es lässt). Daten: teobalt → freddie „crush“ (ersetzt den früheren stillen Schwarm für
 //     Noor, der gestrichen ist). Entwurf im Playtest (44-teobalt-freddie.js), noch nicht im Repo.
 //   FIONA trägt als einzige Figur den Namen eines Heroes: „Fiona, the Princess of Blackport“ und die aufgestiegene, besessene
-//     „Fiona, the Empty Vessel of a Forgotten Sorceress“ (beide im Format gebannt). Das ist ein Thema: auf der Fähre (Hub,
+//     „Fiona, the Empty Vessel of a Forgotten Sorceress“. Das ist ein Thema: auf der Fähre (Hub,
 //     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
+//   KARTENSTATUS: Ob eine Karte „forbidden“/gebannt ist, spielt in der Kampagne keine Rolle (das gilt erst für ein viel später
+//     erfundenes Custom-Format). Niemand bezieht sich darauf, weder im Text noch in Notizen.
 //   CLUBS: Clubs gehören zur Academy. Die Club Fair ist an Tag 3 auf dem Quad (Stände um den Brunnen). Rowan wird Mitglied im
 //     Battle Team, das die Academy bei offiziellen Events vertritt; Leitung: Lilia Mann (4. Jahr, Spectral; Tryouts laut
 //     Kalender). Weitere Clubs dürfen frei erfunden und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
