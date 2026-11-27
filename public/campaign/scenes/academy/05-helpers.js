@@ -24,6 +24,9 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Danach sind weitere Nächte möglich, nichts Festes: Sie sagt ihm sinngemäß, dass ihr Bett für ihn immer offen ist. Je
 //     länger es geht, desto offener und forscher flirtet sie mit ihm (auch vor anderen), nicht weil sie mit ihm zusammen sein
 //     will, sondern weil es ihr Spaß macht und er so gut darauf reagiert. Entwurf im Playtest (41-freya-evenings.js), noch nicht im Repo.
+//     Nathan hält es geheim (darf aber anspielen), bis es auf Pfaden mit vielen Nächten durch Freyas offenes Flirten und Rowans
+//     immer positivere Reaktionen ein offenes Geheimnis wird (freya_open_secret). Das birgt großes Konfliktpotenzial, falls Rowan
+//     eine Romanze mit einer romanceable Figur (Pippa, Fiona …) eingeht: deren Stränge sollen freya_nights/freya_open_secret lesen.
 //   Fiona — organisiert „to uncover the darkest secrets of everyone on the island“ eine große Runde Truth or Dare. Teilnahme
 //     ganz freiwillig; Rowan kann jede teilnehmende Figur fragen (Truth) oder herausfordern (Dare), und wird selbst gefragt.
 //     Verschiedene Verläufe geben Zuneigung oder kosten sie (zu weit gebohrt, Geheimnis verraten, Mut bewiesen …).
@@ -37,6 +40,9 @@ const STORY = helpers.story, DATA = helpers.data;
 //     plant Zufälle; er ist in ihrer Nähe noch genauer als sonst). Optionale Szenen und Entscheidungen, in denen Rowan die
 //     beiden zusammenbringen kann (oder es lässt). Daten: teobalt → freddie „crush“ (ersetzt den früheren stillen Schwarm für
 //     Noor, der gestrichen ist). Entwurf im Playtest (44-teobalt-freddie.js), noch nicht im Repo.
+//   FIONA trägt als einzige Figur den Namen eines Heroes: „Fiona, the Princess of Blackport“ und die aufgestiegene, besessene
+//     „Fiona, the Empty Vessel of a Forgotten Sorceress“ (beide im Format gebannt). Das ist ein Thema: auf der Fähre (Hub,
+//     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
 //   CLUBS: Clubs gehören zur Academy. Die Club Fair ist an Tag 3 auf dem Quad (Stände um den Brunnen). Rowan wird Mitglied im
 //     Battle Team, das die Academy bei offiziellen Events vertritt; Leitung: Lilia Mann (4. Jahr, Spectral; Tryouts laut
 //     Kalender). Weitere Clubs dürfen frei erfunden und mit NPCs besetzt werden. Ein „Freshman Cup“ um Tag 18 ist gesetzt.
