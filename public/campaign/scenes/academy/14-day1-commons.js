@@ -482,8 +482,10 @@ scene("welcome_supper", {
     { say: "maisie", text: "\"Maisie Voltage! Four! It's meant to hum like that, I swear.\"" },
     {
       say: "freddie",
-      text: "\"Winifred Camara. Freddie. Four. Five brothers. Ask me anything. I have seen everything and I am unembarrassed by all of it.\""
+      text: "\"Winifred Camara. Freddie. Not a bungalow, the tower. They've a dining room up there where a man pours your water. I came down for the noise.\""
     },
+    { say: "odalys", text: "\"Then you eat here. Plate for the tower! One true thing!\"" },
+    { say: "freddie", text: "\"Five brothers. I have seen everything and I am unembarrassed by all of it.\"" },
     { say: "fiona", text: "\"Fiona Blackwood. Four.\"" },
     { text: "Low, slow, a candle placed on every syllable." },
     { say: "fiona", text: "\"Things that are thrown away come back.\"" },
@@ -581,9 +583,6 @@ scene("welcome_supper", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["sammy"] = s.notes["sammy"] || []); if (a.indexOf("The Academy lists him as Samuel Counts. He goes by Sammy, and flinches at the full name.") < 0) a.push("The Academy lists him as Samuel Counts. He goes by Sammy, and flinches at the full name."); }
     },
     { flag: "rel_tobias_dmitri" },
-    { flag: "rel_maisie_freddie" },
-    { flag: "rel_fiona_freddie" },
-    { flag: "rel_leona_freddie" },
     {
       say: "odalys",
       text: "\"And last, as in the list, the Wildcard. Stand up, mijo. Everybody is looking at you anyway.\""
@@ -742,8 +741,8 @@ scene("welcome_supper", {
     },
     { text: "Down the left side: Freya, very upright, very cool, hair in a pale braid, saying nothing to anyone with great elegance. Next to her Hedda, who is inspecting the stew with a fork and the narrowed eyes of an investigator." },
     { text: "Next to her Trixie, who has something alive in a matchbox and is whispering to it. \"Don't tell Mama,\" she tells you. \"It's only a beetle.\"" },
-    { text: "Further down, from bungalow 4: Freddie, hair still wet, has taken two helpings and is explaining the anatomy of an octopus to an uninterested bench." },
-    { text: "Maisie is taking the pepper mill apart. Fiona, in black lace, is saying grace in a very deep voice. Leona, ordinary, pleasant, forgettable, has chosen the seat nearest the door." },
+    { text: "Further down, the one white collar at the table: Freddie, hair still wet, has taken two helpings and is explaining the anatomy of an octopus to an uninterested bench." },
+    { text: "From bungalow 4: Maisie is taking the pepper mill apart. Fiona, in black lace, is saying grace in a very deep voice. Leona, ordinary, pleasant, forgettable, has chosen the seat nearest the door." },
     {
       text: "From bungalow 5: Ed is leaning back on two legs of his chair asking Mama which part of the island is forbidden. Tomi is already trading something under the table, quietly, with a boy you do not recognise. Viktor Hale is not here."
     },

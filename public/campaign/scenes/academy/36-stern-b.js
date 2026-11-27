@@ -803,7 +803,7 @@ scene("ferry_freddie", {
   steps: [
     { when: (s)=>!!s.flags["met_freddie"], jump: "again" },
     { text: "At the stern rail a girl with a mop of wet red hair is hanging over the wake by her waist, bare feet hooked round the lowest bar, peering at the water. Diving goggles are pushed up on her forehead." },
-    { text: "A gold jacket with a plain grey collar hangs open over a swimsuit; below it she is wearing the bottom half of a wetsuit, with its empty arms knotted round her middle. A towel is tied to the rail beside her so that the wind cannot have it." },
+    { text: "A gold jacket with a white, gold-edged collar hangs open over a swimsuit; below it she is wearing the bottom half of a wetsuit, with its empty arms knotted round her middle. A towel is tied to the rail beside her so that the wind cannot have it." },
     { text: "A frond of green algae is plastered in her hair. She is, with great concentration, talking to the sea." },
     { say: "freddie", alias: "Girl with goggles on her head", text: "\"Come on — come ON — I saw you, you big brown — that's a ray. That's a *ray*. Hey! Jacketless! Is that a ray?\"" },
     { choice: [
@@ -1021,9 +1021,10 @@ scene("chat_freddie", {
           ] }
         ] },
         { say: "freddie", text: "\"It's the one place nobody was ever ahead of me in the queue, the water. You get in, and it's all yours, right to the edges.\"" },
-        { say: "freddie", text: "\"Bungalow four, my letter says. Four beds.\" She counts them off on her fingers and beams. \"*Four*. I'm going to have a shelf.\"" },
+        { say: "freddie", text: "\"Spectral Tower, my letter says. A suite. One bed, and it's *mine*.\" She beams. \"I think they've muddled me with somebody. My portfolio was crabs. I'm going to have a shelf.\"" },
         { flag: "chat_freddie_1" },
         NOTE("freddie", "Middle of five brothers, three older and two younger. One bathroom, no shame. The sea was the one place that was all hers."),
+        NOTE("freddie", "Placed in Spectral Tower, a suite to herself: the first room she has ever had alone. Suspects they muddled her with somebody, because her portfolio was crabs."),
         { time: 3 }
       ] },
       { text: "\"The other swimmer, on the rail with the towel. Have you two met?\"", when: (s)=>!!s.flags["met_sunny"] && !s.flags["chat_freddie_4"], steps: [
@@ -1455,13 +1456,13 @@ scene("isle_freddie", {
   steps: [
     { when: (s)=>!!s.flags["isle_freddie_done"], jump: "later" },
     { text: "In the shallows behind the bungalow row somebody is floating face down in a swimsuit and diving goggles, a mop of red hair spread out on the water like weed." },
-    { text: "A gold jacket with a grey collar hangs from a bungalow stilt, well above the tide line. As you reach the edge she comes up all at once, streaming, with both hands cupped round something." },
+    { text: "A gold jacket with a white, gold-edged collar hangs from a bungalow stilt, well above the tide line. As you reach the edge she comes up all at once, streaming, with both hands cupped round something." },
     { when: (s)=>!s.flags["met_freddie"], jump: "first" },
     { when: (s)=>!!s.flags["freddie_held_jacket"], say: "freddie", text: "\"Jacket man! Perfect. Hold out your hand.\"" },
     { when: (s)=>!s.flags["freddie_held_jacket"], say: "freddie", text: "\"Rowan! Perfect. Hold out your hand.\"" },
     { jump: "common" },
     { label: "first" },
-    { say: "freddie", alias: "Girl with goggles on", text: "\"You! Wildcard! Vance! Perfect. I'm Freddie — Winifred Camara, but I answer to anything but Winifred — bungalow four, Game Design, and I need a hand. Literally. Hold yours out.\"" },
+    { say: "freddie", alias: "Girl with goggles on", text: "\"You! Wildcard! Vance! Perfect. I'm Freddie — Winifred Camara, but I answer to anything but Winifred — Spectral Tower, apparently, Game Design, and I need a hand. Literally. Hold yours out.\"" },
     MET("freddie", "Freddie Camara"),
     NOTE("freddie", "Game Design student. Means to draw every creature in the sea as a card."),
     { label: "common" },
@@ -1480,10 +1481,12 @@ scene("isle_freddie", {
         { say: "freddie", text: "\"I should hope so, he's just bitten me.\" She opens her hands a crack. A shell, and then legs. \"Hermit crab. Bad-tempered. Lovely.\"" }
       ] }
     ] },
-    { say: "freddie", text: "\"He lives under bungalow four. Under *my* bungalow. I've been here three hours and there's a crab at my address.\"" },
+    { say: "freddie", text: "\"He lives under bungalow four. I've been on this island three hours and I've already got a friend with an address.\"" },
     { text: "She has the rubber notebook out of nowhere and is drawing with the crab balanced on the back of her other hand. He comes out, in six lines, wearing his shell at an angle." },
-    { say: "freddie", text: "\"Four beds in there. One takes things to bits, one says prayers over hers in a very low voice, and one's so nice I've forgotten her name twice. And nobody has drawn on anything of mine yet. It's eerie.\"" },
-    { when: (s)=>!!s.flags["chat_freddie_1"], say: "freddie", text: "\"And I've got the *shelf*, Rowan. I put one shell on it and stood and looked at it.\"" },
+    { say: "freddie", text: "\"They've given me a whole suite up in the tower. One bed, a bath like a rowing boat, and a pool on the terrace. With *corners*. As if the sea needed corners.\"" },
+    { say: "freddie", text: "\"So I come down here, where it hasn't got any. And nobody up there has drawn on anything of mine yet. It's eerie.\"" },
+    NOTE("freddie", "Lives in Spectral Tower but swims behind the Commons row, because the tower pool has corners."),
+    { when: (s)=>!!s.flags["chat_freddie_1"], say: "freddie", text: "\"And I've got the *shelf*, Rowan. Four shelves. I put one shell on each and stood and looked at them.\"" },
     { when: (s)=>!!s.flags["freddie_jumped"], say: "freddie", text: "\"The captain had his word with me, by the way. Regulation four-oh-one. I've read it now. It really is very short.\"" },
     { when: (s)=>!!s.flags["freddie_swim_in"], say: "freddie", text: "\"About swimming round the island. I've had a look from the end of the row. It's bigger than it was from the boat. So: two days, and we take sandwiches.\"" },
     { choice: [
@@ -1640,4 +1643,4 @@ scene("isle_rafa", {
 });
 
 
-/* arrival_stern: unchanged from 19-19-ferry-arrival.js except Freddie's jacket (gold, grey collar) */
+/* arrival_stern: unchanged from 19-19-ferry-arrival.js except Freddie's jacket (gold, Spectral collar) */

@@ -397,7 +397,7 @@ scene("deck_collars", {
       text: "Then collars, which are the interesting part. The white-and-gold ones, Spectral, stand a little apart from the others without seeming to try. The blue ones, Rare, are scattered through the crowd. The grey ones, the Commons, hold their bags in both arms."
     },
     {
-      text: "You count seven white, twelve blue, eighteen grey. That makes thirty-seven, and the one without a collar at all is the thirty-eighth."
+      text: "You count eight white, twelve blue, seventeen grey. That makes thirty-seven, and the one without a collar at all is the thirty-eighth."
     },
     { text: "Rank, printed on every shoulder. You wonder how long it takes for people to stop reading it." },
     { flag: "counted_collars" },

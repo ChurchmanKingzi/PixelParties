@@ -437,7 +437,7 @@ scene("quad_address", {
     { text: "A single, crisp, unhurried syllable at a time." },
     {
       say: "octavia",
-      text: "\"Santa, Georgie. Montclair, Jessica. Brandt, Anneliese. Beaumont-Lyle, Ashton. Pryce, Gideon. Prospero, Magnus. Sunflower, Branden.\""
+      text: "\"Santa, Georgie. Montclair, Jessica. Brandt, Anneliese. Beaumont-Lyle, Ashton. Pryce, Gideon. Prospero, Magnus. Camara, Winifred. Sunflower, Branden.\""
     },
     { when: (s)=>!(!!s.flags["met_branden"]), jump: "next_4" },
     {
@@ -449,6 +449,7 @@ scene("quad_address", {
       text: "From somewhere near knee height a high voice shouts \"HERE!\" and then, a moment later, \"AND ALSO I'M HERE!\""
     },
     { label: "end_3" },
+    { when: (s)=>!!s.flags["met_freddie"], text: "Somewhere behind you a wet voice says, \"*Me?* Up *there?*\" and a girl with seaweed in her hair goes up the hill backwards, still looking at the sea." },
     { when: (s)=>!(!!s.flags["met_gideon"]), jump: "next_7" },
     { text: "From somewhere to your left, a thin, courteous voice murmurs, \"Here.\" You do not turn round." },
     { label: "next_7" },
@@ -478,7 +479,7 @@ scene("quad_address", {
       text: "\"Bungalows one through eight. Bungalow two: Nordlicht, Freya. Njord, Hedda. Hollis, Beatrix.\""
     },
     { say: "octavia", text: "\"Bungalow three: Bell, Inya. Thana, Olivia. Marika, Rana.\"" },
-    { say: "octavia", text: "\"Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona. Camara, Winifred.\"" },
+    { say: "octavia", text: "\"Bungalow four: Voltage, Maisie. Blackwood, Fiona. Helical, Leona.\"" },
     { say: "octavia", text: "\"Bungalow five: Venture, Ed. Reyes, Tomás. Hale, Viktor.\"" },
     { say: "octavia", text: "\"Bungalow six: Counts, Samuel. Crowe, Tobias. Volkov, Dmitri.\"" },
     {

@@ -843,7 +843,7 @@ scene("arrival_stern", {
       run: (s)=>{ s.notes = s.notes || {}; const a = (s.notes["sunny"] = s.notes["sunny"] || []); if (a.indexOf("Lifeguard on a sports scholarship. Says exactly what she thinks.") < 0) a.push("Lifeguard on a sports scholarship. Says exactly what she thinks."); }
     },
     { label: "end_6" },
-    { when: (s)=>!s.flags["met_freddie"], text: "A girl with wet red hair and diving goggles pushed up on her forehead, a gold jacket with a plain grey collar worn open over a swimsuit, is climbing the stern rail." },
+    { when: (s)=>!s.flags["met_freddie"], text: "A girl with wet red hair and diving goggles pushed up on her forehead, a gold jacket with a white, gold-edged collar worn open over a swimsuit, is climbing the stern rail." },
     { when: (s)=>!!s.flags["met_freddie"], text: "Freddie is climbing the stern rail: wet red hair, diving goggles pushed up on her forehead, the gold jacket open over her swimsuit." },
     { when: (s)=>!(!!s.flags["met_freddie"]), jump: "next_10" },
     { say: "freddie", text: "\"Rowan! Jacketless! Hold this!\"" },

@@ -45,6 +45,12 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Flag fiona_blackport), in Truth or Dare, und es berührt ihre Angst, nur noch die Rolle zu sein (das leere Gefäß).
 //   KARTENSTATUS: Ob eine Karte „forbidden“/gebannt ist, spielt in der Kampagne keine Rolle (das gilt erst für ein viel später
 //     erfundenes Custom-Format). Niemand bezieht sich darauf, weder im Text noch in Notizen.
+//   WOHNEN (First-Years, je Bungalow genau drei): B1 Mama Odalys' Küche · B2 Freya, Hedda, Trixie · B3 Inya, Livvie, Rana ·
+//     B4 Maisie, Fiona, Leona · B5 Viktor, Tomi, Ed · B6 Sammy, Tobias, Dmitri · B7 Rowan, Nathan, Baylee · B8 Wäscherei.
+//     Rare Hall (Zweibettzimmer): 101 Eberhart+Mikoto · 102 Teobalt+Jun-ho · 103 Cas+Rafa · 201 Marit+Eloise · 202 Noor+Sunny ·
+//     203 Pippa+Victoria. Spectral Tower (Einzelsuiten): Georgie, Jessica, Anni, Ashton, Gideon, Magnus, Freddie, Branden.
+//     Freddie hat als einzige der Fähre eine Suite für sich (ihr erstes eigenes Zimmer), schwimmt aber hinter der Commons-Reihe.
+//     Kragen-Zählung auf der Fähre: 8 weiß, 12 blau, 17 grau, plus Rowan ohne Jacke.
 //   STUDIENGÄNGE (Jacke = Studiengang, Kragen = Wohnheim), grob gleich groß, Competitive Play etwas größer. First-Years:
 //     rot (Competitive Play): Rowan, Nathan, Baylee, Ed, Inya, Rana, Freya, Fiona, Tobias, Eberhart, Sunny, Georgie, Gideon,
 //       Magnus, Ashton, Branden · gold (Game Design): Livvie, Hedda, Freddie, Jun-ho, Eloise, Teobalt (eigener langer roter
