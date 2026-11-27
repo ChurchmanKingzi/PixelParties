@@ -83,6 +83,8 @@ const STORY = helpers.story, DATA = helpers.data;
 //     Zufallsbegegnung, keine Nebenrolle, kein Gesicht in der Menge. Ihr erster Auftritt ist ein Ereignis — sie kommt selbst,
 //     um Rowan fürs Battle Team zu holen, sobald er sich einen Namen gemacht hat. Bis dahin höchstens von Weitem (eine Gestalt
 //     auf der Klippe, ein leerer Platz in der ersten Reihe, ihr Name auf der Tafel).
+//     Rekrutierung = „Captain's Pick“ (vom Autor abgesegnet): Teamplatz ohne Tryouts, den nur die Kapitänin vergibt; sie kommt
+//     dafür an einem Abend Mo–Do selbst zur Commons-Reihe (Details: Bibel, lilia_e1). Wochenenden: Kaboom Pro League, vom Campus weg.
 //   GIDEON darf frei eingesetzt werden, solange er konsistent bleibt: sein verborgener Schwarm für Fiona zeigt sich nur darin,
 //     dass er sie nie ansieht und über ihre Bewunderer (Sammy) spottet.
 //   STRÄNGE werden konsequent fortgeführt: was eine Szene anstößt (z. B. Pippas „golden hour“ aus Truth or Dare, Pippa soll
