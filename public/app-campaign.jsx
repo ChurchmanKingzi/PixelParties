@@ -420,6 +420,22 @@ function cmpApplyAnte(s, card, youWon) {
 //                 from:'08:00', to:'12:00', daypart:'evening',
 //                 duelWon:'ethan_1', visited:'dock', var:{name:wert} }
 //   Array       alle Bedingungen müssen zutreffen
+// Frei wählbarer Spielername: Eine Kampagne kann in der Welt einen Platzhalter-Namen festlegen,
+//   world.player = { first: 'Rowan', last: 'Vance', firstVar: 'pn', lastVar: 'pl' }.
+// Die Szenen schreiben den Platzhalter; angezeigt wird der Name aus state.vars (auch GROSS geschrieben und als „Vance, R.“).
+function cmpPlayerName(world, state, text) {
+  const p = world && world.player;
+  if (!p || typeof text !== 'string' || !state || !state.vars) return text;
+  const f = state.vars[p.firstVar || 'pn'] || p.first, l = state.vars[p.lastVar || 'pl'] || p.last;
+  if (f === p.first && l === p.last) return text;
+  const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let t = text;
+  if (p.first && p.last) t = t.replace(new RegExp(esc(p.last) + ', ' + esc(p.first.charAt(0)) + '\\.', 'g'), l + ', ' + f.charAt(0).toUpperCase() + '.');
+  if (p.first) t = t.replace(new RegExp('\\b' + esc(p.first.toUpperCase()) + '\\b', 'g'), f.toUpperCase()).replace(new RegExp('\\b' + esc(p.first) + '\\b', 'g'), f);
+  if (p.last) t = t.replace(new RegExp('\\b' + esc(p.last.toUpperCase()) + '\\b', 'g'), l.toUpperCase()).replace(new RegExp('\\b' + esc(p.last) + '\\b', 'g'), l);
+  return t;
+}
+
 function cmpCond(state, when) {
   if (when == null) return true;
   if (typeof when === 'function') { try { return !!when(state); } catch (e) { console.error('[Kampagne] Bedingung warf:', e); return false; } }
@@ -1672,8 +1688,8 @@ function CampaignScreen() {
     const world = stateRef.current && story ? story.world : null;
     const castEntry = (world && world.cast && l.speaker) ? world.cast[l.speaker] : null;
     const shown = {
-      speaker: l.name || (castEntry ? castEntry.name : (l.speaker || null)),
-      text: l.text,
+      speaker: cmpPlayerName(world, stateRef.current, l.name || (castEntry ? castEntry.name : (l.speaker || null))),
+      text: cmpPlayerName(world, stateRef.current, l.text),
       think: l.think,
       side: l.side || (castEntry && castEntry.side) || 'left',
       speed: l.speed,
@@ -1688,9 +1704,12 @@ function CampaignScreen() {
   }, [story]);
 
   const choose = useCallback((c) => {
+    const world = story ? story.world : null, st = stateRef.current;
+    if (world && world.player) c = Object.assign({}, c, { prompt: cmpPlayerName(world, st, c.prompt),
+      options: (c.options || []).map(o => Object.assign({}, o, { text: cmpPlayerName(world, st, o.text) })) });
     setChoice(c);
     return new Promise(res => { waiterRef.current = (idx) => { setChoice(null); res(idx); }; });
-  }, []);
+  }, [story]);
 
   const addTime = useCallback((min) => {
     if (!min) return;
