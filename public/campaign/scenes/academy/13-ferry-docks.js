@@ -449,7 +449,7 @@ scene("quad_address", {
       text: "From somewhere near knee height a high voice shouts \"HERE!\" and then, a moment later, \"AND ALSO I'M HERE!\""
     },
     { label: "end_3" },
-    { when: (s)=>!!s.flags["met_freddie"], text: "Somewhere behind you a wet voice says, \"*Me?* Up *there?*\" and a girl with seaweed in her hair goes up the hill backwards, still looking at the sea." },
+    { when: (s)=>!!s.flags["met_freddie"], text: "Somewhere behind you a wet voice sings out, \"That's me! The crab portfolio!\" and Freddie goes up the hill backwards, still dripping, waving at the sea as if it were seeing her off." },
     { when: (s)=>!(!!s.flags["met_gideon"]), jump: "next_7" },
     { text: "From somewhere to your left, a thin, courteous voice murmurs, \"Here.\" You do not turn round." },
     { label: "next_7" },
