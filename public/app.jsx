@@ -754,7 +754,7 @@ function ProfileScreen() {
   const changePassword = async () => {
     if (!oldPw || !newPw) { notify('Fill in all password fields', 'error'); return; }
     if (newPw !== confirmPw) { notify('New passwords do not match', 'error'); return; }
-    if (newPw.length < 3) { notify('New password must be 3+ characters', 'error'); return; }
+    if (newPw.length < 8) { notify('New password must be 8+ characters', 'error'); return; }
     setPwSaving(true);
     try {
       await api('/profile/password', { method: 'POST', body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }) });

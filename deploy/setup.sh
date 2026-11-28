@@ -149,6 +149,8 @@ else
 fi
 
 if grep -q 'DEINE-MAILADRESSE' /etc/caddy/Caddyfile; then
+  printf '\033[1;33m  In /etc/caddy/Caddyfile steht noch DEINE-MAILADRESSE — bitte die Kontakt-Adresse fuer Let'"'"'s Encrypt eintragen.\033[0m\n'
+fi
 
 # ── 10. SSH absichern — zuletzt und nur mit Netz ──────────────
 if [ -s "$ADMIN_KEYS" ]; then

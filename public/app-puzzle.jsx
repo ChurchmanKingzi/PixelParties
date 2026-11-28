@@ -964,7 +964,8 @@ function PuzzleCreator() {
       const ghost = document.createElement('div');
       ghost.className = 'pz-touch-drag-ghost';
       const img = cardImageUrl(td.cardName);
-      ghost.innerHTML = img ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:3px;" />` : `<span style="font-size:8px;color:#fff;">${td.cardName}</span>`;
+      const _esc = (v) => String(v == null ? '' : v).replace(/[&<>"'`]/g, c => '&#' + c.charCodeAt(0) + ';');
+      ghost.innerHTML = img ? `<img src="${_esc(img)}" style="width:100%;height:100%;object-fit:cover;border-radius:3px;" />` : `<span style="font-size:8px;color:#fff;">${_esc(td.cardName)}</span>`;
       document.body.appendChild(ghost);
       td.ghost = ghost;
       setDragCardName(td.cardName);

@@ -91,6 +91,9 @@ function allTutorialIds(dir = TUTORIAL_DIR) {
 function parseClientClock(data, serverNow = Date.now()) {
   const now = Number(data && data.now), tz = Number(data && data.tz);
   if (!Number.isFinite(now) || !Number.isFinite(tz) || Math.abs(tz) > 14 * 60) return null;
+  // Eine Uhr, die um mehr als 6 h von der Serverzeit abweicht, ist falsch gestellt oder gefaelscht (Sicherheitsaudit 25.11.: `client_clock {now: 31.10.}` schaltete den
+  // Halloween-Skin jederzeit frei). Dann gilt keine Client-Uhr; die Zeitzone allein deckt echte Abweichungen (UTC-12 … UTC+14) weiter ab.
+  if (Math.abs(now - serverNow) > 6 * 3600 * 1000) return null;
   return { skew: now - serverNow, tz };
 }
 

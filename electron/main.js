@@ -400,7 +400,7 @@ function createWindow(withLauncher = false) {
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!isGameUrl(url)) {
-      shell.openExternal(url);
+      openExternalSafe(url);
       return { action: 'deny' };
     }
     return { action: 'allow' };
@@ -409,7 +409,7 @@ function createWindow(withLauncher = false) {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!isGameUrl(url)) {
       event.preventDefault();
-      shell.openExternal(url);
+      openExternalSafe(url);
     }
   });
 
@@ -573,6 +573,14 @@ ipcMain.on('pp-launcher:fullscreen', (e) => {
   if (fromLauncher(e) && mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
 });
 ipcMain.on('pp-launcher:quit', (e) => { if (fromLauncher(e)) app.quit(); });
+
+// Nur http(s)-Links an das System weiterreichen (Sicherheitsaudit 25.11.): `shell.openExternal` mit `file:`/eigenen Protokollen kann Programme starten.
+function openExternalSafe(url) {
+  try {
+    const u = new URL(String(url));
+    if (u.protocol === 'https:' || u.protocol === 'http:') shell.openExternal(u.toString());
+  } catch { /* keine gueltige URL: nichts oeffnen */ }
+}
 
 function isGameUrl(url) {
   try {
