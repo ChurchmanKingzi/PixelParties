@@ -552,14 +552,22 @@
   /** TEST (Al, 23.10.): Kontur der Kartennamen in einem dunkleren Ton der jeweiligen Karte — aus der Namensplatte des Rahmens abgetastet
    *  (mittlerer Farbwert eines Streifens am Rand der Platte, wo selten Schrift steht), auf 60 % Helligkeit abgedunkelt. Schalter: `OPT.nameOutline`
    *  (Standard an; `?namenkontur=0` in der Adresse schaltet aus). */
-  function nameOutlineColor(ctx, sup) {
+  // Das Ergebnis haengt nur vom Rahmen (Typ) ab, solange die Kunst die Namensplatte nicht ueberdeckt — dann einmal je Typ merken (`key`), statt bei JEDER Karte
+  // fuenfmal zu lesen (Chrome: „Multiple readback operations using getImageData … willReadFrequently", 237 Meldungen beim Laden). Wo die Kunst die Platte
+  // ueberdeckt (Fullart), bleibt es bei einer Messung je Karte — aber als EIN Streifen statt fuenf Einzelpixel.
+  const _outlineMemo = new Map();
+  function nameOutlineColor(ctx, sup, key) {
+    if (key != null && _outlineMemo.has(key)) return _outlineMemo.get(key);
     try {
-      const x0 = sup ? 56 : 108, ys = [62, 70, 78, 86, 94];
-      const px = ys.map(y => Array.from(ctx.getImageData(x0, y, 1, 1).data));
+      const x0 = sup ? 56 : 108, ys = [62, 70, 78, 86, 94], y0 = ys[0];
+      const strip = ctx.getImageData(x0, y0, 1, ys[ys.length - 1] - y0 + 1).data;   // 1 Pixel breit, 33 hoch: eine einzige Rueckleseoperation
+      const px = ys.map(y => { const o = (y - y0) * 4; return [strip[o], strip[o + 1], strip[o + 2], strip[o + 3]]; });
       const hell = c => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
       px.sort((a, b) => hell(a) - hell(b));
       const m = px[Math.floor(px.length / 2)];
-      return 'rgb(' + [0, 1, 2].map(i => Math.round(m[i] * 0.6)).join(',') + ')';
+      const farbe = 'rgb(' + [0, 1, 2].map(i => Math.round(m[i] * 0.6)).join(',') + ')';
+      if (key != null) _outlineMemo.set(key, farbe);
+      return farbe;
     } catch (e) { return null; }
   }
   function nameColor(s) {
@@ -751,7 +759,7 @@
     const fillFor = (top, height) => spec.nameGold ? goldFill(ctx, top, height) : supGold ? muenzGoldFill(ctx, top, height) : nameColor(spec);
     // Artifacts: dunkle Schrift auf heller Platte — dort keine Kontur; nur die goldene Schrift der Super-Rare-Artifacts (Orange auf Hellgelb) bekommt eine deutliche, dunkle Kontur
     const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
-    const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
+    const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup, isFullart(t) ? null : t)) : null;
     const nameOutF = supArtiGold ? 0.7 : 0.5;
     if (!textOnly && !spec.noName) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
