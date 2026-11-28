@@ -31,7 +31,7 @@
   const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { nameOutline: !/[?&]namenkontur=0/.test(typeof location !== 'undefined' ? location.search : ''), boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { nameOutline: !/[?&]namenkontur=0/.test(typeof location !== 'undefined' ? location.search : ''), boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true, boxMemo: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -160,8 +160,20 @@
   const STATUS_DISTINCT = 2.2, STATUS_DISTINCT_AUFGEHELLT = 2.6, STATUS_DUNKEL_TRAEGT = 1.6, STATUS_EDGE = 3;   // Mindestabstand des hellen Tons zum Untergrund; des aufgehellten Tons auf gleichfarbigem Untergrund; ab diesem Kontrast traegt der tiefe Ton das Wort selbst; Mindestkontrast der Kontur zum Untergrund
   const OUT_DARK = 'rgb(8,6,12)', OUT_LIGHT = 'rgb(255,248,232)', OUT_DARK_RGB = [8, 6, 12], OUT_LIGHT_RGB = [255, 248, 232];
   /** Mittlere Farbe der Textbox, BEVOR Text darauf kommt (Fuellung des Rahmens); null, wenn nicht lesbar (Textmaske, kein Rahmen). */
+  // Wie bei der Namenskontur (`nameOutlineColor`): Solange die Kunst die Textbox nicht ueberdeckt, haengt die Farbe nur vom Rahmen (Typ) und der Lage der Box ab —
+  // einmal messen und merken (`frameKey` setzt draw(); null bei Fullart). Spart je Karte mit Statusbegriffen eine Rueckleseoperation
+  // (Chrome: „Multiple readback operations using getImageData … willReadFrequently“).
+  let frameKey = null;
+  const _boxMemo = new Map(), _gemesseneTypen = new Set();
   function boxHintergrund(ctx, o) {
     if (TEXT_MASK) return null;
+    const key = OPT.boxMemo && frameKey != null ? frameKey + '|' + [o.left, o.top, o.width, o.height].join(',') : null;
+    if (key != null && _boxMemo.has(key)) return _boxMemo.get(key);
+    const erg = boxHintergrundMessen(ctx, o);
+    if (key != null && _boxMemo.size < 400) _boxMemo.set(key, erg);
+    return erg;
+  }
+  function boxHintergrundMessen(ctx, o) {
     try {
       const x = Math.round(o.left + o.width * 0.1), y = Math.round(o.top + o.height * 0.1);
       const w = Math.max(1, Math.round(o.width * 0.8)), h = Math.max(1, Math.round(o.height * 0.8));
@@ -727,9 +739,15 @@
   function draw(spec, art, target, textOnly) {
     if (!sprites) throw new Error('CardRender.init() fehlt');
     const t = spec.type;
+    frameKey = isFullart(t) ? null : t;   // siehe boxHintergrund / nameOutlineColor
     const cv = target || document.createElement('canvas');
     cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
+    // Fullart-Karten messen Namensplatte und Textboxen je Karte aus dem fertigen Bild (die Kunst liegt darunter, nichts laesst sich merken) — mehrere
+    // Rueckleseoperationen je Canvas: dort die Software-Leinwand waehlen (`willReadFrequently`), das beendet die Chrome-Warnung.
+    // Das erste Mal je Kartentyp wird ebenfalls gemessen (danach aus dem Merker) — auch dort die Software-Leinwand.
+    const messen = frameKey == null || !_gemesseneTypen.has(frameKey);
+    if (frameKey != null) _gemesseneTypen.add(frameKey);
+    const ctx = cv.getContext('2d', messen ? { willReadFrequently: true } : undefined);
     ctx.clearRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
 
