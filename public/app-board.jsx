@@ -1565,7 +1565,6 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
     if (window.PP_ZONE_WATCH) an.push('PP_ZONE_WATCH (Zonen-Renderstelle)');
     if (window.PP_FLIGHT_WATCH) an.push('PP_FLIGHT_WATCH (Flug-Neustarts)');
     if (an.length) console.log('%c[Diagnose] AKTIV: ' + an.join(', '), 'color:#c7855b;font-weight:bold');
-    else console.log('[Diagnose] keine Browser-Sonde aktiv — ?watch=alle an die Adresse haengen.');
   } catch (e) { /* egal */ }
 })();
 
@@ -54915,15 +54914,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // etc.). If only the first fires but nothing after, `gameState` was
       // unexpectedly null. If "emitting" fires but no server log shows up,
       // the socket is disconnected or the handler wasn't bound.
-      console.log('[handleRematch] click', {
-        hasGameState: !!gameState,
-        isCpuBattle: gameState?.isCpuBattle,
-        roomId: gameState?.roomId,
-        resultReason: gameState?.result?.reason,
-        resultIsCpuBattle: gameState?.result?.isCpuBattle,
-        socketConnected: socket?.connected,
-        socketId: socket?.id,
-      });
       if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
       if (!gameState) {
         console.error('[handleRematch] aborting — gameState is null');
@@ -54943,11 +54933,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // `change_deck` (already synced via the dropdown). CPU deck is
         // omitted — the server defaults to the previous match's CPU deck,
         // so "Rematch" means "same opponent, your chosen deck".
-        console.log('[handleRematch] emitting rematch_cpu_battle', { roomId: gameState.roomId });
         socket.emit('rematch_cpu_battle', { roomId: gameState.roomId });
         return;
       }
-      console.log('[handleRematch] emitting request_rematch (PvP)', { roomId: gameState.roomId });
       socket.emit('request_rematch', { roomId: gameState.roomId });
     } catch (err) {
       console.error('[handleRematch] threw:', err);

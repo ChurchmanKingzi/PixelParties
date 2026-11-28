@@ -1443,8 +1443,6 @@ function PlayScreen() {
       const mode = bgmSlug ? 'battle:' + bgmSlug : 'battle';
       if (window.__ppBgmLast !== mode) {
         window.__ppBgmLast = mode;
-        console.log('[bgm] Zustand: isCpuBattle =', gameState.isCpuBattle,
-          '| cpuBgm =', JSON.stringify(gameState.cpuBgm), '→ Modus', mode);
       }
       setBgmMode(mode);
     }
@@ -2929,10 +2927,6 @@ function MusicManager({ bgmMode }) {
     // weiter unten der Fallback auf das generische Kampfthema.
     const fadeIn = _bgmResolveTrack(target);
     if (!fadeIn) return;
-    if (String(target).startsWith('battle')) {
-      console.log('[bgm] switchTrack', JSON.stringify(currentTrack.current), '→',
-        JSON.stringify(target), '| src =', fadeIn.src || '(keine)');
-    }
     // While a fanfare is ducking the BGM (victory / defeat), don't
     // start ANY background music — the fanfare must play uninterrupted
     // by definition. Buffer the requested target on a global slot;

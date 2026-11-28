@@ -5913,16 +5913,20 @@ function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss, klass
       style={{ '--kachel-farbe': farbe }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {zusatz}
-      <div className="vscpu-bild" style={{ '--glanz-verzug': verzug }}>
+      {/* ★ KLICK-BUG (Random Opponent): Innen wird staendig umgebaut — das Zufalls-Portraet (`key={idx}`) alle 120 ms beim Hover, der Wuerfel (`key={wurf.n}`)
+          alle 400 ms. Ein Klick besteht aus Maus-runter und Maus-hoch; ist das Element unter dem Zeiger dazwischen ersetzt worden, kommt am Button kein
+          `click` an (mitunter zig Versuche noetig). Darum faengt der Button selbst alle Mausereignisse: der Inhalt ist rein Anzeige (`pointer-events: none`,
+          wird vererbt). Hover (`onMouseEnter/Leave`) bleibt am Button. */}
+      <div className="vscpu-bild" style={{ '--glanz-verzug': verzug, pointerEvents: 'none' }}>
         {bild(hover && !disabled)}
         <span className="vscpu-bild-vignette" aria-hidden="true" />
         <GlanzBand klasse="vscpu-glanz" />
         {stempel && <span className="vscpu-stempel">{stempel}</span>}
       </div>
-      <div className="vscpu-name-band">
+      <div className="vscpu-name-band" style={{ pointerEvents: 'none' }}>
         <div className="vscpu-name orbit-font">{name}</div>
       </div>
-      <div className="vscpu-fuss">{fuss}</div>
+      <div className="vscpu-fuss" style={{ pointerEvents: 'none' }}>{fuss}</div>
     </button>
   );
 }
@@ -6232,12 +6236,6 @@ function SingleplayerScreen() {
   // CPU battle socket listeners
   useEffect(() => {
     const onGameState = (state) => {
-      console.log('[SP game_state recv]', {
-        roomId: state?.roomId,
-        isCpuBattle: state?.isCpuBattle,
-        turn: state?.turn,
-        hasResult: !!state?.result,
-      });
       if (state.isCpuBattle) {
         cpuBattleRoom.current = state.roomId;
         setCpuBattleState(state);
@@ -6279,8 +6277,6 @@ function SingleplayerScreen() {
       const mode = cpuBattleState.cpuBgm ? 'battle:' + cpuBattleState.cpuBgm : 'battle';
       if (window.__ppBgmLast !== mode) {
         window.__ppBgmLast = mode;
-        console.log('[bgm] SP-Zustand: cpuBgm =',
-          JSON.stringify(cpuBattleState.cpuBgm), '→ Modus', mode);
       }
       setBgmMode(mode);
     }
